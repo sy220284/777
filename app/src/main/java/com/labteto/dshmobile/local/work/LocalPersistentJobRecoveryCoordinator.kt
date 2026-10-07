@@ -82,6 +82,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
             historyMode = LocalSubagentHistoryMode.ISOLATED,
             maxDepth = 1,
         )
+        validateLocalSubagentLaunchSpec(
+            LocalSubagentLaunchSpec(
+                task = task,
+                modelOverride = null,
+                maxSteps = maxSteps,
+                backgroundJobId = "pending",
+                capabilities = capabilities,
+            ),
+        )
         val payload = buildJsonObject {
             put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
             put("session_id", sessionId)
@@ -101,7 +110,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             resumeKind = "subagent_readonly",
             resumePayload = payload,
             ownerSessionId = sessionId,
-            continuable = true,
+            continuable = capabilities.continuable,
         ) { jobId, _ ->
             withContext(LocalModelRunContext(runProfile)) {
                 runner.runResult(
