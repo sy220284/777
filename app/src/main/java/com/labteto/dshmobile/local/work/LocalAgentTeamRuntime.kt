@@ -1169,7 +1169,6 @@ internal class LocalAgentTeamRuntime(
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             delay(WAIT_POLL_MS)
-            synchronizeTeamRuntime(sessionId)
             scanNext()?.let { next ->
                 return "[" + next.id + "] " + next.memberName +
                     " sequence=" + next.sequence +
