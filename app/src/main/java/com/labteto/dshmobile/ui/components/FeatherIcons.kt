@@ -191,6 +191,35 @@ internal object FeatherIcons {
     }
 
 
+    /** `message-circle` — chat/session settings. */
+    val MessageCircle: ImageVector by lazy {
+        feather("MessageCircle") {
+            moveTo(21f, 15f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, -4f, 4f)
+            horizontalLineTo(8f)
+            lineTo(3f, 22f)
+            verticalLineTo(7f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, 4f, -4f)
+            horizontalLineToRelative(10f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, 4f, 4f)
+            close()
+        }
+    }
+
+    /** `bell` — notification settings. */
+    val Bell: ImageVector by lazy {
+        feather("Bell") {
+            moveTo(18f, 8f)
+            arcToRelative(6f, 6f, 0f, isMoreThanHalf = false, isPositiveArc = false, -12f, 0f)
+            curveTo(6f, 15f, 3f, 17f, 3f, 17f)
+            horizontalLineToRelative(18f)
+            curveTo(21f, 17f, 18f, 15f, 18f, 8f)
+            close()
+            moveTo(13.73f, 21f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -3.46f, 0f)
+        }
+    }
+
     /** `plus` — compact create action. */
     val Plus: ImageVector by lazy {
         feather("Plus") {
