@@ -17,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +40,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsBottomSheet
@@ -508,7 +508,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            Switch(
+            DsSwitch(
                 checked = quietEnabled,
                 onCheckedChange = { quietEnabled = it },
             )
@@ -626,7 +626,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            Switch(
+            DsSwitch(
                 checked = notify,
                 onCheckedChange = { notify = it },
             )
