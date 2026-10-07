@@ -872,6 +872,61 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun agentMessagesCursorReturnsEarliestBatchWithoutSkippingBacklog() {
+        val fixture = fixture("team-message-backlog")
+        appendActiveMember(fixture.log, "team-message-backlog")
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第一条结果",
+            ),
+        )
+        val firstSequence = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 2,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第二条结果",
+            ),
+        )
+        val secondSequence = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 3,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第三条结果",
+            ),
+        )
+
+        val messages = fixture.runtime.agentMessages(
+            sessionId = "team-message-backlog",
+            targetName = "worker",
+            limit = 1,
+            afterSequence = firstSequence,
+        )
+
+        assertEquals(1, messages.size)
+        assertEquals(secondSequence, messages.single().sequence)
+        assertEquals("第二条结果", messages.single().content)
+    }
+
+    @Test
     fun discardedMailboxMessageIsDurablySettledAndCannotRemainPending() {
         val fixture = fixture("team-discard-message")
         appendActiveMember(fixture.log, "team-discard-message")

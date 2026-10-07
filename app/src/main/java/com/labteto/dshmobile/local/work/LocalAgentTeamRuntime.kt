@@ -1017,37 +1017,70 @@ internal class LocalAgentTeamRuntime(
         }
         val bounded = limit.coerceIn(1, MAX_AGENT_MESSAGE_LIMIT)
         val log = eventLogFor(sessionId)
+
+        fun decode(event: LocalSessionEventLog.Event): LocalTeamAgentMessageSnapshot? {
+            if (event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT) return null
+            val jobId = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull ?: return null
+            val member = membersByJob[jobId] ?: return null
+            if (target != null && member.name != target) return null
+            val content = event.data["terminal_output"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+            return LocalTeamAgentMessageSnapshot(
+                id = "agent-msg-" + event.sequence,
+                sequence = event.sequence,
+                createdAt = event.createdAt,
+                memberId = member.id,
+                memberName = member.name,
+                content = content,
+                step = event.data["step"]?.jsonPrimitive?.intOrNull?.coerceAtLeast(0) ?: 0,
+            )
+        }
+
+        if (afterSequence >= 0L) {
+            val result = ArrayList<LocalTeamAgentMessageSnapshot>(bounded)
+            var cursor = afterSequence
+            repeat(MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES) {
+                if (result.size >= bounded) return@repeat
+                val page = log.pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
+                if (page.isEmpty()) return@repeat
+                for (event in page.sortedBy(LocalSessionEventLog.Event::sequence)) {
+                    cursor = maxOf(cursor, event.sequence)
+                    decode(event)?.let(result::add)
+                    if (result.size >= bounded) break
+                }
+                if (result.size >= bounded || page.size < AGENT_MESSAGE_SCAN_PAGE) {
+                    return result
+                        .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
+                        .sortedBy(LocalTeamAgentMessageSnapshot::sequence)
+                        .take(bounded)
+                }
+            }
+            return result
+                .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
+                .sortedBy(LocalTeamAgentMessageSnapshot::sequence)
+                .take(bounded)
+        }
+
         val result = ArrayList<LocalTeamAgentMessageSnapshot>(bounded)
         var before = Long.MAX_VALUE
-        while (result.size < bounded) {
+        repeat(MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES) {
+            if (result.size >= bounded) return@repeat
             val page = log.pageBefore(before, AGENT_MESSAGE_SCAN_PAGE)
-            if (page.isEmpty()) break
+            if (page.isEmpty()) return@repeat
             page.asSequence()
                 .sortedByDescending(LocalSessionEventLog.Event::sequence)
                 .forEach { event ->
                     if (result.size >= bounded) return@forEach
-                    if (event.type != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT) return@forEach
-                    if (event.sequence <= afterSequence) return@forEach
-                    val jobId = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull
-                        ?: return@forEach
-                    val member = membersByJob[jobId] ?: return@forEach
-                    if (target != null && member.name != target) return@forEach
-                    val content = event.data["terminal_output"]?.jsonPrimitive?.contentOrNull
-                        ?.takeIf(String::isNotBlank)
-                        ?: return@forEach
-                    result += LocalTeamAgentMessageSnapshot(
-                        id = "agent-msg-" + event.sequence,
-                        sequence = event.sequence,
-                        createdAt = event.createdAt,
-                        memberId = member.id,
-                        memberName = member.name,
-                        content = content,
-                        step = event.data["step"]?.jsonPrimitive?.intOrNull?.coerceAtLeast(0) ?: 0,
-                    )
+                    decode(event)?.let(result::add)
                 }
-            val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
-            before = oldestSequence
-            if (oldestSequence <= afterSequence || page.size < AGENT_MESSAGE_SCAN_PAGE) break
+            before = page.minOf(LocalSessionEventLog.Event::sequence)
+            if (result.size >= bounded || page.size < AGENT_MESSAGE_SCAN_PAGE) {
+                return result
+                    .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
+                    .sortedBy(LocalTeamAgentMessageSnapshot::sequence)
+                    .takeLast(bounded)
+            }
         }
         return result
             .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
