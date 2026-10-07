@@ -23,8 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -456,7 +454,7 @@ private fun CustomAnswerField(
     onContinue: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    TextField(
+    DsTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
@@ -494,13 +492,6 @@ private fun CustomAnswerField(
         keyboardActions = KeyboardActions(
             onDone = { onContinue() },
             onNext = { onContinue() },
-        ),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-            unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-            disabledContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-            focusedIndicatorColor = colors.accent,
-            unfocusedIndicatorColor = colors.borderL2,
         ),
     )
 }

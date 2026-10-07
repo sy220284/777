@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -249,13 +247,7 @@ internal fun LocalModeDrawer(
                         },
                         singleLine = true,
                         shape = DsShapes.block,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = colors.bgModulePlatform,
-                            unfocusedContainerColor = colors.bgModulePlatform,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            disabledBorderColor = Color.Transparent,
-                        ),
+                        flat = true,
                     )
                 }
 

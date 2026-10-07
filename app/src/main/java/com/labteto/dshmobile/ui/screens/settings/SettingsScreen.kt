@@ -31,10 +31,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +64,7 @@ import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
@@ -558,7 +557,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
-                                TextField(
+                                DsTextField(
                                     value = customChatFilterDraft,
                                     onValueChange = {
                                         customChatFilterDraft = it

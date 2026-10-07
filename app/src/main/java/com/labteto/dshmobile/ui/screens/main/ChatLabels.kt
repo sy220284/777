@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.annotation.StringRes
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
@@ -12,9 +11,6 @@ import com.labteto.dshmobile.core.wire.dto.GoalPhase
 import com.labteto.dshmobile.core.wire.dto.JobStatus
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /** Shared label and status mappings for the chat surface. */
 
@@ -113,16 +109,3 @@ internal fun AgentPresetEntry.displayName(): String =
 internal fun AgentPresetEntry.displayDescription(): String? =
     builtInPresetStrings(this)?.let { stringResource(it.second) }
         ?: description?.takeIf { it.isNotBlank() }
-
-// ---------------------------------------------------------------------------
-// Shared field styling
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun dialogTextFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    unfocusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    focusedIndicatorColor = DsTheme.colors.accent,
-    unfocusedIndicatorColor = DsTheme.colors.borderL2,
-    cursorColor = DsTheme.colors.accent,
-)

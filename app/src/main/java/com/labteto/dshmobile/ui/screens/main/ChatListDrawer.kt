@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +42,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.data.SessionRow
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.data.WorkspaceRow
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -242,7 +241,7 @@ fun ChatListDrawer(
             )
         }
 
-        TextField(
+        DsTextField(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
@@ -257,13 +256,7 @@ fun ChatListDrawer(
             },
             singleLine = true,
             shape = DsShapes.pillFull,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
-                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                cursorColor = colors.accent,
-            ),
+            flat = true,
         )
         if (!contentSearchAvailable && query.isNotBlank()) {
             Text(
