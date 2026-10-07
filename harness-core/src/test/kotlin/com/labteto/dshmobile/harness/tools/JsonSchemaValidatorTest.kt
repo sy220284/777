@@ -67,6 +67,24 @@ class JsonSchemaValidatorTest {
     }
 
     @Test
+    fun rejectsConstraintKeywordsThatRuntimeDoesNotImplement() {
+        val schema = Json.parseToJsonElement(
+            """{
+              "type":"object",
+              "properties":{
+                "name":{"type":"string","pattern":"^[a-z]+$"}
+              }
+            }"""
+        ).jsonObject
+
+        assertTrue(
+            JsonSchemaValidator.validateSchema(schema, requireObjectRoot = true)
+                .orEmpty()
+                .contains("未支持的 JSON Schema 关键字"),
+        )
+    }
+
+    @Test
     fun rejectsExtraPropertiesWhenSchemaClosesObject() {
         val schema = Json.parseToJsonElement(
             """{
