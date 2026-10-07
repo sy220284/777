@@ -216,6 +216,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
         val continuation = decodeSubagentContinuation(snapshot)
+        var resumeAsNewActivation = snapshot.status == "idle"
+        if (snapshot.status == "interrupted") {
+            val completed = latestCompletedSubagentActivation(sessionId, snapshot.id)
+            if (completed != null) {
+                val output = completed.data["answer"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: snapshot.output
+                jobs.parkPersistent(snapshot.id, output, sessionId)
+                resumeAsNewActivation = true
+                if (jobs.peekMessages(snapshot.id).isEmpty()) return
+            }
+        }
         val pendingIds = jobs.peekMessages(snapshot.id).mapTo(hashSetOf()) { it.id }
         val alreadyClaimedPending = continuation
             ?.claimedMessageIds
@@ -248,10 +260,25 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     virtualScreen = virtualScreen,
                     recoveredHistory = continuation?.history,
                     recoveredClaimedMessageIds = continuation?.claimedMessageIds.orEmpty(),
-                    recoveredStep = continuation?.step ?: 0,
+                    recoveredStep = if (resumeAsNewActivation) 0 else continuation?.step ?: 0,
                 ).requireCompletedOutput()
             }
         }
+    }
+
+    private fun latestCompletedSubagentActivation(
+        sessionId: String,
+        backgroundJobId: String,
+    ): LocalSessionEventLog.Event? {
+        val log = eventLogFor(sessionId)
+        val latestStart = log.latestMatching(setOf("subagent/start")) { data ->
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == backgroundJobId
+        } ?: return null
+        val latestCompleted = log.latestMatching(setOf("subagent/end")) { data ->
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == backgroundJobId &&
+                data["status"]?.jsonPrimitive?.contentOrNull == "completed"
+        } ?: return null
+        return latestCompleted.takeIf { event -> event.sequence > latestStart.sequence }
     }
 
     private fun decodeSubagentContinuation(
