@@ -15,6 +15,9 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 /**
  * Owns the spatial grammar for the local feature stack.
  *
+ * Kimi 3.1.3 uses a restrained 180ms view transition: small hierarchy displacement, fast
+ * opacity settlement, and peer pages that cross-fade without artificial travel.
+ *
  * Screens provide the semantic page; this host alone decides how push/pop/peer swaps should move
  * so feature pages cannot drift into different transition directions or timings.
  *
@@ -43,30 +46,30 @@ internal fun LocalFeatureAnimatedHost(
             when {
                 targetState.size > initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageForward) { width -> width / 9 } +
+                        slideInHorizontally(DsAnimations.featurePageForward) { width -> width / 16 } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageForward) { width -> -width / 18 } +
+                        slideOutHorizontally(DsAnimations.featurePageForward) { width -> -width / 32 } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }
 
                 targetState.size < initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageBackward) { width -> -width / 18 } +
+                        slideInHorizontally(DsAnimations.featurePageBackward) { width -> -width / 32 } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageBackward) { width -> width / 9 } +
+                        slideOutHorizontally(DsAnimations.featurePageBackward) { width -> width / 16 } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }
 
                 else -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePagePeer) { width -> width / 64 } +
+                        slideInHorizontally(DsAnimations.featurePagePeer) { 0 } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePagePeer) { width -> -width / 96 } +
+                        slideOutHorizontally(DsAnimations.featurePagePeer) { 0 } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }
