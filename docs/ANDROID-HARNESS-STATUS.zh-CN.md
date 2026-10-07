@@ -116,6 +116,8 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - 只有显式 `continuable=true` 的持久子代理在一次 Activation 结束后进入 `dormant`；无新消息时不占运行槽也不自动唤醒，收到新消息后重新激活同一 Child Agent 身份；旧版 `completed + continuable` 快照读取时兼容归一为 `dormant`。
 - 子代理启动统一使用 `LocalSubagentLaunchSpec + LocalSubagentCapabilities`；mutation、continuation、virtual screen、history mode、max depth、tool allowlist 与 output schema 由同一契约声明，未支持能力在启动前 fail closed。
 - `toolAllowlist` 直接限制模型实际可见工具 Surface；持久子代理恢复元数据升级 V2 保存 capabilities，旧 V1 映射为只读、isolated、continuable、depth=1。
+- Structured Subagent Result 已启用：`outputSchema` 先做有界 meta-schema 校验，最终回复必须是纯 JSON 对象并复用与 ToolRegistry 相同的 JSON Schema 值校验；不符合契约直接返回稳定错误码，不自动重跑整轮。
+- 结构化终态只有在 JSON 解析与 Schema 校验通过后才写 `terminal checkpoint`；校验失败不会被 Cold Resume 误结算为 completed。
 - `interrupted` 的可恢复任务与 `dormant` 的 continuable 子代理不会被普通历史裁剪静默删除；保留上限被持久对象占满时显式拒绝新任务，需先终止不再使用的持久代理。
 - 最终 assistant 已持久化但 Job 终态尚未提交时，恢复直接按终态 Checkpoint 结算；已认领但残留在 Inbox 的消息只做确认，不触发重复模型请求。
 - Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 持有自己的强类型句柄。
