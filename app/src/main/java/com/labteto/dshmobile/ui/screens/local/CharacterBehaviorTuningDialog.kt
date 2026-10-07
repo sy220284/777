@@ -21,11 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,6 +48,8 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsSlider
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -436,16 +434,10 @@ internal fun CharacterBehaviorTuningDialog(
                                 color = colors.labelSecondary,
                             )
                         }
-                        Switch(
+                        DsSwitch(
                             checked = draft.lockRelationshipStage,
                             onCheckedChange = { draft = draft.copy(lockRelationshipStage = it) },
                             enabled = !saving,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = colors.characterAccent,
-                                checkedThumbColor = colors.bgLayer1,
-                                uncheckedTrackColor = colors.borderL3,
-                                uncheckedThumbColor = colors.labelTertiary,
-                            ),
                         )
                     }
                 }
@@ -520,7 +512,7 @@ private fun BehaviorSlider(
                 color = colors.characterAccent,
             )
         }
-        Slider(
+        DsSlider(
             value = clean.toFloat(),
             onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 100)) },
             enabled = enabled,
@@ -529,13 +521,6 @@ private fun BehaviorSlider(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = title },
-            colors = SliderDefaults.colors(
-                thumbColor = colors.characterAccent,
-                activeTrackColor = colors.characterAccent,
-                inactiveTrackColor = colors.borderL2,
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent,
-            ),
         )
         Row(Modifier.fillMaxWidth()) {
             Text(low, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
