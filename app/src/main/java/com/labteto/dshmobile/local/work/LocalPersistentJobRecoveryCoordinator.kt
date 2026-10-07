@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -72,7 +74,27 @@ internal class LocalPersistentJobRecoveryCoordinator(
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
-    ): String {
+    ): String = startReadonlySubagentResult(
+        task = task,
+        model = model,
+        maxSteps = maxSteps,
+        virtualScreen = virtualScreen,
+        outputSchema = outputSchema,
+        sessionId = sessionId,
+        boundState = boundState,
+        historySnapshot = historySnapshot,
+    ).message
+
+    suspend fun startReadonlySubagentResult(
+        task: String,
+        model: String?,
+        maxSteps: Int,
+        virtualScreen: Boolean,
+        outputSchema: JsonObject? = null,
+        sessionId: String = currentSessionId(),
+        boundState: LocalHarnessState = currentState(),
+        historySnapshot: () -> List<JsonObject> = defaultHistory,
+    ): JobStartResult {
         val runProfile = modelGateway.profileForRun(model)
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
@@ -108,7 +130,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("max_steps", maxSteps)
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
         }.toString()
-        return jobs.startPersistent(
+        return jobs.startPersistentResult(
             label = "子代理：${task.take(100)}",
             resumeKind = "subagent_readonly",
             resumePayload = payload,
@@ -134,8 +156,21 @@ internal class LocalPersistentJobRecoveryCoordinator(
         message: String,
         sessionId: String,
     ): String {
-        val result = jobs.send(agentId, message, sessionId)
-        if (result.startsWith("消息已发送") || result.startsWith("消息已持久排队")) {
+        val input = QueuedAgentInput(
+            id = "msg-" + java.util.UUID.randomUUID().toString().replace("-", "").take(16),
+            content = message,
+            memoryInput = message,
+        )
+        return sendInput(agentId, input, sessionId).message
+    }
+
+    fun sendInput(
+        agentId: String,
+        input: QueuedAgentInput,
+        sessionId: String,
+    ): JobMessageAdmission {
+        val result = jobs.sendInput(agentId, input, sessionId)
+        if (result.accepted && result.requiresResume) {
             schedule(sessionId)
         }
         return result
