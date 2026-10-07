@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalToolOutputStore
 import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.context.ContextComposer
+import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
@@ -51,6 +52,7 @@ internal class LocalSubagentRunnerFactory(
     private val memoryClassMb: Int,
     private val agentRunCoordinator: LocalAgentRunCoordinator,
     private val contextComposer: ContextComposer,
+    private val projectContext: ProjectContextPort,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val eventLogFor: (String) -> LocalSessionEventLog,
@@ -96,6 +98,7 @@ internal class LocalSubagentRunnerFactory(
                         projectId = boundState.projectId,
                         lineageId = boundState.lineageId,
                         handoffSummary = boundState.handoffSummary,
+                        projectInstructions = projectContext.instructionsFor(boundState.projectId),
                     ),
                 )
             },
