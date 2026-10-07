@@ -164,6 +164,7 @@ internal class LocalSubagentRunner(
         recoveredStep: Int = 0,
         recoveredSoftStepLimit: Int? = null,
         resumeAfterCompletion: Boolean = false,
+        onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
@@ -189,6 +190,7 @@ internal class LocalSubagentRunner(
                     recoveredStep = recoveredStep,
                     recoveredSoftStepLimit = recoveredSoftStepLimit,
                     resumeAfterCompletion = resumeAfterCompletion,
+                    onCheckpointProgress = onCheckpointProgress,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -204,6 +206,7 @@ internal class LocalSubagentRunner(
         recoveredStep: Int,
         recoveredSoftStepLimit: Int?,
         resumeAfterCompletion: Boolean,
+        onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
     ): LocalSubagentResult {
         val task = spec.task
         val capabilities: LocalSubagentCapabilities = spec.capabilities
@@ -378,6 +381,16 @@ internal class LocalSubagentRunner(
                 if (!terminalOutput.isNullOrBlank()) {
                     lastTerminalCheckpointStep = step
                     lastTerminalCheckpointOutput = terminalOutput
+                }
+                onCheckpointProgress?.let { sink ->
+                    runCatching { sink(step, totalBudgetLimit) }
+                        .onFailure { error ->
+                            AppLog.warn(
+                                "LocalSubagentRunner",
+                                "子智能体进度上报失败 agent=$subagentId step=$step",
+                                error,
+                            )
+                        }
                 }
             } catch (error: Exception) {
                 throw JobContinuationPersistenceException(
