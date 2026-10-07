@@ -29,6 +29,7 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -61,44 +62,24 @@ internal fun NewSessionModeDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsButton(
-            text = stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_continue
-                } else {
-                    R.string.local_new_session_continue
-                },
+        DsSheetChoiceRow(
+            title = stringResource(
+                if (chatMode) R.string.local_new_session_chat_continue
+                else R.string.local_new_session_continue,
+            ),
+            subtitle = stringResource(
+                if (chatMode) R.string.local_new_session_chat_continue_hint
+                else R.string.local_new_session_continue_hint,
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
-            modifier = Modifier.fillMaxWidth(),
         )
-        Text(
-            stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_continue_hint
-                } else {
-                    R.string.local_new_session_continue_hint
-                },
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_new_session_independent),
+            subtitle = stringResource(
+                if (chatMode) R.string.local_new_session_chat_independent_hint
+                else R.string.local_new_session_independent_hint,
             ),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
-        )
-        DsButton(
-            text = stringResource(R.string.local_new_session_independent),
             onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-        Text(
-            stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_independent_hint
-                } else {
-                    R.string.local_new_session_independent_hint
-                },
-            ),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
         )
     }
 }
@@ -119,16 +100,13 @@ internal fun GroupNewSessionDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsButton(
-            text = stringResource(R.string.local_group_new_group),
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_group_new_group),
             onClick = onNewGroup,
-            modifier = Modifier.fillMaxWidth(),
         )
-        DsButton(
-            text = stringResource(R.string.local_group_new_single),
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_group_new_single),
             onClick = onNewSingle,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
         )
     }
 }
@@ -359,11 +337,9 @@ internal fun QuestionDialog(
     ) {
         Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
         options.forEach { option ->
-            DsButton(
-                text = option,
+            DsSheetChoiceRow(
+                title = option,
                 onClick = { onAnswer(option) },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
             )
         }
         DsTextField(
