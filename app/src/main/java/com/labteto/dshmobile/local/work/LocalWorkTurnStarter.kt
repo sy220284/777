@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,8 @@ internal class LocalWorkTurnStarter(
         sessionLease: LocalSessionRuntimeLease,
     ): Job = startFresh(
         content = prepared.content,
+        visibleContent = prepared.visibleContent,
+        blocks = prepared.blocks,
         memoryInput = prepared.memoryInput,
         modelMessage = prepared.modelMessage,
         sessionLease = sessionLease,
@@ -54,6 +57,8 @@ internal class LocalWorkTurnStarter(
 
     internal fun startFresh(
         content: String,
+        visibleContent: String = content,
+        blocks: List<LocalMessageBlock> = emptyList(),
         memoryInput: String,
         modelMessage: JsonObject?,
         sessionLease: LocalSessionRuntimeLease,
@@ -66,8 +71,9 @@ internal class LocalWorkTurnStarter(
         val transcriptMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
             role = "user",
-            content = content,
+            content = visibleContent,
             createdAt = System.currentTimeMillis(),
+            blocks = blocks,
         )
         val eventLog = sessionStorage.eventLogs.get(sessionId)
         val event = eventLog.append("user/message", buildJsonObject {

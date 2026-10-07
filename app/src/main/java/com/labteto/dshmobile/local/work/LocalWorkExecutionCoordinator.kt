@@ -265,8 +265,9 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                         val transcript = LocalHarnessMessage(
                             id = queuedInput.id,
                             role = "user",
-                            content = prepared.content,
+                            content = prepared.visibleContent,
                             createdAt = System.currentTimeMillis(),
+                            blocks = prepared.blocks,
                         )
                         val event = eventLogFor(sessionId).append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
