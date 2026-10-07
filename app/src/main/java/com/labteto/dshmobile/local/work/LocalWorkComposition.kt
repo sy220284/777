@@ -47,6 +47,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
+    workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
     private val tools: LocalToolCompositionRoot,
     memoryStore: MemoryStore,
@@ -117,6 +118,15 @@ internal class LocalWorkComposition @Inject constructor(
             currentSessionId = runtimeStateStore::currentSessionId,
             currentState = { runtimeStateStore.state.value },
             defaultHistory = runtimeStateStore.foregroundRunHandle.modelHistory::snapshot,
+            stateForSession = { sessionId ->
+                workRunRegistry[sessionId]?.aggregateSnapshot()
+                    ?: runtimeStateStore.state.value.takeIf { state -> state.sessionId == sessionId }
+            },
+            historyForSession = { sessionId ->
+                workRunRegistry[sessionId]?.runHandle?.modelHistory?.snapshot()
+                    ?: runtimeStateStore.foregroundRunHandle.modelHistory.snapshot()
+                        .takeIf { runtimeStateStore.state.value.sessionId == sessionId }
+            },
             subagentRunner = { sessionId, boundState, history ->
                 subagentFactory.createBound(
                     sessionId = sessionId,
@@ -151,12 +161,34 @@ internal class LocalWorkComposition @Inject constructor(
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
         updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
     )
+    private val agentTeams by lazy {
+        LocalAgentTeamRuntime(
+            jobs = runtimeStateStore.jobManager,
+            startTeammate = { binding, task, model, maxSteps ->
+                persistentJobs.startReadonlySubagentResult(
+                    task = task,
+                    model = model,
+                    maxSteps = maxSteps,
+                    virtualScreen = false,
+                    sessionId = binding.sessionId,
+                    boundState = binding.aggregateSnapshot(),
+                    historySnapshot = binding.runHandle.modelHistory::snapshot,
+                )
+            },
+            sendToTeammate = { agentId, input, sessionId ->
+                persistentJobs.sendInput(agentId, input, sessionId)
+            },
+            eventLogFor = sessionStorage.eventLogs::get,
+            projectionRegistry = sessionStorage.projectionRegistry,
+        )
+    }
     private val agentControlBuiltins by lazy {
         LocalWorkAgentControlBuiltinRuntime(
             jobs = runtimeStateStore.jobManager,
             modelGateway = modelGateway,
             subagents = subagents,
             persistentJobs = persistentJobs,
+            teams = agentTeams,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
@@ -170,6 +202,7 @@ internal class LocalWorkComposition @Inject constructor(
         workRunRegistry = workRunRegistry,
         workMemoryRuntime = workMemoryRuntime,
         workModelHistoryRuntime = workModelHistoryRuntime,
+        workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
     )
@@ -218,7 +251,11 @@ internal class LocalWorkComposition @Inject constructor(
         modelAdmission = LocalWorkExecutionControl().asModelAdmissionPort(),
     )
 
-    internal fun schedulePersistentRecovery() = persistentJobs.schedule()
+    internal fun schedulePersistentRecovery() {
+        val sessionId = runtimeStateStore.currentSessionId
+        runCatching { agentTeams.recoverMailbox(sessionId) }
+        persistentJobs.schedule(sessionId)
+    }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,

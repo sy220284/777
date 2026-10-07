@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
+import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
@@ -54,6 +55,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private val repository: LocalSessionRepository
     private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
     internal val coordinator: LocalSessionCoordinator
+    internal val projectionRegistry = SessionProjectionRegistry()
     internal val agentRunCoordinator = LocalAgentRunCoordinator(eventLogFor = eventLogs::get)
 
     init {
