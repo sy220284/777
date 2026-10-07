@@ -43,10 +43,15 @@ class LocalToolCatalogTest {
             .map { it.jsonPrimitive.content }
         val subagentProperties = functions.getValue("subagent").jsonObject["function"]!!
             .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val forkProperties = functions.getValue("subagent_fork").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
 
         assertEquals(setOf("parallel", "pipeline"), modes.toSet())
         assertTrue("model" in subagentProperties)
         assertTrue("max_steps" in subagentProperties)
+        assertTrue("output_schema" in subagentProperties)
+        assertTrue("output_schema" in forkProperties)
+        assertTrue("output_schema" in workflowProperties)
     } 
 
     @Test
