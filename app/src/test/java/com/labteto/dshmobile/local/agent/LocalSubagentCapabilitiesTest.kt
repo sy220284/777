@@ -107,6 +107,47 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun versionTwoCapabilitiesRoundTripIncludingFutureOutputSchema() {
+        val capabilities = LocalSubagentCapabilities(
+            allowMutation = false,
+            continuable = true,
+            virtualScreen = true,
+            historyMode = LocalSubagentHistoryMode.ISOLATED,
+            maxDepth = 1,
+            toolAllowlist = setOf("read", "grep"),
+            outputSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", false)
+            },
+        )
+        val payload = buildJsonObject {
+            put("capabilities", encodeLocalSubagentCapabilities(capabilities))
+        }
+
+        assertEquals(
+            capabilities,
+            decodeLocalSubagentCapabilities(payload, version = 2),
+        )
+    }
+
+    @Test
+    fun versionOnePersistentPayloadMapsToSafeReadonlyCapabilities() {
+        val payload = buildJsonObject {
+            put("virtual_screen", true)
+        }
+
+        val decoded = decodeLocalSubagentCapabilities(payload, version = 1)
+
+        assertEquals(false, decoded.allowMutation)
+        assertEquals(true, decoded.continuable)
+        assertEquals(true, decoded.virtualScreen)
+        assertEquals(LocalSubagentHistoryMode.ISOLATED, decoded.historyMode)
+        assertEquals(1, decoded.maxDepth)
+        assertEquals(null, decoded.toolAllowlist)
+        assertEquals(null, decoded.outputSchema)
+    }
+
+    @Test
     fun backgroundLaunchRequiresExplicitContinuation() {
         val spec = LocalSubagentLaunchSpec(
             task = "后台任务",
