@@ -238,21 +238,25 @@ internal class LocalWorkComposition @Inject constructor(
     }
 
     private fun observeTeamJobTransitions(jobs: List<LocalJobInfo>) {
-        jobs.asSequence()
-            .filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
-            .forEach { job ->
-                val previous = teamJobStatuses.put(job.id, job.status)
-                if (
-                    previous != job.status &&
-                    job.status in TEAM_RECONCILE_JOB_STATUSES
-                ) {
-                    val sessionId = job.ownerSessionId ?: return@forEach
-                    scope.launch {
-                        runCatching { agentTeams.recoverMailbox(sessionId) }
-                        runCatching { publishTeamUiState(sessionId) }
-                    }
+        val teamJobs = jobs.filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
+        val visibleIds = teamJobs.mapTo(hashSetOf(), LocalJobInfo::id)
+        teamJobStatuses.keys.toList()
+            .filterNot(visibleIds::contains)
+            .forEach(teamJobStatuses::remove)
+
+        teamJobs.forEach { job ->
+            val previous = teamJobStatuses.put(job.id, job.status)
+            if (
+                previous != job.status &&
+                job.status in TEAM_RECONCILE_JOB_STATUSES
+            ) {
+                val sessionId = job.ownerSessionId ?: return@forEach
+                scope.launch {
+                    runCatching { agentTeams.recoverMailbox(sessionId) }
+                    runCatching { publishTeamUiState(sessionId) }
                 }
             }
+        }
     }
 
     internal suspend fun executeBuiltin(

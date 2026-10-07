@@ -1093,18 +1093,6 @@ class LocalAgentTeamRuntimeTest {
         put("reason", "test")
     }
 
-    private fun teamDiscarded(
-        teamId: String,
-        messageId: String,
-        targetId: String,
-    ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
-        put("teamId", teamId)
-        put("messageId", messageId)
-        put("targetId", targetId)
-        put("reason", "test")
-    }
-
     private fun task(
         teamId: String,
         id: String,
