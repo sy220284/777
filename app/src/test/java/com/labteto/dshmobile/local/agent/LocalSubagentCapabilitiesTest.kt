@@ -100,6 +100,33 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun rejectsUnsupportedRecursiveDepth() {
+        val issues = LocalSubagentCapabilities(
+            maxDepth = 2,
+        ).validateLaunch(backgroundJobId = null)
+
+        assertTrue(issues.any { it.contains("maxDepth=1") })
+    }
+
+    @Test
+    fun rejectsBlankToolNameInAllowlist() {
+        val issues = LocalSubagentCapabilities(
+            toolAllowlist = setOf("read", ""),
+        ).validateLaunch(backgroundJobId = null)
+
+        assertTrue(issues.any { it.contains("空工具名") })
+    }
+
+    @Test
+    fun rejectsOversizedToolAllowlist() {
+        val issues = LocalSubagentCapabilities(
+            toolAllowlist = (0..128).map { "tool_$it" }.toSet(),
+        ).validateLaunch(backgroundJobId = null)
+
+        assertTrue(issues.any { it.contains("最多允许 128 个工具") })
+    }
+
+    @Test
     fun invalidJsonCannotBeReportedAsStructuredSuccess() {
         val parsed = parseStructuredSubagentResult(
             "not-json",
