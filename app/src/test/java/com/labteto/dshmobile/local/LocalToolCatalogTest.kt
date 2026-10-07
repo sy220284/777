@@ -58,6 +58,19 @@ class LocalToolCatalogTest {
     } 
 
     @Test
+    fun teamSpawnExposesExplicitFreshOrForkContext() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val properties = functions.getValue("team_spawn").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val contexts = properties.getValue("context").jsonObject["enum"]!!.jsonArray
+            .map { it.jsonPrimitive.content }
+
+        assertEquals(setOf("fresh", "fork"), contexts.toSet())
+    }
+
+    @Test
     fun sessionEventSearchExposesPagingControls() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
