@@ -37,6 +37,8 @@
     <string name="common_error">出了点问题</string>
     <string name="common_close">关闭</string>
     <string name="local_delete_session">删除会话</string>
+    <string name="local_drawer_multi_select">多选</string>
+    <string name="local_delete_session_confirm_message">删除后该会话与历史记录将被移除，确定继续吗？</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
     <string name="local_drawer_pinned">置顶</string>
     <string name="local_drawer_recent">最近</string>
