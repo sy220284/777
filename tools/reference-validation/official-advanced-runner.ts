@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { teamProjectionDefinition } from '@deepseek-ai/dsh-experimental-agent-team/src/projection.ts'
+import { teamProjectionDefinition } from './packages/experimental/agent-team/src/projection.ts'
 
 async function main(): Promise<void> {
   const ctx = new Context()
