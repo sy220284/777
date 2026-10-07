@@ -50,8 +50,11 @@ class LocalToolCatalogTest {
         assertTrue("model" in subagentProperties)
         assertTrue("max_steps" in subagentProperties)
         assertTrue("output_schema" in subagentProperties)
+        assertTrue("allowed_tools" in subagentProperties)
         assertTrue("output_schema" in forkProperties)
+        assertTrue("allowed_tools" in forkProperties)
         assertTrue("output_schema" in workflowProperties)
+        assertTrue("allowed_tools" in workflowProperties)
     } 
 
     @Test
