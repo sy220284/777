@@ -352,6 +352,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 切换到 Responses 时，旧 Chat Completions 的每个 tool_call 都转换为同 call_id 的 function_call；原始 Responses output 优先重放，不重复添加调用。
 - Responses function schema 显式保留 strict 设置；未声明时使用 non-strict，不能把可选工具参数隐式变成必填。
 - 子代理按 profileId 绑定独立 model/baseUrl/protocol/authKind/credentialRef；不得修改父代理活动档案。同名 API/套餐或多账户模型必须消除来源歧义。
+- 子代理能力契约必须在模型执行前校验：持久 Agent 禁止可变副作用，continuable 必须绑定持久 Job，请求独立虚拟屏时分配失败必须显式失败。
+- 子代理 `output_schema` 必须拒绝未实现的 JSON Schema 关键字与错误类型；结构化终态只有在 Schema 校验通过后才允许写入 terminal checkpoint，失败结果不得伪装 completed。
 - list_subagent_models 只展示有凭据的已保存档案，不硬编码 DeepSeek 列表。
 - 自定义 API 协议选择要同时用于保存和连接测试，并在重新加载、替换 Key 后保留。
 - 套餐模型目录结构异常必须报错，不得静默解释为空目录而覆盖已有档案；标准 API data[].id 不能被当作套餐共享授权依据。
