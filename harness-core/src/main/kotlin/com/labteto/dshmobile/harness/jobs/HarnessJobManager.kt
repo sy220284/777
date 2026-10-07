@@ -393,7 +393,10 @@ class HarnessJobManager(
             }
         }
         val shouldStart = synchronized(lock) {
-            if (record.status == "running" && record.job == null) {
+            if (
+                record.status == "running" &&
+                (record.job == null || record.job?.isCompleted == true)
+            ) {
                 record.job = launched
                 true
             } else {
