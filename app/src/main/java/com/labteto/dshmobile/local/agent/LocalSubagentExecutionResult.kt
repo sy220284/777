@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.agent
 
-
+import kotlinx.serialization.json.JsonElement
 
 internal enum class LocalSubagentStatus {
     COMPLETED,
@@ -14,6 +14,7 @@ internal data class LocalSubagentResult(
     val output: String,
     val errorCode: String? = null,
     val retryable: Boolean = false,
+    val structuredResult: JsonElement? = null,
 ) {
     val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
 }
