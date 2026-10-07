@@ -35,6 +35,12 @@ class LocalWorkApprovalCoordinatorTest {
             when (method.name) {
                 "putBoolean" -> { values[args!![0] as String] = args[1] as Boolean; proxy }
                 "putString" -> { strings[args!![0] as String] = args[1] as String?; proxy }
+                "remove" -> {
+                    val key = args!![0] as String
+                    values.remove(key)
+                    strings.remove(key)
+                    proxy
+                }
                 "apply" -> null
                 else -> error("Unexpected editor call: ${method.name}")
             }
