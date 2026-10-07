@@ -122,7 +122,7 @@ internal class LocalAgentTeamRuntime(
 
     private val teamProjection = projectionRegistry.register(
         name = "work.agent-team",
-        stateVersion = OFFICIAL_TEAM_PROJECTION_STATE_VERSION,
+        stateVersion = LOCAL_TEAM_PROJECTION_STATE_VERSION,
         initial = { LocalTeamProjection() },
         reducer = SessionReducer<LocalTeamProjection> { state, event ->
             applyEvent(state, event)
@@ -2023,7 +2023,9 @@ internal class LocalAgentTeamRuntime(
         const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
         const val TEAM_MESSAGE_DISCARDED = "team/message/discarded"
         const val TEAM_EVENT_VERSION = 2
-        const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 5
+        // Official V2 whole-value protocol remains at version 4; local activity projection adds display state.
+        const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
+        private const val LOCAL_TEAM_PROJECTION_STATE_VERSION = 5
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
