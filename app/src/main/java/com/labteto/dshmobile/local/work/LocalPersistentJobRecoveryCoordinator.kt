@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.validateStructuredOutputSchema
 import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +67,12 @@ internal class LocalPersistentJobRecoveryCoordinator(
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
     ): String {
+        outputSchema?.let { schema ->
+            val issues = validateStructuredOutputSchema(schema)
+            if (issues.isNotEmpty()) {
+                return "后台子代理启动失败：output_schema 无效：" + issues.joinToString("；")
+            }
+        }
         val runProfile = modelGateway.profileForRun(model)
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
