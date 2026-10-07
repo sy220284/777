@@ -49,7 +49,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconFamily
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -127,7 +127,7 @@ internal fun WorkspaceMenu(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    DsDialog(title = null, onDismiss = onDismiss) {
+    DsBottomSheet(title = null, onDismiss = onDismiss) {
         SheetRow(title = stringResource(R.string.chatlist_workspace_new_session), onClick = onNewSession)
         SheetRow(title = stringResource(R.string.chatlist_workspace_rename), onClick = onRename)
         SheetRow(title = stringResource(R.string.chatlist_workspace_delete), onClick = onDelete)
@@ -305,7 +305,7 @@ internal fun SessionRowItem(
         }
 
         if (menuOpen) {
-            DsDialog(title = null, onDismiss = { menuOpen = false }) {
+            DsBottomSheet(title = null, onDismiss = { menuOpen = false }) {
                 if (archived) {
                     SheetRow(title = stringResource(R.string.archived_restore)) {
                         menuOpen = false
@@ -435,7 +435,7 @@ internal fun NewSessionDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.chatlist_new_session_in), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_new_session_in), onDismiss = onDismiss) {
         if (workspaces.isEmpty()) {
             Text(
                 stringResource(R.string.chatlist_no_workspaces),
@@ -464,7 +464,7 @@ internal fun ManageWorkspacesDialog(
     onDismiss: () -> Unit,
     onPick: (WorkspaceRow) -> Unit,
 ) {
-    DsDialog(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
         LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
             items(workspaces, key = { it.workspaceId }) { workspace ->
                 SheetRow(
@@ -480,7 +480,7 @@ internal fun ManageWorkspacesDialog(
 @Composable
 internal fun NewWorkspaceDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var pathText by remember { mutableStateOf("") }
-    DsDialog(title = stringResource(R.string.chatlist_new_workspace), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_new_workspace), onDismiss = onDismiss) {
         DsTextField(
             value = pathText,
             onValueChange = { pathText = it },
