@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.components.DsRadioButton
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -145,7 +145,7 @@ internal fun ModelChoice(id: String, label: String, selected: String, onSelect: 
             .padding(vertical = DsSpacing.tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected == id, onClick = { onSelect(id) })
+        DsRadioButton(selected = selected == id, onClick = { onSelect(id) })
         Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
     }
 }
