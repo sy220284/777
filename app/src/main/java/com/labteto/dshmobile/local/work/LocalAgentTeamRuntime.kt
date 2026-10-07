@@ -303,6 +303,7 @@ internal class LocalAgentTeamRuntime(
         memberId: String,
         message: String,
     ): String {
+        synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可接收消息")
@@ -310,6 +311,7 @@ internal class LocalAgentTeamRuntime(
     }
 
     internal fun interruptUiMember(sessionId: String, memberId: String): String {
+        synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可停止")
@@ -745,7 +747,24 @@ internal class LocalAgentTeamRuntime(
         state.members
             .filter { it.phase == LocalTeamMemberPhase.ACTIVE }
             .forEach { member ->
-                when (val status = jobStates[member.jobId]?.status ?: return@forEach) {
+                val job = jobStates[member.jobId]
+                if (job == null) {
+                    releaseOwnedTasks(sessionId, member.id)
+                    val current = project(sessionId).members
+                        .singleOrNull { it.id == member.id }
+                        ?: return@forEach
+                    if (current.phase == LocalTeamMemberPhase.ACTIVE) {
+                        appendMember(
+                            sessionId,
+                            current.copy(
+                                phase = LocalTeamMemberPhase.FAILED,
+                                error = "TEAM_MEMBER_CHILD_MISSING",
+                            ),
+                        )
+                    }
+                    return@forEach
+                }
+                when (val status = job.status) {
                     "dormant", "completed" -> autoCompleteOwnedTask(sessionId, member)
                     "failed", "cancelled", "killed" -> {
                         releaseOwnedTasks(sessionId, member.id)

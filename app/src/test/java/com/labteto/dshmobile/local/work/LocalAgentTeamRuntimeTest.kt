@@ -719,6 +719,36 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun activeMemberWithMissingChildFailsAndReleasesOwnedTask() {
+        val fixture = fixture("team-missing-child")
+        appendActiveMember(fixture.log, "team-missing-child")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-missing-child", "task-1", 1, blockedBy = emptyList(), subject = "检查"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-missing-child",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+                subject = "检查",
+            ),
+        )
+
+        fixture.runtime.recoverMailbox("team-missing-child")
+
+        val projection = fixture.runtime.project("team-missing-child")
+        assertEquals(LocalTeamMemberPhase.FAILED, projection.members.single().phase)
+        assertEquals("TEAM_MEMBER_CHILD_MISSING", projection.members.single().error)
+        assertEquals(LocalTeamTaskStatus.PENDING, projection.tasks.single().status)
+        assertNull(projection.tasks.single().ownerId)
+    }
+
+    @Test
     fun failedMemberReleasesOwnedTaskAndMovesToFailedPhase() {
         val fixture = fixture("team-auto-release")
         appendActiveMember(fixture.log, "team-auto-release")
