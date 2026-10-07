@@ -64,7 +64,7 @@ fun main(args: Array<String>) {
             put("stateVersion", firstSnapshot.stateVersion)
             put("asOfSequence", firstSnapshot.asOfSequence)
             put("value", firstSnapshot.state)
-            put("sameVersionShared", sameVersionShared)
+            put("sameVersionSharedFirstDefinition", sameVersionShared)
             put("differentVersionRejected", differentVersionRejected)
             put("survivesFirstDispose", survivesFirstDispose)
             put("removedAfterLastDispose", removedAfterLastDispose)
