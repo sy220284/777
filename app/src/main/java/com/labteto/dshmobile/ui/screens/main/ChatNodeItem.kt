@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -333,10 +330,10 @@ private fun MessageActionsRow(node: AssistantMessageNode, context: ChatNodeConte
         ActionIcon(FeatherIcons.GitBranch, stringResource(R.string.chat_branch_message)) {
             context.onBranchFrom(node.seq)
         }
-        ActionIcon(Icons.Filled.ThumbUp, stringResource(R.string.chat_feedback_up)) {
+        ActionIcon(FeatherIcons.ThumbsUp, stringResource(R.string.chat_feedback_up)) {
             context.onFeedback(node.seq, true)
         }
-        ActionIcon(Icons.Filled.ThumbDown, stringResource(R.string.chat_feedback_down)) {
+        ActionIcon(FeatherIcons.ThumbsDown, stringResource(R.string.chat_feedback_down)) {
             context.onFeedback(node.seq, false)
         }
     }
