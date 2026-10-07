@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -10,7 +11,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT = "subagent/history-checkpoint"
+internal const val LOCAL_SUBAGENT_INBOX_CLAIM_EVENT = "subagent/inbox-claimed"
 private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 1
+private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
 private const val MAX_TERMINAL_OUTPUT_CHARS = 65_536
 
@@ -49,6 +52,53 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
                 .map(::JsonPrimitive),
         ),
     )
+}
+
+internal fun encodeLocalSubagentInboxClaimEvent(
+    agentId: String,
+    backgroundJobId: String,
+    messages: List<QueuedAgentInput>,
+): JsonObject = buildJsonObject {
+    put("version", LOCAL_SUBAGENT_INBOX_CLAIM_VERSION)
+    put("agent_id", agentId)
+    put("background_job_id", backgroundJobId)
+    put(
+        "messages",
+        JsonArray(
+            messages.map { message ->
+                buildJsonObject {
+                    put("id", message.id)
+                    put("content", message.content)
+                    put("memory_input", message.memoryInput)
+                    message.modelMessage?.let { put("model_message", it) }
+                }
+            },
+        ),
+    )
+}
+
+internal fun decodeLocalSubagentInboxClaimedMessages(
+    data: JsonObject,
+): List<QueuedAgentInput>? {
+    val version = data["version"]?.jsonPrimitive?.intOrNull ?: return null
+    if (version != LOCAL_SUBAGENT_INBOX_CLAIM_VERSION) return null
+    val rawMessages = data["messages"] as? JsonArray ?: return null
+    val decoded = rawMessages.mapNotNull { raw ->
+        val message = raw as? JsonObject ?: return@mapNotNull null
+        val id = message["id"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf(String::isNotBlank)
+            ?: return@mapNotNull null
+        val content = message["content"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf(String::isNotBlank)
+            ?: return@mapNotNull null
+        QueuedAgentInput(
+            id = id,
+            content = content,
+            memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull ?: content,
+            modelMessage = message["model_message"] as? JsonObject,
+        )
+    }
+    return decoded.takeIf { it.size == rawMessages.size }
 }
 
 internal fun shouldSettleCompletedSubagentCheckpoint(

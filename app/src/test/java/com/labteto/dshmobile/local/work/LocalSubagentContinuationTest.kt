@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -34,6 +35,56 @@ class LocalSubagentContinuationTest {
         assertEquals(listOf("system", "user"), decoded.history.map { it["role"].toString().trim('"') })
         assertEquals(setOf("msg-1", "msg-2"), decoded.claimedMessageIds)
         assertEquals(12, decoded.softStepLimit)
+    }
+
+    @Test
+    fun inboxClaimEventRoundTripsFullQueuedInputContract() {
+        val modelMessage = buildJsonObject {
+            put("role", "user")
+            put("content", "结构化内容")
+        }
+        val encoded = encodeLocalSubagentInboxClaimEvent(
+            agentId = "sa-1",
+            backgroundJobId = "job-1",
+            messages = listOf(
+                QueuedAgentInput(
+                    id = "msg-1",
+                    content = "展示文本",
+                    memoryInput = "记忆输入",
+                    modelMessage = modelMessage,
+                ),
+            ),
+        )
+
+        val decoded = requireNotNull(decodeLocalSubagentInboxClaimedMessages(encoded))
+
+        assertEquals(1, decoded.size)
+        assertEquals("msg-1", decoded.single().id)
+        assertEquals("展示文本", decoded.single().content)
+        assertEquals("记忆输入", decoded.single().memoryInput)
+        assertEquals(modelMessage, decoded.single().modelMessage)
+    }
+
+    @Test
+    fun turnBoundaryCleanupCannotReplacePrimaryPersistenceFailure() {
+        val primary = IllegalStateException("checkpoint write failed")
+        val cleanup = IllegalStateException("compaction event write failed")
+
+        runSubagentTurnBoundaryCleanup(primary) { throw cleanup }
+
+        assertEquals(1, primary.suppressed.size)
+        assertEquals(cleanup, primary.suppressed.single())
+    }
+
+    @Test
+    fun turnBoundaryCleanupStillFailsWhenThereIsNoPrimaryFailure() {
+        val cleanup = IllegalStateException("compaction event write failed")
+
+        val failure = runCatching {
+            runSubagentTurnBoundaryCleanup(null) { throw cleanup }
+        }.exceptionOrNull()
+
+        assertEquals(cleanup, failure)
     }
 
     @Test

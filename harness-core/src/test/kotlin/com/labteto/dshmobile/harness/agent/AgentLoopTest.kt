@@ -285,6 +285,30 @@ class AgentLoopTest {
     }
 
     @Test
+    fun terminalFailureEventCannotReplacePrimaryEventSinkFailure() = runTest {
+        val primary = IllegalStateException("checkpoint write failed")
+        val secondary = IllegalStateException("turn failed write also failed")
+        val loop = AgentLoop(
+            model = AgentModel { AgentModelReply(content = "完成") },
+            tools = AgentToolExecutor { AgentToolResult("") },
+            eventSink = AgentEventSink { event ->
+                when (event) {
+                    is AgentEvent.AssistantObserved -> throw primary
+                    is AgentEvent.TurnFailed -> throw secondary
+                    else -> Unit
+                }
+            },
+            idFactory = { "turn-primary-failure" },
+        )
+
+        val failure = runCatching { loop.run("开始") }.exceptionOrNull()
+
+        assertTrue(failure === primary)
+        assertEquals(1, failure?.suppressed?.size)
+        assertTrue(failure?.suppressed?.single() === secondary)
+    }
+
+    @Test
     fun toolFailureProducesFailureWithoutSyntheticToolResult() = runTest {
         val events = mutableListOf<AgentEvent>()
         val loop = AgentLoop(
