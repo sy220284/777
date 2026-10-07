@@ -146,6 +146,113 @@ class LocalRequestReconstructionTest {
     }
 
     @Test
+    fun unknownRequestUidReturnsNull() {
+        withLog("request-reconstruct-missing") { log ->
+            assertNull(reconstructLocalModelRequest(log, "req-not-found"))
+        }
+    }
+
+    @Test
+    fun versionTwoRequestWithoutMessageSurfaceFailsClosed() {
+        withLog("request-reconstruct-v2-missing-surface") { log ->
+            val messages = listOf(message("user", "任务"))
+            val tools = JsonArray(emptyList())
+            val evidence = buildLocalRequestEvidence(messages, tools)
+            val toolSurface = log.append("request/tool-surface", buildJsonObject {
+                put("version", 2)
+                put("digest", evidence.toolSchemaDigest)
+                put("schemas", tools)
+            })
+            val contextSurface = log.append("request/context-surface", buildJsonObject {
+                put("version", 2)
+                put("digest", evidence.contextDigest)
+                put("messages", evidence.contextMessages)
+                put("redacted", false)
+            })
+            val route = "route-missing-message"
+            val envelope = stableJsonSha256(JsonArray(listOf(
+                JsonPrimitive(route),
+                JsonPrimitive(evidence.messageDigest),
+                JsonPrimitive(evidence.toolSchemaDigest),
+                JsonPrimitive(evidence.contextDigest),
+            )))
+            log.append("request/header", buildJsonObject {
+                put("version", 2)
+                put("request_uid", "req-missing-message")
+                put("route_fingerprint", route)
+                put("message_digest", evidence.messageDigest)
+                put("context_digest", evidence.contextDigest)
+                put("tool_schema_digest", evidence.toolSchemaDigest)
+                put("message_surface_digest", evidence.messageDigest)
+                put("context_surface_digest", evidence.contextDigest)
+                put("tool_surface_seq", toolSurface.sequence)
+                put("context_surface_seq", contextSurface.sequence)
+                put("request_envelope_fingerprint", envelope)
+            })
+
+            val reconstructed = requireNotNull(
+                reconstructLocalModelRequest(log, "req-missing-message"),
+            )
+
+            assertEquals(LocalRequestReconstructionStatus.INVALID, reconstructed.status)
+            assertTrue(reconstructed.issues.any { it.contains("message_surface_seq") })
+        }
+    }
+
+    @Test
+    fun rejectsSurfaceReferenceAtOrAfterHeaderSequence() {
+        withLog("request-reconstruct-future-surface") { log ->
+            val messages = listOf(message("user", "任务"))
+            val tools = JsonArray(emptyList())
+            val evidence = buildLocalRequestEvidence(messages, tools)
+            val toolSurface = log.append("request/tool-surface", buildJsonObject {
+                put("version", 2)
+                put("digest", evidence.toolSchemaDigest)
+                put("schemas", tools)
+            })
+            val contextSurface = log.append("request/context-surface", buildJsonObject {
+                put("version", 2)
+                put("digest", evidence.contextDigest)
+                put("messages", evidence.contextMessages)
+                put("redacted", false)
+            })
+            val route = "route-future"
+            val envelope = stableJsonSha256(JsonArray(listOf(
+                JsonPrimitive(route),
+                JsonPrimitive(evidence.messageDigest),
+                JsonPrimitive(evidence.toolSchemaDigest),
+                JsonPrimitive(evidence.contextDigest),
+            )))
+            val header = log.append("request/header", buildJsonObject {
+                put("version", 2)
+                put("request_uid", "req-future")
+                put("route_fingerprint", route)
+                put("message_digest", evidence.messageDigest)
+                put("context_digest", evidence.contextDigest)
+                put("tool_schema_digest", evidence.toolSchemaDigest)
+                put("message_surface_digest", evidence.messageDigest)
+                put("context_surface_digest", evidence.contextDigest)
+                put("message_surface_seq", 3L)
+                put("tool_surface_seq", toolSurface.sequence)
+                put("context_surface_seq", contextSurface.sequence)
+                put("request_envelope_fingerprint", envelope)
+            })
+            val futureSurface = log.append("request/message-surface", buildJsonObject {
+                put("version", 2)
+                put("digest", evidence.messageDigest)
+                put("messages", JsonArray(messages))
+                put("redacted", false)
+            })
+            assertEquals(header.sequence + 1L, futureSurface.sequence)
+
+            val reconstructed = requireNotNull(reconstructLocalModelRequest(log, "req-future"))
+
+            assertEquals(LocalRequestReconstructionStatus.INVALID, reconstructed.status)
+            assertTrue(reconstructed.issues.any { it.contains("request/header 之前") })
+        }
+    }
+
+    @Test
     fun versionOneRequestRemainsEvidenceOnlyCompatible() {
         withLog("request-reconstruct-v1") { log ->
             val messages = listOf(message("system", "旧规则"), message("user", "旧任务"))
