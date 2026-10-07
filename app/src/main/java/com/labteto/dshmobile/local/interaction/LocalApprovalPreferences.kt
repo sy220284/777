@@ -26,8 +26,8 @@ enum class LocalApprovalMode {
 /**
  * Device-local authority for the global approval mode.
  *
- * The string mode is the current fact. The legacy boolean key remains a downgrade/migration aid:
- * true maps to AUTO and false maps to MANUAL. Fresh installs default to DEFAULT.
+ * The string mode is the only durable fact. The legacy boolean is consumed once during
+ * migration and removed atomically with the new value. Fresh installs default to DEFAULT.
  */
 @Singleton
 class LocalApprovalPreferences internal constructor(
@@ -60,7 +60,7 @@ class LocalApprovalPreferences internal constructor(
 
     @Synchronized
     internal fun currentMode(legacySessionValue: Boolean = false): LocalApprovalMode {
-        if (!preferences.contains(KEY_APPROVAL_MODE)) {
+        if (!preferences.contains(KEY_APPROVAL_MODE) || preferences.contains(KEY_SAFE_AUTO_APPROVAL)) {
             val migrated = when {
                 preferences.contains(KEY_SAFE_AUTO_APPROVAL) ->
                     if (preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, true)) {
@@ -111,7 +111,7 @@ class LocalApprovalPreferences internal constructor(
     private fun persistMode(value: LocalApprovalMode) {
         preferences.edit()
             .putString(KEY_APPROVAL_MODE, value.name.lowercase())
-            .putBoolean(KEY_SAFE_AUTO_APPROVAL, value == LocalApprovalMode.AUTO)
+            .remove(KEY_SAFE_AUTO_APPROVAL)
             .apply()
     }
 

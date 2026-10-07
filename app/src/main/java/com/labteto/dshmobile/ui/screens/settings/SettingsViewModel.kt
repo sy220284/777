@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
@@ -64,6 +65,7 @@ class SettingsViewModel @Inject constructor(
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
+    val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
     val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
         .mapLatest {
@@ -107,6 +109,8 @@ class SettingsViewModel @Inject constructor(
     fun set(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch { hostsStore.setSetting(transform) }
     }
+
+    fun configureApprovalMode(mode: LocalApprovalMode) = localHarness.configureApprovalMode(mode)
 
     fun configureChatStyleGuard(enabled: Boolean) {
         localHarness.configureChatStyleGuard(enabled)
