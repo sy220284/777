@@ -28,9 +28,11 @@ internal object LocalWorkCompletionClaimGuard {
         val activeTeamMembers = workState.team.members.count {
             it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
         }
+        val pendingTeamMessages = workState.team.members.sumOf { it.pendingMessageCount }
         if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
         if (openTeamTasks > 0) findings += "完成声明与未完成 Agent Team 任务冲突"
         if (activeTeamMembers > 0) findings += "完成声明与仍在运行的 Agent Team 成员冲突"
+        if (pendingTeamMessages > 0) findings += "完成声明与待投递 Agent Team 消息冲突"
         if (workState.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
         if (findings.isEmpty()) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
@@ -90,6 +92,11 @@ internal fun guardWorkCompletionDelivery(
         put("changed", true)
         put("delivery_blocked", true)
         put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
+        put("open_team_tasks", state.work.team.tasks.count { it.status == "pending" || it.status == "in_progress" })
+        put("active_team_members", state.work.team.members.count {
+            it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
+        })
+        put("pending_team_messages", state.work.team.members.sumOf { it.pendingMessageCount })
         state.work.goal?.status?.let { put("goal_status", it) }
     })
     val guardedMessage = JsonObject(reply.message + ("content" to JsonPrimitive(result.text)))
@@ -110,11 +117,13 @@ private fun truthfulIncompleteDeliveryText(
     blockedGoal: Boolean,
     openTeamTasks: Int,
     activeTeamMembers: Int,
+    pendingTeamMessages: Int,
 ): String {
     val reasons = buildList {
         if (openTodos > 0) add("仍有 " + openTodos + " 项任务未完成")
         if (openTeamTasks > 0) add("Agent Team 仍有 " + openTeamTasks + " 项任务未完成")
         if (activeTeamMembers > 0) add("仍有 " + activeTeamMembers + " 个智能体在执行")
+        if (pendingTeamMessages > 0) add("仍有 " + pendingTeamMessages + " 条 Team 消息待投递")
         if (blockedGoal) add("目标仍处于阻塞状态")
     }
     return "当前尚未完成：" + reasons.joinToString("；") +
@@ -133,6 +142,11 @@ internal fun recordWorkCompletionQuality(
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
         put("changed", result.changed)
         put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
+        put("open_team_tasks", state.work.team.tasks.count { it.status == "pending" || it.status == "in_progress" })
+        put("active_team_members", state.work.team.members.count {
+            it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
+        })
+        put("pending_team_messages", state.work.team.members.sumOf { it.pendingMessageCount })
         state.work.goal?.status?.let { put("goal_status", it) }
     })
 }

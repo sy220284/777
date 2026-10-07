@@ -80,6 +80,31 @@ class LocalWorkCompletionClaimGuardTest {
     }
 
     @Test
+    fun pendingTeamMailboxBlocksFalseGlobalCompletionClaim() {
+        val state = LocalWorkState(
+            team = LocalAgentTeamUiState(
+                members = listOf(
+                    LocalAgentTeamMemberUiState(
+                        id = "member-1",
+                        jobId = "job-team-1",
+                        name = "reviewer",
+                        description = "审查",
+                        phase = "active",
+                        activity = "dormant",
+                        pendingMessageCount = 2,
+                    ),
+                ),
+            ),
+        )
+
+        val result = LocalWorkCompletionClaimGuard.inspect("全部完成，可以交付。", state)
+
+        assertTrue(result.changed)
+        assertTrue(result.findings.contains("完成声明与待投递 Agent Team 消息冲突"))
+        assertTrue(result.text.contains("仍有 2 条 Team 消息待投递"))
+    }
+
+    @Test
     fun localProgressClaimIsNotMistakenForWholeTaskCompletion() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
