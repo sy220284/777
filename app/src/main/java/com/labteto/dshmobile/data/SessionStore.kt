@@ -44,8 +44,6 @@ import com.labteto.dshmobile.core.wire.dto.RemoteEventRejection
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
-import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
-import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
@@ -81,10 +79,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
