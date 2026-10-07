@@ -9,7 +9,6 @@ class AccentThemeTest {
         assertEquals("default_blue", AccentPalettes.of(null).key)
         assertEquals("default_blue", AccentPalettes.of("").key)
         assertEquals("default_blue", AccentPalettes.of("celadon").key)
-        assertEquals("default_blue", AccentPalettes.of("kimi").key)
         assertEquals("默认蓝", AccentPalettes.DEFAULT.cnName)
         assertEquals("default_blue", AccentPalettes.of("unknown").key)
     }

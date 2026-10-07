@@ -32,7 +32,7 @@ object AccentPalettes {
     val DEFAULT = ALL.first()
 
     fun of(key: String?): AccentPalette = when (key) {
-        null, "", "celadon", "kimi" -> DEFAULT
+        null, "", "celadon" -> DEFAULT
         else -> ALL.firstOrNull { it.key == key } ?: DEFAULT
     }
 }
