@@ -1,30 +1,65 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
+/**
+ * One quiet settings group: a single surface with independent, full-width tap targets.
+ * Section headers live outside it so the content reads as a menu, not stacked cards.
+ */
 @Composable
 internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth(), content = content)
+    val colors = DsTheme.colors
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tonalElevation = 0.dp,
+    ) {
+        Column(Modifier.padding(vertical = DsSpacing.tiny), content = content)
+    }
+}
+
+@Composable
+internal fun AppSettingsDivider() {
+    val colors = DsTheme.colors
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 56.dp, end = DsSpacing.medium)
+            .height(1.dp)
+            .background(colors.borderL1),
+    )
 }
 
 @Composable
@@ -38,26 +73,59 @@ internal fun AppSettingsRow(
 ) {
     val colors = DsTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget)
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = DsSpacing.small),
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        icon?.let { Icon(it, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(20.dp)) }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = DsType.std14, color = colors.labelPrimary)
-            subtitle?.let { Text(it, style = DsType.caption11, color = colors.labelTertiary, maxLines = 2) }
+        icon?.let {
+            Box(
+                modifier = Modifier.size(32.dp).clip(DsShapes.row).background(colors.bgModulePlatform),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(it, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(18.dp))
+            }
         }
-        value?.let {
-            Text(it, modifier = Modifier.weight(0.45f), style = DsType.caption11, color = colors.labelTertiary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+            Text(
+                title,
+                style = DsType.std14.withReadingWeight(),
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(
+                    it,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        if (trailing != null) {
-            trailing()
-        } else if (onClick != null) {
-            Icon(FeatherIcons.ChevronRight, contentDescription = null,
-                tint = colors.labelCaption, modifier = Modifier.size(16.dp))
+        value?.takeIf(String::isNotBlank)?.let {
+            Text(
+                it,
+                modifier = Modifier.widthIn(max = 108.dp),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+            )
+        }
+        trailing?.invoke()
+        if (onClick != null) {
+            Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
