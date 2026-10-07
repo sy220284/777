@@ -59,10 +59,15 @@ RELAY_CONFORMANCE_PATHS = {
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
     "tools/reference-validation/official-runner.ts",
+    "tools/reference-validation/official-advanced-runner.ts",
     "tools/reference-validation/refresh-official-fixtures.sh",
     "tools/reference-validation/package.json",
     "tools/reference-validation/package-lock.json",
 }
+FIXTURE_PROVENANCE_PREFIXES = (
+    "reference-validation/src/test/resources/official-semantic/",
+)
+
 CI_CONTROL_FILES = {
     ".github/workflows/ci.yml",
     ".github/scripts/classify-ci-scope.py",
@@ -103,6 +108,10 @@ ARCHITECTURE_3_PREFIXES = (
 def normalize(path: str) -> str:
     value = path.strip()
     return value[2:] if value.startswith("./") else value
+
+
+def is_fixture_provenance_path(path: str) -> bool:
+    return path in FIXTURE_PROVENANCE_PATHS or path.startswith(FIXTURE_PROVENANCE_PREFIXES)
 
 
 def is_documentation(path: str) -> bool:
@@ -179,7 +188,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
             affects_release = True
             continue
 
-        if path in FIXTURE_PROVENANCE_PATHS:
+        if is_fixture_provenance_path(path):
             unit = True
             fixture = True
             continue
@@ -371,6 +380,13 @@ def self_test() -> None:
         plan = classify([path])
         if not (plan.run_static and plan.run_unit and plan.run_fixture):
             raise AssertionError(f"{path}: fixture provenance change lost required verification: {plan}")
+
+    advanced_fixture = "reference-validation/src/test/resources/official-semantic/advanced.json"
+    plan = classify([advanced_fixture])
+    if not (plan.run_static and plan.run_unit and plan.run_fixture):
+        raise AssertionError(
+            f"{advanced_fixture}: fixture provenance change lost required verification: {plan}"
+        )
 
 
 def main() -> None:
