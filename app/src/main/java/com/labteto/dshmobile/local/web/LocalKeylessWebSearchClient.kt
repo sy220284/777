@@ -22,7 +22,7 @@ internal class LocalKeylessWebSearchClient(private val http: OkHttpClient) {
     suspend fun search(queries: List<String>): String = withContext(Dispatchers.IO) {
         val clean = queries.map(String::trim).filter(String::isNotBlank).distinct().take(4)
         require(clean.isNotEmpty()) { "至少需要一个搜索词" }
-        clean.joinToString("\n\n") { query -> searchOne(query.take(400)) }
+        clean.map { query -> searchOne(query.take(400)) }.joinToString("\n\n")
     }
 
     private suspend fun searchOne(query: String): String {
