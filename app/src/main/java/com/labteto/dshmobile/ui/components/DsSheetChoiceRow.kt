@@ -29,13 +29,13 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 @Composable
 fun DsSheetChoiceRow(
     title: String,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     icon: ImageVector? = null,
     selected: Boolean = false,
     danger: Boolean = false,
     enabled: Boolean = true,
+    onClick: () -> Unit,
 ) {
     val colors = DsTheme.colors
     Surface(
