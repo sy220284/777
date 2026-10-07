@@ -40,7 +40,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 fun DsIconButton(
     icon: ImageVector?,
     contentDescription: String?,
-    iconPainter: Painter? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -49,6 +48,7 @@ fun DsIconButton(
     containerColor: Color = Color.Transparent,
     shadowElevation: Dp = 0.dp,
     selected: Boolean = false,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     val interactionSource = remember { MutableInteractionSource() }

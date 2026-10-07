@@ -101,7 +101,6 @@ fun DsConversationComposer(
 fun DsComposerAction(
     icon: ImageVector?,
     contentDescription: String,
-    iconPainter: Painter? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -110,6 +109,7 @@ fun DsComposerAction(
     visualSize: Dp = DsComposerMetrics.actionVisualSize,
     iconSize: Dp = DsComposerMetrics.actionIconSize,
     content: (@Composable () -> Unit)? = null,
+    iconPainter: Painter? = null,
 ) {
     val resolvedContainer = if (enabled) containerColor else containerColor.copy(alpha = 0.38f)
     val resolvedTint = if (enabled) tint else tint.copy(alpha = 0.38f)

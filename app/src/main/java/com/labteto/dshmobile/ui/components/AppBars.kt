@@ -45,11 +45,11 @@ fun DsTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     actionIcon: ImageVector? = null,
-    actionPainter: Painter? = null,
     actionContentDescription: String? = null,
     actionEnabled: Boolean = true,
     onAction: (() -> Unit)? = null,
     largeTitle: Boolean = false,
+    actionPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     Box(

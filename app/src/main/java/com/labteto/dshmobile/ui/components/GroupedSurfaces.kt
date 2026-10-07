@@ -73,13 +73,13 @@ fun DsGroupCard(
 fun DsCategoryRow(
     icon: ImageVector? = null,
     title: String,
-    iconPainter: Painter? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     value: String? = null,
     iconFamily: DsIconFamily = DsIconFamily.Neutral,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -171,10 +171,10 @@ fun DsCategoryRow(
 fun DsQuickActionTile(
     icon: ImageVector?,
     label: String,
-    iconPainter: Painter? = null,
     onClick: () -> Unit,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     Surface(
