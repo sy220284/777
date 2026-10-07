@@ -78,6 +78,32 @@ internal fun GroupChatMemberPickerSheet(
     DsBottomSheet(
         title = stringResource(R.string.local_group_chat_members_title),
         onDismiss = onDismiss,
+        scrollable = true,
+        footer = {
+        Text(
+            stringResource(
+                R.string.local_group_chat_selected_count,
+                selected.size,
+                MAX_GROUP_CHAT_MEMBERS,
+            ),
+            style = DsType.caption11.withReadingWeight(),
+            color = DsTheme.colors.labelTertiary,
+        )
+        DsButton(
+            text = stringResource(R.string.local_group_chat_apply_members),
+            onClick = {
+                if (onSave(selected.toList())) onDismiss()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled && selected.size in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS,
+        )
+        DsButton(
+            text = stringResource(R.string.common_cancel),
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
+        },
     ) {
         Text(
             stringResource(
@@ -182,28 +208,5 @@ internal fun GroupChatMemberPickerSheet(
             }
         }
 
-        Text(
-            stringResource(
-                R.string.local_group_chat_selected_count,
-                selected.size,
-                MAX_GROUP_CHAT_MEMBERS,
-            ),
-            style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
-        )
-        DsButton(
-            text = stringResource(R.string.local_group_chat_apply_members),
-            onClick = {
-                if (onSave(selected.toList())) onDismiss()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled && selected.size in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS,
-        )
-        DsButton(
-            text = stringResource(R.string.common_cancel),
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
-        )
     }
 }
