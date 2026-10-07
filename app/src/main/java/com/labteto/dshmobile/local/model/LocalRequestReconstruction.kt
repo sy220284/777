@@ -72,6 +72,10 @@ internal fun reconstructLocalModelRequest(
 
     fun surface(sequenceKey: String, expectedType: String): LocalSessionEventLog.Event? {
         val sequence = data[sequenceKey]?.jsonPrimitive?.longOrNull ?: return null
+        if (sequence >= header.sequence) {
+            issues += "$sequenceKey 必须指向 request/header 之前的 Surface：$sequence >= ${header.sequence}"
+            return null
+        }
         val event = eventAt(sequence)
         if (event == null) {
             issues += "$sequenceKey 指向不存在的事件：$sequence"
