@@ -12,8 +12,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,6 +35,127 @@ class LocalAgentTeamRuntimeTest {
     fun cleanup() {
         logs.forEach(LocalSessionEventLog::close)
         scopes.forEach(CoroutineScope::cancel)
+    }
+
+    @Test
+    fun productionProjectionMatchesOfficialAgentTeamGolden() {
+        val official = requireNotNull(
+            javaClass.classLoader?.getResourceAsStream("official-semantic/advanced.json"),
+        ).bufferedReader().use { reader ->
+            Json.parseToJsonElement(reader.readText()).jsonObject["agentTeam"]!!.jsonObject
+        }
+        val fixture = fixture("777-agent-team")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("777-agent-team", "777-agent-team-worker", "worker", "provisioning"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("777-agent-team", "777-agent-team-worker", "worker", "active"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                teamId = "777-agent-team",
+                id = "task-1",
+                revision = 1,
+                blockedBy = emptyList(),
+                subject = "first",
+                writeScopes = listOf("src"),
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                teamId = "777-agent-team",
+                id = "task-2",
+                revision = 1,
+                blockedBy = listOf("task-1"),
+                subject = "second",
+                writeScopes = listOf("src/feature"),
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            buildJsonObject {
+                put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+                put("teamId", "777-agent-team")
+                put("message", buildJsonObject {
+                    put("id", "team-msg-1")
+                    put("senderId", "777-agent-team")
+                    put("senderName", "lead")
+                    put("targetId", "777-agent-team-worker")
+                    put(
+                        "content",
+                        JsonArray(
+                            listOf(
+                                buildJsonObject {
+                                    put("type", "text")
+                                    put("text", "continue")
+                                },
+                            ),
+                        ),
+                    )
+                })
+            },
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            buildJsonObject {
+                put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+                put("teamId", "777-agent-team")
+                put("messageId", "team-msg-1")
+                put("targetId", "777-agent-team-worker")
+            },
+        )
+
+        val projection = fixture.runtime.project("777-agent-team")
+        val native = buildJsonObject {
+            put("stateVersion", LocalAgentTeamRuntime.OFFICIAL_TEAM_PROJECTION_STATE_VERSION)
+            put("asOfSequence", projection.asOfSequence)
+            put(
+                "members",
+                JsonArray(
+                    projection.members.map { member ->
+                        buildJsonObject {
+                            put("id", member.id)
+                            put("name", member.name)
+                            put("description", member.description)
+                            put("provider", member.provider)
+                            put("context", member.context.name.lowercase())
+                            put("phase", member.phase.name.lowercase())
+                            member.error?.let { put("error", it) }
+                        }
+                    },
+                ),
+            )
+            put(
+                "tasks",
+                JsonArray(
+                    projection.tasks
+                        .filter { it.status != LocalTeamTaskStatus.DELETED }
+                        .map { task ->
+                            buildJsonObject {
+                                put("id", task.id)
+                                put("revision", task.revision)
+                                put("subject", task.subject)
+                                put("description", task.description)
+                                put("status", task.status.name.lowercase())
+                                task.ownerId?.let { put("ownerId", it) }
+                                put("blockedBy", JsonArray(task.blockedBy.map(::JsonPrimitive)))
+                                put("writeScopes", JsonArray(task.writeScopes.map(::JsonPrimitive)))
+                            }
+                        },
+                ),
+            )
+            put(
+                "pendingMessageIds",
+                JsonArray(projection.pendingMessages.map { JsonPrimitive(it.id) }),
+            )
+            put("failure", projection.failure?.let(::JsonPrimitive) ?: JsonNull)
+        }
+
+        assertEquals(official, native)
     }
 
     @Test
@@ -235,17 +358,19 @@ class LocalAgentTeamRuntimeTest {
         id: String,
         revision: Int,
         blockedBy: List<String>,
+        subject: String = id,
+        writeScopes: List<String> = emptyList(),
     ) = buildJsonObject {
         put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("task", buildJsonObject {
             put("id", id)
             put("revision", revision)
-            put("subject", id)
+            put("subject", subject)
             put("description", "")
             put("status", "pending")
             put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
-            put("writeScopes", JsonArray(emptyList()))
+            put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
         })
     }
 }
