@@ -231,6 +231,36 @@ class LocalSubagentContinuationTest {
     }
 
     @Test
+    fun stepZeroForkSeedCheckpointIsRecoverableAndNonTerminal() {
+        val encoded = encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-team-seed",
+            agentId = localPersistentSubagentId("job-team-seed"),
+            step = 0,
+            history = listOf(
+                buildJsonObject {
+                    put("role", "system")
+                    put("content", "继承父历史")
+                },
+                buildJsonObject {
+                    put("role", "user")
+                    put("content", "新子任务")
+                },
+            ),
+            claimedMessageIds = emptySet(),
+        )
+
+        val decoded = requireNotNull(decodeLocalSubagentHistoryCheckpoint(encoded))
+
+        assertEquals(0, decoded.step)
+        assertEquals(null, decoded.terminalOutput)
+        assertEquals(
+            false,
+            shouldSettleCompletedSubagentCheckpoint(decoded, emptySet()),
+        )
+        assertEquals("sa-team-seed", localPersistentSubagentId("job-team-seed"))
+    }
+
+    @Test
     fun rejectsCheckpointWithRolelessHistoryMessage() {
         val encoded = encodeLocalSubagentHistoryCheckpoint(
             backgroundJobId = "job-1",
