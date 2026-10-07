@@ -161,11 +161,11 @@ internal class LocalAgentTeamRuntime(
     ): String {
         val cleanName = normalizeName(name)
         val before = project(binding.sessionId)
-        require(before.members.none { it.name == cleanName && it.phase != LocalTeamMemberPhase.FAILED }) {
-            "TEAM_MEMBER_NAME_CONFLICT：成员名称已存在：$cleanName"
+        require(before.members.none { it.name == cleanName }) {
+            "TEAM_MEMBER_NAME_CONFLICT：成员名称一经使用不可复用：$cleanName"
         }
-        require(before.members.count { it.phase == LocalTeamMemberPhase.ACTIVE } < MAX_TEAMMATES) {
-            "TEAM_MEMBER_LIMIT：最多允许 $MAX_TEAMMATES 个 active teammate"
+        require(before.members.size < MAX_TEAMMATES) {
+            "TEAM_MEMBER_LIMIT：最多允许 $MAX_TEAMMATES 个 teammate（包括 failed）"
         }
         val start = startTeammate(
             binding,
@@ -182,7 +182,12 @@ internal class LocalAgentTeamRuntime(
             id = memberId,
             jobId = jobId,
             name = cleanName,
-            description = description.trim().take(MAX_DESCRIPTION_CHARS),
+            description = boundedTeamText(
+                value = description,
+                field = "description",
+                maxChars = MAX_DESCRIPTION_CHARS,
+                allowEmpty = true,
+            ),
             phase = LocalTeamMemberPhase.PROVISIONING,
         )
         return try {
@@ -216,14 +221,22 @@ internal class LocalAgentTeamRuntime(
         val member = state.members.singleOrNull {
             it.name == targetName.trim() && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：找不到 active teammate：$targetName")
+        val cleanMessage = message.trim()
+        require(cleanMessage.isNotEmpty()) { "TEAM_MESSAGE_REQUIRED：消息不能为空" }
+        require(cleanMessage.toByteArray(Charsets.UTF_8).size <= MAX_MESSAGE_BYTES) {
+            "TEAM_MESSAGE_TOO_LARGE：消息超过 $MAX_MESSAGE_BYTES UTF-8 字节"
+        }
+        require(state.pendingMessages.count { it.targetId == member.id } < MAX_PENDING_MESSAGES_PER_MEMBER) {
+            "TEAM_MAILBOX_LIMIT：" + member.name +
+                " 的待投递消息已达 $MAX_PENDING_MESSAGES_PER_MEMBER 条"
+        }
         val snapshot = LocalTeamMessageSnapshot(
             id = "team-msg-" + UUID.randomUUID().toString().replace("-", "").take(20),
             senderId = sessionId,
             senderName = "lead",
             targetId = member.id,
-            content = message.trim().take(MAX_MESSAGE_CHARS),
+            content = cleanMessage,
         )
-        require(snapshot.content.isNotEmpty()) { "TEAM_MESSAGE_REQUIRED：消息不能为空" }
         val log = eventLogFor(sessionId)
         log.append(TEAM_MESSAGE_QUEUED, snapshot.toEvent(sessionId))
         val delivered = deliverMessage(sessionId, snapshot, member)
@@ -284,8 +297,18 @@ internal class LocalAgentTeamRuntime(
         val task = LocalTeamTaskSnapshot(
             id = id,
             revision = 1,
-            subject = subject.trim().take(MAX_SUBJECT_CHARS),
-            description = description.trim().take(MAX_DESCRIPTION_CHARS),
+            subject = boundedTeamText(
+                value = subject,
+                field = "subject",
+                maxChars = MAX_SUBJECT_CHARS,
+                allowEmpty = false,
+            ),
+            description = boundedTeamText(
+                value = description,
+                field = "description",
+                maxChars = MAX_DESCRIPTION_CHARS,
+                allowEmpty = true,
+            ),
             status = LocalTeamTaskStatus.PENDING,
             blockedBy = normalizeTaskIds(blockedBy),
             writeScopes = normalizeWriteScopes(writeScopes),
@@ -340,6 +363,30 @@ internal class LocalAgentTeamRuntime(
                 }
                 next.copy(status = LocalTeamTaskStatus.COMPLETED)
             }
+            "reopen" -> {
+                require(current.status == LocalTeamTaskStatus.COMPLETED) {
+                    "TEAM_TASK_STATUS_INVALID：只有 completed 任务可以 reopen"
+                }
+                next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
+            }
+            "reassign" -> {
+                require(
+                    current.status == LocalTeamTaskStatus.PENDING ||
+                        current.status == LocalTeamTaskStatus.IN_PROGRESS,
+                ) {
+                    "TEAM_TASK_STATUS_INVALID：只有 pending / in_progress 任务可以 reassign"
+                }
+                val requestedOwner = ownerName?.trim()?.takeIf(String::isNotBlank)
+                if (requestedOwner == null) {
+                    next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
+                } else {
+                    require(dependenciesReady(current, state.tasks)) {
+                        "TEAM_TASK_BLOCKED：依赖尚未完成"
+                    }
+                    val member = resolveOwner(state, requestedOwner)
+                    next.copy(status = LocalTeamTaskStatus.IN_PROGRESS, ownerId = member.id)
+                }
+            }
             "delete" -> {
                 val dependents = state.tasks.filter { task ->
                     task.status != LocalTeamTaskStatus.DELETED &&
@@ -357,12 +404,20 @@ internal class LocalAgentTeamRuntime(
                     blockedBy ?: error("TEAM_TASK_DEPENDENCIES_REQUIRED：blocked_by 必填"),
                 ),
             )
-            "update" -> next.copy(
-                subject = subject?.trim()?.take(MAX_SUBJECT_CHARS) ?: current.subject,
-                description = description?.trim()?.take(MAX_DESCRIPTION_CHARS)
-                    ?: current.description,
-                writeScopes = writeScopes?.let(::normalizeWriteScopes) ?: current.writeScopes,
-            )
+            "edit", "update" -> {
+                require(subject != null || description != null || writeScopes != null) {
+                    "TEAM_TASK_EDIT_REQUIRED：edit 至少需要 subject / description / write_scopes 之一"
+                }
+                next.copy(
+                    subject = subject?.let {
+                        boundedTeamText(it, "subject", MAX_SUBJECT_CHARS, allowEmpty = false)
+                    } ?: current.subject,
+                    description = description?.let {
+                        boundedTeamText(it, "description", MAX_DESCRIPTION_CHARS, allowEmpty = true)
+                    } ?: current.description,
+                    writeScopes = writeScopes?.let(::normalizeWriteScopes) ?: current.writeScopes,
+                )
+            }
             else -> error("TEAM_TASK_ACTION_INVALID：不支持的 action=$action")
         }
         validateTaskTransition(state.tasks, previous = current, next = next)
@@ -601,6 +656,7 @@ internal class LocalAgentTeamRuntime(
                 )
                 LocalTeamTaskStatus.COMPLETED -> setOf(
                     LocalTeamTaskStatus.COMPLETED,
+                    LocalTeamTaskStatus.PENDING,
                     LocalTeamTaskStatus.DELETED,
                 )
                 LocalTeamTaskStatus.DELETED -> emptySet()
@@ -650,11 +706,16 @@ internal class LocalAgentTeamRuntime(
         return map.keys.any(::visit)
     }
 
-    private fun isReady(task: LocalTeamTaskSnapshot, tasks: List<LocalTeamTaskSnapshot>): Boolean {
-        if (task.status != LocalTeamTaskStatus.PENDING) return false
+    private fun dependenciesReady(
+        task: LocalTeamTaskSnapshot,
+        tasks: List<LocalTeamTaskSnapshot>,
+    ): Boolean {
         val byId = tasks.associateBy(LocalTeamTaskSnapshot::id)
         return task.blockedBy.all { byId[it]?.status == LocalTeamTaskStatus.COMPLETED }
     }
+
+    private fun isReady(task: LocalTeamTaskSnapshot, tasks: List<LocalTeamTaskSnapshot>): Boolean =
+        task.status == LocalTeamTaskStatus.PENDING && dependenciesReady(task, tasks)
 
     private fun writeScopeWarnings(
         task: LocalTeamTaskSnapshot,
@@ -690,11 +751,18 @@ internal class LocalAgentTeamRuntime(
         .take(MAX_WRITE_SCOPES)
         .toList()
 
-    private fun normalizeTaskIds(values: List<String>): List<String> = values
-        .map(String::trim)
-        .filter(String::isNotBlank)
-        .distinct()
-        .take(MAX_BLOCKERS)
+    private fun normalizeTaskIds(values: List<String>): List<String> {
+        val normalized = values
+            .map(String::trim)
+            .filter(String::isNotBlank)
+        require(normalized.size <= MAX_BLOCKERS) {
+            "TEAM_TASK_BLOCKER_LIMIT：最多允许 $MAX_BLOCKERS 个依赖"
+        }
+        require(normalized.distinct().size == normalized.size) {
+            "TEAM_TASK_BLOCKER_DUPLICATE：blocked_by 不能包含重复任务"
+        }
+        return normalized
+    }
 
     private fun nextTaskId(tasks: List<LocalTeamTaskSnapshot>): String =
         "task-" + ((tasks.maxOfOrNull(::taskNumber) ?: 0) + 1)
@@ -703,9 +771,26 @@ internal class LocalAgentTeamRuntime(
         task.id.removePrefix("task-").toIntOrNull() ?: Int.MAX_VALUE
 
     private fun normalizeName(value: String): String {
-        val clean = value.trim().replace(Regex("\\s+"), "-").take(MAX_NAME_CHARS)
-        require(clean.matches(Regex("[A-Za-z0-9_-]+"))) {
-            "TEAM_MEMBER_NAME_INVALID：名称只允许字母、数字、下划线和短横线"
+        val clean = value.trim().replace(Regex("\\s+"), "-").lowercase()
+        require(clean.isNotEmpty() && clean.length <= MAX_NAME_CHARS) {
+            "TEAM_MEMBER_NAME_INVALID：名称长度必须在 1..$MAX_NAME_CHARS"
+        }
+        require(clean.matches(Regex("[a-z0-9_-]+"))) {
+            "TEAM_MEMBER_NAME_INVALID：名称只允许小写字母、数字、下划线和短横线"
+        }
+        return clean
+    }
+
+    private fun boundedTeamText(
+        value: String,
+        field: String,
+        maxChars: Int,
+        allowEmpty: Boolean,
+    ): String {
+        val clean = value.trim()
+        require(allowEmpty || clean.isNotEmpty()) { "TEAM_ARGUMENT_REQUIRED：$field" }
+        require(clean.length <= maxChars) {
+            "TEAM_ARGUMENT_TOO_LARGE：$field 超过 $maxChars 字符"
         }
         return clean
     }
@@ -808,7 +893,8 @@ internal class LocalAgentTeamRuntime(
         private const val MAX_NAME_CHARS = 48
         private const val MAX_SUBJECT_CHARS = 240
         private const val MAX_DESCRIPTION_CHARS = 2_000
-        private const val MAX_MESSAGE_CHARS = 8_000
+        private const val MAX_MESSAGE_BYTES = 65_536
+        private const val MAX_PENDING_MESSAGES_PER_MEMBER = 64
         private const val MAX_ERROR_CHARS = 1_000
         private const val MAX_BLOCKERS = 32
         private const val MAX_WRITE_SCOPES = 32
