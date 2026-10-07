@@ -17,6 +17,10 @@ import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +29,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -68,6 +73,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val runProfile = modelGateway.profileForRun(model)
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
+        val capabilities = LocalSubagentCapabilities(
+            allowMutation = false,
+            continuable = true,
+            virtualScreen = virtualScreen,
+            historyMode = LocalSubagentHistoryMode.ISOLATED,
+            maxDepth = 1,
+        )
         val payload = buildJsonObject {
             put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
             put("session_id", sessionId)
@@ -80,7 +92,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             runProfile.credentialRef?.let { put("credential_ref", it) }
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
-            put("virtual_screen", virtualScreen)
+            put("capabilities", encodeCapabilities(capabilities))
         }.toString()
         return jobs.startPersistent(
             label = "子代理：${task.take(100)}",
@@ -91,13 +103,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
         ) { jobId, _ ->
             withContext(LocalModelRunContext(runProfile)) {
                 runner.runResult(
-                    task = task,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    backgroundJobId = jobId,
-                    modelOverride = null,
-                    maxSteps = maxSteps,
-                    virtualScreen = virtualScreen,
+                    LocalSubagentLaunchSpec(
+                        task = task,
+                        modelOverride = null,
+                        maxSteps = maxSteps,
+                        backgroundJobId = jobId,
+                        capabilities = capabilities,
+                    ),
                 ).requireCompletedOutput()
             }
         }
@@ -208,7 +220,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     ) {
         val version = payload["version"]?.jsonPrimitive?.intOrNull
             ?: error("旧版持久子代理缺少路由身份，已停止自动续跑")
-        require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
+        require(version in MIN_PERSISTENT_SUBAGENT_RESUME_VERSION..PERSISTENT_SUBAGENT_RESUME_VERSION) {
             "持久子代理恢复版本不受支持：$version"
         }
         val task = payload.requiredString("task")
@@ -219,7 +231,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val protocol = payload.requiredString("protocol")
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
-        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+        val capabilities = decodeCapabilities(payload, version)
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -291,13 +303,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
             withContext(LocalModelRunContext(profile)) {
                 runner.runResult(
-                    task = task,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    backgroundJobId = jobId,
-                    modelOverride = null,
-                    maxSteps = maxSteps,
-                    virtualScreen = virtualScreen,
+                    spec = validateLocalSubagentLaunchSpec(
+                        LocalSubagentLaunchSpec(
+                            task = task,
+                            modelOverride = null,
+                            maxSteps = maxSteps,
+                            backgroundJobId = jobId,
+                            capabilities = capabilities,
+                        ),
+                    ),
                     recoveredHistory = recoveredHistory,
                     recoveredClaimedMessageIds = recoveredClaimedIds,
                     recoveredStep = continuation?.step ?: 0,
@@ -349,6 +363,59 @@ internal class LocalPersistentJobRecoveryCoordinator(
         return recovered
     }
 
+    private fun encodeCapabilities(
+        capabilities: LocalSubagentCapabilities,
+    ): JsonObject = buildJsonObject {
+        put("allow_mutation", capabilities.allowMutation)
+        put("continuable", capabilities.continuable)
+        put("virtual_screen", capabilities.virtualScreen)
+        put("history_mode", capabilities.historyMode.name.lowercase())
+        put("max_depth", capabilities.maxDepth)
+        capabilities.toolAllowlist?.let { allowlist ->
+            put(
+                "tool_allowlist",
+                JsonArray(allowlist.sorted().map(kotlinx.serialization.json::JsonPrimitive)),
+            )
+        }
+    }
+
+    private fun decodeCapabilities(
+        payload: JsonObject,
+        version: Int,
+    ): LocalSubagentCapabilities {
+        if (version <= 1) {
+            return LocalSubagentCapabilities(
+                allowMutation = false,
+                continuable = true,
+                virtualScreen =
+                    payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
+                historyMode = LocalSubagentHistoryMode.ISOLATED,
+                maxDepth = 1,
+            )
+        }
+        val data = payload["capabilities"] as? JsonObject
+            ?: error("持久子代理 V2 缺少 capabilities")
+        val historyMode = when (
+            data["history_mode"]?.jsonPrimitive?.contentOrNull
+                ?.lowercase()
+        ) {
+            "isolated" -> LocalSubagentHistoryMode.ISOLATED
+            "inherit_parent" -> LocalSubagentHistoryMode.INHERIT_PARENT
+            else -> error("持久子代理 capabilities.history_mode 无效")
+        }
+        val toolAllowlist = (data["tool_allowlist"] as? JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?.toSet()
+        return LocalSubagentCapabilities(
+            allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
+            continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
+            virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
+            historyMode = historyMode,
+            maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
+            toolAllowlist = toolAllowlist,
+        )
+    }
+
     private fun effectiveProtocol(profile: LocalModelProfile): String =
         if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
             LocalModelProtocol.RESPONSES.name
@@ -376,7 +443,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
         this[key]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
             ?: error("恢复任务缺少 $key")
     private companion object {
-        const val PERSISTENT_SUBAGENT_RESUME_VERSION = 1
+        const val MIN_PERSISTENT_SUBAGENT_RESUME_VERSION = 1
+        const val PERSISTENT_SUBAGENT_RESUME_VERSION = 2
         const val RECOVERY_EVENT_PAGE_SIZE = 200
         const val MAX_RECOVERY_EVENT_PAGES = 64
     }
