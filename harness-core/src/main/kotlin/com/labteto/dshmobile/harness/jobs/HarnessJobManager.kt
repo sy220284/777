@@ -269,6 +269,9 @@ class HarnessJobManager(
         val record = synchronized(lock) {
             if (ownerId in removingOwners) return "会话正在移除，无法启动后台任务"
             pruneRetainedLocked()
+            if (records.size >= maxRetainedJobs) {
+                return "后台任务记录已满：请先结束不再需要的持久代理"
+            }
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
