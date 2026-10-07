@@ -433,6 +433,53 @@ internal object FeatherIcons {
         }
     }
 
+    /** `arrow-down` — jump to latest / downward navigation. */
+    val ArrowDown: ImageVector by lazy {
+        feather("ArrowDown") {
+            moveTo(12f, 5f); lineTo(12f, 19f)
+            moveTo(5f, 12f); lineTo(12f, 19f); lineTo(19f, 12f)
+        }
+    }
+
+    /** `copy` — copy text / plan action. */
+    val Copy: ImageVector by lazy {
+        feather("Copy") {
+            rectangle(9f, 9f, 12f, 12f)
+            moveTo(15f, 5f)
+            horizontalLineTo(5f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = false, -2f, 2f)
+            verticalLineToRelative(10f)
+        }
+    }
+
+    /** `thumbs-up` — positive message feedback. */
+    val ThumbsUp: ImageVector by lazy {
+        feather("ThumbsUp") {
+            moveTo(7f, 10f); verticalLineTo(22f); horizontalLineTo(3f); verticalLineTo(10f); close()
+            moveTo(7f, 10f); lineTo(11f, 2f)
+            curveTo(13f, 2f, 14f, 3.5f, 13.5f, 5.5f)
+            lineTo(13f, 8f); horizontalLineTo(19f)
+            curveTo(21f, 8f, 22f, 9.5f, 21.5f, 11f)
+            lineTo(19f, 20f)
+            curveTo(18.7f, 21.2f, 17.8f, 22f, 16.5f, 22f)
+            horizontalLineTo(7f)
+        }
+    }
+
+    /** `thumbs-down` — negative message feedback. */
+    val ThumbsDown: ImageVector by lazy {
+        feather("ThumbsDown") {
+            moveTo(17f, 14f); verticalLineTo(2f); horizontalLineTo(21f); verticalLineTo(14f); close()
+            moveTo(17f, 14f); lineTo(13f, 22f)
+            curveTo(11f, 22f, 10f, 20.5f, 10.5f, 18.5f)
+            lineTo(11f, 16f); horizontalLineTo(5f)
+            curveTo(3f, 16f, 2f, 14.5f, 2.5f, 13f)
+            lineTo(5f, 4f)
+            curveTo(5.3f, 2.8f, 6.2f, 2f, 7.5f, 2f)
+            horizontalLineTo(17f)
+        }
+    }
+
     /** `arrow-up` — send/queue action. */
     val ArrowUp: ImageVector by lazy {
         feather("ArrowUp") {

@@ -11,12 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.CallSplit
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -238,7 +232,7 @@ internal fun FileChip(name: String, bytes: Long, modifier: Modifier = Modifier) 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
-            Icons.Outlined.Description,
+            FeatherIcons.FileText,
             contentDescription = null,
             tint = colors.labelSecondary,
             modifier = Modifier.size(18.dp),
@@ -310,7 +304,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ActionIcon(
-                    Icons.Outlined.ContentCopy,
+                    FeatherIcons.Copy,
                     stringResource(R.string.chat_copy_answer),
                 ) {
                     clipboard.setText(AnnotatedString(finalText))
@@ -333,13 +327,13 @@ private fun MessageActionsRow(node: AssistantMessageNode, context: ChatNodeConte
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ActionIcon(Icons.AutoMirrored.Outlined.CallSplit, stringResource(R.string.chat_branch_message)) {
+        ActionIcon(FeatherIcons.GitBranch, stringResource(R.string.chat_branch_message)) {
             context.onBranchFrom(node.seq)
         }
-        ActionIcon(Icons.Filled.ThumbUp, stringResource(R.string.chat_feedback_up)) {
+        ActionIcon(FeatherIcons.ThumbsUp, stringResource(R.string.chat_feedback_up)) {
             context.onFeedback(node.seq, true)
         }
-        ActionIcon(Icons.Filled.ThumbDown, stringResource(R.string.chat_feedback_down)) {
+        ActionIcon(FeatherIcons.ThumbsDown, stringResource(R.string.chat_feedback_down)) {
             context.onFeedback(node.seq, false)
         }
     }

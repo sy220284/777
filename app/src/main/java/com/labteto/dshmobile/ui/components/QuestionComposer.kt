@@ -20,12 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -308,7 +302,7 @@ private fun QuestionHeader(
             Spacer(Modifier.width(4.dp))
         }
         DsIconButton(
-            icon = Icons.Filled.Close,
+            icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.questions_dismiss),
             onClick = onDismiss,
             enabled = !busy,
@@ -426,7 +420,7 @@ private fun OptionMarker(ordinal: Int, selected: Boolean, multiSelect: Boolean) 
             if (multiSelect) {
                 if (selected) {
                     Icon(
-                        Icons.Filled.Check,
+                        FeatherIcons.Check,
                         contentDescription = null,
                         tint = colors.onAccent,
                         modifier = Modifier.size(12.dp),
@@ -482,7 +476,7 @@ private fun CustomAnswerField(
                     OptionMarker(ordinal = 0, selected = value.isNotBlank(), multiSelect = true)
                 } else {
                     Icon(
-                        Icons.Filled.Edit,
+                        FeatherIcons.Edit3,
                         contentDescription = null,
                         tint = colors.labelTertiary,
                         modifier = Modifier.size(16.dp),
@@ -534,14 +528,14 @@ private fun QuestionFooter(
     ) {
         if (count > 1) {
             DsIconButton(
-                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                icon = FeatherIcons.ArrowLeft,
                 contentDescription = stringResource(R.string.questions_nav_previous),
                 onClick = onPrevious,
                 enabled = index > 0 && !busy,
                 iconSize = 18.dp,
             )
             DsIconButton(
-                icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                icon = FeatherIcons.ChevronRight,
                 contentDescription = stringResource(R.string.questions_nav_next),
                 onClick = onNext,
                 enabled = index < count - 1 && !busy,
