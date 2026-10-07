@@ -23,10 +23,12 @@ Session format reference: V4
 
 ## 结构
 
-- `official-runner.ts`：只在刷新官方 fixture 时运行。
-- `refresh-official-fixtures.sh`：拉取锁定提交并重新生成官方黄金结果。
-- `reference-validation/src/test/resources/official/`：提交到仓库的固定黄金结果。
-- `:reference-validation:test`：运行 Android 原生实现并与黄金结果比较。
+- `official-runner.ts`：只在刷新基础 AgentLoop fixture 时运行。
+- `official-semantic-runner.ts`：只在刷新高级官方语义快照时运行；直接调用锁定官方包，不经过 777 实现。
+- `refresh-official-fixtures.sh`：拉取锁定提交并重新生成两类官方黄金结果。
+- `reference-validation/src/test/resources/official/`：基础 AgentLoop 固定黄金结果。
+- `reference-validation/src/test/resources/official-semantic/`：高级语义固定黄金结果。
+- `:reference-validation:test`：运行 Android 原生实现并与两类黄金结果比较。
 
 ## 覆盖
 
@@ -42,6 +44,16 @@ Session format reference: V4
 - 空工具输出。
 
 基础黄金 fixture 只证明锁定官方版本的 AgentLoop 核心调度结果；它不代表整个 Android Harness 与官方所有高级子系统语义等价。
+
+高级语义 fixture 与基础回复向量分开维护。当前首个高级 fixture 覆盖 Session Projection Registry：
+
+- `stateVersion=0` 合法；
+- 同 key + 同 stateVersion 共享首个注册 unit；
+- 同 key + 不同 stateVersion 明确拒绝；
+- 同版本重复注册采用引用计数，最后一个 disposer 退出后能力消失；
+- 多 projection/多事件读取使用同一 `asOfSequence` 事件切面。
+
+高级 fixture 同样只能由锁定官方源码运行生成，禁止手写“预期值”冒充官方行为。
 
 不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
 
