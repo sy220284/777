@@ -9,6 +9,13 @@ import org.junit.Test
 
 class LocalSubagentContinuationTest {
     @Test
+    fun coldResumeKeepsContinuousStepNumbersAcrossActivations() {
+        assertEquals(8, continuousSubagentStep(recoveredStep = 7, activationStep = 1))
+        assertEquals(12, continuousSubagentStep(recoveredStep = 7, activationStep = 5))
+        assertEquals(1, continuousSubagentStep(recoveredStep = 0, activationStep = 1))
+    }
+
+    @Test
     fun roundTripsHistoryClaimedMessagesAndStep() {
         val history = listOf(
             buildJsonObject {
