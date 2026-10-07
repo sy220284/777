@@ -43,7 +43,9 @@ internal object LocalToolPolicy {
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
         "skill", "subagent_fork", "list_subagent_models", "list_agents", "send_message",
-        "interrupt_agent", "workflow", "memory_search", "memory_list", "memory_remember",
+        "interrupt_agent", "workflow", "team_members", "team_spawn", "team_send_message",
+        "team_task_create", "team_task_get", "team_task_list", "team_task_update",
+        "team_interrupt", "team_wait", "memory_search", "memory_list", "memory_remember",
         "memory_update", "memory_forget", "session_search", "session_trace",
         "session_event_trace", "session_event_read", "present" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
@@ -97,13 +99,16 @@ internal object LocalToolPolicy {
         "update_plan", "exit_plan_mode", "todo_write", "create_goal", "update_goal",
         "ask_user_question", "memory_remember", "memory_update", "memory_forget" -> ToolAccess.SESSION_WRITE
         "bash", "job_kill" -> ToolAccess.PROCESS
-        "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent" -> ToolAccess.AGENT_CONTROL
+        "subagent", "subagent_fork", "workflow", "send_message", "interrupt_agent",
+        "team_spawn", "team_send_message", "team_task_create", "team_task_update",
+        "team_interrupt" -> ToolAccess.AGENT_CONTROL
         "web_search", "web_fetch", "network_diagnose" -> ToolAccess.NETWORK
         "http_request" -> ToolAccess.PRIVILEGED
         "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "environment_info", "capability_search", "get_goal", "skill", "list_subagent_models", "list_agents",
         "session_event_search", "session_search", "memory_search", "memory_list",
-        "session_trace", "session_event_trace", "session_event_read" -> ToolAccess.READ_ONLY
+        "session_trace", "session_event_trace", "session_event_read",
+        "team_members", "team_task_get", "team_task_list", "team_wait" -> ToolAccess.READ_ONLY
         else -> error("内置工具尚未声明权限：$name")
     }
 
@@ -119,7 +124,9 @@ internal object LocalToolPolicy {
             "ask_user_question" -> "任务"
             "skill" -> "技能"
             "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents",
-            "send_message", "interrupt_agent" -> "智能体"
+            "send_message", "interrupt_agent", "team_members", "team_spawn", "team_send_message",
+            "team_task_create", "team_task_get", "team_task_list", "team_task_update",
+            "team_interrupt", "team_wait" -> "智能体"
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" -> "记忆"
             "session_event_search", "session_search", "session_trace", "session_event_trace",
             "session_event_read" -> "会话"
@@ -155,6 +162,9 @@ internal object LocalToolPolicy {
             "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表")
             "list_agents", "send_message", "interrupt_agent" -> setOf("代理", "agent", "子任务", "消息", "中断")
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
+            "team_members", "team_spawn", "team_send_message", "team_task_create",
+            "team_task_get", "team_task_list", "team_task_update", "team_interrupt",
+            "team_wait" -> setOf("智能体团队", "多代理协作", "agent team", "teammate", "任务板", "mailbox")
             "memory_search" -> setOf("搜索记忆", "查找记忆", "memory")
             "memory_list" -> setOf("记忆列表", "查看记忆", "memory")
             "memory_remember" -> setOf("记住", "长期记忆", "memory")
@@ -183,6 +193,7 @@ internal object LocalToolPolicy {
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
+        "team_send_message", "team_interrupt",
         "http_request", "session_event_search", "session_trace", "session_event_trace", "session_event_read",
         "memory_update", "memory_forget" -> ToolApprovalPolicy.ALWAYS
         else -> { access(name); ToolApprovalPolicy.NEVER }
