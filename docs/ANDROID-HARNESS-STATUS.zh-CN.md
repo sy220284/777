@@ -58,6 +58,8 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - 有界模型请求重试。
 - 主代理与子代理统一核心循环。
 - 普通子代理、fork 子代理、持久子代理；持久只读子代理具备稳定 Agent 身份、持久 Inbox、历史 Checkpoint 与冷恢复续跑。
+- 子代理启动使用显式能力契约；请求独立虚拟屏但资源不可用时直接失败，不再降级成主屏/无虚拟屏执行。
+- `subagent` / `subagent_fork` / `workflow` 支持可选 `output_schema`；最终结果必须通过受控 JSON Schema 子集校验后才可作为 completed 结果和 terminal checkpoint，结构不合法以 `STRUCTURED_OUTPUT_INVALID` 失败返回。
 - 并行 / 流水线工作流。
 - Goal / Todo / Plan。
 - 用户提问与审批。
