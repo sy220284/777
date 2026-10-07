@@ -42,6 +42,18 @@ internal fun LocalModelPickerSheet(
     DsBottomSheet(
         title = stringResource(R.string.models_title),
         onDismiss = onDismiss,
+        scrollable = true,
+        footer = {
+        DsButton(
+            text = stringResource(R.string.local_manage_model_config),
+            onClick = {
+                onDismiss()
+                onConfigure()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
+        },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             profiles.forEach { profile ->
@@ -100,14 +112,5 @@ internal fun LocalModelPickerSheet(
                 }
             }
         }
-        DsButton(
-            text = stringResource(R.string.local_manage_model_config),
-            onClick = {
-                onDismiss()
-                onConfigure()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
-        )
     }
 }
