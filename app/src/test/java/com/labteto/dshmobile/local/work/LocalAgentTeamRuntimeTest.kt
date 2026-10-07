@@ -842,6 +842,43 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun agentMessageCursorScansPastLargeUnrelatedEventBacklog() {
+        val fixture = fixture("team-message-deep-scan")
+        appendActiveMember(fixture.log, "team-message-deep-scan")
+        val baseline = fixture.log.latestSequence()
+
+        repeat(3_000) { index ->
+            fixture.log.append(
+                "test/noise",
+                buildJsonObject {
+                    put("index", index)
+                },
+            )
+        }
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 7,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "深层结果仍可找到",
+            ),
+        )
+
+        val messages = fixture.runtime.agentMessages(
+            sessionId = "team-message-deep-scan",
+            targetName = "worker",
+            limit = 1,
+            afterSequence = baseline,
+        )
+
+        assertEquals(1, messages.size)
+        assertEquals("深层结果仍可找到", messages.single().content)
+    }
+
+    @Test
     fun discardedMailboxMessageLeavesPendingSetAndCannotLaterDeliver() {
         val fixture = fixture("team-message-discard")
         appendActiveMember(fixture.log, "team-message-discard")
