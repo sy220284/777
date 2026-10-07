@@ -30,10 +30,8 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 enum class DsStatus { Running, Done, Warning, Failed, Neutral }
 
 /**
- * Full-size status badge (运行中 / 已完成 / 失败).
- *
- * Running owns the only motion: a restrained breathing dot. Terminal states render fully static so
- * history remains calm even when a page contains many completed rows.
+ * Kimi-style status label: the chip stays neutral and semantic color is confined to the 6dp dot.
+ * Running owns the only motion; settled history is static.
  */
 @Composable
 fun DsStatusPill(
@@ -42,22 +40,26 @@ fun DsStatusPill(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val (dot, tint) = when (state) {
-        DsStatus.Running -> colors.accent to colors.accentTertiary
-        DsStatus.Done -> colors.success to colors.successTertiary
-        DsStatus.Warning -> colors.warnLabel to colors.warnTertiary
-        DsStatus.Failed -> colors.error to colors.errorTertiary
-        DsStatus.Neutral -> colors.labelTertiary to colors.hover
+    val dot = when (state) {
+        DsStatus.Running -> colors.accent
+        DsStatus.Done -> colors.success
+        DsStatus.Warning -> colors.warnLabel
+        DsStatus.Failed -> colors.error
+        DsStatus.Neutral -> colors.labelTertiary
     }
     Row(
         modifier = modifier
-            .background(tint, DsShapes.pillFull)
+            .background(colors.bgModulePlatform, DsShapes.pillFull)
             .padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DsStatusDot(color = dot, running = state == DsStatus.Running)
         Spacer(Modifier.width(5.dp))
-        Text(label, style = DsType.caption11Strong.withReadingWeight(), color = dot)
+        Text(
+            text = label,
+            style = DsType.caption11Strong.withReadingWeight(),
+            color = colors.labelSecondary,
+        )
     }
 }
 

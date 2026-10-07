@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -91,10 +89,16 @@ internal fun ExecutionStatusCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = if (showHeader) {
+            colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+        } else {
+            colors.bgBase
+        },
     ) {
         Column(
-            Modifier.padding(DsSpacing.comfortable),
+            modifier = Modifier.padding(
+                if (showHeader) DsSpacing.comfortable else DsSpacing.small,
+            ),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             if (showHeader) {
@@ -320,9 +324,11 @@ private fun RunCenterJobsSection(
             val expanded = expandedJobId == job.id
             Surface(
                 shape = DsShapes.row,
-                color = colors.wallpaperSurface(
-                    if (attention) WallpaperSurfaceLevel.FLOATING else WallpaperSurfaceLevel.CARD,
-                ),
+                color = if (attention) {
+                    colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING)
+                } else {
+                    colors.bgModulePlatform
+                },
             ) {
                 Column(
                     modifier = Modifier
