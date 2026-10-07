@@ -37,6 +37,10 @@ internal class LocalJobManager(
 
     fun interruptedSnapshots(): List<JobSnapshot> = delegate.interruptedSnapshots()
 
+    fun resumableSnapshots(): List<JobSnapshot> = delegate.resumableSnapshots()
+
+    fun pendingAgentMessageSnapshots(): List<JobSnapshot> = delegate.pendingAgentMessageSnapshots()
+
     fun availableSlots(): Int = delegate.availableSlots()
 
     fun failInterrupted(id: String, detail: String): String = delegate.failInterrupted(id, detail)
@@ -69,6 +73,12 @@ internal class LocalJobManager(
         messageIds: Set<String>,
         ownerSessionId: String? = null,
     ) = delegate.acknowledgeMessages(id, messageIds, ownerSessionId)
+
+    fun parkPersistent(
+        id: String,
+        output: String,
+        ownerSessionId: String? = null,
+    ) = delegate.parkPersistent(id, output, ownerSessionId)
 
     fun updateContinuationState(
         id: String,
