@@ -306,6 +306,7 @@
     <string name="settings_appearance_preview_assistant">这是一段助手回复示例，用来检查正文与背景的可读性。</string>
     <string name="settings_appearance_preview_user">好呀</string>
     <string name="settings_appearance_preview_hint">修改字号、字重或通透度后会立即应用到界面。</string>
+    <string name="settings_reading_preferences">阅读与排版</string>
     <string name="settings_text_size">字号</string>
     <string name="settings_text_smaller">小</string>
     <string name="settings_text_scale_value">%1$d%%</string>
