@@ -71,8 +71,9 @@ fun DsGroupCard(
  */
 @Composable
 fun DsCategoryRow(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
+    iconPainter: Painter? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     value: String? = null,
@@ -116,7 +117,7 @@ fun DsCategoryRow(
             .padding(horizontal = 4.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsIconBox(icon = icon, family = iconFamily)
+        DsIconBox(icon = icon, iconPainter = iconPainter, family = iconFamily)
         Spacer(Modifier.width(10.dp))
         Column(
             modifier = Modifier.weight(1f),

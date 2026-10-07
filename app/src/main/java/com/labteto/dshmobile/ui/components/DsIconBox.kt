@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -35,7 +36,8 @@ enum class DsIconFamily {
 /** Compact monochrome 24-grid glyph holder used by grouped rows. */
 @Composable
 fun DsIconBox(
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconPainter: Painter? = null,
     family: DsIconFamily = DsIconFamily.Neutral,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
@@ -61,13 +63,23 @@ fun DsIconBox(
         modifier = modifier.size(30.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = colors.labelSecondary,
-            modifier = Modifier
-                .size(20.dp)
-                .graphicsLayer { alpha = iconAlpha },
-        )
+        when {
+            iconPainter != null -> Icon(
+                painter = iconPainter,
+                contentDescription = contentDescription,
+                tint = colors.labelSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { alpha = iconAlpha },
+            )
+            icon != null -> Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = colors.labelSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { alpha = iconAlpha },
+            )
+        }
     }
 }
