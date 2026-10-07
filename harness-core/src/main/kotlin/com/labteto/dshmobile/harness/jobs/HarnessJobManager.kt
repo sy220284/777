@@ -541,7 +541,7 @@ class HarnessJobManager(
                     delay(RUNNING_HEARTBEAT_MILLIS)
                     synchronized(lock) {
                         if (record.status != "running") return@launch
-                        record.updatedAt = System.currentTimeMillis()
+                        record.updatedAt = nextActivityTimestamp(record.updatedAt)
                     }
                     publish()
                 }
@@ -550,7 +550,7 @@ class HarnessJobManager(
                 val report: (String) -> Unit = { output ->
                     synchronized(lock) {
                         record.output = output.takeLast(MAX_OUTPUT)
-                        record.updatedAt = System.currentTimeMillis()
+                        record.updatedAt = nextActivityTimestamp(record.updatedAt)
                     }
                     // Progress is a volatile UI signal. Heartbeats persist a bounded running
                     // snapshot; writing the whole durable store for every output chunk amplifies IO.
@@ -1062,6 +1062,9 @@ class HarnessJobManager(
             }
         }.mapNotNull { it.job }
     }
+
+    private fun nextActivityTimestamp(previous: Long): Long =
+        maxOf(System.currentTimeMillis(), previous + 1L)
 
     private fun allocateUniqueIdLocked(): String {
         repeat(MAX_ID_FACTORY_ATTEMPTS) {

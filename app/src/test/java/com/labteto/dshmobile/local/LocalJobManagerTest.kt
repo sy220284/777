@@ -50,6 +50,31 @@ class LocalJobManagerTest {
         assertTrue(manager.output(id).contains("[completed]"))
     }
     @Test
+    fun runningProgressPublishesMonotonicUpdatedAtVersions() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val versions = mutableListOf<Long>()
+        val manager = LocalJobManager(this) { jobs ->
+            jobs.singleOrNull()
+                ?.takeIf { it.status == "running" }
+                ?.let { versions += it.updatedAt }
+        }
+        manager.start("streaming-versions") { _, report ->
+            report("step-1")
+            report("step-2")
+            gate.await()
+            "done"
+        }
+
+        runCurrent()
+
+        assertTrue(versions.size >= 3)
+        assertTrue(versions.zipWithNext().all { (left, right) -> right > left })
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
     fun jobIdsAreUniqueAndCancellingOneDoesNotCancelAnother() = runTest {
         val gateA = CompletableDeferred<Unit>()
         val gateB = CompletableDeferred<Unit>()
