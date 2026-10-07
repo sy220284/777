@@ -236,7 +236,8 @@ internal class LocalSubagentRunner(
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         val activationStepOffset = recoveredStep.coerceAtLeast(0)
         var modelStep = activationStepOffset
-        fun continuousStep(localStep: Int): Int = activationStepOffset + localStep
+        fun continuousStep(localStep: Int): Int =
+            continuousSubagentStep(activationStepOffset, localStep)
         val modelToolStepSurface = LocalModelToolStepSurface()
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
