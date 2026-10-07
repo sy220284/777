@@ -43,6 +43,7 @@ internal class LocalWorkSubagentRuntime(
         requiredEvidence: List<String>,
         modelOverride: String?,
         outputSchema: JsonObject?,
+        toolAllowlist: Set<String>?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
@@ -61,6 +62,7 @@ internal class LocalWorkSubagentRuntime(
                             continuable = false,
                             virtualScreen = false,
                             historyMode = LocalSubagentHistoryMode.ISOLATED,
+                            toolAllowlist = toolAllowlist,
                             outputSchema = outputSchema,
                         ),
                     ),
