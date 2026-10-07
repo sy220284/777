@@ -163,6 +163,11 @@ object LocalToolCatalog {
                 put("description", "可选；要求子代理最终只输出符合该 JSON Schema 子集的 JSON。顶层必须是 object，支持 properties、required、additionalProperties、items、enum 与基础 type。")
                 put("additionalProperties", true)
             },
+            "allowed_tools" to buildJsonObject {
+                put("type", "array")
+                put("description", "可选；限制子代理本次可见且可执行的工具名。若包含当前不可用工具，启动直接失败。")
+                put("items", buildJsonObject { put("type", "string") })
+            },
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
             "task" to string("需要结合当前上下文处理的任务"),
@@ -170,6 +175,11 @@ object LocalToolCatalog {
                 put("type", "object")
                 put("description", "可选；要求子代理最终只输出符合该 JSON Schema 子集的 JSON。顶层必须是 object。")
                 put("additionalProperties", true)
+            },
+            "allowed_tools" to buildJsonObject {
+                put("type", "array")
+                put("description", "可选；限制 fork 子代理可见且可执行的工具名。")
+                put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("task")))
         add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
@@ -204,6 +214,11 @@ object LocalToolCatalog {
                 put("type", "object")
                 put("description", "可选；所有子任务共享的结构化输出 JSON Schema 子集。顶层必须是 object。")
                 put("additionalProperties", true)
+            },
+            "allowed_tools" to buildJsonObject {
+                put("type", "array")
+                put("description", "可选；所有工作流子任务共享的工具 allowlist。")
+                put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("tasks")))
         add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
