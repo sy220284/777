@@ -34,6 +34,8 @@ import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsFullScreenDialog
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.*
 import java.io.File
@@ -134,9 +136,9 @@ internal fun WorkspacePanels(
                             }
                             DsTextButton(onClick = { listDirectory(state.directory) }, enabled = !state.busy) { Text(stringResource(R.string.common_retry)) }
                         }
-                        Text(state.directory, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+                        Text(state.directory, Modifier.padding(horizontal = 16.dp), style = DsType.caption11.withReadingWeight())
                         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        state.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+                        state.error?.let { Text(it, Modifier.padding(16.dp), color = DsTheme.colors.error) }
                         if (state.listing?.truncated == true) Text(stringResource(R.string.panel_truncated), Modifier.padding(16.dp))
                         LazyColumn(Modifier.weight(1f), state = state.directoryScroll.getOrPut(state.directory) { androidx.compose.foundation.lazy.LazyListState() }) {
                             items(state.listing?.entries.orEmpty(), key = { it.name }) { entry ->
@@ -257,10 +259,10 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
         Text(
             tab.path.substringAfterLast('/').substringAfterLast('\\'),
             Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.bodySmall,
+            style = DsType.caption11.withReadingWeight(),
         )
         if (tab.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        tab.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+        tab.error?.let { Text(it, Modifier.padding(16.dp), color = DsTheme.colors.error) }
         DsTextButton(onClick = { scope.launch {
             try { store.apiForHost(key.host)?.sessionOpenWorkspacePath(key.sessionId, tab.path)?.requireValue() }
             catch (e: CancellationException) { throw e }
