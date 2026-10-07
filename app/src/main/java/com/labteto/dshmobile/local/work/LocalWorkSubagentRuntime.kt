@@ -2,10 +2,12 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
+import com.labteto.dshmobile.local.agent.validateStructuredOutputSchema
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 /** Work-owned subagent and workflow composition bound to the originating Work run. */
 internal class LocalWorkSubagentRuntime(
@@ -38,10 +40,17 @@ internal class LocalWorkSubagentRuntime(
         mode: String,
         requiredEvidence: List<String>,
         modelOverride: String?,
+        outputSchema: JsonObject?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
+        outputSchema?.let { schema ->
+            val issues = validateStructuredOutputSchema(schema)
+            require(issues.isEmpty()) {
+                "工作流 output_schema 无效：" + issues.joinToString("；")
+            }
+        }
         binding.workState.update { current -> current.copy(workflowProgress = null) }
 
         return LocalWorkflowCoordinator(
@@ -52,6 +61,7 @@ internal class LocalWorkSubagentRuntime(
                     allowMutation = false,
                     modelOverride = workerSelection,
                     maxSteps = binding.aggregateSnapshot().subagentMaxSteps,
+                    outputSchema = outputSchema,
                 ).requireCompletedOutput()
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
