@@ -38,6 +38,7 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.durableToolResultContent
 import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
@@ -122,6 +123,9 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        recoveredHistory: List<JsonObject>? = null,
+        recoveredClaimedMessageIds: Set<String> = emptySet(),
+        recoveredStep: Int = 0,
     ): String = runResult(
         task = task,
         inheritHistory = inheritHistory,
@@ -131,6 +135,9 @@ internal class LocalSubagentRunner(
         modelOverride = modelOverride,
         maxSteps = maxSteps,
         virtualScreen = virtualScreen,
+        recoveredHistory = recoveredHistory,
+        recoveredClaimedMessageIds = recoveredClaimedMessageIds,
+        recoveredStep = recoveredStep,
     ).output
 
     suspend fun runResult(
@@ -142,6 +149,9 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        recoveredHistory: List<JsonObject>? = null,
+        recoveredClaimedMessageIds: Set<String> = emptySet(),
+        recoveredStep: Int = 0,
     ): LocalSubagentResult = resourceScheduler.withResource(
         HarnessResourceKind.AGENT,
         owner = "subagent:" + task.take(80),
@@ -160,6 +170,9 @@ internal class LocalSubagentRunner(
                 modelOverride = modelOverride,
                 maxSteps = maxSteps,
                 virtualScreenId = virtualScreenId,
+                recoveredHistory = recoveredHistory,
+                recoveredClaimedMessageIds = recoveredClaimedMessageIds,
+                recoveredStep = recoveredStep,
             )
         } finally {
             virtualScreenId?.let(releaseVirtualScreen)
@@ -175,13 +188,26 @@ internal class LocalSubagentRunner(
         modelOverride: String?,
         maxSteps: Int,
         virtualScreenId: String?,
+        recoveredHistory: List<JsonObject>?,
+        recoveredClaimedMessageIds: Set<String>,
+        recoveredStep: Int,
     ): LocalSubagentResult {
-        val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        require(backgroundJobId == null || !allowMutation) {
+            "持久子代理只支持只读执行，避免冷恢复重放未知副作用"
+        }
+        val subagentId = backgroundJobId
+            ?.let(::persistentSubagentId)
+            ?: "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        val recoveringHistory = recoveredHistory != null
         val history = LocalModelHistoryBuffer().apply {
             reset(
-                if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-                else emptyList(),
+                recoveredHistory
+                    ?: if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+                    else emptyList(),
             )
+        }
+        val claimedMessageIds = linkedSetOf<String>().apply {
+            addAll(recoveredClaimedMessageIds)
         }
         val progress = ArrayDeque<String>()
         val progressTracker = LocalAgentProgressTracker()
@@ -208,7 +234,7 @@ internal class LocalSubagentRunner(
             kind = runKind,
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
-        var modelStep = 0
+        var modelStep = recoveredStep.coerceAtLeast(0)
         val modelToolStepSurface = LocalModelToolStepSurface()
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
@@ -275,30 +301,54 @@ internal class LocalSubagentRunner(
             agentId = subagentId,
         )
 
+        fun persistContinuationCheckpoint(step: Int) {
+            val jobId = backgroundJobId ?: return
+            eventLog().append(
+                LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+                encodeLocalSubagentHistoryCheckpoint(
+                    backgroundJobId = jobId,
+                    agentId = subagentId,
+                    step = step,
+                    history = durableModelHistorySnapshot(history.snapshot()),
+                    claimedMessageIds = claimedMessageIds,
+                ),
+            )
+        }
+
         try {
-            if (!inheritHistory) history.append(buildJsonObject {
-                put("role", "system")
-                put(
-                    "content",
-                    if (allowMutation) {
-                        "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
-                    } else {
-                        "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
-                    },
-                )
-            })
-            boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
-                val insertion = buildJsonObject {
+            if (!recoveringHistory) {
+                if (!inheritHistory) history.append(buildJsonObject {
                     put("role", "system")
                     put(
                         "content",
-                        "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
+                        if (allowMutation) {
+                            "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
+                        } else {
+                            "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
+                        },
                     )
+                })
+                boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
+                    val insertion = buildJsonObject {
+                        put("role", "system")
+                        put(
+                            "content",
+                            "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
+                        )
+                    }
+                    val index = if (
+                        history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+                    ) 1 else 0
+                    history.insert(index, insertion)
                 }
-                val index = if (
-                    history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
-                ) 1 else 0
-                history.insert(index, insertion)
+                history.append(buildJsonObject { put("role", "user"); put("content", task) })
+            }
+            if (recoveringHistory) {
+                history.removeAll { message ->
+                    message["role"]?.jsonPrimitive?.contentOrNull == "system" &&
+                        message["content"]?.jsonPrimitive?.contentOrNull
+                            ?.startsWith("【独立虚拟屏】id=") == true
+                }
             }
             virtualScreenId?.let { id ->
                 history.append(buildJsonObject {
@@ -309,15 +359,48 @@ internal class LocalSubagentRunner(
                     )
                 })
             }
-            history.append(buildJsonObject { put("role", "user"); put("content", task) })
+            backgroundJobId?.let { jobId ->
+                val staleClaimedIds = jobs.peekMessages(jobId)
+                    .mapTo(linkedSetOf()) { it.id }
+                    .intersect(claimedMessageIds)
+                if (staleClaimedIds.isNotEmpty()) {
+                    jobs.acknowledgeMessages(jobId, staleClaimedIds, runSessionId())
+                }
+            }
+            persistContinuationCheckpoint(step = modelStep)
+            val remainingSteps = (stepLimit - modelStep).coerceAtLeast(1)
             val loop = AgentLoop(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
-                    backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
-                        history.append(buildJsonObject {
-                            put("role", "user")
-                            put("content", message)
-                        })
+                    backgroundJobId?.let { jobId ->
+                        val queuedMessages = jobs.peekMessages(jobId)
+                            .filterNot { message -> message.id in claimedMessageIds }
+                        if (queuedMessages.isNotEmpty()) {
+                            eventLog().append("subagent/inbox-claimed", buildJsonObject {
+                                put("version", 1)
+                                put("agent_id", subagentId)
+                                put("background_job_id", jobId)
+                                put("messages", JsonArray(queuedMessages.map { message ->
+                                    buildJsonObject {
+                                        put("id", message.id)
+                                        put("content", message.content)
+                                    }
+                                }))
+                            })
+                            queuedMessages.forEach { message ->
+                                history.append(buildJsonObject {
+                                    put("role", "user")
+                                    put("content", message.content)
+                                })
+                                claimedMessageIds += message.id
+                            }
+                            persistContinuationCheckpoint(step = modelStep)
+                            jobs.acknowledgeMessages(
+                                jobId,
+                                queuedMessages.mapTo(linkedSetOf()) { it.id },
+                                runSessionId(),
+                            )
+                        }
                     }
                     compactionPolicy.beforeModelStep(historyPolicy, history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
@@ -468,6 +551,9 @@ internal class LocalSubagentRunner(
                             })
                             history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         }
+                        is AgentEvent.StepFinished -> {
+                            persistContinuationCheckpoint(step = event.step)
+                        }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
@@ -501,7 +587,7 @@ internal class LocalSubagentRunner(
                         runCoordinator?.recordEvent(context, event)
                     }
                 },
-                maxSteps = stepLimit,
+                maxSteps = remainingSteps,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(runProfile)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
@@ -584,8 +670,20 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
-        } finally { compactionPolicy.atTurnBoundary(historyPolicy, history, subagentId, runHistoryBudget, runCachePolicy) }
+        } finally {
+            compactionPolicy.atTurnBoundary(
+                historyPolicy,
+                history,
+                subagentId,
+                runHistoryBudget,
+                runCachePolicy,
+            )
+            persistContinuationCheckpoint(step = modelStep)
+        }
     }
+
+    private fun persistentSubagentId(jobId: String): String =
+        "sa-" + jobId.removePrefix("job-").take(24)
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
