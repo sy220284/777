@@ -50,8 +50,6 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsTimeline
 import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -168,13 +166,6 @@ internal fun WorkProcessRow(
         DsStatus.Warning, DsStatus.Failed -> R.string.audit_attempt_failed
         else -> R.string.agent_operation_status_done
     })
-    val processStateDot = when (processStatus) {
-        DsStatus.Running -> StateDotState.Running
-        DsStatus.Failed -> StateDotState.Error
-        DsStatus.Warning -> StateDotState.Warning
-        DsStatus.Done -> StateDotState.Done
-        DsStatus.Neutral -> StateDotState.Idle
-    }
     val processSurface = if (backgroundState.hasImage) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
@@ -224,7 +215,6 @@ internal fun WorkProcessRow(
             WorkOperationIcon(
                 kind = latestNode.kind,
                 running = processStatus == DsStatus.Running,
-                failed = processStatus == DsStatus.Failed || processStatus == DsStatus.Warning,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -331,10 +321,7 @@ internal fun WorkProcessRow(
 private fun WorkOperationIcon(
     kind: AgentOperationKind,
     running: Boolean,
-    failed: Boolean,
 ) {
-    @Suppress("UNUSED_VARIABLE")
-    val failureState = failed
     when (kind) {
         AgentOperationKind.Delegate -> DsIconBox(
             icon = null,
