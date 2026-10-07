@@ -171,12 +171,25 @@ class LocalAgentTeamRuntimeTest {
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
             buildJsonObject {
-                put("team_id", "team-restart")
-                put("id", "team-msg-restart")
-                put("sender_id", "team-restart")
-                put("sender_name", "lead")
-                put("target_id", "member-1")
-                put("content", "重启后继续投递")
+                put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+                put("teamId", "team-restart")
+                put("message", buildJsonObject {
+                    put("id", "team-msg-restart")
+                    put("senderId", "team-restart")
+                    put("senderName", "lead")
+                    put("targetId", "member-1")
+                    put(
+                        "content",
+                        JsonArray(
+                            listOf(
+                                buildJsonObject {
+                                    put("type", "text")
+                                    put("text", "重启后继续投递")
+                                },
+                            ),
+                        ),
+                    )
+                })
             },
         )
 
