@@ -17,6 +17,8 @@ internal data class LocalSubagentCapabilities(
     val virtualScreen: Boolean = false,
     val continuable: Boolean = false,
     val outputSchema: JsonObject? = null,
+    val toolAllowlist: Set<String>? = null,
+    val maxDepth: Int = 1,
 ) {
     fun validateLaunch(backgroundJobId: String?): List<String> = buildList {
         if (continuable && backgroundJobId == null) {
@@ -27,6 +29,17 @@ internal data class LocalSubagentCapabilities(
         }
         if (backgroundJobId != null && !continuable) {
             add("持久后台子代理必须显式声明 continuable")
+        }
+        if (maxDepth != 1) {
+            add("当前子代理只支持 maxDepth=1，禁止静默忽略更深递归请求")
+        }
+        toolAllowlist?.let { tools ->
+            if (tools.size > MAX_TOOL_ALLOWLIST_SIZE) {
+                add("子代理工具过滤器最多允许 $MAX_TOOL_ALLOWLIST_SIZE 个工具")
+            }
+            tools.filter(String::isBlank).forEach {
+                add("子代理工具过滤器包含空工具名")
+            }
         }
     }
 }
@@ -299,3 +312,4 @@ private val SUPPORTED_TYPES = setOf(
 private const val MAX_SCHEMA_DEPTH = 8
 private const val MAX_SCHEMA_PROPERTIES = 64
 private const val MAX_SCHEMA_CHARS = 16_384
+private const val MAX_TOOL_ALLOWLIST_SIZE = 128
