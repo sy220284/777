@@ -519,4 +519,3 @@ UI 修改必须同时验证功能、体验和性能，不允许通过视觉调�
 ### Harness 合流约束
 
 - 运行中心与 Agent 交互只消费主线 Harness 的结构化能力投影；Durable Inbox、Cold Resume、Session Projection 与 Agent Teams 继续以 #491 合入后的主线实现为唯一事实源。
-
