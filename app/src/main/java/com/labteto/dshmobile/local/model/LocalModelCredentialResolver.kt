@@ -62,6 +62,9 @@ class LocalModelCredentialResolver @Inject constructor(
         chatGptAccounts.select(account.id)
     }
 
+    internal suspend fun selectedAccountId(): String? = chatGptAccounts.selectedId()
+    internal suspend fun restoreAccountSelection(id: String?) = chatGptAccounts.restoreSelection(id)
+
     suspend fun diagnostic(profile: LocalModelProfile): LocalCredentialDiagnostic =
         when (profile.authKind) {
             LocalModelAuthKind.API_KEY -> LocalCredentialDiagnostic(

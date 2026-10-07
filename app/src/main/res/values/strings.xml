@@ -254,6 +254,7 @@
     <string name="local_team_state_stopped">已停止</string>
     <string name="local_team_state_offwork">已下班</string>
     <string name="local_team_state_failed">任务失败</string>
+    <string name="local_team_state_awaiting_review">结果待核验</string>
     <string name="local_team_state_waiting">等待任务</string>
     <string name="local_team_task_pending">待开始</string>
     <string name="local_team_task_running">进行中</string>

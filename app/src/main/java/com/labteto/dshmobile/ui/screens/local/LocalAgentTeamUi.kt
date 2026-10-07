@@ -782,6 +782,7 @@ private fun teamDotState(team: LocalAgentTeamUiState, launchPending: Boolean): S
 }
 
 private fun teamMemberPriority(member: LocalAgentTeamMemberUiState): Int = when {
+    member.awaitingReview -> 2
     member.activity == "running" || member.activity == "stopping" -> 0
     member.phase == "provisioning" -> 1
     member.activity == "dormant" || member.activity == "waiting" || member.activity == "active" -> 2
@@ -792,6 +793,7 @@ private fun teamMemberPriority(member: LocalAgentTeamMemberUiState): Int = when 
 }
 
 private fun memberDotState(member: LocalAgentTeamMemberUiState): StateDotState = when {
+    member.awaitingReview -> StateDotState.Idle
     member.phase == "failed" || member.activity == "failed" -> StateDotState.Error
     member.phase == "provisioning" -> StateDotState.Running
     member.activity == "running" || member.activity == "stopping" -> StateDotState.Running
@@ -803,6 +805,7 @@ private fun memberDotState(member: LocalAgentTeamMemberUiState): StateDotState =
 @Composable
 private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = stringResource(
     when {
+        member.awaitingReview -> R.string.local_team_state_awaiting_review
         member.phase == "failed" || member.activity == "failed" -> R.string.local_team_state_failed
         member.phase == "provisioning" -> R.string.local_team_state_booting
         member.activity == "running" || member.activity == "stopping" -> R.string.local_team_state_thinking

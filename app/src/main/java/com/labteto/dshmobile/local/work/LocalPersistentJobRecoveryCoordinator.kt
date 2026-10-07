@@ -169,7 +169,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ownerSessionId = sessionId,
             continuable = true,
             requestedId = requestedJobId,
-        ) { jobId, _ ->
+        ) { jobId, report ->
             withContext(LocalModelRunContext(runProfile)) {
                 runner.runResult(
                     spec = LocalSubagentLaunchSpec(
@@ -181,6 +181,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
                         capabilities = capabilities,
                     ),
                     recoveredHistory = initialHistorySeed,
+                    onCheckpointProgress = { step, totalLimit ->
+                        report("子代理执行进度：$step/$totalLimit")
+                    },
                 ).requireCompletedOutput()
             }
         }
@@ -387,7 +390,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             recoveredTail.forEach { add(it.id) }
         }
 
-        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
+        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, report ->
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
             require(
                 profile.authKind.name == authKind &&
@@ -414,6 +417,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     recoveredSoftStepLimit = continuation?.softStepLimit,
                     resumeAfterCompletion =
                         shouldColdResumeCompletedSubagent(continuation, pendingIds),
+                    onCheckpointProgress = { step, totalLimit ->
+                        report("子代理执行进度：$step/$totalLimit")
+                    },
                 ).requireCompletedOutput()
             }
         }

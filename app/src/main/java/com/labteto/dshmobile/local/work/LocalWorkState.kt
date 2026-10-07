@@ -17,7 +17,7 @@ data class LocalAgentTeamUiState(
     val provisioningMemberCount: Int
         get() = members.count { it.phase == "provisioning" }
     val completedMemberCount: Int
-        get() = members.count { it.activity == "completed" }
+        get() = members.count { it.activity == "completed" && !it.awaitingReview }
     val failedMemberCount: Int
         get() = members.count { it.phase == "failed" || it.activity == "failed" }
     val completedTaskCount: Int
@@ -57,7 +57,10 @@ data class LocalAgentTeamMemberUiState(
     val resultMessageCount: Int = 0,
     val pendingMessageCount: Int = 0,
     val error: String? = null,
-)
+) {
+    val awaitingReview: Boolean
+        get() = currentTask != null && resultMessageCount > 0 && activity in setOf("dormant", "completed")
+}
 
 data class LocalAgentTeamTaskUiState(
     val id: String,

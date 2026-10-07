@@ -280,7 +280,9 @@ internal class LocalAgentTeamRuntime(
                 currentTask = currentTask,
                 progressPercent = memberProgressPercent(sessionId, member, activity),
                 resultMessageCount = messageCounts[member.id] ?: 0,
-                pendingMessageCount = state.pendingMessages.count { it.targetId == member.id },
+                pendingMessageCount =
+                    state.pendingMessages.count { it.targetId == member.id } +
+                        (jobsById[member.jobId]?.pendingMessageCount ?: 0),
                 error = member.error,
             )
         }
@@ -301,7 +303,7 @@ internal class LocalAgentTeamRuntime(
         return LocalAgentTeamUiState(
             members = members,
             tasks = tasks,
-            pendingMessageCount = state.pendingMessages.size,
+            pendingMessageCount = members.sumOf(LocalAgentTeamMemberUiState::pendingMessageCount),
             failure = state.failure,
         )
     }
@@ -311,6 +313,7 @@ internal class LocalAgentTeamRuntime(
         memberId: String,
         message: String,
     ): String {
+        synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可接收消息")
@@ -318,6 +321,7 @@ internal class LocalAgentTeamRuntime(
     }
 
     internal fun interruptUiMember(sessionId: String, memberId: String): String {
+        synchronizeTeamRuntime(sessionId)
         val member = project(sessionId).members.singleOrNull {
             it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
         } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可停止")
@@ -395,12 +399,12 @@ internal class LocalAgentTeamRuntime(
             require(member.phase in setOf(LocalTeamMemberPhase.CREATED, LocalTeamMemberPhase.DISABLED)) {
                 "TEAM_MEMBER_START_INVALID：" + member.name +
                     " 当前 phase=" + member.phase.name.lowercase()
-        }
-        val cleanTask = boundedTeamText(task, "task", MAX_TASK_CHARS, allowEmpty = false)
-        val provisioning = member.copy(phase = LocalTeamMemberPhase.PROVISIONING, error = null)
-        appendMember(binding.sessionId, provisioning)
-        startingMembers.add(binding.sessionId to member.id)
-        Triple(member, cleanTask, provisioning)
+            }
+            val cleanTask = boundedTeamText(task, "task", MAX_TASK_CHARS, allowEmpty = false)
+            val provisioning = member.copy(phase = LocalTeamMemberPhase.PROVISIONING, error = null)
+            appendMember(binding.sessionId, provisioning)
+            startingMembers.add(binding.sessionId to member.id)
+            Triple(member, cleanTask, provisioning)
         }
         return try {
             val existingJob = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
@@ -548,27 +552,27 @@ internal class LocalAgentTeamRuntime(
             val before = project(binding.sessionId)
             require(before.members.none { it.name == cleanName }) {
                 "TEAM_MEMBER_NAME_CONFLICT：成员名称一经使用不可复用：$cleanName"
-        }
-        requireMemberCapacity(before)
-        val memberId = TEAM_MEMBER_ID_PREFIX + UUID.randomUUID().toString().replace("-", "").take(16)
-        val jobId = teamJobId(memberId)
-        val provisioning = LocalTeamMemberSnapshot(
-            id = memberId,
-            jobId = jobId,
-            name = cleanName,
-            description = boundedTeamText(
-                value = description,
-                field = "description",
-                maxChars = MAX_DESCRIPTION_CHARS,
-                allowEmpty = true,
-            ),
-            provider = LOCAL_SUBAGENT_PROVIDER,
-            context = context,
-            phase = LocalTeamMemberPhase.PROVISIONING,
-        )
-        appendMember(binding.sessionId, provisioning)
-        startingMembers.add(binding.sessionId to provisioning.id)
-        provisioning
+            }
+            requireMemberCapacity(before)
+            val memberId = TEAM_MEMBER_ID_PREFIX + UUID.randomUUID().toString().replace("-", "").take(16)
+            val jobId = teamJobId(memberId)
+            val provisioning = LocalTeamMemberSnapshot(
+                id = memberId,
+                jobId = jobId,
+                name = cleanName,
+                description = boundedTeamText(
+                    value = description,
+                    field = "description",
+                    maxChars = MAX_DESCRIPTION_CHARS,
+                    allowEmpty = true,
+                ),
+                provider = LOCAL_SUBAGENT_PROVIDER,
+                context = context,
+                phase = LocalTeamMemberPhase.PROVISIONING,
+            )
+            appendMember(binding.sessionId, provisioning)
+            startingMembers.add(binding.sessionId to provisioning.id)
+            provisioning
 
         }
         val cleanName = provisioning.name
@@ -787,7 +791,24 @@ internal class LocalAgentTeamRuntime(
         state.members
             .filter { it.phase == LocalTeamMemberPhase.ACTIVE }
             .forEach { member ->
-                when (val status = jobStates[member.jobId]?.status ?: return@forEach) {
+                val job = jobStates[member.jobId]
+                if (job == null) {
+                    releaseOwnedTasks(sessionId, member.id)
+                    val current = project(sessionId).members
+                        .singleOrNull { it.id == member.id }
+                        ?: return@forEach
+                    if (current.phase == LocalTeamMemberPhase.ACTIVE) {
+                        appendMember(
+                            sessionId,
+                            current.copy(
+                                phase = LocalTeamMemberPhase.FAILED,
+                                error = "TEAM_MEMBER_CHILD_MISSING",
+                            ),
+                        )
+                    }
+                    return@forEach
+                }
+                when (val status = job.status) {
                     "failed", "cancelled", "killed" -> {
                         releaseOwnedTasks(sessionId, member.id)
                         val current = project(sessionId).members
@@ -846,6 +867,9 @@ internal class LocalAgentTeamRuntime(
             val state = project(sessionId)
             require(state.tasks.count { it.status != LocalTeamTaskStatus.DELETED } < MAX_TASKS) {
                 "TEAM_TASK_LIMIT：最多允许 $MAX_TASKS 个活动任务"
+            }
+            require(state.tasks.size < MAX_TEAM_TASK_HISTORY) {
+                "TEAM_TASK_HISTORY_LIMIT：历史任务已达 $MAX_TEAM_TASK_HISTORY 个"
             }
             val id = nextTaskId(state.tasks)
             val task = LocalTeamTaskSnapshot(
@@ -2017,6 +2041,7 @@ internal class LocalAgentTeamRuntime(
         private const val MAX_MESSAGE_BYTES = 65_536
         private const val MAX_PENDING_MESSAGES_PER_MEMBER = 64
         private const val MAX_TASKS = 256
+        private const val MAX_TEAM_TASK_HISTORY = 2_048
         private const val MAX_ERROR_CHARS = 1_000
         private const val MAX_BLOCKERS = 32
         private const val MAX_WRITE_SCOPES = 32

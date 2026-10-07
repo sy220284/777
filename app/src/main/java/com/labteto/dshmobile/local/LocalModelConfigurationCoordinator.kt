@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.model.LocalModelConnectionTester
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelConfigurationTransaction
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
@@ -50,11 +52,15 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
     private val profiles = LocalModelProfileStore(preferences, json)
-    private val unconfirmedTransactions = mutableSetOf<String>()
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
+    private val transactions = LocalModelConfigurationTransaction(
+        json, apiKeys::readMutationJournal, apiKeys::writeMutationJournal, apiKeys::clearMutationJournal,
+        profiles::transactionId, ::restoreJournal,
+        { failure -> AppLog.warn("ModelConfiguration", "model/configuration-journal-cleanup-pending", failure) },
+    )
     internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
-            recoverMutation()
+            transactions.recover()
             require(model.isNotBlank()) { "模型名称不能为空" }
             val existingProfiles = profiles.read()
             val draft = resolveLocalModelApiKeyDraft(apiKey, normalizeModel(model), baseUrl, protocol,
@@ -69,7 +75,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
     ): List<LocalModelProfile> = LocalModelMutationGate.run {
-        recoverMutation()
+        transactions.recover()
         val all = com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles(profiles.read(), accountId, models)
         val active = gateway.activeProfile()?.let { previous -> all.firstOrNull { it.id == previous.id } }
         persistConfiguration(all, active)
@@ -80,7 +86,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         id: String,
         all: List<LocalModelProfile> = profiles.read(),
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
-        recoverMutation()
+        transactions.recover()
         val current = profiles.read()
         val selected = current.firstOrNull { it.id == id } ?: return@run null
         require(gateway.hasCredential(selected)) { credentialError(selected) }
@@ -93,7 +99,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
-        recoverMutation()
+        transactions.recover()
         val all = profiles.read()
         val removed = all.firstOrNull { it.id == id } ?: return@run null
         val activeRemoved = profiles.active(currentModel, currentBaseUrl, all)?.id == id
@@ -106,7 +112,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
-        recoverMutation()
+        transactions.recover()
         val all = profiles.read()
         val removed = all.filter {
             it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
@@ -126,7 +132,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult = LocalModelMutationGate.run {
-        recoverMutation()
+        transactions.recover()
         val all = profiles.read()
         val active = profiles.active(currentModel, currentBaseUrl, all)
         finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl,
@@ -134,7 +140,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     }
 
     internal suspend fun prepareStartup(model: String, baseUrl: String) = LocalModelMutationGate.run {
-        withContext(Dispatchers.IO) { recoverMutation(); startup.prepare(model, baseUrl) }
+        withContext(Dispatchers.IO) { transactions.recover(); startup.prepare(model, baseUrl) }
     }
 
     internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
@@ -181,50 +187,28 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         active: LocalModelProfile?,
         credentialChanges: Map<String, String?> = emptyMap(),
     ) = withContext(Dispatchers.IO + NonCancellable) {
-        recoverMutation()
+        transactions.recover()
         val token = UUID.randomUUID().toString()
         val oldMetadata = profiles.configurationSnapshot()
-        val previous = gateway.activeProfile()
+        val previousAccount = gateway.selectedCredentialAccountId()
         val oldKeys = credentialChanges.keys.associateWith { apiKeys.getFor(it) }
         val journal = buildJsonObject {
+            put("version", 1)
             put("transaction", token)
+            put("selected_chatgpt", previousAccount?.let(::JsonPrimitive) ?: JsonNull)
             put("metadata", buildJsonObject { oldMetadata.forEach { (key, value) -> put(key, value?.let(::JsonPrimitive) ?: JsonNull) } })
             put("keys", buildJsonObject { oldKeys.forEach { (key, value) -> put(key, value?.let(::JsonPrimitive) ?: JsonNull) } })
         }
-        apiKeys.writeMutationJournal(journal.toString())
-        unconfirmedTransactions.add(token)
-        try {
+        transactions.commit(journal, persist = {
             credentialChanges.forEach { (id, key) -> if (key == null) apiKeys.clearFor(id) else apiKeys.putFor(id, key) }
             active?.let { gateway.synchronizeCredentialSelection(it) }
             profiles.commitConfiguration(all, active, token)
-            unconfirmedTransactions.remove(token)
-        } catch (failure: Exception) {
-            // commit(false) changes SharedPreferences memory too: restore explicitly, retain the
-            // encrypted journal if any rollback write fails so startup can finish recovery.
-            try {
-                restoreJournal(journal)
-                previous?.let { gateway.synchronizeCredentialSelection(it) }
-                apiKeys.clearMutationJournal()
-                unconfirmedTransactions.remove(token)
-            } catch (rollback: Exception) {
-                failure.addSuppressed(rollback)
+        }, activate = {
+            if (active != null) gateway.activate(active) else {
+                gateway.clearActive()
+                apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
             }
-            throw failure
-        }
-        if (active != null) gateway.activate(active) else {
-            gateway.clearActive()
-            apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
-        }
-        apiKeys.clearMutationJournal()
-    }
-
-    private suspend fun recoverMutation() {
-        val raw = apiKeys.readMutationJournal() ?: return
-        val journal = json.parseToJsonElement(raw).jsonObject
-        val token = journal["transaction"]?.jsonPrimitive?.contentOrNull
-        if (token in unconfirmedTransactions || profiles.transactionId() != token) restoreJournal(journal)
-        apiKeys.clearMutationJournal()
-        unconfirmedTransactions.remove(token)
+        })
     }
 
     private suspend fun restoreJournal(journal: JsonObject) {
@@ -233,6 +217,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             if (key == null) apiKeys.clearFor(id) else apiKeys.putFor(id, key)
         }
         profiles.restoreConfiguration(journal["metadata"]!!.jsonObject.mapValues { it.value.jsonPrimitive.contentOrNull })
+        gateway.restoreCredentialAccountSelection(journal["selected_chatgpt"]?.jsonPrimitive?.contentOrNull)
     }
 
     private fun credentialError(profile: LocalModelProfile): String =

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
@@ -240,7 +241,9 @@ internal class LocalWorkComposition @Inject constructor(
 
     private val teamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
         if (reconcile) runCatching { agentTeams.recoverMailbox(sessionId) }
+            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team 后台状态恢复失败 session=$sessionId", it) }
         runCatching { publishTeamUiState(sessionId) }
+            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team UI 投影刷新失败 session=$sessionId", it) }
     }
 
     init {
@@ -322,7 +325,21 @@ internal class LocalWorkComposition @Inject constructor(
     internal fun schedulePersistentRecovery() {
         val sessionId = runtimeStateStore.currentSessionId
         runCatching { agentTeams.recoverMailbox(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动恢复失败 session=$sessionId",
+                    error,
+                )
+            }
         runCatching { publishTeamUiState(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动投影刷新失败 session=$sessionId",
+                    error,
+                )
+            }
         persistentJobs.schedule(sessionId)
     }
 

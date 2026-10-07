@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -721,6 +722,38 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(LocalTeamTaskStatus.IN_PROGRESS, task.status)
         assertEquals(2, task.revision)
         assertEquals("member-1", task.ownerId)
+        assertTrue(fixture.runtime.uiState("team-auto-complete").members.single().awaitingReview)
+        assertEquals(0, fixture.runtime.uiState("team-auto-complete").completedTaskCount)
+    }
+
+    @Test
+    fun activeMemberWithMissingChildFailsAndReleasesOwnedTask() {
+        val fixture = fixture("team-missing-child")
+        appendActiveMember(fixture.log, "team-missing-child")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-missing-child", "task-1", 1, blockedBy = emptyList(), subject = "检查"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-missing-child",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+                subject = "检查",
+            ),
+        )
+
+        fixture.runtime.recoverMailbox("team-missing-child")
+
+        val projection = fixture.runtime.project("team-missing-child")
+        assertEquals(LocalTeamMemberPhase.FAILED, projection.members.single().phase)
+        assertEquals("TEAM_MEMBER_CHILD_MISSING", projection.members.single().error)
+        assertEquals(LocalTeamTaskStatus.PENDING, projection.tasks.single().status)
+        assertNull(projection.tasks.single().ownerId)
     }
 
     @Test
@@ -1321,6 +1354,7 @@ class LocalAgentTeamRuntimeTest {
             JobMessageAdmission(true, false, false, "accepted")
         }
         appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
         val executor = Executors.newFixedThreadPool(2)
         try {
             val send = executor.submit<String> { fixture.runtime.sendUiMessage(session, "member-1", "继续检查") }
@@ -1389,6 +1423,7 @@ class LocalAgentTeamRuntimeTest {
         val session = "team-claim-race"
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
         fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT,
             task(session, "task-1", 1, emptyList(), subject = "审查"))
         val binding = teamBinding(fixture, session)
@@ -1420,6 +1455,7 @@ class LocalAgentTeamRuntimeTest {
         val session = "team-verified-complete"
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
         fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
         fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
             status = "in_progress", ownerId = "member-1"))
@@ -1440,6 +1476,30 @@ class LocalAgentTeamRuntimeTest {
         assertNull(state.failure)
         assertEquals(LocalTeamTaskStatus.COMPLETED, state.tasks.first { it.id == "task-1" }.status)
         assertEquals(3, state.tasks.first { it.id == "task-1" }.revision)
+    }
+
+    @Test
+    fun uiPendingMessagesIncludesDurableChildInbox() {
+        val fixture = fixture("team-durable-inbox")
+        appendActiveMember(fixture.log, "team-durable-inbox")
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "team-durable-inbox",
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> awaitCancellation() }
+        fixture.jobs.send(
+            id = "job-team-1",
+            message = "待处理追加消息",
+            ownerSessionId = "team-durable-inbox",
+        )
+
+        val ui = fixture.runtime.uiState("team-durable-inbox")
+
+        assertEquals(1, ui.members.single().pendingMessageCount)
+        assertEquals(1, ui.pendingMessageCount)
     }
 
     private data class Fixture(
@@ -1470,6 +1530,17 @@ class LocalAgentTeamRuntimeTest {
             projectionRegistry = SessionProjectionRegistry(),
         )
         return Fixture(runtime, log, jobs)
+    }
+
+    private fun startLiveChild(fixture: Fixture, session: String) {
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session,
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> awaitCancellation() }
     }
 
     private fun appendActiveMember(log: LocalSessionEventLog, teamId: String) {
