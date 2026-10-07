@@ -10,7 +10,7 @@ internal data class LocalSkillMetadata(
 
 /**
  * Read only scalar front-matter fields used by the existing skill contract. Unknown fields stay in
- * the source document untouched. Malformed documents keep their original invocation behaviour.
+ * the source document untouched. Incomplete front matter is hidden from automatic model access.
  */
 internal fun parseLocalSkillMetadata(name: String, document: String): LocalSkillMetadata {
     val lines = document.lineSequence().take(96).toList()
