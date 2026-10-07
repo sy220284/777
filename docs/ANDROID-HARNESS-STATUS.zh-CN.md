@@ -288,6 +288,7 @@ Gallery identity
 - 审批。
 - Ask User。
 - 主 / 子代理。
+- 持久只读子代理支持稳定 Agent 身份、可落盘 Inbox、完整模型历史检查点与进程中断后的 Cold Resume；恢复从最后完整 Step 继续，已进入历史但尚未来得及从 Inbox 删除的消息按消息 ID 去重确认。
 - 后台任务。
 - 自动任务。
 - MCP / LSP。
