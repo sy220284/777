@@ -436,36 +436,7 @@ internal class LocalSubagentRunner(
             val loop = AgentLoop(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
-                    backgroundJobId?.let { jobId ->
-                        val queuedMessages = jobs.peekMessages(jobId)
-                            .filterNot { message -> message.id in claimedMessageIds }
-                        if (queuedMessages.isNotEmpty()) {
-                            eventLog().append("subagent/inbox-claimed", buildJsonObject {
-                                put("version", 1)
-                                put("agent_id", subagentId)
-                                put("background_job_id", jobId)
-                                put("messages", JsonArray(queuedMessages.map { message ->
-                                    buildJsonObject {
-                                        put("id", message.id)
-                                        put("content", message.content)
-                                    }
-                                }))
-                            })
-                            queuedMessages.forEach { message ->
-                                history.append(buildJsonObject {
-                                    put("role", "user")
-                                    put("content", message.content)
-                                })
-                                claimedMessageIds += message.id
-                            }
-                            persistContinuationCheckpoint(step = modelStep)
-                            jobs.acknowledgeMessages(
-                                jobId,
-                                queuedMessages.mapTo(linkedSetOf()) { it.id },
-                                runSessionId(),
-                            )
-                        }
-                    }
+                    claimQueuedMessages()
                     compactionPolicy.beforeModelStep(historyPolicy, history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
                     val durableHistory = history.snapshot()
