@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.session.SessionEvent
+import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
+import com.labteto.dshmobile.harness.session.SessionReducer
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -66,9 +69,16 @@ internal class LocalAgentTeamRuntime(
     private val jobs: LocalJobManager,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val eventLogFor: (String) -> LocalSessionEventLog,
+    projectionRegistry: SessionProjectionRegistry,
 ) {
-    private val cacheLock = Any()
-    private val projections = mutableMapOf<String, LocalTeamProjection>()
+    private val teamProjection = projectionRegistry.register(
+        name = "work.agent-team",
+        stateVersion = 1,
+        initial = { LocalTeamProjection() },
+        reducer = SessionReducer<LocalTeamProjection> { state, event ->
+            applyEvent(state, event)
+        },
+    )
 
     suspend fun execute(
         call: LocalToolCall,
@@ -210,7 +220,6 @@ internal class LocalAgentTeamRuntime(
         require(snapshot.content.isNotEmpty()) { "TEAM_MESSAGE_REQUIRED：消息不能为空" }
         val log = eventLogFor(sessionId)
         log.append(TEAM_MESSAGE_QUEUED, snapshot.toEvent(sessionId))
-        invalidate(sessionId)
         val delivered = deliverMessage(sessionId, snapshot, member)
         return if (delivered) {
             "Team 消息已投递：${snapshot.id} → ${member.name}"
@@ -243,7 +252,6 @@ internal class LocalAgentTeamRuntime(
                 put("target_id", member.id)
             },
         )
-        invalidate(sessionId)
         return true
     }
 
@@ -456,48 +464,39 @@ internal class LocalAgentTeamRuntime(
         val current = project(sessionId)
         validateMemberTransition(current.members, member)
         eventLogFor(sessionId).append(TEAM_MEMBER_EVENT, member.toEvent(sessionId))
-        invalidate(sessionId)
     }
 
     private fun appendTask(sessionId: String, task: LocalTeamTaskSnapshot) {
         eventLogFor(sessionId).append(TEAM_TASK_EVENT, task.toEvent(sessionId))
-        invalidate(sessionId)
     }
 
-    internal fun project(sessionId: String): LocalTeamProjection = synchronized(cacheLock) {
-        val log = eventLogFor(sessionId)
-        var state = projections[sessionId] ?: LocalTeamProjection()
-        if (state.asOfSequence > log.latestSequence()) {
-            state = LocalTeamProjection()
+    internal fun project(sessionId: String): LocalTeamProjection {
+        val events = eventLogFor(sessionId).withEvents { stream ->
+            stream
+                .filter { event ->
+                    event.type in TEAM_EVENTS &&
+                        event.data["team_id"]?.jsonPrimitive?.contentOrNull == sessionId
+                }
+                .map { event ->
+                    SessionEvent(
+                        sequence = event.sequence,
+                        type = event.type,
+                        createdAt = event.createdAt,
+                        data = event.data,
+                    )
+                }
+                .toList()
         }
-        val events = log.pageAfter(state.asOfSequence, limit = MAX_PROJECTION_BATCH)
-        if (events.isEmpty()) return@synchronized state
-        var cursor = state
-        var nextStart = state.asOfSequence
-        while (true) {
-            val page = if (nextStart == state.asOfSequence) events
-                else log.pageAfter(nextStart, limit = MAX_PROJECTION_BATCH)
-            if (page.isEmpty()) break
-            page.forEach { event ->
-                cursor = applyEvent(sessionId, cursor, event)
-                nextStart = event.sequence
-            }
-            if (page.size < MAX_PROJECTION_BATCH) break
-        }
-        projections[sessionId] = cursor
-        cursor
+        return teamProjection.fold(events).state
     }
 
     private fun applyEvent(
-        sessionId: String,
         state: LocalTeamProjection,
-        event: LocalSessionEventLog.Event,
+        event: SessionEvent,
     ): LocalTeamProjection {
         if (event.sequence <= state.asOfSequence) return state
         val advanced = state.copy(asOfSequence = event.sequence)
         if (state.failure != null) return advanced
-        if (event.type !in TEAM_EVENTS) return advanced
-        if (event.data["team_id"]?.jsonPrimitive?.contentOrNull != sessionId) return advanced
         return try {
             when (event.type) {
                 TEAM_MEMBER_EVENT -> {
@@ -519,7 +518,7 @@ internal class LocalAgentTeamRuntime(
                     val message = decodeMessage(event.data)
                     val existing = state.pendingMessages.firstOrNull { it.id == message.id }
                     require(existing == null || existing == message) {
-                        "TEAM_MESSAGE_ID_CONFLICT：${message.id}"
+                        "TEAM_MESSAGE_ID_CONFLICT：" + message.id
                     }
                     if (existing != null) advanced
                     else advanced.copy(pendingMessages = state.pendingMessages + message)
@@ -537,7 +536,6 @@ internal class LocalAgentTeamRuntime(
             advanced.copy(failure = error.message ?: error::class.java.simpleName)
         }
     }
-
     private fun validateMemberTransition(
         members: List<LocalTeamMemberSnapshot>,
         next: LocalTeamMemberSnapshot,
@@ -659,11 +657,6 @@ internal class LocalAgentTeamRuntime(
             "TEAM_MEMBER_NAME_INVALID：名称只允许字母、数字、下划线和短横线"
         }
         return clean
-    }
-
-    private fun invalidate(sessionId: String) = synchronized(cacheLock) {
-        projections.remove(sessionId)
-        Unit
     }
 
     private fun buildTeamTaskPrompt(name: String, description: String, task: String): String =
