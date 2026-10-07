@@ -231,6 +231,7 @@ class HarnessJobManager(
         records.values
             .filter { record ->
                 record.label.startsWith(AGENT_PREFIX) &&
+                    !record.resumeKind.isNullOrBlank() &&
                     record.inbox.isNotEmpty() &&
                     record.status in setOf("running", "idle", "interrupted")
             }
