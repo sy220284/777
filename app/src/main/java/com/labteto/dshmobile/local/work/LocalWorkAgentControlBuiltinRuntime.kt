@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -44,12 +45,14 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
+                val outputSchema = args["output_schema"] as? JsonObject
                 if (args.boolean("run_in_background", false)) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
+                        outputSchema = outputSchema,
                         sessionId = run.sessionId,
                         boundState = snapshot,
                         historySnapshot = run.runHandle.modelHistory::snapshot,
@@ -62,6 +65,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                         modelOverride = model,
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
+                        outputSchema = outputSchema,
                     )
                 }
             }
@@ -72,6 +76,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 parentCallId = call.id,
                 modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
                 maxSteps = snapshot.subagentMaxSteps,
+                outputSchema = args["output_schema"] as? JsonObject,
             )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
@@ -94,6 +99,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
+                outputSchema = args["output_schema"] as? JsonObject,
                 binding = run,
                 runner = runner,
             )
