@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,8 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +32,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
@@ -43,9 +41,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -343,13 +339,12 @@ private fun LocalFileList(
             val path = prefix + name
             val file = filesByPath[path]
             if (file == null) {
-                ListItem(
-                    headlineContent = { Text(name) },
-                    supportingContent = { Text(stringResource(R.string.panel_folder)) },
-                    modifier = Modifier.clickable { onDirectory(path) },
-                    colors = ListItemDefaults.colors(
-                        containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                    ),
+                DsCategoryRow(
+                    icon = FeatherIcons.Folder,
+                    title = name,
+                    subtitle = stringResource(R.string.panel_folder),
+                    onClick = { onDirectory(path) },
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
                 )
             } else {
                 LocalFileRow(file) { scope.launch { onOpen(file) } }
@@ -360,13 +355,12 @@ private fun LocalFileList(
 
 @Composable
 private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(file.path.substringAfterLast('/')) },
-        supportingContent = { Text("${file.path} · ${formatBytes(file.bytes)}") },
-        modifier = Modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(
-            containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        ),
+    DsCategoryRow(
+        icon = FeatherIcons.FileText,
+        title = file.path.substringAfterLast('/'),
+        subtitle = "${file.path} · ${formatBytes(file.bytes)}",
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = DsSpacing.medium),
     )
 }
 

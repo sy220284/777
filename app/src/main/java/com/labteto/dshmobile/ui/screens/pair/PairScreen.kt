@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -208,7 +207,6 @@ fun PairScreen(
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
                         DsTextField(
                             value = state.code,
@@ -220,7 +218,6 @@ fun PairScreen(
                                 keyboardType = KeyboardType.NumberPassword,
                             ),
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
                         DsTextField(
                             value = state.deviceName,
@@ -229,7 +226,6 @@ fun PairScreen(
                             singleLine = true,
                             label = { Text(stringResource(R.string.pair_name_label)) },
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
                         DsButton(
                             text = stringResource(
@@ -313,11 +309,3 @@ private fun PairFailureBlock(failure: PairFailure) {
     }
 }
 
-@Composable
-private fun pairFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    unfocusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    focusedBorderColor = DsTheme.colors.accent,
-    unfocusedBorderColor = DsTheme.colors.borderL2,
-    cursorColor = DsTheme.colors.accent,
-)
