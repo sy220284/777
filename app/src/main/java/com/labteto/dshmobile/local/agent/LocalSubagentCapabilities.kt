@@ -82,6 +82,8 @@ internal fun validateLocalSubagentLaunchSpec(
 }
 
 
+private const val MAX_SUBAGENT_OUTPUT_SCHEMA_CHARS = 32_768
+
 internal fun filterLocalSubagentSchemas(
     source: JsonArray,
     capabilities: LocalSubagentCapabilities,
