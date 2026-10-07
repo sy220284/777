@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +32,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 private const val PLAN_REVIEW_PREFIX = "Harness 已完成计划，是否批准并进入执行模式？"
 
@@ -113,7 +111,7 @@ internal fun LocalPlanReviewCard(
                 }
                 Spacer(Modifier.weight(1f))
                 CompactMessageAction(
-                    icon = Icons.Outlined.ContentCopy,
+                    icon = FeatherIcons.Copy,
                     contentDescription = stringResource(R.string.local_plan_review_copy),
                     onClick = {
                         clipboard.setText(AnnotatedString(review.plan))
@@ -122,7 +120,7 @@ internal fun LocalPlanReviewCard(
                     enabled = !busy,
                 )
                 CompactMessageAction(
-                    icon = Icons.Outlined.Refresh,
+                    icon = FeatherIcons.RefreshCw,
                     contentDescription = stringResource(R.string.local_plan_review_regenerate),
                     onClick = onRegenerate,
                     enabled = !busy,

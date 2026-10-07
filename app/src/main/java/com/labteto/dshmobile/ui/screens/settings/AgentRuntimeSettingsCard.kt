@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +41,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun LocalAgentSettingsCard(
@@ -54,7 +53,7 @@ internal fun LocalAgentSettingsCard(
     val maximumLabel = stringResource(R.string.common_maximum)
     val reportSaved = { report(agentSavedMessage) }
 
-    SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
+    SettingsCard(stringResource(R.string.advanced_agent_settings), FeatherIcons.Sliders) {
         StepperRow(
             label = stringResource(R.string.advanced_main_steps),
             hint = stringResource(R.string.advanced_agent_limits_hint),

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +30,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /**
  * The agent-preset picker.
@@ -123,7 +122,7 @@ internal fun PresetsSheet(
                     if (selected) {
                         Spacer(Modifier.width(DsSpacing.small))
                         Icon(
-                            Icons.Filled.Check,
+                            FeatherIcons.Check,
                             contentDescription = stringResource(R.string.presets_current),
                             tint = colors.accent,
                             modifier = Modifier.size(16.dp),

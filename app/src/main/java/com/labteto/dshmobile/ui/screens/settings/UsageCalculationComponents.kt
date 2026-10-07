@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -70,6 +68,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot) {
@@ -327,7 +326,7 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(DsSpacing.small))
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            imageVector = FeatherIcons.ChevronRight,
             contentDescription = null,
             tint = colors.labelTertiary,
             modifier = Modifier.size(20.dp),

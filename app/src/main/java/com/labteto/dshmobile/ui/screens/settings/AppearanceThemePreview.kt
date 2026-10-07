@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +26,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /** Miniature Clear Realm preview: canvas, grouped surface, content hierarchy and composer. */
 @Composable
@@ -77,7 +76,7 @@ internal fun ThemePreviewBlock(
             }
             if (selected) {
                 Icon(
-                    Icons.Filled.Check,
+                    FeatherIcons.Check,
                     contentDescription = null,
                     tint = colors.accent,
                     modifier = Modifier

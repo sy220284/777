@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,6 +16,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun LocalSessionStorageCard(
@@ -30,7 +29,7 @@ internal fun LocalSessionStorageCard(
     val colors = DsTheme.colors
     SettingsCard(
         title = stringResource(R.string.settings_local_session_storage),
-        icon = Icons.Outlined.History,
+        icon = FeatherIcons.History,
     ) {
         if (status == null) {
             Text(

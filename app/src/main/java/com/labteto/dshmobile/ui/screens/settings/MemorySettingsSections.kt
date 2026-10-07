@@ -15,13 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -87,13 +80,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun MemoryOverviewCard(
     local: LocalHarnessSettingsState,
     recordCount: Int,
 ) {
-    SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_memory_overview), FeatherIcons.Cpu) {
         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsStatusPill(
                 state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
@@ -142,7 +136,7 @@ internal fun LocalMemorySettingsCard(
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var showRulesEditor by remember { mutableStateOf(false) }
 
-    SettingsCard(stringResource(R.string.advanced_memory_settings), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_memory_settings), FeatherIcons.Cpu) {
         DsValueRow(
             label = stringResource(R.string.advanced_user_rules),
             value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
@@ -240,7 +234,7 @@ internal fun MemoryManagementCard(
         filteredRecords.take(visibleLimit)
     }
 
-    SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_manage_memory), FeatherIcons.Cpu) {
         if (records.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_empty),

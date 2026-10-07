@@ -28,8 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -72,6 +70,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /**
  * Modal dialog: dim overlay (platform scrim ~ overlayMask), r24 bgLayer2 plate
@@ -475,7 +474,7 @@ private fun DsMenuPreview() {
         DsMenu(
             anchor = { DsButton("Menu", onClick = {}) },
             items = listOf(
-                MenuItem("Open", icon = Icons.Filled.Edit, onClick = {}),
+                MenuItem("Open", icon = FeatherIcons.Edit3, onClick = {}),
                 MenuItem("Delete", danger = true, onClick = {}),
             ),
         )

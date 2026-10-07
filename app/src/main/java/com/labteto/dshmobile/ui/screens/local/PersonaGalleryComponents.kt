@@ -25,13 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -83,6 +76,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun PersonaGalleryTopBar(
@@ -102,7 +96,7 @@ internal fun PersonaGalleryTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DsIconButton(
-                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                icon = FeatherIcons.ArrowLeft,
                 contentDescription = stringResource(R.string.common_back),
                 onClick = onBack,
             )
@@ -307,7 +301,7 @@ internal fun StoryDetailSection(
         DsCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Outlined.History,
+                    FeatherIcons.History,
                     contentDescription = null,
                     tint = DsTheme.colors.labelSecondary,
                     modifier = Modifier.size(18.dp),
@@ -410,7 +404,7 @@ internal fun GalleryOverviewHeader(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Outlined.AutoAwesome,
+                        FeatherIcons.Sparkles,
                         contentDescription = null,
                         tint = DsTheme.colors.characterAccent,
                         modifier = Modifier.size(22.dp),
@@ -788,7 +782,7 @@ internal fun PersonaInspectionPanel(
         DsCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Outlined.PersonSearch,
+                    FeatherIcons.User,
                     contentDescription = null,
                     tint = DsTheme.colors.characterAccent,
                     modifier = Modifier.size(18.dp),

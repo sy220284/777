@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +41,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun ChatGptAccountPanel(
@@ -177,7 +176,7 @@ internal fun ChatGptAccountPanel(
                         DsMenu(
                             anchor = {
                                 Icon(
-                                    Icons.Filled.MoreVert,
+                                    FeatherIcons.MoreVertical,
                                     contentDescription = accountActionsLabel,
                                     tint = colors.labelSecondary,
                                     modifier = Modifier.padding(10.dp),
@@ -277,7 +276,7 @@ internal fun ChatGptAccountPanel(
                                 DsMenu(
                                     anchor = {
                                         Icon(
-                                            Icons.Filled.MoreVert,
+                                            FeatherIcons.MoreVertical,
                                             contentDescription = accountActionsLabel,
                                             tint = colors.labelSecondary,
                                             modifier = Modifier.padding(10.dp),

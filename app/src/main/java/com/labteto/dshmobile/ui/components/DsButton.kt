@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -44,6 +42,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /** Button variants mirroring the harness primary/info/ghost/outline/danger palette. */
 enum class DsButtonVariant { Primary, Info, Ghost, Outline, Danger }
@@ -170,7 +169,7 @@ private const val HOLD_REPEAT_INTERVAL_MS = 90L
 private fun DsButtonPreview() {
     DshTheme {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            DsButton("Primary", {}, icon = Icons.Filled.Add)
+            DsButton("Primary", {}, icon = FeatherIcons.Plus)
             DsButton("Info", {}, variant = DsButtonVariant.Info)
             DsButton("Ghost", {}, variant = DsButtonVariant.Ghost)
             DsButton("Outline", {}, variant = DsButtonVariant.Outline)

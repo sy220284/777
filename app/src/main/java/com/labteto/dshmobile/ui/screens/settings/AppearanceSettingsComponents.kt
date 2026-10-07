@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -57,6 +55,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun AppearanceReadingPreview() {
@@ -259,7 +258,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     )
                     if (selected) {
                         Icon(
-                            Icons.Filled.Check,
+                            FeatherIcons.Check,
                             contentDescription = null,
                             tint = colors.accent,
                             modifier = Modifier.size(14.dp),

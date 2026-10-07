@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +32,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 // ---------------------------------------------------------------------------
 // Interaction takeovers: sandbox-approval and plan review. The ask_user_question
@@ -75,7 +74,7 @@ fun ApprovalPanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Filled.WarningAmber,
+                        FeatherIcons.AlertTriangle,
                         contentDescription = null,
                         tint = colors.warn,
                         modifier = Modifier.width(14.dp),

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +23,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /**
  * A row that shows a stored value (model name, endpoint, masked key…) and opens an editor.
@@ -92,7 +91,7 @@ fun DsValueRow(
         if (onClick != null) {
             Spacer(Modifier.width(DsSpacing.small))
             Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                FeatherIcons.ChevronRight,
                 contentDescription = null,
                 tint = colors.labelCaption,
             )

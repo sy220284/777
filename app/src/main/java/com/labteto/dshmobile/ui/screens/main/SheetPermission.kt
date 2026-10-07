@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -38,6 +36,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 /** The permission-preset picker. `custom` is a derived state, so it is never offered as a target. */
 @Composable
@@ -82,7 +81,7 @@ internal fun PermissionMenu(
                 if (selected) {
                     Spacer(Modifier.width(8.dp))
                     Icon(
-                        Icons.Filled.Check,
+                        FeatherIcons.Check,
                         contentDescription = null,
                         tint = colors.accent,
                         modifier = Modifier.size(16.dp),

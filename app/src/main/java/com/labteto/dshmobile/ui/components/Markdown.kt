@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +48,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 val LocalFileOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
 
@@ -532,7 +531,7 @@ private fun CodeBlock(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Filled.ContentCopy,
+                        FeatherIcons.Copy,
                         contentDescription = "Copy code",
                         tint = colors.labelTertiary,
                         modifier = Modifier.size(16.dp),

@@ -95,6 +95,111 @@ internal object FeatherIcons {
         }
     }
 
+    /** AI suggestion / capability sparkle. */
+    val Sparkles: ImageVector by lazy {
+        feather("Sparkles") {
+            moveTo(12f, 3f); lineTo(13.5f, 8.5f); lineTo(19f, 10f)
+            lineTo(13.5f, 11.5f); lineTo(12f, 17f)
+            lineTo(10.5f, 11.5f); lineTo(5f, 10f)
+            lineTo(10.5f, 8.5f); close()
+            moveTo(19f, 3f); lineTo(19.6f, 5.4f); lineTo(22f, 6f)
+            lineTo(19.6f, 6.6f); lineTo(19f, 9f)
+            lineTo(18.4f, 6.6f); lineTo(16f, 6f)
+            lineTo(18.4f, 5.4f); close()
+        }
+    }
+
+    val ArrowUp: ImageVector by lazy {
+        feather("ArrowUp") {
+            moveTo(12f, 19f); lineTo(12f, 5f)
+            moveTo(5f, 12f); lineTo(12f, 5f); lineTo(19f, 12f)
+        }
+    }
+
+    val ArrowDown: ImageVector by lazy {
+        feather("ArrowDown") {
+            moveTo(12f, 5f); lineTo(12f, 19f)
+            moveTo(5f, 12f); lineTo(12f, 19f); lineTo(19f, 12f)
+        }
+    }
+
+    val Square: ImageVector by lazy {
+        feather("Square") { rectangle(6f, 6f, 12f, 12f) }
+    }
+
+    val Shield: ImageVector by lazy {
+        feather("Shield") {
+            moveTo(12f, 22f)
+            curveTo(12f, 22f, 20f, 18f, 20f, 12f)
+            verticalLineTo(5f); lineTo(12f, 2f); lineTo(4f, 5f); verticalLineTo(12f)
+            curveTo(4f, 18f, 12f, 22f, 12f, 22f); close()
+        }
+    }
+
+    val List: ImageVector by lazy {
+        feather("List") {
+            moveTo(8f, 6f); lineTo(21f, 6f)
+            moveTo(8f, 12f); lineTo(21f, 12f)
+            moveTo(8f, 18f); lineTo(21f, 18f)
+            moveTo(3f, 6f); lineTo(3.01f, 6f)
+            moveTo(3f, 12f); lineTo(3.01f, 12f)
+            moveTo(3f, 18f); lineTo(3.01f, 18f)
+        }
+    }
+
+    val Check: ImageVector by lazy {
+        feather("Check") { moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f) }
+    }
+
+    val Copy: ImageVector by lazy {
+        feather("Copy") {
+            rectangle(9f, 9f, 12f, 12f)
+            moveTo(5f, 15f); horizontalLineTo(4f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -2f, -2f)
+            verticalLineTo(4f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 2f, -2f)
+            horizontalLineTo(13f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 2f, 2f)
+            verticalLineTo(5f)
+        }
+    }
+
+    val Paperclip: ImageVector by lazy {
+        feather("Paperclip") {
+            moveTo(21.44f, 11.05f); lineTo(12.25f, 20.24f)
+            arcToRelative(6f, 6f, 0f, isMoreThanHalf = false, isPositiveArc = true, -8.49f, -8.49f)
+            lineTo(12.95f, 2.56f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, 5.66f, 5.66f)
+            lineTo(9.41f, 17.41f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -2.83f, -2.83f)
+            lineTo(15.07f, 6.1f)
+        }
+    }
+
+    val MoreVertical: ImageVector by lazy {
+        feather("MoreVertical") {
+            circle(12f, 5f, 1f); circle(12f, 12f, 1f); circle(12f, 19f, 1f)
+        }
+    }
+
+    val SwapVertical: ImageVector by lazy {
+        feather("SwapVertical") {
+            moveTo(7f, 4f); lineTo(7f, 20f)
+            moveTo(3f, 8f); lineTo(7f, 4f); lineTo(11f, 8f)
+            moveTo(17f, 20f); lineTo(17f, 4f)
+            moveTo(13f, 16f); lineTo(17f, 20f); lineTo(21f, 16f)
+        }
+    }
+
+    val History: ImageVector by lazy {
+        feather("History") {
+            moveTo(3f, 12f)
+            arcToRelative(9f, 9f, 0f, isMoreThanHalf = true, isPositiveArc = false, 3f, -6.7f)
+            moveTo(3f, 4f); lineTo(3f, 9f); lineTo(8f, 9f)
+            moveTo(12f, 7f); lineTo(12f, 12f); lineTo(16f, 14f)
+        }
+    }
+
     /** `terminal` — the shell tools (bash, pwsh). */
     val Terminal: ImageVector by lazy {
         feather("Terminal") {

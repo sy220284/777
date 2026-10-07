@@ -15,13 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -90,6 +83,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 @Composable
 internal fun LocalModelSettingsCard(
@@ -139,7 +133,7 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_model_settings), FeatherIcons.Cloud) {
         ChatGptAccountPanel(chatGpt, viewModel, report)
         Text(
             stringResource(R.string.local_model_image_mode_title),
@@ -244,7 +238,7 @@ internal fun LocalModelSettingsCard(
             editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
             custom = false
             showEditor = true
-        }, modifier = Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
+        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
     }
 
     if (showEditor) {
@@ -270,7 +264,7 @@ internal fun LocalModelSettingsCard(
                                     }?.let { "${it.provider} · ${it.model}" } ?: model,
                                     style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
                                     modifier = Modifier.weight(1f))
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                                Icon(FeatherIcons.ChevronRight, contentDescription = null)
                             }
                         }
                     },
@@ -445,7 +439,7 @@ internal fun DeepSeekPricingCard(
         stringResource(R.string.pricing_builtin_source)
     }
 
-    SettingsCard(stringResource(R.string.pricing_deepseek_title), Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.pricing_deepseek_title), FeatherIcons.Cloud) {
         Text(
             stringResource(R.string.pricing_current_period, periodLabel),
             style = DsType.small13Strong.withReadingWeight(),

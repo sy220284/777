@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -39,6 +36,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlin.math.abs
 import kotlinx.coroutines.delay
+import com.labteto.dshmobile.ui.components.FeatherIcons
 
 enum class ConversationScrollTarget { START, LATEST }
 
@@ -146,8 +144,8 @@ fun ConversationScrollShortcut(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            if (direction == ConversationScrollTarget.START) Icons.Filled.ArrowUpward
-                            else Icons.Filled.ArrowDownward,
+                            if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
+                            else FeatherIcons.ArrowDown,
                             contentDescription = label,
                             tint = colors.labelPrimary,
                             modifier = Modifier.size(19.dp),
