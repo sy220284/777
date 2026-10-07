@@ -1070,6 +1070,13 @@ private fun JsonObject.requiredTeamString(key: String): String =
 private fun JsonObject.optionalTeamString(key: String): String? =
     this[key]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
 
+private fun JsonObject.optionalTeamContext(): LocalTeamMemberContext =
+    when (optionalTeamString("context")?.lowercase()) {
+        null, "", "fresh" -> LocalTeamMemberContext.FRESH
+        "fork" -> LocalTeamMemberContext.FORK
+        else -> error("TEAM_MEMBER_CONTEXT_INVALID：context 仅支持 fresh / fork")
+    }
+
 private fun JsonObject.teamStringArray(key: String): List<String> =
     (this[key] as? JsonArray)?.mapNotNull { element ->
         element.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotBlank)
