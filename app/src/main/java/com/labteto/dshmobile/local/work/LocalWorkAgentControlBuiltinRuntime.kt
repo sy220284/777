@@ -8,7 +8,9 @@ import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,6 +48,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
                 val outputSchema = args.outputSchema()
+                val toolAllowlist = args.toolAllowlist()
                 if (args.boolean("run_in_background", false)) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
@@ -53,6 +56,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
                         outputSchema = outputSchema,
+                        toolAllowlist = toolAllowlist,
                         sessionId = run.sessionId,
                         boundState = snapshot,
                         historySnapshot = run.runHandle.modelHistory::snapshot,
@@ -66,6 +70,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
                         outputSchema = outputSchema,
+                        toolAllowlist = toolAllowlist,
                     )
                 }
             }
@@ -77,6 +82,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
                 maxSteps = snapshot.subagentMaxSteps,
                 outputSchema = args.outputSchema(),
+                toolAllowlist = args.toolAllowlist(),
             )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
@@ -100,6 +106,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
                 outputSchema = args.outputSchema(),
+                toolAllowlist = args.toolAllowlist(),
                 binding = run,
                 runner = runner,
             )
@@ -110,6 +117,18 @@ internal class LocalWorkAgentControlBuiltinRuntime(
     private fun JsonObject.outputSchema(): JsonObject? {
         val raw = this["output_schema"] ?: return null
         return raw as? JsonObject ?: error("output_schema 必须是 JSON object")
+    }
+
+    private fun JsonObject.toolAllowlist(): Set<String>? {
+        val raw = this["allowed_tools"] ?: return null
+        val array = raw as? JsonArray ?: error("allowed_tools 必须是字符串数组")
+        return array.map { item ->
+            (item as? JsonPrimitive)
+                ?.takeIf { it.isString }
+                ?.contentOrNull
+                ?.takeIf(String::isNotBlank)
+                ?: error("allowed_tools 包含非法工具名")
+        }.toSet()
     }
 
     internal companion object {
