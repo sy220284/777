@@ -1,11 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.ui.components.FeatherIcons
+
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +28,7 @@ internal fun ConversationActionsMenu(
     var expanded by remember { mutableStateOf(false) }
     Box {
         DsIconButton(
-            icon = Icons.Filled.MoreVert,
+            icon = FeatherIcons.MoreVertical,
             contentDescription = stringResource(R.string.local_session_actions),
             onClick = { expanded = true },
             tint = colors.labelSecondary,
@@ -43,17 +40,17 @@ internal fun ConversationActionsMenu(
             items = listOf(
                 MenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
-                    icon = Icons.Outlined.PushPin,
+                    icon = FeatherIcons.Pin,
                     onClick = onTogglePin,
                 ),
                 MenuItem(
                     text = stringResource(R.string.common_rename),
-                    icon = Icons.Outlined.Edit,
+                    icon = FeatherIcons.Edit3,
                     onClick = onRename,
                 ),
                 MenuItem(
                     text = stringResource(R.string.local_delete_session),
-                    icon = Icons.Outlined.DeleteOutline,
+                    icon = FeatherIcons.Trash2,
                     danger = true,
                     onClick = onDelete,
                 ),

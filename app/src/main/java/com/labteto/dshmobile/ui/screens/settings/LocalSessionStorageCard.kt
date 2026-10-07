@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.components.FeatherIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -30,7 +30,7 @@ internal fun LocalSessionStorageCard(
     val colors = DsTheme.colors
     SettingsCard(
         title = stringResource(R.string.settings_local_session_storage),
-        icon = Icons.Outlined.History,
+        icon = FeatherIcons.Clock,
     ) {
         if (status == null) {
             Text(
