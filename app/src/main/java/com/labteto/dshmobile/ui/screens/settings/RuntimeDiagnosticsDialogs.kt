@@ -40,7 +40,12 @@ internal fun NetworkDiagnosticDialog(
     var result by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
     val failedText = stringResource(R.string.settings_runtime_network_diagnostic_failed)
-    DsBottomSheet(title = stringResource(R.string.settings_runtime_network_diagnostic_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.settings_runtime_network_diagnostic_title),
+        onDismiss = { if (!running) onDismiss() },
+        scrollable = true,
+        dismissEnabled = !running,
+    ) {
         Text(
             stringResource(R.string.settings_runtime_network_diagnostic_intro),
             style = DsType.small13.withReadingWeight(),
@@ -92,7 +97,11 @@ internal fun EnvironmentInfoDialog(
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     val eventTime = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()) }
     val emptyEvents = stringResource(R.string.settings_diagnostic_empty)
-    DsBottomSheet(title = stringResource(R.string.settings_runtime_environment_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.settings_runtime_environment_title),
+        onDismiss = onDismiss,
+        scrollable = true,
+    ) {
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
             style = DsType.small13.withReadingWeight(),
