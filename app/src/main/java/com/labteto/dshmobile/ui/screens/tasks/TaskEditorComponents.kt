@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -22,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
@@ -159,7 +159,7 @@ internal fun ColumnScope.TaskEditorPane(
                         color = colors.labelTertiary,
                     )
                 }
-                Switch(
+                DsSwitch(
                     checked = notify,
                     onCheckedChange = { notify = it },
                 )
