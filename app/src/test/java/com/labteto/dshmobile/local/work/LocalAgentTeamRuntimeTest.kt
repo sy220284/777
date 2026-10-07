@@ -392,7 +392,7 @@ class LocalAgentTeamRuntimeTest {
         ).also(logs::add)
         val runtime = LocalAgentTeamRuntime(
             jobs = jobs,
-            startTeammate = { _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "测试不启动子代理")
             },
             sendToTeammate = { _, _, _ ->
