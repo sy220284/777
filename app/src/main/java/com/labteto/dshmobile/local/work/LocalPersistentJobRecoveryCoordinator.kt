@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.jobs.JobContinuationPersistenceException
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
@@ -99,6 +100,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
+    fun sendMessage(
+        agentId: String,
+        message: String,
+        sessionId: String,
+    ): String {
+        val result = jobs.send(agentId, message, sessionId)
+        if (result.startsWith("消息已")) {
+            schedule()
+        }
+        return result
+    }
+
     fun schedule() {
         synchronized(lock) {
             if (recoveryJob?.isActive == true) return
@@ -107,9 +120,16 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     while (true) {
                         val targetSession = currentSessionId()
                         resumePass(targetSession)
-                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedSessionId(snapshot, targetSession) == targetSession
-                        }
+                        val remaining =
+                            jobs.resumableSnapshots().any { snapshot ->
+                                interruptedSessionId(snapshot, targetSession) == targetSession
+                            } ||
+                                jobs.durableSnapshots().any { snapshot ->
+                                    snapshot.resumeKind == "subagent_readonly" &&
+                                        snapshot.status == "running" &&
+                                        snapshot.inbox.isNotEmpty() &&
+                                        interruptedSessionId(snapshot, targetSession) == targetSession
+                                }
                         if (!remaining) break
                         delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
                     }
@@ -124,7 +144,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     }
 
     private fun resumePass(targetSession: String) {
-        jobs.interruptedSnapshots().forEach { snapshot ->
+        jobs.resumableSnapshots().forEach { snapshot ->
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -139,6 +159,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (error: JobContinuationPersistenceException) {
+                recordError(snapshot, sessionId, error)
             } catch (error: Exception) {
                 jobs.failInterrupted(snapshot.id, "任务无法恢复：${error.message.orEmpty().take(500)}")
                 recordError(snapshot, sessionId, error)
@@ -199,15 +221,16 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
+        val continuation = decodeSubagentContinuation(snapshot)
+        val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
+        require(
+            profile.authKind.name == authKind &&
+                effectiveProtocol(profile) == protocol &&
+                profile.credentialRef == credentialRef &&
+                profile.routeFingerprint() == fingerprint
+        ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
-            val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
-            require(
-                profile.authKind.name == authKind &&
-                    effectiveProtocol(profile) == protocol &&
-                    profile.credentialRef == credentialRef &&
-                    profile.routeFingerprint() == fingerprint
-            ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
             withContext(LocalModelRunContext(profile)) {
                 runner.runResult(
                     task = task,
@@ -217,9 +240,28 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    recoveredHistory = continuation?.history,
+                    recoveredClaimedMessageIds = continuation?.claimedMessageIds.orEmpty(),
+                    recoveredStep = continuation?.step ?: 0,
                 ).requireCompletedOutput()
             }
         }
+    }
+
+    private fun decodeSubagentContinuation(
+        snapshot: JobSnapshot,
+    ): LocalSubagentHistoryCheckpoint? {
+        val encoded = snapshot.continuationState ?: return null
+        val data = runCatching {
+            json.parseToJsonElement(encoded).jsonObject
+        }.getOrElse { error ->
+            throw IllegalStateException("持久子代理续跑检查点损坏", error)
+        }
+        require(
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
+        ) { "持久子代理续跑检查点与任务身份不匹配" }
+        return decodeLocalSubagentHistoryCheckpoint(data)
+            ?: error("持久子代理续跑检查点格式不受支持")
     }
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =

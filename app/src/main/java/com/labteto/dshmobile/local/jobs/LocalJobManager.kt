@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.jobs.HarnessJobManager
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import kotlinx.coroutines.CoroutineScope
 
@@ -36,6 +37,10 @@ internal class LocalJobManager(
 
     fun interruptedSnapshots(): List<JobSnapshot> = delegate.interruptedSnapshots()
 
+    fun resumableSnapshots(): List<JobSnapshot> = delegate.resumableSnapshots()
+
+    fun durableSnapshots(): List<JobSnapshot> = delegate.snapshots()
+
     fun availableSlots(): Int = delegate.availableSlots()
 
     fun failInterrupted(id: String, detail: String): String = delegate.failInterrupted(id, detail)
@@ -60,6 +65,20 @@ internal class LocalJobManager(
 
     fun send(id: String, message: String, ownerSessionId: String? = null): String =
         delegate.send(id, message, ownerSessionId)
+
+    fun peekMessages(id: String): List<QueuedAgentInput> = delegate.peekMessages(id)
+
+    fun acknowledgeMessages(
+        id: String,
+        messageIds: Set<String>,
+        ownerSessionId: String? = null,
+    ) = delegate.acknowledgeMessages(id, messageIds, ownerSessionId)
+
+    fun updateContinuationState(
+        id: String,
+        state: String,
+        ownerSessionId: String? = null,
+    ) = delegate.updateContinuationState(id, state, ownerSessionId)
 
     fun drainMessages(id: String): List<String> = delegate.drainMessages(id)
 

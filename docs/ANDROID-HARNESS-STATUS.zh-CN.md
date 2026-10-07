@@ -62,8 +62,10 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - Goal / Todo / Plan。
 - 用户提问与审批。
 - 取消、停止和受控结束。
-- Agent inbox。
+- Agent inbox；前台与持久子代理统一使用 `QueuedAgentInput` 语义，满队列明确拒绝，不静默丢弃旧消息。
 - Agent run checkpoint。
+- 持久只读子代理使用稳定 Child Agent 身份；一次进程内运行只是 Activation，完成后进入 dormant，可由后续 `send_message` 再次激活。
+- 持久子代理在安全 Step 边界保存最新完整模型历史、累计 step 与已认领 Inbox 编号；进程中断后从该检查点 Cold Resume，不从原任务重新开始。
 
 运行归属：
 
@@ -110,6 +112,8 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - 尚未执行的工具：`TOOL_NOT_STARTED`。
 - 未知副作用不会在重启后自动重放。
 - durable Agent inbox 在启动 / 会话切换时恢复。
+- 持久子代理 Inbox、续跑历史与路由身份同步落盘；消息写入或续跑检查点落盘失败时不伪装成功。
+- 自动 Cold Resume 只开放给持久只读子代理；可变更外部状态的子代理不允许依赖进程重启自动重放。
 - 外部进程被 Android 杀死后不能伪装成透明续跑。
 
 ## 上下文与长对话
@@ -297,6 +301,10 @@ Gallery identity
 - 任务恢复。
 
 Chat / Work 共用底层 Agent / Tools / Permissions / Context。
+
+后台持久子代理采用 Child Session / Activation 分离语义：Agent 身份与历史长期存在，进程内 Activation 可以结束并进入 dormant；后续消息触发同一 Child Agent 从最近安全检查点继续。显式停止会清除 continuation 与待处理 Inbox。
+
+Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 继续持有自己的强类型投影句柄，不通过全局无类型查找共享可变状态。
 
 差异只存在于产品 prompt、状态投影和 UI。
 

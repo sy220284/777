@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.jobs
 
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
 import java.io.FileOutputStream
@@ -60,6 +62,16 @@ internal class LocalPersistentJobStore(
         file.parentFile?.mkdirs()
         val payload = buildJsonArray {
             snapshots.takeLast(MAX_RECORDS).forEach { snapshot ->
+                require(snapshot.inbox.size <= AgentInputQueue.DEFAULT_CAPACITY) {
+                    "后台代理Inbox超过容量：${snapshot.inbox.size}/${AgentInputQueue.DEFAULT_CAPACITY}"
+                }
+                require(snapshot.inbox.all { it.id.isNotBlank() && it.content.isNotBlank() }) {
+                    "后台代理Inbox包含无效消息"
+                }
+                val inboxIds = snapshot.inbox.map(QueuedAgentInput::id)
+                require(inboxIds.distinct().size == inboxIds.size) {
+                    "后台代理Inbox包含重复消息编号"
+                }
                 add(buildJsonObject {
                     put("id", snapshot.id)
                     put("label", snapshot.label)
@@ -68,6 +80,24 @@ internal class LocalPersistentJobStore(
                     snapshot.resumeKind?.let { put("resume_kind", it) }
                     snapshot.resumePayload?.let { put("resume_payload", it) }
                     snapshot.ownerId?.let { put("owner_session_id", it) }
+                    snapshot.continuationState
+                        ?.takeIf(String::isNotBlank)
+                        ?.let { put("continuation_state", it.take(MAX_PERSISTED_CONTINUATION_STATE_CHARS)) }
+                    if (snapshot.inbox.isNotEmpty()) {
+                        put("inbox", buildJsonArray {
+                            snapshot.inbox.takeLast(MAX_PERSISTED_INBOX_MESSAGES).forEach { message ->
+                                add(buildJsonObject {
+                                    put("id", message.id.take(MAX_PERSISTED_INBOX_ID_CHARS))
+                                    put("content", message.content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS))
+                                    put(
+                                        "memory_input",
+                                        message.memoryInput.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                                    )
+                                    message.modelMessage?.let { put("model_message", it) }
+                                })
+                            }
+                        })
+                    }
                     if (snapshot.startedAt > 0L) put("started_at", snapshot.startedAt)
                     if (snapshot.deadlineAt > 0L) put("deadline_at", snapshot.deadlineAt)
                     put("updated_at", snapshot.updatedAt)
@@ -97,6 +127,33 @@ internal class LocalPersistentJobStore(
             val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull
             val resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull
+            val continuationState = item["continuation_state"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank)
+                ?.take(MAX_PERSISTED_CONTINUATION_STATE_CHARS)
+            val inbox = item["inbox"]?.jsonArray?.map { rawMessage ->
+                val message = rawMessage.jsonObject
+                val messageId = message["id"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 id")
+                val content = message["content"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 content")
+                QueuedAgentInput(
+                    id = messageId.take(MAX_PERSISTED_INBOX_ID_CHARS),
+                    content = content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                    memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull
+                        ?.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS)
+                        ?: content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                    modelMessage = message["model_message"] as? JsonObject,
+                )
+            }.orEmpty()
+            require(inbox.size <= AgentInputQueue.DEFAULT_CAPACITY) {
+                "后台代理Inbox快照超过容量：${inbox.size}/${AgentInputQueue.DEFAULT_CAPACITY}"
+            }
+            val inboxIds = inbox.map(QueuedAgentInput::id)
+            require(inboxIds.distinct().size == inboxIds.size) {
+                "后台代理Inbox快照包含重复消息编号"
+            }
             JobSnapshot(
                 id = id,
                 label = label,
@@ -109,6 +166,8 @@ internal class LocalPersistentJobStore(
                 startedAt = item["started_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 deadlineAt = item["deadline_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+                inbox = inbox,
+                continuationState = continuationState,
             )
         }
 
@@ -155,6 +214,10 @@ internal class LocalPersistentJobStore(
     private companion object {
         const val MAX_RECORDS = 64
         const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
+        const val MAX_PERSISTED_INBOX_MESSAGES = AgentInputQueue.DEFAULT_CAPACITY
+        const val MAX_PERSISTED_INBOX_ID_CHARS = 64
+        const val MAX_PERSISTED_INBOX_MESSAGE_CHARS = 4_000
+        const val MAX_PERSISTED_CONTINUATION_STATE_CHARS = 4_000_000
         val LEGACY_OWNER_INFERENCE_KINDS = setOf("web_fetch", "subagent_readonly")
     }
 }

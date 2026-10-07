@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.harness.jobs
 
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -286,6 +289,334 @@ class HarnessJobPersistenceTest {
         assertTrue((1..8).all { index ->
             manager.output("job-$index").contains("[completed]")
         })
+    }
+
+    @Test
+    fun interruptedPersistentAgentKeepsDurableInboxAndAcceptsColdResumeMessage() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = """{"session_id":"session-a"}""",
+                    ownerId = "session-a",
+                    inbox = listOf(QueuedAgentInput(id = "msg-old", content = "已有消息")),
+                ),
+            ),
+            onSnapshotsChanged = { durable = it },
+        )
+
+        assertTrue(manager.output("job-agent", "session-a").contains("[interrupted]"))
+        val result = manager.send("job-agent", "恢复后继续核查", "session-a")
+
+        assertTrue(result.contains("持久排队"))
+        assertTrue(manager.peekMessages("job-agent").map { it.content } == listOf("已有消息", "恢复后继续核查"))
+        assertTrue(durable.single().inbox.size == 2)
+        assertTrue(durable.single().inbox.last().content == "恢复后继续核查")
+    }
+
+    @Test
+    fun persistentAgentInboxRejectsOverflowWithoutDroppingOlderMessages() = runTest {
+        val existing = (1..com.labteto.dshmobile.harness.agent.AgentInputQueue.DEFAULT_CAPACITY).map { index ->
+            QueuedAgentInput(
+                id = "msg-$index",
+                content = "消息$index",
+            )
+        }
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    inbox = existing,
+                ),
+            ),
+        )
+
+        val result = manager.send("job-agent", "不能挤掉旧消息", "session-a")
+
+        assertTrue(result.contains("消息队列已满"))
+        assertTrue(manager.peekMessages("job-agent") == existing)
+    }
+
+    @Test
+    fun oversizedRestoredInboxIsRejectedInsteadOfSilentlyTruncated() = runTest {
+        val oversized = (1..AgentInputQueue.DEFAULT_CAPACITY + 1).map { index ->
+            QueuedAgentInput(
+                id = "msg-$index",
+                content = "消息$index",
+            )
+        }
+
+        val failure = runCatching {
+            HarnessJobManager(
+                scope = this,
+                onChanged = { },
+                initialSnapshots = listOf(
+                    JobSnapshot(
+                        id = "job-agent",
+                        label = "子代理：审计",
+                        status = "running",
+                        resumeKind = "subagent_readonly",
+                        resumePayload = "{}",
+                        ownerId = "session-a",
+                        inbox = oversized,
+                    ),
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+    }
+
+    @Test
+    fun persistentAgentMessageRollsBackWhenDurableWriteFails() = runTest {
+        var writes = 0
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    inbox = listOf(QueuedAgentInput(id = "msg-old", content = "已有消息")),
+                ),
+            ),
+            onSnapshotsChanged = {
+                writes += 1
+                if (writes >= 2) error("disk full")
+            },
+        )
+
+        val failure = runCatching {
+            manager.send("job-agent", "不能伪装成功", "session-a")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertTrue(manager.peekMessages("job-agent") == listOf(QueuedAgentInput(id = "msg-old", content = "已有消息")))
+    }
+
+    @Test
+    fun resumePreflightWriteFailureKeepsInterruptedCheckpointRecoverable() = runTest {
+        var ran = false
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    continuationState = """{"version":1,"step":4,"history":[]}""",
+                ),
+            ),
+            onSnapshotsChanged = { snapshots ->
+                if (snapshots.single().status == "running") error("disk full")
+            },
+        )
+
+        val failure = runCatching {
+            manager.resumePersistent("job-agent", "session-a") { _, _ ->
+                ran = true
+                "must not run"
+            }
+        }.exceptionOrNull()
+
+        assertTrue(failure is JobContinuationPersistenceException)
+        assertFalse(ran)
+        val snapshot = manager.snapshots().single()
+        assertTrue(snapshot.status == "interrupted")
+        assertTrue(snapshot.continuationState?.contains("\"step\":4") == true)
+        assertTrue(manager.resumableSnapshots().single().id == "job-agent")
+    }
+
+    @Test
+    fun continuationWriteFailureFallsBackToPreviousRecoverableCheckpoint() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    continuationState = """{"version":1,"step":1,"history":[]}""",
+                ),
+            ),
+            onSnapshotsChanged = { snapshots ->
+                if (snapshots.single().continuationState?.contains("\"step\":2") == true) {
+                    error("disk full")
+                }
+                durable = snapshots
+            },
+        )
+
+        manager.resumePersistent("job-agent", "session-a") { id, _ ->
+            manager.updateContinuationState(
+                id = id,
+                state = """{"version":1,"step":2,"history":[]}""",
+                ownerId = "session-a",
+            )
+            "must not complete"
+        }
+        advanceUntilIdle()
+
+        val recovered = manager.snapshots().single()
+        assertTrue(recovered.status == "interrupted")
+        assertTrue(recovered.continuationState?.contains("\"step\":1") == true)
+        assertTrue(manager.resumableSnapshots().single().id == "job-agent")
+        assertTrue(durable.single().continuationState?.contains("\"step\":1") == true)
+    }
+
+    @Test
+    fun persistentAgentBecomesDormantAndCanResumeSameContinuation() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val gate = CompletableDeferred<Unit>()
+        lateinit var manager: HarnessJobManager
+        manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-agent-state" },
+            onSnapshotsChanged = { durable = it },
+        )
+
+        manager.startPersistent(
+            label = "子代理：审计",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerId = "session-a",
+        ) { id, _ ->
+            manager.updateContinuationState(
+                id = id,
+                state = """{"version":1,"step":1,"history":[]}""",
+                ownerId = "session-a",
+            )
+            gate.await()
+            "first done"
+        }
+        runCurrent()
+
+        assertTrue(
+            durable.single { it.id == "job-agent-state" }.continuationState ==
+                """{"version":1,"step":1,"history":[]}"""
+        )
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val dormant = manager.snapshots().single { it.id == "job-agent-state" }
+        assertTrue(dormant.status == "dormant")
+        assertTrue(dormant.continuationState != null)
+        assertTrue(manager.availableSlots() >= 1)
+        assertTrue(manager.resumableSnapshots().isEmpty())
+
+        val queued = manager.send("job-agent-state", "继续第二轮", "session-a")
+        assertTrue(queued.contains("持久排队"))
+        assertTrue(manager.peekMessages("job-agent-state").single().content == "继续第二轮")
+        assertTrue(manager.resumableSnapshots().single().id == "job-agent-state")
+
+        manager.resumePersistent("job-agent-state", "session-a") { id, _ ->
+            val message = manager.peekMessages(id).single()
+            manager.updateContinuationState(
+                id = id,
+                state = """{"version":1,"step":2,"history":[]}""",
+                ownerId = "session-a",
+            )
+            manager.acknowledgeMessages(id, setOf(message.id), "session-a")
+            "second done"
+        }
+        advanceUntilIdle()
+
+        val resumed = manager.snapshots().single { it.id == "job-agent-state" }
+        assertTrue(resumed.status == "dormant")
+        assertTrue(resumed.output == "second done")
+        assertTrue(resumed.inbox.isEmpty())
+        assertTrue(resumed.continuationState?.contains("\"step\":2") == true)
+    }
+
+    @Test
+    fun killingDormantAgentClearsContinuationAndQueuedMessages() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-dormant",
+                    label = "子代理：审计",
+                    status = "dormant",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    continuationState = """{"version":1,"step":3,"history":[]}""",
+                    inbox = listOf(QueuedAgentInput(id = "msg-1", content = "继续")),
+                ),
+            ),
+        )
+
+        val result = manager.kill("job-dormant", "session-a")
+        val snapshot = manager.snapshots().single()
+
+        assertTrue(result.contains("已停止后台代理"))
+        assertTrue(snapshot.status == "cancelled")
+        assertTrue(snapshot.continuationState == null)
+        assertTrue(snapshot.inbox.isEmpty())
+        assertTrue(manager.resumableSnapshots().isEmpty())
+    }
+
+    @Test
+    fun persistentAgentInboxAcknowledgementIsDurableAndScoped() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    inbox = listOf(
+                        QueuedAgentInput(id = "msg-1", content = "第一条"),
+                        QueuedAgentInput(id = "msg-2", content = "第二条"),
+                    ),
+                ),
+            ),
+            onSnapshotsChanged = { durable = it },
+        )
+
+        manager.acknowledgeMessages("job-agent", setOf("msg-1"), "session-a")
+
+        assertTrue(manager.peekMessages("job-agent").map { it.id } == listOf("msg-2"))
+        assertTrue(durable.single().inbox.map { it.id } == listOf("msg-2"))
+        val failure = runCatching {
+            manager.acknowledgeMessages("job-agent", setOf("msg-2"), "session-b")
+        }.exceptionOrNull()
+        assertTrue(failure != null)
+        assertTrue(manager.peekMessages("job-agent").single().id == "msg-2")
     }
 
     @Test

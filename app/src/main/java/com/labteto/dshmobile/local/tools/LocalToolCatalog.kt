@@ -164,11 +164,11 @@ object LocalToolCatalog {
         ), listOf("task")))
         add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
-        add(tool("send_message", "向正在运行的后台代理追加消息", properties(
+        add(tool("send_message", "向后台代理追加消息；持久代理运行中直接接收，休眠或进程中断时持久排队并唤醒同一代理继续原历史", properties(
             "agent_id" to string("后台代理编号"),
             "message" to string("需要追加的消息"),
         ), listOf("agent_id", "message")))
-        add(tool("interrupt_agent", "停止正在运行的后台代理", properties(
+        add(tool("interrupt_agent", "停止后台代理；运行中的代理会取消，休眠或待恢复代理会结束并清除后续续跑状态", properties(
             "agent_id" to string("后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "并行执行只读子任务，或按顺序传递结果；逐项验收，失败最多重新指派一次", properties(

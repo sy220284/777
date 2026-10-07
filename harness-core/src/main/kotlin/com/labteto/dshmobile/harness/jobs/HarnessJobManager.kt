@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.harness.jobs
 
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +15,11 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+
+class JobContinuationPersistenceException(
+    message: String,
+    cause: Throwable,
+) : IllegalStateException(message, cause)
 
 data class JobInfo(
     val id: String,
@@ -32,6 +39,8 @@ data class JobSnapshot(
     val startedAt: Long = 0L,
     val deadlineAt: Long = 0L,
     val updatedAt: Long = System.currentTimeMillis(),
+    val inbox: List<QueuedAgentInput> = emptyList(),
+    val continuationState: String? = null,
 )
 
 /** Process-agnostic shared job controller used by the Android runtime adapter. */
@@ -59,7 +68,8 @@ class HarnessJobManager(
         var status: String = "running",
         var output: String = "",
         var job: Job? = null,
-        val inbox: MutableList<String> = mutableListOf(),
+        val inbox: MutableList<QueuedAgentInput> = mutableListOf(),
+        var continuationState: String? = null,
         val resumeKind: String? = null,
         val resumePayload: String? = null,
         var ownerId: String? = null,
@@ -77,9 +87,26 @@ class HarnessJobManager(
 
     private fun Record.occupiesSlot(): Boolean = status == "running" || job?.isCompleted == false
 
+    private fun Record.isContinuableAgent(): Boolean =
+        resumeKind == CONTINUABLE_AGENT_RESUME_KIND &&
+            !continuationState.isNullOrBlank()
+
+    private fun Record.isResumable(): Boolean =
+        status == "interrupted" || (status == "dormant" && isContinuableAgent())
+
     init {
         synchronized(lock) {
             initialSnapshots.takeLast(maxRetainedJobs).forEach { snapshot ->
+                require(snapshot.inbox.size <= MAX_INBOX_MESSAGES) {
+                    "恢复的后台代理 Inbox 超过容量：${snapshot.inbox.size}/$MAX_INBOX_MESSAGES"
+                }
+                require(snapshot.inbox.all { it.id.isNotBlank() && it.content.isNotBlank() }) {
+                    "恢复的后台代理 Inbox 包含无效消息"
+                }
+                val restoredInboxIds = snapshot.inbox.map(QueuedAgentInput::id)
+                require(restoredInboxIds.distinct().size == restoredInboxIds.size) {
+                    "恢复的后台代理 Inbox 包含重复消息编号"
+                }
                 val interrupted = snapshot.status == "running"
                 records[snapshot.id] = Record(
                     id = snapshot.id,
@@ -102,6 +129,19 @@ class HarnessJobManager(
                     startedAt = snapshot.startedAt,
                     deadlineAt = snapshot.deadlineAt,
                     updatedAt = snapshot.updatedAt,
+                    inbox = snapshot.inbox
+                        .map { message ->
+                            QueuedAgentInput(
+                                id = message.id.take(MAX_INBOX_ID),
+                                content = message.content.take(MAX_INBOX_MESSAGE),
+                                memoryInput = message.memoryInput.take(MAX_INBOX_MESSAGE),
+                                modelMessage = message.modelMessage,
+                            )
+                        }
+                        .toMutableList(),
+                    continuationState = snapshot.continuationState
+                        ?.takeIf(String::isNotBlank)
+                        ?.take(MAX_CONTINUATION_STATE_CHARS),
                 )
             }
         }
@@ -148,19 +188,22 @@ class HarnessJobManager(
         var previousOutput = ""
         var previousUpdatedAt = 0L
         var previousOwnerId: String? = null
+        var previousStatus = "interrupted"
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
             if ((ownerId ?: found.ownerId) in removingOwners) return "会话正在移除，无法恢复后台任务"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
-            if (found.status != "interrupted") return "后台任务无需恢复：$id [${found.status}]"
+            if (!found.isResumable()) return "后台任务无需恢复：$id [${found.status}]"
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
             previousOutput = found.output
+            previousStatus = found.status
             previousUpdatedAt = found.updatedAt
             previousOwnerId = found.ownerId
             if (!ownerId.isNullOrBlank()) found.ownerId = ownerId
+            found.job = null
             found.status = "running"
             found.output = "正在从安全检查点恢复…"
             found.updatedAt = System.currentTimeMillis()
@@ -170,13 +213,16 @@ class HarnessJobManager(
             persistCurrentSnapshots()
         } catch (error: Exception) {
             synchronized(lock) {
-                record.status = "interrupted"
+                record.status = previousStatus
                 record.output = previousOutput
                 record.ownerId = previousOwnerId
                 record.updatedAt = previousUpdatedAt
             }
             notifyChanged()
-            throw IllegalStateException("持久任务恢复元数据写入失败，任务未启动", error)
+            throw JobContinuationPersistenceException(
+                "持久任务恢复元数据写入失败，任务未启动",
+                error,
+            )
         }
         launchRecord(record, block)
         notifyChanged()
@@ -189,6 +235,19 @@ class HarnessJobManager(
             .map(::snapshot)
     }
 
+    fun resumableSnapshots(): List<JobSnapshot> = synchronized(lock) {
+        records.values
+            .filter { record ->
+                record.status == "interrupted" ||
+                    (
+                        record.status == "dormant" &&
+                            record.isContinuableAgent() &&
+                            record.inbox.isNotEmpty()
+                    )
+            }
+            .map(::snapshot)
+    }
+
     fun snapshots(): List<JobSnapshot> = synchronized(lock) { records.values.map(::snapshot) }
 
     fun availableSlots(): Int = synchronized(lock) {
@@ -198,9 +257,10 @@ class HarnessJobManager(
     fun failInterrupted(id: String, detail: String): String {
         synchronized(lock) {
             val record = records[id] ?: return "后台任务不存在：$id"
-            if (record.status != "interrupted") return "后台任务无需标记失败：$id [${record.status}]"
+            if (!record.isResumable()) return "后台任务无需标记失败：$id [${record.status}]"
             record.status = "failed"
             record.output = detail.takeLast(MAX_OUTPUT)
+            record.continuationState = null
             record.updatedAt = System.currentTimeMillis()
         }
         publish()
@@ -218,6 +278,9 @@ class HarnessJobManager(
         val record = synchronized(lock) {
             if (ownerId in removingOwners) return "会话正在移除，无法启动后台任务"
             pruneRetainedLocked()
+            if (records.size >= maxRetainedJobs) {
+                return "后台任务保留已满：请先停止不再需要的持久代理或清理旧任务"
+            }
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
@@ -287,21 +350,39 @@ class HarnessJobManager(
                 synchronized(lock) {
                     if (record.status != "running") throw CancellationException("后台任务已停止")
                     record.output = result
-                    record.status = "completed"
+                    if (record.isContinuableAgent()) {
+                        record.status = "dormant"
+                    } else {
+                        record.status = "completed"
+                        record.continuationState = null
+                    }
                     record.updatedAt = System.currentTimeMillis()
                 }
             } catch (cancelled: CancellationException) {
                 synchronized(lock) {
                     record.status = "cancelled"
                     record.output = "任务已取消"
+                    record.continuationState = null
                     record.updatedAt = System.currentTimeMillis()
                 }
                 throw cancelled
+            } catch (error: JobContinuationPersistenceException) {
+                synchronized(lock) {
+                    if (record.status != "running") return@synchronized
+                    record.status = "interrupted"
+                    record.output = "续跑检查点暂时无法持久化，已保留上一份安全状态等待恢复"
+                    record.updatedAt = System.currentTimeMillis()
+                }
             } catch (error: Exception) {
                 synchronized(lock) {
                     if (record.status != "running") return@synchronized
-                    record.status = "failed"
                     record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
+                    if (record.isContinuableAgent()) {
+                        record.status = "dormant"
+                    } else {
+                        record.status = "failed"
+                        record.continuationState = null
+                    }
                     record.updatedAt = System.currentTimeMillis()
                 }
             } finally {
@@ -348,45 +429,170 @@ class HarnessJobManager(
     }
 
     fun kill(id: String, ownerId: String? = null): String {
+        var idleCancellation = false
         val job = synchronized(lock) {
             val record = records[id]
                 ?.takeIf { ownerId == null || it.ownerId == ownerId }
                 ?: return "后台任务不存在：$id"
-            if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
-            record.status = "cancelled"
-            record.output = "任务已取消"
-            record.updatedAt = System.currentTimeMillis()
-            record.job
+            if (record.status == "dormant" || record.status == "interrupted") {
+                idleCancellation = true
+                record.status = "cancelled"
+                record.output = "任务已取消"
+                record.inbox.clear()
+                record.continuationState = null
+                record.updatedAt = System.currentTimeMillis()
+                null
+            } else {
+                if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
+                record.status = "cancelled"
+                record.output = "任务已取消"
+                record.inbox.clear()
+                record.continuationState = null
+                record.updatedAt = System.currentTimeMillis()
+                record.job
+            }
         }
         job?.cancel()
         publish()
-        return "已请求停止后台任务：$id"
+        return if (idleCancellation) "已停止后台代理：$id" else "已请求停止后台任务：$id"
     }
 
     fun send(id: String, message: String, ownerId: String? = null): String {
         val clean = message.trim()
         require(clean.isNotEmpty()) { "消息不能为空" }
-        synchronized(lock) {
-            val record = records[id]
+        var queuedForResume = false
+        var previousInbox: List<QueuedAgentInput> = emptyList()
+        var previousUpdatedAt = 0L
+        val record = synchronized(lock) {
+            val found = records[id]
                 ?.takeIf { ownerId == null || it.ownerId == ownerId }
                 ?: return "后台代理不存在：$id"
-            if (record.status != "running" || !record.label.startsWith(AGENT_PREFIX)) {
-                return "目标不是正在运行的后台代理：$id"
+            if (!found.label.startsWith(AGENT_PREFIX)) {
+                return "目标不是后台代理：$id"
             }
-            record.inbox += clean.take(MAX_INBOX_MESSAGE)
-            while (record.inbox.size > MAX_INBOX_MESSAGES) {
-                record.inbox.removeAt(0)
+            queuedForResume = found.isResumable()
+            if (found.status != "running" && !queuedForResume) {
+                return "目标后台代理当前不可接收消息：$id [${found.status}]"
             }
-            record.updatedAt = System.currentTimeMillis()
+            if (found.inbox.size >= MAX_INBOX_MESSAGES) {
+                return "后台代理消息队列已满：最多保留 $MAX_INBOX_MESSAGES 条待处理消息"
+            }
+            previousInbox = found.inbox.toList()
+            previousUpdatedAt = found.updatedAt
+            found.inbox += QueuedAgentInput(
+                id = "msg-" + UUID.randomUUID().toString().replace("-", "").take(16),
+                content = clean.take(MAX_INBOX_MESSAGE),
+                memoryInput = clean.take(MAX_INBOX_MESSAGE),
+            )
+            found.updatedAt = System.currentTimeMillis()
+            found
         }
-        publish()
-        return "消息已发送给后台代理：$id"
+        if (!record.resumeKind.isNullOrBlank()) {
+            try {
+                persistCurrentSnapshots()
+            } catch (error: Exception) {
+                synchronized(lock) {
+                    record.inbox.clear()
+                    record.inbox.addAll(previousInbox)
+                    record.updatedAt = previousUpdatedAt
+                }
+                notifyChanged()
+                throw IllegalStateException("后台代理消息持久化失败，消息未发送", error)
+            }
+            notifyChanged()
+        } else {
+            publish()
+        }
+        return if (queuedForResume) {
+            "消息已持久排队，后台代理将在恢复后接收：$id"
+        } else {
+            "消息已发送给后台代理：$id"
+        }
     }
 
-    fun drainMessages(id: String): List<String> = synchronized(lock) {
-        val record = records[id] ?: return@synchronized emptyList()
-        record.inbox.toList().also { record.inbox.clear() }
+    fun peekMessages(id: String): List<QueuedAgentInput> = synchronized(lock) {
+        records[id]?.inbox?.toList().orEmpty()
     }
+
+    fun updateContinuationState(
+        id: String,
+        state: String,
+        ownerId: String? = null,
+    ) {
+        require(state.isNotBlank()) { "后台代理续跑状态不能为空" }
+        require(state.length <= MAX_CONTINUATION_STATE_CHARS) {
+            "后台代理续跑状态超过上限"
+        }
+        var previousState: String? = null
+        var previousUpdatedAt = 0L
+        val record = synchronized(lock) {
+            val found = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: error("后台代理不存在：$id")
+            check(!found.resumeKind.isNullOrBlank()) { "后台代理不是持久任务：$id" }
+            check(found.status == "running") { "后台代理当前不可更新续跑状态：$id [${found.status}]" }
+            previousState = found.continuationState
+            previousUpdatedAt = found.updatedAt
+            found.continuationState = state
+            found.updatedAt = System.currentTimeMillis()
+            found
+        }
+        try {
+            persistCurrentSnapshots()
+        } catch (error: Exception) {
+            synchronized(lock) {
+                record.continuationState = previousState
+                record.updatedAt = previousUpdatedAt
+            }
+            notifyChanged()
+            throw JobContinuationPersistenceException("后台代理续跑状态持久化失败", error)
+        }
+        notifyChanged()
+    }
+
+    fun acknowledgeMessages(
+        id: String,
+        messageIds: Set<String>,
+        ownerId: String? = null,
+    ) {
+        if (messageIds.isEmpty()) return
+        var previousInbox: List<QueuedAgentInput> = emptyList()
+        var previousUpdatedAt = 0L
+        val record = synchronized(lock) {
+            val found = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: error("后台代理不存在：$id")
+            previousInbox = found.inbox.toList()
+            previousUpdatedAt = found.updatedAt
+            found.inbox.removeAll { it.id in messageIds }
+            found.updatedAt = System.currentTimeMillis()
+            found
+        }
+        if (!record.resumeKind.isNullOrBlank()) {
+            try {
+                persistCurrentSnapshots()
+            } catch (error: Exception) {
+                synchronized(lock) {
+                    record.inbox.clear()
+                    record.inbox.addAll(previousInbox)
+                    record.updatedAt = previousUpdatedAt
+                }
+                notifyChanged()
+                throw IllegalStateException("后台代理消息确认持久化失败", error)
+            }
+            notifyChanged()
+        } else {
+            publish()
+        }
+    }
+
+    fun drainMessages(id: String): List<String> {
+        val messages = peekMessages(id)
+        if (messages.isEmpty()) return emptyList()
+        acknowledgeMessages(id, messages.mapTo(linkedSetOf()) { it.id })
+        return messages.map { it.content }
+    }
+
 
     fun stopAll() {
         val jobs = markRunningJobsCancelled()
@@ -466,7 +672,7 @@ class HarnessJobManager(
     private fun pruneRetainedLocked() {
         if (records.size < maxRetainedJobs) return
         val removable = records.values
-            .filter { !it.occupiesSlot() }
+            .filter { !it.occupiesSlot() && !it.isResumable() }
             .map { it.id }
         for (id in removable) {
             if (records.size < maxRetainedJobs) break
@@ -495,6 +701,8 @@ class HarnessJobManager(
         startedAt = record.startedAt,
         deadlineAt = record.deadlineAt,
         updatedAt = record.updatedAt,
+        inbox = record.inbox.toList(),
+        continuationState = record.continuationState,
     )
 
     private suspend fun persistTerminalState(record: Record) = withContext(NonCancellable) {
@@ -511,7 +719,7 @@ class HarnessJobManager(
             }
         }
         synchronized(lock) {
-            record.status = "failed"
+            record.status = if (record.isContinuableAgent()) "interrupted" else "failed"
             record.output = (
                 record.output.takeLast(MAX_OUTPUT / 2) +
                     "\n任务终态持久化失败：" +
@@ -564,10 +772,13 @@ class HarnessJobManager(
 
     private companion object {
         const val AGENT_PREFIX = "子代理："
+        const val CONTINUABLE_AGENT_RESUME_KIND = "subagent_readonly"
         const val MAX_LABEL = 160
         const val MAX_OUTPUT = 65_536
+        const val MAX_INBOX_ID = 64
         const val MAX_INBOX_MESSAGE = 4_000
-        const val MAX_INBOX_MESSAGES = 32
+        const val MAX_INBOX_MESSAGES = AgentInputQueue.DEFAULT_CAPACITY
+        const val MAX_CONTINUATION_STATE_CHARS = 4_000_000
         const val MAX_RESUME_KIND = 64
         const val MAX_RESUME_PAYLOAD = 64_000
         const val DEFAULT_MAX_CONCURRENT_JOBS = 4

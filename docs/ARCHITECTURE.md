@@ -235,6 +235,7 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - EventLog / transcript 权威事实；
 - 模型请求可重建证据、模型可见 Context / Tool Surface 版本；
 - ModelHistory Checkpoint 事件水位与尾部重放；
+- Session Projection 统一注册、状态版本与 `asOfSequence` 时间切面；Feature 持有强类型句柄，Registry 不提供无类型全局状态读取；
 - 恢复时的所有权裁决。
 
 Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。
@@ -258,10 +259,13 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 - Agent run identity；
 - 主 / 子代理运行契约；
-- checkpoint；
-- continuation；
+- 统一 Agent Inbox 消息语义与有界 admission；
+- Child Agent 持久身份与进程内 Activation 生命周期；
+- 安全 Step 历史 checkpoint、continuation 与 Cold Resume；
 - run recovery；
 - tool result continuation 语义。
+
+持久 Child Agent 的自动续跑当前限定为只读执行。Dormant Agent 保留历史与 Inbox，收到后续消息后重新激活；显式停止才终止其持久生命周期。任何可能产生外部副作用的可变更子代理不得通过 Cold Resume 盲目重放。
 
 ### Tool Capability
 

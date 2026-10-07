@@ -54,6 +54,8 @@ Session format reference: V4
 - request evidence / Tool & Context Surface 关联。
 - tool execution admission identity。
 - compaction provenance。
+- durable Agent Inbox / continuable subagent / cold resume。
+- Session Projection registry / stateVersion / asOfSequence。
 - Plugin Tool View。
 - Android device。
 
