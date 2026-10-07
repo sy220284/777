@@ -164,7 +164,20 @@ internal class LocalWorkComposition @Inject constructor(
     private val agentTeams by lazy {
         LocalAgentTeamRuntime(
             jobs = runtimeStateStore.jobManager,
-            persistentJobs = persistentJobs,
+            startTeammate = { binding, task, model, maxSteps ->
+                persistentJobs.startReadonlySubagentResult(
+                    task = task,
+                    model = model,
+                    maxSteps = maxSteps,
+                    virtualScreen = false,
+                    sessionId = binding.sessionId,
+                    boundState = binding.aggregateSnapshot(),
+                    historySnapshot = binding.runHandle.modelHistory::snapshot,
+                )
+            },
+            sendToTeammate = { agentId, input, sessionId ->
+                persistentJobs.sendInput(agentId, input, sessionId)
+            },
             eventLogFor = sessionStorage.eventLogs::get,
             projectionRegistry = sessionStorage.projectionRegistry,
         )
