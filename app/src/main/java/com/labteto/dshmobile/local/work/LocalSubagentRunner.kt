@@ -33,9 +33,8 @@ import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
 import com.labteto.dshmobile.local.agent.LocalStructuredSubagentOutputException
-import com.labteto.dshmobile.local.agent.localStructuredSubagentInstruction
 import com.labteto.dshmobile.local.agent.validateLocalStructuredSubagentOutput
-import com.labteto.dshmobile.local.agent.boundedSubagentContext
+import com.labteto.dshmobile.local.agent.buildLocalSubagentInitialHistory
 import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.jobs.LocalJobManager
@@ -142,6 +141,22 @@ internal class LocalSubagentRunner(
         spec: LocalSubagentLaunchSpec,
     ): String = runResult(spec).output
 
+    internal fun prepareForkSeed(
+        task: String,
+        parentCallId: String,
+        outputSchema: JsonObject? = null,
+    ): List<JsonObject> =
+        durableModelHistorySnapshot(
+            buildLocalSubagentInitialHistory(
+                baseHistory = inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId),
+                task = task,
+                inheritParentHistory = true,
+                allowMutation = false,
+                context = contextSnapshot(task),
+                outputSchema = outputSchema,
+            ),
+        )
+
     suspend fun runResult(
         spec: LocalSubagentLaunchSpec,
         recoveredHistory: List<JsonObject>? = null,
@@ -205,8 +220,19 @@ internal class LocalSubagentRunner(
         val history = LocalModelHistoryBuffer().apply {
             reset(
                 recoveredHistory
-                    ?: if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-                    else emptyList(),
+                    ?: buildLocalSubagentInitialHistory(
+                        baseHistory =
+                            if (inheritHistory) {
+                                inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+                            } else {
+                                emptyList()
+                            },
+                        task = task,
+                        inheritParentHistory = inheritHistory,
+                        allowMutation = allowMutation,
+                        context = contextSnapshot(task),
+                        outputSchema = capabilities.outputSchema,
+                    ),
             )
         }
         val claimedMessageIds = linkedSetOf<String>().apply {
@@ -354,39 +380,6 @@ internal class LocalSubagentRunner(
 
         var primaryFailure: Exception? = null
         try {
-            if (!recoveringHistory) {
-                if (!inheritHistory) history.append(buildJsonObject {
-                    put("role", "system")
-                    put(
-                        "content",
-                        if (allowMutation) {
-                            "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
-                        } else {
-                            "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
-                        },
-                    )
-                })
-                boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
-                    val insertion = buildJsonObject {
-                        put("role", "system")
-                        put(
-                            "content",
-                            "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
-                        )
-                    }
-                    val index = if (
-                        history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
-                    ) 1 else 0
-                    history.insert(index, insertion)
-                }
-                capabilities.outputSchema?.let { schema ->
-                    history.append(buildJsonObject {
-                        put("role", "system")
-                        put("content", localStructuredSubagentInstruction(schema))
-                    })
-                }
-                history.append(buildJsonObject { put("role", "user"); put("content", task) })
-            }
             if (recoveringHistory) {
                 history.reset(
                     history.snapshot().filterNot { message ->
