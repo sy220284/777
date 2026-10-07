@@ -59,12 +59,12 @@ fun DsIconButton(
         label = "iconButtonScale"
     )
     
-    val restingBackground = if (selected) colors.accentTertiary else containerColor
-    val resolvedTint = if (selected) colors.accent else tint
+    val restingBackground = if (selected) colors.bgModulePlatform else containerColor
+    val resolvedTint = if (selected) colors.labelPrimary else tint
     val targetBackground = when {
         !enabled -> Color.Transparent
         isPressed -> colors.hover.compositeOver(restingBackground)
-        isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(restingBackground)
+        isHovered -> colors.hover.compositeOver(restingBackground)
         else -> restingBackground
     }
     val background by animateColorAsState(
