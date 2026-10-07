@@ -158,9 +158,19 @@ object LocalToolCatalog {
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
+            "output_schema" to buildJsonObject {
+                put("type", "object")
+                put("description", "可选；要求子代理最终只输出符合该 JSON Schema 子集的 JSON。顶层必须是 object，支持 properties、required、additionalProperties、items、enum 与基础 type。")
+                put("additionalProperties", true)
+            },
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
             "task" to string("需要结合当前上下文处理的任务"),
+            "output_schema" to buildJsonObject {
+                put("type", "object")
+                put("description", "可选；要求子代理最终只输出符合该 JSON Schema 子集的 JSON。顶层必须是 object。")
+                put("additionalProperties", true)
+            },
         ), listOf("task")))
         add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
@@ -190,6 +200,11 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
             "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
+            "output_schema" to buildJsonObject {
+                put("type", "object")
+                put("description", "可选；所有子任务共享的结构化输出 JSON Schema 子集。顶层必须是 object。")
+                put("additionalProperties", true)
+            },
         ), listOf("tasks")))
         add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),
