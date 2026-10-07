@@ -185,7 +185,7 @@ internal fun ExecutionStatusCard(
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    (if (showAll) state.jobs else state.jobs.sortedBy { it.status !in setOf("running", "interrupted") }.take(4)).forEach { job ->
+                    (if (showAll) state.jobs else state.jobs.sortedBy { it.status !in setOf("running", "idle", "interrupted") }.take(4)).forEach { job ->
                         val expanded = expandedJobId == job.id
                         Surface(
                             shape = DsShapes.row,
@@ -259,7 +259,7 @@ internal fun ExecutionStatusCard(
                                                 variant = DsButtonVariant.Ghost,
                                                 size = DsButtonSize.Small,
                                             )
-                                            if (job.status == "running") {
+                                            if (job.status in setOf("running", "idle", "interrupted")) {
                                                 DsButton(
                                                     text = stringResource(R.string.local_run_job_stop),
                                                     onClick = {
