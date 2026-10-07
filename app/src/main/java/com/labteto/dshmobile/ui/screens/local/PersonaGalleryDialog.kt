@@ -942,4 +942,3 @@ internal fun PersonaGalleryScreen(
         }
     }
 }
-

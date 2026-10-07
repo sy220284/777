@@ -582,4 +582,3 @@ internal fun decodeLocalAttachmentThumbnail(
         BitmapFactory.Options().apply { inSampleSize = sample },
     )?.asImageBitmap()
 }.getOrNull()
-

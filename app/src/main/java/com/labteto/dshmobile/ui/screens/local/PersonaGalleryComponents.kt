@@ -902,4 +902,3 @@ private fun personaFieldLabel(field: String): String = when (field) {
     "corrections" -> stringResource(R.string.persona_field_corrections)
     else -> field
 }
-
