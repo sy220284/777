@@ -510,6 +510,13 @@ internal class LocalAgentTeamRuntime(
                     val task = decodeTask(event.data)
                     val previous = state.tasks.firstOrNull { it.id == task.id }
                     validateTaskTransition(state.tasks, previous, task)
+                    task.ownerId?.let { ownerId ->
+                        require(
+                            state.members.any { member ->
+                                member.id == ownerId && member.phase == LocalTeamMemberPhase.ACTIVE
+                            },
+                        ) { "TEAM_TASK_OWNER_NOT_ACTIVE：" + ownerId }
+                    }
                     advanced.copy(
                         tasks = state.tasks.filterNot { it.id == task.id } + task,
                     )
@@ -544,7 +551,13 @@ internal class LocalAgentTeamRuntime(
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：${next.name}" }
-        val previous = members.firstOrNull { it.id == next.id } ?: return
+        val previous = members.firstOrNull { it.id == next.id }
+        if (previous == null) {
+            require(next.phase == LocalTeamMemberPhase.PROVISIONING) {
+                "TEAM_MEMBER_MUST_PROVISION_FIRST：" + next.id
+            }
+            return
+        }
         require(previous.name == next.name && previous.description == next.description) {
             "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：${next.id}"
         }
@@ -563,6 +576,34 @@ internal class LocalAgentTeamRuntime(
         next: LocalTeamTaskSnapshot,
     ) {
         require(next.subject.isNotBlank()) { "TEAM_TASK_SUBJECT_REQUIRED" }
+        if (previous == null) {
+            require(next.status == LocalTeamTaskStatus.PENDING && next.ownerId == null) {
+                "TEAM_TASK_MUST_START_PENDING：" + next.id
+            }
+        } else {
+            val allowed = when (previous.status) {
+                LocalTeamTaskStatus.PENDING -> setOf(
+                    LocalTeamTaskStatus.PENDING,
+                    LocalTeamTaskStatus.IN_PROGRESS,
+                    LocalTeamTaskStatus.DELETED,
+                )
+                LocalTeamTaskStatus.IN_PROGRESS -> setOf(
+                    LocalTeamTaskStatus.IN_PROGRESS,
+                    LocalTeamTaskStatus.PENDING,
+                    LocalTeamTaskStatus.COMPLETED,
+                    LocalTeamTaskStatus.DELETED,
+                )
+                LocalTeamTaskStatus.COMPLETED -> setOf(
+                    LocalTeamTaskStatus.COMPLETED,
+                    LocalTeamTaskStatus.DELETED,
+                )
+                LocalTeamTaskStatus.DELETED -> emptySet()
+            }
+            require(next.status in allowed) {
+                "TEAM_TASK_STATUS_TRANSITION_INVALID：" +
+                    previous.status.name.lowercase() + " -> " + next.status.name.lowercase()
+            }
+        }
         require(next.revision == (previous?.revision?.plus(1) ?: 1)) {
             "TEAM_TASK_REVISION_INVALID：${next.id}"
         }
@@ -582,6 +623,10 @@ internal class LocalAgentTeamRuntime(
         }
         if (next.status == LocalTeamTaskStatus.IN_PROGRESS) {
             require(next.ownerId != null) { "TEAM_TASK_OWNER_REQUIRED" }
+        } else if (next.status in setOf(LocalTeamTaskStatus.PENDING, LocalTeamTaskStatus.DELETED)) {
+            require(next.ownerId == null) {
+                "TEAM_TASK_OWNER_INVALID：" + next.status.name.lowercase() + " 任务不能携带 owner"
+            }
         }
     }
 
