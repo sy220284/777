@@ -53,8 +53,11 @@ internal fun KimiSettingsRow(
             Text(it, modifier = Modifier.weight(0.45f), style = DsType.caption11, color = colors.labelTertiary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        trailing?.invoke()
-        if (onClick != null) Icon(FeatherIcons.ChevronRight, contentDescription = null,
-            tint = colors.labelCaption, modifier = Modifier.size(16.dp))
+        if (trailing != null) {
+            trailing()
+        } else if (onClick != null) {
+            Icon(FeatherIcons.ChevronRight, contentDescription = null,
+                tint = colors.labelCaption, modifier = Modifier.size(16.dp))
+        }
     }
 }
