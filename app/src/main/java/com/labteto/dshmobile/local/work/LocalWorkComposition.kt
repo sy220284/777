@@ -63,7 +63,12 @@ internal class LocalWorkComposition @Inject constructor(
     json: Json,
 ) : LocalWorkAgentUiPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val teamJobStatuses = ConcurrentHashMap<String, String>()
+    private data class TeamJobSignal(
+        val status: String,
+        val updatedAt: Long,
+        val pendingMessageCount: Int,
+    )
+    private val teamJobSignals = ConcurrentHashMap<String, TeamJobSignal>()
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
@@ -240,21 +245,37 @@ internal class LocalWorkComposition @Inject constructor(
     private fun observeTeamJobTransitions(jobs: List<LocalJobInfo>) {
         val teamJobs = jobs.filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
         val visibleIds = teamJobs.mapTo(hashSetOf(), LocalJobInfo::id)
-        teamJobStatuses.keys.toList()
+        teamJobSignals.keys.toList()
             .filterNot(visibleIds::contains)
-            .forEach(teamJobStatuses::remove)
+            .forEach(teamJobSignals::remove)
+
+        data class SessionRefresh(
+            var reconcile: Boolean = false,
+        )
+        val sessions = linkedMapOf<String, SessionRefresh>()
 
         teamJobs.forEach { job ->
-            val previous = teamJobStatuses.put(job.id, job.status)
-            if (
-                previous != job.status &&
-                job.status in TEAM_RECONCILE_JOB_STATUSES
-            ) {
-                val sessionId = job.ownerSessionId ?: return@forEach
-                scope.launch {
+            val current = TeamJobSignal(
+                status = job.status,
+                updatedAt = job.updatedAt,
+                pendingMessageCount = job.pendingMessageCount,
+            )
+            val previous = teamJobSignals.put(job.id, current)
+            if (previous == current) return@forEach
+
+            val sessionId = job.ownerSessionId ?: return@forEach
+            val refresh = sessions.getOrPut(sessionId, ::SessionRefresh)
+            if (job.status in TEAM_RECONCILE_JOB_STATUSES) {
+                refresh.reconcile = true
+            }
+        }
+
+        sessions.forEach { (sessionId, refresh) ->
+            scope.launch {
+                if (refresh.reconcile) {
                     runCatching { agentTeams.recoverMailbox(sessionId) }
-                    runCatching { publishTeamUiState(sessionId) }
                 }
+                runCatching { publishTeamUiState(sessionId) }
             }
         }
     }

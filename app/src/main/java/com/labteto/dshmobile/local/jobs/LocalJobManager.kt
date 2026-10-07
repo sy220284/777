@@ -164,4 +164,5 @@ private fun JobInfo.toLocalJobInfo(): LocalJobInfo = LocalJobInfo(
     canMessage = canMessage,
     continuable = continuable,
     pendingMessageCount = pendingMessageCount,
+    updatedAt = updatedAt,
 )

@@ -30,6 +30,7 @@ data class JobInfo(
     val canMessage: Boolean = false,
     val continuable: Boolean = false,
     val pendingMessageCount: Int = 0,
+    val updatedAt: Long = 0L,
 )
 
 data class JobStartResult(
@@ -1110,6 +1111,7 @@ class HarnessJobManager(
             canMessage = messageable,
             continuable = continuable,
             pendingMessageCount = inbox.size,
+            updatedAt = updatedAt,
         )
     }
 
