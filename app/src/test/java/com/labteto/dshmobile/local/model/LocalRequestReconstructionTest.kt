@@ -146,6 +146,140 @@ class LocalRequestReconstructionTest {
     }
 
     @Test
+    fun reconstructsProviderAttemptsAcrossRecoveryRounds() {
+        withLog("request-reconstruct-provider-attempts") { log ->
+            val originalMessages = listOf(
+                message("system", "系统规则"),
+                message("user", "很长的任务"),
+            )
+            val compactedMessages = listOf(
+                message("system", "系统规则"),
+                message("user", "压缩后的任务摘要"),
+            )
+            val tools = JsonArray(emptyList())
+            val header = appendVersionTwoRequest(
+                log = log,
+                requestUid = "req-attempts",
+                routeFingerprint = "route-attempts",
+                originalMessages = originalMessages,
+                replayMessages = originalMessages,
+                tools = tools,
+                temperature = 0.4,
+            )
+            appendProviderAttempt(
+                log = log,
+                headerSequence = header.sequence,
+                requestUid = "req-attempts",
+                routeFingerprint = "route-attempts",
+                messages = originalMessages,
+                tools = tools,
+                attempt = 1,
+                recoveryRound = 0,
+                temperature = 0.4,
+            )
+            appendProviderAttempt(
+                log = log,
+                headerSequence = header.sequence,
+                requestUid = "req-attempts",
+                routeFingerprint = "route-attempts",
+                messages = compactedMessages,
+                tools = tools,
+                attempt = 1,
+                recoveryRound = 1,
+                temperature = 0.4,
+            )
+
+            val reconstructed = requireNotNull(
+                reconstructLocalModelRequest(log, "req-attempts"),
+            )
+
+            assertEquals(LocalRequestReconstructionStatus.VERIFIED, reconstructed.status)
+            assertEquals(2, reconstructed.providerAttempts.size)
+            assertEquals(0, reconstructed.providerAttempts[0].recoveryRound)
+            assertEquals(1, reconstructed.providerAttempts[1].recoveryRound)
+            assertEquals(compactedMessages, reconstructed.providerAttempts[1].messages)
+            assertTrue(reconstructed.providerAttempts.all { it.fingerprintVerified })
+            assertTrue(reconstructed.providerAttempts.all { it.issues.isEmpty() })
+        }
+    }
+
+    @Test
+    fun invalidProviderAttemptFingerprintInvalidatesWholeRequest() {
+        withLog("request-reconstruct-provider-attempt-corrupt") { log ->
+            val messages = listOf(message("user", "任务"))
+            val tools = JsonArray(emptyList())
+            val header = appendVersionTwoRequest(
+                log = log,
+                requestUid = "req-attempt-corrupt",
+                routeFingerprint = "route-attempt-corrupt",
+                originalMessages = messages,
+                replayMessages = messages,
+                tools = tools,
+            )
+            val event = appendProviderAttempt(
+                log = log,
+                headerSequence = header.sequence,
+                requestUid = "req-attempt-corrupt",
+                routeFingerprint = "route-attempt-corrupt",
+                messages = messages,
+                tools = tools,
+                attempt = 1,
+                recoveryRound = 0,
+                temperature = null,
+                fingerprintOverride = "tampered",
+            )
+            assertTrue(event.sequence > header.sequence)
+
+            val reconstructed = requireNotNull(
+                reconstructLocalModelRequest(log, "req-attempt-corrupt"),
+            )
+
+            assertEquals(LocalRequestReconstructionStatus.INVALID, reconstructed.status)
+            assertEquals(false, reconstructed.providerAttempts.single().fingerprintVerified)
+            assertTrue(
+                reconstructed.issues.any { it.contains("provider_attempt_fingerprint") },
+            )
+        }
+    }
+
+    @Test
+    fun providerAttemptRouteMetadataTamperInvalidatesWholeRequest() {
+        withLog("request-reconstruct-provider-route-tamper") { log ->
+            val messages = listOf(message("user", "任务"))
+            val tools = JsonArray(emptyList())
+            val header = appendVersionTwoRequest(
+                log = log,
+                requestUid = "req-route-tamper",
+                routeFingerprint = "route-route-tamper",
+                originalMessages = messages,
+                replayMessages = messages,
+                tools = tools,
+            )
+            appendProviderAttempt(
+                log = log,
+                headerSequence = header.sequence,
+                requestUid = "req-route-tamper",
+                routeFingerprint = "route-route-tamper",
+                messages = messages,
+                tools = tools,
+                attempt = 1,
+                recoveryRound = 0,
+                temperature = null,
+                modelOverride = "tampered-model",
+            )
+
+            val reconstructed = requireNotNull(
+                reconstructLocalModelRequest(log, "req-route-tamper"),
+            )
+
+            assertEquals(LocalRequestReconstructionStatus.INVALID, reconstructed.status)
+            assertTrue(
+                reconstructed.issues.any { it.contains("model 与 request/header 不一致") },
+            )
+        }
+    }
+
+    @Test
     fun unknownRequestUidReturnsNull() {
         withLog("request-reconstruct-missing") { log ->
             assertNull(reconstructLocalModelRequest(log, "req-not-found"))
@@ -302,7 +436,8 @@ class LocalRequestReconstructionTest {
         originalMessages: List<kotlinx.serialization.json.JsonObject>,
         replayMessages: List<kotlinx.serialization.json.JsonObject>,
         tools: JsonArray,
-    ) {
+        temperature: Double? = null,
+    ): LocalSessionEventLog.Event {
         val original = buildLocalRequestEvidence(originalMessages, tools)
         val replay = buildLocalRequestEvidence(replayMessages, tools)
         val messageSurface = log.append("request/message-surface", buildJsonObject {
@@ -328,9 +463,15 @@ class LocalRequestReconstructionTest {
             JsonPrimitive(original.toolSchemaDigest),
             JsonPrimitive(original.contextDigest),
         )))
-        log.append("request/header", buildJsonObject {
+        return log.append("request/header", buildJsonObject {
             put("version", 2)
             put("request_uid", requestUid)
+            put("model", modelOverride ?: "deepseek-chat")
+            put("base_url", "https://example.invalid")
+            put("profile_id", "profile-test")
+            put("provider", "test")
+            put("protocol", "OPENAI_CHAT_COMPLETIONS")
+            temperature?.let { put("temperature", it) }
             put("route_fingerprint", routeFingerprint)
             put("message_digest", original.messageDigest)
             put("context_digest", original.contextDigest)
@@ -343,6 +484,78 @@ class LocalRequestReconstructionTest {
             put("message_surface_redacted", replay.messageDigest != original.messageDigest)
             put("context_surface_redacted", replay.contextDigest != original.contextDigest)
             put("request_envelope_fingerprint", envelope)
+        })
+    }
+
+    private fun appendProviderAttempt(
+        log: LocalSessionEventLog,
+        headerSequence: Long,
+        requestUid: String,
+        routeFingerprint: String,
+        messages: List<kotlinx.serialization.json.JsonObject>,
+        tools: JsonArray,
+        attempt: Int,
+        recoveryRound: Int,
+        temperature: Double?,
+        fingerprintOverride: String? = null,
+        modelOverride: String? = null,
+    ): LocalSessionEventLog.Event {
+        val original = buildLocalRequestEvidence(messages, tools)
+        val replayMessages = redactModelImages(messages)
+        val replay = buildLocalRequestEvidence(replayMessages, tools)
+        val messageSurface = log.append("request/message-surface", buildJsonObject {
+            put("version", 2)
+            put("digest", replay.messageDigest)
+            put("messages", JsonArray(replayMessages))
+            put("redacted", replay.messageDigest != original.messageDigest)
+        })
+        val toolSurface = log.append("request/tool-surface", buildJsonObject {
+            put("version", 2)
+            put("digest", original.toolSchemaDigest)
+            put("schemas", tools)
+        })
+        val contextSurface = log.append("request/context-surface", buildJsonObject {
+            put("version", 2)
+            put("digest", replay.contextDigest)
+            put("messages", replay.contextMessages)
+            put("redacted", replay.contextDigest != original.contextDigest)
+        })
+        val actualFingerprint = stableJsonSha256(JsonArray(listOf(
+            routeFingerprint,
+            original.messageDigest,
+            original.toolSchemaDigest,
+            original.contextDigest,
+            temperature?.toString() ?: "null",
+            "null",
+            "null",
+            "null",
+            "streaming:true",
+        ).map(::JsonPrimitive)))
+        return log.append("request/provider-attempt", buildJsonObject {
+            put("version", 1)
+            put("request_uid", requestUid)
+            put("header_seq", headerSequence)
+            put("attempt", attempt)
+            put("recovery_round", recoveryRound)
+            put("model", "deepseek-chat")
+            put("base_url", "https://example.invalid")
+            put("profile_id", "profile-test")
+            put("provider", "test")
+            put("protocol", "OPENAI_CHAT_COMPLETIONS")
+            put("route_fingerprint", routeFingerprint)
+            put("streaming", true)
+            temperature?.let { put("temperature", it) }
+            put("message_digest", original.messageDigest)
+            put("message_surface_digest", replay.messageDigest)
+            put("message_surface_seq", messageSurface.sequence)
+            put("message_surface_redacted", replay.messageDigest != original.messageDigest)
+            put("context_digest", original.contextDigest)
+            put("context_surface_digest", replay.contextDigest)
+            put("context_surface_seq", contextSurface.sequence)
+            put("context_surface_redacted", replay.contextDigest != original.contextDigest)
+            put("tool_schema_digest", original.toolSchemaDigest)
+            put("tool_surface_seq", toolSurface.sequence)
+            put("provider_attempt_fingerprint", fingerprintOverride ?: actualFingerprint)
         })
     }
 
