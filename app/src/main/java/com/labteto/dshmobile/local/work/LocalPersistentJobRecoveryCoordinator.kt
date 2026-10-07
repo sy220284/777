@@ -99,6 +99,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
+    fun sendMessage(
+        agentId: String,
+        message: String,
+        sessionId: String,
+    ): String {
+        val result = jobs.send(agentId, message, sessionId)
+        if (result.startsWith("消息已持久排队")) {
+            schedule()
+        }
+        return result
+    }
+
     fun schedule() {
         synchronized(lock) {
             if (recoveryJob?.isActive == true) return
@@ -199,6 +211,21 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
+        val continuation = eventLogFor(sessionId)
+            .latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
+                data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
+            }
+            ?.let { event -> decodeLocalSubagentHistoryCheckpoint(event.data) }
+
+        continuation?.claimedMessageIds
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { claimedIds ->
+                jobs.acknowledgeMessages(
+                    snapshot.id,
+                    claimedIds,
+                    sessionId,
+                )
+            }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
@@ -217,6 +244,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    recoveredHistory = continuation?.history,
+                    recoveredClaimedMessageIds = continuation?.claimedMessageIds.orEmpty(),
+                    recoveredStep = continuation?.step ?: 0,
                 ).requireCompletedOutput()
             }
         }
