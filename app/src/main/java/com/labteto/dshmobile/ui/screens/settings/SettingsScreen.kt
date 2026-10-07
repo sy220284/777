@@ -63,6 +63,7 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
@@ -194,6 +195,7 @@ fun SettingsScreen(
     val projectSettings by viewModel.projectSettings.collectAsStateWithLifecycle()
     val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
+    val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
@@ -704,6 +706,38 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.PERMISSIONS -> {
+                        SettingsCard(stringResource(R.string.settings_approval_mode_title), FeatherIcons.Shield) {
+                            Text(
+                                stringResource(R.string.settings_approval_mode_subtitle),
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                            DsSegmented(
+                                segments = listOf(
+                                    DsSegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
+                                    DsSegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
+                                    DsSegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
+                                ),
+                                selectedKey = approvalMode.name,
+                                onSelect = { selected ->
+                                    LocalApprovalMode.entries.firstOrNull { it.name == selected }
+                                        ?.let(viewModel::configureApprovalMode)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                stretch = true,
+                            )
+                            Text(
+                                stringResource(
+                                    when (approvalMode) {
+                                        LocalApprovalMode.DEFAULT -> R.string.settings_approval_default_hint
+                                        LocalApprovalMode.MANUAL -> R.string.settings_approval_manual_hint
+                                        LocalApprovalMode.AUTO -> R.string.settings_approval_auto_hint
+                                    },
+                                ),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
                         SettingsCard(stringResource(R.string.settings_connection), FeatherIcons.GitBranch) {
                             ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
                             ToggleRow(
