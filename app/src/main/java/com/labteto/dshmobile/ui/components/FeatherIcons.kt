@@ -234,6 +234,24 @@ internal object FeatherIcons {
         }
     }
 
+    /** `sparkles` — AI/persona generation affordance. */
+    val Sparkles: ImageVector by lazy {
+        feather("Sparkles") {
+            moveTo(12f, 3f); lineTo(13.6f, 7.4f); lineTo(18f, 9f)
+            lineTo(13.6f, 10.6f); lineTo(12f, 15f)
+            lineTo(10.4f, 10.6f); lineTo(6f, 9f)
+            lineTo(10.4f, 7.4f); close()
+            moveTo(19f, 15f); lineTo(19.8f, 17.2f); lineTo(22f, 18f)
+            lineTo(19.8f, 18.8f); lineTo(19f, 21f)
+            lineTo(18.2f, 18.8f); lineTo(16f, 18f)
+            lineTo(18.2f, 17.2f); close()
+            moveTo(5f, 2f); lineTo(5.6f, 3.4f); lineTo(7f, 4f)
+            lineTo(5.6f, 4.6f); lineTo(5f, 6f)
+            lineTo(4.4f, 4.6f); lineTo(3f, 4f)
+            lineTo(4.4f, 3.4f); close()
+        }
+    }
+
     /** `plus` — compact create action. */
     val Plus: ImageVector by lazy {
         feather("Plus") {
