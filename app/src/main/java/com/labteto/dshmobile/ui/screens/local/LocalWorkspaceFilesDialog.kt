@@ -149,7 +149,7 @@ internal fun LocalWorkspaceFilesDialog(
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
-                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.kimi_project_title)
+                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.app_project_title)
                     else -> stringResource(R.string.local_files_conversation_title)
                 }
                 val headerSubtitle = when {
@@ -180,8 +180,8 @@ internal fun LocalWorkspaceFilesDialog(
                 if (preview == null && mode == LocalFilesMode.WORKSPACE) {
                     DsSegmentedTabs(
                         labels = listOf(
-                            stringResource(R.string.kimi_project_materials),
-                            stringResource(R.string.kimi_project_context),
+                            stringResource(R.string.app_project_materials),
+                            stringResource(R.string.app_project_context),
                             stringResource(R.string.panel_artifacts),
                         ),
                         selectedIndex = section,
@@ -270,7 +270,7 @@ private fun LocalFilesEmpty(title: String, body: String) {
         verticalArrangement = Arrangement.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_kimi_project_empty),
+            painter = painterResource(R.drawable.ic_ui_project_empty),
             contentDescription = null,
             modifier = Modifier.size(100.dp),
         )
@@ -314,7 +314,7 @@ private fun ConversationLocalFileList(
         if (files.involved.isNotEmpty()) {
             item(key = "local-involved-header") {
                 Text(
-                    stringResource(R.string.kimi_project_context),
+                    stringResource(R.string.app_project_context),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
@@ -402,8 +402,8 @@ private fun LocalDirectoryRow(
         ) {
             Image(
                 painter = painterResource(
-                    if (dark) R.drawable.ic_kimi_filefolder_dark
-                    else R.drawable.ic_kimi_filefolder_light,
+                    if (dark) R.drawable.ic_ui_filefolder_dark
+                    else R.drawable.ic_ui_filefolder_light,
                 ),
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
@@ -445,11 +445,11 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     val fileIconRes = when (extension) {
         "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "go", "rs", "swift",
         "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" ->
-            if (dark) R.drawable.ic_kimi_filecode_dark else R.drawable.ic_kimi_filecode_light
+            if (dark) R.drawable.ic_ui_filecode_dark else R.drawable.ic_ui_filecode_light
         "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" ->
-            if (dark) R.drawable.ic_kimi_fileimage_dark else R.drawable.ic_kimi_fileimage_light
+            if (dark) R.drawable.ic_ui_fileimage_dark else R.drawable.ic_ui_fileimage_light
         else ->
-            if (dark) R.drawable.ic_kimi_filetxt_dark else R.drawable.ic_kimi_filetxt_light
+            if (dark) R.drawable.ic_ui_filetxt_dark else R.drawable.ic_ui_filetxt_light
     }
     Surface(
         onClick = onClick,

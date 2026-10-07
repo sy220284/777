@@ -149,7 +149,7 @@ internal fun LocalConversationComposer(
         if (state.running) return
         DsComposerAction(
             icon = null,
-            iconPainter = painterResource(R.drawable.ic_kimi_add),
+            iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
             onClick = onOpenAttachmentPicker,
             tint = colors.labelPrimary,
@@ -178,10 +178,10 @@ internal fun LocalConversationComposer(
     fun SendControl(queue: Boolean = false) {
         val dark = colors.bgBase.luminance() < 0.5f
         val buttonRes = when {
-            !canSend && dark -> R.drawable.ic_kimi_button_send_disabled_dark
-            !canSend -> R.drawable.ic_kimi_button_send_disabled_light
-            dark -> R.drawable.ic_kimi_button_send_dark
-            else -> R.drawable.ic_kimi_button_send_light
+            !canSend && dark -> R.drawable.ic_ui_button_send_disabled_dark
+            !canSend -> R.drawable.ic_ui_button_send_disabled_light
+            dark -> R.drawable.ic_ui_button_send_dark
+            else -> R.drawable.ic_ui_button_send_light
         }
         DsComposerAction(
             icon = null,
@@ -218,8 +218,8 @@ internal fun LocalConversationComposer(
             content = {
                 Image(
                     painter = painterResource(
-                        if (dark) R.drawable.ic_kimi_button_stop_dark
-                        else R.drawable.ic_kimi_button_stop_light,
+                        if (dark) R.drawable.ic_ui_button_stop_dark
+                        else R.drawable.ic_ui_button_stop_light,
                     ),
                     contentDescription = null,
                     modifier = Modifier.size(32.dp),

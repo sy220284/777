@@ -171,7 +171,7 @@ internal fun ChatAutomationScreen(
                 }
                 if (tasks.isEmpty()) {
                     item("events-empty") {
-                        KimiAutomationSurface(
+                        AutomationCardSurface(
                             modifier = Modifier.padding(horizontal = DsSpacing.large),
                         ) {
                             Text(
@@ -233,7 +233,7 @@ internal fun ChatAutomationScreen(
                         state.plannerSuggestions.take(3),
                         key = { "suggestion|$it" },
                     ) { suggestion ->
-                        KimiAutomationSuggestionRow(
+                        AutomationSuggestionRow(
                             text = suggestion,
                             onClick = {
                                 editingTaskId = null
@@ -276,10 +276,10 @@ internal fun ChatAutomationScreen(
                     val canSubmitPlan = canPlan && draft.isNotBlank() && !state.planning
                     val dark = colors.bgBase.luminance() < 0.5f
                     val sendRes = when {
-                        !canSubmitPlan && dark -> R.drawable.ic_kimi_button_send_disabled_dark
-                        !canSubmitPlan -> R.drawable.ic_kimi_button_send_disabled_light
-                        dark -> R.drawable.ic_kimi_button_send_dark
-                        else -> R.drawable.ic_kimi_button_send_light
+                        !canSubmitPlan && dark -> R.drawable.ic_ui_button_send_disabled_dark
+                        !canSubmitPlan -> R.drawable.ic_ui_button_send_disabled_light
+                        dark -> R.drawable.ic_ui_button_send_dark
+                        else -> R.drawable.ic_ui_button_send_light
                     }
                     DsComposerAction(
                         icon = null,
@@ -324,7 +324,7 @@ internal fun ChatAutomationScreen(
 }
 
 @Composable
-private fun KimiAutomationSurface(
+private fun AutomationCardSurface(
     modifier: Modifier = Modifier,
     status: DsStatus = DsStatus.Neutral,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
@@ -352,7 +352,7 @@ private fun KimiAutomationSurface(
 }
 
 @Composable
-private fun KimiAutomationSuggestionRow(
+private fun AutomationSuggestionRow(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -438,7 +438,7 @@ private fun ChatAutomationEventRow(
     val colors = DsTheme.colors
     val visualStatus = chatAutomationVisualStatus(task)
     var confirmDelete by remember { mutableStateOf(false) }
-    KimiAutomationSurface(
+    AutomationCardSurface(
         modifier = Modifier.padding(horizontal = DsSpacing.large),
         status = visualStatus.dsStatus(),
     ) {

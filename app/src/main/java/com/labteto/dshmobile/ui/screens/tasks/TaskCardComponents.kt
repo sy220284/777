@@ -78,7 +78,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 
 @Composable
-private fun KimiTaskCardSurface(
+private fun TaskCardSurface(
     status: AutomationStatus,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -173,7 +173,7 @@ internal fun TaskCard(
             stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
     }
 
-    KimiTaskCardSurface(status = task.status) {
+    TaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),

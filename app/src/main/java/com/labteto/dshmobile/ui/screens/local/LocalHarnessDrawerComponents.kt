@@ -177,7 +177,7 @@ internal fun DrawerQuickActions(
         var expanded by rememberSaveable(usageMode) { mutableStateOf(false) }
         DrawerQuickAction(
             icon = if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
-            title = stringResource(R.string.kimi_extended_capabilities),
+            title = stringResource(R.string.app_extended_capabilities),
             onClick = { expanded = !expanded },
         )
         if (expanded) {

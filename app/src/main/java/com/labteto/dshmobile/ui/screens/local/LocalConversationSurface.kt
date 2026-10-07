@@ -1086,7 +1086,7 @@ internal fun LocalConversationSurface(
                         )
                         DsQuickActionTile(
                             icon = FeatherIcons.Shield,
-                            label = stringResource(if (state.safeAutoApprovalEnabled) R.string.kimi_auto_approval_enabled else R.string.local_auto_approve_short),
+                            label = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
                             onClick = {
                                 showAttachmentPicker = false
                                 if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
@@ -1107,7 +1107,7 @@ internal fun LocalConversationSurface(
                     ) {
                         DsQuickActionTile(
                             icon = null,
-                            iconPainter = painterResource(R.drawable.ic_kimi_project),
+                            iconPainter = painterResource(R.drawable.ic_ui_project),
                             label = stringResource(R.string.chatlist_workspace_files),
                             onClick = {
                                 showAttachmentPicker = false

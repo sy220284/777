@@ -83,7 +83,7 @@ internal fun ChatTopBar(
             Spacer(Modifier.width(DsSpacing.small))
             DsIconButton(
                 icon = null,
-                iconPainter = painterResource(R.drawable.ic_kimi_project),
+                iconPainter = painterResource(R.drawable.ic_ui_project),
                 contentDescription = stringResource(R.string.chat_open_files),
                 onClick = onOpenFiles,
                 tint = colors.labelTertiary,
@@ -169,7 +169,7 @@ private fun ModelChip(
     ) {
         if (models != null && !models.routable) StateDot(StateDotState.Warning, size = 6.dp)
         Icon(
-            painter = painterResource(R.drawable.ic_kimi_model),
+            painter = painterResource(R.drawable.ic_ui_model),
             contentDescription = null,
             tint = if (loading && models == null) colors.labelTertiary else colors.labelSecondary,
             modifier = Modifier.size(16.dp),

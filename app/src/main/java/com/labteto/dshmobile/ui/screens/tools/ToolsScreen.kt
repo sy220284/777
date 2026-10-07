@@ -471,8 +471,8 @@ fun ToolsScreen(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         val builtinAvailable = "local-builtin" in state.localPlugins
-                        KimiToolCapabilityRow(
-                            iconPainter = painterResource(R.drawable.ic_kimi_plugin),
+                        ToolCapabilityRow(
+                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.skills_title),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             status = capabilityStateLabel(builtinAvailable),
@@ -480,7 +480,7 @@ fun ToolsScreen(
                         )
 
                         val terminalAvailable = "android-runtime" in state.localPlugins
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Terminal,
                             title = stringResource(R.string.tools_capability_terminal),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
@@ -490,7 +490,7 @@ fun ToolsScreen(
                         )
 
                         val codeAvailable = "local-language-server" in state.localPlugins
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Code,
                             title = stringResource(R.string.tools_capability_code),
                             subtitle = stringResource(R.string.tools_capability_code_hint),
@@ -500,7 +500,7 @@ fun ToolsScreen(
                         )
 
                         val deviceAvailable = "android-device" in state.localPlugins
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Device,
                             title = stringResource(R.string.tools_capability_device),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
@@ -510,7 +510,7 @@ fun ToolsScreen(
                         )
 
                         val visionAvailable = "local-vision" in state.localPlugins
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Image,
                             title = stringResource(R.string.tools_capability_vision),
                             subtitle = stringResource(R.string.tools_capability_vision_hint),
@@ -521,7 +521,7 @@ fun ToolsScreen(
 
                         val automationAvailable =
                             "android-automation" in state.localPlugins || "android-webhook" in state.localPlugins
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Clock,
                             title = stringResource(R.string.tools_capability_automation),
                             subtitle = stringResource(R.string.tools_capability_automation_hint),
@@ -537,7 +537,7 @@ fun ToolsScreen(
                         color = colors.labelTertiary,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
                             subtitle = stringResource(R.string.tools_github_connector_hint),
@@ -548,15 +548,15 @@ fun ToolsScreen(
                             state = if (state.githubConfigured) StateDotState.Done else StateDotState.Idle,
                             onClick = { showGitHubConfig = true },
                         )
-                        KimiToolCapabilityRow(
-                            iconPainter = painterResource(R.drawable.ic_kimi_plugin),
+                        ToolCapabilityRow(
+                            iconPainter = painterResource(R.drawable.ic_ui_plugin),
                             title = stringResource(R.string.tools_external_services),
                             subtitle = stringResource(R.string.tools_external_services_hint),
                             status = state.servers.size.toString(),
                             state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
                             onClick = { showExternalConfig = true },
                         )
-                        KimiToolCapabilityRow(
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Zap,
                             title = stringResource(R.string.tools_webhook_title),
                             subtitle = stringResource(R.string.tools_webhook_hint),
@@ -950,7 +950,7 @@ fun ToolsScreen(
 }
 
 @Composable
-private fun KimiToolCapabilityRow(
+private fun ToolCapabilityRow(
     title: String,
     subtitle: String,
     status: String,

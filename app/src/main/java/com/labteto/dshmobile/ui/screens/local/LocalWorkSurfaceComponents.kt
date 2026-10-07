@@ -354,7 +354,7 @@ private fun RunCenterJobsSection(
                     ) {
                         if (job.isAgent) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_kimi_create_subagent),
+                                painter = painterResource(R.drawable.ic_ui_create_subagent),
                                 contentDescription = null,
                                 tint = if (active) colors.accent else colors.labelSecondary,
                                 modifier = Modifier.size(20.dp),

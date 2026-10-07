@@ -47,11 +47,11 @@ internal fun LocalModelPickerSheet(
             profiles.forEach { profile ->
                 val selected = profile.id == activeProfileId
                 val detail = when {
-                    selected -> stringResource(R.string.kimi_model_current)
+                    selected -> stringResource(R.string.app_model_current)
                     profile.contextWindowTokensOverride != null -> stringResource(
-                        R.string.kimi_model_context, profile.contextWindowTokensOverride,
+                        R.string.app_model_context, profile.contextWindowTokensOverride,
                     )
-                    else -> stringResource(R.string.kimi_model_available)
+                    else -> stringResource(R.string.app_model_available)
                 }
                 Row(
                     modifier = Modifier
@@ -68,7 +68,7 @@ internal fun LocalModelPickerSheet(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_kimi_model),
+                        painter = painterResource(R.drawable.ic_ui_model),
                         contentDescription = null,
                         tint = if (selected) colors.accent else colors.labelSecondary,
                         modifier = Modifier.size(22.dp),
@@ -91,7 +91,7 @@ internal fun LocalModelPickerSheet(
                     }
                     if (selected) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_kimi_check),
+                            painter = painterResource(R.drawable.ic_ui_check),
                             contentDescription = null,
                             tint = colors.accent,
                             modifier = Modifier.size(18.dp),
