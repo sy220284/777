@@ -510,6 +510,8 @@ fun LocalHarnessScreen(
                     }
                 },
                 onDeleteSessions = viewModel::deleteSessions,
+                onRenameSession = viewModel::renameSession,
+                onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
