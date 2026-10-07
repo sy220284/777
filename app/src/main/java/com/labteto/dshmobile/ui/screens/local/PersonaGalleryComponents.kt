@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.DsCheckbox
 
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
@@ -27,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -845,7 +845,7 @@ internal fun PersonaInspectionPanel(
             val key = suggestionKey(suggestion)
             DsCard(onClick = { onToggle(suggestion) }) {
                 Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(
+                    DsCheckbox(
                         checked = key in selectedKeys,
                         onCheckedChange = { onToggle(suggestion) },
                     )
