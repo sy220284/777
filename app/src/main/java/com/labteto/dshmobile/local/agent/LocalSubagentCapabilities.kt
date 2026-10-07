@@ -72,7 +72,7 @@ internal fun parseStructuredSubagentResult(
 internal fun validateStructuredOutputSchema(schema: JsonObject): List<String> {
     val issues = mutableListOf<String>()
     if (schema.toString().length > MAX_SCHEMA_CHARS) {
-        issues += "$ 超过最大 Schema 大小 $MAX_SCHEMA_CHARS 字符"
+        issues += "\$ 超过最大 Schema 大小 $MAX_SCHEMA_CHARS 字符"
         return issues
     }
     validateSchemaNode(
