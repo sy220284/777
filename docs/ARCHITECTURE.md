@@ -258,7 +258,9 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 - Agent run identity；
 - 主 / 子代理运行契约；
-- checkpoint；
+- 持久 Child Agent 的稳定身份与 Activation 恢复；
+- durable Inbox 的排队、认领、确认与崩溃去重；
+- 子代理模型历史 checkpoint；
 - continuation；
 - run recovery；
 - tool result continuation 语义。
