@@ -148,6 +148,7 @@ internal fun ChatAutomationScreen(
                     onBack = onClose,
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = true,
+                    backIcon = FeatherIcons.X,
                 )
             }
             LazyColumn(
