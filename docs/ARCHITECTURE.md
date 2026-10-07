@@ -259,6 +259,8 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 - Agent run identity；
 - 主 / 子代理运行契约；
+- 子代理能力通过显式 `LocalSubagentCapabilities` 契约声明；继承上下文、可变执行、虚拟屏、continuable 与结构化输出不得由下游静默推断或忽略；
+- `output_schema` 只支持受控 JSON Schema 子集（object/array/string/boolean/integer/number/null、properties、required、additionalProperties、items、enum）；未实现关键字必须启动前拒绝，禁止“接受但不生效”；
 - 前台与持久子代理共享 `QueuedAgentInput` 消息契约；Inbox 有界且满载显式拒绝，禁止通过淘汰旧消息伪装成功；
 - checkpoint；
 - continuation；
