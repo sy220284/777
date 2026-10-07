@@ -22,7 +22,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -128,12 +127,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                         val nextSession = synchronized(lock) {
                             pendingRecoverySessions.firstOrNull()?.also { pendingRecoverySessions.remove(it) }
                         } ?: break
-                        val deferredForMissingContext = resumePass(nextSession)
-                        val remaining = hasRemainingRecovery(nextSession)
-                        if (remaining && !deferredForMissingContext) {
-                            synchronized(lock) { pendingRecoverySessions += nextSession }
-                            delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
-                        }
+                        resumePass(nextSession)
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
@@ -150,16 +144,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
-    private fun hasRemainingRecovery(targetSession: String): Boolean =
-        jobs.resumableSnapshots().any { snapshot ->
-            interruptedSessionId(snapshot, targetSession) == targetSession
-        } ||
-            jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
-                interruptedSessionId(snapshot, targetSession) == targetSession
-            }
-
-    private fun resumePass(targetSession: String): Boolean {
-        var deferredForMissingContext = false
+    private fun resumePass(targetSession: String) {
         jobs.resumableSnapshots().forEach { snapshot ->
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
@@ -167,11 +152,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             try {
                 when (snapshot.resumeKind) {
                     "web_fetch" -> resumeWebFetch(snapshot, sessionId, payload)
-                    "subagent_readonly" -> {
-                        if (!resumeSubagent(snapshot, sessionId, payload)) {
-                            deferredForMissingContext = true
-                        }
-                    }
+                    "subagent_readonly" -> resumeSubagent(snapshot, sessionId, payload)
                     else -> jobs.failResumable(
                         snapshot.id,
                         "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
@@ -184,7 +165,6 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 recordError(snapshot, sessionId, error)
             }
         }
-        return deferredForMissingContext
     }
 
     private fun decodePayload(snapshot: JobSnapshot, fallbackSessionId: String): JsonObject? {
@@ -225,7 +205,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         snapshot: JobSnapshot,
         sessionId: String,
         payload: JsonObject,
-    ): Boolean {
+    ) {
         val version = payload["version"]?.jsonPrimitive?.intOrNull
             ?: error("旧版持久子代理缺少路由身份，已停止自动续跑")
         require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
@@ -257,12 +237,12 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ownerSessionId = sessionId,
             )
         ) {
-            return true
+            return
         }
         // Only an actual model continuation needs a live, session-owned execution context.
         // Terminal checkpoint settlement above is fully durable and can finish off-screen.
-        val boundState = stateForSession(sessionId) ?: return false
-        val parentHistory = historyForSession(sessionId) ?: return false
+        val boundState = stateForSession(sessionId) ?: return
+        val parentHistory = historyForSession(sessionId) ?: return
         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
             ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
             ?: boundState.subagentMaxSteps
@@ -327,7 +307,6 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ).requireCompletedOutput()
             }
         }
-        return true
     }
 
     private fun recoverClaimedMessagesAfterCheckpoint(
