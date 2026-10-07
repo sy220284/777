@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.jobs.JobInboxMessage
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
@@ -248,6 +249,40 @@ class LocalJobManagerTest {
             val manager = LocalJobManager(this, store) { }
             manager.removeOwnedAndJoin(setOf("session-old"))
             assertTrue(manager.snapshotInfos().none { it.id == "job-legacy" })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun persistentStoreRoundTripsAgentInbox() = runTest {
+        val root = createTempDir(prefix = "persistent-agent-inbox-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-agent",
+                        label = "子代理：审计",
+                        status = "running",
+                        resumeKind = "subagent_readonly",
+                        resumePayload = """{"session_id":"session-a"}""",
+                        ownerId = "session-a",
+                        inbox = listOf(
+                            JobInboxMessage("msg-1", "继续核查"),
+                            JobInboxMessage("msg-2", "补充验证"),
+                        ),
+                    ),
+                ),
+            )
+
+            val restored = store.read().single()
+
+            assertEquals(listOf("msg-1", "msg-2"), restored.inbox.map { it.id })
+            assertEquals(listOf("继续核查", "补充验证"), restored.inbox.map { it.content })
         } finally {
             root.deleteRecursively()
         }
