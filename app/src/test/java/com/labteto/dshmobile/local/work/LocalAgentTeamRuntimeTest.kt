@@ -47,11 +47,23 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("777-agent-team")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("777-agent-team", "member-worker", "worker", "provisioning"),
+            member(
+                "777-agent-team",
+                "member-worker",
+                "worker",
+                "provisioning",
+                description = "research",
+            ),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("777-agent-team", "member-worker", "worker", "active"),
+            member(
+                "777-agent-team",
+                "member-worker",
+                "worker",
+                "active",
+                description = "research",
+            ),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_TASK_EVENT,
@@ -527,13 +539,14 @@ class LocalAgentTeamRuntimeTest {
         id: String,
         name: String,
         phase: String,
+        description: String = "",
     ) = buildJsonObject {
         put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("member", buildJsonObject {
             put("id", id)
             put("name", name)
-            put("description", "")
+            put("description", description)
             put("provider", "local-subagent")
             put("context", "fresh")
             put("phase", phase)
