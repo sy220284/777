@@ -216,7 +216,6 @@
     <string name="jobs_title">后台任务</string>
     <string name="jobs_empty">没有后台任务</string>
     <string name="jobs_running">运行中</string>
-    <string name="jobs_waiting_message">等待消息</string>
     <string name="jobs_completed">已完成</string>
     <string name="jobs_killed">已终止</string>
     <string name="jobs_failed">失败</string>
