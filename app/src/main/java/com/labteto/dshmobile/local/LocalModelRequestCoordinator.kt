@@ -662,43 +662,45 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         add(JsonPrimitive(promptCacheTtl ?: "null"))
                         add(JsonPrimitive("streaming:true"))
                     })
-                    log.append("request/provider-attempt", buildJsonObject {
-                        put("version", PROVIDER_ATTEMPT_EVIDENCE_VERSION)
-                        put("request_uid", requestUid)
-                        put("header_seq", requestHeader.sequence)
-                        put("attempt", providerAttempt)
-                        put("recovery_round", overflowRound)
-                        put("model", runSurface.model)
-                        put("base_url", runSurface.baseUrl)
-                        put("profile_id", frozenProfile.id)
-                        put("provider", frozenProfile.provider)
-                        put("protocol", runSurface.protocol.name)
-                        put("route_fingerprint", routeFingerprint)
-                        put("streaming", true)
-                        temperature?.let { put("temperature", it) }
-                        cacheComparisonResponseId?.let {
-                            put("prompt_cache_comparison_response_id", it)
-                        }
-                        promptCacheKey?.let { put("prompt_cache_key", it) }
-                        promptCacheTtl?.let { put("prompt_cache_ttl", it) }
-                        put("message_digest", activeEvidence.messageDigest)
-                        put("message_surface_digest", activeReplayEvidence.messageDigest)
-                        put("message_surface_seq", activeMessageSurfaceSeq)
-                        put(
-                            "message_surface_redacted",
-                            activeReplayEvidence.messageDigest != activeEvidence.messageDigest,
-                        )
-                        put("context_digest", activeEvidence.contextDigest)
-                        put("context_surface_digest", activeReplayEvidence.contextDigest)
-                        put("context_surface_seq", activeContextSurfaceSeq)
-                        put(
-                            "context_surface_redacted",
-                            activeReplayEvidence.contextDigest != activeEvidence.contextDigest,
-                        )
-                        put("tool_schema_digest", activeEvidence.toolSchemaDigest)
-                        put("tool_surface_seq", toolSurfaceSeq)
-                        put("provider_attempt_fingerprint", providerAttemptFingerprint)
-                    })
+                    val persistProviderAttempt: suspend () -> Unit = {
+                        log.append("request/provider-attempt", buildJsonObject {
+                            put("version", PROVIDER_ATTEMPT_EVIDENCE_VERSION)
+                            put("request_uid", requestUid)
+                            put("header_seq", requestHeader.sequence)
+                            put("attempt", providerAttempt)
+                            put("recovery_round", overflowRound)
+                            put("model", runSurface.model)
+                            put("base_url", runSurface.baseUrl)
+                            put("profile_id", frozenProfile.id)
+                            put("provider", frozenProfile.provider)
+                            put("protocol", runSurface.protocol.name)
+                            put("route_fingerprint", routeFingerprint)
+                            put("streaming", true)
+                            temperature?.let { put("temperature", it) }
+                            cacheComparisonResponseId?.let {
+                                put("prompt_cache_comparison_response_id", it)
+                            }
+                            promptCacheKey?.let { put("prompt_cache_key", it) }
+                            promptCacheTtl?.let { put("prompt_cache_ttl", it) }
+                            put("message_digest", activeEvidence.messageDigest)
+                            put("message_surface_digest", activeReplayEvidence.messageDigest)
+                            put("message_surface_seq", activeMessageSurfaceSeq)
+                            put(
+                                "message_surface_redacted",
+                                activeReplayEvidence.messageDigest != activeEvidence.messageDigest,
+                            )
+                            put("context_digest", activeEvidence.contextDigest)
+                            put("context_surface_digest", activeReplayEvidence.contextDigest)
+                            put("context_surface_seq", activeContextSurfaceSeq)
+                            put(
+                                "context_surface_redacted",
+                                activeReplayEvidence.contextDigest != activeEvidence.contextDigest,
+                            )
+                            put("tool_schema_digest", activeEvidence.toolSchemaDigest)
+                            put("tool_surface_seq", toolSurfaceSeq)
+                            put("provider_attempt_fingerprint", providerAttemptFingerprint)
+                        })
+                    }
                     val streamPreview = LocalStreamPreview(
                         maxChars = maxStreamPreviewChars,
                         minIntervalMs = streamPreviewIntervalMs,
@@ -734,6 +736,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 promptCacheKey = promptCacheKey,
                             promptCacheTtl = promptCacheTtl,
                             admission = admission,
+                            beforeProviderInvoke = persistProviderAttempt,
                             onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     appendAttemptStream(visible)
