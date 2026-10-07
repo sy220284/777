@@ -437,6 +437,7 @@ class LocalRequestReconstructionTest {
         replayMessages: List<kotlinx.serialization.json.JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        modelOverride: String? = null,
     ): LocalSessionEventLog.Event {
         val original = buildLocalRequestEvidence(originalMessages, tools)
         val replay = buildLocalRequestEvidence(replayMessages, tools)
