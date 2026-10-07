@@ -1333,6 +1333,30 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(listOf("team-msg-failed"), projection.discardedMessageIds)
     }
 
+    @Test
+    fun uiPendingMessagesIncludesDurableChildInbox() {
+        val fixture = fixture("team-durable-inbox")
+        appendActiveMember(fixture.log, "team-durable-inbox")
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "team-durable-inbox",
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> awaitCancellation() }
+        fixture.jobs.send(
+            id = "job-team-1",
+            message = "待处理追加消息",
+            ownerSessionId = "team-durable-inbox",
+        )
+
+        val ui = fixture.runtime.uiState("team-durable-inbox")
+
+        assertEquals(1, ui.members.single().pendingMessageCount)
+        assertEquals(1, ui.pendingMessageCount)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,

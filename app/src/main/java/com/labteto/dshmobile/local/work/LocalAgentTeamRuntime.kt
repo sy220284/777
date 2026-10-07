@@ -272,7 +272,9 @@ internal class LocalAgentTeamRuntime(
                 currentTask = currentTask,
                 progressPercent = memberProgressPercent(sessionId, member, activity),
                 resultMessageCount = messageCounts[member.id] ?: 0,
-                pendingMessageCount = state.pendingMessages.count { it.targetId == member.id },
+                pendingMessageCount =
+                    state.pendingMessages.count { it.targetId == member.id } +
+                        (jobsById[member.jobId]?.pendingMessageCount ?: 0),
                 error = member.error,
             )
         }
@@ -293,7 +295,7 @@ internal class LocalAgentTeamRuntime(
         return LocalAgentTeamUiState(
             members = members,
             tasks = tasks,
-            pendingMessageCount = state.pendingMessages.size,
+            pendingMessageCount = members.sumOf(LocalAgentTeamMemberUiState::pendingMessageCount),
             failure = state.failure,
         )
     }
