@@ -20,6 +20,7 @@ class CiPlan:
     run_android: bool
     run_fixture: bool
     affects_release: bool
+    run_relay: bool = False
 
     def as_outputs(self) -> dict[str, str]:
         return {
@@ -32,6 +33,7 @@ class CiPlan:
             "run_android16": str(self.run_android).lower(),
             "run_android17": str(self.run_android).lower(),
             "run_fixture": str(self.run_fixture).lower(),
+            "run_relay": str(self.run_relay).lower(),
             "affects_release": str(self.affects_release).lower(),
         }
 
@@ -48,6 +50,12 @@ FULL_VALIDATION_SCRIPTS = {
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",
 }
+RELAY_CONFORMANCE_PATHS = {
+    ".github/workflows/ci.yml",
+    ".github/scripts/classify-ci-scope.py",
+    "app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt",
+}
+
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
     "tools/reference-validation/official-runner.ts",
@@ -147,6 +155,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
     unit = False
     android = False
     fixture = force_full
+    relay = force_full
     full = force_full
     affects_release = force_full
 
@@ -157,6 +166,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
 
         architecture_path = is_architecture_3_path(path)
         architecture = architecture or architecture_path
+        relay = relay or path in RELAY_CONFORMANCE_PATHS
 
         if path in ARCHITECTURE_3_CONTROL_FILES and is_documentation(path):
             continue
@@ -206,6 +216,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
     run_build = full
     run_device = android or full
     run_android = android or full
+    run_relay = relay or full
 
     if full:
         scope = "full"
@@ -240,6 +251,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
         run_android=run_android,
         run_fixture=fixture,
         affects_release=affects_release,
+        run_relay=run_relay,
     )
 
 
@@ -263,7 +275,7 @@ def self_test() -> None:
         ),
         (
             [".github/workflows/ci.yml"],
-            CiPlan("architecture-control", True, True, False, False, False, False, False, False),
+            CiPlan("architecture-control", True, True, False, False, False, False, False, False, True),
         ),
         (
             [".github/scripts/check-local-architecture-boundaries.py"],
@@ -271,7 +283,7 @@ def self_test() -> None:
         ),
         (
             [".github/release-version"],
-            CiPlan("full", True, True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True, True),
         ),
         (
             ["app/src/test/java/com/labteto/dshmobile/local/ExampleTest.kt"],
@@ -291,19 +303,19 @@ def self_test() -> None:
         ),
         (
             ["app/src/main/java/com/labteto/dshmobile/local/chat/ChatFeature.kt"],
-            CiPlan("full", True, True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True, True),
         ),
         (
             ["app/src/main/java/example/App.kt"],
-            CiPlan("full", True, True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True, True),
         ),
         (
             ["build.gradle.kts"],
-            CiPlan("full", True, True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True, True),
         ),
         (
             ["README.md", "app/src/main/java/example/App.kt"],
-            CiPlan("full", True, True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True, True),
         ),
         (
             [".github/workflows/release.yml", "app/src/test/java/example/Test.kt"],
@@ -311,7 +323,7 @@ def self_test() -> None:
         ),
         (
             [".github/scripts/verify-android16-apk.sh"],
-            CiPlan("full", True, True, True, True, True, True, False, False),
+            CiPlan("full", True, True, True, True, True, True, False, False, True),
         ),
     ]
     for paths, expected in cases:
@@ -334,6 +346,10 @@ def self_test() -> None:
         plan = classify([path])
         if not (plan.run_static and plan.run_architecture):
             raise AssertionError(f"{path}: architecture control file must run static + architecture gates: {plan}")
+
+    relay_plan = classify(["app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt"])
+    if not (relay_plan.run_static and relay_plan.run_unit and relay_plan.run_relay):
+        raise AssertionError(f"real relay conformance test must select unit + relay lanes: {relay_plan}")
 
     synthetic_guard = classify([".github/scripts/check-new-guard.py"])
     if not synthetic_guard.run_static:
