@@ -117,7 +117,7 @@ jobs:
                 require_true "$RUN_ANDROID16" "android-16-instrumented" "$path"
                 require_true "$RUN_ANDROID17" "android-17-instrumented" "$path"
                 ;;
-              upstream/deepseek-harness.lock.json|tools/reference-validation/official-runner.ts|tools/reference-validation/refresh-official-fixtures.sh|tools/reference-validation/package.json|tools/reference-validation/package-lock.json)
+              upstream/deepseek-harness.lock.json|tools/reference-validation/official-runner.ts|tools/reference-validation/official-advanced-runner.ts|tools/reference-validation/refresh-official-fixtures.sh|tools/reference-validation/package.json|tools/reference-validation/package-lock.json|reference-validation/src/test/resources/official-semantic/*)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
                 require_true "$RUN_FIXTURE" "fixture-provenance" "$path"
@@ -200,7 +200,7 @@ jobs:
         run: |
           corepack enable
           bash tools/reference-validation/refresh-official-fixtures.sh
-          git diff --exit-code -- reference-validation/src/test/resources/official
+          git diff --exit-code -- reference-validation/src/test/resources/official reference-validation/src/test/resources/official-semantic
 
   unit-tests:
     needs: [scope, static-gates, architecture-3-gates]
