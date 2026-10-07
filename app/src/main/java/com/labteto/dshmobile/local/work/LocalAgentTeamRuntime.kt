@@ -1068,21 +1068,15 @@ internal class LocalAgentTeamRuntime(
         if (afterSequence >= 0L) {
             val result = ArrayList<LocalTeamAgentMessageSnapshot>(bounded)
             var cursor = afterSequence
-            repeat(MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES) {
-                if (result.size >= bounded) return@repeat
+            while (result.size < bounded) {
                 val page = log.pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
-                if (page.isEmpty()) return@repeat
+                if (page.isEmpty()) break
                 for (event in page.sortedBy(LocalSessionEventLog.Event::sequence)) {
                     cursor = maxOf(cursor, event.sequence)
                     decode(event)?.let(result::add)
                     if (result.size >= bounded) break
                 }
-                if (result.size >= bounded || page.size < AGENT_MESSAGE_SCAN_PAGE) {
-                    return result
-                        .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
-                        .sortedBy(LocalTeamAgentMessageSnapshot::sequence)
-                        .take(bounded)
-                }
+                if (page.size < AGENT_MESSAGE_SCAN_PAGE) break
             }
             return result
                 .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
@@ -1092,10 +1086,9 @@ internal class LocalAgentTeamRuntime(
 
         val result = ArrayList<LocalTeamAgentMessageSnapshot>(bounded)
         var before = Long.MAX_VALUE
-        repeat(MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES) {
-            if (result.size >= bounded) return@repeat
+        while (result.size < bounded) {
             val page = log.pageBefore(before, AGENT_MESSAGE_SCAN_PAGE)
-            if (page.isEmpty()) return@repeat
+            if (page.isEmpty()) break
             page.asSequence()
                 .sortedByDescending(LocalSessionEventLog.Event::sequence)
                 .forEach { event ->
@@ -1103,12 +1096,7 @@ internal class LocalAgentTeamRuntime(
                     decode(event)?.let(result::add)
                 }
             before = page.minOf(LocalSessionEventLog.Event::sequence)
-            if (result.size >= bounded || page.size < AGENT_MESSAGE_SCAN_PAGE) {
-                return result
-                    .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
-                    .sortedBy(LocalTeamAgentMessageSnapshot::sequence)
-                    .takeLast(bounded)
-            }
+            if (page.size < AGENT_MESSAGE_SCAN_PAGE) break
         }
         return result
             .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
@@ -1165,7 +1153,7 @@ internal class LocalAgentTeamRuntime(
         }
 
         var cursor = afterSequence
-        repeat(MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES) {
+        while (true) {
             val page = eventLogFor(sessionId).pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
             if (page.isEmpty()) {
                 return AgentMessageForwardScan(null, cursor)
@@ -1197,7 +1185,6 @@ internal class LocalAgentTeamRuntime(
                 return AgentMessageForwardScan(null, cursor)
             }
         }
-        return AgentMessageForwardScan(null, cursor)
     }
 
     private suspend fun waitForMessage(
@@ -1965,7 +1952,6 @@ internal class LocalAgentTeamRuntime(
         private const val MAX_AGENT_MESSAGE_LIMIT = 100
         private const val MAX_RENDERED_MESSAGE_CHARS = 8_000
         private const val AGENT_MESSAGE_SCAN_PAGE = 160
-        private const val MAX_AGENT_MESSAGE_FORWARD_SCAN_PAGES = 32
         private const val MIN_WAIT_MS = 1_000
         private const val MAX_WAIT_MS = 60_000
         private const val WAIT_POLL_MS = 250L
