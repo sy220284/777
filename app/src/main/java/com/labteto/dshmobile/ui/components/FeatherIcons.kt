@@ -514,6 +514,44 @@ internal object FeatherIcons {
         }
     }
 
+    /** `thumbs-up` — positive response feedback. */
+    val ThumbsUp: ImageVector by lazy {
+        feather("ThumbsUp") {
+            moveTo(7f, 22f); horizontalLineTo(4f)
+            curveTo(2.9f, 22f, 2f, 21.1f, 2f, 20f)
+            verticalLineTo(13f)
+            curveTo(2f, 11.9f, 2.9f, 11f, 4f, 11f)
+            horizontalLineTo(7f)
+            moveTo(7f, 22f); verticalLineTo(11f); lineTo(11f, 2f)
+            curveTo(12.7f, 2f, 14f, 3.3f, 14f, 5f)
+            verticalLineTo(9f)
+            horizontalLineTo(19.7f)
+            curveTo(21f, 9f, 22f, 10.2f, 21.8f, 11.4f)
+            lineTo(20.4f, 20.3f)
+            curveTo(20.2f, 21.3f, 19.3f, 22f, 18.3f, 22f)
+            close()
+        }
+    }
+
+    /** `thumbs-down` — negative response feedback. */
+    val ThumbsDown: ImageVector by lazy {
+        feather("ThumbsDown") {
+            moveTo(17f, 2f); horizontalLineTo(20f)
+            curveTo(21.1f, 2f, 22f, 2.9f, 22f, 4f)
+            verticalLineTo(11f)
+            curveTo(22f, 12.1f, 21.1f, 13f, 20f, 13f)
+            horizontalLineTo(17f)
+            moveTo(17f, 2f); verticalLineTo(13f); lineTo(13f, 22f)
+            curveTo(11.3f, 22f, 10f, 20.7f, 10f, 19f)
+            verticalLineTo(15f)
+            horizontalLineTo(4.3f)
+            curveTo(3f, 15f, 2f, 13.8f, 2.2f, 12.6f)
+            lineTo(3.6f, 3.7f)
+            curveTo(3.8f, 2.7f, 4.7f, 2f, 5.7f, 2f)
+            close()
+        }
+    }
+
     /** `chevron-down` — compact selector disclosure. */
     val ChevronDown: ImageVector by lazy {
         feather("ChevronDown") {
