@@ -226,7 +226,7 @@ fun ChatListDrawer(
             .padding(horizontal = DsSpacing.medium),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
+            modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.small, bottom = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SidebarAvatarPicker()
@@ -238,7 +238,7 @@ fun ChatListDrawer(
                 onClick = { newSessionOpen = true },
                 tint = colors.labelPrimary,
                 containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 2.dp,
+                shadowElevation = 0.dp,
             )
         }
 
@@ -256,7 +256,7 @@ fun ChatListDrawer(
                 )
             },
             singleLine = true,
-            shape = DsShapes.pillFull,
+            shape = DsShapes.row,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
                 unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
@@ -431,7 +431,7 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.FileText,
                     title = stringResource(R.string.chatlist_workspace_files),
-                    iconFamily = DsIconFamily.Cyan,
+                    iconFamily = DsIconFamily.Neutral,
                     onClick = if (currentSessionId != null && connection.host != null) {
                         {
                             val sessionId = currentSessionId
@@ -450,7 +450,7 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
-                    iconFamily = DsIconFamily.Amber,
+                    iconFamily = DsIconFamily.Neutral,
                     onClick = {
                         onClose()
                         onOpenTasks()
@@ -468,7 +468,7 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Device,
                     title = stringResource(R.string.chatlist_exit_remote_control),
-                    iconFamily = DsIconFamily.Cyan,
+                    iconFamily = DsIconFamily.Neutral,
                     onClick = {
                         onClose()
                         onOpenLocalHarness()

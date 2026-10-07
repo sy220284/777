@@ -50,7 +50,7 @@ const val DS_CONVERSATION_COMPOSER_TAG = "ds-conversation-composer"
 object DsComposerMetrics {
     val actionTouchTarget = 48.dp
     val actionVisualSize = 32.dp
-    val primaryActionVisualSize = 34.dp
+    val primaryActionVisualSize = 32.dp
     val actionIconSize = 18.dp
 }
 

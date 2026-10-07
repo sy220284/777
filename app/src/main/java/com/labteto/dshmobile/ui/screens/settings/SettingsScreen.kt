@@ -425,7 +425,7 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
                             DsCategoryRow(
-                                icon = FeatherIcons.CloudDownload,
+                                icon = FeatherIcons.Download,
                                 title = stringResource(R.string.settings_update_check),
                                 subtitle = updateStatus,
                                 iconFamily = DsIconFamily.Neutral,
