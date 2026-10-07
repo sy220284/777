@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.attachment
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.local.model.LocalImageMetadata
@@ -201,9 +203,19 @@ internal class LocalAttachmentImporter(
             },
         ) ?: error("所选图片无法解码")
         val normalized = File(dir, ".normalized-${UUID.randomUUID()}.jpg")
+        val encodedBitmap = if (bitmap.hasAlpha()) {
+            Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888).also { opaque ->
+                Canvas(opaque).apply {
+                    drawColor(Color.WHITE)
+                    drawBitmap(bitmap, 0f, 0f, null)
+                }
+            }
+        } else {
+            bitmap
+        }
         try {
             normalized.outputStream().use { output ->
-                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)) {
+                check(encodedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)) {
                     "图片格式转换失败"
                 }
             }
@@ -214,14 +226,15 @@ internal class LocalAttachmentImporter(
                 file = normalized,
                 imageMetadata = LocalImageMetadata(
                     mediaType = "image/jpeg",
-                    width = bitmap.width,
-                    height = bitmap.height,
+                    width = encodedBitmap.width,
+                    height = encodedBitmap.height,
                 ),
             )
         } catch (error: Throwable) {
             normalized.delete()
             throw error
         } finally {
+            if (encodedBitmap !== bitmap) encodedBitmap.recycle()
             bitmap.recycle()
         }
     }
@@ -242,7 +255,7 @@ internal class LocalAttachmentImporter(
     }
 
     private companion object {
-        const val MAX_NORMALIZATION_PIXELS = 24_000_000L
+        const val MAX_NORMALIZATION_PIXELS = 16_000_000L
     }
 }
 
