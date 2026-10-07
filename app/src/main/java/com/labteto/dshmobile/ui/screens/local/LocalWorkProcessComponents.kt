@@ -330,9 +330,11 @@ private fun KimiAnimatedToolIcon(
 ) {
     val context = LocalContext.current
     val drawable = remember(resId) {
-        ImageDecoder.decodeDrawable(
-            ImageDecoder.createSource(context.resources, resId),
-        ) as? AnimatedImageDrawable
+        runCatching {
+            ImageDecoder.decodeDrawable(
+                ImageDecoder.createSource(context.resources, resId),
+            ) as? AnimatedImageDrawable
+        }.getOrNull()
     }
     DisposableEffect(drawable) {
         drawable?.start()
@@ -358,9 +360,17 @@ private fun WorkOperationIcon(
     kind: AgentOperationKind,
     running: Boolean,
 ) {
-    if (running && kind == AgentOperationKind.Generic) {
+    val animatedRes = when (kind) {
+        AgentOperationKind.Inspect -> R.drawable.kimi_anim_tool_file
+        AgentOperationKind.Search -> R.drawable.kimi_anim_tool_search
+        AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.kimi_anim_tool_code
+        AgentOperationKind.Web -> R.drawable.kimi_anim_tool_web
+        AgentOperationKind.Generic -> R.drawable.kimi_anim_tool_think
+        else -> null
+    }
+    if (running && animatedRes != null) {
         KimiAnimatedToolIcon(
-            resId = R.drawable.kimi_anim_tool_think,
+            resId = animatedRes,
             modifier = Modifier.size(34.dp),
         )
         return
