@@ -166,6 +166,7 @@ internal class LocalWorkComposition @Inject constructor(
             jobs = runtimeStateStore.jobManager,
             persistentJobs = persistentJobs,
             eventLogFor = sessionStorage.eventLogs::get,
+            projectionRegistry = sessionStorage.projectionRegistry,
         )
     }
     private val agentControlBuiltins by lazy {
@@ -237,7 +238,11 @@ internal class LocalWorkComposition @Inject constructor(
         modelAdmission = LocalWorkExecutionControl().asModelAdmissionPort(),
     )
 
-    internal fun schedulePersistentRecovery() = persistentJobs.schedule()
+    internal fun schedulePersistentRecovery() {
+        val sessionId = runtimeStateStore.currentSessionId
+        runCatching { agentTeams.recoverMailbox(sessionId) }
+        persistentJobs.schedule(sessionId)
+    }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,
