@@ -87,7 +87,7 @@ internal fun LocalAgentSwarmLaunchEntry(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_kimi_create_subagent),
+                painter = painterResource(R.drawable.ic_ui_create_subagent),
                 contentDescription = null,
                 tint = if (selected) colors.accent else colors.labelPrimary,
             )
@@ -110,7 +110,7 @@ internal fun LocalAgentSwarmLaunchEntry(
             }
             if (selected) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_kimi_check),
+                    painter = painterResource(R.drawable.ic_ui_check),
                     contentDescription = null,
                     tint = colors.accent,
                 )
@@ -159,7 +159,7 @@ internal fun LocalAgentTeamStatusBar(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_kimi_task_subagent),
+                        painter = painterResource(R.drawable.ic_ui_task_subagent),
                         contentDescription = null,
                         tint = if (teamDotState(team, launchPending) == StateDotState.Running) {
                             colors.accent
@@ -815,22 +815,22 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
     val colors = DsTheme.colors
     if (team.activities.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text(stringResource(R.string.kimi_team_activity_feed), style = DsType.std14Strong, color = colors.labelPrimary)
+        Text(stringResource(R.string.app_team_activity_feed), style = DsType.std14Strong, color = colors.labelPrimary)
         team.activities.takeLast(12).forEach { activity ->
             val status = when (activity.status) {
                 "provisioning" -> R.string.local_team_recruiting
-                "active" -> R.string.kimi_team_started
-                "failed" -> R.string.kimi_team_failed
-                "in_progress" -> R.string.kimi_team_task_started
+                "active" -> R.string.app_team_started
+                "failed" -> R.string.app_team_failed
+                "in_progress" -> R.string.app_team_task_started
                 "completed" -> R.string.local_team_task_completed
-                "deleted" -> R.string.kimi_team_task_removed
-                "updated" -> R.string.kimi_team_task_updated
-                "queued" -> R.string.kimi_team_message_queued
-                "delivered" -> R.string.kimi_team_message_delivered
-                else -> R.string.kimi_team_task_created
+                "deleted" -> R.string.app_team_task_removed
+                "updated" -> R.string.app_team_task_updated
+                "queued" -> R.string.app_team_message_queued
+                "delivered" -> R.string.app_team_message_delivered
+                else -> R.string.app_team_task_created
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                Icon(painterResource(R.drawable.ic_kimi_task_subagent), contentDescription = null, tint = colors.labelSecondary)
+                Icon(painterResource(R.drawable.ic_ui_task_subagent), contentDescription = null, tint = colors.labelSecondary)
                 Column(Modifier.weight(1f)) {
                     Text(
                         listOfNotNull(activity.memberName, stringResource(status)).joinToString(" · "),
@@ -859,7 +859,7 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
             }
             member.currentTask?.let { Text(it, style = DsType.small13, color = colors.labelPrimary) }
             Text(
-                stringResource(R.string.kimi_team_worksite),
+                stringResource(R.string.app_team_worksite),
                 style = DsType.caption11Strong, color = colors.labelTertiary,
             )
             Text(

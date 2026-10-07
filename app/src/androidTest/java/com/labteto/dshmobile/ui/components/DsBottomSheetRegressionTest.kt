@@ -14,7 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-class DsBottomSheetKimiRegressionTest {
+class DsBottomSheetRegressionTest {
     @get:Rule val compose = createComposeRule()
 
     @Test
@@ -39,7 +39,7 @@ class DsBottomSheetKimiRegressionTest {
             }
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("kimiSheetScrollBody").assertExists()
+        compose.onNodeWithTag("bottomSheetScrollBody").assertExists()
         compose.onNodeWithText("保存更改").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, saved) }
     }

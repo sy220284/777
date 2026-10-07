@@ -162,7 +162,7 @@ private fun WorkTasksScreen(
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = false,
                     actionIcon = null,
-                    actionPainter = if (showCreate) null else painterResource(R.drawable.ic_kimi_add),
+                    actionPainter = if (showCreate) null else painterResource(R.drawable.ic_ui_add),
                     actionContentDescription = stringResource(R.string.tasks_new),
                     onAction = ::startCreate,
                 )
@@ -174,7 +174,7 @@ private fun WorkTasksScreen(
                         createInvalidMessage = createInvalidMessage,
                         onReset = ::resetEditor,
                     )
-                    visibleTasks.isEmpty() -> KimiTaskEmptyState(
+                    visibleTasks.isEmpty() -> TaskEmptyState(
                         onManualCreate = ::startCreate,
                         onCreateViaChat = onClose,
                     )
@@ -214,7 +214,7 @@ private fun WorkTasksScreen(
 }
 
 @Composable
-private fun KimiTaskEmptyState(
+private fun TaskEmptyState(
     onManualCreate: () -> Unit,
     onCreateViaChat: () -> Unit,
 ) {
@@ -227,7 +227,7 @@ private fun KimiTaskEmptyState(
         verticalArrangement = Arrangement.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_kimi_task_empty),
+            painter = painterResource(R.drawable.ic_ui_task_empty),
             contentDescription = null,
             modifier = Modifier.padding(bottom = DsSpacing.medium),
         )

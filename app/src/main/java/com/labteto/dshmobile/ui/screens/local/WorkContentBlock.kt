@@ -28,7 +28,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Tool content remains verbatim evidence; no guessed progress, result counts or screenshots. */
 @Composable
-internal fun KimiWorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
+internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val colors = DsTheme.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -56,13 +56,13 @@ internal fun KimiWorkContentBlock(node: LocalWorkProcessNode, running: Boolean) 
             }
             if (node.toolContent != null) {
                 val heading = when (node.kind) {
-                    AgentOperationKind.Search -> R.string.kimi_tool_search_results
-                    AgentOperationKind.Web -> R.string.kimi_tool_web_content
-                    AgentOperationKind.Update -> R.string.kimi_tool_code_changes
-                    AgentOperationKind.Execute -> R.string.kimi_tool_terminal_output
-                    AgentOperationKind.Inspect -> R.string.kimi_tool_file_content
-                    AgentOperationKind.Image -> R.string.kimi_tool_image_result
-                    AgentOperationKind.Delegate -> R.string.kimi_tool_agent_result
+                    AgentOperationKind.Search -> R.string.app_tool_search_results
+                    AgentOperationKind.Web -> R.string.app_tool_web_content
+                    AgentOperationKind.Update -> R.string.app_tool_code_changes
+                    AgentOperationKind.Execute -> R.string.app_tool_terminal_output
+                    AgentOperationKind.Inspect -> R.string.app_tool_file_content
+                    AgentOperationKind.Image -> R.string.app_tool_image_result
+                    AgentOperationKind.Delegate -> R.string.app_tool_agent_result
                     else -> R.string.local_team_activity
                 }
                 Text(stringResource(heading), style = DsType.caption11, color = colors.labelTertiary)

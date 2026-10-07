@@ -110,7 +110,7 @@ fun DsBottomSheet(
                 Column(
                     modifier = Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
-                        .testTag("kimiSheetScrollBody"),
+                        .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     content = content,
                 )

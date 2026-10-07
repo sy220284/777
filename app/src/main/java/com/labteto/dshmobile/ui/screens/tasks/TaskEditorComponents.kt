@@ -234,7 +234,7 @@ internal fun ColumnScope.TaskEditorPane(
         }
     }
     if (showSchedulePicker) {
-        KimiSchedulePicker(
+        TaskSchedulePicker(
             initialMillis = firstRunAt,
             onPicked = { picked ->
                 firstRunAt = picked
@@ -278,7 +278,7 @@ private fun CadenceRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KimiSchedulePicker(
+private fun TaskSchedulePicker(
     initialMillis: Long,
     onPicked: (Long) -> Unit,
     onDismiss: () -> Unit,
@@ -326,7 +326,7 @@ private fun KimiSchedulePicker(
 
     com.labteto.dshmobile.ui.components.DsBottomSheet(
         title = stringResource(
-            if (choosingTime) R.string.kimi_schedule_choose_time else R.string.kimi_schedule_choose_date,
+            if (choosingTime) R.string.app_schedule_choose_time else R.string.app_schedule_choose_date,
         ),
         onDismiss = onDismiss,
     ) {
@@ -339,7 +339,7 @@ private fun KimiSchedulePicker(
                 showModeToggle = false,
             )
             DsButton(
-                text = stringResource(R.string.kimi_schedule_next),
+                text = stringResource(R.string.app_schedule_next),
                 onClick = { choosingTime = true },
                 enabled = dateState.selectedDateMillis != null,
                 modifier = Modifier.fillMaxWidth(),
@@ -353,7 +353,7 @@ private fun KimiSchedulePicker(
             }
             if (!validTime) {
                 Text(
-                    stringResource(R.string.kimi_schedule_future_hint),
+                    stringResource(R.string.app_schedule_future_hint),
                     style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.warnLabel,
                 )

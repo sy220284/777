@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 777 的交互色卡。Kimi 蓝是当前默认，历史传统色继续作为显式可选外观。
+ * 777 的交互色卡。默认蓝是当前默认，历史传统色继续作为显式可选外观。
  *
  * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
@@ -18,9 +18,9 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** Kimi 蓝为默认交互色；旧版持久化默认 "celadon" 在 [of] 中迁移为 Kimi。 */
+    /** 默认蓝为默认交互色；旧版持久化默认 "celadon" 在 [of] 中迁移为默认蓝。 */
     val ALL = listOf(
-        AccentPalette("kimi", "Kimi", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
+        AccentPalette("default_blue", "默认蓝", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
         AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
         AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
         AccentPalette("zhusha", "朱砂", Color(0xFFA64B44), Color(0xFFDE8B84), onDark = Color(0xFF1C0D0C)),
@@ -32,7 +32,7 @@ object AccentPalettes {
     val DEFAULT = ALL.first()
 
     fun of(key: String?): AccentPalette = when (key) {
-        null, "", "celadon" -> DEFAULT
+        null, "", "celadon", "kimi" -> DEFAULT
         else -> ALL.firstOrNull { it.key == key } ?: DEFAULT
     }
 }

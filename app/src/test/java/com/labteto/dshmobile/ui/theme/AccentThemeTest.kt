@@ -5,11 +5,12 @@ import org.junit.Test
 
 class AccentThemeTest {
     @Test
-    fun legacyDefaultCeladonResolvesToKimi() {
-        assertEquals("kimi", AccentPalettes.of(null).key)
-        assertEquals("kimi", AccentPalettes.of("").key)
-        assertEquals("kimi", AccentPalettes.of("celadon").key)
-        assertEquals("kimi", AccentPalettes.of("unknown").key)
+    fun legacyDefaultCeladonResolvesToDefaultBlue() {
+        assertEquals("default_blue", AccentPalettes.of(null).key)
+        assertEquals("default_blue", AccentPalettes.of("").key)
+        assertEquals("default_blue", AccentPalettes.of("celadon").key)
+        assertEquals("default_blue", AccentPalettes.of("kimi").key)
+        assertEquals("default_blue", AccentPalettes.of("unknown").key)
     }
 
     @Test

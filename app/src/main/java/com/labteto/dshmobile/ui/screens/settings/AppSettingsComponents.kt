@@ -23,12 +23,12 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 
 @Composable
-internal fun KimiSettingsSection(content: @Composable ColumnScope.() -> Unit) {
+internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth(), content = content)
 }
 
 @Composable
-internal fun KimiSettingsRow(
+internal fun AppSettingsRow(
     icon: ImageVector?,
     title: String,
     subtitle: String? = null,
