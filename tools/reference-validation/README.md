@@ -14,8 +14,8 @@ upstream/deepseek-harness.lock.json
 
 ```text
 deepseek-ai/deepseek-harness
-0.1.7-rc.2
-477b4f420553e8a52c2fbccc464d7561b239c443
+0.2.1-alpha.1
+5badb15009ae1756c3afe0ae0cef1faafc290ccc
 Session format reference: V4
 ```
 
@@ -41,7 +41,18 @@ Session format reference: V4
 - JSON 参数。
 - 空工具输出。
 
-基础黄金 fixture 只证明锁定官方版本的 AgentLoop 核心调度结果；它不代表整个 Android Harness 与官方所有高级子系统语义等价。
+基础黄金 fixture 证明锁定官方版本的 AgentLoop 核心调度结果。
+
+此外，刷新脚本会在同一个锁定官方 checkout 中运行 `official-advanced-runner.ts`，并与 777 `harness-core` 的 native advanced runner 直接比较：
+
+- Session Projection `stateVersion`；
+- per-projection `asOfSequence` 水位；
+- fold 后状态值；
+- 同 key + 同 stateVersion 共享首个 projection unit 并引用计数；
+- 同 key + 不同 stateVersion fail-closed；
+- 最后一个 disposer 释放后移除 projection capability。
+
+高级 Projection 结果只存在于本次 CI 临时目录，不手写、不提交伪 golden。
 
 不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
 
@@ -54,6 +65,9 @@ Session format reference: V4
 - request evidence / Tool & Context Surface 关联。
 - tool execution admission identity。
 - compaction provenance。
+- durable Agent Inbox / continuable subagent / cold resume / terminal settlement。
+- Session Projection registry / stateVersion / asOfSequence（官方高级差分）。
+- Agent Teams roster / durable mailbox / Task DAG / CAS / fail-loud bounds（Work-owned 领域回归；不为测试把 App 领域下沉到 harness-core）。
 - Plugin Tool View。
 - Android device。
 

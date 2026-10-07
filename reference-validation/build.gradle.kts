@@ -21,3 +21,15 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+
+tasks.register<JavaExec>("runAdvancedConformance") {
+    group = "verification"
+    description = "输出777原生高级语义差分结果"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.labteto.dshmobile.reference.AdvancedConformanceMainKt")
+    val output = providers.gradleProperty("advancedOutput")
+    doFirst {
+        args(output.orNull ?: error("缺少 -PadvancedOutput=<path>"))
+    }
+}

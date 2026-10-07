@@ -1,11 +1,15 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 /** Work-owned subagent and workflow composition bound to the originating Work run. */
 internal class LocalWorkSubagentRuntime(
@@ -38,6 +42,7 @@ internal class LocalWorkSubagentRuntime(
         mode: String,
         requiredEvidence: List<String>,
         modelOverride: String?,
+        outputSchema: JsonObject?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
@@ -47,11 +52,18 @@ internal class LocalWorkSubagentRuntime(
         return LocalWorkflowCoordinator(
             execute = { prompt ->
                 runner.runResult(
-                    task = prompt,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    modelOverride = workerSelection,
-                    maxSteps = binding.aggregateSnapshot().subagentMaxSteps,
+                    LocalSubagentLaunchSpec(
+                        task = prompt,
+                        modelOverride = workerSelection,
+                        maxSteps = binding.aggregateSnapshot().subagentMaxSteps,
+                        capabilities = LocalSubagentCapabilities(
+                            allowMutation = false,
+                            continuable = false,
+                            virtualScreen = false,
+                            historyMode = LocalSubagentHistoryMode.ISOLATED,
+                            outputSchema = outputSchema,
+                        ),
+                    ),
                 ).requireCompletedOutput()
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
