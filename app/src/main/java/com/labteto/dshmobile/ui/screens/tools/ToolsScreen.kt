@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,9 +24,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,7 +46,6 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -463,52 +468,64 @@ fun ToolsScreen(
                             color = colors.labelTertiary,
                         )
                     }
-                    DsGroupCard {
-                        DsCategoryRow(
-                            icon = null,
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        val builtinAvailable = "local-builtin" in state.localPlugins
+                        KimiToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_kimi_plugin),
                             title = stringResource(R.string.skills_title),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
-                            value = capabilityStateLabel("local-builtin" in state.localPlugins),
+                            status = capabilityStateLabel(builtinAvailable),
+                            state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
                         )
-                        DsCategoryRow(
+
+                        val terminalAvailable = "android-runtime" in state.localPlugins
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Terminal,
                             title = stringResource(R.string.tools_capability_terminal),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
-                            value = capabilityStateLabel("android-runtime" in state.localPlugins),
+                            status = capabilityStateLabel(terminalAvailable),
+                            state = if (terminalAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { onOpenSettings(SettingsDestination.ADVANCED) },
                         )
-                        DsCategoryRow(
+
+                        val codeAvailable = "local-language-server" in state.localPlugins
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Code,
                             title = stringResource(R.string.tools_capability_code),
                             subtitle = stringResource(R.string.tools_capability_code_hint),
-                            value = capabilityStateLabel(
-                                "local-language-server" in state.localPlugins,
-                            ),
+                            status = capabilityStateLabel(codeAvailable),
+                            state = if (codeAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { capabilityDetail = "code" },
                         )
-                        DsCategoryRow(
+
+                        val deviceAvailable = "android-device" in state.localPlugins
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Device,
                             title = stringResource(R.string.tools_capability_device),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
-                            value = capabilityStateLabel("android-device" in state.localPlugins),
+                            status = capabilityStateLabel(deviceAvailable),
+                            state = if (deviceAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { onOpenSettings(SettingsDestination.PERMISSIONS) },
                         )
-                        DsCategoryRow(
+
+                        val visionAvailable = "local-vision" in state.localPlugins
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Image,
                             title = stringResource(R.string.tools_capability_vision),
                             subtitle = stringResource(R.string.tools_capability_vision_hint),
-                            value = capabilityStateLabel("local-vision" in state.localPlugins),
+                            status = capabilityStateLabel(visionAvailable),
+                            state = if (visionAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { capabilityDetail = "vision" },
                         )
-                        DsCategoryRow(
+
+                        val automationAvailable =
+                            "android-automation" in state.localPlugins || "android-webhook" in state.localPlugins
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Clock,
                             title = stringResource(R.string.tools_capability_automation),
                             subtitle = stringResource(R.string.tools_capability_automation_hint),
-                            value = capabilityStateLabel(
-                                "android-automation" in state.localPlugins ||
-                                    "android-webhook" in state.localPlugins,
-                            ),
+                            status = capabilityStateLabel(automationAvailable),
+                            state = if (automationAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = onOpenTasks,
                         )
                     }
@@ -518,33 +535,35 @@ fun ToolsScreen(
                         style = DsType.std14.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    DsGroupCard {
-                        DsCategoryRow(
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
                             subtitle = stringResource(R.string.tools_github_connector_hint),
-                            value = stringResource(
+                            status = stringResource(
                                 if (state.githubConfigured) R.string.tools_github_configured
                                 else R.string.tools_github_unconfigured,
                             ),
+                            state = if (state.githubConfigured) StateDotState.Done else StateDotState.Idle,
                             onClick = { showGitHubConfig = true },
                         )
-                        DsCategoryRow(
-                            icon = null,
+                        KimiToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_kimi_plugin),
                             title = stringResource(R.string.tools_external_services),
                             subtitle = stringResource(R.string.tools_external_services_hint),
-                            value = state.servers.size.toString(),
+                            status = state.servers.size.toString(),
+                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
                             onClick = { showExternalConfig = true },
                         )
-                        DsCategoryRow(
+                        KimiToolCapabilityRow(
                             icon = FeatherIcons.Zap,
                             title = stringResource(R.string.tools_webhook_title),
                             subtitle = stringResource(R.string.tools_webhook_hint),
-                            value = stringResource(
+                            status = stringResource(
                                 if (state.webhook.enabled) R.string.tools_webhook_enabled
                                 else R.string.tools_webhook_disabled,
                             ),
+                            state = if (state.webhook.enabled) StateDotState.Done else StateDotState.Idle,
                             onClick = {
                                 webhookPort = state.webhook.port.toString()
                                 showWebhookConfig = true
@@ -924,6 +943,98 @@ fun ToolsScreen(
                     enabled = !state.loading,
                     variant = DsButtonVariant.Danger,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KimiToolCapabilityRow(
+    title: String,
+    subtitle: String,
+    status: String,
+    state: StateDotState,
+    icon: ImageVector? = null,
+    iconPainter: Painter? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 70.dp)
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = DsShapes.row,
+                color = colors.bgModulePlatform,
+                tonalElevation = 0.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    when {
+                        iconPainter != null -> Icon(
+                            painter = iconPainter,
+                            contentDescription = null,
+                            tint = colors.labelSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        icon != null -> Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = colors.labelSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    title,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    subtitle,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                StateDot(state, size = 7.dp)
+                Text(
+                    status,
+                    style = DsType.caption11Strong.withReadingWeight(),
+                    color = if (state == StateDotState.Done) colors.labelSecondary else colors.labelTertiary,
+                    maxLines = 1,
+                )
+                if (onClick != null) {
+                    Icon(
+                        FeatherIcons.ChevronRight,
+                        contentDescription = null,
+                        tint = colors.labelCaption,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
     }
