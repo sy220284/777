@@ -1179,6 +1179,7 @@
 <string name="tools_capability_agent_available">由智能体按需调用</string>
 <string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
 <string name="chat_composer_add_attachment">添加附件</string>
+<string name="local_composer_more_actions">更多</string>
 
     <string name="tasks_chat_quiet_start_value">开始 %1$s</string>
     <string name="tasks_chat_quiet_end_value">结束 %1$s</string>
