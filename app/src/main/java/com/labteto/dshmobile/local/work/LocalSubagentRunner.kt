@@ -425,14 +425,18 @@ internal class LocalSubagentRunner(
                                     buildJsonObject {
                                         put("id", message.id)
                                         put("content", message.content)
+                                        put("memory_input", message.memoryInput)
+                                        message.modelMessage?.let { put("model_message", it) }
                                     }
                                 }))
                             })
                             queuedMessages.forEach { message ->
-                                history.append(buildJsonObject {
-                                    put("role", "user")
-                                    put("content", message.content)
-                                })
+                                history.append(
+                                    message.modelMessage ?: buildJsonObject {
+                                        put("role", "user")
+                                        put("content", message.content)
+                                    },
+                                )
                                 claimedMessageIds += message.id
                             }
                             persistContinuationCheckpoint(step = modelStep)
