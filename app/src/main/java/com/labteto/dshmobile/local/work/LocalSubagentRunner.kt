@@ -557,13 +557,22 @@ internal class LocalSubagentRunner(
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "completed")
                                 put("steps", event.steps)
+                                put(
+                                    "output",
+                                    truncateWithoutSplittingSurrogatePair(
+                                        event.answer,
+                                        SUBAGENT_EVENT_CHARS,
+                                    ),
+                                )
                             })
                         }
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "step_limit")
                                 put("steps", event.steps)
                             })
@@ -571,12 +580,14 @@ internal class LocalSubagentRunner(
                         is AgentEvent.TurnCancelled -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "cancelled")
                             })
                         }
                         is AgentEvent.TurnFailed -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "failed")
                                 put("detail", event.reason.take(2_000))
                             })
@@ -681,9 +692,6 @@ internal class LocalSubagentRunner(
             persistContinuationCheckpoint(step = modelStep)
         }
     }
-
-    private fun persistentSubagentId(jobId: String): String =
-        "sa-" + jobId.removePrefix("job-").take(24)
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
