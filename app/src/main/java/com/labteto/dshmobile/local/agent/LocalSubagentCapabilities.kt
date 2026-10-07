@@ -28,9 +28,6 @@ internal data class LocalSubagentCapabilities(
         if (backgroundJobId != null && !continuable) {
             add("持久后台子代理必须显式声明 continuable")
         }
-        outputSchema?.let { schema ->
-            addAll(validateStructuredOutputSchema(schema))
-        }
     }
 }
 
