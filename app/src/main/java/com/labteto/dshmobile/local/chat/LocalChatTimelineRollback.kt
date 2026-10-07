@@ -136,13 +136,13 @@ internal fun sourceEventSequenceForMessage(
 ): Long? {
     var beforeSequenceExclusive = Long.MAX_VALUE
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = CHAT_TIMELINE_SCAN_PAGE_SIZE,
         )
         if (page.isEmpty()) return null
 
-        page.asReversed().firstOrNull { event ->
+        page.firstOrNull { event ->
             (
                 event.type == "user/message" ||
                     event.type == LOCAL_AGENT_INBOX_EVENT_TYPE ||
@@ -233,13 +233,13 @@ private inline fun <T> scanTimelineBackward(
 ): T? {
     var beforeSequenceExclusive = sequenceExclusive ?: Long.MAX_VALUE
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = CHAT_TIMELINE_SCAN_PAGE_SIZE,
         )
         if (page.isEmpty()) return null
 
-        for (event in page.asReversed()) {
+        for (event in page) {
             if (sequenceExclusive == null && event.createdAt >= createdAtExclusive) continue
             decode(event)?.let { return it }
         }

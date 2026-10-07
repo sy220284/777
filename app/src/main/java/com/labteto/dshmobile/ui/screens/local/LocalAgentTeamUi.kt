@@ -299,6 +299,7 @@ internal fun LocalAgentTeamSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
+            TeamActivityFeed(team)
             TeamProgressBlock(team)
 
             Text(
@@ -568,27 +569,7 @@ private fun TeamMemberDetail(
                 color = colors.labelSecondary,
             )
         }
-        if (output.isNotBlank()) {
-            Text(
-                stringResource(R.string.local_team_activity),
-                style = DsType.caption11Strong.withReadingWeight(),
-                color = colors.labelTertiary,
-            )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = DsShapes.row,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
-            ) {
-                Text(
-                    output.takeLast(MAX_TEAM_OUTPUT_CHARS),
-                    modifier = Modifier.padding(DsSpacing.small),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 10,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        TeamMemberWorksite(member, output)
 
         Text(
             stringResource(R.string.local_team_messages),
@@ -825,4 +806,64 @@ private fun taskStatusLabel(task: LocalAgentTeamTaskUiState): String = stringRes
 )
 
 private const val MAX_INLINE_TEAM_MEMBERS = 2
-private const val MAX_TEAM_OUTPUT_CHARS = 2400
+
+@Composable
+private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
+    val colors = DsTheme.colors
+    if (team.activities.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Text(stringResource(R.string.kimi_team_activity_feed), style = DsType.std14Strong, color = colors.labelPrimary)
+        team.activities.takeLast(12).forEach { activity ->
+            val status = when (activity.status) {
+                "provisioning" -> R.string.local_team_recruiting
+                "active" -> R.string.kimi_team_started
+                "failed" -> R.string.kimi_team_failed
+                "in_progress" -> R.string.kimi_team_task_started
+                "completed" -> R.string.local_team_task_completed
+                "deleted" -> R.string.kimi_team_task_removed
+                "updated" -> R.string.kimi_team_task_updated
+                "queued" -> R.string.kimi_team_message_queued
+                "delivered" -> R.string.kimi_team_message_delivered
+                else -> R.string.kimi_team_task_created
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Icon(painterResource(R.drawable.ic_kimi_task_subagent), contentDescription = null, tint = colors.labelSecondary)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        listOfNotNull(activity.memberName, stringResource(status)).joinToString(" · "),
+                        style = DsType.small13Strong,
+                        color = if (activity.status == "failed") colors.error else colors.labelPrimary,
+                    )
+                    if (activity.title.isNotBlank()) Text(
+                        activity.title, style = DsType.caption11, color = colors.labelSecondary,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: String) {
+    val colors = DsTheme.colors
+    Surface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, color = colors.bgLayer1) {
+        Column(Modifier.padding(DsSpacing.small), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Delegate, member.activity == "running" || member.phase == "provisioning")
+                Text(member.name, style = DsType.small13Strong, color = colors.labelPrimary, modifier = Modifier.weight(1f))
+                Text(memberStatusLabel(member), style = DsType.caption11, color = colors.labelTertiary)
+            }
+            member.currentTask?.let { Text(it, style = DsType.small13, color = colors.labelPrimary) }
+            Text(
+                stringResource(R.string.kimi_team_worksite),
+                style = DsType.caption11Strong, color = colors.labelTertiary,
+            )
+            Text(
+                output.takeLast(1600).ifBlank { member.error ?: member.description },
+                style = DsType.small13, color = colors.labelSecondary, maxLines = 14,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

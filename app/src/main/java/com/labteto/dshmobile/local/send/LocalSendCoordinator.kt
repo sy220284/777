@@ -100,7 +100,7 @@ internal fun prepareLocalSend(
             if (isNotEmpty()) append("\n\n")
             append("本次附件已导入本机工作区：\n").append(attachmentBlock)
             if (attachments.any { it.mediaType.startsWith("image/") }) {
-                append("\n图片处理：支持图片输入的主模型会直接读取像素；若当前模型不支持，将使用 vision_analyze_file 分析上述工作区图片。")
+                append("\n图片处理：支持图片输入的当前路线会直接读取像素；其他路线仅在当前模式具备可用图片分析能力时处理，否则会明确返回不支持。")
             }
         }
     }

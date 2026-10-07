@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * DeepSeek Harness design tokens, ported from
+ * Kimi default surfaces with retained optional accent palettes; originally ported from
  * packages/client/ui-theme/src/styles/design-platform.css (harness repo).
  * Static primitive scales + semantic alias tokens for light and dark.
  */

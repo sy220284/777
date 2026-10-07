@@ -130,8 +130,12 @@ class LocalWorkRunRegistry internal constructor(
                 enqueue = {
                     pending.offer(queuedInput) {
                         val transcriptMessage = binding.transcriptRuntime
-                            .newMessage("user", prepared.visibleContent)
-                            .copy(id = queuedInput.id, blocks = prepared.blocks)
+                            .newMessage(
+                                role = "user",
+                                content = prepared.visibleContent,
+                                blocks = prepared.blocks,
+                            )
+                            .copy(id = queuedInput.id)
                         val event = binding.eventLog.append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
                             encodeLocalAgentInboxEvent(

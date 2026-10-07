@@ -187,7 +187,7 @@ class SessionEventLogTest {
             assertTrue(!raw.exists())
             assertTrue(File(raw.path + ".gz").isFile)
             assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
-            assertEquals(listOf(26L, 27L, 28L), restarted.pageBefore(limit = 3).map(SessionEvent::sequence))
+            assertEquals(listOf(26L, 27L, 28L), restarted.pageBeforeChronological(limit = 3).map(SessionEvent::sequence))
         } finally {
             directory.deleteRecursively()
         }
@@ -318,15 +318,26 @@ class SessionEventLogTest {
 
             assertEquals(
                 listOf(27L, 28L, 29L),
-                log.pageBefore(limit = 3).map(SessionEvent::sequence),
+                log.pageBeforeChronological(limit = 3).map(SessionEvent::sequence),
+            )
+            assertEquals(
+                listOf(29L, 28L, 27L),
+                log.pageBeforeNewestFirst(limit = 3).map(SessionEvent::sequence),
             )
             assertEquals(
                 listOf(12L, 13L, 14L),
-                log.pageBefore(sequenceExclusive = 15L, limit = 3).map(SessionEvent::sequence),
+                log.pageBeforeChronological(sequenceExclusive = 15L, limit = 3)
+                    .map(SessionEvent::sequence),
+            )
+            assertEquals(
+                listOf(14L, 13L, 12L),
+                log.pageBeforeNewestFirst(sequenceExclusive = 15L, limit = 3)
+                    .map(SessionEvent::sequence),
             )
             assertEquals(
                 listOf(0L, 1L),
-                log.pageBefore(sequenceExclusive = 2L, limit = 20).map(SessionEvent::sequence),
+                log.pageBeforeChronological(sequenceExclusive = 2L, limit = 20)
+                    .map(SessionEvent::sequence),
             )
         } finally {
             directory.deleteRecursively()

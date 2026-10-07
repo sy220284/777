@@ -1,10 +1,15 @@
 package com.labteto.dshmobile.local.attachment
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.labteto.dshmobile.local.model.LocalImageMetadata
+import com.labteto.dshmobile.local.model.MAX_LOCAL_IMAGE_EDGE
+import com.labteto.dshmobile.local.model.MAX_LOCAL_IMAGE_PIXELS
 import com.labteto.dshmobile.local.model.SUPPORTED_LOCAL_IMAGE_TYPES
 import com.labteto.dshmobile.local.model.validateLocalImageMetadata
 import com.labteto.dshmobile.local.files.LocalWorkspace
@@ -50,7 +55,16 @@ internal class LocalAttachmentImporter(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
+        val originalMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
+        // SVG is text/XML and should stay a document attachment instead of entering the raster-image path.
+        val declaredMediaType = if (
+            originalMediaType == "image/svg+xml" ||
+            safeName.endsWith(".svg", ignoreCase = true)
+        ) {
+            "application/xml"
+        } else {
+            originalMediaType
+        }
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -74,24 +88,45 @@ internal class LocalAttachmentImporter(
             throw error
         }
 
-        val imageMetadata = inspectImportedImage(incoming)
-        if (declaredMediaType.startsWith("image/") && imageMetadata == null) {
+        val probe = inspectImportedImage(incoming, declaredMediaType)
+        if (declaredMediaType.startsWith("image/") && probe == null) {
             incoming.delete()
-            error("所选文件不是可用的 PNG/JPEG/WebP/GIF 图片")
+            error("所选图片无法解码")
         }
+
+        val normalized = try {
+            if (probe != null && probe.mediaType !in SUPPORTED_LOCAL_IMAGE_TYPES) {
+                normalizeImportedImage(incoming, probe, dir)
+            } else {
+                NormalizedImportedFile(
+                    file = incoming,
+                    imageMetadata = probe?.let {
+                        LocalImageMetadata(
+                            mediaType = it.mediaType,
+                            width = it.width,
+                            height = it.height,
+                        )
+                    },
+                )
+            }
+        } catch (error: Throwable) {
+            incoming.delete()
+            throw error
+        }
+
+        val imageMetadata = normalized.imageMetadata
         if (imageMetadata != null) {
             try {
                 validateLocalImageMetadata(imageMetadata)
             } catch (error: Throwable) {
-                incoming.delete()
+                normalized.file.delete()
+                if (normalized.file != incoming) incoming.delete()
                 throw error
             }
         }
 
         val mediaType = imageMetadata?.mediaType ?: declaredMediaType
-        val attachmentId = digest.digest().joinToString("") { byte ->
-            "%02x".format(byte.toInt() and 0xff)
-        }
+        val attachmentId = sha256(normalized.file)
         val extension = when (mediaType) {
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
@@ -104,16 +139,18 @@ internal class LocalAttachmentImporter(
         try {
             currentCoroutineContext().ensureActive()
         } catch (error: Throwable) {
-            incoming.delete()
+            normalized.file.delete()
+            if (normalized.file != incoming) incoming.delete()
             throw error
         }
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
         if (target.exists()) {
-            incoming.delete()
-        } else if (!incoming.renameTo(target)) {
-            incoming.copyTo(target, overwrite = false)
-            incoming.delete()
+            normalized.file.delete()
+        } else if (!normalized.file.renameTo(target)) {
+            normalized.file.copyTo(target, overwrite = false)
+            normalized.file.delete()
         }
+        if (normalized.file != incoming) incoming.delete()
 
         return LocalImportedAttachment(
             name = displayName ?: safeName,
@@ -126,16 +163,108 @@ internal class LocalAttachmentImporter(
         )
     }
 
-    private fun inspectImportedImage(file: File): LocalImageMetadata? {
+    private data class ImportedImageProbe(
+        val mediaType: String,
+        val width: Int,
+        val height: Int,
+    )
+
+    private data class NormalizedImportedFile(
+        val file: File,
+        val imageMetadata: LocalImageMetadata?,
+    )
+
+    private fun inspectImportedImage(file: File, declaredMediaType: String): ImportedImageProbe? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, options)
-        val mediaType = options.outMimeType?.lowercase()
-            ?.takeIf { it in SUPPORTED_LOCAL_IMAGE_TYPES }
-            ?: return null
         val width = options.outWidth
         val height = options.outHeight
         if (width <= 0 || height <= 0) return null
-        return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
+        val mediaType = options.outMimeType?.lowercase()
+            ?: declaredMediaType.takeIf { it.startsWith("image/") }
+            ?: "image/unknown"
+        return ImportedImageProbe(mediaType = mediaType, width = width, height = height)
+    }
+
+    private fun normalizeImportedImage(
+        source: File,
+        probe: ImportedImageProbe,
+        dir: File,
+    ): NormalizedImportedFile {
+        require(probe.width in 1..MAX_LOCAL_IMAGE_EDGE && probe.height in 1..MAX_LOCAL_IMAGE_EDGE) {
+            "图片边长不能超过 $MAX_LOCAL_IMAGE_EDGE 像素"
+        }
+        require(probe.width.toLong() * probe.height.toLong() <= MAX_LOCAL_IMAGE_PIXELS) {
+            "图片总像素不能超过 ${MAX_LOCAL_IMAGE_PIXELS / 1_000_000} 百万像素"
+        }
+        var sample = 1
+        while (
+            (probe.width / sample).toLong() * (probe.height / sample).toLong() >
+            MAX_NORMALIZATION_PIXELS
+        ) {
+            sample *= 2
+        }
+        val bitmap = BitmapFactory.decodeFile(
+            source.absolutePath,
+            BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            },
+        ) ?: error("所选图片无法解码")
+        val normalized = File(dir, ".normalized-${UUID.randomUUID()}.jpg")
+        val encodedBitmap = if (bitmap.hasAlpha()) {
+            Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888).also { opaque ->
+                Canvas(opaque).apply {
+                    drawColor(Color.WHITE)
+                    drawBitmap(bitmap, 0f, 0f, null)
+                }
+            }
+        } else {
+            bitmap
+        }
+        try {
+            normalized.outputStream().use { output ->
+                check(encodedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)) {
+                    "图片格式转换失败"
+                }
+            }
+            require(normalized.length() in 1..maxAttachmentBytes) {
+                "转换后的图片超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限"
+            }
+            return NormalizedImportedFile(
+                file = normalized,
+                imageMetadata = LocalImageMetadata(
+                    mediaType = "image/jpeg",
+                    width = encodedBitmap.width,
+                    height = encodedBitmap.height,
+                ),
+            )
+        } catch (error: Throwable) {
+            normalized.delete()
+            throw error
+        } finally {
+            if (encodedBitmap !== bitmap) encodedBitmap.recycle()
+            bitmap.recycle()
+        }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { byte ->
+            "%02x".format(byte.toInt() and 0xff)
+        }
+    }
+
+    private companion object {
+        const val MAX_NORMALIZATION_PIXELS = 16_000_000L
     }
 }
 

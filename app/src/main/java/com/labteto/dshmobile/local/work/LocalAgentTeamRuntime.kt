@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.util.UUID
 import kotlinx.coroutines.currentCoroutineContext
@@ -67,6 +68,7 @@ internal data class LocalTeamProjection(
     val deliveredMessageIds: List<String> = emptyList(),
     val failure: String? = null,
     val asOfSequence: Long = -1L,
+    val activities: List<LocalAgentTeamActivityUiState> = emptyList(),
 )
 
 /** Work-owned Agent Team domain. Durable state lives only in the lead Session EventLog. */
@@ -216,6 +218,7 @@ internal class LocalAgentTeamRuntime(
             tasks = tasks,
             pendingMessageCount = state.pendingMessages.size,
             failure = state.failure,
+            activities = state.activities,
         )
     }
 
@@ -714,7 +717,7 @@ internal class LocalAgentTeamRuntime(
         val advanced = state.copy(asOfSequence = event.sequence)
         if (state.failure != null) return advanced
         return try {
-            when (event.type) {
+            val next = when (event.type) {
                 TEAM_MEMBER_EVENT -> {
                     val member = decodeMember(event.data)
                     validateMemberTransition(state.members, member)
@@ -785,6 +788,39 @@ internal class LocalAgentTeamRuntime(
                 }
                 else -> advanced
             }
+            val activity = when (event.type) {
+                TEAM_MEMBER_EVENT -> decodeMember(event.data).let { member ->
+                    LocalAgentTeamActivityUiState(
+                        event.sequence, "member", truncateWithoutSplittingSurrogatePair(member.description, 180),
+                        member.phase.name.lowercase(), member.name,
+                    )
+                }
+                TEAM_TASK_EVENT -> decodeTask(event.data).let { task ->
+                    LocalAgentTeamActivityUiState(
+                        event.sequence, "task", truncateWithoutSplittingSurrogatePair(task.subject, 180),
+                        if (task.status == LocalTeamTaskStatus.PENDING && state.tasks.any { it.id == task.id }) {
+                            "updated"
+                        } else task.status.name.lowercase(),
+                        next.members.firstOrNull { it.id == task.ownerId }?.name,
+                    )
+                }
+                TEAM_MESSAGE_QUEUED -> decodeMessage(event.data).let { message ->
+                    LocalAgentTeamActivityUiState(
+                        event.sequence, "message", truncateWithoutSplittingSurrogatePair(message.content, 180), "queued",
+                        next.members.firstOrNull { it.id == message.targetId }?.name,
+                    )
+                }
+                TEAM_MESSAGE_DELIVERED -> LocalAgentTeamActivityUiState(
+                    event.sequence, "message", "", "delivered",
+                    next.members.firstOrNull {
+                        it.id == event.data["targetId"]?.jsonPrimitive?.contentOrNull
+                    }?.name,
+                )
+                else -> null
+            }
+            if (activity == null) next else next.copy(
+                activities = (state.activities + activity).takeLast(64),
+            )
         } catch (error: Exception) {
             advanced.copy(failure = error.message ?: error::class.java.simpleName)
         }
@@ -1124,7 +1160,7 @@ internal class LocalAgentTeamRuntime(
         const val TEAM_MESSAGE_QUEUED = "team/message/queued"
         const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
         const val TEAM_EVENT_VERSION = 2
-        const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
+        const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 5
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,

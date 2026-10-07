@@ -490,6 +490,7 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(listOf("member-1"), projection.members.map { it.id })
         assertEquals(listOf("team-msg-restart"), projection.pendingMessages.map { it.id })
         assertNull(projection.failure)
+        assertEquals(fixture.runtime.uiState("team-restart").activities, recreated.uiState("team-restart").activities)
     }
 
     @Test
@@ -541,6 +542,10 @@ class LocalAgentTeamRuntimeTest {
         val ui = fixture.runtime.uiState("team-ui")
 
         assertTrue(ui.visible)
+        assertTrue(ui.activities.zipWithNext().all { (a, b) -> a.sequence < b.sequence })
+        assertEquals(ui.activities, fixture.runtime.uiState("team-ui").activities)
+        assertEquals("queued", ui.activities.last().status)
+        assertEquals("in_progress", ui.activities.first { it.title == "检查持久化恢复" && it.status == "in_progress" }.status)
         assertEquals(1, ui.members.size)
         assertEquals("检查持久化恢复", ui.members.single().currentTask)
         assertEquals(1, ui.members.single().pendingMessageCount)
@@ -552,6 +557,23 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(!ui.tasks.single { it.id == "task-2" }.ready)
         assertEquals(1, ui.blockedTaskCount)
         assertEquals(1, ui.pendingMessageCount)
+    }
+
+    @Test
+    fun activityHistoryIsBoundedAndRepeatedProjectionDoesNotDuplicateEvents() {
+        val fixture = fixture("team-activity-limit")
+        repeat(70) { index ->
+            fixture.log.append(
+                LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+                task("team-activity-limit", "task-${index + 1}", 1, blockedBy = emptyList()),
+            )
+        }
+        val ui = fixture.runtime.uiState("team-activity-limit")
+        assertEquals(70, ui.tasks.size)
+        assertEquals(64, ui.activities.size)
+        assertEquals(64, ui.activities.map { it.sequence }.distinct().size)
+        assertEquals(ui.activities, fixture.runtime.uiState("team-activity-limit").activities)
+        assertNull(ui.failure)
     }
 
     private data class Fixture(

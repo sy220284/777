@@ -46,15 +46,12 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
-import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsTimeline
-import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -77,6 +74,8 @@ internal data class LocalWorkProcessNode(
     val operationKinds: List<AgentOperationKind> = emptyList(),
     val failed: Boolean = false,
     val count: Int = 0,
+    val toolContent: String? = null,
+    val toolName: String? = null,
 ) {
     val kind: AgentOperationKind
         get() = operationKinds.firstOrNull() ?: AgentOperationKind.Generic
@@ -98,39 +97,20 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
         }
     }
 
-    fun appendOperation(kind: AgentOperationKind, failed: Boolean) {
-        val last = nodes.lastOrNull()
-        if (last?.summary != null) {
-            val kinds = if (kind in last.operationKinds) last.operationKinds else last.operationKinds + kind
-            nodes[nodes.lastIndex] = last.copy(
-                operationKinds = kinds,
-                failed = last.failed || failed,
-                count = last.count + 1,
-            )
-            return
-        }
-
-        if (last?.kind == kind) {
-            nodes[nodes.lastIndex] = last.copy(
-                failed = last.failed || failed,
-                count = last.count + 1,
-            )
-        } else {
-            nodes += LocalWorkProcessNode(
-                operationKinds = listOf(kind),
-                failed = failed,
-                count = 1,
-            )
-        }
+    fun appendOperation(message: LocalHarnessMessage) {
+        nodes += LocalWorkProcessNode(
+            operationKinds = listOf(agentOperationKind(message.toolName)),
+            failed = message.toolIsError ?: toolResultFailed(message.content),
+            count = 1,
+            toolContent = message.content,
+            toolName = message.toolName,
+        )
     }
 
     messages.forEach { message ->
         when (message.role) {
             "progress", "assistant" -> appendSummary(message.content)
-            "tool" -> appendOperation(
-                kind = agentOperationKind(message.toolName),
-                failed = message.toolIsError ?: toolResultFailed(message.content),
-            )
+            "tool" -> appendOperation(message)
         }
     }
 
@@ -220,7 +200,7 @@ internal fun WorkProcessRow(
         ) {
             WorkOperationIcon(
                 kind = latestNode.kind,
-                running = processStatus == DsStatus.Running,
+                running = processStatus == DsStatus.Running && latestNode.toolContent == null,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -263,48 +243,11 @@ internal fun WorkProcessRow(
                 modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                val timelineItems = visibleNodes.mapIndexed { visibleIndex, node ->
-                    val operationLabel = stringResource(agentOperationLabelRes(node.kind))
-                    val stepNumber = visibleStartIndex + visibleIndex + 1
-                    val rowRunning = running && stepNumber - 1 == nodes.lastIndex && !node.failed
-                    val rowStatus = when {
-                        node.failed -> DsStatus.Failed
-                        rowRunning -> DsStatus.Running
-                        else -> DsStatus.Done
-                    }
-                    val statusLabel = stringResource(
-                        agentOperationStatusRes(
-                            running = rowStatus == DsStatus.Running,
-                            failed = rowStatus == DsStatus.Failed,
-                        ),
-                    )
-                    val detail = when {
-                        node.summary != null && node.count > 0 -> stringResource(
-                            R.string.local_work_process_step_operation_detail,
-                            stepNumber,
-                            operationLabel,
-                            node.count,
-                        )
-                        node.summary != null -> stringResource(
-                            R.string.local_work_process_step_number,
-                            stepNumber,
-                        )
-                        node.count > 1 -> stringResource(
-                            R.string.local_work_process_operation_count,
-                            node.count,
-                        )
-                        else -> stringResource(R.string.local_work_process_step_number, stepNumber)
-                    }
-                    DsTimelineItem(
-                        text = node.summary ?: operationLabel,
-                        detail = "$detail · $statusLabel",
-                        state = rowStatus,
-                    )
+                visibleNodes.forEachIndexed { visibleIndex, node ->
+                    val rowRunning = running && visibleStartIndex + visibleIndex == nodes.lastIndex &&
+                        node.toolContent == null && !node.failed
+                    KimiWorkContentBlock(node, rowRunning)
                 }
-                DsTimeline(
-                    items = timelineItems,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 if (collapsedHiddenCount > 0) {
                     DsButton(
                         text = if (showAllNodes) {
@@ -356,7 +299,7 @@ private fun KimiAnimatedToolIcon(
 }
 
 @Composable
-private fun WorkOperationIcon(
+internal fun WorkOperationIcon(
     kind: AgentOperationKind,
     running: Boolean,
 ) {
@@ -366,6 +309,11 @@ private fun WorkOperationIcon(
         AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.kimi_anim_tool_code
         AgentOperationKind.Web -> R.drawable.kimi_anim_tool_web
         AgentOperationKind.Generic -> R.drawable.kimi_anim_tool_think
+        AgentOperationKind.Delegate -> R.drawable.kimi_anim_tool_create_subagent
+        AgentOperationKind.Image -> R.drawable.kimi_anim_tool_image
+        AgentOperationKind.External -> R.drawable.kimi_anim_tool_mcp
+        AgentOperationKind.Background -> R.drawable.kimi_anim_tool_task
+        AgentOperationKind.Device -> R.drawable.kimi_anim_tool_browser
         else -> null
     }
     if (running && animatedRes != null) {

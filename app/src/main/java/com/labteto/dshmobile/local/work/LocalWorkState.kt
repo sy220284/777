@@ -9,6 +9,7 @@ data class LocalAgentTeamUiState(
     val tasks: List<LocalAgentTeamTaskUiState> = emptyList(),
     val pendingMessageCount: Int = 0,
     val failure: String? = null,
+    val activities: List<LocalAgentTeamActivityUiState> = emptyList(),
 ) {
     val visible: Boolean
         get() = members.isNotEmpty() || tasks.isNotEmpty() || failure != null
@@ -80,4 +81,13 @@ data class LocalWorkState(
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
     val deviceApprovalLease: Boolean = false,
+)
+
+/** Bounded display projection of durable team events; never an execution owner. */
+data class LocalAgentTeamActivityUiState(
+    val sequence: Long,
+    val kind: String,
+    val title: String,
+    val status: String,
+    val memberName: String? = null,
 )

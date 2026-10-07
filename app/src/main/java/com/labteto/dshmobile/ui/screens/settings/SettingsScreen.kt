@@ -67,10 +67,7 @@ import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -97,7 +94,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * App settings, grouped into cards.
+ * App settings with flat sections and secondary configuration destinations.
  *
  * Only the top group is genuinely the app's own; connection, harness facts and data are all about
  * the *link* to a harness. Keeping the read-only notice scoped to the harness group matters —
@@ -339,47 +336,42 @@ fun SettingsScreen(
                 when (page) {
                     SettingsDestination.ROOT -> {
                         Text(stringResource(R.string.settings_group_models), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Globe,
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
-                                iconFamily = DsIconFamily.Accent,
                                 value = localHarness.model.takeIf { it.isNotBlank() },
                                 onClick = { page = SettingsDestination.MODELS },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
                                 subtitle = stringResource(R.string.settings_model_usage_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                             )
                         }
 
                         Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.BookOpen,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
-                                iconFamily = DsIconFamily.Purple,
                                 value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_appearance),
                                 subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 value = appearanceThemeLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.APPEARANCE },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.MessageCircle,
                                 title = stringResource(R.string.settings_page_session),
                                 subtitle = stringResource(R.string.settings_session_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 value = stringResource(
                                     if (sessionSort == "updated") {
                                         R.string.chatlist_sort_updated
@@ -392,41 +384,37 @@ fun SettingsScreen(
                         }
 
                         Text(stringResource(R.string.settings_group_system), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Device,
                                 title = stringResource(R.string.settings_page_permissions),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
-                                iconFamily = DsIconFamily.Green,
                                 onClick = { page = SettingsDestination.PERMISSIONS },
                                 trailing = {
                                     StateDot(deviceCapabilitiesState(deviceCapabilities))
                                 },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Bell,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 value = enabledNotificationCount(settings).toString(),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
 
                         Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
-                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.RefreshCw,
                                 title = stringResource(R.string.settings_update_check),
                                 subtitle = updateStatus,
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = onCheckUpdate,
                             )
                         }
@@ -449,12 +437,11 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_chat_style_guard),
                                 subtitle = stringResource(R.string.settings_chat_style_guard_hint),
-                                iconFamily = DsIconFamily.Purple,
                                 value = stringResource(
                                     if (localHarness.chatStyleGuardEnabled) {
                                         R.string.common_enabled
@@ -633,19 +620,17 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
-                        DsGroupCard {
-                            DsCategoryRow(
+                        KimiSettingsSection {
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.PRICING },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
@@ -793,19 +778,17 @@ fun SettingsScreen(
                             onCleanup = onClose,
                         )
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), FeatherIcons.Info) {
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.GitBranch,
                                 title = stringResource(R.string.settings_network_diagnostic),
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { showDiagnostic = true },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Device,
                                 title = stringResource(R.string.settings_environment_capabilities),
-                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { showEnvironment = true },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
                                 subtitle = stringResource(R.string.settings_export_diagnostics_hint),
@@ -919,7 +902,7 @@ internal fun SettingsCard(
             Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
             Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         }
-        DsGroupCard {
+        KimiSettingsSection {
             content()
         }
     }

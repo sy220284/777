@@ -20,12 +20,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -41,8 +39,6 @@ internal fun LocalModelPickerSheet(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    val chatGptPlanLabel = stringResource(R.string.chatgpt_plan_usage)
-    val chatGptAccountLabel = stringResource(R.string.chatgpt_account_short)
     DsBottomSheet(
         title = stringResource(R.string.models_title),
         onDismiss = onDismiss,
@@ -50,12 +46,12 @@ internal fun LocalModelPickerSheet(
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             profiles.forEach { profile ->
                 val selected = profile.id == activeProfileId
-                val detail = if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                    val account = profile.credentialRef?.takeLast(6).orEmpty()
-                    if (account.isBlank()) chatGptPlanLabel
-                    else "$chatGptPlanLabel · $chatGptAccountLabel $account"
-                } else {
-                    profile.baseUrl.substringAfter("://").substringBefore('/')
+                val detail = when {
+                    selected -> stringResource(R.string.kimi_model_current)
+                    profile.contextWindowTokensOverride != null -> stringResource(
+                        R.string.kimi_model_context, profile.contextWindowTokensOverride,
+                    )
+                    else -> stringResource(R.string.kimi_model_available)
                 }
                 Row(
                     modifier = Modifier

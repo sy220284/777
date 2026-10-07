@@ -34,17 +34,19 @@ internal class LocalWorkSessionProjectionRuntime @Inject constructor(
 
     internal fun structuredEventSnapshot(
         eventLog: LocalSessionEventLog,
-    ): SessionProjectionSnapshot<LocalWorkStructuredEventWindow> {
-        val events = eventLog.pageBefore(limit = LOCAL_STRUCTURED_EVENT_SCAN_LIMIT)
-            .asReversed()
-            .map { event ->
-                SessionEvent(
-                    sequence = event.sequence,
-                    type = event.type,
-                    createdAt = event.createdAt,
-                    data = event.data,
-                )
-            }
-        return structuredEventWindow.fold(events)
-    }
+    ): SessionProjectionSnapshot<LocalWorkStructuredEventWindow> =
+        structuredEventWindow.fold(localWorkStructuredProjectionEvents(eventLog))
 }
+
+internal fun localWorkStructuredProjectionEvents(
+    eventLog: LocalSessionEventLog,
+): List<SessionEvent> =
+    eventLog.pageBeforeChronological(limit = LOCAL_STRUCTURED_EVENT_SCAN_LIMIT)
+        .map { event ->
+            SessionEvent(
+                sequence = event.sequence,
+                type = event.type,
+                createdAt = event.createdAt,
+                data = event.data,
+            )
+        }

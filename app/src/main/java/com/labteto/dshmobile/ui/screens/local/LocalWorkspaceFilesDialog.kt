@@ -149,13 +149,13 @@ internal fun LocalWorkspaceFilesDialog(
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
-                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.panel_workspace)
+                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.kimi_project_title)
                     else -> stringResource(R.string.local_files_conversation_title)
                 }
                 val headerSubtitle = when {
                     preview != null -> preview?.file?.path
                     mode == LocalFilesMode.WORKSPACE && section == 0 ->
-                        workspacePath + if (directory.isEmpty()) "" else "/$directory"
+                        directory.takeIf(String::isNotEmpty)
                     else -> null
                 }
                 DsTopBar(
@@ -180,8 +180,8 @@ internal fun LocalWorkspaceFilesDialog(
                 if (preview == null && mode == LocalFilesMode.WORKSPACE) {
                     DsSegmentedTabs(
                         labels = listOf(
-                            stringResource(R.string.chatlist_workspace_files),
-                            stringResource(R.string.panel_involved_files),
+                            stringResource(R.string.kimi_project_materials),
+                            stringResource(R.string.kimi_project_context),
                             stringResource(R.string.panel_artifacts),
                         ),
                         selectedIndex = section,
@@ -314,7 +314,7 @@ private fun ConversationLocalFileList(
         if (files.involved.isNotEmpty()) {
             item(key = "local-involved-header") {
                 Text(
-                    stringResource(R.string.panel_involved_files),
+                    stringResource(R.string.kimi_project_context),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),

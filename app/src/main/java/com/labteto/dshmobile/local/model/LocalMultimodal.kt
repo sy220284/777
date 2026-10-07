@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.attachment.LocalDocumentContent
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.attachment.renderLocalPdfForModel
 import java.io.File
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
@@ -26,6 +28,7 @@ import kotlinx.serialization.json.put
  * on every model step.
  */
 internal const val LOCAL_IMAGE_REF = "local_image_ref"
+internal const val LOCAL_FILE_REF = "local_file_ref"
 
 internal enum class LocalImageCapability {
     UNKNOWN,
@@ -110,34 +113,34 @@ internal fun resolveLocalImageInputMode(
 internal fun buildLocalUserModelMessage(
     visibleText: String,
     attachments: List<LocalImportedAttachment>,
-): JsonObject {
-    val images = attachments.filter { it.mediaType.startsWith("image/") }
-    return buildJsonObject {
-        put("role", "user")
-        if (images.isEmpty()) {
-            put("content", visibleText)
-        } else {
-            put("content", buildJsonArray {
-                if (visibleText.isNotBlank()) {
-                    add(buildJsonObject {
-                        put("type", "text")
-                        put("text", visibleText)
-                    })
-                }
-                images.forEach { image ->
-                    add(buildJsonObject {
-                        put("type", LOCAL_IMAGE_REF)
-                        put("path", image.relativePath)
-                        put("mediaType", image.mediaType)
-                        put("name", image.name)
-                        put("bytes", image.bytes)
-                        image.attachmentId?.let { put("attachmentId", it) }
-                        image.width?.let { put("width", it) }
-                        image.height?.let { put("height", it) }
-                    })
-                }
-            })
-        }
+): JsonObject = buildJsonObject {
+    put("role", "user")
+    if (attachments.isEmpty()) {
+        put("content", visibleText)
+    } else {
+        put("content", buildJsonArray {
+            if (visibleText.isNotBlank()) {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", visibleText)
+                })
+            }
+            attachments.forEach { attachment ->
+                add(buildJsonObject {
+                    put(
+                        "type",
+                        if (attachment.mediaType.startsWith("image/")) LOCAL_IMAGE_REF else LOCAL_FILE_REF,
+                    )
+                    put("path", attachment.relativePath)
+                    put("mediaType", attachment.mediaType)
+                    put("name", attachment.name)
+                    put("bytes", attachment.bytes)
+                    attachment.attachmentId?.let { put("attachmentId", it) }
+                    attachment.width?.let { put("width", it) }
+                    attachment.height?.let { put("height", it) }
+                })
+            }
+        })
     }
 }
 
@@ -173,8 +176,14 @@ internal fun hasLocalImageRefs(messages: List<JsonObject>): Boolean =
     messages.any(::hasLocalImageRefs)
 
 private fun hasLocalImageRefs(message: JsonObject): Boolean =
+    hasLocalRef(message, LOCAL_IMAGE_REF)
+
+private fun hasLocalFileRefs(message: JsonObject): Boolean =
+    hasLocalRef(message, LOCAL_FILE_REF)
+
+private fun hasLocalRef(message: JsonObject, type: String): Boolean =
     (message["content"] as? JsonArray).orEmpty().any { part ->
-        (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == LOCAL_IMAGE_REF
+        (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == type
     }
 
 internal suspend fun prepareLocalMultimodalMessages(
@@ -188,16 +197,119 @@ internal suspend fun prepareLocalMultimodalMessages(
     maxImageBytes: Long = MAX_NATIVE_IMAGE_BYTES,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
+    val activeFileMessageIndices = activeFileMessageIndices(messages)
     val root = workspaceRoot.canonicalFile
     var activeImages = 0
     var activeRawBytes = 0L
+    var activeDocumentChars = 0
+    val reservedDirectImages = messages.mapIndexed { index, message ->
+        if (index in activeImageMessageIndices) {
+            (message["content"] as? JsonArray).orEmpty().count { part ->
+                (part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == LOCAL_IMAGE_REF
+            }
+        } else {
+            0
+        }
+    }.sum()
+    var pdfPageSlots = (budget.maxImages - reservedDirectImages).coerceAtLeast(0)
 
     messages.mapIndexed { messageIndex, message ->
         val content = message["content"] as? JsonArray ?: return@mapIndexed message
         val converted = buildJsonArray {
             content.forEach { part ->
                 val obj = part as? JsonObject
-                if (obj?.get("type")?.jsonPrimitive?.contentOrNull != LOCAL_IMAGE_REF) {
+                val type = obj?.get("type")?.jsonPrimitive?.contentOrNull
+
+                if (type == LOCAL_FILE_REF) {
+                    if (messageIndex !in activeFileMessageIndices) {
+                        add(historicalFileReference(obj))
+                        return@forEach
+                    }
+                    val relative = obj["path"]?.jsonPrimitive?.contentOrNull
+                        ?: error("文件引用缺少工作区路径")
+                    val file = File(root, relative).canonicalFile
+                    require(file.toPath().startsWith(root.toPath())) { "文件引用越过工作区边界" }
+                    require(file.isFile) { "文件附件不存在：$relative" }
+                    require(file.length() in 1..MAX_LOCAL_DOCUMENT_BYTES) {
+                        "文件附件超过 ${MAX_LOCAL_DOCUMENT_BYTES / 1024 / 1024} MB 解析上限：$relative"
+                    }
+                    val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: file.name
+                    val mediaType = obj["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+                    val remainingChars = (MAX_LOCAL_DOCUMENT_CHARS_PER_REQUEST - activeDocumentChars)
+                        .coerceAtLeast(1)
+                    val extracted = LocalDocumentContent.extract(
+                        file = file,
+                        displayName = name,
+                        mediaType = mediaType,
+                        maxChars = minOf(MAX_LOCAL_DOCUMENT_CHARS_PER_FILE, remainingChars),
+                    )
+                    if (extracted.parsed && extracted.text.isNotBlank()) {
+                        val body = buildString {
+                            append("[附件内容：").append(name).append(" · ").append(extracted.formatLabel)
+                            if (extracted.truncated) append(" · 已按上下文预算截断")
+                            append("]\n").append(extracted.text)
+                        }
+                        activeDocumentChars += body.length
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put("text", body)
+                        })
+                    }
+
+                    val isPdf = name.endsWith(".pdf", ignoreCase = true) ||
+                        mediaType.substringBefore(';').trim().equals("application/pdf", ignoreCase = true)
+                    val shouldRenderPdf = isPdf &&
+                        mode != LocalImageInputMode.TOOL &&
+                        pdfPageSlots > 0 &&
+                        (!extracted.parsed || extracted.text.length < MIN_RELIABLE_PDF_TEXT_CHARS)
+                    if (shouldRenderPdf) {
+                        val rendered = renderLocalPdfForModel(
+                            file = file,
+                            maxPages = minOf(pdfPageSlots, MAX_LOCAL_PDF_RENDER_PAGES),
+                        )
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put(
+                                "text",
+                                buildString {
+                                    append("[PDF 页面视觉内容：").append(name)
+                                    append("，共 ").append(rendered.pageCount).append(" 页")
+                                    if (rendered.truncated) {
+                                        append("；当前按本轮图片预算发送前 ").append(rendered.pages.size).append(" 页")
+                                    }
+                                    append("]")
+                                },
+                            )
+                        })
+                        rendered.pages.forEach { page ->
+                            activeImages += 1
+                            activeRawBytes += page.bytes.size
+                            require(activeImages <= budget.maxImages) {
+                                "本轮图片总量超过 ${budget.maxImages} 张预算"
+                            }
+                            require(activeRawBytes <= budget.maxRawBytes) {
+                                "本轮图片原始数据超过 ${budget.maxRawBytes / 1024 / 1024} MB 预算"
+                            }
+                            add(modelImageUrl(page.mediaType, page.bytes))
+                        }
+                        pdfPageSlots -= rendered.pages.size
+                    } else if (!extracted.parsed || extracted.text.isBlank()) {
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put(
+                                "text",
+                                if (isPdf && mode == LocalImageInputMode.TOOL) {
+                                    "[附件：$name（PDF）。未能可靠提取文本；扫描型或复杂 PDF 需要切换到支持图片理解的模型后按页面读取。工作区路径：$relative]"
+                                } else {
+                                    "[附件：$name（${extracted.formatLabel}）。当前文件已保存在工作区，未提取到可直接发送给模型的文本内容。工作区路径：$relative]"
+                                },
+                            )
+                        })
+                    }
+                    return@forEach
+                }
+
+                if (type != LOCAL_IMAGE_REF) {
                     add(part)
                     return@forEach
                 }
@@ -230,16 +342,11 @@ internal suspend fun prepareLocalMultimodalMessages(
                 require(storedMediaType == null || storedMediaType == actualMediaType) {
                     "图片附件内容与记录格式不一致：$relative"
                 }
-                val data = Base64.getEncoder().encodeToString(
-                    readLocalImageBytesBounded(file, minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES)),
+                val bytes = readLocalImageBytesBounded(
+                    file,
+                    minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES),
                 )
-                add(buildJsonObject {
-                    put("type", "image_url")
-                    put("image_url", buildJsonObject {
-                        put("url", "data:$actualMediaType;base64,$data")
-                        put("detail", "high")
-                    })
-                })
+                add(modelImageUrl(actualMediaType, bytes))
             }
         }
         JsonObject(message.toMutableMap().apply { put("content", converted) })
@@ -249,8 +356,18 @@ internal suspend fun prepareLocalMultimodalMessages(
 private fun activeImageMessageIndices(
     messages: List<JsonObject>,
     mode: LocalImageInputMode,
+): Set<Int> =
+    if (mode == LocalImageInputMode.TOOL) emptySet()
+    else activeUserMessageIndices(messages, ::hasLocalImageRefs)
+
+private fun activeFileMessageIndices(messages: List<JsonObject>): Set<Int> =
+    activeUserMessageIndices(messages, ::hasLocalFileRefs)
+
+private fun activeUserMessageIndices(
+    messages: List<JsonObject>,
+    hasReference: (JsonObject) -> Boolean,
 ): Set<Int> {
-    if (mode == LocalImageInputMode.TOOL || messages.isEmpty()) return emptySet()
+    if (messages.isEmpty()) return emptySet()
     fun roleAt(index: Int): String? =
         messages[index]["role"]?.jsonPrimitive?.contentOrNull
 
@@ -258,17 +375,37 @@ private fun activeImageMessageIndices(
         var start = messages.lastIndex
         while (start > 0 && roleAt(start - 1) == "user") start -= 1
         return (start..messages.lastIndex)
-            .filter { index -> hasLocalImageRefs(messages[index]) }
+            .filter { index -> hasReference(messages[index]) }
             .toSet()
     }
 
     val latestUser = messages.indexOfLast { message ->
         message["role"]?.jsonPrimitive?.contentOrNull == "user"
     }
-    return if (latestUser >= 0 && hasLocalImageRefs(messages[latestUser])) {
-        setOf(latestUser)
-    } else {
-        emptySet()
+    return if (latestUser >= 0 && hasReference(messages[latestUser])) setOf(latestUser) else emptySet()
+}
+
+private fun historicalFileReference(file: JsonObject): JsonObject {
+    val name = file["name"]?.jsonPrimitive?.contentOrNull ?: "未命名文件"
+    val path = file["path"]?.jsonPrimitive?.contentOrNull ?: "未知路径"
+    val mediaType = file["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+    return buildJsonObject {
+        put("type", "text")
+        put(
+            "text",
+            "[历史文件引用：$name；类型：$mediaType；工作区路径：$path。文件正文未重复注入，需要时重新附加或在工作模式读取。]",
+        )
+    }
+}
+
+private fun modelImageUrl(mediaType: String, bytes: ByteArray): JsonObject {
+    val data = Base64.getEncoder().encodeToString(bytes)
+    return buildJsonObject {
+        put("type", "image_url")
+        put("image_url", buildJsonObject {
+            put("url", "data:$mediaType;base64,$data")
+            put("detail", "high")
+        })
     }
 }
 
@@ -369,3 +506,8 @@ internal val SUPPORTED_LOCAL_IMAGE_TYPES = setOf(
 internal const val MAX_LOCAL_IMAGE_EDGE = 8192
 internal const val MAX_LOCAL_IMAGE_PIXELS = 64_000_000L
 private const val MAX_NATIVE_IMAGE_BYTES = 20L * 1024L * 1024L
+private const val MAX_LOCAL_DOCUMENT_BYTES = 20L * 1024L * 1024L
+private const val MAX_LOCAL_DOCUMENT_CHARS_PER_FILE = 40_000
+private const val MAX_LOCAL_DOCUMENT_CHARS_PER_REQUEST = 80_000
+private const val MIN_RELIABLE_PDF_TEXT_CHARS = 1_200
+private const val MAX_LOCAL_PDF_RENDER_PAGES = 6

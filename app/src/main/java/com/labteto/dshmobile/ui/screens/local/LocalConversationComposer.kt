@@ -344,9 +344,6 @@ internal fun LocalConversationComposer(
             replySuggestionsControl = { ReplySuggestionsControl() },
             stopControl = { StopControl() },
             sendControl = { queue -> SendControl(queue) },
-            onPlanModeChange = onPlanModeChange,
-            onAutoApprove = onAutoApprove,
-            onDisableAutoApprove = onDisableAutoApprove,
         )
     }
 }
