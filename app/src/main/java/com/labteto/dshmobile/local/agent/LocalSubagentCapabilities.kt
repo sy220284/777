@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.agent
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 internal enum class LocalSubagentHistoryMode {
     ISOLATED,
@@ -58,4 +61,19 @@ internal fun validateLocalSubagentLaunchSpec(
         }
     }
     return spec
+}
+
+
+internal fun filterLocalSubagentSchemas(
+    source: JsonArray,
+    capabilities: LocalSubagentCapabilities,
+): JsonArray {
+    val allowlist = capabilities.toolAllowlist ?: return source
+    return JsonArray(
+        source.filter { element ->
+            val function = (element as? JsonObject)?.get("function") as? JsonObject
+            val name = function?.get("name")?.jsonPrimitive?.contentOrNull
+            name != null && name in allowlist
+        },
+    )
 }
