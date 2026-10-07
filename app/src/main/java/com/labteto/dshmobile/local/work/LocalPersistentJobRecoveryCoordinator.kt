@@ -99,6 +99,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
+    fun sendMessage(
+        agentId: String,
+        message: String,
+        sessionId: String,
+    ): String {
+        val result = jobs.send(agentId, message, sessionId)
+        if (result.startsWith("消息已持久排队")) {
+            schedule()
+        }
+        return result
+    }
+
     fun schedule() {
         synchronized(lock) {
             if (recoveryJob?.isActive == true) return
@@ -199,6 +211,19 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
+        val continuation = decodeSubagentContinuation(snapshot)
+        val pendingIds = jobs.peekMessages(snapshot.id).mapTo(hashSetOf()) { it.id }
+        val alreadyClaimedPending = continuation
+            ?.claimedMessageIds
+            .orEmpty()
+            .filterTo(linkedSetOf()) { it in pendingIds }
+        if (alreadyClaimedPending.isNotEmpty()) {
+            jobs.acknowledgeMessages(
+                id = snapshot.id,
+                messageIds = alreadyClaimedPending,
+                ownerSessionId = sessionId,
+            )
+        }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
@@ -217,9 +242,28 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    recoveredHistory = continuation?.history,
+                    recoveredClaimedMessageIds = continuation?.claimedMessageIds.orEmpty(),
+                    recoveredStep = continuation?.step ?: 0,
                 ).requireCompletedOutput()
             }
         }
+    }
+
+    private fun decodeSubagentContinuation(
+        snapshot: JobSnapshot,
+    ): LocalSubagentHistoryCheckpoint? {
+        val encoded = snapshot.continuationState ?: return null
+        val data = runCatching {
+            json.parseToJsonElement(encoded).jsonObject
+        }.getOrElse { error ->
+            throw IllegalStateException("持久子代理续跑检查点损坏", error)
+        }
+        require(
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
+        ) { "持久子代理续跑检查点与任务身份不匹配" }
+        return decodeLocalSubagentHistoryCheckpoint(data)
+            ?: error("持久子代理续跑检查点格式不受支持")
     }
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =
