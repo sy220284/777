@@ -38,11 +38,15 @@ import kotlinx.serialization.json.jsonPrimitive
 private val LOCAL_AGENT_TEAM_DIRECTIVE = """
     【本轮执行方式：Agent 集群】
     用户已明确选择 Agent 集群。你是 Lead，必须使用 Agent Team 能力组织本轮任务。
-    先检查当前 Team 与任务板；能复用现有 active teammate 时优先复用，避免重复招募。
-    将目标拆成清晰的共享任务；能够并行的工作并行执行，存在前置条件时记录依赖。
-    按实际需要招募不同职责的 teammate，并及时维护任务负责人、进行中、完成与阻塞状态。
-    关键结果必须等待 teammate 返回并由 Lead 交叉核验后再汇总；禁止在成员仍执行关键任务时提前宣称整体完成。
-    最终回复面向用户说明结果，不把 team_spawn、task id、revision、mailbox 等内部实现术语当成答复主体。
+    先读取当前 Team 与任务板；能复用现有成员时优先复用，避免重复创建身份。
+    复杂任务先建立共享任务与依赖，再按职责创建/启动成员；team_spawn 可用于一步创建并启动。
+    每个成员认领任务后再执行。成员产出通过 team_wait_for_message / team_messages 回收，不依赖猜测后台状态。
+    等待前先调用 team_messages 获取 next_cursor；之后始终把该值作为 after_sequence 传给 team_wait_for_message，并用每次返回的新 next_cursor 继续等待，避免重复或漏掉提前到达的结果。
+    收到可核验结果后交叉检查；运行时会在成员单一认领任务且结果晚于认领时自动结算该任务。
+    成员失败、停用或解雇后，其未完成任务会自动释放回任务板，由 Lead 重新分配。
+    临时停止用 team_interrupt；保留成员但停止使用可 team_disable_member；永久移除用 team_dismiss_member；整体暂停用 team_stop_all。
+    关键任务未完成、仍有成员运行或结果尚未回收时禁止宣称整体完成。
+    最终回复面向用户说明结果，不把 tool 名、task id、revision、mailbox 等内部实现术语当成答复主体。
 """.trimIndent()
 
 internal fun prepareLocalAgentTeamSend(

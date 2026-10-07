@@ -117,6 +117,11 @@ internal class LocalJobManager(
         ownerSessionId: String? = null,
     ): String = delegate.interruptContinuableAgent(id, ownerSessionId)
 
+    fun interruptContinuableAgents(
+        ids: Set<String>,
+        ownerSessionId: String? = null,
+    ): String = delegate.interruptContinuableAgents(ids, ownerSessionId)
+
     fun kill(id: String, ownerSessionId: String? = null): String = delegate.kill(id, ownerSessionId)
 
     fun send(id: String, message: String, ownerSessionId: String? = null): String =

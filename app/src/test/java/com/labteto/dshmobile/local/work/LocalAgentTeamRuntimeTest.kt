@@ -3,13 +3,19 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -554,9 +560,431 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(1, ui.pendingMessageCount)
     }
 
+    @Test
+    fun projectionRejectsTwoConcurrentTasksOwnedBySameMember() {
+        val fixture = fixture("team-member-busy")
+        appendActiveMember(fixture.log, "team-member-busy")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-member-busy", "task-1", 1, blockedBy = emptyList()),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-member-busy",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-member-busy", "task-2", 1, blockedBy = emptyList()),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-member-busy",
+                "task-2",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+            ),
+        )
+
+        val projection = fixture.runtime.project("team-member-busy")
+
+        assertNotNull(projection.failure)
+        assertTrue(projection.failure!!.contains("TEAM_MEMBER_TASK_BUSY"))
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, projection.tasks.single { it.id == "task-1" }.status)
+        assertEquals(LocalTeamTaskStatus.PENDING, projection.tasks.single { it.id == "task-2" }.status)
+    }
+
+    @Test
+    fun memberLifecycleSupportsCreateDisableRestartAndDismiss() {
+        val fixture = fixture("team-lifecycle")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-lifecycle", "member-1", "worker", "created"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-lifecycle", "member-1", "worker", "disabled"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-lifecycle", "member-1", "worker", "provisioning"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-lifecycle", "member-1", "worker", "active"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-lifecycle", "member-1", "worker", "dismissed"),
+        )
+
+        val projection = fixture.runtime.project("team-lifecycle")
+
+        assertNull(projection.failure)
+        assertEquals(LocalTeamMemberPhase.DISMISSED, projection.members.single().phase)
+    }
+
+    @Test
+    fun terminalCheckpointBecomesFirstClassAgentMessageAndCompletedProgress() {
+        val fixture = fixture("team-messages")
+        appendActiveMember(fixture.log, "team-messages")
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "team-messages",
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "完成审查" }
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 4,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "完成审查",
+            ),
+        )
+
+        val messages = fixture.runtime.agentMessages("team-messages", "worker", 20)
+        val ui = fixture.runtime.uiState("team-messages")
+
+        assertEquals(1, messages.size)
+        assertEquals("完成审查", messages.single().content)
+        assertEquals(100, ui.members.single().progressPercent)
+        assertEquals(1, ui.members.single().resultMessageCount)
+    }
+
+    @Test
+    fun completedMemberAutomaticallyCompletesSingleOwnedTaskAfterFreshResult() {
+        val fixture = fixture("team-auto-complete")
+        appendActiveMember(fixture.log, "team-auto-complete")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-auto-complete", "task-1", 1, blockedBy = emptyList(), subject = "审查"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-auto-complete",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+                subject = "审查",
+            ),
+        )
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "team-auto-complete",
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> "已完成" }
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 3,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 3,
+                terminalOutput = "审查完成，可核验",
+            ),
+        )
+
+        fixture.runtime.recoverMailbox("team-auto-complete")
+
+        val task = fixture.runtime.project("team-auto-complete").tasks.single()
+        assertEquals(LocalTeamTaskStatus.COMPLETED, task.status)
+        assertEquals(3, task.revision)
+        assertEquals("member-1", task.ownerId)
+    }
+
+    @Test
+    fun failedMemberReleasesOwnedTaskAndMovesToFailedPhase() {
+        val fixture = fixture("team-auto-release")
+        appendActiveMember(fixture.log, "team-auto-release")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-auto-release", "task-1", 1, blockedBy = emptyList(), subject = "检查"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-auto-release",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+                subject = "检查",
+            ),
+        )
+        fixture.jobs.startPersistent(
+            label = "子代理：worker",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "team-auto-release",
+            continuable = true,
+            requestedId = "job-team-1",
+        ) { _, _ -> error("worker failed") }
+
+        fixture.runtime.recoverMailbox("team-auto-release")
+
+        val projection = fixture.runtime.project("team-auto-release")
+        val task = projection.tasks.single()
+        assertEquals(LocalTeamTaskStatus.PENDING, task.status)
+        assertEquals(3, task.revision)
+        assertNull(task.ownerId)
+        assertEquals(LocalTeamMemberPhase.FAILED, projection.members.single().phase)
+    }
+
+    @Test
+    fun agentMessagesUsesDurableSequenceAsCursor() {
+        val fixture = fixture("team-message-cursor")
+        appendActiveMember(fixture.log, "team-message-cursor")
+        val first = fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "第一条结果",
+            ),
+        )
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 2,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "第二条结果",
+            ),
+        )
+
+        val messages = fixture.runtime.agentMessages(
+            sessionId = "team-message-cursor",
+            targetName = "worker",
+            limit = 20,
+            afterSequence = first.sequence,
+        )
+
+        assertEquals(listOf("第二条结果"), messages.map { it.content })
+        assertTrue(messages.single().sequence > first.sequence)
+    }
+
+    @Test
+    fun discardedMailboxMessageLeavesPendingSetAndCannotLaterDeliver() {
+        val fixture = fixture("team-message-discard")
+        appendActiveMember(fixture.log, "team-message-discard")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(
+                teamId = "team-message-discard",
+                id = "team-msg-discard",
+                targetId = "member-1",
+                text = "无需继续处理",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_DISCARDED,
+            teamDiscarded(
+                teamId = "team-message-discard",
+                messageId = "team-msg-discard",
+                targetId = "member-1",
+            ),
+        )
+
+        val settled = fixture.runtime.project("team-message-discard")
+        assertTrue(settled.pendingMessages.isEmpty())
+        assertEquals(listOf("team-msg-discard"), settled.discardedMessageIds)
+
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            teamDelivered("team-message-discard", "team-msg-discard", "member-1"),
+        )
+
+        val invalid = fixture.runtime.project("team-message-discard")
+        assertNotNull(invalid.failure)
+        assertTrue(invalid.failure!!.contains("AFTER_DISCARD"))
+    }
+
+    @Test
+    fun agentMessagesSupportsDurableSequenceCursorWithoutMissingExistingResult() {
+        val fixture = fixture("team-message-cursor")
+        appendActiveMember(fixture.log, "team-message-cursor")
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第一条结果",
+            ),
+        )
+        val firstSequence = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 2,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第二条结果",
+            ),
+        )
+
+        val messages = fixture.runtime.agentMessages(
+            sessionId = "team-message-cursor",
+            targetName = "worker",
+            limit = 20,
+            afterSequence = firstSequence,
+        )
+
+        assertEquals(1, messages.size)
+        assertEquals("第二条结果", messages.single().content)
+        assertTrue(messages.single().sequence > firstSequence)
+    }
+
+    @Test
+    fun discardedMailboxMessageIsDurablySettledAndCannotRemainPending() {
+        val fixture = fixture("team-discard-message")
+        appendActiveMember(fixture.log, "team-discard-message")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(
+                teamId = "team-discard-message",
+                id = "team-msg-discard",
+                targetId = "member-1",
+                text = "成员解雇前未投递",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_DISCARDED,
+            teamDiscarded(
+                teamId = "team-discard-message",
+                messageId = "team-msg-discard",
+                targetId = "member-1",
+            ),
+        )
+
+        val projection = fixture.runtime.project("team-discard-message")
+
+        assertNull(projection.failure)
+        assertTrue(projection.pendingMessages.isEmpty())
+        assertEquals(listOf("team-msg-discard"), projection.discardedMessageIds)
+        assertTrue(projection.deliveredMessageIds.isEmpty())
+    }
+
+    @Test
+    fun waitForMessageReturnsEarliestResultAfterCursorWithoutSkippingLaterResult() = runBlocking {
+        val sessionId = "team-wait-cursor"
+        val fixture = fixture(sessionId)
+        appendActiveMember(fixture.log, sessionId)
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第一条结果",
+            ),
+        )
+        val firstSequence = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 2,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第二条结果",
+            ),
+        )
+        val secondSequence = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 3,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                softStepLimit = 4,
+                terminalOutput = "第三条结果",
+            ),
+        )
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(
+                id = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                maxPendingInputs = 8,
+            ),
+            eventLog = fixture.log,
+        )
+
+        val result = requireNotNull(
+            fixture.runtime.execute(
+                LocalToolCall(
+                    id = "call-wait",
+                    name = "team_wait_for_message",
+                    arguments = buildJsonObject {
+                        put("target", "worker")
+                        put("after_sequence", firstSequence)
+                        put("timeout_ms", 1_000)
+                    },
+                ),
+                binding,
+            ),
+        )
+
+        assertTrue(result.contains("第二条结果"))
+        assertTrue(!result.contains("第三条结果"))
+        assertTrue(result.contains("next_cursor=" + secondSequence))
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,
+        val jobs: LocalJobManager,
     )
 
     private fun fixture(sessionId: String): Fixture {
@@ -582,7 +1010,7 @@ class LocalAgentTeamRuntimeTest {
             eventLogFor = { log },
             projectionRegistry = SessionProjectionRegistry(),
         )
-        return Fixture(runtime, log)
+        return Fixture(runtime, log, jobs)
     }
 
     private fun appendActiveMember(log: LocalSessionEventLog, teamId: String) {
@@ -651,6 +1079,30 @@ class LocalAgentTeamRuntimeTest {
         put("teamId", teamId)
         put("messageId", messageId)
         put("targetId", targetId)
+    }
+
+    private fun teamDiscarded(
+        teamId: String,
+        messageId: String,
+        targetId: String,
+    ) = buildJsonObject {
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("messageId", messageId)
+        put("targetId", targetId)
+        put("reason", "test")
+    }
+
+    private fun teamDiscarded(
+        teamId: String,
+        messageId: String,
+        targetId: String,
+    ) = buildJsonObject {
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("messageId", messageId)
+        put("targetId", targetId)
+        put("reason", "test")
     }
 
     private fun task(

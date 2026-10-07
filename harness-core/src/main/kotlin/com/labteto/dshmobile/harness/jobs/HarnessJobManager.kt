@@ -696,6 +696,78 @@ class HarnessJobManager(
         "已中断后台代理当前执行轮次：$id；身份与待处理消息已保留"
     }
 
+    /**
+     * Interrupt multiple durable continuable Agents with one persistence commit.
+     *
+     * Identity, durable Inbox and resume metadata remain intact. Persistence is committed once
+     * before any coroutine cancellation starts; a persistence failure rolls every status back.
+     */
+    fun interruptContinuableAgents(
+        ids: Set<String>,
+        ownerId: String? = null,
+    ): String = synchronized(publicationLock) {
+        val requested = ids.map(String::trim).filter(String::isNotBlank).toSet()
+        if (requested.isEmpty()) return@synchronized "没有需要中断的后台代理"
+
+        data class Previous(
+            val record: Record,
+            val status: String,
+            val output: String,
+            val updatedAt: Long,
+            val job: Job?,
+        )
+
+        val previous = mutableListOf<Previous>()
+        synchronized(lock) {
+            val selected = requested.map { id ->
+                val found = records[id]
+                    ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                    ?: error("后台代理不存在：" + id)
+                require(found.isContinuableAgent()) {
+                    "目标不是可继续后台代理：" + id
+                }
+                found
+            }
+            selected.forEach { found ->
+                if (found.status == "running") {
+                    previous += Previous(
+                        record = found,
+                        status = found.status,
+                        output = found.output,
+                        updatedAt = found.updatedAt,
+                        job = found.job,
+                    )
+                    found.status = "interrupted"
+                    found.output = "当前执行轮次已中断；Agent 身份、恢复状态与待处理消息已保留"
+                    found.updatedAt = System.currentTimeMillis()
+                }
+            }
+        }
+        if (previous.isEmpty()) {
+            return@synchronized "所选后台代理当前均没有运行中的执行轮次"
+        }
+
+        try {
+            persistCurrentSnapshots()
+        } catch (error: Exception) {
+            synchronized(lock) {
+                previous.forEach { snapshot ->
+                    snapshot.record.status = snapshot.status
+                    snapshot.record.output = snapshot.output
+                    snapshot.record.updatedAt = snapshot.updatedAt
+                }
+            }
+            notifyChanged()
+            throw IllegalStateException("批量中断状态写入失败，所有 Agent 保持原状态", error)
+        }
+
+        previous.forEach { snapshot ->
+            snapshot.job?.cancel(CancellationException("当前 Agent Activation 已被批量中断"))
+        }
+        notifyChanged()
+        "已中断 " + previous.size + " 个后台代理当前执行轮次；身份与待处理消息已保留"
+    }
+
     fun kill(id: String, ownerId: String? = null): String {
         var durableDormant = false
         var previousStatus = ""

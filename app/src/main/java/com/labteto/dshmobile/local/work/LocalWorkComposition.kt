@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -23,11 +24,13 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
@@ -60,6 +63,7 @@ internal class LocalWorkComposition @Inject constructor(
     json: Json,
 ) : LocalWorkAgentUiPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val teamJobStatuses = ConcurrentHashMap<String, String>()
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
@@ -228,6 +232,28 @@ internal class LocalWorkComposition @Inject constructor(
         workRunRegistry = workRunRegistry,
         runTurn = turnExecutor::run,
     )
+
+    init {
+        runtimeStateStore.observeJobSnapshots(::observeTeamJobTransitions)
+    }
+
+    private fun observeTeamJobTransitions(jobs: List<LocalJobInfo>) {
+        jobs.asSequence()
+            .filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
+            .forEach { job ->
+                val previous = teamJobStatuses.put(job.id, job.status)
+                if (
+                    previous != job.status &&
+                    job.status in TEAM_RECONCILE_JOB_STATUSES
+                ) {
+                    val sessionId = job.ownerSessionId ?: return@forEach
+                    scope.launch {
+                        runCatching { agentTeams.recoverMailbox(sessionId) }
+                        runCatching { publishTeamUiState(sessionId) }
+                    }
+                }
+            }
+    }
 
     internal suspend fun executeBuiltin(
         call: LocalToolCall,
@@ -410,6 +436,16 @@ internal class LocalWorkComposition @Inject constructor(
                 )
             }
         }
+
+    private companion object {
+        val TEAM_RECONCILE_JOB_STATUSES = setOf(
+            "dormant",
+            "completed",
+            "failed",
+            "cancelled",
+            "killed",
+        )
+    }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,

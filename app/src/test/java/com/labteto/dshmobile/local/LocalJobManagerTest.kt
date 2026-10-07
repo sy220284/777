@@ -147,6 +147,66 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun batchInterruptContinuableAgentsCommitsAllSelectedStatusesTogether() = runTest {
+        val manager = LocalJobManager(this) { }
+        val first = manager.startPersistent(
+            label = "子代理：first",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "session-a",
+            continuable = true,
+            requestedId = "job-team-first",
+        ) { _, _ -> awaitCancellation() }
+        val second = manager.startPersistent(
+            label = "子代理：second",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "session-a",
+            continuable = true,
+            requestedId = "job-team-second",
+        ) { _, _ -> awaitCancellation() }
+        runCurrent()
+
+        assertTrue(first.contains("job-team-first"))
+        assertTrue(second.contains("job-team-second"))
+        val result = manager.interruptContinuableAgents(
+            setOf("job-team-first", "job-team-second"),
+            "session-a",
+        )
+        runCurrent()
+
+        assertTrue(result.contains("已中断 2 个"))
+        assertTrue(manager.output("job-team-first", "session-a").contains("[interrupted]"))
+        assertTrue(manager.output("job-team-second", "session-a").contains("[interrupted]"))
+    }
+
+    @Test
+    fun batchInterruptValidationFailureDoesNotPartiallyInterruptEarlierAgent() = runTest {
+        val manager = LocalJobManager(this) { }
+        manager.startPersistent(
+            label = "子代理：valid",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = "session-a",
+            continuable = true,
+            requestedId = "job-team-valid",
+        ) { _, _ -> awaitCancellation() }
+        runCurrent()
+
+        val error = runCatching {
+            manager.interruptContinuableAgents(
+                linkedSetOf("job-team-valid", "job-team-missing"),
+                "session-a",
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error != null)
+        assertTrue(manager.output("job-team-valid", "session-a").contains("[running]"))
+        manager.kill("job-team-valid", "session-a")
+        runCurrent()
+    }
+
+    @Test
     fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-backup-")
         try {
