@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -35,6 +32,7 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -63,7 +61,7 @@ internal fun AttachmentSheet(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             DsQuickActionTile(
-                icon = Icons.Filled.Image,
+                icon = FeatherIcons.Image,
                 label = stringResource(R.string.chat_composer_attach),
                 enabled = canAttach,
                 onClick = {
@@ -73,7 +71,7 @@ internal fun AttachmentSheet(
                 modifier = Modifier.weight(1f),
             )
             DsQuickActionTile(
-                icon = Icons.Filled.AttachFile,
+                icon = FeatherIcons.Paperclip,
                 label = stringResource(R.string.chat_composer_attach_file),
                 enabled = canAttach,
                 onClick = {

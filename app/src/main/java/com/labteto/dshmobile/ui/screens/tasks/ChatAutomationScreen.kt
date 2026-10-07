@@ -16,8 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -271,7 +269,7 @@ internal fun ChatAutomationScreen(
                         maxLines = 5,
                     )
                     DsComposerAction(
-                        icon = Icons.Filled.ArrowUpward,
+                        icon = FeatherIcons.ArrowUp,
                         contentDescription = stringResource(R.string.tasks_chat_plan_send),
                         onClick = { viewModel.submitChatPlan(draft, editingTaskId) },
                         enabled = canPlan && draft.isNotBlank() && !state.planning,

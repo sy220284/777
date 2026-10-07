@@ -220,6 +220,20 @@ internal object FeatherIcons {
         }
     }
 
+    /** `paperclip` — file / attachment entry. */
+    val Paperclip: ImageVector by lazy {
+        feather("Paperclip") {
+            moveTo(21.44f, 11.05f)
+            lineTo(12.25f, 20.24f)
+            arcToRelative(6f, 6f, 0f, isMoreThanHalf = false, isPositiveArc = true, -8.49f, -8.49f)
+            lineTo(12.95f, 2.56f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, 5.66f, 5.66f)
+            lineTo(9.41f, 17.41f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -2.83f, -2.83f)
+            lineTo(15.07f, 6.1f)
+        }
+    }
+
     /** `plus` — compact create action. */
     val Plus: ImageVector by lazy {
         feather("Plus") {

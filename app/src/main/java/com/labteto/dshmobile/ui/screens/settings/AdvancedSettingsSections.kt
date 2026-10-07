@@ -15,13 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -70,6 +63,7 @@ import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -106,7 +100,7 @@ internal fun ProjectSettingsCard(
     report: (String) -> Unit,
 ) {
     if (!state.available && state.error == null && !state.loading) return
-    SettingsCard(stringResource(R.string.advanced_project_config), Icons.Outlined.Tune) {
+    SettingsCard(stringResource(R.string.advanced_project_config), FeatherIcons.Sliders) {
         when {
             state.loading -> Text(stringResource(R.string.advanced_project_loading), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelTertiary)
             state.error != null -> {
@@ -153,7 +147,7 @@ internal fun ProjectSettingsCard(
                         modifier = Modifier.weight(1f),
                     )
                     Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        FeatherIcons.ChevronRight,
                         contentDescription = null,
                         tint = DsTheme.colors.labelCaption,
                         modifier = Modifier
@@ -353,7 +347,7 @@ internal fun ModelServicesCard(
     viewModel: SettingsViewModel,
 ) {
     if (state.providers.isEmpty() && state.error == null && !state.loading) return
-    SettingsCard(stringResource(R.string.advanced_model_services), Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_model_services), FeatherIcons.Globe) {
         Text(
             stringResource(R.string.advanced_model_services_hint),
             style = DsType.caption11.withReadingWeight(),
