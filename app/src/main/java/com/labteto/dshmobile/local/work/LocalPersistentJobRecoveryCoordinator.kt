@@ -105,7 +105,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         sessionId: String,
     ): String {
         val result = jobs.send(agentId, message, sessionId)
-        if (result.startsWith("消息已持久排队")) {
+        if (result.startsWith("消息已发送") || result.startsWith("消息已持久排队")) {
             schedule()
         }
         return result
@@ -119,9 +119,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     while (true) {
                         val targetSession = currentSessionId()
                         resumePass(targetSession)
-                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedSessionId(snapshot, targetSession) == targetSession
-                        }
+                        val remaining =
+                            jobs.interruptedSnapshots().any { snapshot ->
+                                interruptedSessionId(snapshot, targetSession) == targetSession
+                            } ||
+                                jobs.pendingAgentMessageSnapshots().any { snapshot ->
+                                    interruptedSessionId(snapshot, targetSession) == targetSession
+                                }
                         if (!remaining) break
                         delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
                     }
@@ -136,7 +140,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     }
 
     private fun resumePass(targetSession: String) {
-        jobs.interruptedSnapshots().forEach { snapshot ->
+        jobs.resumableSnapshots().forEach { snapshot ->
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
