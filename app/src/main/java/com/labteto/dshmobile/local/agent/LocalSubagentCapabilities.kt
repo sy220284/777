@@ -84,6 +84,22 @@ internal fun validateLocalSubagentLaunchSpec(
 
 private const val MAX_SUBAGENT_OUTPUT_SCHEMA_CHARS = 32_768
 
+internal fun validateLocalSubagentToolAllowlist(
+    source: JsonArray,
+    capabilities: LocalSubagentCapabilities,
+) {
+    val allowlist = capabilities.toolAllowlist ?: return
+    val available = source.mapNotNull { element ->
+        val function = (element as? JsonObject)?.get("function") as? JsonObject
+        function?.get("name")?.jsonPrimitive?.contentOrNull
+    }.toSet()
+    val unavailable = allowlist - available
+    require(unavailable.isEmpty()) {
+        "SUBAGENT_TOOL_FILTER_UNAVAILABLE：工具白名单包含当前子代理不可用能力：" +
+            unavailable.sorted().joinToString(",")
+    }
+}
+
 internal fun filterLocalSubagentSchemas(
     source: JsonArray,
     capabilities: LocalSubagentCapabilities,
