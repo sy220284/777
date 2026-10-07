@@ -17,6 +17,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.local.project.LocalProjectCatalogState
@@ -67,10 +69,10 @@ private fun LocalProjectScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onBack) { Text("返回") }
-            Text("项目管理")
+            Button(onClick = onBack) { Text(stringResource(R.string.local_project_back)) }
+            Text(stringResource(R.string.local_project_management_title))
         }
-        Text("切换项目只影响以后新建的项目会话，已有会话仍保留原项目归属。")
+        Text(stringResource(R.string.local_project_new_session_hint))
         state.projects.forEach { project ->
             Button(
                 onClick = {
@@ -85,7 +87,7 @@ private fun LocalProjectScreen(
         OutlinedTextField(
             value = newName,
             onValueChange = { newName = it.take(80) },
-            label = { Text("新项目名称") },
+            label = { Text(stringResource(R.string.local_project_name_hint)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
@@ -96,13 +98,13 @@ private fun LocalProjectScreen(
                     .onFailure { error = it.message }
             },
             enabled = newName.isNotBlank(),
-        ) { Text("创建项目") }
+        ) { Text(stringResource(R.string.local_project_create)) }
         active?.let { project ->
-            Text("项目指令 · ${project.name}")
+            Text(stringResource(R.string.local_project_instruction_label, project.name))
             OutlinedTextField(
                 value = instructionDraft,
                 onValueChange = { instructionDraft = it.take(8_000) },
-                label = { Text("本项目长期工作规则") },
+                label = { Text(stringResource(R.string.local_project_instruction_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 4,
                 maxLines = 12,
@@ -114,7 +116,7 @@ private fun LocalProjectScreen(
                         .onFailure { error = it.message }
                 },
                 enabled = instructionDraft != project.instructions,
-            ) { Text("保存项目指令") }
+            ) { Text(stringResource(R.string.local_project_save_instruction)) }
         }
         error?.let { Text(it) }
     }
