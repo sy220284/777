@@ -17,6 +17,115 @@ class LocalRequestReconstructionTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun reconstructsVersionThreeNativeToolSurfaceAndProviderAttempt() {
+        withLog("request-reconstruct-v3-native") { log ->
+            val messages = listOf(message("user", "画一张图"))
+            val tools = JsonArray(emptyList())
+            val nativeTools = JsonArray(listOf(JsonPrimitive("image_generation")))
+            val original = buildLocalRequestEvidence(messages, tools, nativeTools)
+            val messageSurface = log.append("request/message-surface", buildJsonObject {
+                put("version", 3)
+                put("digest", original.messageDigest)
+                put("messages", JsonArray(messages))
+                put("redacted", false)
+            })
+            val toolSurface = log.append("request/tool-surface", buildJsonObject {
+                put("version", 3)
+                put("digest", original.resolvedToolSurfaceDigest)
+                put("schema_digest", original.toolSchemaDigest)
+                put("schemas", tools)
+                put("native_tools", nativeTools)
+            })
+            val contextSurface = log.append("request/context-surface", buildJsonObject {
+                put("version", 3)
+                put("digest", original.contextDigest)
+                put("messages", original.contextMessages)
+                put("redacted", false)
+            })
+            val route = "route-v3-native"
+            val envelope = stableJsonSha256(JsonArray(listOf(
+                JsonPrimitive(route),
+                JsonPrimitive(original.messageDigest),
+                JsonPrimitive(original.resolvedToolSurfaceDigest),
+                JsonPrimitive(original.contextDigest),
+            )))
+            val header = log.append("request/header", buildJsonObject {
+                put("version", 3)
+                put("request_uid", "req-v3-native")
+                put("model", "gpt-6-astra")
+                put("base_url", "https://api.openai.com/v1")
+                put("profile_id", "profile-test")
+                put("provider", "openai")
+                put("protocol", "RESPONSES")
+                put("route_fingerprint", route)
+                put("message_digest", original.messageDigest)
+                put("context_digest", original.contextDigest)
+                put("tool_schema_digest", original.toolSchemaDigest)
+                put("resolved_tool_surface_digest", original.resolvedToolSurfaceDigest)
+                put("native_tool_names", nativeTools)
+                put("image_generation_enabled", true)
+                put("message_surface_digest", original.messageDigest)
+                put("context_surface_digest", original.contextDigest)
+                put("message_surface_seq", messageSurface.sequence)
+                put("tool_surface_seq", toolSurface.sequence)
+                put("context_surface_seq", contextSurface.sequence)
+                put("message_surface_redacted", false)
+                put("context_surface_redacted", false)
+                put("request_envelope_fingerprint", envelope)
+            })
+            val attemptFingerprint = stableJsonSha256(JsonArray(listOf(
+                route,
+                original.messageDigest,
+                original.resolvedToolSurfaceDigest,
+                original.contextDigest,
+                "null",
+                "null",
+                "null",
+                "null",
+                "streaming:true",
+            ).map(::JsonPrimitive)))
+            log.append("request/provider-attempt", buildJsonObject {
+                put("version", 2)
+                put("request_uid", "req-v3-native")
+                put("header_seq", header.sequence)
+                put("attempt", 1)
+                put("recovery_round", 0)
+                put("model", "gpt-6-astra")
+                put("base_url", "https://api.openai.com/v1")
+                put("profile_id", "profile-test")
+                put("provider", "openai")
+                put("protocol", "RESPONSES")
+                put("route_fingerprint", route)
+                put("streaming", true)
+                put("native_tool_names", nativeTools)
+                put("image_generation_enabled", true)
+                put("message_digest", original.messageDigest)
+                put("message_surface_digest", original.messageDigest)
+                put("message_surface_seq", messageSurface.sequence)
+                put("message_surface_redacted", false)
+                put("context_digest", original.contextDigest)
+                put("context_surface_digest", original.contextDigest)
+                put("context_surface_seq", contextSurface.sequence)
+                put("context_surface_redacted", false)
+                put("tool_schema_digest", original.toolSchemaDigest)
+                put("resolved_tool_surface_digest", original.resolvedToolSurfaceDigest)
+                put("tool_surface_seq", toolSurface.sequence)
+                put("provider_attempt_fingerprint", attemptFingerprint)
+            })
+
+            val reconstructed = requireNotNull(reconstructLocalModelRequest(log, "req-v3-native"))
+
+            assertEquals(LocalRequestReconstructionStatus.VERIFIED, reconstructed.status)
+            assertEquals(nativeTools, reconstructed.nativeTools)
+            assertEquals(original.resolvedToolSurfaceDigest, reconstructed.resolvedToolSurfaceDigest)
+            assertTrue(reconstructed.envelopeFingerprintVerified)
+            assertTrue(reconstructed.providerAttempts.single().fingerprintVerified)
+            assertEquals(nativeTools, reconstructed.providerAttempts.single().nativeTools)
+            assertTrue(reconstructed.issues.isEmpty())
+        }
+    }
+
+    @Test
     fun reconstructsVersionTwoTextRequestAndVerifiesAllDigests() {
         withLog("request-reconstruct-v2") { log ->
             val messages = listOf(

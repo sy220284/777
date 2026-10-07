@@ -69,6 +69,7 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+        allowImageGeneration: Boolean = false,
         admission: LocalModelAdmissionPort? = null,
         beforeProviderInvoke: suspend () -> Unit = {},
         onDelta: (LocalModelDelta) -> Unit = {},
@@ -86,6 +87,7 @@ internal class LocalAgentModelRequestRuntime(
                     promptCacheComparisonResponseId = promptCacheComparisonResponseId,
                     promptCacheKey = promptCacheKey,
                     promptCacheTtl = promptCacheTtl,
+                    allowImageGeneration = allowImageGeneration,
                     onDelta = onDelta,
                 )
             } else {
@@ -99,6 +101,7 @@ internal class LocalAgentModelRequestRuntime(
                     promptCacheComparisonResponseId = promptCacheComparisonResponseId,
                     promptCacheKey = promptCacheKey,
                     promptCacheTtl = promptCacheTtl,
+                    allowImageGeneration = allowImageGeneration,
                 )
             }
         }

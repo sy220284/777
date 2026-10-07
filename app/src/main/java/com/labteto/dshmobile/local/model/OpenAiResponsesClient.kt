@@ -52,6 +52,7 @@ class OpenAiResponsesClient @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         planSharing: Boolean,
+        allowImageGeneration: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
@@ -70,6 +71,12 @@ class OpenAiResponsesClient @Inject constructor(
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
+            enableImageGenerationTool = resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = baseUrl,
+                model = model,
+                planSharing = planSharing,
+                requested = allowImageGeneration,
+            ),
         )
         validateRequestPayload(payload)
         val admissionTracker = LocalModelAdmissionTracker()
@@ -208,6 +215,9 @@ class OpenAiResponsesClient @Inject constructor(
         }
     }
 
+    internal fun supportsOpenAiImageGenerationTool(model: String): Boolean =
+        supportsOpenAiImageGenerationModel(model)
+
     internal fun validateRequestPayload(payload: JsonObject) {
         val input = payload["input"] as? JsonArray
         if (input.isNullOrEmpty()) {
@@ -256,6 +266,7 @@ class OpenAiResponsesClient @Inject constructor(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+        enableImageGenerationTool: Boolean = false,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
@@ -285,8 +296,16 @@ class OpenAiResponsesClient @Inject constructor(
         if (includeEncryptedReasoning) {
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
-        if (tools.isNotEmpty()) {
-            put("tools", responseTools(tools, planSharing, enforceOpenAiToolSchema))
+        val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
+        if (adaptedTools.isNotEmpty() || enableImageGenerationTool) {
+            put("tools", buildJsonArray {
+                adaptedTools.forEach(::add)
+                if (enableImageGenerationTool) {
+                    add(buildJsonObject {
+                        put("type", "image_generation")
+                    })
+                }
+            })
         }
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
@@ -447,11 +466,27 @@ class OpenAiResponsesClient @Inject constructor(
         val content = StringBuilder()
         val reasoning = StringBuilder()
         val toolCalls = mutableListOf<LocalToolCall>()
+        val visibleParts = mutableListOf<JsonObject>()
+        var generatedImageCount = 0
         output.forEach { item ->
             val obj = item as? JsonObject ?: return@forEach
             when (obj["type"]?.jsonPrimitive?.contentOrNull) {
                 "message" -> {
-                    content.append(responseMessageText((obj["content"] as? JsonArray) ?: JsonArray(emptyList())))
+                    val parts = (obj["content"] as? JsonArray) ?: JsonArray(emptyList())
+                    parts.forEach partLoop@ { part ->
+                        val visible = part as? JsonObject ?: return@partLoop
+                        when (visible["type"]?.jsonPrimitive?.contentOrNull) {
+                            "output_text" -> visible["text"]?.jsonPrimitive?.contentOrNull
+                            "refusal" -> visible["refusal"]?.jsonPrimitive?.contentOrNull
+                            else -> null
+                        }?.takeIf(String::isNotBlank)?.let { text ->
+                            content.append(text)
+                            visibleParts += buildJsonObject {
+                                put("type", "output_text")
+                                put("text", text)
+                            }
+                        }
+                    }
                 }
                 "reasoning" -> {
                     (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
@@ -473,6 +508,23 @@ class OpenAiResponsesClient @Inject constructor(
                     }.getOrNull() ?: throw responseProtocolError("工具参数不是合法 JSON 对象")
                     toolCalls += LocalToolCall(callId, name, arguments, rawArguments)
                 }
+                "image_generation_call" -> {
+                    val result = obj["result"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: return@forEach
+                    val mediaType = when (obj["output_format"]?.jsonPrimitive?.contentOrNull) {
+                        "jpeg", "jpg" -> "image/jpeg"
+                        "webp" -> "image/webp"
+                        else -> "image/png"
+                    }
+                    generatedImageCount += 1
+                    visibleParts += buildJsonObject {
+                        put("type", "image_url")
+                        put("image_url", buildJsonObject {
+                            put("url", "data:$mediaType;base64,$result")
+                        })
+                    }
+                }
             }
         }
         val settledContent = content.toString().takeIf(String::isNotBlank)
@@ -481,7 +533,22 @@ class OpenAiResponsesClient @Inject constructor(
             ?: streamedReasoning.takeIf(String::isNotBlank)
         val message = buildJsonObject {
             put("role", "assistant")
-            if (settledContent != null) put("content", settledContent) else put("content", JsonNull)
+            if (generatedImageCount == 0) {
+                if (settledContent != null) put("content", settledContent) else put("content", JsonNull)
+            } else {
+                val hasVisibleText = visibleParts.any { part ->
+                    part["type"]?.jsonPrimitive?.contentOrNull == "output_text"
+                }
+                put("content", buildJsonArray {
+                    if (!hasVisibleText && settledContent != null) {
+                        add(buildJsonObject {
+                            put("type", "output_text")
+                            put("text", settledContent)
+                        })
+                    }
+                    visibleParts.forEach(::add)
+                })
+            }
             if (toolCalls.isNotEmpty()) {
                 put("tool_calls", buildJsonArray {
                     toolCalls.forEach { call ->
@@ -496,7 +563,7 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 })
             }
-            put(RESPONSES_OUTPUT_KEY, output)
+            put(RESPONSES_OUTPUT_KEY, responseReplayOutput(output))
         }
         return LocalModelReply(
             message = message,
@@ -510,6 +577,17 @@ class OpenAiResponsesClient @Inject constructor(
                 response["prompt_cache_diagnostics"] as? JsonObject,
             ),
         ).also(::validateUsableModelReply)
+    }
+
+    private fun responseReplayOutput(output: JsonArray): JsonArray = buildJsonArray {
+        output.forEach { item ->
+            val obj = item as? JsonObject
+            if (obj?.get("type")?.jsonPrimitive?.contentOrNull == "image_generation_call") {
+                add(JsonObject(obj - "result"))
+            } else {
+                add(item)
+            }
+        }
     }
 
     private fun parsePromptCacheDiagnostic(value: JsonObject?): LocalPromptCacheDiagnostic? {
@@ -767,12 +845,8 @@ class OpenAiResponsesClient @Inject constructor(
     internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean =
         usesOpenAiResponsesContract(baseUrl, planSharing)
 
-    internal fun usesOpenAiResponsesContract(baseUrl: String, planSharing: Boolean): Boolean {
-        if (planSharing) return true
-        return runCatching {
-            java.net.URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
-        }.getOrDefault(false)
-    }
+    internal fun usesOpenAiResponsesContract(baseUrl: String, planSharing: Boolean): Boolean =
+        usesOfficialOpenAiResponsesContract(baseUrl, planSharing)
 
     internal fun networkFailure(error: IOException): LocalModelException {
         val detail = error.message.orEmpty().lowercase()

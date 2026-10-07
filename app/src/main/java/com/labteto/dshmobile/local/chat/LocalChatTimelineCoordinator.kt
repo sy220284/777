@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.plainTextProjection
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -99,8 +100,15 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                 val original = activeTranscript[originalIndex]
                 if (original.role != "user") return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
 
-                val content = withEditedChatUserText(original, requestedText)
-                if (content.isBlank()) return@synchronized LocalChatUserEditResult.EMPTY
+                val editedBlocks = withEditedChatUserBlocks(original, requestedText)
+                val content = if (original.blocks.isNotEmpty()) {
+                    editedBlocks.plainTextProjection()
+                } else {
+                    withEditedChatUserText(original, requestedText)
+                }
+                if (content.isBlank() && !editedBlocks.hasNonTextMessageBlock()) {
+                    return@synchronized LocalChatUserEditResult.EMPTY
+                }
                 if (editableChatUserText(original).trim() == requestedText) {
                     return@synchronized LocalChatUserEditResult.UNCHANGED
                 }
@@ -136,6 +144,7 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     role = "user",
                     content = content,
                     createdAt = System.currentTimeMillis(),
+                    blocks = editedBlocks,
                 )
                 val rewritten = rewriteChatTranscriptFromUserEdit(
                     activeMessages = activeTranscript,

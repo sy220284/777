@@ -4,7 +4,9 @@ import java.security.MessageDigest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal data class LocalRequestEvidence(
     val messageDigest: String,
     val toolSchemaDigest: String,
+    val resolvedToolSurfaceDigest: String,
     val contextDigest: String,
     val contextMessages: JsonArray,
 )
@@ -24,15 +27,21 @@ internal data class LocalRequestEvidence(
 internal fun buildLocalRequestEvidence(
     messages: List<JsonObject>,
     tools: JsonArray,
+    nativeTools: JsonArray = JsonArray(emptyList()),
 ): LocalRequestEvidence {
     val contextMessages = JsonArray(
         messages.filter { message ->
             message["role"]?.jsonPrimitive?.contentOrNull in MODEL_CONTEXT_ROLES
         },
     )
+    val resolvedToolSurface = buildJsonObject {
+        put("schemas", tools)
+        put("native_tools", nativeTools)
+    }
     return LocalRequestEvidence(
         messageDigest = stableJsonSha256(JsonArray(messages)),
         toolSchemaDigest = stableJsonSha256(tools),
+        resolvedToolSurfaceDigest = stableJsonSha256(resolvedToolSurface),
         contextDigest = stableJsonSha256(contextMessages),
         contextMessages = contextMessages,
     )

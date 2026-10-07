@@ -22,6 +22,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
+import com.labteto.dshmobile.local.session.assistantModelMessageFromEvent
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
@@ -61,6 +62,17 @@ internal fun buildEditedChatModelHistory(
             .map(LocalHarnessMessage::id)
             .toSet(),
     )
+    val durableAssistantMessages = if (groupMode) {
+        emptyMap()
+    } else {
+        loadDurableAssistantModelMessages(
+            eventLog = eventLog,
+            messageIds = messages.asSequence()
+                .filter { message -> message.role == "assistant" }
+                .map(LocalHarnessMessage::id)
+                .toSet(),
+        )
+    }
 
     return buildList {
         add(buildJsonObject {
@@ -79,10 +91,12 @@ internal fun buildEditedChatModelHistory(
                         }
                     },
                 )
-                "assistant" -> add(buildJsonObject {
-                    put("role", "assistant")
-                    put("content", if (groupMode) groupTranscriptLine(message) else message.content)
-                })
+                "assistant" -> add(
+                    durableAssistantMessages[message.id] ?: buildJsonObject {
+                        put("role", "assistant")
+                        put("content", if (groupMode) groupTranscriptLine(message) else message.content)
+                    },
+                )
             }
         }
     }
@@ -100,6 +114,13 @@ internal fun buildDurableChatModelHistory(
             .map(LocalHarnessMessage::id)
             .toSet(),
     )
+    val durableAssistantMessages = loadDurableAssistantModelMessages(
+        eventLog = eventLog,
+        messageIds = messages.asSequence()
+            .filter { message -> message.role == "assistant" }
+            .map(LocalHarnessMessage::id)
+            .toSet(),
+    )
     return buildList {
         add(buildJsonObject {
             put("role", "system")
@@ -113,10 +134,12 @@ internal fun buildDurableChatModelHistory(
                         put("content", message.content)
                     },
                 )
-                "assistant" -> add(buildJsonObject {
-                    put("role", "assistant")
-                    put("content", message.content)
-                })
+                "assistant" -> add(
+                    durableAssistantMessages[message.id] ?: buildJsonObject {
+                        put("role", "assistant")
+                        put("content", message.content)
+                    },
+                )
             }
         }
     }
@@ -241,6 +264,46 @@ private fun loadDurableUserModelMessages(
                         remaining.remove(message.id)
                     }
                 }
+            }
+        }
+        if (remaining.isEmpty()) break
+
+        val oldestSequence = page.minOf(LocalSessionEventLog.Event::sequence)
+        if (page.size < CHAT_EVENT_SCAN_PAGE_SIZE || oldestSequence <= 0L) break
+        beforeSequenceExclusive = oldestSequence
+    }
+    return result
+}
+
+private fun loadDurableAssistantModelMessages(
+    eventLog: LocalSessionEventLog,
+    messageIds: Set<String>,
+): Map<String, JsonObject> {
+    if (messageIds.isEmpty()) return emptyMap()
+    val remaining = messageIds.toMutableSet()
+    val result = linkedMapOf<String, JsonObject>()
+    var beforeSequenceExclusive = Long.MAX_VALUE
+
+    while (remaining.isNotEmpty()) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = beforeSequenceExclusive,
+            limit = CHAT_EVENT_SCAN_PAGE_SIZE,
+        )
+        if (page.isEmpty()) break
+
+        page.asReversed().forEach { event ->
+            if (event.type != "assistant/message") return@forEach
+            val transcriptAssistants = decodeTranscriptMessages(event.data)
+                .orEmpty()
+                .asSequence()
+                .filter { message -> message.role == "assistant" && message.id in remaining }
+                .toList()
+            if (transcriptAssistants.isEmpty()) return@forEach
+
+            val structured = assistantModelMessageFromEvent(event.data)
+            transcriptAssistants.forEach { message ->
+                result[message.id] = structured
+                remaining.remove(message.id)
             }
         }
         if (remaining.isEmpty()) break

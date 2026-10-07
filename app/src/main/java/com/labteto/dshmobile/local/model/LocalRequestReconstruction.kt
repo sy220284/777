@@ -5,11 +5,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 
 internal enum class LocalRequestReconstructionStatus {
     VERIFIED,
@@ -34,10 +36,12 @@ internal data class LocalProviderAttemptReconstruction(
     val promptCacheTtl: String?,
     val messages: List<JsonObject>?,
     val tools: JsonArray?,
+    val nativeTools: JsonArray?,
     val contextMessages: JsonArray?,
     val messageDigest: String?,
     val contextDigest: String?,
     val toolSchemaDigest: String?,
+    val resolvedToolSurfaceDigest: String?,
     val fingerprintVerified: Boolean,
     val redacted: Boolean,
     val issues: List<String>,
@@ -51,11 +55,13 @@ internal data class LocalRequestReconstruction(
     val messages: List<JsonObject>?,
     val tools: JsonArray?,
     val contextMessages: JsonArray?,
+    val nativeTools: JsonArray?,
     val originalMessageDigest: String?,
     val reconstructedMessageDigest: String?,
     val originalContextDigest: String?,
     val reconstructedContextDigest: String?,
     val toolSchemaDigest: String?,
+    val resolvedToolSurfaceDigest: String?,
     val envelopeFingerprintVerified: Boolean,
     val exactMessageDigestVerified: Boolean?,
     val exactContextDigestVerified: Boolean?,
@@ -128,6 +134,7 @@ internal fun reconstructLocalModelRequest(
         data.string("context_digest")
             ?: if (version <= 1) data.string("context_surface_digest") else null
     val expectedToolDigest = data.string("tool_schema_digest")
+    val expectedResolvedToolSurfaceDigest = data.string("resolved_tool_surface_digest")
     val expectedMessageSurfaceDigest = data.string("message_surface_digest")
     val expectedContextSurfaceDigest = data.string("context_surface_digest")
     val routeFingerprint = data.string("route_fingerprint")
@@ -163,17 +170,20 @@ internal fun reconstructLocalModelRequest(
     }
     if (version >= 2) {
         if (data["message_surface_seq"]?.jsonPrimitive?.longOrNull == null) {
-            issues += "V2 request/header 缺少 message_surface_seq"
+            issues += "V2+ request/header 缺少 message_surface_seq"
         }
         if (expectedMessageSurfaceDigest == null) {
-            issues += "V2 request/header 缺少 message_surface_digest"
+            issues += "V2+ request/header 缺少 message_surface_digest"
         }
         if (originalContextDigest == null) {
-            issues += "V2 request/header 缺少 context_digest"
+            issues += "V2+ request/header 缺少 context_digest"
         }
         if (expectedContextSurfaceDigest == null) {
-            issues += "V2 request/header 缺少 context_surface_digest"
+            issues += "V2+ request/header 缺少 context_surface_digest"
         }
+    }
+    if (version >= 3 && expectedResolvedToolSurfaceDigest == null) {
+        issues += "V3 request/header 缺少 resolved_tool_surface_digest"
     }
 
     val messages = messageSurface?.data?.get("messages").asObjectListOrNull().also {
@@ -186,14 +196,47 @@ internal fun reconstructLocalModelRequest(
             issues += "request/tool-surface 缺少合法 schemas"
             null
         } else null
+    val nativeTools = if (version >= 3) {
+        toolSurface?.data?.get("native_tools") as? JsonArray
+            ?: if (toolSurface != null) {
+                issues += "V3 request/tool-surface 缺少合法 native_tools"
+                null
+            } else null
+    } else {
+        JsonArray(emptyList())
+    }
     val contextMessages = contextSurface?.data?.get("messages") as? JsonArray
         ?: if (contextSurface != null) {
             issues += "request/context-surface 缺少合法 messages"
             null
         } else null
+    if (version >= 3 && nativeTools != null) {
+        val headerNativeTools = data["native_tool_names"] as? JsonArray
+        if (headerNativeTools == null) {
+            issues += "V3 request/header 缺少 native_tool_names"
+        } else if (headerNativeTools != nativeTools) {
+            issues += "native_tool_names 与 request/tool-surface 不一致"
+        }
+        val expectedImageEnabled = nativeTools.any { element ->
+            element.jsonPrimitive.contentOrNull == LOCAL_NATIVE_TOOL_IMAGE_GENERATION
+        }
+        val headerImageEnabled = data["image_generation_enabled"]?.jsonPrimitive?.booleanOrNull
+        if (headerImageEnabled == null) {
+            issues += "V3 request/header 缺少 image_generation_enabled"
+        } else if (headerImageEnabled != expectedImageEnabled) {
+            issues += "image_generation_enabled 与 Native Tool Surface 不一致"
+        }
+    }
 
     val reconstructedMessageDigest = messages?.let { stableJsonSha256(JsonArray(it)) }
     val reconstructedToolDigest = tools?.let(::stableJsonSha256)
+    val reconstructedResolvedToolSurfaceDigest =
+        if (tools != null && nativeTools != null) {
+            stableJsonSha256(buildJsonObject {
+                put("schemas", tools)
+                put("native_tools", nativeTools)
+            })
+        } else null
     val reconstructedContextDigest = contextMessages?.let(::stableJsonSha256)
 
     verifySurfaceDigest(
@@ -203,13 +246,34 @@ internal fun reconstructLocalModelRequest(
         reconstructed = reconstructedMessageDigest,
         issues = issues,
     )
-    verifySurfaceDigest(
-        name = "tool",
-        event = toolSurface,
-        expectedFromHeader = expectedToolDigest,
-        reconstructed = reconstructedToolDigest,
-        issues = issues,
-    )
+    if (version >= 3) {
+        verifySurfaceDigest(
+            name = "tool",
+            event = toolSurface,
+            expectedFromHeader = expectedResolvedToolSurfaceDigest,
+            reconstructed = reconstructedResolvedToolSurfaceDigest,
+            issues = issues,
+        )
+        val surfaceSchemaDigest = toolSurface?.data?.string("schema_digest")
+        if (surfaceSchemaDigest == null) {
+            issues += "V3 request/tool-surface 缺少 schema_digest"
+        } else {
+            if (expectedToolDigest != null && surfaceSchemaDigest != expectedToolDigest) {
+                issues += "tool schema digest 与 request/header 不一致"
+            }
+            if (reconstructedToolDigest != null && surfaceSchemaDigest != reconstructedToolDigest) {
+                issues += "tool schemas 与 schema_digest 不一致"
+            }
+        }
+    } else {
+        verifySurfaceDigest(
+            name = "tool",
+            event = toolSurface,
+            expectedFromHeader = expectedToolDigest,
+            reconstructed = reconstructedToolDigest,
+            issues = issues,
+        )
+    }
     verifySurfaceDigest(
         name = "context",
         event = contextSurface,
@@ -248,12 +312,23 @@ internal fun reconstructLocalModelRequest(
     val reconstructedEnvelope = if (
         routeFingerprint != null &&
         expectedToolDigest != null &&
-        originalContextDigest != null
+        originalContextDigest != null &&
+        (version < 3 || expectedResolvedToolSurfaceDigest != null)
     ) {
-        val parts = if (version >= 2 && originalMessageDigest != null) {
-            listOf(routeFingerprint, originalMessageDigest, expectedToolDigest, originalContextDigest)
-        } else {
-            listOf(routeFingerprint, expectedToolDigest, originalContextDigest)
+        val parts = when {
+            version >= 3 && originalMessageDigest != null -> listOf(
+                routeFingerprint,
+                originalMessageDigest,
+                requireNotNull(expectedResolvedToolSurfaceDigest),
+                originalContextDigest,
+            )
+            version >= 2 && originalMessageDigest != null -> listOf(
+                routeFingerprint,
+                originalMessageDigest,
+                expectedToolDigest,
+                originalContextDigest,
+            )
+            else -> listOf(routeFingerprint, expectedToolDigest, originalContextDigest)
         }
         stableJsonSha256(JsonArray(parts.map(::JsonPrimitive)))
     } else {
@@ -284,11 +359,13 @@ internal fun reconstructLocalModelRequest(
         messages = messages,
         tools = tools,
         contextMessages = contextMessages,
+        nativeTools = nativeTools,
         originalMessageDigest = originalMessageDigest,
         reconstructedMessageDigest = reconstructedMessageDigest,
         originalContextDigest = originalContextDigest,
         reconstructedContextDigest = reconstructedContextDigest,
         toolSchemaDigest = expectedToolDigest,
+        resolvedToolSurfaceDigest = expectedResolvedToolSurfaceDigest,
         envelopeFingerprintVerified = envelopeFingerprintVerified,
         exactMessageDigestVerified = exactMessageDigestVerified,
         exactContextDigestVerified = exactContextDigestVerified,
@@ -310,6 +387,7 @@ private fun reconstructProviderAttempt(
 ): LocalProviderAttemptReconstruction {
     val data = event.data
     val issues = mutableListOf<String>()
+    val headerVersion = header.data["version"]?.jsonPrimitive?.intOrNull ?: 1
     val headerSeq = data["header_seq"]?.jsonPrimitive?.longOrNull
     if (headerSeq != header.sequence) {
         issues += "header_seq 不匹配：期望 " + header.sequence + "，实际 " + headerSeq
@@ -364,14 +442,44 @@ private fun reconstructProviderAttempt(
 
     val messages = messageSurface?.data?.get("messages").asObjectListOrNull()
     val tools = toolSurface?.data?.get("schemas") as? JsonArray
+    val nativeTools = if (headerVersion >= 3) {
+        toolSurface?.data?.get("native_tools") as? JsonArray
+    } else {
+        JsonArray(emptyList())
+    }
     val contextMessages = contextSurface?.data?.get("messages") as? JsonArray
+    if (headerVersion >= 3 && nativeTools != null) {
+        val attemptNativeTools = data["native_tool_names"] as? JsonArray
+        if (attemptNativeTools == null) {
+            issues += "V3 Provider Attempt 缺少 native_tool_names"
+        } else if (attemptNativeTools != nativeTools) {
+            issues += "Provider Attempt native_tool_names 与 Tool Surface 不一致"
+        }
+        val expectedImageEnabled = nativeTools.any { element ->
+            element.jsonPrimitive.contentOrNull == LOCAL_NATIVE_TOOL_IMAGE_GENERATION
+        }
+        val attemptImageEnabled = data["image_generation_enabled"]?.jsonPrimitive?.booleanOrNull
+        if (attemptImageEnabled == null) {
+            issues += "V3 Provider Attempt 缺少 image_generation_enabled"
+        } else if (attemptImageEnabled != expectedImageEnabled) {
+            issues += "Provider Attempt image_generation_enabled 与 Native Tool Surface 不一致"
+        }
+    }
 
     val replayMessageDigest = messages?.let { stableJsonSha256(JsonArray(it)) }
     val replayToolDigest = tools?.let(::stableJsonSha256)
+    val replayResolvedToolSurfaceDigest =
+        if (tools != null && nativeTools != null) {
+            stableJsonSha256(buildJsonObject {
+                put("schemas", tools)
+                put("native_tools", nativeTools)
+            })
+        } else null
     val replayContextDigest = contextMessages?.let(::stableJsonSha256)
 
     val expectedMessageSurfaceDigest = data.string("message_surface_digest")
     val expectedToolDigest = data.string("tool_schema_digest")
+    val expectedResolvedToolSurfaceDigest = data.string("resolved_tool_surface_digest")
     val expectedContextSurfaceDigest = data.string("context_surface_digest")
 
     verifySurfaceDigest(
@@ -381,13 +489,29 @@ private fun reconstructProviderAttempt(
         reconstructed = replayMessageDigest,
         issues = issues,
     )
-    verifySurfaceDigest(
-        name = "attempt-tool",
-        event = toolSurface,
-        expectedFromHeader = expectedToolDigest,
-        reconstructed = replayToolDigest,
-        issues = issues,
-    )
+    if (headerVersion >= 3) {
+        verifySurfaceDigest(
+            name = "attempt-tool",
+            event = toolSurface,
+            expectedFromHeader = expectedResolvedToolSurfaceDigest,
+            reconstructed = replayResolvedToolSurfaceDigest,
+            issues = issues,
+        )
+        if (expectedResolvedToolSurfaceDigest == null) {
+            issues += "V3 Provider Attempt 缺少 resolved_tool_surface_digest"
+        }
+        if (expectedResolvedToolSurfaceDigest != header.data.string("resolved_tool_surface_digest")) {
+            issues += "resolved_tool_surface_digest 与 request/header 不一致"
+        }
+    } else {
+        verifySurfaceDigest(
+            name = "attempt-tool",
+            event = toolSurface,
+            expectedFromHeader = expectedToolDigest,
+            reconstructed = replayToolDigest,
+            issues = issues,
+        )
+    }
     verifySurfaceDigest(
         name = "attempt-context",
         event = contextSurface,
@@ -405,16 +529,18 @@ private fun reconstructProviderAttempt(
     val cacheKey = data.string("prompt_cache_key")
     val cacheTtl = data.string("prompt_cache_ttl")
     val expectedFingerprint = data.string("provider_attempt_fingerprint")
+    val toolFingerprintDigest =
+        if (headerVersion >= 3) expectedResolvedToolSurfaceDigest else expectedToolDigest
     val reconstructedFingerprint = if (
         routeFingerprint != null &&
         messageDigest != null &&
-        expectedToolDigest != null &&
+        toolFingerprintDigest != null &&
         contextDigest != null
     ) {
         stableJsonSha256(JsonArray(listOf(
             routeFingerprint,
             messageDigest,
-            expectedToolDigest,
+            toolFingerprintDigest,
             contextDigest,
             temperature?.toString() ?: "null",
             comparisonResponseId ?: "null",
@@ -461,10 +587,12 @@ private fun reconstructProviderAttempt(
         promptCacheTtl = cacheTtl,
         messages = messages,
         tools = tools,
+        nativeTools = nativeTools,
         contextMessages = contextMessages,
         messageDigest = messageDigest,
         contextDigest = contextDigest,
         toolSchemaDigest = expectedToolDigest,
+        resolvedToolSurfaceDigest = expectedResolvedToolSurfaceDigest,
         fingerprintVerified = fingerprintVerified,
         redacted = messageRedacted || contextRedacted,
         issues = issues,

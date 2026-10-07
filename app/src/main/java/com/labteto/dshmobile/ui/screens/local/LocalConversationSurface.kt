@@ -605,6 +605,7 @@ internal fun LocalConversationSurface(
                         is LocalTranscriptItem.Message -> LocalMessageRow(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
+                            workspacePath = state.workspacePath,
                             groupMode = state.groupChat.enabled,
                             canEdit = messageEditingEnabled &&
                                 messageActionsEnabled &&

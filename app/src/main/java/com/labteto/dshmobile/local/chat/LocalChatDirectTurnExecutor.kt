@@ -231,6 +231,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     messages = requestMessages,
                     step = 1,
                     toolsOverride = JsonArray(emptyList()),
+                    allowImageGeneration = true,
                     publishPreviewEnabled = false,
                     streamFilterPhrases = ChatStyleGuard.activePhrases(
                         customPhrases = snapshot.chat.chatStyleGuardCustomPhrases,
@@ -280,6 +281,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
                         toolsOverride = JsonArray(emptyList()),
+                        allowImageGeneration = false,
                         publishPreviewEnabled = false,
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
@@ -294,26 +296,32 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 appendEvent = { type, data -> eventLog.append(type, data) },
             )
 
-            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
+            val materializedReply = materializeLocalChatReplyMedia(
+                reply = reply,
+                workspaceRoot = File(sessionStorage.files.workspace.path),
+            )
+            val durableReply = materializedReply.reply
+            if (replacingMessageId != null && materializedReply.blocks.isEmpty()) {
                 error("模型没有返回可用回复")
             }
 
-            val assistantTranscript = reply.content
-                ?.takeIf(String::isNotBlank)
-                ?.let { content ->
+            val assistantTranscript = materializedReply.blocks
+                .takeIf { it.isNotEmpty() }
+                ?.let { blocks ->
                     LocalHarnessMessage(
                         id = UUID.randomUUID().toString(),
                         role = "assistant",
-                        content = content,
+                        content = durableReply.content.orEmpty(),
                         createdAt = System.currentTimeMillis(),
+                        blocks = blocks,
                     )
                 }
             val transcriptMessages = listOfNotNull(assistantTranscript)
             val assistantData = if (transcriptMessages.isEmpty()) {
-                reply.message
+                durableReply.message
             } else {
                 JsonObject(
-                    reply.message +
+                    durableReply.message +
                         ("transcript" to encodeTranscriptMessages(transcriptMessages)),
                 )
             }
@@ -338,7 +346,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     replacingMessageId,
                 )
             }
-            modelHistory.history.append(reply.message)
+            modelHistory.history.append(durableReply.message)
             check(modelHistory.refreshMetrics(sessionId)) {
                 "Chat 回复提交后前台会话已切换"
             }
@@ -405,7 +413,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             )
             sessionStorage.enqueueCurrentSnapshot(sessionId)
 
-            val assistantMessage = reply.content?.takeIf(String::isNotBlank)
+            val assistantMessage = durableReply.content?.takeIf(String::isNotBlank)
             if (assistantTranscript != null && assistantMessage != null) {
                 snapshot.modelState.modelSelection.activeProfile?.let { profile ->
                     postTurn.schedule(

@@ -1236,6 +1236,139 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun imageGenerationResolverRequiresExplicitOfficialSupportedRoute() {
+        assertTrue(
+            resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://api.openai.com/v1",
+                model = "gpt-6-astra",
+                planSharing = false,
+                requested = true,
+            ),
+        )
+        assertFalse(
+            resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://proxy.example.com/v1",
+                model = "gpt-6-astra",
+                planSharing = false,
+                requested = true,
+            ),
+        )
+        assertFalse(
+            resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://api.openai.com/v1",
+                model = "gpt-5.6",
+                planSharing = false,
+                requested = true,
+            ),
+        )
+        assertFalse(
+            resolveOpenAiImageGenerationToolEnabled(
+                baseUrl = "https://api.openai.com/v1",
+                model = "gpt-6-astra",
+                planSharing = false,
+                requested = false,
+            ),
+        )
+    }
+
+    @Test
+    fun nativeImageGenerationToolStaysDisabledWithoutExplicitOptIn() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "普通聊天")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = false,
+        )
+
+        val tools = payload["tools"] as? JsonArray
+        assertTrue(tools == null || tools.none {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "image_generation"
+        })
+    }
+
+    @Test
+    fun supportedResponsesModelCanExposeNativeImageGenerationTool() {
+        val payload = client.buildPayload(
+            model = "gpt-6-astra",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "画一只猫")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = false,
+            enableImageGenerationTool = true,
+        )
+
+        val tools = payload["tools"]!!.jsonArray
+        assertEquals(1, tools.size)
+        assertEquals("image_generation", tools.single().jsonObject["type"]?.jsonPrimitive?.content)
+        assertTrue(client.supportsOpenAiImageGenerationTool("gpt-6-astra"))
+        assertFalse(client.supportsOpenAiImageGenerationTool("gpt-5.6"))
+    }
+
+    @Test
+    fun interleavedResponseTextAndGeneratedImageKeepOutputOrder() {
+        val response = Json.parseToJsonElement(
+            """{
+                "id":"resp-interleaved",
+                "output":[
+                    {"type":"message","content":[{"type":"output_text","text":"第一段"}]},
+                    {"type":"image_generation_call","id":"ig_1","status":"completed","result":"AAAA"},
+                    {"type":"message","content":[{"type":"output_text","text":"第二段"}]}
+                ]
+            }""",
+        ).jsonObject
+
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+
+        val parts = reply.message["content"]!!.jsonArray
+        assertEquals(listOf("output_text", "image_url", "output_text"), parts.map {
+            it.jsonObject["type"]!!.jsonPrimitive.content
+        })
+        assertEquals("第一段第二段", reply.content)
+    }
+
+    @Test
+    fun imageGenerationCallBecomesAssistantImageWithoutPersistingRawResult() {
+        val response = Json.parseToJsonElement(
+            """{
+                "id":"resp-image",
+                "output":[{
+                    "type":"image_generation_call",
+                    "id":"ig_1",
+                    "status":"completed",
+                    "output_format":"png",
+                    "result":"AAAA"
+                }]
+            }""",
+        ).jsonObject
+
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+
+        val parts = reply.message["content"]!!.jsonArray
+        assertEquals("image_url", parts.single().jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals(
+            "data:image/png;base64,AAAA",
+            parts.single().jsonObject["image_url"]?.jsonObject?.get("url")?.jsonPrimitive?.content,
+        )
+        val replay = reply.message[OpenAiResponsesClient.RESPONSES_OUTPUT_KEY]!!
+            .jsonArray.single().jsonObject
+        assertEquals("ig_1", replay["id"]?.jsonPrimitive?.content)
+        assertFalse("result" in replay)
+    }
+
+    @Test
     fun convertsImageInputForResponses() {
         val payload = client.buildPayload(
             model = "gpt-test",

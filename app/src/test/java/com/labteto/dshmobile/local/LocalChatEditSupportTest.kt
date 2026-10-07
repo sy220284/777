@@ -5,23 +5,114 @@ import com.labteto.dshmobile.local.chat.buildEditedChatModelHistory
 import com.labteto.dshmobile.local.chat.buildDurableChatModelHistory
 import com.labteto.dshmobile.local.chat.persistActiveChatTranscript
 import com.labteto.dshmobile.local.chat.persistRewrittenChatTranscript
+import com.labteto.dshmobile.local.chat.withEditedChatUserBlocks
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalChatEditSupportTest {
+    @Test
+    fun editingStructuredUserMessagePreservesMediaBlocks() {
+        val image = LocalMessageBlock.Image(
+            relativePath = ".dsh/attachments/image.png",
+            mediaType = "image/png",
+            name = "image.png",
+            bytes = 128L,
+            attachmentId = "image",
+            width = 320,
+            height = 240,
+            source = LocalMessageMediaSource.USER,
+        )
+        val file = LocalMessageBlock.File(
+            relativePath = ".dsh/attachments/doc.txt",
+            mediaType = "text/plain",
+            name = "doc.txt",
+            bytes = 32L,
+            attachmentId = "doc",
+        )
+        val original = LocalHarnessMessage(
+            id = "u-media",
+            role = "user",
+            content = "原文字",
+            createdAt = 1L,
+            blocks = listOf(LocalMessageBlock.Text("原文字"), image, file),
+        )
+
+        val edited = withEditedChatUserBlocks(original, "新文字")
+        assertEquals(LocalMessageBlock.Text("新文字"), edited[0])
+        assertEquals(image, edited[1])
+        assertEquals(file, edited[2])
+
+        val mediaOnly = withEditedChatUserBlocks(original, "")
+        assertEquals(listOf(image, file), mediaOnly)
+    }
+
+    @Test
+    fun branchHistoryRestoresStructuredAssistantMediaMessage() {
+        withLog { log ->
+            val assistant = LocalHarnessMessage(
+                id = "a-media",
+                role = "assistant",
+                content = "生成好了",
+                createdAt = 2L,
+                blocks = listOf(
+                    LocalMessageBlock.Text("生成好了"),
+                    LocalMessageBlock.Image(
+                        relativePath = ".dsh/attachments/generated.png",
+                        mediaType = "image/png",
+                        name = "generated.png",
+                        bytes = 64L,
+                        attachmentId = "generated",
+                        source = LocalMessageMediaSource.MODEL,
+                    ),
+                ),
+            )
+            log.append("assistant/message", buildJsonObject {
+                put("role", "assistant")
+                put("content", buildJsonArray {
+                    add(buildJsonObject {
+                        put("type", "output_text")
+                        put("text", "生成好了")
+                    })
+                    add(buildJsonObject {
+                        put("type", "local_image_ref")
+                        put("path", ".dsh/attachments/generated.png")
+                        put("mediaType", "image/png")
+                    })
+                })
+                put("marker", "assistant-structured")
+                put("transcript", encodeTranscriptMessages(listOf(assistant)))
+            })
+
+            val history = buildDurableChatModelHistory(
+                eventLog = log,
+                messages = listOf(assistant),
+                systemPrompt = "system",
+            )
+
+            assertEquals("assistant-structured", history[1]["marker"]?.jsonPrimitive?.content)
+            val content = history[1]["content"]!!.jsonArray
+            assertEquals("local_image_ref", content[1].jsonObject["type"]?.jsonPrimitive?.content)
+        }
+    }
+
     @Test
     fun historicalEditLookupPagesPastRecentEventChunk() {
         withLog { log ->

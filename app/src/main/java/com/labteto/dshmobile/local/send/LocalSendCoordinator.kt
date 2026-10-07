@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.send
 
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import kotlinx.serialization.json.JsonObject
 
 internal enum class LocalSendDisposition {
@@ -73,9 +75,13 @@ internal fun evaluateLocalSendAdmission(
 
 
 internal data class LocalPreparedSend(
+    /** Execution/model-facing text; may include local attachment paths required by tool fallback. */
     val content: String,
+    /** Exact user-visible text without internal attachment instructions. */
+    val visibleContent: String = content,
     val memoryInput: String,
     val modelMessage: JsonObject,
+    val blocks: List<LocalMessageBlock> = emptyList(),
 )
 
 internal fun prepareLocalSend(
@@ -98,10 +104,42 @@ internal fun prepareLocalSend(
             }
         }
     }
+    val blocks = buildList {
+        if (prompt.isNotBlank()) add(LocalMessageBlock.Text(prompt))
+        attachments.forEach { attachment ->
+            if (attachment.mediaType.startsWith("image/")) {
+                add(
+                    LocalMessageBlock.Image(
+                        relativePath = attachment.relativePath,
+                        mediaType = attachment.mediaType,
+                        name = attachment.name,
+                        bytes = attachment.bytes,
+                        attachmentId = attachment.attachmentId,
+                        width = attachment.width,
+                        height = attachment.height,
+                        source = LocalMessageMediaSource.USER,
+                    ),
+                )
+            } else {
+                add(
+                    LocalMessageBlock.File(
+                        relativePath = attachment.relativePath,
+                        mediaType = attachment.mediaType,
+                        name = attachment.name,
+                        bytes = attachment.bytes,
+                        attachmentId = attachment.attachmentId,
+                        source = LocalMessageMediaSource.USER,
+                    ),
+                )
+            }
+        }
+    }
     return LocalPreparedSend(
         content = content,
+        visibleContent = prompt,
         memoryInput = prompt,
         modelMessage = buildLocalUserModelMessage(content, attachments),
+        blocks = blocks,
     )
 }
 

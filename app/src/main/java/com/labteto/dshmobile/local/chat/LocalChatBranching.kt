@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -75,10 +76,13 @@ internal fun chatBranchingEligible(messages: List<LocalHarnessMessage>): Boolean
 }
 
 internal fun chatMessageHasAttachmentContext(message: LocalHarnessMessage): Boolean =
-    message.role == "user" && LOCAL_IMPORTED_ATTACHMENT_MARKER in message.content
+    message.role == "user" && (
+        message.blocks.hasNonTextMessageBlock() ||
+            LOCAL_IMPORTED_ATTACHMENT_MARKER in message.content
+        )
 
 internal fun editableChatUserText(message: LocalHarnessMessage): String {
-    if (message.role != "user") return message.content
+    if (message.role != "user" || message.blocks.isNotEmpty()) return message.content
     val markerIndex = message.content.indexOf(LOCAL_IMPORTED_ATTACHMENT_MARKER)
     if (markerIndex < 0) return message.content
     return message.content.substring(0, markerIndex).trimEnd()
@@ -89,7 +93,7 @@ internal fun withEditedChatUserText(
     replacement: String,
 ): String {
     val clean = replacement.trim()
-    if (message.role != "user") return clean
+    if (message.role != "user" || message.blocks.isNotEmpty()) return clean
 
     val markerIndex = message.content.indexOf(LOCAL_IMPORTED_ATTACHMENT_MARKER)
     if (markerIndex < 0) return clean
@@ -102,6 +106,34 @@ internal fun withEditedChatUserText(
         append(attachmentContext)
     }
 }
+
+internal fun withEditedChatUserBlocks(
+    message: LocalHarnessMessage,
+    replacement: String,
+): List<LocalMessageBlock> {
+    if (message.role != "user" || message.blocks.isEmpty()) return message.blocks
+    val clean = replacement.trim()
+    var textInserted = false
+    return buildList {
+        message.blocks.forEach { block ->
+            when (block) {
+                is LocalMessageBlock.Text -> {
+                    if (!textInserted && clean.isNotEmpty()) {
+                        add(LocalMessageBlock.Text(clean))
+                        textInserted = true
+                    }
+                }
+                else -> add(block)
+            }
+        }
+        if (!textInserted && clean.isNotEmpty()) {
+            add(0, LocalMessageBlock.Text(clean))
+        }
+    }
+}
+
+internal fun List<LocalMessageBlock>.hasNonTextMessageBlock(): Boolean =
+    any { block -> block !is LocalMessageBlock.Text }
 
 /**
  * Rewrites the active conversation from one historical user turn.
