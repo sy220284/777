@@ -234,7 +234,9 @@ internal class LocalSubagentRunner(
             kind = runKind,
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
-        var modelStep = recoveredStep.coerceAtLeast(0)
+        val activationStepOffset = recoveredStep.coerceAtLeast(0)
+        var modelStep = activationStepOffset
+        fun continuousStep(localStep: Int): Int = activationStepOffset + localStep
         val modelToolStepSurface = LocalModelToolStepSurface()
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
@@ -490,21 +492,23 @@ internal class LocalSubagentRunner(
                 eventSink = AgentEventSink { event ->
                     when (event) {
                         is AgentEvent.AssistantObserved -> {
-                            val reply = repliesByStep.remove(event.step)
-                                ?: error("缺少子代理第 ${event.step} 步模型响应")
+                            val step = continuousStep(event.step)
+                            val reply = repliesByStep.remove(step)
+                                ?: error("缺少子代理第 $step 步模型响应")
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history.append(reply.message)
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
                                     progress,
-                                    "第 ${event.step} 步回复：${content.take(1_500)}",
+                                    "第 $step 步回复：${content.take(1_500)}",
                                 )
                             }
                         }
                         is AgentEvent.ToolStarted -> {
+                            val step = continuousStep(event.step)
                             eventLog().append("subagent/tool-call", buildJsonObject {
                                 put("agent_id", subagentId)
-                                put("step", event.step)
+                                put("step", step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
                                 put("arguments", event.call.arguments)
@@ -512,6 +516,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
+                            val step = continuousStep(event.step)
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
@@ -528,14 +533,14 @@ internal class LocalSubagentRunner(
                             ).modelVisibleContent()
                             historyPolicy.rememberProgress(
                                 progress,
-                                "第 ${event.step} 步 · ${event.call.name}：" +
+                                "第 $step 步 · ${event.call.name}：" +
                                     truncateWithoutSplittingSurrogatePair(
                                         durableToolResultContent(event.output, event.retention), 1_500,
                                     ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
-                                put("step", event.step)
+                                put("step", step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
                                 put(
@@ -554,14 +559,14 @@ internal class LocalSubagentRunner(
                             history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         }
                         is AgentEvent.StepFinished -> {
-                            persistContinuationCheckpoint(step = event.step)
+                            persistContinuationCheckpoint(step = continuousStep(event.step))
                         }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
                                 backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "completed")
-                                put("steps", event.steps)
+                                put("steps", continuousStep(event.steps))
                                 put(
                                     "output",
                                     truncateWithoutSplittingSurrogatePair(
@@ -576,7 +581,7 @@ internal class LocalSubagentRunner(
                                 put("agent_id", subagentId)
                                 backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "step_limit")
-                                put("steps", event.steps)
+                                put("steps", continuousStep(event.steps))
                             })
                         }
                         is AgentEvent.TurnCancelled -> {
