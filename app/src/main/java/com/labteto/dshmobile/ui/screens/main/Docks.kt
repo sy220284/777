@@ -30,7 +30,7 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -133,7 +133,7 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
         )
     }
     if (editing) {
-        DsDialog(title = stringResource(R.string.goal_edit), onDismiss = { editing = false }) {
+        DsBottomSheet(title = stringResource(R.string.goal_edit), onDismiss = { editing = false }) {
             DsTextField(
                 value = editText,
                 onValueChange = { editText = it },
@@ -235,7 +235,7 @@ internal fun QueueDock(queue: List<QueueItem>, store: SessionStore, modifier: Mo
     }
 
     editingId?.let { id ->
-        DsDialog(title = stringResource(R.string.chat_queue_edit), onDismiss = { editingId = null }) {
+        DsBottomSheet(title = stringResource(R.string.chat_queue_edit), onDismiss = { if (!busy) editingId = null }, dismissEnabled = !busy) {
             DsTextField(
                 value = editText,
                 onValueChange = { editText = it },
