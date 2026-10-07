@@ -34,6 +34,7 @@ fun DsSheetChoiceRow(
     subtitle: String? = null,
     icon: ImageVector? = null,
     selected: Boolean = false,
+    danger: Boolean = false,
     enabled: Boolean = true,
 ) {
     val colors = DsTheme.colors
@@ -63,7 +64,7 @@ fun DsSheetChoiceRow(
                 Text(
                     title,
                     style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
+                    color = if (danger) colors.error else colors.labelPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -80,7 +81,11 @@ fun DsSheetChoiceRow(
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = if (selected) colors.accent else colors.labelCaption,
+                tint = when {
+                    danger -> colors.error
+                    selected -> colors.accent
+                    else -> colors.labelCaption
+                },
                 modifier = Modifier.size(16.dp),
             )
         }
