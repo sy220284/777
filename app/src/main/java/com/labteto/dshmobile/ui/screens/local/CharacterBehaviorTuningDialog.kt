@@ -177,6 +177,9 @@ internal fun CharacterBehaviorTuningDialog(
         scrollable = true,
         dismissEnabled = !saving,
         footer = {
+            saveError?.let {
+                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
+            }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
@@ -197,10 +200,14 @@ internal fun CharacterBehaviorTuningDialog(
                     saving = true
                     saveError = null
                     coroutineScope.launch {
-                        onSave(submitted)
-                            .onSuccess { onDismiss() }
-                            .onFailure { saveError = it.message ?: saveFailedText }
-                        saving = false
+                        try {
+                            runCatching { onSave(submitted) }
+                                .getOrElse { Result.failure(it) }
+                                .onSuccess { onDismiss() }
+                                .onFailure { saveError = it.message ?: saveFailedText }
+                        } finally {
+                            saving = false
+                        }
                     }
                 },
                 enabled = !saving,
@@ -480,10 +487,6 @@ internal fun CharacterBehaviorTuningDialog(
             }
         }
 
-
-        saveError?.let {
-            Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
-        }
     }
 }
 
