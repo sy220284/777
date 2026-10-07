@@ -344,11 +344,13 @@ internal class LocalSubagentRunner(
                 history.append(buildJsonObject { put("role", "user"); put("content", task) })
             }
             if (recoveringHistory) {
-                history.removeAll { message ->
-                    message["role"]?.jsonPrimitive?.contentOrNull == "system" &&
-                        message["content"]?.jsonPrimitive?.contentOrNull
-                            ?.startsWith("【独立虚拟屏】id=") == true
-                }
+                history.reset(
+                    history.snapshot().filterNot { message ->
+                        message["role"]?.jsonPrimitive?.contentOrNull == "system" &&
+                            message["content"]?.jsonPrimitive?.contentOrNull
+                                ?.startsWith("【独立虚拟屏】id=") == true
+                    },
+                )
             }
             virtualScreenId?.let { id ->
                 history.append(buildJsonObject {
