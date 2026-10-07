@@ -11,25 +11,32 @@ async function main(): Promise<void> {
   ]
 
   const projections = ctx.sessionProjections as any
-  projections.register({
+  const disposeFirst = projections.register({
     key: '777/advanced-count',
     stateSchema: z.number().int().nonnegative(),
     init: () => 0,
     apply: (state: number) => state + 1,
     stateVersion: 7,
   })
+  const disposeSecond = projections.register({
+    key: '777/advanced-count',
+    stateSchema: z.number().int().nonnegative(),
+    init: () => 999,
+    apply: (state: number) => state + 999,
+    stateVersion: 7,
+  })
 
-  let duplicateKeyRejected = false
+  let differentVersionRejected = false
   try {
     projections.register({
       key: '777/advanced-count',
       stateSchema: z.number().int().nonnegative(),
       init: () => 0,
       apply: (state: number) => state,
-      stateVersion: 7,
+      stateVersion: 8,
     })
   } catch {
-    duplicateKeyRejected = true
+    differentVersionRejected = true
   }
 
   const session = ctx.sessions.create(SessionId('777-advanced-projection'))
@@ -39,12 +46,21 @@ async function main(): Promise<void> {
   const row = projections.checkpoint(session)['777/advanced-count']
   if (row === undefined) throw new Error('advanced projection checkpoint missing')
 
+  const sameVersionShared = row.val === 2
+  disposeFirst()
+  const survivesFirstDispose = projections.stateOf(session, '777/advanced-count') !== undefined
+  disposeSecond()
+  const removedAfterLastDispose = projections.stateOf(session, '777/advanced-count') === undefined
+
   process.stdout.write(`${JSON.stringify({
     projection: {
       stateVersion: row.ver,
       asOfSequence: Number(row.seq),
       value: row.val,
-      duplicateKeyRejected,
+      sameVersionShared,
+      differentVersionRejected,
+      survivesFirstDispose,
+      removedAfterLastDispose,
     },
   }, null, 2)}\n`)
 
