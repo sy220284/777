@@ -36,6 +36,46 @@ class LocalStructuredSubagentOutputTest {
     }
 
     @Test
+    fun canonicalOutputAndDigestIgnoreObjectKeyOrder() {
+        val nestedSchema = Json.parseToJsonElement(
+            """{
+              "type":"object",
+              "properties":{
+                "a":{"type":"integer"},
+                "nested":{
+                  "type":"object",
+                  "properties":{
+                    "x":{"type":"string"},
+                    "y":{"type":"string"}
+                  },
+                  "required":["x","y"],
+                  "additionalProperties":false
+                }
+              },
+              "required":["a","nested"],
+              "additionalProperties":false
+            }"""
+        ).jsonObject
+
+        val first = validateLocalStructuredSubagentOutput(
+            """{"nested":{"y":"2","x":"1"},"a":1}""",
+            nestedSchema,
+        ).getOrThrow()
+        val second = validateLocalStructuredSubagentOutput(
+            """{"a":1,"nested":{"x":"1","y":"2"}}""",
+            nestedSchema,
+        ).getOrThrow()
+
+        assertEquals(first.canonicalJson, second.canonicalJson)
+        assertEquals(first.resultDigest, second.resultDigest)
+        assertEquals(first.schemaDigest, second.schemaDigest)
+        assertEquals(
+            """{"a":1,"nested":{"x":"1","y":"2"}}""",
+            first.canonicalJson,
+        )
+    }
+
+    @Test
     fun rejectsMarkdownFenceAndExtraText() {
         listOf(
             """```json
