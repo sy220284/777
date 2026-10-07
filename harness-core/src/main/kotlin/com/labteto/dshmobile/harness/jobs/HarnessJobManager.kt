@@ -211,6 +211,40 @@ class HarnessJobManager(
         (maxConcurrentJobs - records.values.count { it.occupiesSlot() }).coerceAtLeast(0)
     }
 
+    fun completeInterrupted(
+        id: String,
+        output: String,
+        ownerId: String? = null,
+    ): Boolean {
+        var previousOutput = ""
+        var previousUpdatedAt = 0L
+        val record = synchronized(lock) {
+            val found = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: return false
+            if (found.status != "interrupted") return false
+            previousOutput = found.output
+            previousUpdatedAt = found.updatedAt
+            found.status = "completed"
+            found.output = output.takeLast(MAX_OUTPUT)
+            found.updatedAt = System.currentTimeMillis()
+            found
+        }
+        return try {
+            persistCurrentSnapshots()
+            notifyChanged()
+            true
+        } catch (_: Exception) {
+            synchronized(lock) {
+                record.status = "interrupted"
+                record.output = previousOutput
+                record.updatedAt = previousUpdatedAt
+            }
+            notifyChanged()
+            false
+        }
+    }
+
     fun failInterrupted(id: String, detail: String): String {
         synchronized(lock) {
             val record = records[id] ?: return "后台任务不存在：$id"
