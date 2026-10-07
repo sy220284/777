@@ -28,6 +28,19 @@ data class JobInfo(
     val ownerId: String? = null,
 )
 
+data class JobStartResult(
+    val accepted: Boolean,
+    val id: String?,
+    val message: String,
+)
+
+data class JobMessageAdmission(
+    val accepted: Boolean,
+    val duplicate: Boolean,
+    val requiresResume: Boolean,
+    val message: String,
+)
+
 data class JobSnapshot(
     val id: String,
     val label: String,
@@ -171,7 +184,7 @@ class HarnessJobManager(
         ownerId = ownerId,
         expectedDurationMillis = expectedDurationMillis,
         block = block,
-    )
+    ).message
 
     fun startPersistent(
         label: String,
@@ -180,7 +193,23 @@ class HarnessJobManager(
         ownerId: String? = null,
         continuable: Boolean = false,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String {
+    ): String = startPersistentResult(
+        label = label,
+        resumeKind = resumeKind,
+        resumePayload = resumePayload,
+        ownerId = ownerId,
+        continuable = continuable,
+        block = block,
+    ).message
+
+    fun startPersistentResult(
+        label: String,
+        resumeKind: String,
+        resumePayload: String,
+        ownerId: String? = null,
+        continuable: Boolean = false,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): JobStartResult {
         require(resumeKind.isNotBlank()) { "持久任务恢复类型不能为空" }
         require(resumePayload.length <= MAX_RESUME_PAYLOAD) {
             "持久任务恢复元数据过大：最多允许 $MAX_RESUME_PAYLOAD 个字符"
@@ -215,7 +244,11 @@ class HarnessJobManager(
             }
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
-                return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
+                return JobStartResult(
+                    false,
+                    null,
+                    "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务",
+                )
             }
             previousStatus = found.status
             previousOutput = found.output
@@ -418,12 +451,18 @@ class HarnessJobManager(
         continuable: Boolean = false,
         expectedDurationMillis: Long? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String {
+    ): JobStartResult {
         val record = synchronized(lock) {
-            if (ownerId in removingOwners) return "会话正在移除，无法启动后台任务"
+            if (ownerId in removingOwners) {
+                return JobStartResult(false, null, "会话正在移除，无法启动后台任务")
+            }
             pruneRetainedLocked()
             if (records.size >= maxRetainedJobs) {
-                return "后台任务保留上限已满：请先终止不再需要的持久代理或清理已结束任务"
+                return JobStartResult(
+                    false,
+                    null,
+                    "后台任务保留上限已满：请先终止不再需要的持久代理或清理已结束任务",
+                )
             }
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
@@ -462,7 +501,11 @@ class HarnessJobManager(
             launchRecord(record, block)
             publish()
         }
-        return "后台任务已启动：${record.id}"
+        return JobStartResult(
+            accepted = true,
+            id = record.id,
+            message = "后台任务已启动：${record.id}",
+        )
     }
 
     private fun launchRecord(
