@@ -45,7 +45,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
-                val outputSchema = args["output_schema"] as? JsonObject
+                val outputSchema = args.outputSchema()
                 if (args.boolean("run_in_background", false)) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
@@ -76,7 +76,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 parentCallId = call.id,
                 modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
                 maxSteps = snapshot.subagentMaxSteps,
-                outputSchema = args["output_schema"] as? JsonObject,
+                outputSchema = args.outputSchema(),
             )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
@@ -99,12 +99,17 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
-                outputSchema = args["output_schema"] as? JsonObject,
+                outputSchema = args.outputSchema(),
                 binding = run,
                 runner = runner,
             )
             else -> error("未覆盖的 Work 代理工具：${call.name}")
         }
+    }
+
+    private fun JsonObject.outputSchema(): JsonObject? {
+        val raw = this["output_schema"] ?: return null
+        return raw as? JsonObject ?: error("output_schema 必须是 JSON object")
     }
 
     internal companion object {
