@@ -12,8 +12,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,11 +38,107 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun productionProjectionMatchesOfficialAgentTeamGolden() {
+        val official = requireNotNull(
+            javaClass.classLoader?.getResourceAsStream("official-semantic/advanced.json"),
+        ).bufferedReader().use { reader ->
+            Json.parseToJsonElement(reader.readText()).jsonObject["agentTeam"]!!.jsonObject
+        }
+        val fixture = fixture("777-agent-team")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("777-agent-team", "member-worker", "worker", "provisioning"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("777-agent-team", "member-worker", "worker", "active"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                teamId = "777-agent-team",
+                id = "task-1",
+                revision = 1,
+                blockedBy = emptyList(),
+                subject = "first",
+                writeScopes = listOf("src"),
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                teamId = "777-agent-team",
+                id = "task-2",
+                revision = 1,
+                blockedBy = listOf("task-1"),
+                subject = "second",
+                writeScopes = listOf("src/feature"),
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage("777-agent-team", "team-msg-1", "member-worker", "continue"),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            teamDelivered("777-agent-team", "team-msg-1", "member-worker"),
+        )
+
+        val projection = fixture.runtime.project("777-agent-team")
+        val native = buildJsonObject {
+            put("stateVersion", LocalAgentTeamRuntime.OFFICIAL_TEAM_PROJECTION_STATE_VERSION)
+            put("asOfSequence", projection.asOfSequence)
+            put(
+                "members",
+                JsonArray(
+                    projection.members.map { member ->
+                        buildJsonObject {
+                            put("id", member.id)
+                            put("name", member.name)
+                            put("description", member.description)
+                            put("provider", member.provider)
+                            put("context", member.context.name.lowercase())
+                            put("phase", member.phase.name.lowercase())
+                            member.error?.let { put("error", it) }
+                        }
+                    },
+                ),
+            )
+            put(
+                "tasks",
+                JsonArray(
+                    projection.tasks
+                        .filter { it.status != LocalTeamTaskStatus.DELETED }
+                        .map { task ->
+                            buildJsonObject {
+                                put("id", task.id)
+                                put("revision", task.revision)
+                                put("subject", task.subject)
+                                put("description", task.description)
+                                put("status", task.status.name.lowercase())
+                                task.ownerId?.let { put("ownerId", it) }
+                                put("blockedBy", JsonArray(task.blockedBy.map(::JsonPrimitive)))
+                                put("writeScopes", JsonArray(task.writeScopes.map(::JsonPrimitive)))
+                            }
+                        },
+                ),
+            )
+            put(
+                "pendingMessageIds",
+                JsonArray(projection.pendingMessages.map { JsonPrimitive(it.id) }),
+            )
+            put("failure", projection.failure?.let(::JsonPrimitive) ?: JsonNull)
+        }
+
+        assertEquals(official, native)
+    }
+
+    @Test
     fun rosterRequiresProvisioningBeforeActive() {
         val fixture = fixture("team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-1", "job-1", "worker", "active"),
+            member("team-a", "member-1", "worker", "active"),
         )
 
         val projection = fixture.runtime.project("team-a")
@@ -56,14 +154,12 @@ class LocalAgentTeamRuntimeTest {
         appendActiveMember(fixture.log, "team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
-            buildJsonObject {
-                put("team_id", "team-a")
-                put("id", "team-msg-1")
-                put("sender_id", "team-a")
-                put("sender_name", "lead")
-                put("target_id", "member-1")
-                put("content", "检查结果")
-            },
+            teamMessage(
+                teamId = "team-a",
+                id = "team-msg-1",
+                targetId = "member-1",
+                text = "检查结果",
+            ),
         )
 
         assertEquals(
@@ -73,11 +169,7 @@ class LocalAgentTeamRuntimeTest {
 
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
-            buildJsonObject {
-                put("team_id", "team-a")
-                put("message_id", "team-msg-1")
-                put("target_id", "member-1")
-            },
+            teamDelivered("team-a", "team-msg-1", "member-1"),
         )
 
         assertTrue(fixture.runtime.project("team-a").pendingMessages.isEmpty())
@@ -88,15 +180,15 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("fork-b")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("ancestor-a", "member-old", "job-old", "old", "provisioning"),
+            member("ancestor-a", "member-old", "old", "provisioning"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("fork-b", "member-new", "job-new", "new", "provisioning"),
+            member("fork-b", "member-new", "new", "provisioning"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("fork-b", "member-new", "job-new", "new", "active"),
+            member("fork-b", "member-new", "new", "active"),
         )
 
         val projection = fixture.runtime.project("fork-b")
@@ -171,15 +263,15 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-1", "job-1", "reviewer", "provisioning"),
+            member("team-a", "member-1", "reviewer", "provisioning"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-1", "job-1", "reviewer", "failed"),
+            member("team-a", "member-1", "reviewer", "failed"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-2", "job-2", "reviewer", "provisioning"),
+            member("team-a", "member-2", "reviewer", "provisioning"),
         )
 
         val projection = fixture.runtime.project("team-a")
@@ -212,14 +304,12 @@ class LocalAgentTeamRuntimeTest {
     fun duplicateQueuedMessageFailsClosed() {
         val fixture = fixture("team-a")
         appendActiveMember(fixture.log, "team-a")
-        val queued = buildJsonObject {
-            put("team_id", "team-a")
-            put("id", "team-msg-1")
-            put("sender_id", "team-a")
-            put("sender_name", "lead")
-            put("target_id", "member-1")
-            put("content", "检查结果")
-        }
+        val queued = teamMessage(
+            teamId = "team-a",
+            id = "team-msg-1",
+            targetId = "member-1",
+            text = "检查结果",
+        )
         fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED, queued)
         fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED, queued)
 
@@ -236,11 +326,7 @@ class LocalAgentTeamRuntimeTest {
         appendActiveMember(fixture.log, "team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
-            buildJsonObject {
-                put("team_id", "team-a")
-                put("message_id", "team-msg-missing")
-                put("target_id", "member-1")
-            },
+            teamDelivered("team-a", "team-msg-missing", "member-1"),
         )
 
         val projection = fixture.runtime.project("team-a")
@@ -255,7 +341,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-1", "job-team-missing", "reviewer", "provisioning"),
+            member("team-a", "member-missing", "reviewer", "provisioning"),
         )
 
         fixture.runtime.recoverMailbox("team-a")
@@ -326,27 +412,68 @@ class LocalAgentTeamRuntimeTest {
     private fun appendActiveMember(log: LocalSessionEventLog, teamId: String) {
         log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member(teamId, "member-1", "job-1", "worker", "provisioning"),
+            member(teamId, "member-1", "worker", "provisioning"),
         )
         log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member(teamId, "member-1", "job-1", "worker", "active"),
+            member(teamId, "member-1", "worker", "active"),
         )
     }
 
     private fun member(
         teamId: String,
         id: String,
-        jobId: String,
         name: String,
         phase: String,
     ) = buildJsonObject {
-        put("team_id", teamId)
-        put("id", id)
-        put("job_id", jobId)
-        put("name", name)
-        put("description", "")
-        put("phase", phase)
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("member", buildJsonObject {
+            put("id", id)
+            put("name", name)
+            put("description", "")
+            put("provider", "local-subagent")
+            put("context", "fresh")
+            put("phase", phase)
+        })
+    }
+
+    private fun teamMessage(
+        teamId: String,
+        id: String,
+        targetId: String,
+        text: String,
+    ) = buildJsonObject {
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("message", buildJsonObject {
+            put("id", id)
+            put("senderId", teamId)
+            put("senderName", "lead")
+            put("targetId", targetId)
+            put(
+                "content",
+                JsonArray(
+                    listOf(
+                        buildJsonObject {
+                            put("type", "text")
+                            put("text", text)
+                        },
+                    ),
+                ),
+            )
+        })
+    }
+
+    private fun teamDelivered(
+        teamId: String,
+        messageId: String,
+        targetId: String,
+    ) = buildJsonObject {
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("messageId", messageId)
+        put("targetId", targetId)
     }
 
     private fun task(
@@ -356,15 +483,20 @@ class LocalAgentTeamRuntimeTest {
         blockedBy: List<String>,
         status: String = "pending",
         ownerId: String? = null,
+        subject: String = id,
+        writeScopes: List<String> = emptyList(),
     ) = buildJsonObject {
-        put("team_id", teamId)
-        put("id", id)
-        put("revision", revision)
-        put("subject", id)
-        put("description", "")
-        put("status", status)
-        ownerId?.let { put("owner_id", it) }
-        put("blocked_by", JsonArray(blockedBy.map(::JsonPrimitive)))
-        put("write_scopes", JsonArray(emptyList()))
+        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("task", buildJsonObject {
+            put("id", id)
+            put("revision", revision)
+            put("subject", subject)
+            put("description", "")
+            put("status", status)
+            ownerId?.let { put("ownerId", it) }
+            put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
+            put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
+        })
     }
 }
