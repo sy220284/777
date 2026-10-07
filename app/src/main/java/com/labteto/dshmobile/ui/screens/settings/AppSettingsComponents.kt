@@ -51,6 +51,16 @@ internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
+internal fun SettingsGroupTitle(text: String) {
+    Text(
+        text = text,
+        style = DsType.small13Strong.withReadingWeight(),
+        color = DsTheme.colors.labelTertiary,
+        modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small, bottom = DsSpacing.tiny),
+    )
+}
+
+@Composable
 internal fun AppSettingsDivider() {
     val colors = DsTheme.colors
     Box(
