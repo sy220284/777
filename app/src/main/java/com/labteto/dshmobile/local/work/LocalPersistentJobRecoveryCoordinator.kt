@@ -198,6 +198,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
         require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
             "持久子代理恢复版本不受支持：$version"
         }
+        completedSubagentOutput(sessionId, snapshot.id)?.let { output ->
+            jobs.completeInterrupted(
+                snapshot.id,
+                output,
+                sessionId,
+            )
+            return
+        }
         val task = payload.requiredString("task")
         val profileId = payload.requiredString("profile_id")
         val model = payload.requiredString("model")
@@ -250,6 +258,23 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ).requireCompletedOutput()
             }
         }
+    }
+
+    private fun completedSubagentOutput(
+        sessionId: String,
+        backgroundJobId: String,
+    ): String? {
+        val log = eventLogFor(sessionId)
+        val latestStart = log.latestMatching(setOf("subagent/start")) { data ->
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == backgroundJobId
+        } ?: return null
+        val latestEnd = log.latestMatching(setOf("subagent/end")) { data ->
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == backgroundJobId &&
+                data["agent_id"]?.jsonPrimitive?.contentOrNull == persistentSubagentId(backgroundJobId)
+        } ?: return null
+        if (latestEnd.sequence <= latestStart.sequence) return null
+        if (latestEnd.data["status"]?.jsonPrimitive?.contentOrNull != "completed") return null
+        return latestEnd.data["output"]?.jsonPrimitive?.contentOrNull
     }
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =
