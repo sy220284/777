@@ -233,7 +233,7 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - Session owner / lease；
 - 删除与维护事务；
 - EventLog / transcript 权威事实；
-- 模型请求可重建证据、模型可见 Context / Tool Surface 版本；
+- 模型请求可重建证据、脱敏 Message / Context / Tool Surface 版本，以及按 requestUid 自动重建和一致性验证；
 - ModelHistory Checkpoint 事件水位与尾部重放；
 - Session Projection 提供统一注册底座、状态版本与 `asOfSequence` 时间切面；新接入 Projection 由 Feature 持有强类型句柄，Registry 不提供无类型全局状态读取；现有 Feature 投影按 Owner 渐进迁移，不另起第二套事实源；
 - 恢复时的所有权裁决。
