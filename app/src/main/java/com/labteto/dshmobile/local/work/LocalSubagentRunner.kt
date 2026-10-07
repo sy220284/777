@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
+import com.labteto.dshmobile.harness.jobs.JobContinuationPersistenceException
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -38,6 +39,7 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.durableToolResultContent
 import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
@@ -122,6 +124,11 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        recoveredHistory: List<JsonObject>? = null,
+        recoveredClaimedMessageIds: Set<String> = emptySet(),
+        recoveredStep: Int = 0,
+        recoveredSoftStepLimit: Int? = null,
+        resumeAfterCompletion: Boolean = false,
     ): String = runResult(
         task = task,
         inheritHistory = inheritHistory,
@@ -131,6 +138,11 @@ internal class LocalSubagentRunner(
         modelOverride = modelOverride,
         maxSteps = maxSteps,
         virtualScreen = virtualScreen,
+        recoveredHistory = recoveredHistory,
+        recoveredClaimedMessageIds = recoveredClaimedMessageIds,
+        recoveredStep = recoveredStep,
+        recoveredSoftStepLimit = recoveredSoftStepLimit,
+        resumeAfterCompletion = resumeAfterCompletion,
     ).output
 
     suspend fun runResult(
@@ -142,6 +154,11 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        recoveredHistory: List<JsonObject>? = null,
+        recoveredClaimedMessageIds: Set<String> = emptySet(),
+        recoveredStep: Int = 0,
+        recoveredSoftStepLimit: Int? = null,
+        resumeAfterCompletion: Boolean = false,
     ): LocalSubagentResult = resourceScheduler.withResource(
         HarnessResourceKind.AGENT,
         owner = "subagent:" + task.take(80),
@@ -160,6 +177,11 @@ internal class LocalSubagentRunner(
                 modelOverride = modelOverride,
                 maxSteps = maxSteps,
                 virtualScreenId = virtualScreenId,
+                recoveredHistory = recoveredHistory,
+                recoveredClaimedMessageIds = recoveredClaimedMessageIds,
+                recoveredStep = recoveredStep,
+                recoveredSoftStepLimit = recoveredSoftStepLimit,
+                resumeAfterCompletion = resumeAfterCompletion,
             )
         } finally {
             virtualScreenId?.let(releaseVirtualScreen)
@@ -175,13 +197,28 @@ internal class LocalSubagentRunner(
         modelOverride: String?,
         maxSteps: Int,
         virtualScreenId: String?,
+        recoveredHistory: List<JsonObject>?,
+        recoveredClaimedMessageIds: Set<String>,
+        recoveredStep: Int,
+        recoveredSoftStepLimit: Int?,
+        resumeAfterCompletion: Boolean,
     ): LocalSubagentResult {
-        val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        require(backgroundJobId == null || !allowMutation) {
+            "持久子代理只支持只读执行，避免冷恢复重放未知副作用"
+        }
+        val subagentId = backgroundJobId
+            ?.let(::persistentSubagentId)
+            ?: "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        val recoveringHistory = recoveredHistory != null
         val history = LocalModelHistoryBuffer().apply {
             reset(
-                if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-                else emptyList(),
+                recoveredHistory
+                    ?: if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+                    else emptyList(),
             )
+        }
+        val claimedMessageIds = linkedSetOf<String>().apply {
+            addAll(recoveredClaimedMessageIds)
         }
         val progress = ArrayDeque<String>()
         val progressTracker = LocalAgentProgressTracker()
@@ -208,7 +245,17 @@ internal class LocalSubagentRunner(
             kind = runKind,
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
-        var modelStep = 0
+        val recoveredBaseStep = recoveredStep.coerceAtLeast(0)
+        var activationStep = 0
+        var modelStep = recoveredBaseStep
+        var totalBudgetLimit = resolveSubagentTotalBudgetLimit(
+            adaptiveStepLimit = stepLimit,
+            recoveredStep = recoveredBaseStep,
+            recoveredSoftStepLimit = recoveredSoftStepLimit,
+            resumeAfterCompletion = resumeAfterCompletion,
+            maxDynamicSteps = MAX_DYNAMIC_STEPS,
+        )
+        var pendingTerminalOutput: String? = null
         val modelToolStepSurface = LocalModelToolStepSurface()
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
@@ -275,30 +322,68 @@ internal class LocalSubagentRunner(
             agentId = subagentId,
         )
 
-        try {
-            if (!inheritHistory) history.append(buildJsonObject {
-                put("role", "system")
-                put(
-                    "content",
-                    if (allowMutation) {
-                        "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
-                    } else {
-                        "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
-                    },
+        fun persistContinuationCheckpoint(
+            step: Int,
+            terminalOutput: String? = null,
+        ) {
+            val jobId = backgroundJobId ?: return
+            try {
+                eventLog().append(
+                    LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+                    encodeLocalSubagentHistoryCheckpoint(
+                        backgroundJobId = jobId,
+                        agentId = subagentId,
+                        step = step,
+                        history = durableModelHistorySnapshot(history.snapshot()),
+                        claimedMessageIds = claimedMessageIds,
+                        softStepLimit = totalBudgetLimit,
+                        terminalOutput = terminalOutput,
+                    ),
                 )
-            })
-            boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
-                val insertion = buildJsonObject {
+            } catch (error: Exception) {
+                throw JobContinuationPersistenceException(
+                    "持久子代理历史检查点写入失败",
+                    error,
+                )
+            }
+        }
+
+        try {
+            if (!recoveringHistory) {
+                if (!inheritHistory) history.append(buildJsonObject {
                     put("role", "system")
                     put(
                         "content",
-                        "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
+                        if (allowMutation) {
+                            "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。"
+                        } else {
+                            "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
+                        },
                     )
+                })
+                boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
+                    val insertion = buildJsonObject {
+                        put("role", "system")
+                        put(
+                            "content",
+                            "【父任务约束】\n$inherited\n遵守以上约束；本子任务的明确更新优先。",
+                        )
+                    }
+                    val index = if (
+                        history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+                    ) 1 else 0
+                    history.insert(index, insertion)
                 }
-                val index = if (
-                    history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
-                ) 1 else 0
-                history.insert(index, insertion)
+                history.append(buildJsonObject { put("role", "user"); put("content", task) })
+            }
+            if (recoveringHistory) {
+                history.reset(
+                    history.snapshot().filterNot { message ->
+                        message["role"]?.jsonPrimitive?.contentOrNull == "system" &&
+                            message["content"]?.jsonPrimitive?.contentOrNull
+                                ?.startsWith("【独立虚拟屏】id=") == true
+                    },
+                )
             }
             virtualScreenId?.let { id ->
                 history.append(buildJsonObject {
@@ -309,18 +394,66 @@ internal class LocalSubagentRunner(
                     )
                 })
             }
-            history.append(buildJsonObject { put("role", "user"); put("content", task) })
+            backgroundJobId?.let { jobId ->
+                val staleClaimedIds = jobs.peekMessages(jobId)
+                    .mapTo(linkedSetOf()) { it.id }
+                    .intersect(claimedMessageIds)
+                if (staleClaimedIds.isNotEmpty()) {
+                    jobs.acknowledgeMessages(jobId, staleClaimedIds, runSessionId())
+                }
+            }
+            persistContinuationCheckpoint(step = modelStep)
+            if (totalBudgetLimit <= recoveredBaseStep) {
+                return LocalSubagentResult(
+                    LocalSubagentStatus.STEP_LIMIT,
+                    "[subagent][$subagentId][STEP_LIMIT] 已恢复到第 $recoveredBaseStep 步，当前执行预算已用尽；没有重跑已完成步骤。",
+                    "STEP_LIMIT",
+                )
+            }
+            val remainingSteps = totalBudgetLimit - recoveredBaseStep
             val loop = AgentLoop(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
-                    backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
-                        history.append(buildJsonObject {
-                            put("role", "user")
-                            put("content", message)
-                        })
+                    backgroundJobId?.let { jobId ->
+                        val queuedMessages = jobs.peekMessages(jobId)
+                            .filterNot { message -> message.id in claimedMessageIds }
+                        if (queuedMessages.isNotEmpty()) {
+                            eventLog().append("subagent/inbox-claimed", buildJsonObject {
+                                put("version", 1)
+                                put("agent_id", subagentId)
+                                put("background_job_id", jobId)
+                                put("messages", JsonArray(queuedMessages.map { message ->
+                                    buildJsonObject {
+                                        put("id", message.id)
+                                        put("content", message.content)
+                                    }
+                                }))
+                            })
+                            queuedMessages.forEach { message ->
+                                history.append(buildJsonObject {
+                                    put("role", "user")
+                                    put("content", message.content)
+                                })
+                                claimedMessageIds += message.id
+                            }
+                            persistContinuationCheckpoint(step = modelStep)
+                            jobs.acknowledgeMessages(
+                                jobId,
+                                queuedMessages.mapTo(linkedSetOf()) { it.id },
+                                runSessionId(),
+                            )
+                        }
                     }
-                    compactionPolicy.beforeModelStep(historyPolicy, history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
-                    modelStep += 1
+                    compactionPolicy.beforeModelStep(
+                        historyPolicy,
+                        history,
+                        subagentId,
+                        modelStep,
+                        runHistoryBudget,
+                        runCachePolicy,
+                    )
+                    activationStep += 1
+                    modelStep = recoveredBaseStep + activationStep
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
                     if (hasLocalImageRefs(durableHistory) &&
@@ -381,7 +514,7 @@ internal class LocalSubagentRunner(
                         step = modelStep,
                     ).copy(sessionId = runSessionId())
                     onUsage(routeModel, reply, usageContext)
-                    repliesByStep[modelStep] = reply
+                    repliesByStep[activationStep] = reply
                     AgentModelReply(
                         content = reply.content.orEmpty(),
                         toolCalls = reply.toolCalls.map { call ->
@@ -405,21 +538,34 @@ internal class LocalSubagentRunner(
                 eventSink = AgentEventSink { event ->
                     when (event) {
                         is AgentEvent.AssistantObserved -> {
+                            val absoluteStep = recoveredBaseStep + event.step
                             val reply = repliesByStep.remove(event.step)
-                                ?: error("缺少子代理第 ${event.step} 步模型响应")
+                                ?: error("缺少子代理第 $absoluteStep 步模型响应")
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history.append(reply.message)
+                            pendingTerminalOutput = if (reply.toolCalls.isEmpty()) {
+                                reply.content.orEmpty().ifBlank { "子代理已结束，但没有返回文字。" }
+                            } else {
+                                null
+                            }
+                            pendingTerminalOutput?.let { terminal ->
+                                persistContinuationCheckpoint(
+                                    step = absoluteStep,
+                                    terminalOutput = terminal,
+                                )
+                            }
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
                                     progress,
-                                    "第 ${event.step} 步回复：${content.take(1_500)}",
+                                    "第 $absoluteStep 步回复：${content.take(1_500)}",
                                 )
                             }
                         }
                         is AgentEvent.ToolStarted -> {
+                            val absoluteStep = recoveredBaseStep + event.step
                             eventLog().append("subagent/tool-call", buildJsonObject {
                                 put("agent_id", subagentId)
-                                put("step", event.step)
+                                put("step", absoluteStep)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
                                 put("arguments", event.call.arguments)
@@ -427,6 +573,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
+                            val absoluteStep = recoveredBaseStep + event.step
                             progressTracker.recordToolResult(event.call, event.output, event.isError)
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
@@ -443,14 +590,14 @@ internal class LocalSubagentRunner(
                             ).modelVisibleContent()
                             historyPolicy.rememberProgress(
                                 progress,
-                                "第 ${event.step} 步 · ${event.call.name}：" +
+                                "第 $absoluteStep 步 · ${event.call.name}：" +
                                     truncateWithoutSplittingSurrogatePair(
                                         durableToolResultContent(event.output, event.retention), 1_500,
                                     ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
-                                put("step", event.step)
+                                put("step", absoluteStep)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
                                 put(
@@ -468,18 +615,29 @@ internal class LocalSubagentRunner(
                             })
                             history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         }
+                        is AgentEvent.StepFinished -> {
+                            if (pendingTerminalOutput == null) {
+                                persistContinuationCheckpoint(
+                                    step = recoveredBaseStep + event.step,
+                                )
+                            }
+                        }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("status", "completed")
-                                put("steps", event.steps)
+                                put("steps", recoveredBaseStep + event.steps)
                             })
+                            persistContinuationCheckpoint(
+                                step = recoveredBaseStep + event.steps,
+                                terminalOutput = event.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                            )
                         }
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
                                 put("status", "step_limit")
-                                put("steps", event.steps)
+                                put("steps", recoveredBaseStep + event.steps)
                             })
                         }
                         is AgentEvent.TurnCancelled -> {
@@ -498,23 +656,28 @@ internal class LocalSubagentRunner(
                         else -> Unit
                     }
                     runContext?.let { context ->
-                        runCoordinator?.recordEvent(context, event)
+                        runCoordinator?.recordEvent(
+                            context,
+                            event.withStepOffset(recoveredBaseStep),
+                        )
                     }
                 },
-                maxSteps = stepLimit,
+                maxSteps = remainingSteps,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(runProfile)
-                    if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
+                    val currentTotalLimit = recoveredBaseStep + currentLimit
+                    totalBudgetLimit = maxOf(totalBudgetLimit, currentTotalLimit)
+                    if (currentTotalLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
                     if (!progressTracker.claimExtensionProgress()) {
                         eventLog().append("subagent/budget-stopped", buildJsonObject {
                             put("agent_id", subagentId)
-                            put("steps_used", stepsUsed)
+                            put("steps_used", recoveredBaseStep + stepsUsed)
                             put("reason", "no-new-evidence")
                         })
                         return@AgentStepLimitExtender null
                     }
                     val next = nextAdaptiveAgentStepLimit(
-                        currentLimit = currentLimit,
+                        currentLimit = currentTotalLimit,
                         configuredBase = maxSteps,
                         task = task,
                         contextChars = history.encodedChars,
@@ -522,18 +685,24 @@ internal class LocalSubagentRunner(
                         pressure = resourceScheduler.snapshot().pressure,
                         kind = runKind,
                     )
-                    val boundedNext = next?.coerceAtMost(MAX_DYNAMIC_STEPS)
-                    if (boundedNext != null && boundedNext > currentLimit) {
+                    val boundedNextTotal = next?.coerceAtMost(MAX_DYNAMIC_STEPS)
+                    if (boundedNextTotal != null && boundedNextTotal > currentTotalLimit) {
+                        totalBudgetLimit = boundedNextTotal
+                        persistContinuationCheckpoint(
+                            step = recoveredBaseStep + stepsUsed,
+                        )
                         eventLog().append("subagent/budget-extended", buildJsonObject {
                             put("agent_id", subagentId)
-                            put("steps_used", stepsUsed)
-                            put("previous_limit", currentLimit)
-                            put("next_limit", boundedNext)
+                            put("steps_used", recoveredBaseStep + stepsUsed)
+                            put("previous_limit", currentTotalLimit)
+                            put("next_limit", boundedNextTotal)
                             put("context_chars", history.encodedChars)
                             put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
                         })
                     }
-                    boundedNext
+                    boundedNextTotal
+                        ?.minus(recoveredBaseStep)
+                        ?.takeIf { it > currentLimit }
                 },
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
@@ -548,7 +717,10 @@ internal class LocalSubagentRunner(
 
             val partial = progress.joinToString("\n")
             val output = buildString {
-                append("[subagent][$subagentId][STEP_LIMIT] 动态执行预算已无法继续扩展，任务在第 ${result.steps} 步暂停。")
+                append(
+                    "[subagent][$subagentId][STEP_LIMIT] 动态执行预算已无法继续扩展，任务在第 " +
+                        "${recoveredBaseStep + result.steps} 步暂停。",
+                )
                 if (partial.isNotBlank()) {
                     append("\n已完成的最近进度：\n")
                     append(partial)
@@ -584,8 +756,35 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
-        } finally { compactionPolicy.atTurnBoundary(historyPolicy, history, subagentId, runHistoryBudget, runCachePolicy) }
+        } finally {
+            compactionPolicy.atTurnBoundary(
+                historyPolicy,
+                history,
+                subagentId,
+                runHistoryBudget,
+                runCachePolicy,
+            )
+        }
     }
+
+    private fun AgentEvent.withStepOffset(offset: Int): AgentEvent {
+        if (offset == 0) return this
+        return when (this) {
+            is AgentEvent.StepStarted -> copy(step = offset + step)
+            is AgentEvent.AssistantObserved -> copy(step = offset + step)
+            is AgentEvent.ToolStarted -> copy(step = offset + step)
+            is AgentEvent.ToolFinished -> copy(step = offset + step)
+            is AgentEvent.StepFinished -> copy(step = offset + step)
+            is AgentEvent.TurnCompleted -> copy(steps = offset + steps)
+            is AgentEvent.TurnStepLimit -> copy(steps = offset + steps)
+            is AgentEvent.TurnStarted,
+            is AgentEvent.TurnFailed,
+            is AgentEvent.TurnCancelled -> this
+        }
+    }
+
+    private fun persistentSubagentId(jobId: String): String =
+        "sa-" + jobId.removePrefix("job-").take(24)
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {

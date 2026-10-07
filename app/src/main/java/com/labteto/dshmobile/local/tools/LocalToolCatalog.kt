@@ -164,7 +164,7 @@ object LocalToolCatalog {
         ), listOf("task")))
         add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
-        add(tool("send_message", "向正在运行的后台代理追加消息", properties(
+        add(tool("send_message", "向后台代理追加消息；可继续的持久子代理即使已完成或因进程中断，也会先持久排队并安全恢复同一身份", properties(
             "agent_id" to string("后台代理编号"),
             "message" to string("需要追加的消息"),
         ), listOf("agent_id", "message")))

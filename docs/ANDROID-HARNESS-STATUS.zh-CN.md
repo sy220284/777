@@ -57,12 +57,12 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - reasoning / assistant / tool call / tool result 完整模型回合。
 - 有界模型请求重试。
 - 主代理与子代理统一核心循环。
-- 普通子代理、fork 子代理、持久子代理。
+- 普通子代理、fork 子代理、持久子代理；持久只读子代理具备稳定 Agent 身份、持久 Inbox、历史 Checkpoint 与冷恢复续跑。
 - 并行 / 流水线工作流。
 - Goal / Todo / Plan。
 - 用户提问与审批。
 - 取消、停止和受控结束。
-- Agent inbox。
+- Agent inbox；前台与持久子代理统一使用 `QueuedAgentInput` 语义，满载明确拒绝，不静默丢弃旧消息。
 - Agent run checkpoint。
 
 运行归属：
@@ -110,6 +110,11 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - 尚未执行的工具：`TOOL_NOT_STARTED`。
 - 未知副作用不会在重启后自动重放。
 - durable Agent inbox 在启动 / 会话切换时恢复。
+- 持久只读子代理消息先落盘再确认；进程中断后从最近完整 Child History Checkpoint、全局 Step 水位与动态软预算继续，已进入检查点但尚未确认的 Inbox 消息不会重复注入。
+- 只有显式 `continuable=true` 的持久子代理在一次 Activation 结束后进入 `dormant`；无新消息时不占运行槽也不自动唤醒，收到新消息后重新激活同一 Child Agent 身份；旧版 `completed + continuable` 快照读取时兼容归一为 `dormant`。
+- `interrupted` 的可恢复任务与 `dormant` 的 continuable 子代理不会被普通历史裁剪静默删除；保留上限被持久对象占满时显式拒绝新任务，需先终止不再使用的持久代理。
+- 最终 assistant 已持久化但 Job 终态尚未提交时，恢复直接按终态 Checkpoint 结算；已认领但残留在 Inbox 的消息只做确认，不触发重复模型请求。
+- Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 持有自己的强类型句柄。
 - 外部进程被 Android 杀死后不能伪装成透明续跑。
 
 ## 上下文与长对话

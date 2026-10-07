@@ -47,6 +47,7 @@ internal class LocalWorkComposition @Inject constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     workMemoryRuntime: LocalWorkMemoryRuntime,
     workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
+    workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
     private val tools: LocalToolCompositionRoot,
     memoryStore: MemoryStore,
@@ -170,6 +171,7 @@ internal class LocalWorkComposition @Inject constructor(
         workRunRegistry = workRunRegistry,
         workMemoryRuntime = workMemoryRuntime,
         workModelHistoryRuntime = workModelHistoryRuntime,
+        workSessionProjection = workSessionProjection,
         workToolResultRuntime = toolResultRuntime,
         workTurnToolRuntime = turnToolRuntime,
     )

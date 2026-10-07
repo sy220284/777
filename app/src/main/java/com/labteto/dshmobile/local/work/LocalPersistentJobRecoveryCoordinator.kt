@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
@@ -25,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -84,6 +86,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             resumeKind = "subagent_readonly",
             resumePayload = payload,
             ownerSessionId = sessionId,
+            continuable = true,
         ) { jobId, _ ->
             withContext(LocalModelRunContext(runProfile)) {
                 runner.runResult(
@@ -99,6 +102,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
+    fun sendMessage(
+        agentId: String,
+        message: String,
+        sessionId: String,
+    ): String {
+        val result = jobs.send(agentId, message, sessionId)
+        if (result.startsWith("消息已发送") || result.startsWith("消息已持久排队")) {
+            schedule()
+        }
+        return result
+    }
+
     fun schedule() {
         synchronized(lock) {
             if (recoveryJob?.isActive == true) return
@@ -107,9 +122,13 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     while (true) {
                         val targetSession = currentSessionId()
                         resumePass(targetSession)
-                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedSessionId(snapshot, targetSession) == targetSession
-                        }
+                        val remaining =
+                            jobs.resumableSnapshots().any { snapshot ->
+                                interruptedSessionId(snapshot, targetSession) == targetSession
+                            } ||
+                                jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
+                                    interruptedSessionId(snapshot, targetSession) == targetSession
+                                }
                         if (!remaining) break
                         delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
                     }
@@ -124,7 +143,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     }
 
     private fun resumePass(targetSession: String) {
-        jobs.interruptedSnapshots().forEach { snapshot ->
+        jobs.resumableSnapshots().forEach { snapshot ->
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
             if (sessionId != targetSession || jobs.availableSlots() <= 0) return@forEach
@@ -132,7 +151,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 when (snapshot.resumeKind) {
                     "web_fetch" -> resumeWebFetch(snapshot, sessionId, payload)
                     "subagent_readonly" -> resumeSubagent(snapshot, sessionId, payload)
-                    else -> jobs.failInterrupted(
+                    else -> jobs.failResumable(
                         snapshot.id,
                         "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
                     )
@@ -140,7 +159,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                jobs.failInterrupted(snapshot.id, "任务无法恢复：${error.message.orEmpty().take(500)}")
+                jobs.failResumable(snapshot.id, "任务无法恢复：${error.message.orEmpty().take(500)}")
                 recordError(snapshot, sessionId, error)
             }
         }
@@ -149,7 +168,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private fun decodePayload(snapshot: JobSnapshot, fallbackSessionId: String): JsonObject? {
         val text = snapshot.resumePayload
         if (text.isNullOrBlank()) {
-            jobs.failInterrupted(snapshot.id, "任务恢复失败：缺少恢复元数据")
+            jobs.failResumable(snapshot.id, "任务恢复失败：缺少恢复元数据")
             return null
         }
         return try {
@@ -157,7 +176,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
+            jobs.failResumable(snapshot.id, "任务恢复失败：恢复元数据损坏")
             recordError(snapshot, fallbackSessionId, error)
             null
         }
@@ -199,6 +218,57 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
+        val log = eventLogFor(sessionId)
+        val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
+            data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
+        }
+        val continuation = checkpointEvent
+            ?.let { event -> decodeLocalSubagentHistoryCheckpoint(event.data) }
+
+        var pendingIds = jobs.peekMessages(snapshot.id).mapTo(hashSetOf()) { it.id }
+        if (
+            shouldSettleCompletedSubagentCheckpoint(continuation, pendingIds) &&
+            jobs.settleResumableAgentIfInboxClaimed(
+                id = snapshot.id,
+                output = continuation?.terminalOutput.orEmpty(),
+                claimedMessageIds = continuation?.claimedMessageIds.orEmpty(),
+                ownerSessionId = sessionId,
+            )
+        ) {
+            return
+        }
+        // A genuinely new message may have arrived after the first Inbox snapshot.
+        // Refresh before rebuilding the recovery tail so terminal settlement cannot
+        // overwrite a newly queued continuation request.
+        pendingIds = jobs.peekMessages(snapshot.id).mapTo(hashSetOf()) { it.id }
+
+        val recoveredTail = if (checkpointEvent != null && continuation != null) {
+            recoverClaimedMessagesAfterCheckpoint(
+                log = log,
+                backgroundJobId = snapshot.id,
+                checkpointSequence = checkpointEvent.sequence,
+                alreadyClaimed = continuation.claimedMessageIds,
+                pendingIds = pendingIds,
+            )
+        } else {
+            emptyList()
+        }
+        val recoveredHistory = continuation?.history?.let { base ->
+            if (recoveredTail.isEmpty()) {
+                base
+            } else {
+                base + recoveredTail.map { message ->
+                    buildJsonObject {
+                        put("role", "user")
+                        put("content", message.content)
+                    }
+                }
+            }
+        }
+        val recoveredClaimedIds = buildSet {
+            addAll(continuation?.claimedMessageIds.orEmpty())
+            recoveredTail.forEach { add(it.id) }
+        }
 
         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
             val profile = modelGateway.profileForRoute(profileId, model, baseUrl)
@@ -217,9 +287,62 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    recoveredHistory = recoveredHistory,
+                    recoveredClaimedMessageIds = recoveredClaimedIds,
+                    recoveredStep = continuation?.step ?: 0,
+                    recoveredSoftStepLimit = continuation?.softStepLimit,
+                    resumeAfterCompletion =
+                        shouldColdResumeCompletedSubagent(continuation, pendingIds),
                 ).requireCompletedOutput()
             }
         }
+    }
+
+    private fun recoverClaimedMessagesAfterCheckpoint(
+        log: LocalSessionEventLog,
+        backgroundJobId: String,
+        checkpointSequence: Long,
+        alreadyClaimed: Set<String>,
+        pendingIds: Set<String>,
+    ): List<QueuedAgentInput> {
+        val recovered = mutableListOf<QueuedAgentInput>()
+        val seen = alreadyClaimed.toMutableSet()
+        val scanThrough = log.latestSequence()
+        var cursor = checkpointSequence
+        var pages = 0
+        while (cursor < scanThrough) {
+            check(pages < MAX_RECOVERY_EVENT_PAGES) {
+                "持久子代理恢复事件过多，拒绝无界扫描"
+            }
+            pages += 1
+            val page = log.pageAfter(cursor, RECOVERY_EVENT_PAGE_SIZE)
+            if (page.isEmpty()) break
+            for (event in page) {
+                if (event.sequence > scanThrough) break
+                if (
+                    event.type != "subagent/inbox-claimed" ||
+                    event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != backgroundJobId
+                ) {
+                    continue
+                }
+                val messages = event.data["messages"] as? JsonArray ?: continue
+                for (raw in messages) {
+                    val data = raw as? JsonObject ?: continue
+                    val id = data["id"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: continue
+                    val content = data["content"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: continue
+                    if (id in pendingIds || !seen.add(id)) continue
+                    recovered += QueuedAgentInput(id = id, content = content, memoryInput = content)
+                }
+            }
+            val nextCursor = page.last().sequence
+            if (nextCursor <= cursor) break
+            cursor = nextCursor
+        }
+        return recovered
     }
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =
@@ -250,5 +373,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: error("恢复任务缺少 $key")
     private companion object {
         const val PERSISTENT_SUBAGENT_RESUME_VERSION = 1
+        const val RECOVERY_EVENT_PAGE_SIZE = 200
+        const val MAX_RECOVERY_EVENT_PAGES = 64
     }
 }
