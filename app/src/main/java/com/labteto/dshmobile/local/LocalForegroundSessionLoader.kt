@@ -316,7 +316,11 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private fun checkpointModelHistory(reason: String) {
         eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
-            codec.encode(durableModelHistorySnapshot(modelHistory.snapshot()), reason),
+            codec.encode(
+                messages = durableModelHistorySnapshot(modelHistory.snapshot()),
+                reason = reason,
+                asOfSequence = eventLog.latestSequence(),
+            ),
         )
         runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
     }

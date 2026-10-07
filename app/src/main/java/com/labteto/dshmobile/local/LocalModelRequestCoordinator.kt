@@ -30,6 +30,9 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
+import com.labteto.dshmobile.local.model.stableJsonSha256
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -72,6 +75,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val streamPreviewIntervalMs: Long = 50L
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
+    private val evidenceLock = Any()
+    private val toolSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
+    private val contextSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
 
     suspend fun complete(
         snapshot: LocalHarnessState,
@@ -223,6 +229,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 }
             })
         }
+        val requestUid = UUID.randomUUID().toString()
         val logMessages = redactModelImages(requestMessages)
         val contextChars = logMessages.sumOf { it.toString().length }
         val toolNames = buildJsonArray {
@@ -233,7 +240,41 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 }
             }
         }
-        log.append("request/header", buildJsonObject {
+        val requestEvidence = buildLocalRequestEvidence(requestMessages, tools)
+        val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
+        val evidenceLogSequence = log.latestSequence()
+        val toolSurfaceSeq = ensureRequestEvidenceSurface(
+            cache = toolSurfaceEvidence,
+            key = evidenceKey,
+            digest = requestEvidence.toolSchemaDigest,
+            currentLogSequence = evidenceLogSequence,
+        ) {
+            log.append("request/tool-surface", buildJsonObject {
+                put("version", REQUEST_EVIDENCE_VERSION)
+                put("digest", requestEvidence.toolSchemaDigest)
+                put("schemas", tools)
+            }).sequence
+        }
+        val contextSurfaceSeq = ensureRequestEvidenceSurface(
+            cache = contextSurfaceEvidence,
+            key = evidenceKey,
+            digest = requestEvidence.contextDigest,
+            currentLogSequence = log.latestSequence(),
+        ) {
+            log.append("request/context-surface", buildJsonObject {
+                put("version", REQUEST_EVIDENCE_VERSION)
+                put("digest", requestEvidence.contextDigest)
+                put("messages", requestEvidence.contextMessages)
+            }).sequence
+        }
+        val requestEnvelopeFingerprint = stableJsonSha256(buildJsonArray {
+            add(JsonPrimitive(routeFingerprint))
+            add(JsonPrimitive(requestEvidence.toolSchemaDigest))
+            add(JsonPrimitive(requestEvidence.contextDigest))
+        })
+        val requestHeader = log.append("request/header", buildJsonObject {
+            put("version", REQUEST_EVIDENCE_VERSION)
+            put("request_uid", requestUid)
             put("model", snapshot.modelState.model)
             put("base_url", snapshot.modelState.baseUrl)
             put("profile_id", frozenProfile.id)
@@ -290,10 +331,20 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
+            put("message_digest", requestEvidence.messageDigest)
+            put("tool_schema_digest", requestEvidence.toolSchemaDigest)
+            put("context_surface_digest", requestEvidence.contextDigest)
+            put("tool_surface_seq", toolSurfaceSeq)
+            put("context_surface_seq", contextSurfaceSeq)
+            put("request_envelope_fingerprint", requestEnvelopeFingerprint)
             put("plan_mode", snapshot.work.planMode)
             temperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
+            put("version", REQUEST_EVIDENCE_VERSION)
+            put("request_uid", requestUid)
+            put("header_seq", requestHeader.sequence)
+            put("request_envelope_fingerprint", requestEnvelopeFingerprint)
             put("step", step)
             put("model", snapshot.modelState.model)
             put("message_count", logMessages.size)
@@ -307,6 +358,17 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
+        var attemptStreamTail = ""
+        var attemptStreamChars = 0
+
+        fun appendAttemptStream(delta: String) {
+            if (delta.isEmpty()) return
+            attemptStreamChars += delta.length
+            attemptStreamTail = takeLastWithoutSplittingSurrogatePair(
+                attemptStreamTail + delta,
+                MAX_ATTEMPT_STREAM_TAIL_CHARS,
+            )
+        }
         val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -323,6 +385,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     is AgentRequestEvent.AttemptStarted -> {
                         attemptStartedNanos = System.nanoTime()
                         lastProviderError = null
+                        attemptStreamTail = ""
+                        attemptStreamChars = 0
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
@@ -384,6 +448,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             failureContextDiagnosticLogged = true
                         }
                         log.append("request/error", buildJsonObject {
+                            put("request_uid", requestUid)
+                            put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                             put("duration_ms", durationMs)
                             put("session_id", snapshot.sessionId)
                             put("step", step)
@@ -404,9 +470,16 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("detail", event.reason.take(2_000))
                         })
                         log.append("assistant/attempt", buildJsonObject {
+                            put("request_uid", requestUid)
+                            put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "failed")
+                            put("stream_total_chars", attemptStreamChars)
+                            if (attemptStreamTail.isNotEmpty()) {
+                                put("stream_tail", attemptStreamTail)
+                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
@@ -414,6 +487,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     }
                     is AgentRequestEvent.RetryScheduled -> {
                         log.append("llm/retry", buildJsonObject {
+                            put("request_uid", requestUid)
                             put("step", step)
                             put("attempt", event.attempt)
                             put("next_attempt", event.nextAttempt)
@@ -422,9 +496,16 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     }
                     is AgentRequestEvent.AttemptCancelled -> {
                         log.append("assistant/attempt", buildJsonObject {
+                            put("request_uid", requestUid)
+                            put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "cancelled")
+                            put("stream_total_chars", attemptStreamChars)
+                            if (attemptStreamTail.isNotEmpty()) {
+                                put("stream_tail", attemptStreamTail)
+                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            }
                             put("will_retry", false)
                             event.reason?.let { put("detail", it.take(2_000)) }
                         })
@@ -462,6 +543,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             }
                         }
                         log.append("request/context-overflow-recovery", buildJsonObject {
+                            put("request_uid", requestUid)
                             put("step", step)
                             put("round", overflowRound)
                             put("model", snapshot.modelState.model)
@@ -526,6 +608,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             admission = admission,
                             onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                    appendAttemptStream(visible)
                                     streamPreview.append(visible)
                                 },
                             )
@@ -533,6 +616,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             val admissionState =
                                 (cancelled as? LocalModelCancellationException)?.admissionState
                             log.append("request/cancelled", buildJsonObject {
+                                put("request_uid", requestUid)
                                 put("step", step)
                                 admissionState?.let {
                                     put("admission_state", it.name.lowercase())
@@ -550,6 +634,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         } catch (error: LocalModelException) {
                             lastProviderError = error
                             log.append("request/provider-error", buildJsonObject {
+                                put("request_uid", requestUid)
                                 put("step", step)
                                 put("code", error.code)
                                 error.status?.let { put("status", it) }
@@ -581,6 +666,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                             }
                             log.append("request/completed", buildJsonObject {
+                                put("request_uid", requestUid)
+                                put("request_envelope_fingerprint", requestEnvelopeFingerprint)
+                                put("header_seq", requestHeader.sequence)
                                 put("step", step)
                                 put("request_id", reply.requestId)
                                 put("reported", reply.usage.reported)
@@ -611,6 +699,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
                                 reply.promptCacheDiagnostic?.let { diagnostic ->
                                     log.append("request/cache-diagnostic", buildJsonObject {
+                                        put("request_uid", requestUid)
                                         put("step", step)
                                         put("type", diagnostic.type)
                                         diagnostic.reason?.let { put("reason", it) }
@@ -631,6 +720,26 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         }
     }
 
+    private fun ensureRequestEvidenceSurface(
+        cache: MutableMap<String, RequestEvidenceRef>,
+        key: String,
+        digest: String,
+        currentLogSequence: Long,
+        append: () -> Long,
+    ): Long = synchronized(evidenceLock) {
+        val existing = cache[key]
+        if (
+            existing?.digest == digest &&
+            existing.sequence <= currentLogSequence
+        ) {
+            existing.sequence
+        } else {
+            val sequence = append()
+            cache[key] = RequestEvidenceRef(digest = digest, sequence = sequence)
+            sequence
+        }
+    }
+
     private fun stablePromptCacheKey(sessionId: String, routeFingerprint: String): String {
         val raw = sessionId + "\u0000" + routeFingerprint
         return MessageDigest.getInstance("SHA-256")
@@ -639,4 +748,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             .take(64)
     }
 
+    private data class RequestEvidenceRef(
+        val digest: String,
+        val sequence: Long,
+    )
+
+    private companion object {
+        const val REQUEST_EVIDENCE_VERSION = 1
+        const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
+    }
 }

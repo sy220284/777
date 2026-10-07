@@ -40,12 +40,16 @@ internal fun restoreLocalModelHistory(
 
     var checkpointIndex = -1
     var checkpointMessages: List<JsonObject>? = null
+    var checkpointAsOfSequence: Long? = null
     for (index in events.indices.reversed()) {
         val event = events[index]
         if (event.type != ModelHistoryCheckpointCodec.EVENT_TYPE) continue
-        val decoded = codec.decode(event.data) ?: continue
+        val decoded = codec.decodeCheckpoint(event.data) ?: continue
+        val decodedWatermark = decoded.asOfSequence
+        if (decodedWatermark != null && decodedWatermark >= event.sequence) continue
         checkpointIndex = index
-        checkpointMessages = decoded
+        checkpointMessages = decoded.messages
+        checkpointAsOfSequence = decodedWatermark
         break
     }
 
@@ -56,6 +60,10 @@ internal fun restoreLocalModelHistory(
         else -> mutableListOf()
     }
     val replayStart = when {
+        checkpointIndex >= 0 && checkpointAsOfSequence != null ->
+            events.indexOfFirst { event -> event.sequence > checkpointAsOfSequence!! }
+                .takeIf { it >= 0 }
+                ?: events.size
         checkpointIndex >= 0 -> checkpointIndex + 1
         usedLegacyFallback -> events.size
         else -> 0
@@ -67,12 +75,19 @@ internal fun restoreLocalModelHistory(
     }
 
     val invalidCheckpointAfterRestore = latestCheckpointIndex > checkpointIndex
+    val checkpointNeedsWatermark =
+        checkpointMessages != null && checkpointAsOfSequence == null
     val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(history)
     return LocalModelHistoryRestore(
         messages = sanitizedHistory,
         replayedTail = replayed,
         usedLegacyFallback = usedLegacyFallback,
-        checkpointRecommended = usedLegacyFallback || replayed || invalidCheckpointAfterRestore || repairedStructure,
+        checkpointRecommended =
+            usedLegacyFallback ||
+                replayed ||
+                invalidCheckpointAfterRestore ||
+                checkpointNeedsWatermark ||
+                repairedStructure,
     )
 }
 

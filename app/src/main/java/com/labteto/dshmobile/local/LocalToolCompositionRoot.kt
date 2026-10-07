@@ -126,12 +126,15 @@ internal class LocalToolCompositionRoot @Inject constructor(
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },
-            recordExecutionStarted = { sessionId, call ->
+            recordExecutionStarted = { sessionId, call, identity ->
                 sessionStorage.eventLogs.get(sessionId).append(
                     "tool/execution-started",
                     buildJsonObject {
                         put("id", call.id)
                         put("name", call.name)
+                        put("execution_id", identity.executionId)
+                        put("root_call_id", identity.rootCallId)
+                        identity.parentExecutionId?.let { put("parent_execution_id", it) }
                     },
                 )
             },

@@ -12,10 +12,12 @@ import com.labteto.dshmobile.local.runtime.MODEL_HISTORY_CHECKPOINT_TURN_INTERVA
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.model.workSystemPrompt
+import com.labteto.dshmobile.local.model.stableJsonSha256
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -123,6 +125,10 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             state = snapshot,
         )
         val steadyStateApplied = budget.maxHistoryTokens != baseBudget.maxHistoryTokens
+        val sourceAsOfSequence = binding.eventLog.latestSequence()
+        val sourceCheckpointSequence =
+            binding.eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)?.sequence
+        val sourceMessageCount = history.snapshot().size
         val compaction = history.compact(
             compactor = compactor,
             budget = budget,
@@ -141,8 +147,14 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         binding.eventLog.append(
             "session/compaction",
             buildJsonObject {
+                put("version", 2)
+                put("source_as_of_sequence", sourceAsOfSequence)
+                sourceCheckpointSequence?.let { put("source_checkpoint_sequence", it) }
+                put("source_message_count", sourceMessageCount)
+                put("result_message_count", history.snapshot().size)
                 put("omitted_messages", compaction.omittedMessages)
                 put("summary", compaction.summary)
+                put("summary_digest", stableJsonSha256(JsonPrimitive(compaction.summary)))
                 put("estimated_tokens_before", compaction.estimatedTokensBefore)
                 put("estimated_tokens_after", compaction.estimatedTokensAfter)
                 put("extra_request_tokens", extraTokens)
@@ -163,6 +175,10 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
     ) {
         if (snapshot.sessionId != binding.sessionId) return
         val history = binding.runHandle.modelHistory
+        val sourceAsOfSequence = binding.eventLog.latestSequence()
+        val sourceCheckpointSequence =
+            binding.eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)?.sequence
+        val sourceMessageCount = history.snapshot().size
         val compaction = history.compactOverflow(
             compactor = compactor,
             summaryMode = summaryMode,
@@ -173,9 +189,15 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             compaction.estimatedTokensAfter,
         )
         binding.eventLog.append("session/compaction", buildJsonObject {
+            put("version", 2)
             put("trigger", "context-overflow")
+            put("source_as_of_sequence", sourceAsOfSequence)
+            sourceCheckpointSequence?.let { put("source_checkpoint_sequence", it) }
+            put("source_message_count", sourceMessageCount)
+            put("result_message_count", history.snapshot().size)
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
+            put("summary_digest", stableJsonSha256(JsonPrimitive(compaction.summary)))
             put("estimated_tokens_before", compaction.estimatedTokensBefore)
             put("estimated_tokens_after", compaction.estimatedTokensAfter)
         })
@@ -191,8 +213,9 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         binding.eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             checkpointCodec.encode(
-                durableModelHistorySnapshot(binding.runHandle.modelHistory.snapshot()),
-                reason,
+                messages = durableModelHistorySnapshot(binding.runHandle.modelHistory.snapshot()),
+                reason = reason,
+                asOfSequence = binding.eventLog.latestSequence(),
             ),
         )
         binding.runHandle.turnsSinceModelHistoryCheckpoint = 0

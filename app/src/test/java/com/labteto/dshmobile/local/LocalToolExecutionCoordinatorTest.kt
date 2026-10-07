@@ -196,7 +196,7 @@ class LocalToolExecutionCoordinatorTest {
         }
         val coordinator = coordinator(
             registry = registry,
-            recordExecutionStarted = { _, _ -> executionStarts += 1 },
+            recordExecutionStarted = { _, _, _ -> executionStarts += 1 },
         )
 
         val result = coordinator.execute(
@@ -210,6 +210,47 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
         assertEquals(1, executionStarts)
         assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
+    }
+
+    @Test
+    fun executionIdentityIsStableAcrossToolContextAndDurableStartCallback() = runBlocking {
+        val observedAttributes = mutableMapOf<String, Any?>()
+        var startedIdentity: LocalToolExecutionIdentity? = null
+        val registry = ToolRegistry().apply {
+            register(HarnessTool(
+                name = "identity_probe",
+                schema = functionToolSchema("identity_probe", "检查执行身份"),
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+                executor = HarnessToolExecutor { context, _, _ ->
+                    observedAttributes.putAll(context.attributes)
+                    ToolResult("ok")
+                },
+            ))
+        }
+        val coordinator = coordinator(
+            registry = registry,
+            recordExecutionStarted = { _, _, identity -> startedIdentity = identity },
+            executionIdFactory = { "exec-fixed" },
+        )
+
+        val result = coordinator.execute(
+            LocalToolCall("call-root", "identity_probe", JsonObject(emptyMap()), "{}"),
+            allowMutation = true,
+        )
+
+        assertFalse(result.isError)
+        assertEquals("exec-fixed", observedAttributes["execution_id"])
+        assertEquals("call-root", observedAttributes["root_call_id"])
+        assertEquals(
+            LocalToolExecutionIdentity(
+                executionId = "exec-fixed",
+                rootCallId = "call-root",
+            ),
+            startedIdentity,
+        )
     }
 
     @Test
@@ -230,7 +271,7 @@ class LocalToolExecutionCoordinatorTest {
         }
         val coordinator = coordinator(
             registry = registry,
-            recordExecutionStarted = { _, _ -> executionStarts += 1 },
+            recordExecutionStarted = { _, _, _ -> executionStarts += 1 },
         )
 
         val result = coordinator.executeScoped(
@@ -648,7 +689,12 @@ class LocalToolExecutionCoordinatorTest {
     private fun coordinator(
         registry: ToolRegistry,
         planMode: Boolean = false,
-        recordExecutionStarted: suspend (String, LocalToolCall) -> Unit = { _, _ -> },
+        recordExecutionStarted: suspend (
+            String,
+            LocalToolCall,
+            LocalToolExecutionIdentity,
+        ) -> Unit = { _, _, _ -> },
+        executionIdFactory: () -> String = { "exec-test" },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -656,6 +702,7 @@ class LocalToolExecutionCoordinatorTest {
         enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
+        executionIdFactory = executionIdFactory,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(
