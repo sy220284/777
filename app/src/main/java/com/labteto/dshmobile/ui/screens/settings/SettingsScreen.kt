@@ -318,7 +318,7 @@ fun SettingsScreen(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = page == SettingsDestination.ROOT,
+                    largeTitle = false,
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
@@ -335,7 +335,7 @@ fun SettingsScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                         .padding(horizontal = DsSpacing.large),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {

@@ -428,7 +428,7 @@ fun ToolsScreen(
                     subtitle = stringResource(R.string.tools_subtitle),
                     onBack = onClose,
                     backContentDescription = stringResource(R.string.common_back),
-                largeTitle = true,
+                    largeTitle = false,
                     actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
@@ -455,7 +455,7 @@ fun ToolsScreen(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = DsSpacing.large),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(

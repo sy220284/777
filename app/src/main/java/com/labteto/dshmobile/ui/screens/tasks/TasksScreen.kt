@@ -144,14 +144,14 @@ private fun WorkTasksScreen(
                     .fillMaxSize()
                     .safeDrawingPadding()
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsTopBar(
                     title = stringResource(R.string.tasks_title),
                     subtitle = stringResource(R.string.tasks_subtitle),
                     onBack = navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = true,
+                    largeTitle = false,
                     actionIcon = if (showCreate) null else FeatherIcons.Plus,
                     actionContentDescription = stringResource(R.string.tasks_new),
                     onAction = ::startCreate,

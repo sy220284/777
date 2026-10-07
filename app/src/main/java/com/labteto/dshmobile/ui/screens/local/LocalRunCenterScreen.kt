@@ -78,7 +78,7 @@ internal fun LocalRunCenterScreen(
                 title = stringResource(R.string.local_run_center),
                 onBack = onDismiss,
                 backContentDescription = stringResource(R.string.common_back),
-                largeTitle = true,
+                largeTitle = false,
                 actionIcon = FeatherIcons.Plus,
                 actionContentDescription = stringResource(R.string.local_run_agent_start),
                 onAction = { showAgentLauncher = true },
