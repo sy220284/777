@@ -77,10 +77,10 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
             }
             "list_agents" -> jobs.listAgents(run.sessionId)
-            "send_message" -> jobs.send(
-                args.string("agent_id"),
-                args.string("message"),
-                run.sessionId,
+            "send_message" -> persistentJobs.sendMessage(
+                agentId = args.string("agent_id"),
+                message = args.string("message"),
+                sessionId = run.sessionId,
             )
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), run.sessionId)
             "workflow" -> subagents.runWorkflow(
