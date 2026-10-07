@@ -164,12 +164,22 @@ internal class LocalWorkComposition @Inject constructor(
     private val agentTeams by lazy {
         LocalAgentTeamRuntime(
             jobs = runtimeStateStore.jobManager,
-            startTeammate = { binding, requestedJobId, task, model, maxSteps ->
+            startTeammate = {
+                    binding,
+                    requestedJobId,
+                    task,
+                    model,
+                    maxSteps,
+                    context,
+                    parentCallId,
+                ->
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
                     model = model,
                     maxSteps = maxSteps,
                     virtualScreen = false,
+                    forkParentCallId =
+                        parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
                     sessionId = binding.sessionId,
                     boundState = binding.aggregateSnapshot(),
                     historySnapshot = binding.runHandle.modelHistory::snapshot,
