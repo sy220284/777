@@ -50,6 +50,7 @@ fun DsTopBar(
     onAction: (() -> Unit)? = null,
     largeTitle: Boolean = false,
     actionPainter: Painter? = null,
+    backIcon: ImageVector = FeatherIcons.ArrowLeft,
 ) {
     val colors = DsTheme.colors
     Box(
@@ -58,7 +59,7 @@ fun DsTopBar(
             .heightIn(min = DsMetrics.topBarHeight),
     ) {
         DsIconButton(
-            icon = FeatherIcons.ArrowLeft,
+            icon = backIcon,
             contentDescription = backContentDescription,
             onClick = onBack,
             modifier = Modifier.align(Alignment.CenterStart),
