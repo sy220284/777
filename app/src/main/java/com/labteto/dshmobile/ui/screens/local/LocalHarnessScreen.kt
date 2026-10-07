@@ -83,6 +83,7 @@ import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
+import com.labteto.dshmobile.local.presentation.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -298,6 +299,31 @@ fun LocalHarnessScreen(
             actions = shellActions,
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
+            onOpenWorkspace = {
+                filesMode = LocalFilesMode.WORKSPACE
+                pushFeature(LocalFeaturePage.WORKSPACE)
+            },
+            onOpenTasks = {
+                taskMode = null
+                pushFeature(LocalFeaturePage.TASKS)
+            },
+            onOpenTools = { pushFeature(LocalFeaturePage.TOOLS) },
+            onOpenPersonaGallery = {
+                if (viewModel.hasUnsavedCurrentPersona()) {
+                    showPersonaGallerySavePrompt = true
+                } else {
+                    pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                }
+            },
+            onOpenGroupChat = {
+                val established = findEstablishedGroupChatSession(shell.sessions)?.id
+                if (established != null) {
+                    if (viewModel.switchSession(established)) resetFeatureNavigation()
+                } else {
+                    showGroupSetup = true
+                }
+            },
+            onOpenDiary = { pushFeature(LocalFeaturePage.DIARY) },
             onNewSession = { showNewSessionMode = true },
         ),
         localChatFeatureUiContribution(
