@@ -44,6 +44,8 @@ internal class LocalFileObservationCache(
     internal fun size(): Int = synchronized(entries) { entries.size }
 }
 
+private const val MAX_MODEL_SKILL_LIST = 128
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -363,6 +365,36 @@ class LocalWorkspace(
                 '\\' !in normalized,
         ) { "技能名称只能是 .dsh/skills 下的直接子目录名" }
         return read(".dsh/skills/$normalized/SKILL.md", 1, 800)
+    }
+
+    /** Model-facing skill catalog. User-only skills stay installed but are hidden from tools. */
+    fun modelSkillCatalog(): String {
+        val visible = skills().take(MAX_MODEL_SKILL_LIST)
+            .map { name ->
+                val raw = readSkill(name).lineSequence()
+                    .map { it.substringAfter(": ", it) }
+                    .joinToString("\n")
+                parseLocalSkillMetadata(name, raw)
+            }
+            .filter(LocalSkillMetadata::modelInvocable)
+        if (visible.isEmpty()) return "未安装可由模型调用的技能"
+        return visible.joinToString("\n") { skill ->
+            val description = skill.description.ifBlank { "无描述" }
+            val guidance = skill.whenToUse?.let { "；适用：$it" }.orEmpty()
+            "${skill.name}：$description$guidance"
+        }
+    }
+
+    /** Model tool access must respect user-only metadata; direct user access remains unchanged. */
+    fun readModelSkill(name: String): String {
+        val content = readSkill(name)
+        val raw = content.lineSequence()
+            .map { it.substringAfter(": ", it) }
+            .joinToString("\n")
+        require(parseLocalSkillMetadata(name.trim(), raw).modelInvocable) {
+            "SKILL_USER_ONLY：此技能仅支持用户主动调用"
+        }
+        return content
     }
 
     /** Validate a deliverable before the model presents it. */

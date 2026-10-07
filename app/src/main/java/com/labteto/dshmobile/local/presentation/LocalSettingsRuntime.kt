@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
@@ -36,6 +38,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
     private val web: LocalWebProvider,
     private val sessionStorage: LocalSessionStorageRuntime,
+    private val approvalPreferences: LocalApprovalPreferences,
     runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val runtimeState = runtimeStateStore.state
@@ -43,6 +46,9 @@ class LocalSettingsRuntime @Inject internal constructor(
     val initialState get() = runtimeState.value.toSettingsUiState()
     val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
     val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
+    val approvalMode: StateFlow<LocalApprovalMode> = approvalPreferences.approvalMode
+
+    fun configureApprovalMode(mode: LocalApprovalMode) = approvalPreferences.setApprovalMode(mode)
 
     fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)

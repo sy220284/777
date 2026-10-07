@@ -279,10 +279,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             } else {
                 root.execution.searchCapabilities(args.string("query"), binding.enabledOptionalTools)
             }
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readSkill)
-                ?: workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
-            "list_skills" -> workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
-            "read_skill" -> workspace.readSkill(args.string("name"))
+            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readModelSkill)
+                ?: workspace.modelSkillCatalog()
+            "list_skills" -> workspace.modelSkillCatalog()
+            "read_skill" -> workspace.readModelSkill(args.string("name"))
             "session_search" -> sessionAccess.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)

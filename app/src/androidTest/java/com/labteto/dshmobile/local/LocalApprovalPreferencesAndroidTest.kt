@@ -44,6 +44,7 @@ class LocalApprovalPreferencesAndroidTest {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
         LocalApprovalPreferences(shared).setApprovalMode(LocalApprovalMode.AUTO)
         assertEquals(LocalApprovalMode.AUTO, LocalApprovalPreferences(shared).currentMode())
+        assertFalse(shared.contains("safe_auto_approval"))
 
         LocalApprovalPreferences(shared).setApprovalMode(LocalApprovalMode.MANUAL)
         val restored = LocalApprovalPreferences(shared)
@@ -59,6 +60,20 @@ class LocalApprovalPreferencesAndroidTest {
         val restored = LocalApprovalPreferences(shared)
         assertEquals(LocalApprovalMode.AUTO, restored.currentMode())
         assertTrue(restored.isSafeAutoApprovalEnabled())
+        assertFalse(shared.contains("safe_auto_approval"))
+    }
+
+    @Test
+    fun staleLegacyBooleanIsRemovedWithoutOverridingExplicitMode() {
+        val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        shared.edit()
+            .putString("approval_mode", "manual")
+            .putBoolean("safe_auto_approval", true)
+            .commit()
+        val preferences = LocalApprovalPreferences(shared)
+
+        assertEquals(LocalApprovalMode.MANUAL, preferences.currentMode())
+        assertFalse(shared.contains("safe_auto_approval"))
     }
 
     @Test
