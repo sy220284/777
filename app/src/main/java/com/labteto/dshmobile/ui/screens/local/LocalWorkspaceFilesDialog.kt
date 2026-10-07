@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -16,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,20 +30,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -362,12 +366,9 @@ private fun LocalFileList(
             val path = prefix + name
             val file = filesByPath[path]
             if (file == null) {
-                DsCategoryRow(
-                    icon = FeatherIcons.Folder,
-                    title = name,
-                    subtitle = stringResource(R.string.panel_folder),
+                LocalDirectoryRow(
+                    name = name,
                     onClick = { onDirectory(path) },
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
                 )
             } else {
                 LocalFileRow(file) { scope.launch { onOpen(file) } }
@@ -377,14 +378,132 @@ private fun LocalFileList(
 }
 
 @Composable
-private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
-    DsCategoryRow(
-        icon = FeatherIcons.FileText,
-        title = file.path.substringAfterLast('/'),
-        subtitle = "${file.path} · ${formatBytes(file.bytes)}",
+private fun LocalDirectoryRow(
+    name: String,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val dark = colors.bgBase.luminance() < 0.5f
+    Surface(
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = DsSpacing.medium),
-    )
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium),
+        shape = DsShapes.row,
+        color = colors.bgBase,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 62.dp)
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Image(
+                painter = painterResource(
+                    if (dark) R.drawable.ic_kimi_filefolder_dark
+                    else R.drawable.ic_kimi_filefolder_light,
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    name,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.panel_folder),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 1,
+                )
+            }
+            Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
+    val colors = DsTheme.colors
+    val fileName = file.path.substringAfterLast('/')
+    val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    val icon = when (extension) {
+        "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "go", "rs", "swift",
+        "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" -> FeatherIcons.Code
+        "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" -> FeatherIcons.Image
+        else -> FeatherIcons.FileText
+    }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium),
+        shape = DsShapes.row,
+        color = colors.bgBase,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 62.dp)
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = DsShapes.row,
+                color = colors.bgModulePlatform,
+            ) {
+                androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = colors.labelSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    fileName,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${file.path} · ${formatBytes(file.bytes)}",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
 }
 
 @Composable
