@@ -72,6 +72,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         maxSteps: Int,
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
+        toolAllowlist: Set<String>? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -82,6 +83,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         maxSteps = maxSteps,
         virtualScreen = virtualScreen,
         outputSchema = outputSchema,
+        toolAllowlist = toolAllowlist,
         sessionId = sessionId,
         boundState = boundState,
         historySnapshot = historySnapshot,
@@ -94,6 +96,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         maxSteps: Int,
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
+        toolAllowlist: Set<String>? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -108,6 +111,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             virtualScreen = virtualScreen,
             historyMode = LocalSubagentHistoryMode.ISOLATED,
             maxDepth = 1,
+            toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
         )
         validateLocalSubagentLaunchSpec(
