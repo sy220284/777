@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -98,7 +96,7 @@ internal fun SortChip(byRecency: Boolean, onPick: (byRecency: Boolean) -> Unit) 
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
                 Icon(
-                    Icons.Filled.SwapVert,
+                    FeatherIcons.ArrowUpDown,
                     contentDescription = stringResource(R.string.chatlist_sort_title),
                     tint = colors.labelTertiary,
                     modifier = Modifier.size(16.dp),
