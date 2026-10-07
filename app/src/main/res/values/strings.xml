@@ -299,6 +299,13 @@
     <string name="presets_system">内置</string>
     <string name="presets_user">自定义</string>
     <string name="settings_title">设置</string>
+    <string name="tools_catalog_title">插件</string>
+    <string name="tools_catalog_search">搜索插件</string>
+    <string name="tools_catalog_installed">已安装</string>
+    <string name="tools_catalog_connections">服务扩展</string>
+    <string name="tools_catalog_empty">当前列表中暂无可用的插件</string>
+    <string name="tools_catalog_details">查看</string>
+    <string name="tools_catalog_return_chat">返回对话</string>
     <string name="settings_plugins">插件</string>
     <string name="settings_plugins_inventory">插件清单</string>
     <string name="settings_appearance">外观</string>
