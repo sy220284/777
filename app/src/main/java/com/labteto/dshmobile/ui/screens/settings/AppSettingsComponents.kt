@@ -66,7 +66,7 @@ internal fun AppSettingsDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = 56.dp, end = DsSpacing.medium)
+            .padding(start = 54.dp, end = DsSpacing.medium)
             .height(1.dp)
             .background(colors.borderL1),
     )
@@ -85,19 +85,19 @@ internal fun AppSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = 52.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
         icon?.let {
-            Box(
-                modifier = Modifier.size(32.dp).clip(DsShapes.row).background(colors.bgModulePlatform),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(it, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(18.dp))
-            }
+            Icon(
+                it,
+                contentDescription = null,
+                tint = colors.labelPrimary,
+                modifier = Modifier.size(22.dp),
+            )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
             Text(
