@@ -94,7 +94,7 @@ internal fun LocalConversationComposer(
     val canSend = !state.loading &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
-    val attachmentLabel = stringResource(R.string.chat_composer_add_attachment)
+    val moreActionsLabel = stringResource(R.string.local_composer_more_actions)
     val replySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
     val replySuggestionsAvailable =
         state.usageMode == LocalUsageMode.CHAT &&
@@ -136,7 +136,7 @@ internal fun LocalConversationComposer(
         if (state.running) return
         DsComposerAction(
             icon = FeatherIcons.Plus,
-            contentDescription = attachmentLabel,
+            contentDescription = moreActionsLabel,
             onClick = onOpenAttachmentPicker,
             tint = colors.labelPrimary,
             containerColor = colors.hoverSolid,
@@ -193,7 +193,7 @@ internal fun LocalConversationComposer(
 
     DsConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
-        shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+        shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
         // the IME is already animating the whole surface.
         animateSize = false,
