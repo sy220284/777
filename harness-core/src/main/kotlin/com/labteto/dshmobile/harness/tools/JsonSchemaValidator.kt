@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.harness.tools
 
+import java.math.BigDecimal
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
@@ -23,6 +23,17 @@ object JsonSchemaValidator {
     )
 
     fun validate(
+        value: JsonElement,
+        schema: JsonObject,
+        path: String = "$",
+    ): String? {
+        validateSchema(schema)?.let { problem ->
+            return "$path schema 无效：$problem"
+        }
+        return validateValue(value, schema, path)
+    }
+
+    internal fun validateTrusted(
         value: JsonElement,
         schema: JsonObject,
         path: String = "$",
@@ -61,6 +72,44 @@ object JsonSchemaValidator {
                 return "$path 根类型必须是 object"
             }
 
+            listOf("title", "description").forEach { keyword ->
+                current[keyword]?.let { raw ->
+                    val primitive = raw as? JsonPrimitive
+                        ?: return "$path.$keyword 必须是字符串"
+                    if (!primitive.isString) return "$path.$keyword 必须是字符串"
+                }
+            }
+
+            fun requireTypeForKeywords(
+                expected: Set<String>,
+                keywords: Set<String>,
+            ): String? {
+                val present = keywords.filterTo(linkedSetOf()) { it in current }
+                if (present.isEmpty()) return null
+                if (type !in expected) {
+                    return path + " 关键字 " + present.joinToString(",") +
+                        " 要求 type 为 " + expected.sorted().joinToString(" 或 ")
+                }
+                return null
+            }
+
+            requireTypeForKeywords(
+                expected = setOf("object"),
+                keywords = setOf("properties", "required", "additionalProperties"),
+            )?.let { return it }
+            requireTypeForKeywords(
+                expected = setOf("array"),
+                keywords = setOf("items", "minItems", "maxItems"),
+            )?.let { return it }
+            requireTypeForKeywords(
+                expected = setOf("string"),
+                keywords = setOf("minLength", "maxLength"),
+            )?.let { return it }
+            requireTypeForKeywords(
+                expected = setOf("integer", "number"),
+                keywords = setOf("minimum", "maximum"),
+            )?.let { return it }
+
             val properties = current["properties"]
             if (properties != null && properties !is JsonObject) {
                 return "$path.properties 必须是对象"
@@ -86,12 +135,12 @@ object JsonSchemaValidator {
             }
 
             val additional = current["additionalProperties"]
-            if (
-                additional != null &&
-                additional !is JsonObject &&
-                (additional as? JsonPrimitive)?.booleanOrNull == null
-            ) {
-                return "$path.additionalProperties 必须是布尔值或对象 schema"
+            if (additional != null && additional !is JsonObject) {
+                val primitive = additional as? JsonPrimitive
+                    ?: return "$path.additionalProperties 必须是布尔值或对象 schema"
+                if (primitive.isString || primitive.booleanOrNull == null) {
+                    return "$path.additionalProperties 必须是布尔值或对象 schema"
+                }
             }
 
             (properties as? JsonObject)?.forEach { (name, child) ->
@@ -124,21 +173,51 @@ object JsonSchemaValidator {
             nonNegativeInteger("minLength")?.let { return it }
             nonNegativeInteger("maxLength")?.let { return it }
 
-            fun finiteNumber(keyword: String): String? {
-                val raw = current[keyword] ?: return null
-                val value = (raw as? JsonPrimitive)
-                    ?.takeIf { !it.isString }
-                    ?.doubleOrNull
-                    ?: return "$path.$keyword 必须是有限数字"
-                if (!value.isFinite()) return "$path.$keyword 必须是有限数字"
-                return null
+            fun integerKeyword(keyword: String): Long? =
+                current[keyword]?.let { raw ->
+                    (raw as? JsonPrimitive)
+                        ?.takeIf { !it.isString }
+                        ?.longOrNull
+                }
+            val minItems = integerKeyword("minItems")
+            val maxItems = integerKeyword("maxItems")
+            if (minItems != null && maxItems != null && minItems > maxItems) {
+                return path + ".minItems 不能大于 maxItems"
             }
-            finiteNumber("minimum")?.let { return it }
-            finiteNumber("maximum")?.let { return it }
+            val minLength = integerKeyword("minLength")
+            val maxLength = integerKeyword("maxLength")
+            if (minLength != null && maxLength != null && minLength > maxLength) {
+                return path + ".minLength 不能大于 maxLength"
+            }
+
+            fun exactNumber(keyword: String): Pair<BigDecimal?, String?> {
+                val raw = current[keyword] ?: return null to null
+                val primitive = raw as? JsonPrimitive
+                    ?: return null to "$path.$keyword 必须是有限数字"
+                if (primitive.isString) return null to "$path.$keyword 必须是有限数字"
+                val value = primitive.bigDecimalOrNull()
+                    ?: return null to "$path.$keyword 必须是有限数字"
+                return value to null
+            }
+            val (minimum, minimumError) = exactNumber("minimum")
+            minimumError?.let { return it }
+            val (maximum, maximumError) = exactNumber("maximum")
+            maximumError?.let { return it }
+            if (minimum != null && maximum != null && minimum > maximum) {
+                return path + ".minimum 不能大于 maximum"
+            }
 
             val enumValues = current["enum"]
-            if (enumValues != null && enumValues !is JsonArray) {
-                return "$path.enum 必须是数组"
+            if (enumValues != null) {
+                val values = enumValues as? JsonArray ?: return path + ".enum 必须是数组"
+                if (values.isEmpty()) return path + ".enum 不能为空"
+                values.indices.forEach { left ->
+                    for (right in left + 1 until values.size) {
+                        if (jsonSchemaEquals(values[left], values[right])) {
+                            return path + ".enum 不能包含重复值"
+                        }
+                    }
+                }
             }
             return null
         }
@@ -194,33 +273,43 @@ object JsonSchemaValidator {
             "string" -> {
                 val primitive = value as? JsonPrimitive
                 if (primitive == null || !primitive.isString) return "$path 必须是字符串"
+                val length = Character.codePointCount(
+                    primitive.content,
+                    0,
+                    primitive.content.length,
+                ).toLong()
                 schema["minLength"]?.jsonPrimitive?.longOrNull?.let { minimum ->
-                    if (primitive.content.length < minimum) return "$path 长度不能小于 $minimum"
+                    if (length < minimum) return "$path 长度不能小于 $minimum"
                 }
                 schema["maxLength"]?.jsonPrimitive?.longOrNull?.let { maximum ->
-                    if (primitive.content.length > maximum) return "$path 长度不能大于 $maximum"
+                    if (length > maximum) return "$path 长度不能大于 $maximum"
                 }
             }
             "integer" -> {
                 val primitive = value as? JsonPrimitive
-                val number = primitive?.takeIf { !it.isString }?.longOrNull
+                val number = primitive
+                    ?.takeIf { !it.isString }
+                    ?.bigDecimalOrNull()
                     ?: return "$path 必须是整数"
-                schema["minimum"]?.jsonPrimitive?.longOrNull?.let { minimum ->
-                    if (number < minimum) return "$path 不能小于 $minimum"
+                if (!number.isMathematicalInteger()) return "$path 必须是整数"
+                schema.bound("minimum")?.let { minimum ->
+                    if (number < minimum) return "$path 不能小于 ${minimum.toString()}"
                 }
-                schema["maximum"]?.jsonPrimitive?.longOrNull?.let { maximum ->
-                    if (number > maximum) return "$path 不能大于 $maximum"
+                schema.bound("maximum")?.let { maximum ->
+                    if (number > maximum) return "$path 不能大于 ${maximum.toString()}"
                 }
             }
             "number" -> {
                 val primitive = value as? JsonPrimitive
-                val number = primitive?.takeIf { !it.isString }?.doubleOrNull
-                if (number == null || !number.isFinite()) return "$path 必须是有限数字"
-                schema["minimum"]?.jsonPrimitive?.doubleOrNull?.let { minimum ->
-                    if (number < minimum) return "$path 不能小于 $minimum"
+                val number = primitive
+                    ?.takeIf { !it.isString }
+                    ?.bigDecimalOrNull()
+                    ?: return "$path 必须是有限数字"
+                schema.bound("minimum")?.let { minimum ->
+                    if (number < minimum) return "$path 不能小于 ${minimum.toString()}"
                 }
-                schema["maximum"]?.jsonPrimitive?.doubleOrNull?.let { maximum ->
-                    if (number > maximum) return "$path 不能大于 $maximum"
+                schema.bound("maximum")?.let { maximum ->
+                    if (number > maximum) return "$path 不能大于 ${maximum.toString()}"
                 }
             }
             "boolean" -> {
@@ -232,10 +321,46 @@ object JsonSchemaValidator {
         }
 
         val enumValues = schema["enum"] as? JsonArray
-        if (enumValues != null && enumValues.none { it == value }) {
+        if (enumValues != null && enumValues.none { jsonSchemaEquals(it, value) }) {
             return "$path 不在允许枚举值中"
         }
         return null
+    }
+
+    private fun JsonObject.bound(keyword: String): BigDecimal? =
+        (this[keyword] as? JsonPrimitive)
+            ?.takeIf { !it.isString }
+            ?.bigDecimalOrNull()
+
+    private fun JsonPrimitive.bigDecimalOrNull(): BigDecimal? =
+        runCatching { BigDecimal(content) }.getOrNull()
+
+    private fun BigDecimal.isMathematicalInteger(): Boolean =
+        stripTrailingZeros().scale() <= 0
+
+    private fun jsonSchemaEquals(left: JsonElement, right: JsonElement): Boolean = when {
+        left is JsonObject && right is JsonObject ->
+            left.keys == right.keys &&
+                left.all { (key, child) ->
+                    right[key]?.let { jsonSchemaEquals(child, it) } == true
+                }
+        left is JsonArray && right is JsonArray ->
+            left.size == right.size &&
+                left.indices.all { index -> jsonSchemaEquals(left[index], right[index]) }
+        left is JsonPrimitive && right is JsonPrimitive -> {
+            if (left.isString || right.isString) {
+                left.isString == right.isString && left.content == right.content
+            } else {
+                val leftNumber = left.bigDecimalOrNull()
+                val rightNumber = right.bigDecimalOrNull()
+                if (leftNumber != null && rightNumber != null) {
+                    leftNumber.compareTo(rightNumber) == 0
+                } else {
+                    left.content == right.content
+                }
+            }
+        }
+        else -> left == right
     }
 
     private val supportedKeywords = setOf(
