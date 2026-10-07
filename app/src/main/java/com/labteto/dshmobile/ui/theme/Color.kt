@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * DeepSeek Harness design tokens, ported from
+ * Kimi default surfaces with retained optional accent palettes; originally ported from
  * packages/client/ui-theme/src/styles/design-platform.css (harness repo).
  * Static primitive scales + semantic alias tokens for light and dark.
  */
@@ -33,8 +33,7 @@ object Ds {
     val Bluish950 = Color(0xFF141A19)
     val Bluish1000 = Color(0xFF0F1514)
 
-    // Celadon accent (青瓷) — the brand-family scale replacing DeepSeek blue as the
-    // interactive color. Low saturation on purpose: 清新 without shouting.
+    // Legacy celadon scale remains available for saved appearance presets.
     val Celadon50 = Color(0xFFEDF6F5)
     val Celadon100 = Color(0xFFDCEEEC)
     val Celadon200 = Color(0xFFBFE0DD)
@@ -52,7 +51,18 @@ object Ds {
     val FamilyPurpleDeep = Color(0xFF4A4370)
     val FamilyCyanDeep = Color(0xFF3D5872)
 
-    // DeepSeek brand blue — kept as reference scale; no longer the interactive accent.
+    // Kimi interaction blue. The UI itself stays monochrome; blue is reserved for selection,
+    // links, focus and primary interactive state.
+    val Kimi50 = Color(0xFFF2F7FF)
+    val Kimi100 = Color(0xFFE8F2FF)
+    val Kimi200 = Color(0xFFCFE3FF)
+    val Kimi400 = Color(0xFF5A9BFF)
+    val Kimi500 = Color(0xFF356BFD)
+    val Kimi600 = Color(0xFF1783FF)
+    val Kimi700 = Color(0xFF126AD1)
+    val Kimi900 = Color(0xFF132F57)
+
+    // DeepSeek reference scale kept for compatibility with existing saved settings.
     val Deepseek50 = Color(0xFFEDF3FE)
     val Deepseek100 = Color(0xFFE4EDFD)
     val Deepseek200 = Color(0xFFD3E2FF)
@@ -101,25 +111,25 @@ object Ds {
 object DsLight {
     // Paper canvas with white floating surfaces, matching the mobile-first hierarchy used
     // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF7F7F5)
+    val bgBase = Color(0xFFF7F7F7)
     val bgLayer1 = Color(0xFFFFFFFF)
     val bgLayer2 = Color(0xFFFFFFFF)
     val bgLayer3 = Color(0xFFFFFFFF)
-    val bgModulePlatform = Color(0xFFF1F1EF)
+    val bgModulePlatform = Color(0xFFF5F5F5)
     val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
     val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
     val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
     val brandPrimary = Ds.Bluish1000 // ink button fill
     val onBrandPrimary = Color(0xFFFFFFFF)
-    val labelPrimary = Ds.Bluish1000
-    val labelSecondary = Ds.Bluish700
-    val labelTertiary = Ds.Bluish600
-    val labelCaption = Ds.Bluish400
-    val labelDimmed = Ds.Bluish200
-    val accent = Ds.Celadon600
+    val labelPrimary = Color(0xFF121212)
+    val labelSecondary = Color(0xFF353535)
+    val labelTertiary = Color(0xFF8F909A)
+    val labelCaption = Color(0xFFC6C6D0)
+    val labelDimmed = Color(0xFFE2E2E6)
+    val accent = Ds.Kimi600
     val onAccent = Color(0xFFFFFFFF)
-    val accentTertiary = Ds.Celadon100
-    val accentHover = Ds.Celadon500
+    val accentTertiary = Ds.Kimi100
+    val accentHover = Ds.Kimi500
     val hover = Color(0x0F1E3230) // rgba(30,50,48,.06)
     val hoverSolid = Color(0xFFF1F1EF)
     val hoverAccent = Color(0x241E3230) // rgba(30,50,48,.14)
@@ -127,8 +137,8 @@ object DsLight {
     val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
     val buttonPrimaryHover = Ds.Bluish750
     val buttonPrimaryDimmed = Ds.Bluish100
-    val buttonInfoFill = Ds.Celadon600
-    val buttonInfoHover = Ds.Celadon500
+    val buttonInfoFill = Ds.Kimi600
+    val buttonInfoHover = Ds.Kimi500
     val error = Ds.Red600
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red50
@@ -150,14 +160,14 @@ object DsLight {
      * shape stopped reading, and a message you cannot tell apart from the assistant's is a worse
      * failure than a fill that is a shade off the reference.
      */
-    val userBubble = Ds.Celadon100
-    val userBubbleHighlight = Ds.Celadon200
+    val userBubble = Color(0xFFF5F5F5)
+    val userBubbleHighlight = Color(0xFFEDEDED)
     val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF7F7F5)
-    val sidebarNavActive = Color(0xFFE9E9E6)
-    val sidebarNavAccent = Ds.Celadon100
-    val sidebarNavHover = Color(0xFFF1F1EF)
-    val tipSurface = Ds.Bluish60
+    val sidebar = Color(0xFFF7F7F7)
+    val sidebarNavActive = Color(0xFFECECEC)
+    val sidebarNavAccent = Ds.Kimi100
+    val sidebarNavHover = Color(0xFFF1F1F1)
+    val tipSurface = Color(0xFFF5F5F5)
     val codeBlockBg = Ds.Bluish50
     val codeBlockBanner = Ds.Bluish50
     val inlineCode = Ds.Bluish100
@@ -168,25 +178,25 @@ object DsLight {
 
 /** Semantic alias tokens for the dark theme. */
 object DsDark {
-    val bgBase = Color(0xFF10100F)
-    val bgLayer1 = Color(0xFF191918)
-    val bgLayer2 = Color(0xFF222220)
-    val bgLayer3 = Color(0xFF2B2B28)
-    val bgModulePlatform = Color(0xFF222220)
+    val bgBase = Color(0xFF121212)
+    val bgLayer1 = Color(0xFF1A1A1A)
+    val bgLayer2 = Color(0xFF1F1F1F)
+    val bgLayer3 = Color(0xFF282828)
+    val bgModulePlatform = Color(0xFF242424)
     val borderL1 = Color(0x0FFFFFFF) // rgba(255,255,255,.06)
     val borderL2 = Color(0x1FFFFFFF) // rgba(255,255,255,.12)
     val borderL3 = Color(0x29FFFFFF) // rgba(255,255,255,.16)
     val brandPrimary = Ds.Bluish50 // inverted ink button fill
     val onBrandPrimary = Ds.Bluish1000
-    val labelPrimary = Color(0xFFF4F3EF)
-    val labelSecondary = Color(0xFFCAC8C1)
-    val labelTertiary = Color(0xFF92908A)
+    val labelPrimary = Color(0xFFF5F5F5)
+    val labelSecondary = Color(0xFFD5D5D5)
+    val labelTertiary = Color(0xFF909096)
     val labelCaption = Ds.Bluish600
     val labelDimmed = Ds.Bluish750
-    val accent = Ds.Celadon400
+    val accent = Ds.Kimi400
     val onAccent = Color(0xFF0C1A19)
-    val accentTertiary = Ds.Celadon900
-    val accentHover = Ds.Celadon500
+    val accentTertiary = Ds.Kimi900
+    val accentHover = Ds.Kimi500
     val hover = Color(0x14FFFFFF) // rgba(255,255,255,.08)
     val hoverSolid = Ds.Bluish850
     val hoverAccent = Color(0x3DFFFFFF) // rgba(255,255,255,.24)
@@ -194,8 +204,8 @@ object DsDark {
     val dangerHover = Color(0x26DE7A72) // rgba(222,122,114,.15)
     val buttonPrimaryHover = Ds.Bluish100
     val buttonPrimaryDimmed = Ds.Bluish750
-    val buttonInfoFill = Ds.Celadon400
-    val buttonInfoHover = Ds.Celadon500
+    val buttonInfoFill = Ds.Kimi400
+    val buttonInfoHover = Ds.Kimi500
     val error = Ds.Red400
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red900
@@ -208,11 +218,11 @@ object DsDark {
     val warnTertiary = Ds.Amber900
     val toastBg = Ds.Bluish750
     val tooltipBg = Ds.Bluish750
-    val userBubble = Ds.Bluish850
-    val userBubbleHighlight = Ds.Bluish750
-    val composerCard = Color(0xFF222220)
-    val sidebar = Color(0xFF151514)
-    val sidebarNavActive = Color(0xFF2B2B28)
+    val userBubble = Color(0xFF2C2C2E)
+    val userBubbleHighlight = Color(0xFF38383A)
+    val composerCard = Color(0xFF1F1F1F)
+    val sidebar = Color(0xFF171717)
+    val sidebarNavActive = Color(0xFF2A2A2A)
     val sidebarNavAccent = Ds.Bluish800
     val sidebarNavHover = Color(0xFF222220)
     val tipSurface = Ds.Bluish800

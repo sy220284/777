@@ -54,6 +54,11 @@ internal fun localShellFeatureUiContribution(
             },
             onSelectModel = actions.selectModel,
             onSend = actions.send,
+            onSendTeam = actions.sendWithTeam,
+            onTeamMemberOutput = actions.teamMemberOutput,
+            onSendTeamMemberMessage = actions.sendTeamMemberMessage,
+            onStopTeamMember = actions.stopTeamMember,
+            onStopTeam = actions.stopTeam,
             onEditAndResend = actions.editAndResend,
             onSelectMessageVariant = actions.selectMessageVariant,
             onRegenerate = actions.regenerate,
@@ -63,7 +68,11 @@ internal fun localShellFeatureUiContribution(
             onStop = actions.stop,
             onNewSession = onNewSession,
             onExitGroupChat = actions.exitGroupChat,
+            onOpenWorkspace = { onPushFeature(LocalFeaturePage.WORKSPACE) },
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
+            onOpenTasks = { onPushFeature(LocalFeaturePage.TASKS) },
+            onOpenTools = { onPushFeature(LocalFeaturePage.TOOLS) },
+            onOpenPersonaGallery = { onPushFeature(LocalFeaturePage.PERSONA_GALLERY) },
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),

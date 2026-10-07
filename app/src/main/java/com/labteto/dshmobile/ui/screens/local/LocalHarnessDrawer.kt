@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +33,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
@@ -178,7 +179,7 @@ internal fun LocalModeDrawer(
             WallpaperSurfaceLevel.DRAWER,
             base = colors.sidebar,
         ),
-        modifier = Modifier.fillMaxHeight(),
+        modifier = Modifier.fillMaxHeight().width(320.dp),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
@@ -230,7 +231,7 @@ internal fun LocalModeDrawer(
                 )
 
                 DsExpandableColumn(visible = searchOpen) {
-                    OutlinedTextField(
+                    DsTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
                         modifier = Modifier
@@ -246,6 +247,7 @@ internal fun LocalModeDrawer(
                         },
                         singleLine = true,
                         shape = DsShapes.block,
+                        flat = true,
                     )
                 }
 
@@ -276,18 +278,6 @@ internal fun LocalModeDrawer(
                     running = running,
                 )
 
-                DrawerQuickActions(
-                    usageMode = usageMode,
-                    groupMemberCount = groupMemberCount,
-                    galleryCount = gallery.size,
-                    onOpenGroupChat = onOpenGroupChat,
-                    onOpenPersonaGallery = onOpenPersonaGallery,
-                    onOpenDiary = onOpenDiary,
-                    onTasks = onTasks,
-                    onWorkspaceFiles = onWorkspaceFiles,
-                    onOpenRunCenter = onOpenRunCenter,
-                    onTools = onTools,
-                )
             }
 
             LazyColumn(
@@ -376,6 +366,26 @@ internal fun LocalModeDrawer(
                                 horizontal = DsSpacing.small,
                                 vertical = DsSpacing.medium,
                             ),
+                        )
+                    }
+                }
+
+                item(key = "drawer-feature-actions") {
+                    Column(
+                        modifier = Modifier.padding(top = DsSpacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        DrawerQuickActions(
+                            usageMode = usageMode,
+                            groupMemberCount = groupMemberCount,
+                            galleryCount = gallery.size,
+                            onOpenGroupChat = onOpenGroupChat,
+                            onOpenPersonaGallery = onOpenPersonaGallery,
+                            onOpenDiary = onOpenDiary,
+                            onTasks = onTasks,
+                            onWorkspaceFiles = onWorkspaceFiles,
+                            onOpenRunCenter = onOpenRunCenter,
+                            onTools = onTools,
                         )
                     }
                 }

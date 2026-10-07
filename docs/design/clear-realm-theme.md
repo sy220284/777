@@ -1,6 +1,8 @@
 # 澄境（Clear Realm）主题
 
-本文是 777 手机端默认视觉主题的权威设计规范。它与 `docs/UI-UX.zh-CN.md`、`docs/design/mobile-ui.md` 和当前 Compose 实现共同构成 UI 事实源。
+> 历史视觉方案：当前默认前端已经切换到 `docs/UI-UX.zh-CN.md` 与 `docs/design/mobile-ui.md` 定义的 Kimi 3.1.3 参考基线。本文仅用于追溯既有澄境设计思路，不再作为默认 UI 权威事实源。
+
+本文记录 777 早期手机端澄境视觉主题。
 
 ## 1. 设计目标
 

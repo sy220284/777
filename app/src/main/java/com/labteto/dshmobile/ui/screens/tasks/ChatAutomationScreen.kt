@@ -4,6 +4,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +30,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -43,6 +45,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsBottomSheet
@@ -58,6 +61,7 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -167,7 +171,9 @@ internal fun ChatAutomationScreen(
                 }
                 if (tasks.isEmpty()) {
                     item("events-empty") {
-                        DsGroupCard(Modifier.padding(horizontal = DsSpacing.large)) {
+                        KimiAutomationSurface(
+                            modifier = Modifier.padding(horizontal = DsSpacing.large),
+                        ) {
                             Text(
                                 stringResource(R.string.tasks_chat_events_empty),
                                 style = DsType.std14.withReadingWeight(),
@@ -227,17 +233,14 @@ internal fun ChatAutomationScreen(
                         state.plannerSuggestions.take(3),
                         key = { "suggestion|$it" },
                     ) { suggestion ->
-                        DsGroupCard(Modifier.padding(horizontal = DsSpacing.large)) {
-                            DsCategoryRow(
-                                icon = FeatherIcons.Clock,
-                                title = suggestion,
-                                subtitle = stringResource(R.string.tasks_chat_suggestion_hint),
-                                onClick = {
-                                    editingTaskId = null
-                                    draft = "$planMention $suggestion"
-                                },
-                            )
-                        }
+                        KimiAutomationSuggestionRow(
+                            text = suggestion,
+                            onClick = {
+                                editingTaskId = null
+                                draft = "$planMention $suggestion"
+                            },
+                            modifier = Modifier.padding(horizontal = DsSpacing.large),
+                        )
                     }
                 }
             }
@@ -270,22 +273,28 @@ internal fun ChatAutomationScreen(
                         enabled = canPlan && !state.planning,
                         maxLines = 5,
                     )
+                    val canSubmitPlan = canPlan && draft.isNotBlank() && !state.planning
+                    val dark = colors.bgBase.luminance() < 0.5f
+                    val sendRes = when {
+                        !canSubmitPlan && dark -> R.drawable.ic_kimi_button_send_disabled_dark
+                        !canSubmitPlan -> R.drawable.ic_kimi_button_send_disabled_light
+                        dark -> R.drawable.ic_kimi_button_send_dark
+                        else -> R.drawable.ic_kimi_button_send_light
+                    }
                     DsComposerAction(
-                        icon = Icons.Filled.ArrowUpward,
+                        icon = null,
                         contentDescription = stringResource(R.string.tasks_chat_plan_send),
                         onClick = { viewModel.submitChatPlan(draft, editingTaskId) },
-                        enabled = canPlan && draft.isNotBlank() && !state.planning,
-                        tint = if (canPlan && draft.isNotBlank() && !state.planning) {
-                            colors.onAccent
-                        } else {
-                            colors.labelTertiary
+                        enabled = canSubmitPlan,
+                        containerColor = Color.Transparent,
+                        visualSize = 32.dp,
+                        content = {
+                            Image(
+                                painter = painterResource(sendRes),
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                            )
                         },
-                        containerColor = if (canPlan && draft.isNotBlank() && !state.planning) {
-                            colors.buttonInfoFill
-                        } else {
-                            colors.buttonPrimaryDimmed
-                        },
-                        visualSize = DsComposerMetrics.primaryActionVisualSize,
                     )
                 }
                 if (state.planning) {
@@ -311,6 +320,94 @@ internal fun ChatAutomationScreen(
             viewModel = viewModel,
             onDismiss = { policyTaskId = null },
         )
+    }
+}
+
+@Composable
+private fun KimiAutomationSurface(
+    modifier: Modifier = Modifier,
+    status: DsStatus = DsStatus.Neutral,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val colors = DsTheme.colors
+    val borderColor = when (status) {
+        DsStatus.Running -> colors.accent.copy(alpha = 0.28f)
+        DsStatus.Warning -> colors.warn.copy(alpha = 0.32f)
+        DsStatus.Failed -> colors.error.copy(alpha = 0.28f)
+        else -> colors.borderL1
+    }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.comfortable),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun KimiAutomationSuggestionRow(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = DsShapes.row,
+                color = colors.bgModulePlatform,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Icon(
+                        FeatherIcons.Clock,
+                        contentDescription = null,
+                        tint = colors.labelSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    text,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    stringResource(R.string.tasks_chat_suggestion_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+            androidx.compose.material3.Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -341,7 +438,10 @@ private fun ChatAutomationEventRow(
     val colors = DsTheme.colors
     val visualStatus = chatAutomationVisualStatus(task)
     var confirmDelete by remember { mutableStateOf(false) }
-    DsGroupCard(Modifier.padding(horizontal = DsSpacing.large)) {
+    KimiAutomationSurface(
+        modifier = Modifier.padding(horizontal = DsSpacing.large),
+        status = visualStatus.dsStatus(),
+    ) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -510,7 +610,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            Switch(
+            DsSwitch(
                 checked = quietEnabled,
                 onCheckedChange = { quietEnabled = it },
             )
@@ -628,7 +728,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            Switch(
+            DsSwitch(
                 checked = notify,
                 onCheckedChange = { notify = it },
             )

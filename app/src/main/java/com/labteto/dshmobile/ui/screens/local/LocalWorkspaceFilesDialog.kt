@@ -1,28 +1,25 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,7 +30,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
@@ -44,11 +45,12 @@ import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -147,13 +149,13 @@ internal fun LocalWorkspaceFilesDialog(
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
-                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.panel_workspace)
+                    mode == LocalFilesMode.WORKSPACE -> stringResource(R.string.kimi_project_title)
                     else -> stringResource(R.string.local_files_conversation_title)
                 }
                 val headerSubtitle = when {
                     preview != null -> preview?.file?.path
                     mode == LocalFilesMode.WORKSPACE && section == 0 ->
-                        workspacePath + if (directory.isEmpty()) "" else "/$directory"
+                        directory.takeIf(String::isNotEmpty)
                     else -> null
                 }
                 DsTopBar(
@@ -178,8 +180,8 @@ internal fun LocalWorkspaceFilesDialog(
                 if (preview == null && mode == LocalFilesMode.WORKSPACE) {
                     DsSegmentedTabs(
                         labels = listOf(
-                            stringResource(R.string.chatlist_workspace_files),
-                            stringResource(R.string.panel_involved_files),
+                            stringResource(R.string.kimi_project_materials),
+                            stringResource(R.string.kimi_project_context),
                             stringResource(R.string.panel_artifacts),
                         ),
                         selectedIndex = section,
@@ -262,12 +264,31 @@ internal fun LocalWorkspaceFilesDialog(
 
 @Composable
 private fun LocalFilesEmpty(title: String, body: String) {
-    DsPageEmptyState(
-        icon = FeatherIcons.Folder,
-        title = title,
-        body = body,
-        modifier = Modifier.fillMaxSize(),
-    )
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = DsSpacing.xlarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_kimi_project_empty),
+            contentDescription = null,
+            modifier = Modifier.size(100.dp),
+        )
+        Text(
+            title,
+            style = DsType.base16Strong.withReadingWeight(),
+            color = DsTheme.colors.labelPrimary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = DsSpacing.small),
+        )
+        Text(
+            body,
+            style = DsType.small13.withReadingWeight(),
+            color = DsTheme.colors.labelTertiary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = DsSpacing.xsmall),
+        )
+    }
 }
 
 @Composable
@@ -281,7 +302,7 @@ private fun ConversationLocalFileList(
             item(key = "local-artifacts-header") {
                 Text(
                     stringResource(R.string.panel_artifacts),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
@@ -293,8 +314,8 @@ private fun ConversationLocalFileList(
         if (files.involved.isNotEmpty()) {
             item(key = "local-involved-header") {
                 Text(
-                    stringResource(R.string.panel_involved_files),
-                    style = MaterialTheme.typography.titleSmall,
+                    stringResource(R.string.kimi_project_context),
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
@@ -345,13 +366,9 @@ private fun LocalFileList(
             val path = prefix + name
             val file = filesByPath[path]
             if (file == null) {
-                ListItem(
-                    headlineContent = { Text(name) },
-                    supportingContent = { Text(stringResource(R.string.panel_folder)) },
-                    modifier = Modifier.clickable { onDirectory(path) },
-                    colors = ListItemDefaults.colors(
-                        containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                    ),
+                LocalDirectoryRow(
+                    name = name,
+                    onClick = { onDirectory(path) },
                 )
             } else {
                 LocalFileRow(file) { scope.launch { onOpen(file) } }
@@ -361,15 +378,127 @@ private fun LocalFileList(
 }
 
 @Composable
+private fun LocalDirectoryRow(
+    name: String,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val dark = colors.bgBase.luminance() < 0.5f
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium),
+        shape = DsShapes.row,
+        color = colors.bgBase,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 62.dp)
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Image(
+                painter = painterResource(
+                    if (dark) R.drawable.ic_kimi_filefolder_dark
+                    else R.drawable.ic_kimi_filefolder_light,
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    name,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.panel_folder),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 1,
+                )
+            }
+            Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(file.path.substringAfterLast('/')) },
-        supportingContent = { Text("${file.path} · ${formatBytes(file.bytes)}") },
-        modifier = Modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(
-            containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-        ),
-    )
+    val colors = DsTheme.colors
+    val fileName = file.path.substringAfterLast('/')
+    val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    val dark = colors.bgBase.luminance() < 0.5f
+    val fileIconRes = when (extension) {
+        "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "go", "rs", "swift",
+        "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" ->
+            if (dark) R.drawable.ic_kimi_filecode_dark else R.drawable.ic_kimi_filecode_light
+        "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" ->
+            if (dark) R.drawable.ic_kimi_fileimage_dark else R.drawable.ic_kimi_fileimage_light
+        else ->
+            if (dark) R.drawable.ic_kimi_filetxt_dark else R.drawable.ic_kimi_filetxt_light
+    }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium),
+        shape = DsShapes.row,
+        color = colors.bgBase,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 70.dp)
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Image(
+                painter = painterResource(fileIconRes),
+                contentDescription = null,
+                modifier = Modifier.size(width = 38.dp, height = 50.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    fileName,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${file.path} · ${formatBytes(file.bytes)}",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = colors.labelCaption,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
 }
 
 @Composable
@@ -380,7 +509,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
     ) {
         Text(
             "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
-            style = MaterialTheme.typography.bodySmall,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
         if (preview.text == null) {
@@ -393,7 +522,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
             if (preview.truncated) {
                 Text(
                     stringResource(R.string.local_files_truncated_hint),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
             }
@@ -401,7 +530,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
                 Text(
                     preview.text,
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsType.mdCode,
                 )
             }
         }

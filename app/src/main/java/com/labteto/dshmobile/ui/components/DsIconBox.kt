@@ -4,26 +4,25 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.Ds
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /**
- * Function families for tinted icon containers. Each family maps one navigation concept to one
- * hue so a screen can be scanned by color before it is read.
+ * Compatibility labels kept for callers that already classify a capability.
+ *
+ * Kimi's navigation language is monochrome: families no longer paint colored containers.
+ * Accent/semantic color is reserved for selected or live state elsewhere in the row.
  */
 enum class DsIconFamily {
     Accent,
@@ -34,40 +33,21 @@ enum class DsIconFamily {
     Neutral,
 }
 
-private data class DsIconFamilyColors(val container: Color, val content: Color)
-
-@Composable
-private fun colorsFor(family: DsIconFamily): DsIconFamilyColors {
-    val c = DsTheme.colors
-    return when (family) {
-        DsIconFamily.Accent -> DsIconFamilyColors(c.accentTertiary, c.accent)
-        DsIconFamily.Purple -> DsIconFamilyColors(Ds.FamilyPurple.copy(alpha = 0.12f), Ds.FamilyPurple)
-        DsIconFamily.Cyan -> DsIconFamilyColors(Ds.FamilyCyan.copy(alpha = 0.12f), Ds.FamilyCyan)
-        DsIconFamily.Amber -> DsIconFamilyColors(c.warnTertiary, c.warn)
-        DsIconFamily.Green -> DsIconFamilyColors(c.successTertiary, c.success)
-        DsIconFamily.Neutral -> DsIconFamilyColors(c.hover, c.labelSecondary)
-    }
-}
-
-/**
- * 30dp rounded tint container behind a 15dp outlined icon.
- *
- * [active] is reserved for a genuinely live operation. Only the glyph breathes; container geometry
- * stays still, which keeps dense process lists readable and avoids relayout work.
- */
+/** Compact monochrome 24-grid glyph holder used by grouped rows. */
 @Composable
 fun DsIconBox(
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconPainter: Painter? = null,
     family: DsIconFamily = DsIconFamily.Neutral,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     active: Boolean = false,
 ) {
-    val familyColors = colorsFor(family)
+    val colors = DsTheme.colors
     val iconAlpha = if (active) {
         val transition = rememberInfiniteTransition(label = "activeIcon")
         val pulse by transition.animateFloat(
-            initialValue = 0.48f,
+            initialValue = 0.52f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
                 animation = DsAnimations.semanticPulse,
@@ -80,18 +60,26 @@ fun DsIconBox(
         1f
     }
     Box(
-        modifier = modifier
-            .size(30.dp)
-            .background(familyColors.container, RoundedCornerShape(9.dp)),
+        modifier = modifier.size(30.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            tint = familyColors.content,
-            modifier = Modifier
-                .size(15.dp)
-                .graphicsLayer { alpha = iconAlpha },
-        )
+        when {
+            iconPainter != null -> Icon(
+                painter = iconPainter,
+                contentDescription = contentDescription,
+                tint = colors.labelSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { alpha = iconAlpha },
+            )
+            icon != null -> Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = colors.labelSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer { alpha = iconAlpha },
+            )
+        }
     }
 }

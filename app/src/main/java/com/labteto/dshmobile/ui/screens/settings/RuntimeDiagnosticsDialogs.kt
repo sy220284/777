@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -46,7 +46,7 @@ internal fun NetworkDiagnosticDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        OutlinedTextField(
+        DsTextField(
             value = target,
             onValueChange = { target = it },
             modifier = Modifier.fillMaxWidth(),

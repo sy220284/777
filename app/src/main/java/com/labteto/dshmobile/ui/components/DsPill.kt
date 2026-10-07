@@ -1,56 +1,32 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-/**
- * Compact h24 chip: a badge at rest, a trigger when it takes an [onClick].
- *
- * The resting fill is `bgModulePlatform` rather than the harness's `bgLayer2`, and that is a
- * deliberate divergence from a faithful port. In the harness's light theme `bg-base` and all three
- * `bg-layer` rungs are the same pure white, so a pill at `bg-layer-2` on any of them is white on
- * white — the web gets away with it because `:hover` paints the chip the moment a pointer nears it.
- * A touchscreen has no pointer to near it with, so the chip has to be visible at rest or it is not
- * a chip at all: it is a run of grey text that happens to be tappable. The same reasoning already
- * put the model, preset and subagent triggers in the chat bar into pills, and put a permanent
- * chevron on [DisclosureRow].
- *
- * A tappable chip additionally takes a hairline, which is the only affordance separating it from a
- * badge once both have a fill. [selected] takes the accent wash the settings chips and the model
- * cards use — and which the harness itself uses for its own recommended badge. [warn] is unchanged.
- */
+/** Compact Kimi-style tag/trigger: neutral by default, blue only for the selected state. */
 @Composable
 fun DsPill(
     text: String,
@@ -60,21 +36,11 @@ fun DsPill(
     onClick: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
-    val shape = if (warn) DsShapes.pillFull else DsShapes.pill
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    
-    // Animate scale on press for better feedback
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
-        animationSpec = DsAnimations.pressScale,
-        label = "pillScale"
-    )
-    
     val background = when {
         warn -> colors.warnTertiary
         selected -> colors.accentTertiary
-        else -> colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING)
+        else -> colors.bgModulePlatform
     }
     val contentColor = when {
         warn -> colors.warnLabel
@@ -102,17 +68,10 @@ fun DsPill(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier
-                .height(24.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                },
-            shape = shape,
+            modifier = Modifier.height(24.dp),
+            shape = if (warn) DsShapes.pillFull else DsShapes.pill,
             color = background,
             contentColor = contentColor,
-            // Outlined only when it is a trigger: with every chip now carrying a fill, the hairline is
-            // what is left to say "this one does something" without a hover state to say it for you.
             border = if (onClick != null && !warn && !selected) {
                 BorderStroke(1.dp, colors.borderL2)
             } else {
@@ -124,7 +83,7 @@ fun DsPill(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text,
+                    text = text,
                     style = DsType.xsmall12.withReadingWeight(),
                     color = contentColor,
                     maxLines = 1,

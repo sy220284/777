@@ -15,12 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,8 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -53,6 +49,8 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -78,6 +76,9 @@ internal fun LocalConversationComposer(
     onGenerateReplySuggestions: suspend () -> Boolean,
     onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult = onSend,
+    teamDispatchSelected: Boolean = false,
+    onClearTeamDispatch: () -> Unit = {},
     onStop: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
@@ -94,12 +95,12 @@ internal fun LocalConversationComposer(
     var focused by remember { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
-    val expanded = focused || input.contains('\n') || attachments.isNotEmpty()
+    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() || teamDispatchSelected
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
-    val attachmentLabel = stringResource(R.string.chat_composer_add_attachment)
+    val moreActionsLabel = stringResource(R.string.local_composer_more_actions)
     val replySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
     val replySuggestionsAvailable =
         state.usageMode == LocalUsageMode.CHAT &&
@@ -128,8 +129,15 @@ internal fun LocalConversationComposer(
             onConfigure()
             return
         }
-        val result = onSend(input, attachments.toList())
+        val result = if (
+            state.usageMode == LocalUsageMode.WORK && teamDispatchSelected
+        ) {
+            onSendTeam(input, attachments.toList())
+        } else {
+            onSend(input, attachments.toList())
+        }
         if (!result.accepted) return
+        onClearTeamDispatch()
         onInputChange("")
         onClearAttachments()
         focusManager.clearFocus(force = true)
@@ -140,8 +148,9 @@ internal fun LocalConversationComposer(
     fun AttachmentControl() {
         if (state.running) return
         DsComposerAction(
-            icon = Icons.Filled.Add,
-            contentDescription = attachmentLabel,
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_add),
+            contentDescription = moreActionsLabel,
             onClick = onOpenAttachmentPicker,
             tint = colors.labelPrimary,
             containerColor = colors.hoverSolid,
@@ -152,7 +161,7 @@ internal fun LocalConversationComposer(
     fun ReplySuggestionsControl() {
         if (!replySuggestionsAvailable) return
         DsComposerAction(
-            icon = Icons.Outlined.AutoAwesome,
+            icon = FeatherIcons.Activity,
             contentDescription = if (replySuggestionsLoading) {
                 stringResource(R.string.common_loading)
             } else {
@@ -167,8 +176,15 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun SendControl(queue: Boolean = false) {
+        val dark = colors.bgBase.luminance() < 0.5f
+        val buttonRes = when {
+            !canSend && dark -> R.drawable.ic_kimi_button_send_disabled_dark
+            !canSend -> R.drawable.ic_kimi_button_send_disabled_light
+            dark -> R.drawable.ic_kimi_button_send_dark
+            else -> R.drawable.ic_kimi_button_send_light
+        }
         DsComposerAction(
-            icon = Icons.Filled.ArrowUpward,
+            icon = null,
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -178,32 +194,73 @@ internal fun LocalConversationComposer(
             },
             onClick = ::submit,
             enabled = canSend,
-            tint = if (canSend) colors.onAccent else colors.labelTertiary,
-            containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-            visualSize = DsComposerMetrics.primaryActionVisualSize,
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+            content = {
+                Image(
+                    painter = painterResource(buttonRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
         )
     }
 
     @Composable
     fun StopControl() {
+        val dark = colors.bgBase.luminance() < 0.5f
         DsComposerAction(
-            icon = Icons.Filled.Stop,
+            icon = null,
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
-            tint = colors.onAccent,
-            containerColor = colors.error,
-            visualSize = DsComposerMetrics.primaryActionVisualSize,
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+            content = {
+                Image(
+                    painter = painterResource(
+                        if (dark) R.drawable.ic_kimi_button_stop_dark
+                        else R.drawable.ic_kimi_button_stop_light,
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
         )
     }
 
     DsConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
-        shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+        shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
         // the IME is already animating the whole surface.
         animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
+        if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsPill(
+                    text = stringResource(R.string.local_team_title),
+                    selected = true,
+                )
+                Text(
+                    stringResource(R.string.local_team_selected_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                DsIconButton(
+                    icon = FeatherIcons.X,
+                    contentDescription = stringResource(R.string.local_team_mode_clear),
+                    onClick = onClearTeamDispatch,
+                    iconSize = 16.dp,
+                    tint = colors.labelSecondary,
+                )
+            }
+        }
         val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
             (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
         }
@@ -253,6 +310,8 @@ internal fun LocalConversationComposer(
                 value = input,
                 onValueChange = onInputChange,
                 placeholder = when {
+                    state.usageMode == LocalUsageMode.WORK && teamDispatchSelected ->
+                        stringResource(R.string.local_team_input_hint)
                     state.usageMode == LocalUsageMode.WORK ->
                         stringResource(R.string.local_work_composer_hint)
                     state.groupChat.enabled ->
@@ -285,9 +344,6 @@ internal fun LocalConversationComposer(
             replySuggestionsControl = { ReplySuggestionsControl() },
             stopControl = { StopControl() },
             sendControl = { queue -> SendControl(queue) },
-            onPlanModeChange = onPlanModeChange,
-            onAutoApprove = onAutoApprove,
-            onDisableAutoApprove = onDisableAutoApprove,
         )
     }
 }
@@ -326,7 +382,7 @@ private fun ImportedImageAttachmentTile(
             )
         }
         DsIconButton(
-            icon = Icons.Outlined.Close,
+            icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove),
             onClick = onRemove,
             modifier = Modifier.align(Alignment.TopEnd),

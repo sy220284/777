@@ -275,7 +275,7 @@ internal class LocalWorkAgentTurnExecutor(
                         )
                     }
                     val durableRequestMessages = withWorkTurnContext(
-                        runHistory.snapshot(),
+                        withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
                         workPromptContext.dynamic,
                     )

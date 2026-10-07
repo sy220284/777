@@ -27,9 +27,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -62,6 +59,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -90,8 +88,8 @@ fun DsDialog(
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     val scale by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.97f,
-        animationSpec = DsAnimations.normalSpring,
+        targetValue = if (appeared) 1f else 0.985f,
+        animationSpec = DsAnimations.pageFade,
         label = "dialogScale",
     )
     val alpha by animateFloatAsState(
@@ -152,8 +150,8 @@ fun DsDialog(
                     ),
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
-                border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 4.dp,
+                border = BorderStroke(1.dp, colors.borderL2),
+                shadowElevation = 1.dp,
             ) {
                 Column(
                     Modifier.padding(com.labteto.dshmobile.ui.theme.DsSpacing.comfortable),
@@ -240,7 +238,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
             Surface(
                 shape = DsShapes.toast,
                 color = DsTheme.colors.toastBg,
-                shadowElevation = 3.dp,
+                shadowElevation = 2.dp,
                 modifier = Modifier.padding(top = 16.dp),
             ) {
                 Text(
@@ -339,7 +337,7 @@ fun DsPopupMenu(
                     onDismiss()
                     item.onClick()
                 },
-                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(DsShapes.row),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             )
         }
@@ -414,7 +412,7 @@ fun DsContextActionMenu(
                         modifier = Modifier
                             .widthIn(min = 64.dp)
                             .heightIn(min = 64.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(DsShapes.row)
                             .clickable {
                                 onDismiss()
                                 item.onClick()
@@ -475,7 +473,7 @@ private fun DsMenuPreview() {
         DsMenu(
             anchor = { DsButton("Menu", onClick = {}) },
             items = listOf(
-                MenuItem("Open", icon = Icons.Filled.Edit, onClick = {}),
+                MenuItem("Open", icon = FeatherIcons.Edit3, onClick = {}),
                 MenuItem("Delete", danger = true, onClick = {}),
             ),
         )

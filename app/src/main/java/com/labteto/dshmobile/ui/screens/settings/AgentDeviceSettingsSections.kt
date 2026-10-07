@@ -15,16 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -66,6 +58,7 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -104,7 +97,7 @@ internal fun DeviceCapabilitiesCard(
         },
     )
 
-    SettingsCard(stringResource(R.string.advanced_device_capabilities), Icons.Outlined.PhoneAndroid) {
+    SettingsCard(stringResource(R.string.advanced_device_capabilities), FeatherIcons.Device) {
         DsStatusPill(state = overallState, label = overallLabel)
         CapabilityRow(
             label = stringResource(R.string.advanced_accessibility),

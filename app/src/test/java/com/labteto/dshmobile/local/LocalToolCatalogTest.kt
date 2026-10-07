@@ -71,6 +71,46 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun teamCatalogExposesKimiStyleLifecycleMessagesAndStopAll() {
+        val names = LocalToolCatalog.specs.mapNotNull {
+            it.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
+        }.toSet()
+
+        assertTrue(
+            names.containsAll(
+                setOf(
+                    "team_members",
+                    "team_member_status",
+                    "team_create_member",
+                    "team_start_member",
+                    "team_spawn",
+                    "team_send_message",
+                    "team_messages",
+                    "team_wait_for_message",
+                    "team_disable_member",
+                    "team_dismiss_member",
+                    "team_stop_all",
+                    "team_wait",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun teamResultToolsExposeDurableSequenceCursor() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val messages = functions.getValue("team_messages").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val wait = functions.getValue("team_wait_for_message").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertTrue("after_sequence" in messages)
+        assertTrue("after_sequence" in wait)
+    }
+
+    @Test
     fun sessionEventSearchExposesPagingControls() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content

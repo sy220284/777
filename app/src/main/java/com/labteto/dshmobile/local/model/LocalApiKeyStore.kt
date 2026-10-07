@@ -18,6 +18,14 @@ class LocalApiKeyStore @Inject constructor(
         alias = "dsh_local_harness_api_key",
     )
 
+    // Recovery journal is encrypted with the same non-exportable key, never in plain preferences/logs.
+    private val mutationJournal = KeystorePreferenceSecretStore(
+        dataStore, "local_model_configuration_journal", "dsh_local_harness_api_key",
+    )
+    internal suspend fun readMutationJournal(): String? = mutationJournal.get()
+    internal suspend fun writeMutationJournal(value: String) = mutationJournal.put(value)
+    internal suspend fun clearMutationJournal() = mutationJournal.clear()
+
     @Volatile private var activeId: String? = null
 
     fun activate(id: String) { activeId = id }

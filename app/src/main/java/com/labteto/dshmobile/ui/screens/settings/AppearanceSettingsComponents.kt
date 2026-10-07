@@ -23,10 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +39,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.DsSlider
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
@@ -102,7 +101,7 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        Slider(
+        DsSlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
             valueRange = 0.9f..1.3f,
@@ -144,7 +143,7 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        Slider(
+        DsSlider(
             value = settings.wallpaperSurfaceTransparency,
             onValueChange = onTransparencyChange,
             valueRange = 0f..1f,
@@ -217,8 +216,9 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
+            val resolvedAccentKey = AccentPalettes.of(settings.accentTheme).key
             AccentPalettes.ALL.forEach { palette ->
-                val selected = settings.accentTheme == palette.key
+                val selected = resolvedAccentKey == palette.key
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -259,7 +259,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     )
                     if (selected) {
                         Icon(
-                            Icons.Filled.Check,
+                            FeatherIcons.Check,
                             contentDescription = null,
                             tint = colors.accent,
                             modifier = Modifier.size(14.dp),

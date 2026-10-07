@@ -1,23 +1,30 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
@@ -25,13 +32,16 @@ import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import java.text.DateFormat
 import java.util.Date
@@ -144,15 +154,15 @@ private fun WorkTasksScreen(
                     .fillMaxSize()
                     .safeDrawingPadding()
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 DsTopBar(
                     title = stringResource(R.string.tasks_title),
-                    subtitle = stringResource(R.string.tasks_subtitle),
                     onBack = navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = true,
-                    actionIcon = if (showCreate) null else FeatherIcons.Plus,
+                    largeTitle = false,
+                    actionIcon = null,
+                    actionPainter = if (showCreate) null else painterResource(R.drawable.ic_kimi_add),
                     actionContentDescription = stringResource(R.string.tasks_new),
                     onAction = ::startCreate,
                 )
@@ -164,9 +174,9 @@ private fun WorkTasksScreen(
                         createInvalidMessage = createInvalidMessage,
                         onReset = ::resetEditor,
                     )
-                    visibleTasks.isEmpty() -> EmptyHero(
-                        headline = stringResource(R.string.tasks_empty_title),
-                        subtitle = stringResource(R.string.tasks_empty_subtitle),
+                    visibleTasks.isEmpty() -> KimiTaskEmptyState(
+                        onManualCreate = ::startCreate,
+                        onCreateViaChat = onClose,
                     )
                     else -> LazyColumn(
                         modifier = Modifier.weight(1f),
@@ -200,6 +210,63 @@ private fun WorkTasksScreen(
             }
         }
         DsToastHost(toast, Modifier.safeDrawingPadding())
+    }
+}
+
+@Composable
+private fun KimiTaskEmptyState(
+    onManualCreate: () -> Unit,
+    onCreateViaChat: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = DsSpacing.xlarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_kimi_task_empty),
+            contentDescription = null,
+            modifier = Modifier.padding(bottom = DsSpacing.medium),
+        )
+        Text(
+            stringResource(R.string.tasks_empty_title),
+            style = DsType.base16Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            stringResource(R.string.tasks_empty_subtitle),
+            style = DsType.small13.withReadingWeight(),
+            color = colors.labelTertiary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(
+                top = DsSpacing.xsmall,
+                bottom = DsSpacing.large,
+            ),
+        )
+        DsButton(
+            text = stringResource(R.string.tasks_create_manual),
+            onClick = onManualCreate,
+            variant = DsButtonVariant.Info,
+            size = DsButtonSize.Normal,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            stringResource(R.string.tasks_empty_or),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelCaption,
+            modifier = Modifier.padding(vertical = DsSpacing.xsmall),
+        )
+        DsButton(
+            text = stringResource(R.string.tasks_create_via_chat),
+            onClick = onCreateViaChat,
+            variant = DsButtonVariant.Ghost,
+            size = DsButtonSize.Normal,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

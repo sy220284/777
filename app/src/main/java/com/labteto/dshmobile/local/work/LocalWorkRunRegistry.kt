@@ -136,6 +136,7 @@ class LocalWorkRunRegistry internal constructor(
                                 blocks = prepared.blocks,
                             )
                             .copy(id = queuedInput.id)
+
                         val event = binding.eventLog.append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
                             encodeLocalAgentInboxEvent(

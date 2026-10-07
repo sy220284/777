@@ -14,14 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,7 +82,8 @@ internal fun ChatTopBar(
             )
             Spacer(Modifier.width(DsSpacing.small))
             DsIconButton(
-                icon = FeatherIcons.FileText,
+                icon = null,
+                iconPainter = painterResource(R.drawable.ic_kimi_project),
                 contentDescription = stringResource(R.string.chat_open_files),
                 onClick = onOpenFiles,
                 tint = colors.labelTertiary,
@@ -168,6 +168,12 @@ private fun ModelChip(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {
         if (models != null && !models.routable) StateDot(StateDotState.Warning, size = 6.dp)
+        Icon(
+            painter = painterResource(R.drawable.ic_kimi_model),
+            contentDescription = null,
+            tint = if (loading && models == null) colors.labelTertiary else colors.labelSecondary,
+            modifier = Modifier.size(16.dp),
+        )
         Text(
             modelLabel,
             style = DsType.small13.withReadingWeight(),

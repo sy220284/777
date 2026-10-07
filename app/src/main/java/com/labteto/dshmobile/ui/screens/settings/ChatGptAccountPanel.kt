@@ -1,12 +1,12 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.components.FeatherIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -177,7 +177,7 @@ internal fun ChatGptAccountPanel(
                         DsMenu(
                             anchor = {
                                 Icon(
-                                    Icons.Filled.MoreVert,
+                                    FeatherIcons.MoreVertical,
                                     contentDescription = accountActionsLabel,
                                     tint = colors.labelSecondary,
                                     modifier = Modifier.padding(10.dp),
@@ -277,7 +277,7 @@ internal fun ChatGptAccountPanel(
                                 DsMenu(
                                     anchor = {
                                         Icon(
-                                            Icons.Filled.MoreVert,
+                                            FeatherIcons.MoreVertical,
                                             contentDescription = accountActionsLabel,
                                             tint = colors.labelSecondary,
                                             modifier = Modifier.padding(10.dp),

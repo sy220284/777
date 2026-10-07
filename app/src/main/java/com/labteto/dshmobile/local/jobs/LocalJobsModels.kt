@@ -12,4 +12,5 @@ data class LocalJobInfo(
     val canMessage: Boolean = false,
     val continuable: Boolean = false,
     val pendingMessageCount: Int = 0,
+    val updatedAt: Long = 0L,
 )

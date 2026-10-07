@@ -15,17 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -73,6 +65,7 @@ import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -139,7 +132,7 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.advanced_model_settings), FeatherIcons.Globe) {
         ChatGptAccountPanel(chatGpt, viewModel, report)
         Text(
             stringResource(R.string.local_model_image_mode_title),
@@ -244,7 +237,7 @@ internal fun LocalModelSettingsCard(
             editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
             custom = false
             showEditor = true
-        }, modifier = Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
+        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
     }
 
     if (showEditor) {
@@ -270,7 +263,7 @@ internal fun LocalModelSettingsCard(
                                     }?.let { "${it.provider} · ${it.model}" } ?: model,
                                     style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
                                     modifier = Modifier.weight(1f))
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                                Icon(FeatherIcons.ChevronRight, contentDescription = null)
                             }
                         }
                     },
@@ -285,10 +278,10 @@ internal fun LocalModelSettingsCard(
                     },
                 )
                 if (custom) {
-                    OutlinedTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_default_model)) })
-                    OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                     LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
@@ -322,7 +315,7 @@ internal fun LocalModelSettingsCard(
                     }
                 }
                 if (custom) LocalModelProtocolPicker(protocol) { protocol = it; editorGeneration++; testStatus = null }
-                OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
+                DsTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
                         else R.string.advanced_model_key)) },
@@ -445,7 +438,7 @@ internal fun DeepSeekPricingCard(
         stringResource(R.string.pricing_builtin_source)
     }
 
-    SettingsCard(stringResource(R.string.pricing_deepseek_title), Icons.Outlined.Cloud) {
+    SettingsCard(stringResource(R.string.pricing_deepseek_title), FeatherIcons.Globe) {
         Text(
             stringResource(R.string.pricing_current_period, periodLabel),
             style = DsType.small13Strong.withReadingWeight(),

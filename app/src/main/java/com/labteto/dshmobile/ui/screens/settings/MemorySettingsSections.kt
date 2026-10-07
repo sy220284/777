@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.DsSwitch
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,17 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -93,7 +88,7 @@ internal fun MemoryOverviewCard(
     local: LocalHarnessSettingsState,
     recordCount: Int,
 ) {
-    SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_memory_overview), FeatherIcons.BookOpen) {
         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsStatusPill(
                 state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
@@ -142,7 +137,7 @@ internal fun LocalMemorySettingsCard(
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var showRulesEditor by remember { mutableStateOf(false) }
 
-    SettingsCard(stringResource(R.string.advanced_memory_settings), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_memory_settings), FeatherIcons.BookOpen) {
         DsValueRow(
             label = stringResource(R.string.advanced_user_rules),
             value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
@@ -158,7 +153,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            Switch(
+            DsSwitch(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, next, local.autoMemory)
@@ -175,7 +170,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            Switch(
+            DsSwitch(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, local.autoRecall, next)
@@ -191,7 +186,7 @@ internal fun LocalMemorySettingsCard(
             subtitle = stringResource(R.string.advanced_user_rules_hint),
             onDismiss = { showRulesEditor = false },
         ) {
-            OutlinedTextField(
+            DsTextField(
                 value = userRules,
                 onValueChange = { userRules = it.take(6_000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -240,7 +235,7 @@ internal fun MemoryManagementCard(
         filteredRecords.take(visibleLimit)
     }
 
-    SettingsCard(stringResource(R.string.advanced_manage_memory), Icons.Outlined.Memory) {
+    SettingsCard(stringResource(R.string.advanced_manage_memory), FeatherIcons.BookOpen) {
         if (records.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_empty),
@@ -255,7 +250,7 @@ internal fun MemoryManagementCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        OutlinedTextField(
+        DsTextField(
             value = query,
             onValueChange = { query = it.take(200) },
             modifier = Modifier.fillMaxWidth(),
@@ -390,7 +385,7 @@ internal fun MemoryManagementCard(
             subtitle = memoryScopeLabel(editing.scope) + " · " + memoryKindLabel(editing.kind),
             onDismiss = { editingId = null },
         ) {
-            OutlinedTextField(
+            DsTextField(
                 value = content,
                 onValueChange = { content = it.take(2_000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -407,7 +402,7 @@ internal fun MemoryManagementCard(
                     Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
-                Switch(checked = pinned, onCheckedChange = { pinned = it })
+                DsSwitch(checked = pinned, onCheckedChange = { pinned = it })
             }
             DsButton(
                 text = stringResource(R.string.common_save),

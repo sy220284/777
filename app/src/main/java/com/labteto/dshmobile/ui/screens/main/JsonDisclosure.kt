@@ -11,6 +11,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextButton
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import kotlinx.serialization.json.*
 
@@ -29,9 +30,9 @@ internal fun JsonDisclosure(title: String, value: JsonElement, depth: Int = 0) {
                 }
             }
             if (value is JsonPrimitive && value.isString && title in setOf("path", "absolutePath", "file_path", "filePath")) {
-                previewPath(value.content)?.let { path -> TextButton(onClick = { open(path) }) { Text(stringResource(R.string.panel_preview)) } }
+                previewPath(value.content)?.let { path -> DsTextButton(onClick = { open(path) }) { Text(stringResource(R.string.panel_preview)) } }
             }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(value.toString())) }) { Text(stringResource(R.string.common_copy)) }
+            DsTextButton(onClick = { clipboard.setText(AnnotatedString(value.toString())) }) { Text(stringResource(R.string.common_copy)) }
             when {
                 depth >= 8 -> SelectionContainer { Text(value.toString(), fontFamily = FontFamily.Monospace) }
                 value is JsonObject -> value.forEach { (name, child) -> JsonDisclosure(name, child, depth + 1) }

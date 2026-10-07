@@ -9,7 +9,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -30,20 +29,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
-import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-/** Large borderless surface used for mobile setting groups and capability panels. */
+/**
+ * Kimi-style grouped surface: quiet white sheet on the neutral page background.
+ * Rows own interaction feedback; the group itself carries no decorative border or shadow.
+ */
 @Composable
 fun DsGroupCard(
     modifier: Modifier = Modifier,
@@ -55,18 +57,21 @@ fun DsGroupCard(
             .fillMaxWidth()
             .clip(DsShapes.block)
             .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
-            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         content = content,
     )
 }
 
 /**
- * One mobile-first category row. The icon establishes the function family, the subtitle explains
- * scope, and the trailing value keeps current state visible before the row is opened.
+ * Compact disclosure row used across settings, tools and feature indexes.
+ *
+ * [iconFamily] stays in the signature for source compatibility, but the Kimi visual language keeps
+ * function icons monochrome. Selection and semantic state are expressed by row/background/status,
+ * never by assigning a different color family to each function.
  */
 @Composable
 fun DsCategoryRow(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
@@ -74,6 +79,7 @@ fun DsCategoryRow(
     iconFamily: DsIconFamily = DsIconFamily.Neutral,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -82,8 +88,8 @@ fun DsCategoryRow(
     val feedbackColor by animateColorAsState(
         targetValue = when {
             onClick == null -> Color.Transparent
-            pressed -> colors.hoverAccent
-            hovered -> colors.hover
+            pressed -> colors.sidebarNavActive
+            hovered -> colors.sidebarNavHover
             else -> Color.Transparent
         },
         animationSpec = DsAnimations.interactionColor,
@@ -92,7 +98,7 @@ fun DsCategoryRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = DsMetrics.rowHeight)
+            .heightIn(min = 58.dp)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .then(
@@ -108,22 +114,25 @@ fun DsCategoryRow(
                     Modifier
                 },
             )
-            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
+            .padding(horizontal = 4.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsIconBox(icon = icon, family = iconFamily)
-        Spacer(Modifier.width(DsSpacing.small))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        DsIconBox(icon = icon, iconPainter = iconPainter, family = iconFamily)
+        Spacer(Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
-                title,
-                style = DsType.base16Strong.withReadingWeight(),
+                text = title,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             subtitle?.let {
                 Text(
-                    it,
+                    text = it,
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 2,
@@ -134,59 +143,68 @@ fun DsCategoryRow(
         value?.let {
             Spacer(Modifier.width(DsSpacing.small))
             Text(
-                it,
-                style = DsType.std14.withReadingWeight(),
+                text = it,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 144.dp),
+                modifier = Modifier.widthIn(max = 136.dp),
             )
         }
         if (trailing != null) {
             Spacer(Modifier.width(DsSpacing.small))
             trailing()
         } else if (onClick != null) {
-            Spacer(Modifier.width(DsSpacing.small))
+            Spacer(Modifier.width(6.dp))
             Icon(
-                FeatherIcons.ChevronRight,
+                imageVector = FeatherIcons.ChevronRight,
                 contentDescription = null,
                 tint = colors.labelCaption,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
 }
 
-/** Square shortcut used by the composer's add panel. */
+/** Compact add-panel tile: monochrome icon, neutral fill, no function-family color coding. */
 @Composable
 fun DsQuickActionTile(
-    icon: ImageVector,
+    icon: ImageVector?,
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = colors.bgModulePlatform,
         shape = DsShapes.block,
     ) {
         Column(
-            Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.comfortable),
+            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.medium),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (enabled) colors.labelPrimary else colors.labelCaption,
-                modifier = Modifier.size(24.dp),
-            )
+            when {
+                iconPainter != null -> Icon(
+                    painter = iconPainter,
+                    contentDescription = null,
+                    tint = if (enabled) colors.labelSecondary else colors.labelCaption,
+                    modifier = Modifier.size(22.dp),
+                )
+                icon != null -> Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (enabled) colors.labelSecondary else colors.labelCaption,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Text(
-                label,
+                text = label,
                 style = DsType.small13.withReadingWeight(),
                 color = if (enabled) colors.labelPrimary else colors.labelCaption,
                 maxLines = 1,

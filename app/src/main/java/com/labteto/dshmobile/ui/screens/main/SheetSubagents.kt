@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,14 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,15 +31,18 @@ import com.labteto.dshmobile.core.session.AssistantMessageNode
 import com.labteto.dshmobile.core.session.ConversationSnapshot
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -165,13 +164,34 @@ internal fun SubagentsSheet(
                     }
                 }
 
-                TextButton(onClick = { childPanel = true }) { Text(stringResource(R.string.panel_workspace)) }
+                DsButton(
+                    text = stringResource(R.string.panel_workspace),
+                    onClick = { childPanel = true },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    icon = FeatherIcons.Folder,
+                )
                 if (mode == "continuable") {
-                    QueueDock(queues[child.sessionId].orEmpty(), store, sessionId = child.sessionId, blocked = sending, operationState = queueOperation)
-                    Row {
-                        TextButton(onClick = { delivery = "queue" }, enabled = !sending && !queueOperation.value) { Text((if (delivery == "queue") "✓ " else "") + stringResource(R.string.chat_queue_title)) }
-                        TextButton(onClick = { delivery = "steer" }, enabled = !sending && !queueOperation.value) { Text((if (delivery == "steer") "✓ " else "") + stringResource(R.string.chat_queue_steer)) }
-                    }
+                    QueueDock(
+                        queues[child.sessionId].orEmpty(),
+                        store,
+                        sessionId = child.sessionId,
+                        blocked = sending,
+                        operationState = queueOperation,
+                    )
+                    DsSegmentedTabs(
+                        labels = listOf(
+                            stringResource(R.string.chat_queue_title),
+                            stringResource(R.string.chat_queue_steer),
+                        ),
+                        selectedIndex = if (delivery == "queue") 0 else 1,
+                        onSelect = { index ->
+                            if (!sending && !queueOperation.value) {
+                                delivery = if (index == 0) "queue" else "steer"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 if (mode != "continuable") {
                     Text(
@@ -181,7 +201,7 @@ internal fun SubagentsSheet(
                     )
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextField(
+                        DsTextField(
                             value = draft,
                             onValueChange = { draft = it },
                             enabled = !sending && !queueOperation.value,
@@ -196,7 +216,6 @@ internal fun SubagentsSheet(
                             placeholder = {
                                 Text(stringResource(R.string.subagents_message), style = DsType.std14.withReadingWeight())
                             },
-                            colors = dialogTextFieldColors(),
                         )
                         Spacer(Modifier.width(DsSpacing.small))
                         if (childRunning) {
@@ -213,7 +232,7 @@ internal fun SubagentsSheet(
                         run {
                             DsButton(
                                 text = "",
-                                icon = Icons.Filled.ArrowUpward,
+                                icon = FeatherIcons.ArrowUp,
                                 onClick = { sendChild() },
                                 variant = DsButtonVariant.Info,
                                 enabled = draft.isNotBlank() && childId != null && !sending && !queueOperation.value,
@@ -270,7 +289,7 @@ private fun SubagentRow(entry: SubagentListEntry, selected: Boolean, onClick: ()
         if (selected) {
             Spacer(Modifier.width(DsSpacing.xsmall))
             Icon(
-                Icons.Filled.Check,
+                FeatherIcons.Check,
                 contentDescription = null,
                 tint = colors.accent,
                 modifier = Modifier.size(16.dp),

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -62,7 +63,7 @@ fun DsConversationComposer(
         BackgroundRegion.BOTTOM,
         DsTheme.colors.composerCard,
     ),
-    shadowElevation: Dp = 1.dp,
+    shadowElevation: Dp = 0.dp,
     animateSize: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -78,13 +79,13 @@ fun DsConversationComposer(
             ),
         shape = DsShapes.composer,
         color = surfaceColor,
-        border = BorderStroke(1.dp, colors.borderL1),
+        border = BorderStroke(1.dp, colors.borderL2),
         shadowElevation = shadowElevation,
     ) {
         Column(
             modifier = Modifier.padding(
                 horizontal = DsSpacing.small,
-                vertical = DsSpacing.tiny,
+                vertical = DsSpacing.xsmall,
             ),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             content = content,
@@ -108,6 +109,7 @@ fun DsComposerAction(
     visualSize: Dp = DsComposerMetrics.actionVisualSize,
     iconSize: Dp = DsComposerMetrics.actionIconSize,
     content: (@Composable () -> Unit)? = null,
+    iconPainter: Painter? = null,
 ) {
     val resolvedContainer = if (enabled) containerColor else containerColor.copy(alpha = 0.38f)
     val resolvedTint = if (enabled) tint else tint.copy(alpha = 0.38f)
@@ -142,6 +144,12 @@ fun DsComposerAction(
             ) {
                 when {
                     content != null -> content()
+                    iconPainter != null -> Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        tint = resolvedTint,
+                        modifier = Modifier.size(iconSize),
+                    )
                     icon != null -> Icon(
                         imageVector = icon,
                         contentDescription = null,

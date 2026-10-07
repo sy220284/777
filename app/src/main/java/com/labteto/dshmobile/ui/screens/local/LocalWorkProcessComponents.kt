@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -18,38 +21,38 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
-import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsTimeline
-import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -71,6 +74,8 @@ internal data class LocalWorkProcessNode(
     val operationKinds: List<AgentOperationKind> = emptyList(),
     val failed: Boolean = false,
     val count: Int = 0,
+    val toolContent: String? = null,
+    val toolName: String? = null,
 ) {
     val kind: AgentOperationKind
         get() = operationKinds.firstOrNull() ?: AgentOperationKind.Generic
@@ -92,39 +97,20 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
         }
     }
 
-    fun appendOperation(kind: AgentOperationKind, failed: Boolean) {
-        val last = nodes.lastOrNull()
-        if (last?.summary != null) {
-            val kinds = if (kind in last.operationKinds) last.operationKinds else last.operationKinds + kind
-            nodes[nodes.lastIndex] = last.copy(
-                operationKinds = kinds,
-                failed = last.failed || failed,
-                count = last.count + 1,
-            )
-            return
-        }
-
-        if (last?.kind == kind) {
-            nodes[nodes.lastIndex] = last.copy(
-                failed = last.failed || failed,
-                count = last.count + 1,
-            )
-        } else {
-            nodes += LocalWorkProcessNode(
-                operationKinds = listOf(kind),
-                failed = failed,
-                count = 1,
-            )
-        }
+    fun appendOperation(message: LocalHarnessMessage) {
+        nodes += LocalWorkProcessNode(
+            operationKinds = listOf(agentOperationKind(message.toolName)),
+            failed = message.toolIsError ?: toolResultFailed(message.content),
+            count = 1,
+            toolContent = message.content,
+            toolName = message.toolName,
+        )
     }
 
     messages.forEach { message ->
         when (message.role) {
             "progress", "assistant" -> appendSummary(message.content)
-            "tool" -> appendOperation(
-                kind = agentOperationKind(message.toolName),
-                failed = message.toolIsError ?: toolResultFailed(message.content),
-            )
+            "tool" -> appendOperation(message)
         }
     }
 
@@ -166,13 +152,6 @@ internal fun WorkProcessRow(
         DsStatus.Warning, DsStatus.Failed -> R.string.audit_attempt_failed
         else -> R.string.agent_operation_status_done
     })
-    val processStateDot = when (processStatus) {
-        DsStatus.Running -> StateDotState.Running
-        DsStatus.Failed -> StateDotState.Error
-        DsStatus.Warning -> StateDotState.Warning
-        DsStatus.Done -> StateDotState.Done
-        DsStatus.Neutral -> StateDotState.Idle
-    }
     val processSurface = if (backgroundState.hasImage) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
@@ -219,9 +198,9 @@ internal fun WorkProcessRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            StateDot(
-                state = processStateDot,
-                size = 9.dp,
+            WorkOperationIcon(
+                kind = latestNode.kind,
+                running = processStatus == DsStatus.Running && latestNode.toolContent == null,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -264,48 +243,11 @@ internal fun WorkProcessRow(
                 modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                val timelineItems = visibleNodes.mapIndexed { visibleIndex, node ->
-                    val operationLabel = stringResource(agentOperationLabelRes(node.kind))
-                    val stepNumber = visibleStartIndex + visibleIndex + 1
-                    val rowRunning = running && stepNumber - 1 == nodes.lastIndex && !node.failed
-                    val rowStatus = when {
-                        node.failed -> DsStatus.Failed
-                        rowRunning -> DsStatus.Running
-                        else -> DsStatus.Done
-                    }
-                    val statusLabel = stringResource(
-                        agentOperationStatusRes(
-                            running = rowStatus == DsStatus.Running,
-                            failed = rowStatus == DsStatus.Failed,
-                        ),
-                    )
-                    val detail = when {
-                        node.summary != null && node.count > 0 -> stringResource(
-                            R.string.local_work_process_step_operation_detail,
-                            stepNumber,
-                            operationLabel,
-                            node.count,
-                        )
-                        node.summary != null -> stringResource(
-                            R.string.local_work_process_step_number,
-                            stepNumber,
-                        )
-                        node.count > 1 -> stringResource(
-                            R.string.local_work_process_operation_count,
-                            node.count,
-                        )
-                        else -> stringResource(R.string.local_work_process_step_number, stepNumber)
-                    }
-                    DsTimelineItem(
-                        text = node.summary ?: operationLabel,
-                        detail = "$detail · $statusLabel",
-                        state = rowStatus,
-                    )
+                visibleNodes.forEachIndexed { visibleIndex, node ->
+                    val rowRunning = running && visibleStartIndex + visibleIndex == nodes.lastIndex &&
+                        node.toolContent == null && !node.failed
+                    KimiWorkContentBlock(node, rowRunning)
                 }
-                DsTimeline(
-                    items = timelineItems,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 if (collapsedHiddenCount > 0) {
                     DsButton(
                         text = if (showAllNodes) {
@@ -320,6 +262,98 @@ internal fun WorkProcessRow(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun KimiAnimatedToolIcon(
+    resId: Int,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val drawable = remember(resId) {
+        runCatching {
+            ImageDecoder.decodeDrawable(
+                ImageDecoder.createSource(context.resources, resId),
+            ) as? AnimatedImageDrawable
+        }.getOrNull()
+    }
+    DisposableEffect(drawable) {
+        drawable?.start()
+        onDispose { drawable?.stop() }
+    }
+    AndroidView(
+        factory = { viewContext ->
+            ImageView(viewContext).apply {
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setImageDrawable(drawable)
+            }
+        },
+        update = { imageView ->
+            if (imageView.drawable !== drawable) imageView.setImageDrawable(drawable)
+            if (drawable?.isRunning == false) drawable.start()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun WorkOperationIcon(
+    kind: AgentOperationKind,
+    running: Boolean,
+) {
+    val animatedRes = when (kind) {
+        AgentOperationKind.Inspect -> R.drawable.kimi_anim_tool_file
+        AgentOperationKind.Search -> R.drawable.kimi_anim_tool_search
+        AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.kimi_anim_tool_code
+        AgentOperationKind.Web -> R.drawable.kimi_anim_tool_web
+        AgentOperationKind.Generic -> R.drawable.kimi_anim_tool_think
+        AgentOperationKind.Delegate -> R.drawable.kimi_anim_tool_create_subagent
+        AgentOperationKind.Image -> R.drawable.kimi_anim_tool_image
+        AgentOperationKind.External -> R.drawable.kimi_anim_tool_mcp
+        AgentOperationKind.Background -> R.drawable.kimi_anim_tool_task
+        AgentOperationKind.Device -> R.drawable.kimi_anim_tool_browser
+        else -> null
+    }
+    if (running && animatedRes != null) {
+        KimiAnimatedToolIcon(
+            resId = animatedRes,
+            modifier = Modifier.size(34.dp),
+        )
+        return
+    }
+    when (kind) {
+        AgentOperationKind.Delegate -> DsIconBox(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_create_subagent),
+            active = running,
+            modifier = Modifier.size(30.dp),
+        )
+        AgentOperationKind.External -> DsIconBox(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_plugin),
+            active = running,
+            modifier = Modifier.size(30.dp),
+        )
+        else -> {
+            val icon = when (kind) {
+                AgentOperationKind.Inspect -> FeatherIcons.FileText
+                AgentOperationKind.Search -> FeatherIcons.Search
+                AgentOperationKind.Update -> FeatherIcons.Edit3
+                AgentOperationKind.Execute -> FeatherIcons.Code
+                AgentOperationKind.Web -> FeatherIcons.Globe
+                AgentOperationKind.Device -> FeatherIcons.Device
+                AgentOperationKind.Image -> FeatherIcons.Image
+                AgentOperationKind.Background -> FeatherIcons.Clock
+                AgentOperationKind.Generic -> FeatherIcons.Tool
+                AgentOperationKind.Delegate, AgentOperationKind.External -> FeatherIcons.Tool
+            }
+            DsIconBox(
+                icon = icon,
+                active = running,
+                modifier = Modifier.size(30.dp),
+            )
         }
     }
 }

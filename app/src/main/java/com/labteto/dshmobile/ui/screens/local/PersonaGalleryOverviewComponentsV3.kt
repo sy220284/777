@@ -20,9 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +49,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -480,7 +479,7 @@ internal fun CompactPersonaRow(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             if (managing) {
-                Checkbox(
+                DsCheckbox(
                     checked = selected,
                     onCheckedChange = { onClick() },
                 )

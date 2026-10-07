@@ -28,17 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.PersonSearch
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
@@ -82,6 +73,7 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -565,7 +557,7 @@ internal fun PersonaGalleryScreen(
             notice?.let {
                 Surface(
                     color = DsTheme.colors.characterAccentTertiary,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = DsShapes.block,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -644,7 +636,7 @@ internal fun PersonaGalleryScreen(
 
             selectedStory?.let { story ->
                 if (editingStoryTitle) {
-                    OutlinedTextField(
+                    DsTextField(
                         value = storyTitle,
                         onValueChange = { storyTitle = it },
                         label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },

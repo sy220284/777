@@ -109,7 +109,7 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun workProcessNodesIgnoreReasoningAndCollapseStructuredOperations() {
+    fun workProcessNodesIgnoreReasoningAndKeepEachToolResult() {
         val nodes = buildWorkProcessNodes(
             listOf(
                 message("r1", "reasoning", "先确认相关实现，再做最小修改。"),
@@ -119,10 +119,11 @@ class LocalTranscriptPresentationTest {
             ),
         )
 
-        assertEquals(2, nodes.size)
+        assertEquals(3, nodes.size)
         assertEquals(AgentOperationKind.Inspect, nodes[0].kind)
-        assertEquals(2, nodes[0].count)
-        assertEquals(AgentOperationKind.Search, nodes[1].kind)
+        assertEquals("/private/project/A.kt raw content", nodes[0].toolContent)
+        assertEquals("/private/project/B.kt raw content", nodes[1].toolContent)
+        assertEquals(AgentOperationKind.Search, nodes[2].kind)
     }
 
     @Test
@@ -135,11 +136,12 @@ class LocalTranscriptPresentationTest {
             ),
         )
 
-        assertEquals(1, nodes.size)
-        assertEquals("读取权威规则和当前工作过程组件", nodes.single().summary)
-        assertEquals(AgentOperationKind.Inspect, nodes.single().kind)
-        assertEquals(2, nodes.single().count)
-        assertTrue(nodes.single().summary?.contains("/private/path") == false)
+        assertEquals(3, nodes.size)
+        assertEquals("读取权威规则和当前工作过程组件", nodes[0].summary)
+        assertEquals(AgentOperationKind.Inspect, nodes[1].kind)
+        assertEquals("/private/path/AGENTS.md raw body", nodes[1].toolContent)
+        assertEquals("/private/path/UI.kt raw body", nodes[2].toolContent)
+        assertTrue(nodes[0].summary?.contains("/private/path") == false)
     }
 
     @Test
@@ -153,11 +155,11 @@ class LocalTranscriptPresentationTest {
             ),
         )
 
-        assertEquals(2, nodes.size)
+        assertEquals(4, nodes.size)
         assertEquals("先定位展示逻辑", nodes[0].summary)
-        assertEquals(AgentOperationKind.Search, nodes[0].kind)
-        assertEquals("再补回归测试", nodes[1].summary)
-        assertEquals(AgentOperationKind.Update, nodes[1].kind)
+        assertEquals(AgentOperationKind.Search, nodes[1].kind)
+        assertEquals("再补回归测试", nodes[2].summary)
+        assertEquals(AgentOperationKind.Update, nodes[3].kind)
     }
 
     @Test

@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -30,6 +29,7 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -153,7 +153,7 @@ internal fun ChatPersonaPickerDialog(
             color = colors.labelSecondary,
         )
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = DsShapes.block,
             color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -208,7 +208,7 @@ internal fun ChatPersonaPickerDialog(
                         onClick = {
                             if (onSelect(entry.id)) onDismiss()
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = DsShapes.block,
                         color = colors.wallpaperSurface(
                             WallpaperSurfaceLevel.CARD,
                             base = if (selected) colors.bgLayer2 else colors.bgLayer1,
@@ -276,7 +276,7 @@ internal fun ApprovalDialog(
         )
 
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = DsShapes.block,
             color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -367,7 +367,7 @@ internal fun QuestionDialog(
                 variant = DsButtonVariant.Outline,
             )
         }
-        OutlinedTextField(
+        DsTextField(
             value = answer,
             onValueChange = { answer = it },
             modifier = Modifier.fillMaxWidth(),
@@ -458,7 +458,7 @@ internal fun ChatPersonaDialog(
         )
 
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = DsShapes.block,
             color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -476,7 +476,7 @@ internal fun ChatPersonaDialog(
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
-                OutlinedTextField(
+                DsTextField(
                     value = aiDescription,
                     onValueChange = { aiDescription = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -603,7 +603,7 @@ private fun PersonaTextField(
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
 ) {
-    OutlinedTextField(
+    DsTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),

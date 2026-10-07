@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,8 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -91,10 +91,16 @@ internal fun ExecutionStatusCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = if (showHeader) {
+            colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+        } else {
+            colors.bgBase
+        },
     ) {
         Column(
-            Modifier.padding(DsSpacing.comfortable),
+            modifier = Modifier.padding(
+                if (showHeader) DsSpacing.comfortable else DsSpacing.small,
+            ),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             if (showHeader) {
@@ -318,11 +324,22 @@ private fun RunCenterJobsSection(
         )
         (if (showAll) orderedJobs else orderedJobs.take(4)).forEach { job ->
             val expanded = expandedJobId == job.id
+            val active = job.status == "running"
             Surface(
                 shape = DsShapes.row,
-                color = colors.wallpaperSurface(
-                    if (attention) WallpaperSurfaceLevel.FLOATING else WallpaperSurfaceLevel.CARD,
-                ),
+                color = if (attention) {
+                    colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING)
+                } else {
+                    colors.bgModulePlatform
+                },
+                border = if (job.isAgent) {
+                    BorderStroke(
+                        1.dp,
+                        if (active) colors.accent.copy(alpha = 0.26f) else colors.borderL2,
+                    )
+                } else {
+                    null
+                },
             ) {
                 Column(
                     modifier = Modifier
@@ -335,18 +352,44 @@ private fun RunCenterJobsSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
+                        if (job.isAgent) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_kimi_create_subagent),
+                                contentDescription = null,
+                                tint = if (active) colors.accent else colors.labelSecondary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            StateDot(
+                                state = when (job.status) {
+                                    "running" -> StateDotState.Running
+                                    "failed" -> StateDotState.Error
+                                    "completed" -> StateDotState.Done
+                                    else -> StateDotState.Idle
+                                },
+                                size = 8.dp,
+                            )
+                        }
                         Text(
                             job.label,
-                            style = DsType.small13.withReadingWeight(),
-                            color = if (attention) colors.labelPrimary else colors.labelSecondary,
+                            style = if (job.isAgent) {
+                                DsType.small13Strong.withReadingWeight()
+                            } else {
+                                DsType.small13.withReadingWeight()
+                            },
+                            color = if (job.isAgent || attention) colors.labelPrimary else colors.labelSecondary,
                             modifier = Modifier.weight(1f),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             localJobStatusLabel(job.status),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = if (attention) colors.warnLabel else colors.labelTertiary,
+                            style = DsType.caption11Strong.withReadingWeight(),
+                            color = when {
+                                attention -> colors.warnLabel
+                                active -> colors.accent
+                                else -> colors.labelTertiary
+                            },
                         )
                         DsButton(
                             text = stringResource(

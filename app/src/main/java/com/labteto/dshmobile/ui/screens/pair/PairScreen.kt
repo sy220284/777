@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -194,7 +193,7 @@ fun PairScreen(
                     onToggle = { showManual = !showManual },
                 ) {
                     DsGroupCard {
-                        OutlinedTextField(
+                        DsTextField(
                             value = state.url,
                             onValueChange = viewModel::setUrl,
                             modifier = Modifier.fillMaxWidth(),
@@ -208,9 +207,8 @@ fun PairScreen(
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
-                        OutlinedTextField(
+                        DsTextField(
                             value = state.code,
                             onValueChange = viewModel::setCode,
                             modifier = Modifier.fillMaxWidth(),
@@ -220,16 +218,14 @@ fun PairScreen(
                                 keyboardType = KeyboardType.NumberPassword,
                             ),
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
-                        OutlinedTextField(
+                        DsTextField(
                             value = state.deviceName,
                             onValueChange = viewModel::setDeviceName,
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             label = { Text(stringResource(R.string.pair_name_label)) },
                             shape = DsShapes.row,
-                            colors = pairFieldColors(),
                         )
                         DsButton(
                             text = stringResource(
@@ -312,12 +308,3 @@ private fun PairFailureBlock(failure: PairFailure) {
         }
     }
 }
-
-@Composable
-private fun pairFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    unfocusedContainerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-    focusedBorderColor = DsTheme.colors.accent,
-    unfocusedBorderColor = DsTheme.colors.borderL2,
-    cursorColor = DsTheme.colors.accent,
-)

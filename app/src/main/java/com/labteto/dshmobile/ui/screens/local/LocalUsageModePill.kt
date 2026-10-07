@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -24,14 +23,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal fun localHarnessModeSwitchEnabled(
@@ -46,54 +41,34 @@ internal fun LocalUsageModePill(
     onSelect: (LocalUsageMode) -> Unit,
 ) {
     val colors = DsTheme.colors
-    val backgroundState = LocalAppBackgroundState.current
-    val containerColor = colors.wallpaperSurface(
-        level = WallpaperSurfaceLevel.FLOATING,
-        region = BackgroundRegion.TOP,
-        base = colors.bgModulePlatform,
-    )
-    val thumbColor = colors.wallpaperSurface(
-        level = WallpaperSurfaceLevel.FLOATING,
-        region = BackgroundRegion.TOP,
-        base = colors.bgLayer1,
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .widthIn(max = 264.dp)
-            .height(56.dp),
-        shape = DsShapes.pillFull,
-        color = containerColor,
-        border = BorderStroke(1.dp, colors.borderL2),
+            .widthIn(max = 216.dp)
+            .height(44.dp),
+        shape = DsShapes.row,
+        color = colors.bgModulePlatform,
         tonalElevation = 0.dp,
-        shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
+        shadowElevation = 0.dp,
     ) {
         BoxWithConstraints(Modifier.padding(3.dp)) {
             val segmentWidth = maxWidth / 2
             val thumbOffset by animateDpAsState(
                 targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else segmentWidth,
                 animationSpec = DsAnimations.segmentSlide,
-                label = "usage mode thumb",
+                label = "usageModeThumb",
             )
-
-            // 只有这一枚选中滑块会绘制胶囊背景；两个模式本身只是等宽点击区，
-            // 避免轨道、选中项和未选中项叠出“两枚胶囊”的轮廓。
             Surface(
                 modifier = Modifier
                     .offset(x = thumbOffset)
                     .width(segmentWidth)
                     .fillMaxHeight(),
-                shape = DsShapes.pillFull,
-                color = thumbColor,
+                shape = DsShapes.row,
+                color = colors.bgLayer1,
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
             ) {}
-
-            Row(
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth().fillMaxHeight()) {
                 listOf(
                     LocalUsageMode.CHAT to R.string.local_usage_chat,
                     LocalUsageMode.WORK to R.string.local_usage_work,
@@ -112,12 +87,12 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = (if (selected == mode) DsType.std14Strong else DsType.std14)
+                            style = (if (selected == mode) DsType.small13Strong else DsType.small13)
                                 .withReadingWeight(),
                             color = when {
-                                !enabled -> colors.labelTertiary
+                                !enabled -> colors.labelCaption
                                 selected == mode -> colors.labelPrimary
-                                else -> colors.labelSecondary
+                                else -> colors.labelTertiary
                             },
                         )
                     }

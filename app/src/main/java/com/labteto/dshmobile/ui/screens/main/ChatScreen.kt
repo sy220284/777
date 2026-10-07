@@ -69,6 +69,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.rootSurface
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextButton
 import java.util.UUID
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -389,7 +390,7 @@ fun ChatScreen(
             )
 
             connectionError?.let {
-                androidx.compose.material3.TextButton(onClick = { store.retryConnection() }) { ConnectionBanner(it) }
+                DsTextButton(onClick = { store.retryConnection() }) { ConnectionBanner(it) }
             }
             ChatConversationSurface(
                 store = store,

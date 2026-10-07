@@ -36,6 +36,8 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     claimedMessageIds: Set<String>,
     softStepLimit: Int? = null,
     terminalOutput: String? = null,
+    resultId: String? = null,
+    resultFirst: Boolean = true,
 ): JsonObject = buildJsonObject {
     put("version", LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION)
     put("background_job_id", backgroundJobId)
@@ -45,6 +47,7 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     put("history", JsonArray(history))
     terminalOutput?.takeIf(String::isNotBlank)?.let {
         put("terminal_output", it.takeLast(MAX_TERMINAL_OUTPUT_CHARS))
+        resultId?.let { id -> put("result_id", id); put("result_first", resultFirst) }
     }
     put(
         "claimed_message_ids",

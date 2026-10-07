@@ -21,15 +21,21 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsTextButton
 import com.labteto.dshmobile.core.wire.RpcResult
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsFullScreenDialog
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import kotlinx.coroutines.*
 import java.io.File
@@ -94,7 +100,7 @@ internal fun WorkspacePanels(
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back)) }
+                    DsTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back)) }
                     Text(
                         stringResource(
                             if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files
@@ -103,30 +109,36 @@ internal fun WorkspacePanels(
                         modifier = Modifier.padding(16.dp),
                     )
                 }
-                TabRow(selectedTabIndex = state.section) {
-                    listOf(
-                        if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files else R.string.panel_files,
-                        R.string.panel_preview,
-                        R.string.panel_terminal,
-                    ).forEachIndexed { i, title ->
-                        Tab(selected = state.section == i, onClick = { state.section = i }, text = { Text(stringResource(title)) })
-                    }
-                }
+                val workspaceTabs = listOf(
+                    if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files else R.string.panel_files,
+                    R.string.panel_preview,
+                    R.string.panel_terminal,
+                )
+                DsSegmented(
+                    segments = workspaceTabs.mapIndexed { index, title ->
+                        DsSegment(index.toString(), stringResource(title))
+                    },
+                    selectedKey = state.section.toString(),
+                    onSelect = { key -> key.toIntOrNull()?.let { state.section = it } },
+                    role = Role.Tab,
+                    stretch = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                )
                 when (state.section) {
                     0 -> {
                         if (mode == WorkspacePanelMode.CONVERSATION) {
                             ConversationFileList(conversationFiles, state, Modifier.weight(1f))
                         } else {
                         Row(Modifier.fillMaxWidth()) {
-                            TextButton(onClick = { listDirectory(".") }, enabled = !state.busy) { Text(stringResource(R.string.panel_root)) }
-                            TextButton(onClick = { listDirectory(state.directory.substringBeforeLast('/', ".").ifEmpty { "." }) }, enabled = !state.busy) {
+                            DsTextButton(onClick = { listDirectory(".") }, enabled = !state.busy) { Text(stringResource(R.string.panel_root)) }
+                            DsTextButton(onClick = { listDirectory(state.directory.substringBeforeLast('/', ".").ifEmpty { "." }) }, enabled = !state.busy) {
                                 Text(stringResource(R.string.panel_parent))
                             }
-                            TextButton(onClick = { listDirectory(state.directory) }, enabled = !state.busy) { Text(stringResource(R.string.common_retry)) }
+                            DsTextButton(onClick = { listDirectory(state.directory) }, enabled = !state.busy) { Text(stringResource(R.string.common_retry)) }
                         }
-                        Text(state.directory, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+                        Text(state.directory, Modifier.padding(horizontal = 16.dp), style = DsType.caption11.withReadingWeight())
                         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        state.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+                        state.error?.let { Text(it, Modifier.padding(16.dp), color = DsTheme.colors.error) }
                         if (state.listing?.truncated == true) Text(stringResource(R.string.panel_truncated), Modifier.padding(16.dp))
                         LazyColumn(Modifier.weight(1f), state = state.directoryScroll.getOrPut(state.directory) { androidx.compose.foundation.lazy.LazyListState() }) {
                             items(state.listing?.entries.orEmpty(), key = { it.name }) { entry ->
@@ -146,14 +158,14 @@ internal fun WorkspacePanels(
                         else {
                             Row(Modifier.horizontalScroll(rememberScrollState())) {
                                 state.previews.forEachIndexed { i, preview ->
-                                    TextButton(onClick = { state.selectedPreview = i }) { Text(preview.path.substringAfterLast('/').substringAfterLast('\\')) }
+                                    DsTextButton(onClick = { state.selectedPreview = i }) { Text(preview.path.substringAfterLast('/').substringAfterLast('\\')) }
                                 }
                             }
                             val index = state.selectedPreview.coerceIn(0, state.previews.lastIndex)
                             val preview = state.previews[index]
                             Row {
-                                TextButton(onClick = { state.previews.removeAt(index); state.selectedPreview = (index - 1).coerceAtLeast(0) }) { Text(stringResource(R.string.common_close)) }
-                                TextButton(onClick = { preview.stat = null; preview.text = null; preview.bytes = null }) { Text(stringResource(R.string.common_retry)) }
+                                DsTextButton(onClick = { state.previews.removeAt(index); state.selectedPreview = (index - 1).coerceAtLeast(0) }) { Text(stringResource(R.string.common_close)) }
+                                DsTextButton(onClick = { preview.stat = null; preview.text = null; preview.bytes = null }) { Text(stringResource(R.string.common_retry)) }
                             }
                             key(preview) { DocumentPreview(store, key, preview, Modifier.weight(1f)) }
                         }
@@ -186,7 +198,7 @@ private fun ConversationFileList(
                 Text(
                     stringResource(R.string.panel_artifacts),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }
@@ -247,11 +259,11 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
         Text(
             tab.path.substringAfterLast('/').substringAfterLast('\\'),
             Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.bodySmall,
+            style = DsType.caption11.withReadingWeight(),
         )
         if (tab.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        tab.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
-        TextButton(onClick = { scope.launch {
+        tab.error?.let { Text(it, Modifier.padding(16.dp), color = DsTheme.colors.error) }
+        DsTextButton(onClick = { scope.launch {
             try { store.apiForHost(key.host)?.sessionOpenWorkspacePath(key.sessionId, tab.path)?.requireValue() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { tab.error = e.message }
@@ -318,7 +330,7 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
                 else Text(tab.text.orEmpty(), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
             }
         }
-        if (!tab.eof && tab.text != null) TextButton(onClick = { load(true) }, enabled = !tab.busy) { Text(stringResource(R.string.panel_more)) }
+        if (!tab.eof && tab.text != null) DsTextButton(onClick = { load(true) }, enabled = !tab.busy) { Text(stringResource(R.string.panel_more)) }
     }
 }
 
@@ -357,9 +369,9 @@ private fun PdfPreview(bytes: ByteArray, modifier: Modifier) {
         if (failure) Text(stringResource(R.string.panel_failed))
         bitmap?.let { Image(it, null, Modifier.weight(1f).fillMaxWidth()) }
         Row {
-            TextButton(onClick = { page-- }, enabled = page > 0) { Text(stringResource(R.string.common_back)) }
+            DsTextButton(onClick = { page-- }, enabled = page > 0) { Text(stringResource(R.string.common_back)) }
             Text("${page + 1} / $count", Modifier.padding(16.dp))
-            TextButton(onClick = { page++ }, enabled = page + 1 < count) { Text(stringResource(R.string.panel_next)) }
+            DsTextButton(onClick = { page++ }, enabled = page + 1 < count) { Text(stringResource(R.string.panel_next)) }
         }
     }
 }

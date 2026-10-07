@@ -30,22 +30,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,12 +64,10 @@ import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -109,7 +94,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * App settings, grouped into cards.
+ * App settings with flat sections and secondary configuration destinations.
  *
  * Only the top group is genuinely the app's own; connection, harness facts and data are all about
  * the *link* to a harness. Keeping the read-only notice scoped to the harness group matters —
@@ -329,7 +314,7 @@ fun SettingsScreen(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = page == SettingsDestination.ROOT,
+                    largeTitle = false,
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
@@ -346,52 +331,47 @@ fun SettingsScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                         .padding(horizontal = DsSpacing.large),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xlarge),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
                         Text(stringResource(R.string.settings_group_models), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Cloud,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Globe,
                                 title = stringResource(R.string.settings_page_models),
                                 subtitle = stringResource(R.string.settings_models_subtitle),
-                                iconFamily = DsIconFamily.Accent,
                                 value = localHarness.model.takeIf { it.isNotBlank() },
                                 onClick = { page = SettingsDestination.MODELS },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
                                 subtitle = stringResource(R.string.settings_model_usage_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                             )
                         }
 
                         Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Memory,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.BookOpen,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
-                                iconFamily = DsIconFamily.Purple,
                                 value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_appearance),
                                 subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 value = appearanceThemeLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.APPEARANCE },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Chat,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.MessageCircle,
                                 title = stringResource(R.string.settings_page_session),
                                 subtitle = stringResource(R.string.settings_session_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 value = stringResource(
                                     if (sessionSort == "updated") {
                                         R.string.chatlist_sort_updated
@@ -404,41 +384,37 @@ fun SettingsScreen(
                         }
 
                         Text(stringResource(R.string.settings_group_system), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.PhoneAndroid,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Device,
                                 title = stringResource(R.string.settings_page_permissions),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
-                                iconFamily = DsIconFamily.Green,
                                 onClick = { page = SettingsDestination.PERMISSIONS },
                                 trailing = {
                                     StateDot(deviceCapabilitiesState(deviceCapabilities))
                                 },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Notifications,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Bell,
                                 title = stringResource(R.string.settings_page_notifications),
                                 subtitle = stringResource(R.string.settings_notifications_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 value = enabledNotificationCount(settings).toString(),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                             )
                         }
 
                         Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_advanced),
                                 subtitle = stringResource(R.string.settings_advanced_subtitle),
-                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.CloudDownload,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.RefreshCw,
                                 title = stringResource(R.string.settings_update_check),
                                 subtitle = updateStatus,
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = onCheckUpdate,
                             )
                         }
@@ -461,12 +437,11 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_chat_style_guard),
                                 subtitle = stringResource(R.string.settings_chat_style_guard_hint),
-                                iconFamily = DsIconFamily.Purple,
                                 value = stringResource(
                                     if (localHarness.chatStyleGuardEnabled) {
                                         R.string.common_enabled
@@ -480,10 +455,10 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        SettingsCard(stringResource(R.string.settings_appearance_preview), Icons.Outlined.Tune) {
+                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.Sliders) {
                             AppearanceReadingPreview()
                         }
-                        SettingsCard(stringResource(R.string.settings_appearance), Icons.Outlined.Tune) {
+                        SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Sliders) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
                             AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
                             ReadingPreferencesRow(
@@ -526,7 +501,7 @@ fun SettingsScreen(
                                 candidate !in customFilters &&
                                 customFilters.size < MAX_CUSTOM_CHAT_FILTERS
 
-                        SettingsCard(stringResource(R.string.settings_page_chat), Icons.Outlined.Tune) {
+                        SettingsCard(stringResource(R.string.settings_page_chat), FeatherIcons.Sliders) {
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
                                 localHarness.chatStyleGuardEnabled,
@@ -569,7 +544,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
-                                TextField(
+                                DsTextField(
                                     value = customChatFilterDraft,
                                     onValueChange = {
                                         customChatFilterDraft = it
@@ -645,19 +620,17 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
+                        KimiSettingsSection {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
-                                iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.PRICING },
                             )
-                            DsCategoryRow(
+                            KimiSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
@@ -731,7 +704,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.PERMISSIONS -> {
-                        SettingsCard(stringResource(R.string.settings_connection), Icons.Outlined.Link) {
+                        SettingsCard(stringResource(R.string.settings_connection), FeatherIcons.GitBranch) {
                             ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
                             ToggleRow(
                                 stringResource(R.string.settings_background),
@@ -744,7 +717,7 @@ fun SettingsScreen(
 
                     SettingsDestination.NOTIFICATIONS -> {
                         // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
-                        SettingsCard(stringResource(R.string.settings_notifications_group_agent), Icons.Outlined.Notifications) {
+                        SettingsCard(stringResource(R.string.settings_notifications_group_agent), FeatherIcons.Bell) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_turn),
                                 settings.notifyTurnComplete,
@@ -761,7 +734,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
                         }
-                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs), Icons.Outlined.Notifications) {
+                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs), FeatherIcons.Bell) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
@@ -804,21 +777,19 @@ fun SettingsScreen(
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onCleanup = onClose,
                         )
-                        SettingsCard(stringResource(R.string.settings_runtime_diagnostics), Icons.Outlined.Info) {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Link,
+                        SettingsCard(stringResource(R.string.settings_runtime_diagnostics), FeatherIcons.Info) {
+                            KimiSettingsRow(
+                                icon = FeatherIcons.GitBranch,
                                 title = stringResource(R.string.settings_network_diagnostic),
-                                iconFamily = DsIconFamily.Cyan,
                                 onClick = { showDiagnostic = true },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.PhoneAndroid,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Device,
                                 title = stringResource(R.string.settings_environment_capabilities),
-                                iconFamily = DsIconFamily.Neutral,
                                 onClick = { showEnvironment = true },
                             )
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Info,
+                            KimiSettingsRow(
+                                icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
                                 subtitle = stringResource(R.string.settings_export_diagnostics_hint),
                                 onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
@@ -931,7 +902,7 @@ internal fun SettingsCard(
             Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
             Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         }
-        DsGroupCard {
+        KimiSettingsSection {
             content()
         }
     }

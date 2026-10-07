@@ -139,6 +139,15 @@ class LocalHarnessViewModel @Inject constructor(
         LocalUsageMode.WORK -> runtime.work.send(text, attachments)
         LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
     }
+    internal fun sendWithTeam(
+        text: String,
+        attachments: List<LocalImportedAttachment> = emptyList(),
+    ): LocalSendResult = if (state.value.usageMode == LocalUsageMode.WORK) {
+        runtime.work.sendWithTeam(text, attachments)
+    } else {
+        runtime.chat.send(text, attachments)
+    }
+
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
@@ -205,6 +214,26 @@ class LocalHarnessViewModel @Inject constructor(
         message: String,
     ): LocalWorkUiActionResult {
         val result = runtime.work.sendBackgroundAgentMessageForUi(agentId, message)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
+    internal fun teamMemberOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
+
+    internal suspend fun sendTeamMemberMessage(
+        memberId: String,
+        message: String,
+    ): LocalWorkUiActionResult {
+        val result = runtime.work.sendTeamMemberMessageForUi(memberId, message)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
+    internal suspend fun stopTeamMember(memberId: String): LocalWorkUiActionResult {
+        val result = runtime.work.stopTeamMemberForUi(memberId)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
+    internal suspend fun stopTeam(): LocalWorkUiActionResult {
+        val result = runtime.work.stopTeamForUi()
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
     fun approve(callId: String) = runtime.work.answerApproval(callId, true)

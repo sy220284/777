@@ -20,14 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -43,11 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -188,8 +182,9 @@ internal fun Composer(
     fun ComposerMenuControl() {
         Box {
             DsComposerAction(
-                icon = Icons.Filled.Add,
-                contentDescription = stringResource(R.string.chat_composer_attach_file),
+                icon = null,
+                iconPainter = painterResource(R.drawable.ic_kimi_add),
+                contentDescription = stringResource(R.string.local_composer_more_actions),
                 onClick = { composerMenuOpen = true },
                 enabled = enabled && !preparing,
                 tint = colors.labelPrimary,
@@ -202,7 +197,7 @@ internal fun Composer(
                 items = listOf(
                     MenuItem(
                         text = stringResource(R.string.chat_composer_attach_file),
-                        icon = Icons.Outlined.AttachFile,
+                        icon = FeatherIcons.Paperclip,
                         onClick = onOpenAttachments,
                     ),
                     MenuItem(
@@ -217,22 +212,36 @@ internal fun Composer(
 
     @Composable
     fun SendControl() {
+        val dark = colors.bgBase.luminance() < 0.5f
+        val buttonRes = when {
+            !canSend && dark -> R.drawable.ic_kimi_button_send_disabled_dark
+            !canSend -> R.drawable.ic_kimi_button_send_disabled_light
+            dark -> R.drawable.ic_kimi_button_send_dark
+            else -> R.drawable.ic_kimi_button_send_light
+        }
         DsComposerAction(
-            icon = Icons.Filled.ArrowUpward,
+            icon = null,
             contentDescription = stringResource(R.string.chat_composer_send),
             onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 submitDraft()
             },
             enabled = canSend,
-            tint = if (canSend) colors.onAccent else colors.labelTertiary,
-            containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
-            visualSize = DsComposerMetrics.primaryActionVisualSize,
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+            content = {
+                Image(
+                    painter = painterResource(buttonRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
         )
     }
 
     @Composable
     fun StopControl() {
+        val dark = colors.bgBase.luminance() < 0.5f
         DsComposerAction(
             icon = null,
             contentDescription = stringResource(R.string.chat_composer_stop),
@@ -240,17 +249,19 @@ internal fun Composer(
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onStop()
             },
-            tint = colors.onAccent,
-            containerColor = colors.error,
-            visualSize = DsComposerMetrics.primaryActionVisualSize,
-        ) {
-            Box(
-                Modifier
-                    .size(11.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Color.White),
-            )
-        }
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+            content = {
+                Image(
+                    painter = painterResource(
+                        if (dark) R.drawable.ic_kimi_button_stop_dark
+                        else R.drawable.ic_kimi_button_stop_light,
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
+        )
     }
 
     DsConversationComposer(modifier = modifier) {
@@ -345,7 +356,7 @@ private fun PermissionChip(
 
     Box {
         DsComposerAction(
-            icon = Icons.Outlined.Shield,
+            icon = FeatherIcons.Shield,
             contentDescription = label,
             onClick = { menuOpen = true },
             enabled = enabled && pending == null,
@@ -426,7 +437,7 @@ private fun AttachmentStrip(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Filled.Close,
+                            FeatherIcons.X,
                             contentDescription = stringResource(
                                 if (attachment is PendingAttachment.File) R.string.chat_composer_remove_file
                                 else R.string.chat_composer_remove_image,
@@ -474,7 +485,7 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
                 strokeWidth = 2.dp,
             )
             else -> Icon(
-                Icons.Outlined.Description,
+                FeatherIcons.FileText,
                 contentDescription = null,
                 tint = if (failed) colors.error else colors.labelSecondary,
                 modifier = Modifier.size(18.dp),

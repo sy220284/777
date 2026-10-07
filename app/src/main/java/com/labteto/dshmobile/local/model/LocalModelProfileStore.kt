@@ -90,7 +90,7 @@ internal class LocalModelProfileStore(
         preferences.getString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, null)
             ?.takeIf { workerId -> profiles.none { it.id == workerId } }
             ?.let { editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID) }
-        editor.apply()
+        commit(editor)
     }
 
     fun replaceChatGpt(accountId: String, models: List<ChatGptModelOption>): List<LocalModelProfile> =
@@ -122,7 +122,7 @@ internal class LocalModelProfileStore(
             .putString(LocalModelConfigContract.KEY_MODEL, profile.model)
             .putString(LocalModelConfigContract.KEY_BASE_URL, profile.baseUrl)
             .putString(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID, profile.id)
-            .apply()
+            .let(::commit)
     }
 
     fun clearActive(model: String, baseUrl: String) {
@@ -130,7 +130,50 @@ internal class LocalModelProfileStore(
             .remove(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID)
             .putString(LocalModelConfigContract.KEY_MODEL, model)
             .putString(LocalModelConfigContract.KEY_BASE_URL, baseUrl)
-            .apply()
+            .let(::commit)
+    }
+
+    private val configurationKeys = listOf(
+        LocalModelConfigContract.KEY_PROFILES_V3, LocalModelConfigContract.KEY_PROFILES_BACKUP,
+        LocalModelConfigContract.KEY_PROFILES_V2, LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID,
+        LocalModelConfigContract.KEY_MODEL, LocalModelConfigContract.KEY_BASE_URL,
+        LocalModelConfigContract.KEY_WORKER_PROFILE_ID, "model_configuration_transaction",
+    )
+
+    fun configurationSnapshot(): Map<String, String?> = configurationKeys.associateWith { preferences.getString(it, null) }
+
+    fun transactionId(): String? = preferences.getString("model_configuration_transaction", null)
+
+    fun restoreConfiguration(values: Map<String, String?>) {
+        val editor = preferences.edit()
+        configurationKeys.forEach { key -> values[key]?.let { editor.putString(key, it) } ?: editor.remove(key) }
+        commit(editor)
+    }
+
+    fun commitConfiguration(all: List<LocalModelProfile>, active: LocalModelProfile?, transactionId: String) {
+        val encoded = encode(all)
+        val editor = preferences.edit()
+            .putString(LocalModelConfigContract.KEY_PROFILES_V3, encoded)
+            .putString(LocalModelConfigContract.KEY_PROFILES_BACKUP, encoded)
+            .putString(LocalModelConfigContract.KEY_MODEL, active?.model ?: LocalModelConfigContract.DEFAULT_MODEL)
+            .putString(LocalModelConfigContract.KEY_BASE_URL, active?.baseUrl ?: LocalModelConfigContract.DEFAULT_BASE_URL)
+            .putString("model_configuration_transaction", transactionId)
+        if (active == null) editor.remove(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID)
+        else editor.putString(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID, active.id)
+        preferences.getString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, null)
+            ?.takeIf { id -> all.none { it.id == id } }
+            ?.let { editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID) }
+        commit(editor)
+    }
+
+    private fun commit(editor: SharedPreferences.Editor) {
+        val before = configurationSnapshot()
+        if (editor.commit()) return
+        val rollback = preferences.edit()
+        before.forEach { (key, value) -> value?.let { rollback.putString(key, it) } ?: rollback.remove(key) }
+        val failure = java.io.IOException("模型配置未能持久保存")
+        if (!rollback.commit()) failure.addSuppressed(java.io.IOException("模型配置回滚尚未持久完成"))
+        throw failure
     }
 
     fun encode(profiles: List<LocalModelProfile>): String = buildJsonArray {

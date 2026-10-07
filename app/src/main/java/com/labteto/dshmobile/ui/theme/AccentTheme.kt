@@ -3,11 +3,9 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 中国风传统色卡：用户可自选的 accent 主题。
+ * 777 的交互色卡。Kimi 蓝是当前默认，历史传统色继续作为显式可选外观。
  *
- * 每张卡一对主色——亮色主题取深档（对应青瓷 Celadon600），暗色主题取浅档（对应 Celadon400），
- * 保证任何卡在两种主题下都落在既定的对比度带上。色名是专有名词，保留汉字不做翻译——
- * 这是这个功能的审美本体，不是待本地化的文案。
+ * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
 data class AccentPalette(
     val key: String,
@@ -20,9 +18,10 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** 青瓷为默认（与设计系统同源），其余五张为可选换装。 */
+    /** Kimi 蓝为默认交互色；旧版持久化默认 "celadon" 在 [of] 中迁移为 Kimi。 */
     val ALL = listOf(
-        AccentPalette("celadon", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
+        AccentPalette("kimi", "Kimi", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
+        AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
         AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
         AccentPalette("zhusha", "朱砂", Color(0xFFA64B44), Color(0xFFDE8B84), onDark = Color(0xFF1C0D0C)),
         AccentPalette("xianghuang", "缃黄", Color(0xFFA67C32), Color(0xFFD9BC7A), onDark = Color(0xFF1A150A)),
@@ -32,7 +31,10 @@ object AccentPalettes {
 
     val DEFAULT = ALL.first()
 
-    fun of(key: String?): AccentPalette = ALL.firstOrNull { it.key == key } ?: DEFAULT
+    fun of(key: String?): AccentPalette = when (key) {
+        null, "", "celadon" -> DEFAULT
+        else -> ALL.firstOrNull { it.key == key } ?: DEFAULT
+    }
 }
 
 /**

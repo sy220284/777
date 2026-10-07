@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,7 +38,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
  */
 @Composable
 fun DsIconButton(
-    icon: ImageVector,
+    icon: ImageVector?,
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -47,6 +48,7 @@ fun DsIconButton(
     containerColor: Color = Color.Transparent,
     shadowElevation: Dp = 0.dp,
     selected: Boolean = false,
+    iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
@@ -83,17 +85,26 @@ fun DsIconButton(
         shadowElevation = shadowElevation,
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (enabled) resolvedTint else resolvedTint.copy(alpha = 0.4f),
-                modifier = Modifier
-                    .requiredSize(iconSize)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
-            )
+            val iconModifier = Modifier
+                .requiredSize(iconSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+            when {
+                iconPainter != null -> Icon(
+                    painter = iconPainter,
+                    contentDescription = contentDescription,
+                    tint = if (enabled) resolvedTint else resolvedTint.copy(alpha = 0.4f),
+                    modifier = iconModifier,
+                )
+                icon != null -> Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = if (enabled) resolvedTint else resolvedTint.copy(alpha = 0.4f),
+                    modifier = iconModifier,
+                )
+            }
         }
     }
 }

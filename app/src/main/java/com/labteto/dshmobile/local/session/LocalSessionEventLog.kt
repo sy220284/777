@@ -151,7 +151,13 @@ class LocalSessionEventLog(
     fun latestOf(types: Set<String>): Event? =
         delegate.latestOf(types)?.toLocalEvent()
 
-    fun clear() = delegate.clear()
+    @Volatile internal var resetGeneration: Long = 0L
+        private set
+
+    fun clear() = synchronized(this) {
+        delegate.clear()
+        resetGeneration += 1L
+    }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
         sequence = sequence,

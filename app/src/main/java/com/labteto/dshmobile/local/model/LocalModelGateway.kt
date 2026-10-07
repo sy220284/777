@@ -29,6 +29,9 @@ class LocalModelGateway @Inject constructor(
     suspend fun synchronizeCredentialSelection(profile: LocalModelProfile) =
         credentials.synchronizeSelection(profile)
 
+    internal suspend fun selectedCredentialAccountId(): String? = credentials.selectedAccountId()
+    internal suspend fun restoreCredentialAccountSelection(id: String?) = credentials.restoreAccountSelection(id)
+
     suspend fun credentialDiagnostic(profile: LocalModelProfile): LocalCredentialDiagnostic =
         credentials.diagnostic(profile)
 

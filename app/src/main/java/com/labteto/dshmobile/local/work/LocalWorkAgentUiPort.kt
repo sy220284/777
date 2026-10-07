@@ -9,4 +9,7 @@ internal data class LocalWorkAgentUiResult(
 internal interface LocalWorkAgentUiPort {
     suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult
     suspend fun sendMessage(agentId: String, message: String): LocalWorkAgentUiResult
+    suspend fun sendTeamMessage(memberId: String, message: String): LocalWorkAgentUiResult
+    suspend fun stopTeamMember(memberId: String): LocalWorkAgentUiResult
+    suspend fun stopTeam(): LocalWorkAgentUiResult
 }

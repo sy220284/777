@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,11 +28,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.components.DsRadioButton
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -84,7 +84,7 @@ internal fun LocalConfiguration(
 
         Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         DsGroupCard {
-            OutlinedTextField(
+            DsTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -107,7 +107,7 @@ internal fun LocalConfiguration(
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
             Spacer(Modifier.height(DsSpacing.medium))
-            OutlinedTextField(
+            DsTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -139,13 +139,13 @@ internal fun LocalConfiguration(
 @Composable
 internal fun ModelChoice(id: String, label: String, selected: String, onSelect: (String) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+        Modifier.fillMaxWidth().clip(DsShapes.row)
             .heightIn(min = DsSpacing.touchTarget)
             .selectable(selected = selected == id, onClick = { onSelect(id) })
             .padding(vertical = DsSpacing.tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected == id, onClick = { onSelect(id) })
+        DsRadioButton(selected = selected == id, onClick = { onSelect(id) })
         Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
     }
 }

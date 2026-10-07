@@ -7,6 +7,9 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LocalModelProtocolPicker(
@@ -19,7 +22,13 @@ internal fun LocalModelProtocolPicker(
         LocalModelProtocol.ANTHROPIC_MESSAGES to "Anthropic Messages",
     )
     DsMenu(
-        anchor = { Text(stringResource(R.string.local_model_protocol_value, names.getValue(protocol))) },
+        anchor = {
+            Text(
+                stringResource(R.string.local_model_protocol_value, names.getValue(protocol)),
+                style = DsType.small13.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary,
+            )
+        },
         items = names.map { (value, name) -> MenuItem(name) { onSelect(value) } },
     )
 }

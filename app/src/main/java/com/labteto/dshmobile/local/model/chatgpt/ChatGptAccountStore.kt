@@ -72,6 +72,14 @@ class ChatGptAccountStore @Inject constructor(
         dataStore.edit { it[selectedKey] = id }
     }
 
+    internal suspend fun restoreSelection(id: String?) = mutex.withLock {
+        // Account deletion remains authoritative; recovery never recreates credentials.
+        val restored = id?.takeIf { get(it) != null }
+        dataStore.edit { values ->
+            if (restored == null) values.remove(selectedKey) else values[selectedKey] = restored
+        }
+    }
+
     suspend fun clearCredentials(id: String, expected: ChatGptAccountRecord? = null) = mutex.withLock {
         val current = get(id) ?: return@withLock
         if (expected != null && current != expected) return@withLock

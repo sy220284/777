@@ -16,6 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextButton
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.decodeFromJsonElement
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
@@ -61,7 +63,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             Box {
-                TextButton(onClick = { shellMenu = true }, enabled = !busy) { Text(state.shells.firstOrNull { it.path == state.shellPath }?.name ?: stringResource(R.string.terminal_shell)) }
+                DsTextButton(onClick = { shellMenu = true }, enabled = !busy) { Text(state.shells.firstOrNull { it.path == state.shellPath }?.name ?: stringResource(R.string.terminal_shell)) }
                 DsPopupMenu(
                     expanded = shellMenu,
                     onDismiss = { shellMenu = false },
@@ -70,25 +72,25 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                     },
                 )
             }
-            TextButton(enabled = !busy, onClick = { operation {
+            DsTextButton(enabled = !busy, onClick = { operation {
                 val api = store.apiForHost(key.host) ?: error(resources.getString(R.string.common_offline))
                 val info = api.terminalCreate(key.sessionId, TerminalCreateRequest(UUID.randomUUID().toString(), 80, 24, state.shellPath)).requireValue()
                 state.selectedTerminal = info.id
                 refresh()
             } }) { Text(stringResource(R.string.terminal_new)) }
-            TextButton(onClick = { operation { refresh() } }, enabled = !busy) { Text(stringResource(R.string.common_retry)) }
+            DsTextButton(onClick = { operation { refresh() } }, enabled = !busy) { Text(stringResource(R.string.common_retry)) }
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        error?.let { Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
+        error?.let { Text(it, Modifier.padding(12.dp), color = DsTheme.colors.error) }
         Row(Modifier.horizontalScroll(rememberScrollState())) {
-            state.terminals.forEach { terminal -> TextButton(onClick = { state.selectedTerminal = terminal.id }) { Text(terminal.title) } }
+            state.terminals.forEach { terminal -> DsTextButton(onClick = { state.selectedTerminal = terminal.id }) { Text(terminal.title) } }
         }
         val terminal = state.terminals.firstOrNull { it.id == state.selectedTerminal }
         if (terminal == null) Text(stringResource(R.string.terminal_empty), Modifier.padding(24.dp))
         else {
             Row {
-                TextButton(onClick = { rename = terminal.title }) { Text(stringResource(R.string.common_rename)) }
-                TextButton(enabled = !busy, onClick = { operation {
+                DsTextButton(onClick = { rename = terminal.title }) { Text(stringResource(R.string.common_rename)) }
+                DsTextButton(enabled = !busy, onClick = { operation {
                     store.apiForHost(key.host)?.terminalClose(key.sessionId, terminal.id)?.requireValue()
                         ?: error(resources.getString(R.string.common_offline))
                     refresh()
@@ -100,7 +102,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
                     title = stringResource(R.string.common_rename),
                     onDismiss = { if (!busy) rename = null },
                 ) {
-                    OutlinedTextField(
+                    DsTextField(
                         value = title,
                         onValueChange = { rename = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -264,10 +266,10 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
     Column(modifier.fillMaxWidth()) {
         if (!connected || !writable) Row {
             Text(if (connected) stringResource(R.string.terminal_readonly) else stringResource(R.string.common_offline), Modifier.weight(1f).padding(12.dp))
-            TextButton(onClick = { reconnect++ }) { Text(stringResource(if (connected) R.string.terminal_control else R.string.common_retry)) }
+            DsTextButton(onClick = { reconnect++ }) { Text(stringResource(if (connected) R.string.terminal_control else R.string.common_retry)) }
         }
         if (info.state != "running") Text(stringResource(if (info.state == "failed") R.string.common_error else R.string.chat_stopped) + " (${info.exitCode ?: "—"})", Modifier.padding(12.dp))
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+        error?.let { Text(it, color = DsTheme.colors.error, modifier = Modifier.padding(12.dp)) }
         AndroidView(factory = { view }, modifier = Modifier.weight(1f).fillMaxWidth())
     }
 }

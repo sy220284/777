@@ -29,12 +29,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
-/**
- * A grouped surface: rounded, filled, hairline-bordered.
- *
- * Clickable cards share the same pressed/hover language as rows and buttons so a card never relies
- * on a ripple alone to reveal that it is interactive.
- */
+/** Quiet Kimi-style content plate used for status and dense tool content. */
 @Composable
 fun DsCard(
     modifier: Modifier = Modifier,
@@ -50,8 +45,8 @@ fun DsCard(
     val base = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
     val targetBackground = when {
         onClick == null -> base
-        pressed -> colors.hoverAccent.compositeOver(base)
-        hovered -> colors.hover.compositeOver(base)
+        pressed -> colors.sidebarNavActive.compositeOver(base)
+        hovered -> colors.sidebarNavHover.compositeOver(base)
         else -> base
     }
     val background by animateColorAsState(
@@ -65,7 +60,10 @@ fun DsCard(
             .then(if (elevated) Modifier.shadow(1.dp, DsShapes.block, clip = false) else Modifier)
             .clip(DsShapes.block)
             .background(background)
-            .border(1.dp, colors.borderL1, DsShapes.block)
+            .then(
+                if (elevated) Modifier.border(1.dp, colors.borderL2, DsShapes.block)
+                else Modifier
+            )
             .then(
                 if (onClick != null) {
                     Modifier

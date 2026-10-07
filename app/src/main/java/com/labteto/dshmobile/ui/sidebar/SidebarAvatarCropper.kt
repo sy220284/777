@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSlider
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -104,7 +104,7 @@ internal fun SidebarAvatarCropper(
             style = DsType.small13Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
-        Slider(
+        DsSlider(
             value = crop.zoom,
             onValueChange = { zoom ->
                 if (!busy) {

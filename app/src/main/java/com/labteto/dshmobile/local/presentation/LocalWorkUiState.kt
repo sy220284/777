@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
@@ -30,6 +31,7 @@ data class LocalWorkUiState(
     val todos: List<LocalTodoItem> = emptyList(),
     val activeAgents: Int = 0,
     val jobs: List<LocalJobInfo> = emptyList(),
+    val team: LocalAgentTeamUiState = LocalAgentTeamUiState(),
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
     val plan: List<String> = emptyList(),
@@ -57,6 +59,7 @@ internal fun LocalHarnessState.toWorkUiState(): LocalWorkUiState =
         todos = work.todos,
         activeAgents = kernel.resources.activeAgents,
         jobs = work.jobs,
+        team = work.team.withJobs(work.jobs),
         pendingApproval = work.pendingApproval,
         pendingQuestion = work.pendingQuestion,
         plan = work.plan,

@@ -27,21 +27,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
@@ -63,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -137,6 +126,11 @@ internal fun LocalConversationSurface(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onTeamMemberOutput: (String) -> String,
+    onSendTeamMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
+    onStopTeamMember: suspend (String) -> LocalWorkUiActionResult,
+    onStopTeam: suspend () -> LocalWorkUiActionResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
@@ -146,7 +140,11 @@ internal fun LocalConversationSurface(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
+    onOpenWorkspace: () -> Unit,
     onOpenRunCenter: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
+    onOpenPersonaGallery: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -185,6 +183,10 @@ internal fun LocalConversationSurface(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var showTeamPanel by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
@@ -260,6 +262,18 @@ internal fun LocalConversationSurface(
         showPersonaPicker = false
         if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
+        teamDispatchSelected = false
+        teamLaunchPending = false
+        teamLaunchSawRunning = false
+        showTeamPanel = false
+    }
+
+    LaunchedEffect(state.running, state.team.visible, teamLaunchPending) {
+        if (!teamLaunchPending) return@LaunchedEffect
+        if (state.running) teamLaunchSawRunning = true
+        if (state.team.visible || (teamLaunchSawRunning && !state.running)) {
+            teamLaunchPending = false
+        }
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
@@ -414,7 +428,7 @@ internal fun LocalConversationSurface(
         modeIntro?.let { mode ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -443,7 +457,7 @@ internal fun LocalConversationSurface(
         }?.let { notice ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -474,7 +488,7 @@ internal fun LocalConversationSurface(
         if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
             Surface(
                 color = colors.warnTertiary,
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
             ) {
@@ -736,6 +750,18 @@ internal fun LocalConversationSurface(
             }
         }
 
+        LocalAgentTeamStatusBar(
+            team = state.team,
+            launchPending = teamLaunchPending,
+            onClick = {
+                if (state.team.visible) showTeamPanel = true
+            },
+            modifier = Modifier.padding(
+                horizontal = DsSpacing.medium,
+                vertical = DsSpacing.xsmall,
+            ),
+        )
+
         LocalConversationComposer(
             state = state,
             activeModelProfile = activeModelProfile,
@@ -749,6 +775,16 @@ internal fun LocalConversationSurface(
             onGenerateReplySuggestions = onGenerateReplySuggestions,
             onConfigure = onConfigure,
             onSend = onSend,
+            onSendTeam = { text, files ->
+                onSendTeam(text, files).also { result ->
+                    if (result.accepted) {
+                        teamLaunchPending = true
+                        teamLaunchSawRunning = false
+                    }
+                }
+            },
+            teamDispatchSelected = teamDispatchSelected,
+            onClearTeamDispatch = { teamDispatchSelected = false },
             onStop = onStop,
             onPlanModeChange = onPlanModeChange,
             onAutoApprove = onAutoApprove,
@@ -953,31 +989,179 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-            ) {
-                DsQuickActionTile(
-                    icon = Icons.Outlined.Image,
-                    label = stringResource(R.string.local_attachment_image),
-                    onClick = {
-                        showAttachmentPicker = false
-                        imagePicker.launch(arrayOf("image/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                DsQuickActionTile(
-                    icon = Icons.Outlined.AttachFile,
-                    label = stringResource(R.string.local_attachment_file),
-                    onClick = {
-                        showAttachmentPicker = false
-                        filePicker.launch(arrayOf("*/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+        DsBottomSheet(
+            title = stringResource(R.string.local_composer_more_actions),
+            onDismiss = { showAttachmentPicker = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Image,
+                        label = stringResource(R.string.local_attachment_image),
+                        onClick = {
+                            showAttachmentPicker = false
+                            imagePicker.launch(arrayOf("image/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Paperclip,
+                        label = stringResource(R.string.local_attachment_file),
+                        onClick = {
+                            showAttachmentPicker = false
+                            filePicker.launch(arrayOf("*/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                if (state.usageMode == LocalUsageMode.CHAT) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.User,
+                            label = stringResource(R.string.local_persona_picker_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                if (state.groupChat.enabled) {
+                                    onOpenPersonaGallery()
+                                } else {
+                                    showPersonaPicker = true
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Users,
+                            label = stringResource(R.string.local_group_chat_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                if (state.groupChat.enabled) {
+                                    showGroupMemberPicker = true
+                                } else {
+                                    onNewSession()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Clock,
+                            label = stringResource(R.string.tasks_chat_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTasks()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Tool,
+                            label = stringResource(R.string.tools_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTools()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.List,
+                            label = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
+                            onClick = { onPlanModeChange(!state.planMode); showAttachmentPicker = false },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Shield,
+                            label = stringResource(if (state.safeAutoApprovalEnabled) R.string.kimi_auto_approval_enabled else R.string.local_auto_approve_short),
+                            onClick = {
+                                showAttachmentPicker = false
+                                if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    LocalAgentSwarmLaunchEntry(
+                        selected = teamDispatchSelected,
+                        onClick = {
+                            teamDispatchSelected = !teamDispatchSelected
+                            showAttachmentPicker = false
+                        },
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = null,
+                            iconPainter = painterResource(R.drawable.ic_kimi_project),
+                            label = stringResource(R.string.chatlist_workspace_files),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenWorkspace()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Activity,
+                            label = stringResource(R.string.local_run_center),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenRunCenter()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Clock,
+                            label = stringResource(R.string.tasks_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTasks()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Tool,
+                            label = stringResource(R.string.tools_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTools()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
+    }
+
+    if (showTeamPanel && state.usageMode == LocalUsageMode.WORK && state.team.visible) {
+        LocalAgentTeamSheet(
+            team = state.team,
+            onMemberOutput = onTeamMemberOutput,
+            onSendMemberMessage = onSendTeamMemberMessage,
+            onStopMember = onStopTeamMember,
+            onStopAll = onStopTeam,
+            onDismiss = { showTeamPanel = false },
+        )
     }
 }
 

@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.animation.core.animateFloatAsState
@@ -130,7 +127,7 @@ fun ThinkingRow(
             label = "thinkingChevron",
         )
         Icon(
-            Icons.Filled.KeyboardArrowDown,
+            FeatherIcons.ChevronDown,
             contentDescription = null,
             tint = colors.labelTertiary,
             modifier = Modifier
@@ -151,7 +148,7 @@ fun ConnectionBanner(message: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            Icons.Filled.Warning,
+            FeatherIcons.AlertTriangle,
             contentDescription = null,
             tint = DsTheme.colors.onAccent,
             modifier = Modifier.size(16.dp),

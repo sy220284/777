@@ -25,19 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.PersonSearch
-import androidx.compose.material.icons.outlined.QrCodeScanner
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -207,7 +194,7 @@ internal fun LocalMessageRow(
                                 add(
                                     MenuItem(
                                         text = stringResource(R.string.common_copy),
-                                        icon = Icons.Outlined.ContentCopy,
+                                        icon = FeatherIcons.Copy,
                                         onClick = {
                                             clipboard.setText(AnnotatedString(copyText))
                                             Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
@@ -258,7 +245,7 @@ internal fun LocalMessageRow(
                             level = WallpaperSurfaceLevel.CARD,
                             region = BackgroundRegion.MIDDLE,
                         ),
-                        RoundedCornerShape(18.dp),
+                        DsShapes.block,
                     )
                     .border(
                         width = 1.dp,
@@ -267,7 +254,7 @@ internal fun LocalMessageRow(
                         } else {
                             Color.Black.copy(alpha = 0.22f)
                         },
-                        shape = RoundedCornerShape(18.dp),
+                        shape = DsShapes.block,
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             } else {
@@ -308,7 +295,7 @@ internal fun LocalMessageRow(
                     }
                     if (visibleContent.isNotBlank()) {
                         CompactMessageAction(
-                            icon = Icons.Outlined.ContentCopy,
+                            icon = FeatherIcons.Copy,
                             contentDescription = stringResource(R.string.chat_copy_answer),
                             onClick = {
                                 clipboard.setText(AnnotatedString(visibleContent))
@@ -317,7 +304,7 @@ internal fun LocalMessageRow(
                         )
                     }
                     if (canRegenerate) CompactMessageAction(
-                        icon = Icons.Outlined.Refresh,
+                        icon = FeatherIcons.RefreshCw,
                         contentDescription = stringResource(R.string.local_regenerate_reply),
                         onClick = {
                             if (!onRegenerate(message.id)) {
@@ -443,7 +430,7 @@ private fun LocalTranscriptImage(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Outlined.Image,
+                FeatherIcons.Image,
                 contentDescription = image.name,
                 tint = colors.labelTertiary,
                 modifier = Modifier.size(24.dp),
@@ -483,7 +470,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Icon(
-                Icons.Outlined.Extension,
+                FeatherIcons.Tool,
                 contentDescription = null,
                 tint = colors.labelSecondary,
                 modifier = Modifier.size(18.dp),
@@ -507,7 +494,7 @@ private fun MessageVariantControls(
     val info = branchInfo ?: return
     val colors = DsTheme.colors
     CompactMessageAction(
-        icon = Icons.Filled.KeyboardArrowLeft,
+        icon = FeatherIcons.ArrowLeft,
         contentDescription = stringResource(R.string.local_previous_variant),
         onClick = { onSelectVariant(messageId, info.index - 1) },
         enabled = enabled && info.hasPrevious,
@@ -518,7 +505,7 @@ private fun MessageVariantControls(
         color = colors.labelTertiary,
     )
     CompactMessageAction(
-        icon = Icons.Filled.KeyboardArrowRight,
+        icon = FeatherIcons.ChevronRight,
         contentDescription = stringResource(R.string.local_next_variant),
         onClick = { onSelectVariant(messageId, info.index + 1) },
         enabled = enabled && info.hasNext,

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
@@ -9,6 +10,7 @@ import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -23,13 +25,16 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,6 +64,12 @@ internal class LocalWorkComposition @Inject constructor(
     json: Json,
 ) : LocalWorkAgentUiPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private data class TeamJobSignal(
+        val status: String,
+        val updatedAt: Long,
+        val pendingMessageCount: Int,
+    )
+    private val teamJobSignals = ConcurrentHashMap<String, TeamJobSignal>()
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
@@ -228,6 +239,52 @@ internal class LocalWorkComposition @Inject constructor(
         runTurn = turnExecutor::run,
     )
 
+    private val teamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
+        if (reconcile) runCatching { agentTeams.recoverMailbox(sessionId) }
+            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team 后台状态恢复失败 session=$sessionId", it) }
+        runCatching { publishTeamUiState(sessionId) }
+            .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team UI 投影刷新失败 session=$sessionId", it) }
+    }
+
+    init {
+        runtimeStateStore.observeJobSnapshots(::observeTeamJobTransitions)
+    }
+
+    private fun observeTeamJobTransitions(jobs: List<LocalJobInfo>) {
+        val teamJobs = jobs.filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
+        val visibleIds = teamJobs.mapTo(hashSetOf(), LocalJobInfo::id)
+        teamJobSignals.keys.toList()
+            .filterNot(visibleIds::contains)
+            .forEach(teamJobSignals::remove)
+
+        data class SessionRefresh(
+            var reconcile: Boolean = false,
+        )
+        val sessions = linkedMapOf<String, SessionRefresh>()
+
+        teamJobs.forEach { job ->
+            val current = TeamJobSignal(
+                status = job.status,
+                updatedAt = job.updatedAt,
+                pendingMessageCount = job.pendingMessageCount,
+            )
+            val previous = teamJobSignals.put(job.id, current)
+            if (previous == current) return@forEach
+
+            val sessionId = job.ownerSessionId ?: return@forEach
+            val refresh = sessions.getOrPut(sessionId, ::SessionRefresh)
+            if (job.status in TEAM_RECONCILE_JOB_STATUSES &&
+                (previous?.status != current.status || previous.pendingMessageCount != current.pendingMessageCount)
+            ) {
+                refresh.reconcile = true
+            }
+        }
+
+        sessions.forEach { (sessionId, refresh) ->
+            teamRefreshQueue.schedule(sessionId, refresh.reconcile)
+        }
+    }
+
     internal suspend fun executeBuiltin(
         call: LocalToolCall,
         allowMutation: Boolean,
@@ -268,7 +325,38 @@ internal class LocalWorkComposition @Inject constructor(
     internal fun schedulePersistentRecovery() {
         val sessionId = runtimeStateStore.currentSessionId
         runCatching { agentTeams.recoverMailbox(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动恢复失败 session=$sessionId",
+                    error,
+                )
+            }
+        runCatching { publishTeamUiState(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动投影刷新失败 session=$sessionId",
+                    error,
+                )
+            }
         persistentJobs.schedule(sessionId)
+    }
+
+    private fun publishTeamUiState(sessionId: String) {
+        val team = agentTeams.uiState(sessionId)
+        workRunRegistry[sessionId]?.let { binding ->
+            binding.workState.update { current -> current.copy(team = team) }
+            workRunRegistry.mirrorVisible(binding)
+            return
+        }
+        val visible = runtimeStateStore.state.value
+        if (visible.sessionId == sessionId && visible.usageMode == LocalUsageMode.WORK) {
+            runtimeStateStore.projection.projectVisibleWorkRun(
+                sessionId = sessionId,
+                snapshot = visible.copy(work = visible.work.copy(team = team)),
+            )
+        }
     }
 
     override suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult =
@@ -335,6 +423,73 @@ internal class LocalWorkComposition @Inject constructor(
                 )
             }
         }
+
+    override suspend fun sendTeamMessage(
+        memberId: String,
+        message: String,
+    ): LocalWorkAgentUiResult = withContext(Dispatchers.IO) {
+        val clean = message.trim()
+        if (clean.isEmpty()) {
+            return@withContext LocalWorkAgentUiResult(false, "请输入要发送给助手的消息")
+        }
+        val sessionId = runtimeStateStore.currentSessionId
+        try {
+            val result = agentTeams.sendUiMessage(sessionId, memberId, clean)
+            publishTeamUiState(sessionId)
+            LocalWorkAgentUiResult(true, result)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            LocalWorkAgentUiResult(
+                false,
+                "助手消息发送失败：" + (error.message ?: error::class.java.simpleName),
+            )
+        }
+    }
+
+    override suspend fun stopTeamMember(memberId: String): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val sessionId = runtimeStateStore.currentSessionId
+            try {
+                val result = agentTeams.interruptUiMember(sessionId, memberId)
+                publishTeamUiState(sessionId)
+                LocalWorkAgentUiResult(true, result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "停止助手失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
+
+    override suspend fun stopTeam(): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val sessionId = runtimeStateStore.currentSessionId
+            try {
+                val result = agentTeams.interruptAllUi(sessionId)
+                publishTeamUiState(sessionId)
+                LocalWorkAgentUiResult(true, result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "停止 Agent 集群失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
+
+    private companion object {
+        val TEAM_RECONCILE_JOB_STATUSES = setOf(
+            "dormant",
+            "completed",
+            "failed",
+            "cancelled",
+            "killed",
+        )
+    }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,

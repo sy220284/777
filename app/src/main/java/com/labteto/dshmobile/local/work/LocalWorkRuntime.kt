@@ -22,6 +22,11 @@ class LocalWorkRuntime @Inject internal constructor(
         attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList(),
     ): com.labteto.dshmobile.local.send.LocalSendResult = execution.send(text, attachments)
 
+    internal fun sendWithTeam(
+        text: String,
+        attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList(),
+    ): com.labteto.dshmobile.local.send.LocalSendResult = execution.sendWithTeam(text, attachments)
+
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
     internal fun backgroundJobOutputForUi(jobId: String): String =
@@ -32,6 +37,12 @@ class LocalWorkRuntime @Inject internal constructor(
         agentUi.startBackgroundAgent(task)
     internal suspend fun sendBackgroundAgentMessageForUi(agentId: String, message: String): LocalWorkAgentUiResult =
         agentUi.sendMessage(agentId, message)
+    internal suspend fun sendTeamMemberMessageForUi(memberId: String, message: String): LocalWorkAgentUiResult =
+        agentUi.sendTeamMessage(memberId, message)
+    internal suspend fun stopTeamMemberForUi(memberId: String): LocalWorkAgentUiResult =
+        agentUi.stopTeamMember(memberId)
+    internal suspend fun stopTeamForUi(): LocalWorkAgentUiResult =
+        agentUi.stopTeam()
     internal fun answerApproval(callId: String, approved: Boolean) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
         if (binding?.interactions?.answerApproval(callId, approved) == true) return

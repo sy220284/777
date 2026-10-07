@@ -74,10 +74,11 @@ internal class LocalWorkTurnStarter(
             content = visibleContent,
             createdAt = System.currentTimeMillis(),
             blocks = blocks,
+
         )
         val eventLog = sessionStorage.eventLogs.get(sessionId)
         val event = eventLog.append("user/message", buildJsonObject {
-            put("content", content)
+            put("content", visibleContent)
             put("model_message", durableMessage)
             put("queued", false)
             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))

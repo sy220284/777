@@ -1,15 +1,34 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LocalModelPickerSheet(
@@ -19,31 +38,67 @@ internal fun LocalModelPickerSheet(
     onConfigure: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val chatGptPlanLabel = stringResource(R.string.chatgpt_plan_usage)
-    val chatGptAccountLabel = stringResource(R.string.chatgpt_account_short)
-    DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = onDismiss) {
-        profiles.forEach { profile ->
-            DsButton(
-                text = buildString {
-                    append(profile.displayName ?: profile.model)
-                    append("  ·  ")
-                    append(
-                        if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                            val account = profile.credentialRef?.takeLast(6).orEmpty()
-                            if (account.isBlank()) chatGptPlanLabel
-                            else "$chatGptPlanLabel · $chatGptAccountLabel $account"
-                        } else {
-                            profile.baseUrl.substringAfter("://").substringBefore('/')
-                        },
+    val colors = DsTheme.colors
+    DsBottomSheet(
+        title = stringResource(R.string.models_title),
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            profiles.forEach { profile ->
+                val selected = profile.id == activeProfileId
+                val detail = when {
+                    selected -> stringResource(R.string.kimi_model_current)
+                    profile.contextWindowTokensOverride != null -> stringResource(
+                        R.string.kimi_model_context, profile.contextWindowTokensOverride,
                     )
-                },
-                onClick = {
-                    onSelect(profile.id)
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                variant = if (profile.id == activeProfileId) DsButtonVariant.Info else DsButtonVariant.Ghost,
-            )
+                    else -> stringResource(R.string.kimi_model_available)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 60.dp)
+                        .clip(DsShapes.row)
+                        .background(if (selected) colors.bgModulePlatform else colors.bgLayer1)
+                        .clickable {
+                            onSelect(profile.id)
+                            onDismiss()
+                        }
+                        .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_kimi_model),
+                        contentDescription = null,
+                        tint = if (selected) colors.accent else colors.labelSecondary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            profile.displayName ?: profile.model,
+                            style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
+                            color = colors.labelPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            detail,
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (selected) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_kimi_check),
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
         }
         DsButton(
             text = stringResource(R.string.local_manage_model_config),
@@ -52,7 +107,7 @@ internal fun LocalModelPickerSheet(
                 onConfigure()
             },
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
+            variant = DsButtonVariant.Ghost,
         )
     }
 }

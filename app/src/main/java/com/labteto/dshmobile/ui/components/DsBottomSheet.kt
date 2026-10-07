@@ -83,9 +83,9 @@ fun DsBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+                        Text(title, style = DsType.headline17.withReadingWeight(), color = colors.labelPrimary)
                         if (subtitle != null) {
-                            Text(subtitle, style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
+                            Text(subtitle, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                         }
                     }
                     trailing?.invoke()

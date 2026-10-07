@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalResources
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsButton
@@ -74,7 +75,7 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
         title = stringResource(if (positive) R.string.chat_feedback_up else R.string.chat_feedback_down),
         onDismiss = { if (!busy) onDismiss() },
     ) {
-        OutlinedTextField(
+        DsTextField(
             value = note,
             onValueChange = { note = it },
             modifier = Modifier.fillMaxWidth(),
