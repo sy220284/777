@@ -80,7 +80,6 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
-import com.labteto.dshmobile.local.model.SUPPORTED_LOCAL_IMAGE_TYPES
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -964,7 +963,7 @@ internal fun LocalConversationSurface(
                     label = stringResource(R.string.local_attachment_image),
                     onClick = {
                         showAttachmentPicker = false
-                        imagePicker.launch(SUPPORTED_LOCAL_IMAGE_TYPES.toTypedArray())
+                        imagePicker.launch(arrayOf("image/*"))
                     },
                     modifier = Modifier.weight(1f),
                 )
@@ -993,7 +992,7 @@ internal fun localComposerAttachmentDecision(
     candidate: LocalImportedAttachment,
     maxImages: Int = MAX_LOCAL_IMAGE_SELECTION,
 ): LocalComposerAttachmentDecision {
-    require(maxImages > 0) { "图片数量上限必须大于 0" }
+    require(maxImages > 0)
     if (candidate.attachmentId != null && current.any { it.attachmentId == candidate.attachmentId }) {
         return LocalComposerAttachmentDecision.DUPLICATE
     }
