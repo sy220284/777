@@ -1152,6 +1152,120 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(!result.contains("历史结果"))
     }
 
+    @Test
+    fun dismissedMemberFreesCurrentRosterSlotForReplacement() = runBlocking {
+        val sessionId = "team-roster-capacity"
+        val fixture = fixture(sessionId)
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(
+                id = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                maxPendingInputs = 8,
+            ),
+            eventLog = fixture.log,
+        )
+
+        repeat(16) { index ->
+            requireNotNull(
+                fixture.runtime.execute(
+                    LocalToolCall(
+                        id = "call-create-" + index,
+                        name = "team_create_member",
+                        arguments = buildJsonObject {
+                            put("name", "worker-" + index)
+                        },
+                        rawArguments = "{}",
+                    ),
+                    binding,
+                ),
+            )
+        }
+
+        val overflow = runCatching {
+            fixture.runtime.execute(
+                LocalToolCall(
+                    id = "call-overflow",
+                    name = "team_create_member",
+                    arguments = buildJsonObject {
+                        put("name", "worker-overflow")
+                    },
+                    rawArguments = "{}",
+                ),
+                binding,
+            )
+        }.exceptionOrNull()
+        assertNotNull(overflow)
+        assertTrue(overflow!!.message.orEmpty().contains("TEAM_MEMBER_LIMIT"))
+
+        requireNotNull(
+            fixture.runtime.execute(
+                LocalToolCall(
+                    id = "call-dismiss",
+                    name = "team_dismiss_member",
+                    arguments = buildJsonObject {
+                        put("target", "worker-0")
+                    },
+                    rawArguments = "{}",
+                ),
+                binding,
+            ),
+        )
+        val replacement = requireNotNull(
+            fixture.runtime.execute(
+                LocalToolCall(
+                    id = "call-replacement",
+                    name = "team_create_member",
+                    arguments = buildJsonObject {
+                        put("name", "worker-replacement")
+                    },
+                    rawArguments = "{}",
+                ),
+                binding,
+            ),
+        )
+
+        assertTrue(replacement.contains("已创建"))
+        assertEquals(
+            16,
+            fixture.runtime.project(sessionId).members.count {
+                it.phase != LocalTeamMemberPhase.DISMISSED
+            },
+        )
+    }
+
+    @Test
+    fun failedMemberPendingMailboxIsDiscardedDuringRecovery() {
+        val fixture = fixture("team-failed-mailbox")
+        appendActiveMember(fixture.log, "team-failed-mailbox")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(
+                teamId = "team-failed-mailbox",
+                id = "team-msg-failed",
+                targetId = "member-1",
+                text = "稍后继续",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            member("team-failed-mailbox", "member-1", "worker", "failed"),
+        )
+
+        fixture.runtime.recoverMailbox("team-failed-mailbox")
+
+        val projection = fixture.runtime.project("team-failed-mailbox")
+        assertTrue(projection.pendingMessages.isEmpty())
+        assertEquals(listOf("team-msg-failed"), projection.discardedMessageIds)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,

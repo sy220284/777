@@ -505,8 +505,8 @@ internal class LocalAgentTeamRuntime(
             }
         }
         releaseOwnedTasks(sessionId, member.id)
-        discardPendingMessages(sessionId, member.id, reason = "member_dismissed")
         appendMember(sessionId, member.copy(phase = LocalTeamMemberPhase.DISMISSED, error = null))
+        discardPendingMessages(sessionId, member.id, reason = "member_dismissed")
         return "teammate 已解雇：" + member.name
     }
 
@@ -674,6 +674,7 @@ internal class LocalAgentTeamRuntime(
     fun recoverMailbox(sessionId: String) = synchronized(recoveryLock) {
         reconcileProvisioningMembers(sessionId)
         reconcileMemberOutcomes(sessionId)
+        reconcileTerminalMailboxes(sessionId)
         val state = project(sessionId)
         if (state.failure != null || state.pendingMessages.isEmpty()) return@synchronized
         val members = state.members.associateBy(LocalTeamMemberSnapshot::id)
@@ -682,6 +683,30 @@ internal class LocalAgentTeamRuntime(
             if (member.phase != LocalTeamMemberPhase.ACTIVE) return@forEach
             runCatching { deliverMessage(sessionId, message, member) }
         }
+    }
+
+    private fun reconcileTerminalMailboxes(sessionId: String) {
+        val state = project(sessionId)
+        if (state.failure != null || state.pendingMessages.isEmpty()) return
+        val terminalMemberIds = state.members
+            .filter {
+                it.phase == LocalTeamMemberPhase.FAILED ||
+                    it.phase == LocalTeamMemberPhase.DISMISSED
+            }
+            .mapTo(hashSetOf(), LocalTeamMemberSnapshot::id)
+        if (terminalMemberIds.isEmpty()) return
+        state.pendingMessages
+            .asSequence()
+            .filter { it.targetId in terminalMemberIds }
+            .map(LocalTeamMessageSnapshot::targetId)
+            .distinct()
+            .forEach { memberId ->
+                discardPendingMessages(
+                    sessionId = sessionId,
+                    memberId = memberId,
+                    reason = "member_terminal",
+                )
+            }
     }
 
     private fun reconcileProvisioningMembers(sessionId: String) {
