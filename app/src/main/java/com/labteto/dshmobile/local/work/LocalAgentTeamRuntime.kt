@@ -62,6 +62,7 @@ internal data class LocalTeamProjection(
     val members: List<LocalTeamMemberSnapshot> = emptyList(),
     val tasks: List<LocalTeamTaskSnapshot> = emptyList(),
     val pendingMessages: List<LocalTeamMessageSnapshot> = emptyList(),
+    val deliveredMessageIds: List<String> = emptyList(),
     val failure: String? = null,
     val asOfSequence: Long = -1L,
 )
@@ -546,19 +547,31 @@ internal class LocalAgentTeamRuntime(
                 }
                 TEAM_MESSAGE_QUEUED -> {
                     val message = decodeMessage(event.data)
-                    val existing = state.pendingMessages.firstOrNull { it.id == message.id }
-                    require(existing == null || existing == message) {
-                        "TEAM_MESSAGE_ID_CONFLICT：" + message.id
+                    require(state.pendingMessages.none { it.id == message.id }) {
+                        "TEAM_MESSAGE_QUEUED_TWICE：" + message.id
                     }
-                    if (existing != null) advanced
-                    else advanced.copy(pendingMessages = state.pendingMessages + message)
+                    require(message.id !in state.deliveredMessageIds) {
+                        "TEAM_MESSAGE_QUEUED_AFTER_DELIVERY：" + message.id
+                    }
+                    advanced.copy(pendingMessages = state.pendingMessages + message)
                 }
                 TEAM_MESSAGE_DELIVERED -> {
                     validateTeamEnvelope(event.data)
                     val id = event.data["messageId"]?.jsonPrimitive?.contentOrNull
                         ?: error("TEAM_MESSAGE_DELIVERED 缺少 messageId")
+                    val targetId = event.data["targetId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_DELIVERED 缺少 targetId")
+                    require(id !in state.deliveredMessageIds) {
+                        "TEAM_MESSAGE_DELIVERED_TWICE：" + id
+                    }
+                    val queued = state.pendingMessages.firstOrNull { it.id == id }
+                        ?: error("TEAM_MESSAGE_DELIVERED_BEFORE_QUEUE：" + id)
+                    require(queued.targetId == targetId) {
+                        "TEAM_MESSAGE_TARGET_CHANGED：" + id
+                    }
                     advanced.copy(
                         pendingMessages = state.pendingMessages.filterNot { it.id == id },
+                        deliveredMessageIds = state.deliveredMessageIds + id,
                     )
                 }
                 else -> advanced
