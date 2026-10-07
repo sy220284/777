@@ -261,12 +261,20 @@ class ToolRegistry private constructor(
         require(parameterType == "object") {
             "工具 parameters 根类型必须是 object：${tool.name}"
         }
+        JsonSchemaValidator.validateSchema(
+            schema = parameters,
+            requireObjectRoot = true,
+        )?.let { problem ->
+            throw IllegalArgumentException(
+                "工具 parameters schema 非法：${tool.name}：$problem"
+            )
+        }
     }
 
     private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
         val function = tool.schema["function"] as? JsonObject ?: return null
         val parameters = function["parameters"] as? JsonObject ?: return null
-        return JsonSchemaValidator.validate(input, parameters)
+        return JsonSchemaValidator.validateTrusted(input, parameters)
     }
 
 
