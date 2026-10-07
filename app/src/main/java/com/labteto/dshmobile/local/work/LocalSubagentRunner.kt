@@ -143,6 +143,7 @@ internal class LocalSubagentRunner(
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
         outputSchema: JsonObject? = null,
+        toolAllowlist: Set<String>? = null,
         recoveredHistory: List<JsonObject>? = null,
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
@@ -158,6 +159,7 @@ internal class LocalSubagentRunner(
         maxSteps = maxSteps,
         virtualScreen = virtualScreen,
         outputSchema = outputSchema,
+        toolAllowlist = toolAllowlist,
         recoveredHistory = recoveredHistory,
         recoveredClaimedMessageIds = recoveredClaimedMessageIds,
         recoveredStep = recoveredStep,
@@ -175,6 +177,7 @@ internal class LocalSubagentRunner(
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
         outputSchema: JsonObject? = null,
+        toolAllowlist: Set<String>? = null,
         recoveredHistory: List<JsonObject>? = null,
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
@@ -207,6 +210,7 @@ internal class LocalSubagentRunner(
                 virtualScreenId = virtualScreenId,
                 virtualScreenRequested = virtualScreen,
                 outputSchema = outputSchema,
+                toolAllowlist = toolAllowlist,
                 recoveredHistory = recoveredHistory,
                 recoveredClaimedMessageIds = recoveredClaimedMessageIds,
                 recoveredStep = recoveredStep,
@@ -229,6 +233,7 @@ internal class LocalSubagentRunner(
         virtualScreenId: String?,
         virtualScreenRequested: Boolean,
         outputSchema: JsonObject?,
+        toolAllowlist: Set<String>?,
         recoveredHistory: List<JsonObject>?,
         recoveredClaimedMessageIds: Set<String>,
         recoveredStep: Int,
@@ -241,6 +246,7 @@ internal class LocalSubagentRunner(
             virtualScreen = virtualScreenRequested,
             continuable = backgroundJobId != null,
             outputSchema = outputSchema,
+            toolAllowlist = toolAllowlist,
         )
         val schemaIssues = outputSchema
             ?.let(::validateStructuredOutputSchema)
@@ -317,6 +323,33 @@ internal class LocalSubagentRunner(
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
 
+        fun rawToolSchemas(): JsonArray =
+            schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)
+
+        fun toolName(element: kotlinx.serialization.json.JsonElement): String? {
+            val function = (element as? JsonObject)?.get("function") as? JsonObject
+            return (function?.get("name") as? JsonPrimitive)?.contentOrNull
+        }
+
+        val initialToolNames = rawToolSchemas().mapNotNull(::toolName).toSet()
+        val unavailableRequestedTools = capabilities.toolAllowlist
+            ?.minus(initialToolNames)
+            .orEmpty()
+        if (unavailableRequestedTools.isNotEmpty()) {
+            return LocalSubagentResult(
+                status = LocalSubagentStatus.FAILED,
+                output = "[subagent][$subagentId][SUBAGENT_TOOL_UNAVAILABLE] 请求的工具当前不可用：" +
+                    unavailableRequestedTools.sorted().joinToString(", "),
+                errorCode = "SUBAGENT_TOOL_UNAVAILABLE",
+            )
+        }
+
+        fun visibleToolSchemas(): JsonArray {
+            val all = rawToolSchemas()
+            val allowlist = capabilities.toolAllowlist ?: return all
+            return JsonArray(all.filter { element -> toolName(element) in allowlist })
+        }
+
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
             put("background_job_id", backgroundJobId ?: "")
@@ -332,6 +365,13 @@ internal class LocalSubagentRunner(
             put("virtual_screen_requested", capabilities.virtualScreen)
             put("continuable", capabilities.continuable)
             put("structured_output", outputSchema != null)
+            capabilities.toolAllowlist?.let { tools ->
+                put("tool_filter_count", tools.size)
+                put(
+                    "tool_filter_digest",
+                    stableJsonSha256(JsonArray(tools.sorted().map(::JsonPrimitive))),
+                )
+            }
             outputSchema?.let { schema ->
                 put("output_schema_digest", stableJsonSha256(schema))
             }
@@ -372,14 +412,7 @@ internal class LocalSubagentRunner(
                 maxVirtualDisplays = snapshot.kernel.resources.maxVirtualDisplays,
                 maxLanguageServers = snapshot.kernel.resources.maxLanguageServers,
             ),
-            toolNames = schemas(
-                allowMutation,
-                virtualScreenId != null,
-                enabledOptionalTools,
-            ).mapNotNull { element ->
-                val function = (element as? JsonObject)?.get("function") as? JsonObject
-                (function?.get("name") as? JsonPrimitive)?.content
-            },
+            toolNames = visibleToolSchemas().mapNotNull(::toolName),
             contextChars = history.encodedChars + task.length,
             parentRunId = parentRunId,
             agentId = subagentId,
@@ -548,7 +581,7 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = modelToolStepSurface.capture(runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools))),
+                            tools = modelToolStepSurface.capture(runToolSurface.next(visibleToolSchemas())),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -606,7 +639,16 @@ internal class LocalSubagentRunner(
                 },
                 tools = AgentToolExecutor { call ->
                     currentCoroutineContext().ensureActive()
-                    toolCallPolicy.rejection(call) ?: withContext(LocalModelRunContext(runProfile)) {
+                    if (
+                        capabilities.toolAllowlist != null &&
+                        call.name !in capabilities.toolAllowlist
+                    ) {
+                        AgentToolResult(
+                            content = "子代理能力契约未允许工具：${call.name}",
+                            isError = true,
+                            errorCode = "SUBAGENT_TOOL_NOT_ALLOWED",
+                        )
+                    } else toolCallPolicy.rejection(call) ?: withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
                         execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                             .also { currentCoroutineContext().ensureActive() }
