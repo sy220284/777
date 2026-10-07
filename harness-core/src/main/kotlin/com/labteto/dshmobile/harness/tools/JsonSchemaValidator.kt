@@ -43,6 +43,10 @@ object JsonSchemaValidator {
             visited += 1
             if (visited > maxNodes) return "schema 节点超过 $maxNodes 个"
 
+            current.keys.firstOrNull { it !in supportedKeywords }?.let { keyword ->
+                return "$path 包含未支持的 JSON Schema 关键字：$keyword"
+            }
+
             val typeElement = current["type"]
             val type = typeElement?.let { element ->
                 val primitive = element as? JsonPrimitive
@@ -233,6 +237,23 @@ object JsonSchemaValidator {
         }
         return null
     }
+
+    private val supportedKeywords = setOf(
+        "type",
+        "properties",
+        "required",
+        "additionalProperties",
+        "items",
+        "minItems",
+        "maxItems",
+        "minLength",
+        "maxLength",
+        "minimum",
+        "maximum",
+        "enum",
+        "description",
+        "title",
+    )
 
     private const val DEFAULT_MAX_DEPTH = 16
     private const val DEFAULT_MAX_NODES = 512
