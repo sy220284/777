@@ -108,11 +108,19 @@ internal fun LocalAgentSwarmLaunchEntry(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(
-                imageVector = if (selected) FeatherIcons.Check else FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = if (selected) colors.accent else colors.labelCaption,
-            )
+            if (selected) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_kimi_check),
+                    contentDescription = null,
+                    tint = colors.accent,
+                )
+            } else {
+                Icon(
+                    imageVector = FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                )
+            }
         }
     }
 }
@@ -151,7 +159,7 @@ internal fun LocalAgentTeamStatusBar(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_kimi_create_subagent),
+                        painter = painterResource(R.drawable.ic_kimi_task_subagent),
                         contentDescription = null,
                         tint = if (teamDotState(team, launchPending) == StateDotState.Running) {
                             colors.accent

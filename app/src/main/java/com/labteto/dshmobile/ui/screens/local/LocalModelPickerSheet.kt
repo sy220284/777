@@ -95,7 +95,7 @@ internal fun LocalModelPickerSheet(
                     }
                     if (selected) {
                         Icon(
-                            FeatherIcons.Check,
+                            painter = painterResource(R.drawable.ic_kimi_check),
                             contentDescription = null,
                             tint = colors.accent,
                             modifier = Modifier.size(18.dp),
