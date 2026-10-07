@@ -2,8 +2,6 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
