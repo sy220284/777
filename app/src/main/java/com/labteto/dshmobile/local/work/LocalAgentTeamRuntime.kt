@@ -13,6 +13,7 @@ import java.util.UUID
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -104,7 +105,8 @@ internal class LocalAgentTeamRuntime(
         if (call.name !in TOOL_NAMES) return null
         recoverMailbox(binding.sessionId)
         val args = call.arguments
-        return when (call.name) {
+        return try {
+            when (call.name) {
             "team_members" -> renderMembers(binding.sessionId)
             "team_spawn" -> spawn(
                 binding = binding,
@@ -157,6 +159,104 @@ internal class LocalAgentTeamRuntime(
                     .coerceIn(MIN_WAIT_MS, MAX_WAIT_MS),
             )
             else -> error("未覆盖的 Agent Team 工具：${call.name}")
+            }
+        } finally {
+            binding.workState.update { current ->
+                current.copy(team = uiState(binding.sessionId))
+            }
+        }
+    }
+
+    internal fun uiState(sessionId: String): LocalAgentTeamUiState {
+        val state = project(sessionId)
+        val jobsById = jobs.snapshotInfos().associateBy { it.id }
+        val visibleTasks = state.tasks
+            .filter { it.status != LocalTeamTaskStatus.DELETED }
+            .sortedBy(::taskNumber)
+        val taskById = visibleTasks.associateBy { it.id }
+        val memberById = state.members.associateBy { it.id }
+
+        val members = state.members.map { member ->
+            val activity = when (member.phase) {
+                LocalTeamMemberPhase.PROVISIONING -> "provisioning"
+                LocalTeamMemberPhase.FAILED -> "failed"
+                LocalTeamMemberPhase.ACTIVE -> jobsById[member.jobId]?.status ?: "waiting"
+            }
+            val currentTask = visibleTasks.firstOrNull {
+                it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
+            }?.subject
+            LocalAgentTeamMemberUiState(
+                id = member.id,
+                jobId = member.jobId,
+                name = member.name,
+                description = member.description,
+                phase = member.phase.name.lowercase(),
+                activity = activity,
+                currentTask = currentTask,
+                pendingMessageCount = state.pendingMessages.count { it.targetId == member.id },
+                error = member.error,
+            )
+        }
+        val tasks = visibleTasks.map { task ->
+            LocalAgentTeamTaskUiState(
+                id = task.id,
+                subject = task.subject,
+                description = task.description,
+                status = task.status.name.lowercase(),
+                ownerName = task.ownerId?.let { memberById[it]?.name },
+                blockedByTitles = task.blockedBy.map { blockerId ->
+                    taskById[blockerId]?.subject ?: blockerId
+                },
+                ready = isReady(task, state.tasks),
+                writeConflict = writeScopeWarnings(task, state.tasks).isNotEmpty(),
+            )
+        }
+        return LocalAgentTeamUiState(
+            members = members,
+            tasks = tasks,
+            pendingMessageCount = state.pendingMessages.size,
+            failure = state.failure,
+        )
+    }
+
+    internal fun sendUiMessage(
+        sessionId: String,
+        memberId: String,
+        message: String,
+    ): String {
+        val member = project(sessionId).members.singleOrNull {
+            it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+        } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可接收消息")
+        return sendMessage(sessionId, member.name, message)
+    }
+
+    internal fun interruptUiMember(sessionId: String, memberId: String): String {
+        val member = project(sessionId).members.singleOrNull {
+            it.id == memberId && it.phase == LocalTeamMemberPhase.ACTIVE
+        } ?: error("TEAM_MEMBER_NOT_FOUND：该助手当前不可停止")
+        return jobs.interruptContinuableAgent(member.jobId, sessionId)
+    }
+
+    internal fun interruptAllUi(sessionId: String): String {
+        val state = project(sessionId)
+        val jobStatus = jobs.snapshotInfos().associateBy { it.id }
+        val running = state.members.filter { member ->
+            member.phase == LocalTeamMemberPhase.ACTIVE &&
+                jobStatus[member.jobId]?.status == "running"
+        }
+        if (running.isEmpty()) return "当前没有正在运行的助手"
+        val failures = mutableListOf<String>()
+        running.forEach { member ->
+            runCatching {
+                jobs.interruptContinuableAgent(member.jobId, sessionId)
+            }.onFailure { error ->
+                failures += member.name + "：" + (error.message ?: error::class.java.simpleName)
+            }
+        }
+        return if (failures.isEmpty()) {
+            "已停止 ${running.size} 个正在运行的助手"
+        } else {
+            "部分助手停止失败：" + failures.joinToString("；")
         }
     }
 

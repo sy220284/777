@@ -30,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -268,7 +269,24 @@ internal class LocalWorkComposition @Inject constructor(
     internal fun schedulePersistentRecovery() {
         val sessionId = runtimeStateStore.currentSessionId
         runCatching { agentTeams.recoverMailbox(sessionId) }
+        runCatching { publishTeamUiState(sessionId) }
         persistentJobs.schedule(sessionId)
+    }
+
+    private fun publishTeamUiState(sessionId: String) {
+        val team = agentTeams.uiState(sessionId)
+        workRunRegistry[sessionId]?.let { binding ->
+            binding.workState.update { current -> current.copy(team = team) }
+            workRunRegistry.mirrorVisible(binding)
+            return
+        }
+        val visible = runtimeStateStore.state.value
+        if (visible.sessionId == sessionId && visible.usageMode == LocalUsageMode.WORK) {
+            runtimeStateStore.projection.projectVisibleWorkRun(
+                sessionId = sessionId,
+                snapshot = visible.copy(work = visible.work.copy(team = team)),
+            )
+        }
     }
 
     override suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult =
@@ -332,6 +350,63 @@ internal class LocalWorkComposition @Inject constructor(
                 LocalWorkAgentUiResult(
                     false,
                     "消息发送失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
+
+    override suspend fun sendTeamMessage(
+        memberId: String,
+        message: String,
+    ): LocalWorkAgentUiResult = withContext(Dispatchers.IO) {
+        val clean = message.trim()
+        if (clean.isEmpty()) {
+            return@withContext LocalWorkAgentUiResult(false, "请输入要发送给助手的消息")
+        }
+        val sessionId = runtimeStateStore.currentSessionId
+        try {
+            val result = agentTeams.sendUiMessage(sessionId, memberId, clean)
+            publishTeamUiState(sessionId)
+            LocalWorkAgentUiResult(true, result)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            LocalWorkAgentUiResult(
+                false,
+                "助手消息发送失败：" + (error.message ?: error::class.java.simpleName),
+            )
+        }
+    }
+
+    override suspend fun stopTeamMember(memberId: String): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val sessionId = runtimeStateStore.currentSessionId
+            try {
+                val result = agentTeams.interruptUiMember(sessionId, memberId)
+                publishTeamUiState(sessionId)
+                LocalWorkAgentUiResult(true, result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "停止助手失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
+
+    override suspend fun stopTeam(): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val sessionId = runtimeStateStore.currentSessionId
+            try {
+                val result = agentTeams.interruptAllUi(sessionId)
+                publishTeamUiState(sessionId)
+                LocalWorkAgentUiResult(true, result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "停止 Agent 集群失败：" + (error.message ?: error::class.java.simpleName),
                 )
             }
         }

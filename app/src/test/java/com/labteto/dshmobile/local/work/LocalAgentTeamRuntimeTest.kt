@@ -492,6 +492,68 @@ class LocalAgentTeamRuntimeTest {
         assertNull(projection.failure)
     }
 
+    @Test
+    fun uiProjectionExposesAssistantsCurrentWorkProgressAndDependencies() {
+        val fixture = fixture("team-ui")
+        appendActiveMember(fixture.log, "team-ui")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-ui",
+                "task-1",
+                1,
+                blockedBy = emptyList(),
+                subject = "检查持久化恢复",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-ui",
+                "task-1",
+                2,
+                blockedBy = emptyList(),
+                status = "in_progress",
+                ownerId = "member-1",
+                subject = "检查持久化恢复",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task(
+                "team-ui",
+                "task-2",
+                1,
+                blockedBy = listOf("task-1"),
+                subject = "回归测试",
+            ),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(
+                teamId = "team-ui",
+                id = "team-msg-ui",
+                targetId = "member-1",
+                text = "补充检查边界",
+            ),
+        )
+
+        val ui = fixture.runtime.uiState("team-ui")
+
+        assertTrue(ui.visible)
+        assertEquals(1, ui.members.size)
+        assertEquals("检查持久化恢复", ui.members.single().currentTask)
+        assertEquals(1, ui.members.single().pendingMessageCount)
+        assertEquals(2, ui.tasks.size)
+        assertEquals(
+            listOf("检查持久化恢复"),
+            ui.tasks.single { it.id == "task-2" }.blockedByTitles,
+        )
+        assertTrue(!ui.tasks.single { it.id == "task-2" }.ready)
+        assertEquals(1, ui.blockedTaskCount)
+        assertEquals(1, ui.pendingMessageCount)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,

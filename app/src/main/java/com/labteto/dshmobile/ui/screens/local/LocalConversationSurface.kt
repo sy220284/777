@@ -125,6 +125,11 @@ internal fun LocalConversationSurface(
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onTeamMemberOutput: (String) -> String,
+    onSendTeamMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
+    onStopTeamMember: suspend (String) -> LocalWorkUiActionResult,
+    onStopTeam: suspend () -> LocalWorkUiActionResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
@@ -177,6 +182,10 @@ internal fun LocalConversationSurface(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var showTeamPanel by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
@@ -252,6 +261,18 @@ internal fun LocalConversationSurface(
         showPersonaPicker = false
         if (!state.groupChat.enabled) showGroupMemberPicker = false
         editingUserMessage = null
+        teamDispatchSelected = false
+        teamLaunchPending = false
+        teamLaunchSawRunning = false
+        showTeamPanel = false
+    }
+
+    LaunchedEffect(state.running, state.team.visible, teamLaunchPending) {
+        if (!teamLaunchPending) return@LaunchedEffect
+        if (state.running) teamLaunchSawRunning = true
+        if (state.team.visible || (teamLaunchSawRunning && !state.running)) {
+            teamLaunchPending = false
+        }
     }
 
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
@@ -719,6 +740,18 @@ internal fun LocalConversationSurface(
             }
         }
 
+        LocalAgentTeamStatusBar(
+            team = state.team,
+            launchPending = teamLaunchPending,
+            onClick = {
+                if (state.team.visible) showTeamPanel = true
+            },
+            modifier = Modifier.padding(
+                horizontal = DsSpacing.medium,
+                vertical = DsSpacing.xsmall,
+            ),
+        )
+
         LocalConversationComposer(
             state = state,
             activeModelProfile = activeModelProfile,
@@ -732,6 +765,16 @@ internal fun LocalConversationSurface(
             onGenerateReplySuggestions = onGenerateReplySuggestions,
             onConfigure = onConfigure,
             onSend = onSend,
+            onSendTeam = { text, files ->
+                onSendTeam(text, files).also { result ->
+                    if (result.accepted) {
+                        teamLaunchPending = true
+                        teamLaunchSawRunning = false
+                    }
+                }
+            },
+            teamDispatchSelected = teamDispatchSelected,
+            onClearTeamDispatch = { teamDispatchSelected = false },
             onStop = onStop,
             onPlanModeChange = onPlanModeChange,
             onAutoApprove = onAutoApprove,
@@ -1026,6 +1069,20 @@ internal fun LocalConversationSurface(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
                         DsQuickActionTile(
+                            icon = FeatherIcons.Users,
+                            label = stringResource(R.string.local_team_title),
+                            onClick = {
+                                teamDispatchSelected = !teamDispatchSelected
+                                showAttachmentPicker = false
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
                             icon = FeatherIcons.Folder,
                             label = stringResource(R.string.chatlist_workspace_files),
                             onClick = {
@@ -1070,6 +1127,17 @@ internal fun LocalConversationSurface(
                 }
             }
         }
+    }
+
+    if (showTeamPanel && state.usageMode == LocalUsageMode.WORK && state.team.visible) {
+        LocalAgentTeamSheet(
+            team = state.team,
+            onMemberOutput = onTeamMemberOutput,
+            onSendMemberMessage = onSendTeamMemberMessage,
+            onStopMember = onStopTeamMember,
+            onStopAll = onStopTeam,
+            onDismiss = { showTeamPanel = false },
+        )
     }
 }
 

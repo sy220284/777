@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
@@ -33,6 +34,28 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+
+private val LOCAL_AGENT_TEAM_DIRECTIVE = """
+    【本轮执行方式：Agent 集群】
+    用户已明确选择 Agent 集群。你是 Lead，必须使用 Agent Team 能力组织本轮任务。
+    先检查当前 Team 与任务板；能复用现有 active teammate 时优先复用，避免重复招募。
+    将目标拆成清晰的共享任务；能够并行的工作并行执行，存在前置条件时记录依赖。
+    按实际需要招募不同职责的 teammate，并及时维护任务负责人、进行中、完成与阻塞状态。
+    关键结果必须等待 teammate 返回并由 Lead 交叉核验后再汇总；禁止在成员仍执行关键任务时提前宣称整体完成。
+    最终回复面向用户说明结果，不把 team_spawn、task id、revision、mailbox 等内部实现术语当成答复主体。
+""".trimIndent()
+
+internal fun prepareLocalAgentTeamSend(
+    text: String,
+    attachments: List<LocalImportedAttachment>,
+): LocalPreparedSend? {
+    val prepared = prepareLocalSend(text, attachments) ?: return null
+    val modelContent = LOCAL_AGENT_TEAM_DIRECTIVE + "\n\n" + prepared.content
+    return prepared.copy(
+        content = modelContent,
+        modelMessage = buildLocalUserModelMessage(modelContent, attachments),
+    )
+}
 
 /** Work-owned product execution entry. */
 @Singleton
@@ -226,6 +249,18 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         attachments: List<LocalImportedAttachment>,
     ): LocalSendResult {
         val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
+        return sendPrepared(prepared)
+    }
+
+    override fun sendWithTeam(
+        text: String,
+        attachments: List<LocalImportedAttachment>,
+    ): LocalSendResult {
+        val prepared = prepareLocalAgentTeamSend(text, attachments) ?: return LocalSendResult.Empty
+        return sendPrepared(prepared)
+    }
+
+    private fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult {
         workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return it }
 
         var started: Job? = null
@@ -265,8 +300,9 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                         val transcript = LocalHarnessMessage(
                             id = queuedInput.id,
                             role = "user",
-                            content = prepared.content,
+                            content = prepared.visibleContent,
                             createdAt = System.currentTimeMillis(),
+                            blocks = prepared.blocks,
                         )
                         val event = eventLogFor(sessionId).append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,

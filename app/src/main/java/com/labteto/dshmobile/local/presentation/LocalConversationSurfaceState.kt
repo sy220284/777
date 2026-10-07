@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
 
 /**
  * Shared conversation substrate rendered by Chat and Work.
@@ -56,6 +57,7 @@ data class LocalConversationSurfaceState(
     val contextBudgetChars: Int = 0,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
+    val team: LocalAgentTeamUiState = LocalAgentTeamUiState(),
 )
 
 internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceState =
@@ -103,4 +105,5 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceS
         contextBudgetChars = kernel.contextBudgetChars,
         pendingApproval = work.pendingApproval,
         pendingQuestion = work.pendingQuestion,
+        team = work.team.withJobs(work.jobs),
     )

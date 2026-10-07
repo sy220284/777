@@ -47,6 +47,7 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -73,6 +74,9 @@ internal fun LocalConversationComposer(
     onGenerateReplySuggestions: suspend () -> Boolean,
     onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult = onSend,
+    teamDispatchSelected: Boolean = false,
+    onClearTeamDispatch: () -> Unit = {},
     onStop: () -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
@@ -89,7 +93,7 @@ internal fun LocalConversationComposer(
     var focused by remember { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
-    val expanded = focused || input.contains('\n') || attachments.isNotEmpty()
+    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() || teamDispatchSelected
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
         groupChatReady &&
@@ -123,8 +127,15 @@ internal fun LocalConversationComposer(
             onConfigure()
             return
         }
-        val result = onSend(input, attachments.toList())
+        val result = if (
+            state.usageMode == LocalUsageMode.WORK && teamDispatchSelected
+        ) {
+            onSendTeam(input, attachments.toList())
+        } else {
+            onSend(input, attachments.toList())
+        }
         if (!result.accepted) return
+        onClearTeamDispatch()
         onInputChange("")
         onClearAttachments()
         focusManager.clearFocus(force = true)
@@ -199,6 +210,31 @@ internal fun LocalConversationComposer(
         animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
+        if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsPill(
+                    text = stringResource(R.string.local_team_title),
+                    selected = true,
+                )
+                Text(
+                    stringResource(R.string.local_team_selected_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                DsIconButton(
+                    icon = FeatherIcons.X,
+                    contentDescription = stringResource(R.string.local_team_mode_clear),
+                    onClick = onClearTeamDispatch,
+                    iconSize = 16.dp,
+                    tint = colors.labelSecondary,
+                )
+            }
+        }
         val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
             (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
         }
@@ -248,6 +284,8 @@ internal fun LocalConversationComposer(
                 value = input,
                 onValueChange = onInputChange,
                 placeholder = when {
+                    state.usageMode == LocalUsageMode.WORK && teamDispatchSelected ->
+                        stringResource(R.string.local_team_input_hint)
                     state.usageMode == LocalUsageMode.WORK ->
                         stringResource(R.string.local_work_composer_hint)
                     state.groupChat.enabled ->

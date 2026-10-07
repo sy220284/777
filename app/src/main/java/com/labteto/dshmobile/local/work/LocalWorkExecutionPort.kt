@@ -32,6 +32,11 @@ internal interface LocalWorkExecutionPort {
         attachments: List<LocalImportedAttachment> = emptyList(),
     ): LocalSendResult
 
+    fun sendWithTeam(
+        text: String,
+        attachments: List<LocalImportedAttachment> = emptyList(),
+    ): LocalSendResult = send(text, attachments)
+
     fun regenerateReply(messageId: String): Boolean
 
     suspend fun prepareSession(
