@@ -957,12 +957,16 @@ internal fun LocalConversationSurface(
             val actionRows = if (state.usageMode == LocalUsageMode.CHAT) {
                 listOf(
                     listOf(
-                        Triple(FeatherIcons.Image, stringResource(R.string.local_attachment_image)) {
-                            imagePicker.launch(arrayOf("image/*"))
-                        },
-                        Triple(FeatherIcons.FilePlus, stringResource(R.string.local_attachment_file)) {
-                            filePicker.launch(arrayOf("*/*"))
-                        },
+                        Triple(
+                            FeatherIcons.Image,
+                            stringResource(R.string.local_attachment_image),
+                            { imagePicker.launch(arrayOf("image/*")) },
+                        ),
+                        Triple(
+                            FeatherIcons.FilePlus,
+                            stringResource(R.string.local_attachment_file),
+                            { filePicker.launch(arrayOf("*/*")) },
+                        ),
                         Triple(FeatherIcons.User, stringResource(R.string.persona_gallery_title), onOpenPersonaGallery),
                     ),
                     listOf(
@@ -977,12 +981,16 @@ internal fun LocalConversationSurface(
             } else {
                 listOf(
                     listOf(
-                        Triple(FeatherIcons.Image, stringResource(R.string.local_attachment_image)) {
-                            imagePicker.launch(arrayOf("image/*"))
-                        },
-                        Triple(FeatherIcons.FilePlus, stringResource(R.string.local_attachment_file)) {
-                            filePicker.launch(arrayOf("*/*"))
-                        },
+                        Triple(
+                            FeatherIcons.Image,
+                            stringResource(R.string.local_attachment_image),
+                            { imagePicker.launch(arrayOf("image/*")) },
+                        ),
+                        Triple(
+                            FeatherIcons.FilePlus,
+                            stringResource(R.string.local_attachment_file),
+                            { filePicker.launch(arrayOf("*/*")) },
+                        ),
                         Triple(FeatherIcons.Folder, stringResource(R.string.chatlist_workspace_files), onOpenWorkspace),
                     ),
                     listOf(
