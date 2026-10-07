@@ -31,9 +31,28 @@ internal object LocalDocumentContent {
         "cs", "go", "rs", "swift", "m", "mm", "php", "rb", "pl", "lua", "sh",
         "bash", "zsh", "fish", "ps1", "bat", "cmd", "sql", "graphql", "gql",
         "proto", "gradle", "groovy", "vue", "svelte", "tex", "bib", "rst",
+        "eml", "ics", "vcf", "srt", "vtt", "ipynb", "diff", "patch", "svg",
+        "fb2", "env", "editorconfig", "gitignore", "dockerfile",
     )
 
-    private val legacyOfficeExtensions = setOf("doc", "xls", "ppt")
+    private val plainTextMediaTypes = setOf(
+        "application/json",
+        "application/ld+json",
+        "application/xml",
+        "application/xhtml+xml",
+        "application/yaml",
+        "application/x-yaml",
+        "application/javascript",
+        "application/sql",
+        "application/graphql",
+    )
+
+    private val wordOpenXmlExtensions = setOf("docx", "docm", "dotx", "dotm")
+    private val excelOpenXmlExtensions = setOf("xlsx", "xlsm", "xltx", "xltm")
+    private val powerPointOpenXmlExtensions = setOf("pptx", "pptm", "ppsx", "ppsm", "potx", "potm")
+    private val openDocumentExtensions = setOf("odt", "ods", "odp", "ott", "ots", "otp")
+    private val zipLikeExtensions = setOf("zip", "jar", "aar", "apk", "cbz")
+    private val legacyOfficeExtensions = setOf("doc", "xls", "ppt", "wps", "et", "dps")
 
     fun extract(
         file: File,
@@ -46,16 +65,19 @@ internal object LocalDocumentContent {
         val extension = displayName.substringAfterLast('.', file.extension).lowercase()
         val normalizedMediaType = mediaType.substringBefore(';').trim().lowercase()
         return when {
-            extension in plainTextExtensions || normalizedMediaType.startsWith("text/") ->
+            extension in plainTextExtensions ||
+                normalizedMediaType.startsWith("text/") ||
+                normalizedMediaType in plainTextMediaTypes ->
                 extractPlainText(file, extension, maxChars)
-            extension == "docx" -> extractDocx(file, maxChars)
-            extension == "xlsx" -> extractXlsx(file, maxChars)
-            extension == "pptx" -> extractPptx(file, maxChars)
-            extension in setOf("odt", "ods", "odp") -> extractOpenDocument(file, extension, maxChars)
+            extension in wordOpenXmlExtensions -> extractDocx(file, maxChars)
+            extension in excelOpenXmlExtensions -> extractXlsx(file, maxChars)
+            extension in powerPointOpenXmlExtensions -> extractPptx(file, maxChars)
+            extension in openDocumentExtensions -> extractOpenDocument(file, extension, maxChars)
             extension == "epub" -> extractEpub(file, maxChars)
             extension == "rtf" || normalizedMediaType == "application/rtf" -> extractRtf(file, maxChars)
             extension == "pdf" || normalizedMediaType == "application/pdf" -> extractPdfBestEffort(file, maxChars)
-            extension == "zip" || normalizedMediaType == "application/zip" -> extractZip(file, maxChars)
+            extension in zipLikeExtensions || normalizedMediaType == "application/zip" ->
+                extractZip(file, maxChars)
             extension == "gz" || normalizedMediaType in setOf("application/gzip", "application/x-gzip") ->
                 extractGzip(file, displayName, maxChars)
             extension == "tar" -> extractTar(file, maxChars)
@@ -70,10 +92,11 @@ internal object LocalDocumentContent {
     }
 
     private fun extractPlainText(file: File, extension: String, maxChars: Int): LocalDocumentText {
-        val bytes = readBounded(file, MAX_ZIP_ENTRY_BYTES)
+        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
         var text = decodeText(bytes)
         if (extension in setOf("html", "htm", "xhtml")) text = htmlToText(text)
-        return bounded(extension.ifBlank { "文本" }.uppercase(), text, maxChars)
+        val result = bounded(extension.ifBlank { "文本" }.uppercase(), text, maxChars)
+        return result.copy(truncated = result.truncated || file.length() > bytes.size)
     }
 
     private fun extractDocx(file: File, maxChars: Int): LocalDocumentText {
@@ -192,7 +215,8 @@ internal object LocalDocumentContent {
     }
 
     private fun extractRtf(file: File, maxChars: Int): LocalDocumentText {
-        val source = decodeText(readBounded(file, MAX_ZIP_ENTRY_BYTES))
+        val sourceBytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
+        val source = decodeText(sourceBytes)
         val out = StringBuilder()
         var index = 0
         var skipGroupDepth = 0
@@ -250,7 +274,8 @@ internal object LocalDocumentContent {
                 }
             }
         }
-        return bounded("RTF", out.toString(), maxChars)
+        val result = bounded("RTF", out.toString(), maxChars)
+        return result.copy(truncated = result.truncated || file.length() > sourceBytes.size)
     }
 
     private fun extractPdfBestEffort(file: File, maxChars: Int): LocalDocumentText {
@@ -310,7 +335,7 @@ internal object LocalDocumentContent {
             entries.forEach { out.appendLine("- ${it.name}（${it.size.coerceAtLeast(0)} B）") }
             entries.filter { entry ->
                 entry.name.substringAfterLast('.', "").lowercase() in plainTextExtensions &&
-                    entry.size in 0..MAX_ZIP_ENTRY_BYTES.toLong()
+                    entry.size in 0L..MAX_ZIP_ENTRY_BYTES.toLong()
             }.take(12).forEach { entry ->
                 val text = zip.readEntryText(entry.name) ?: return@forEach
                 out.appendLine()
@@ -348,7 +373,7 @@ internal object LocalDocumentContent {
             val dataStart = offset + 512
             val dataEnd = (dataStart + size).coerceAtMost(bytes.size.toLong()).toInt()
             val ext = name.substringAfterLast('.', "").lowercase()
-            if (ext in plainTextExtensions && size in 1..MAX_ZIP_ENTRY_BYTES.toLong() && dataEnd > dataStart) {
+            if (ext in plainTextExtensions && size in 1L..MAX_ZIP_ENTRY_BYTES.toLong() && dataEnd > dataStart) {
                 out.appendLine("[$name]")
                 out.appendLine(decodeText(bytes.copyOfRange(dataStart, dataEnd)))
             }
@@ -649,6 +674,18 @@ internal object LocalDocumentContent {
 
     private fun readBounded(file: File, maxBytes: Int): ByteArray =
         file.inputStream().use { readInputBounded(it, maxBytes) }
+
+    private fun readPrefix(file: File, maxBytes: Int): ByteArray =
+        file.inputStream().use { input ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(16 * 1024)
+            while (out.size() < maxBytes) {
+                val read = input.read(buffer, 0, minOf(buffer.size, maxBytes - out.size()))
+                if (read < 0) break
+                out.write(buffer, 0, read)
+            }
+            out.toByteArray()
+        }
 
     private fun readInputBounded(input: java.io.InputStream, maxBytes: Int): ByteArray {
         val out = ByteArrayOutputStream()
