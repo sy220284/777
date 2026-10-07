@@ -17,6 +17,9 @@ private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
 private const val MAX_TERMINAL_OUTPUT_CHARS = 65_536
 
+internal fun localPersistentSubagentId(jobId: String): String =
+    "sa-" + jobId.removePrefix("job-").take(24)
+
 internal data class LocalSubagentHistoryCheckpoint(
     val history: List<JsonObject>,
     val claimedMessageIds: Set<String>,
