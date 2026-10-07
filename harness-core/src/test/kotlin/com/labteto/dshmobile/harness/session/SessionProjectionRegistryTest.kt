@@ -78,24 +78,105 @@ class SessionProjectionRegistryTest {
     }
 
     @Test
-    fun duplicateProjectionNameIsRejectedWithoutReplacingFirstOwner() {
+    fun duplicateProjectionNameAtSameVersionSharesFirstUnitUntilLastDispose() {
+        val registry = SessionProjectionRegistry()
+        val first = registry.register(
+            name = "chat.relationship",
+            stateVersion = 4,
+            initial = { 10 },
+            reducer = SessionReducer<Int> { state, event ->
+                state + (event.data["delta"]?.jsonPrimitive?.intOrNull ?: 0)
+            },
+        )
+        val second = registry.register(
+            name = " chat.relationship ",
+            stateVersion = 4,
+            initial = { 999 },
+            reducer = SessionReducer<Int> { state, _ -> state + 999 },
+        )
+
+        val events = listOf(event(sequence = 0L, delta = 2))
+
+        assertEquals(12, first.fold(events).state)
+        assertEquals(12, second.fold(events).state)
+        assertEquals(listOf("chat.relationship"), registry.names())
+
+        first.dispose()
+        assertEquals(listOf("chat.relationship"), registry.names())
+
+        second.dispose()
+        assertTrue(registry.names().isEmpty())
+    }
+
+    @Test
+    fun duplicateProjectionNameAtDifferentVersionIsRejected() {
         val registry = SessionProjectionRegistry()
         registry.register(
             name = "chat.relationship",
+            stateVersion = 2,
             initial = { 0 },
             reducer = SessionReducer<Int> { state, _ -> state },
         )
 
         val failure = runCatching {
             registry.register(
-                name = " chat.relationship ",
-                initial = { 1 },
+                name = "chat.relationship",
+                stateVersion = 3,
+                initial = { 0 },
                 reducer = SessionReducer<Int> { state, _ -> state },
             )
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
-        assertEquals(listOf("chat.relationship"), registry.names())
+        assertTrue(failure?.message.orEmpty().contains("stateVersion=2"))
+    }
+
+    @Test
+    fun stateVersionZeroIsAcceptedLikePinnedOfficialRegistry() {
+        val registry = SessionProjectionRegistry()
+        val projection = registry.register(
+            name = "work.zero-version",
+            stateVersion = 0,
+            initial = { "ok" },
+            reducer = SessionReducer<String> { state, _ -> state },
+        )
+
+        assertEquals(0, projection.stateVersion)
+        assertEquals("ok", projection.fold(emptyList()).state)
+    }
+
+    @Test
+    fun registrySnapshotUsesOneSharedEventCutAcrossAllUnits() {
+        val registry = SessionProjectionRegistry()
+        registry.register(
+            name = "work.sum",
+            stateVersion = 1,
+            initial = { 0 },
+            reducer = SessionReducer<Int> { state, event ->
+                state + (event.data["delta"]?.jsonPrimitive?.intOrNull ?: 0)
+            },
+        )
+        registry.register(
+            name = "work.count",
+            stateVersion = 7,
+            initial = { 0 },
+            reducer = SessionReducer<Int> { state, _ -> state + 1 },
+        )
+
+        val snapshot = registry.foldSnapshot(
+            listOf(
+                event(sequence = 2L, delta = 3),
+                event(sequence = 5L, delta = 4),
+            ),
+        )
+
+        assertEquals(5L, snapshot.asOfSequence)
+        assertEquals(7, snapshot.values["work.sum"])
+        assertEquals(2, snapshot.values["work.count"])
+        assertEquals(
+            mapOf("work.sum" to 1, "work.count" to 7),
+            snapshot.stateVersions,
+        )
     }
 
     private fun event(sequence: Long, delta: Int): SessionEvent =
