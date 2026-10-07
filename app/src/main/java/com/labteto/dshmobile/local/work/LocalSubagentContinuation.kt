@@ -16,6 +16,9 @@ private const val MAX_CLAIMED_MESSAGE_IDS = 256
 internal fun persistentSubagentId(backgroundJobId: String): String =
     "sa-" + backgroundJobId.removePrefix("job-").take(24)
 
+internal fun continuousSubagentStep(recoveredStep: Int, activationStep: Int): Int =
+    recoveredStep.coerceAtLeast(0) + activationStep.coerceAtLeast(0)
+
 internal data class LocalSubagentHistoryCheckpoint(
     val history: List<JsonObject>,
     val claimedMessageIds: Set<String>,
