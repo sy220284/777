@@ -167,6 +167,19 @@ Tool / Plugin / Capability Registry 已进入主运行链。
 - Vision / VirtualDisplay。
 - Automation / Webhook。
 
+### 持久子代理连续运行
+
+Work 的后台只读子代理采用可继续 Child Agent 语义：
+
+- 持久子代理拥有稳定 Agent / Job 身份；普通一次性 Job 不进入该状态机。
+- 每个完整 Step 将有界模型历史、已认领 Inbox 消息编号和步数写入 Job Snapshot 的 `continuationState`；EventLog 只记录检查点摘要与指纹，避免重复灌入大历史。
+- 运行中消息进入持久 Inbox；进程被杀后仍可恢复。
+- 正常一轮完成后进入 `idle`（等待消息），不占 Agent 并发槽；收到 `send_message` 后重新激活同一个 Child Agent。
+- `running → interrupted` 表示进程异常中断，按最近安全检查点冷恢复；`running → idle` 表示本轮正常完成。
+- 若进程恰好在“完成事实已落盘、尚未切到 idle”窗口退出，恢复会根据最新 `subagent/start/end` 顺序补偿成 idle，禁止重复模型调用。
+- 持久子代理当前只允许只读执行；可修改子代理仍保持一次性运行，避免未知副作用被冷恢复重放。
+- Inbox 的“写入 → 检查点认领 → 持久确认”有明确顺序；持久化失败会回滚，禁止静默丢消息或伪报发送成功。
+
 平台能力由 `LocalPluginCompositionFactory` 组合。
 
 PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature 通过 Tool / Plugin 共享契约消费，不由 `LocalRuntimeKernel` 或 UI 持有。
