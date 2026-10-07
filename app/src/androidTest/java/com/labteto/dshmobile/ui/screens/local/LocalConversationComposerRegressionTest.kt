@@ -53,7 +53,7 @@ class LocalConversationComposerRegressionTest {
         }
 
         compose.onNodeWithContentDescription(
-            context.getString(R.string.chat_composer_add_attachment),
+            context.getString(R.string.local_composer_more_actions),
         ).performClick()
 
         compose.runOnIdle {
