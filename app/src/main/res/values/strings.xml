@@ -1669,5 +1669,13 @@
     <string name="app_project_materials">项目资料</string>
     <string name="app_project_context">会话资料</string>
     <string name="app_team_task_updated">更新任务安排</string>
+    <string name="settings_approval_mode_title">工具执行审批</string>
+    <string name="settings_approval_mode_subtitle">选择工作任务执行工具时的授权方式。系统权限与安全边界始终生效。</string>
+    <string name="settings_approval_mode_default">默认</string>
+    <string name="settings_approval_mode_manual">手动批准</string>
+    <string name="settings_approval_mode_auto">全自动</string>
+    <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
+    <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
+    <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
 </resources>
 
