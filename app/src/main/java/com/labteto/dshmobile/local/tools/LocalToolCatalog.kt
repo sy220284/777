@@ -192,6 +192,7 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
             "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
+            "output_schema" to jsonSchemaObject("可选；要求每个 Workflow 子代理最终都返回符合该 JSON Schema 的对象"),
         ), listOf("tasks")))
         add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),
