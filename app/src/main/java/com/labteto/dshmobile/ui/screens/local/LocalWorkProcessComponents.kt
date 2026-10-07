@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -18,12 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -318,10 +324,47 @@ internal fun WorkProcessRow(
 }
 
 @Composable
+private fun KimiAnimatedToolIcon(
+    resId: Int,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val drawable = remember(resId) {
+        ImageDecoder.decodeDrawable(
+            ImageDecoder.createSource(context.resources, resId),
+        ) as? AnimatedImageDrawable
+    }
+    DisposableEffect(drawable) {
+        drawable?.start()
+        onDispose { drawable?.stop() }
+    }
+    AndroidView(
+        factory = { viewContext ->
+            ImageView(viewContext).apply {
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setImageDrawable(drawable)
+            }
+        },
+        update = { imageView ->
+            if (imageView.drawable !== drawable) imageView.setImageDrawable(drawable)
+            if (drawable?.isRunning == false) drawable.start()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun WorkOperationIcon(
     kind: AgentOperationKind,
     running: Boolean,
 ) {
+    if (running && kind == AgentOperationKind.Generic) {
+        KimiAnimatedToolIcon(
+            resId = R.drawable.kimi_anim_tool_think,
+            modifier = Modifier.size(34.dp),
+        )
+        return
+    }
     when (kind) {
         AgentOperationKind.Delegate -> DsIconBox(
             icon = null,
