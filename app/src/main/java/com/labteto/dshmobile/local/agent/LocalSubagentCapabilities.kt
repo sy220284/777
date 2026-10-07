@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local.agent
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -75,5 +79,56 @@ internal fun filterLocalSubagentSchemas(
             val name = function?.get("name")?.jsonPrimitive?.contentOrNull
             name != null && name in allowlist
         },
+    )
+}
+
+
+internal fun encodeLocalSubagentCapabilities(
+    capabilities: LocalSubagentCapabilities,
+): JsonObject = buildJsonObject {
+    put("allow_mutation", capabilities.allowMutation)
+    put("continuable", capabilities.continuable)
+    put("virtual_screen", capabilities.virtualScreen)
+    put("history_mode", capabilities.historyMode.name.lowercase())
+    put("max_depth", capabilities.maxDepth)
+    capabilities.toolAllowlist?.let { allowlist ->
+        put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
+    }
+    capabilities.outputSchema?.let { put("output_schema", it) }
+}
+
+internal fun decodeLocalSubagentCapabilities(
+    payload: JsonObject,
+    version: Int,
+): LocalSubagentCapabilities {
+    if (version <= 1) {
+        return LocalSubagentCapabilities(
+            allowMutation = false,
+            continuable = true,
+            virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
+            historyMode = LocalSubagentHistoryMode.ISOLATED,
+            maxDepth = 1,
+        )
+    }
+    val data = payload["capabilities"] as? JsonObject
+        ?: error("持久子代理 V2 缺少 capabilities")
+    val historyMode = when (
+        data["history_mode"]?.jsonPrimitive?.contentOrNull?.lowercase()
+    ) {
+        "isolated" -> LocalSubagentHistoryMode.ISOLATED
+        "inherit_parent" -> LocalSubagentHistoryMode.INHERIT_PARENT
+        else -> error("持久子代理 capabilities.history_mode 无效")
+    }
+    val toolAllowlist = (data["tool_allowlist"] as? JsonArray)
+        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        ?.toSet()
+    return LocalSubagentCapabilities(
+        allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
+        continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
+        virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
+        historyMode = historyMode,
+        maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
+        toolAllowlist = toolAllowlist,
+        outputSchema = data["output_schema"] as? JsonObject,
     )
 }
