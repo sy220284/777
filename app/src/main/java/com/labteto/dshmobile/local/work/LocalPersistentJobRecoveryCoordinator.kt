@@ -243,6 +243,18 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val capabilities = decodeLocalSubagentCapabilities(payload, version)
+        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
+            ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
+            ?: error("持久子代理恢复元数据缺少 max_steps")
+        val recoveredLaunchSpec = validateLocalSubagentLaunchSpec(
+            LocalSubagentLaunchSpec(
+                task = task,
+                modelOverride = null,
+                maxSteps = maxSteps,
+                backgroundJobId = snapshot.id,
+                capabilities = capabilities,
+            ),
+        )
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -266,9 +278,6 @@ internal class LocalPersistentJobRecoveryCoordinator(
         // Terminal checkpoint settlement above is fully durable and can finish off-screen.
         val boundState = stateForSession(sessionId) ?: return
         val parentHistory = historyForSession(sessionId) ?: return
-        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
-            ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
-            ?: boundState.subagentMaxSteps
         val runner = subagentRunner(sessionId, boundState) { parentHistory }
 
         // A genuinely new message may have arrived after the first Inbox snapshot.
@@ -314,15 +323,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ) { "持久子代理原模型路由身份已变化，已停止自动续跑" }
             withContext(LocalModelRunContext(profile)) {
                 runner.runResult(
-                    spec = validateLocalSubagentLaunchSpec(
-                        LocalSubagentLaunchSpec(
-                            task = task,
-                            modelOverride = null,
-                            maxSteps = maxSteps,
-                            backgroundJobId = jobId,
-                            capabilities = capabilities,
-                        ),
-                    ),
+                    spec = recoveredLaunchSpec.copy(backgroundJobId = jobId),
                     recoveredHistory = recoveredHistory,
                     recoveredClaimedMessageIds = recoveredClaimedIds,
                     recoveredStep = continuation?.step ?: 0,
