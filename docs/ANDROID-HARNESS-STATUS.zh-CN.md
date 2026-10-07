@@ -12,8 +12,8 @@ targetSdk: 36
 compileSdk: 37
 
 官方本机语义参考:
-deepseek-ai/deepseek-harness 0.1.7-rc.2
-477b4f420553e8a52c2fbccc464d7561b239c443
+deepseek-ai/deepseek-harness 0.2.1-alpha.1
+5badb15009ae1756c3afe0ae0cef1faafc290ccc
 Session format reference: V4
 ```
 
@@ -57,12 +57,13 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - reasoning / assistant / tool call / tool result 完整模型回合。
 - 有界模型请求重试。
 - 主代理与子代理统一核心循环。
-- 普通子代理、fork 子代理、持久子代理。
+- 普通子代理、fork 子代理、持久子代理；持久只读子代理具备稳定 Agent 身份、持久 Inbox、历史 Checkpoint 与冷恢复续跑。
 - 并行 / 流水线工作流。
+- Work Agent Teams：Lead 持有持久 roster、queued-minus-delivered mailbox 与 revision/CAS 任务板；支持 teammate provisioning/active/failed、任务依赖 DAG、claim/release/edit/complete/reopen/reassign/delete、write-scope 冲突提示和冷恢复投递。
 - Goal / Todo / Plan。
 - 用户提问与审批。
 - 取消、停止和受控结束。
-- Agent inbox。
+- Agent inbox；前台与持久子代理统一使用 `QueuedAgentInput` 语义，满载明确拒绝，不静默丢弃旧消息。
 - Agent run checkpoint。
 
 运行归属：
@@ -84,9 +85,11 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 
 模型请求同时记录可重建证据：
 
-- `request/header` 持有 `request_uid`、路由身份、最终消息摘要、工具 Schema 摘要、上下文摘要以及对应 Surface 事件序号；
+- `request/header` 持有 `request_uid`、路由身份、原始请求不可逆摘要以及对应 Surface 事件序号；
+- V2 新增 `request/message-surface`：文本请求可完整重建；多模态请求只持久化脱敏后的模型可见消息，图片原始数据不复制进 EventLog；
 - `request/tool-surface` 只在工具 Schema Surface 变化时记录完整 Schema；
-- `request/context-surface` 只在 system / developer 模型可见上下文变化时记录完整上下文切片；
+- `request/context-surface` 只在 system / developer 模型可见上下文变化时记录脱敏后的上下文切片；
+- `reconstructRequest(sessionId, requestUid)` 按 Surface 序号重建消息、工具和 Context，重新计算 digest / envelope fingerprint；V1 标记为 evidence-only，V2 区分 exact verified、redacted verified 与 invalid；
 - retry / error / cancelled / completed / `assistant/attempt` 使用同一个 `request_uid` 关联，失败尝试不会伪造正式 assistant 历史；
 - `tool/execution-started` 在真实执行 admission 后记录独立 `execution_id` 与 `root_call_id`，与模型声明的 `tool/call` 分离。
 
@@ -110,6 +113,17 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - 尚未执行的工具：`TOOL_NOT_STARTED`。
 - 未知副作用不会在重启后自动重放。
 - durable Agent inbox 在启动 / 会话切换时恢复。
+- 持久只读子代理消息先落盘再确认；进程中断后从最近完整 Child History Checkpoint、全局 Step 水位与动态软预算继续，已进入检查点但尚未确认的 Inbox 消息不会重复注入。
+- 只有显式 `continuable=true` 的持久子代理在一次 Activation 结束后进入 `dormant`；无新消息时不占运行槽也不自动唤醒，收到新消息后重新激活同一 Child Agent 身份；旧版 `completed + continuable` 快照读取时兼容归一为 `dormant`。
+- 子代理启动统一使用 `LocalSubagentLaunchSpec + LocalSubagentCapabilities`；mutation、continuation、virtual screen、history mode、max depth、tool allowlist 与 output schema 由同一契约声明，未支持能力在启动前 fail closed。
+- `toolAllowlist` 直接限制模型实际可见工具 Surface；持久子代理恢复元数据升级 V2 保存 capabilities，旧 V1 映射为只读、isolated、continuable、depth=1。
+- Structured Subagent Result 已启用：`outputSchema` 先做有界 meta-schema 校验，最终回复必须是纯 JSON 对象并复用与 ToolRegistry 相同的 JSON Schema 值校验；不符合契约直接返回稳定错误码，不自动重跑整轮。
+- 结构化终态只有在 JSON 解析与 Schema 校验通过后才写 `terminal checkpoint`；校验失败不会被 Cold Resume 误结算为 completed。
+- `interrupted` 的可恢复任务与 `dormant` 的 continuable 子代理不会被普通历史裁剪静默删除；保留上限被持久对象占满时显式拒绝新任务，需先终止不再使用的持久代理。
+- 最终 assistant 已持久化但 Job 终态尚未提交时，恢复直接按终态 Checkpoint 结算；已认领但残留在 Inbox 的消息只做确认，不触发重复模型请求。
+- Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 持有自己的强类型句柄。
+- Agent Teams 当前采用 Lead 编排型 Android 适配：teammate 仍保持只读 Child Agent 权限，不开放对等成员直接写 Team 状态；`team_spawn.context` 支持 `fresh | fork`。durable fork 在创建时把 Lead 当前调用前历史一次性物化为 Child `step=0` History Checkpoint，后续首轮与 Cold Resume 都只读取 Child EventLog，不放开 `continuable + INHERIT_PARENT`。
+- Team mailbox 单成员最多 64 条待投递消息，单消息最多 65,536 UTF-8 字节；成员名称永久保留，达到成员/任务/邮箱边界时 fail loud，不静默截断或复用身份。
 - 外部进程被 Android 杀死后不能伪装成透明续跑。
 
 ## 上下文与长对话
@@ -440,3 +454,17 @@ upstream/deepseek-harness.lock.json
 - merge-gate。
 
 详见 [VALIDATION.md](VALIDATION.md)。
+
+
+## Agent Team 语义
+
+Work Lead 可以按需启用持久 Agent Team：
+
+- TeamId 直接使用 Lead SessionId，不新建第二套 Team 存储。
+- Roster、Mailbox、Task DAG 全部是 Lead Session EventLog 的事实；投影通过共享 `SessionProjectionRegistry` 重建。
+- teammate 复用现有 continuable Child Agent / durable Inbox / Cold Resume，不创建另一套 Agent Runtime。
+- 成员名称与职责在 provisioning 后不可变；成员持久 phase 为 `provisioning -> active | failed`，运行/休眠状态从现有 Job/Activation 派生。
+- Team mailbox 先写 `team/message-queued`，再以稳定 message id 投递到 Child Inbox，最后写 `team/message-delivered`；重启按 queued-minus-delivered 自动恢复，重复投递由 stable id 去重。
+- Task Board 使用单调 `task-N`、CAS revision、`blockedBy` DAG 与 deleted tombstone；依赖边必须指向未删除任务且保持无环。
+- `writeScopes` 只用于提示并发写范围重叠，不是文件锁。
+- Team 控制工具只向 Lead Work Agent 暴露，普通子代理不能绕过 Team 权限边界。

@@ -313,16 +313,30 @@ class AgentLoop(
             )
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
-                eventSink.append(AgentEvent.TurnCancelled(turnId))
+                try {
+                    eventSink.append(AgentEvent.TurnCancelled(turnId))
+                } catch (terminalEventError: Exception) {
+                    if (terminalEventError !== cancelled) {
+                        cancelled.addSuppressed(terminalEventError)
+                    }
+                }
             }
             throw cancelled
         } catch (error: Exception) {
-            eventSink.append(
-                AgentEvent.TurnFailed(
-                    turnId = turnId,
-                    reason = error.message ?: error::class.java.simpleName,
-                ),
-            )
+            try {
+                eventSink.append(
+                    AgentEvent.TurnFailed(
+                        turnId = turnId,
+                        reason = error.message ?: error::class.java.simpleName,
+                    ),
+                )
+            } catch (terminalEventError: Exception) {
+                // The failure fact is diagnostic. It must never replace the primary execution
+                // failure, especially when both originate from the same broken durable sink.
+                if (terminalEventError !== error) {
+                    error.addSuppressed(terminalEventError)
+                }
+            }
             throw error
         }
     }

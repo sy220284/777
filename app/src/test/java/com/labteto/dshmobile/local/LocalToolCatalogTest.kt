@@ -43,11 +43,32 @@ class LocalToolCatalogTest {
             .map { it.jsonPrimitive.content }
         val subagentProperties = functions.getValue("subagent").jsonObject["function"]!!
             .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val forkProperties = functions.getValue("subagent_fork").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
 
         assertEquals(setOf("parallel", "pipeline"), modes.toSet())
         assertTrue("model" in subagentProperties)
         assertTrue("max_steps" in subagentProperties)
+        assertTrue("output_schema" in subagentProperties)
+        assertTrue("allowed_tools" in subagentProperties)
+        assertTrue("output_schema" in forkProperties)
+        assertTrue("allowed_tools" in forkProperties)
+        assertTrue("output_schema" in workflowProperties)
+        assertTrue("allowed_tools" in workflowProperties)
     } 
+
+    @Test
+    fun teamSpawnExposesExplicitFreshOrForkContext() {
+        val functions = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val properties = functions.getValue("team_spawn").jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        val contexts = properties.getValue("context").jsonObject["enum"]!!.jsonArray
+            .map { it.jsonPrimitive.content }
+
+        assertEquals(setOf("fresh", "fork"), contexts.toSet())
+    }
 
     @Test
     fun sessionEventSearchExposesPagingControls() {

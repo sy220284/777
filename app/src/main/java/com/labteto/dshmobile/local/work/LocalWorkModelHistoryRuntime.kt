@@ -34,6 +34,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val workMemory: LocalWorkMemoryRuntime,
+    private val workSessionProjection: LocalWorkSessionProjectionRuntime,
 ) {
     private val compactor = LocalHistoryCompactor()
     private val checkpointCodec = ModelHistoryCheckpointCodec()
@@ -134,7 +135,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             budget = budget,
             extraTokens = extraTokens,
             summaryMode = LocalHistorySummaryMode.WORK,
-            structuredWorkState = structuredWorkState(snapshot, binding.eventLog),
+            structuredWorkState = structuredWorkState(snapshot, binding.eventLog, workSessionProjection),
         ) ?: run {
             updateContextMetrics(binding)
             return

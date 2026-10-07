@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
@@ -11,6 +12,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -248,6 +251,80 @@ class LocalJobManagerTest {
             val manager = LocalJobManager(this, store) { }
             manager.removeOwnedAndJoin(setOf("session-old"))
             assertTrue(manager.snapshotInfos().none { it.id == "job-legacy" })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun persistentStoreRoundTripsAgentInbox() = runTest {
+        val root = createTempDir(prefix = "persistent-agent-inbox-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-agent",
+                        label = "子代理：审计",
+                        status = "running",
+                        resumeKind = "subagent_readonly",
+                        resumePayload = """{"session_id":"session-a"}""",
+                        ownerId = "session-a",
+                        continuable = true,
+                        inbox = listOf(
+                            QueuedAgentInput(
+                                id = "msg-1",
+                                content = "继续核查",
+                                memoryInput = "原始记忆输入",
+                                modelMessage = buildJsonObject {
+                                    put("role", "user")
+                                    put("content", "模型消息")
+                                },
+                            ),
+                            QueuedAgentInput(id = "msg-2", content = "补充验证"),
+                        ),
+                    ),
+                ),
+            )
+
+            val restored = store.read().single()
+
+            assertEquals(listOf("msg-1", "msg-2"), restored.inbox.map { it.id })
+            assertEquals(listOf("继续核查", "补充验证"), restored.inbox.map { it.content })
+            assertEquals("原始记忆输入", restored.inbox.first().memoryInput)
+            assertEquals(
+                "模型消息",
+                restored.inbox.first().modelMessage
+                    ?.get("content")
+                    ?.toString()
+                    ?.trim('"'),
+            )
+            assertTrue(restored.continuable)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun legacyPersistentStoreDefaultsContinuableToFalse() = runTest {
+        val root = createTempDir(prefix = "legacy-continuable-default-")
+        try {
+            val file = File(root, "jobs.json")
+            file.writeText(
+                """[{"id":"job-old","label":"子代理：旧任务","status":"completed","resume_kind":"subagent_readonly","resume_payload":"{}","owner_session_id":"session-a","updated_at":1}]""",
+            )
+            val store = LocalPersistentJobStore(
+                file = file,
+                json = Json { ignoreUnknownKeys = true },
+            )
+
+            val restored = store.read().single()
+
+            assertEquals("job-old", restored.id)
+            assertTrue(!restored.continuable)
         } finally {
             root.deleteRecursively()
         }

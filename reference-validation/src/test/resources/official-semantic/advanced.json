@@ -1,0 +1,53 @@
+{
+  "projection": {
+    "stateVersion": 0,
+    "asOfSequence": 1,
+    "value": 2,
+    "sameVersionSharedFirstDefinition": true,
+    "differentVersionRejected": true,
+    "survivesFirstDispose": true,
+    "removedAfterLastDispose": true
+  },
+  "agentTeam": {
+    "stateVersion": 4,
+    "asOfSequence": 5,
+    "members": [
+      {
+        "id": "member-worker",
+        "name": "worker",
+        "description": "research",
+        "provider": "local-subagent",
+        "context": "fresh",
+        "phase": "active"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "task-1",
+        "revision": 1,
+        "subject": "first",
+        "description": "",
+        "status": "pending",
+        "blockedBy": [],
+        "writeScopes": [
+          "src"
+        ]
+      },
+      {
+        "id": "task-2",
+        "revision": 1,
+        "subject": "second",
+        "description": "",
+        "status": "pending",
+        "blockedBy": [
+          "task-1"
+        ],
+        "writeScopes": [
+          "src/feature"
+        ]
+      }
+    ],
+    "pendingMessageIds": [],
+    "failure": null
+  }
+}

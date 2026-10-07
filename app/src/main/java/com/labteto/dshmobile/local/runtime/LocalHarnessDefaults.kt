@@ -48,6 +48,8 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "exit_plan_mode",
     "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
     "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
+    "team_members", "team_spawn", "team_send_message", "team_task_create", "team_task_get",
+    "team_task_list", "team_task_update", "team_interrupt", "team_wait",
     "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
     "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
     "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
@@ -60,6 +62,7 @@ internal val PLAN_MODE_BLOCKED_TOOLS = setOf(
     "bash", "run_shell", "job_kill", "todo_write",
     "create_goal", "update_goal", "subagent", "spawn_subagent", "subagent_fork", "fork_subagent",
     "workflow", "present", "send_message", "interrupt_agent",
+    "team_spawn", "team_send_message", "team_task_create", "team_task_update", "team_interrupt",
 )
 internal val PLAN_MODE_PROMPT = """
     当前为规划模式：只读、搜索和分析，不执行改变状态的操作。

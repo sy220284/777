@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal fun structuredWorkState(
     snapshot: LocalHarnessState,
     eventLog: LocalSessionEventLog,
+    sessionProjection: LocalWorkSessionProjectionRuntime,
 ): LocalStructuredWorkState {
     if (snapshot.usageMode != LocalUsageMode.WORK) return LocalStructuredWorkState()
 
@@ -40,8 +41,9 @@ internal fun structuredWorkState(
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
     val artifacts = linkedSetOf<String>()
-    eventLog.pageBefore(limit = MAX_STRUCTURED_EVENT_SCAN)
-        .asReversed()
+    sessionProjection.structuredEventSnapshot(eventLog)
+        .state
+        .events
         .forEach { event ->
             when (event.type) {
                 "user/message" -> {
@@ -178,7 +180,6 @@ private val ARTIFACT_FACT_KEYS = listOf(
     "commit_sha",
 )
 
-private const val MAX_STRUCTURED_EVENT_SCAN = 160
 private const val MAX_STRUCTURED_PLAN_ITEMS = 12
 private const val MAX_STRUCTURED_TODO_ITEMS = 12
 private const val MAX_STRUCTURED_CONSTRAINTS = 8

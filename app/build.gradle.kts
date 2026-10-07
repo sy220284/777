@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -228,6 +230,10 @@ android {
             "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 
+    sourceSets.getByName("test").resources.srcDir(
+        rootProject.file("reference-validation/src/test/resources"),
+    )
+
     sourceSets.getByName("main").apply {
         // AGP 9 rejects Provider-backed entries in the legacy SourceSet API. These providers only
         // describe deterministic build-directory paths; generating task edges remain explicit
@@ -284,6 +290,23 @@ tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
         compactBundledRuntimeAssets,
         prepareUpdatePatcher,
     )
+}
+
+/*
+ * CI 必须能指出长时间运行的 JVM 单测停在哪个用例。这里只记录开始与失败事件，
+ * 不改变测试选择、超时、并行度或通过条件。
+ */
+if (System.getenv("CI") == "true") {
+    tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+        testLogging {
+            events("started", "failed")
+            showStandardStreams = false
+        }
+        if (name == "testDebugUnitTest") {
+            // 该任务在健康基线中约半秒完成；两分钟只用于快速识别挂死/死锁。
+            timeout.set(Duration.ofMinutes(2))
+        }
+    }
 }
 
 dependencies {

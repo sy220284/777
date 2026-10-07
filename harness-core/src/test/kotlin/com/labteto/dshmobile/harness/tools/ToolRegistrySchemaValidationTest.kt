@@ -96,6 +96,41 @@ executor = HarnessToolExecutor { _, input, _ ->
     }
 
     @Test
+    fun registrationRejectsInvalidParameterSchemaBeforeToolBecomesVisible() {
+        val invalid = HarnessTool(
+            name = "invalid_schema",
+            schema = buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "invalid_schema")
+                    put("description", "非法Schema测试")
+                    put("parameters", buildJsonObject {
+                        put("type", "object")
+                        put("properties", buildJsonObject {
+                            put("name", buildJsonObject {
+                                put("type", "string")
+                                put("minimum", 1)
+                            })
+                        })
+                    })
+                })
+            },
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("测试"),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("不应执行") },
+        )
+        val registry = ToolRegistry()
+
+        val failure = runCatching { registry.register(invalid) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("parameters schema 非法"))
+        assertTrue("invalid_schema" !in registry.names())
+    }
+
+    @Test
     fun rejectsWrongTypesMissingRequiredUnknownFieldsAndBadEnumsBeforeExecution() = runTest {
         val (registry, calls) = registry("count")
 
