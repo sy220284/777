@@ -112,7 +112,6 @@ class SessionStore @Inject constructor(
     private val queuesBySession = MutableStateFlow<Map<String, List<QueueItem>>>(emptyMap())
     val sessionQueues: StateFlow<Map<String, List<QueueItem>>> = queuesBySession.asStateFlow()
 
-
     // ------------------------------------------------------------------ public StateFlows
     private val _sessions = MutableStateFlow<List<SessionRow>>(emptyList())
     val sessions: StateFlow<List<SessionRow>> = _sessions.asStateFlow()
