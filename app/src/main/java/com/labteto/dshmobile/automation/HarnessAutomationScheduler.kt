@@ -49,6 +49,26 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+internal fun AutomationTask.withChatInteractionPolicy(
+    quietHoursEnabled: Boolean,
+    quietStartHour: Int,
+    quietStartMinute: Int,
+    quietEndHour: Int,
+    quietEndMinute: Int,
+    proactiveMinGapMinutes: Long,
+    proactiveMaxUnanswered: Int,
+    notify: Boolean,
+): AutomationTask = copy(
+    quietHoursEnabled = quietHoursEnabled,
+    quietStartHour = quietStartHour,
+    quietStartMinute = quietStartMinute,
+    quietEndHour = quietEndHour,
+    quietEndMinute = quietEndMinute,
+    proactiveMinGapMinutes = proactiveMinGapMinutes,
+    proactiveMaxUnanswered = proactiveMaxUnanswered,
+    notify = notify,
+)
+
 @Singleton
 class HarnessAutomationScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -392,6 +412,7 @@ class HarnessAutomationScheduler @Inject constructor(
         quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
         proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
         proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
+        notify: Boolean? = null,
     ): Boolean {
         val current = store.get(id) ?: return false
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -474,6 +495,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 quietEndMinute = quietEndMinute,
                 proactiveMinGapMinutes = proactiveMinGapMinutes,
                 proactiveMaxUnanswered = proactiveMaxUnanswered,
+                notify = notify ?: latest.notify,
                 status = if (latest.status == AutomationStatus.PAUSED) AutomationStatus.PAUSED else AutomationStatus.SCHEDULED,
                 lastError = null,
                 failureStreak = 0,
@@ -489,6 +511,45 @@ class HarnessAutomationScheduler @Inject constructor(
         workManager.cancelUniqueWork(workName(id, current.scheduleGeneration))
         workManager.cancelUniqueWork(manualWorkName(id))
         return true
+    }
+
+    fun updateChatInteractionPolicy(
+        id: String,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        notify: Boolean,
+    ): Boolean {
+        val current = store.get(id) ?: return false
+        require(current.mode == AutomationMode.CHAT) { "互动策略仅支持聊天模式" }
+        validateChatPolicy(
+            mode = current.mode,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        )
+        return store.updateIf(
+            id,
+            predicate = { it.scheduleGeneration == current.scheduleGeneration },
+        ) { latest ->
+            latest.withChatInteractionPolicy(
+                quietHoursEnabled = quietHoursEnabled,
+                quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
+                quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                proactiveMinGapMinutes = proactiveMinGapMinutes,
+                proactiveMaxUnanswered = proactiveMaxUnanswered,
+                notify = notify,
+            )
+        } != null
     }
 
     fun onChatUserActivity(sessionId: String, userMessageAt: Long) {

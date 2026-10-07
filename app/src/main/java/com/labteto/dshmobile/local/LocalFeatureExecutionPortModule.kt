@@ -18,6 +18,7 @@ import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionAdapter
+import com.labteto.dshmobile.local.work.LocalWorkAgentUiPort
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
@@ -68,6 +69,11 @@ internal object LocalFeatureExecutionPortModule {
     fun provideLocalWorkExecutionPort(
         coordinator: LocalWorkExecutionCoordinator,
     ): LocalWorkExecutionPort = coordinator
+
+    @Provides
+    @Singleton
+    fun provideLocalWorkAgentUiPort(composition: LocalWorkComposition): LocalWorkAgentUiPort =
+        composition
 
     @Provides
     @Singleton

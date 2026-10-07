@@ -26,6 +26,10 @@ data class JobInfo(
     val label: String,
     val status: String,
     val ownerId: String? = null,
+    val isAgent: Boolean = false,
+    val canMessage: Boolean = false,
+    val continuable: Boolean = false,
+    val pendingMessageCount: Int = 0,
 )
 
 data class JobStartResult(
@@ -308,6 +312,9 @@ class HarnessJobManager(
 
     fun snapshots(): List<JobSnapshot> = synchronized(lock) { records.values.map(::snapshot) }
 
+    /** Current user-facing projection; keeps live callbacks and replay snapshots on one mapping. */
+    fun infos(): List<JobInfo> = snapshotRecords()
+
     fun availableSlots(): Int = synchronized(lock) {
         (maxConcurrentJobs - records.values.count { it.occupiesSlot() }).coerceAtLeast(0)
     }
@@ -389,9 +396,7 @@ class HarnessJobManager(
                         error,
                     )
                 }
-                infos = records.values.map { record ->
-                    JobInfo(record.id, record.label, record.status, record.ownerId)
-                }
+                infos = records.values.map { it.toJobInfo() }
                 true
             }
         }
@@ -849,9 +854,7 @@ class HarnessJobManager(
                     found.updatedAt = previousUpdatedAt
                     throw IllegalStateException("后台代理消息持久化失败，消息未发送", error)
                 }
-                infos = records.values.map { record ->
-                    JobInfo(record.id, record.label, record.status, record.ownerId)
-                }
+                infos = records.values.map { it.toJobInfo() }
             }
 
             JobMessageAdmission(
@@ -905,9 +908,7 @@ class HarnessJobManager(
                         found.updatedAt = previousUpdatedAt
                         throw IllegalStateException("后台代理消息确认持久化失败", error)
                     }
-                    infos = records.values.map { record ->
-                        JobInfo(record.id, record.label, record.status, record.ownerId)
-                    }
+                    infos = records.values.map { it.toJobInfo() }
                 }
             }
             if (persistent) {
@@ -1019,10 +1020,31 @@ class HarnessJobManager(
         (status == "interrupted" && !resumeKind.isNullOrBlank()) ||
             isIdleContinuableAgent()
 
+    private fun Record.toJobInfo(): JobInfo {
+        val agent = label.startsWith(AGENT_PREFIX)
+        val messageable =
+            agent &&
+                (
+                    status == "running" ||
+                        status == "interrupted" ||
+                        isIdleContinuableAgent()
+                    )
+        return JobInfo(
+            id = id,
+            label = label,
+            status = status,
+            ownerId = ownerId,
+            isAgent = agent,
+            canMessage = messageable,
+            continuable = continuable,
+            pendingMessageCount = inbox.size,
+        )
+    }
+
     private fun snapshotRecords(ownerId: String? = null): List<JobInfo> = synchronized(lock) {
         records.values
             .filter { ownerId == null || it.ownerId == ownerId }
-            .map { JobInfo(it.id, it.label, it.status, it.ownerId) }
+            .map { it.toJobInfo() }
     }
 
     // Old snapshots may still contain a full shell command, including credentials.
@@ -1074,7 +1096,7 @@ class HarnessJobManager(
         val infos: List<JobInfo>
         val snapshots: List<JobSnapshot>
         synchronized(lock) {
-            infos = records.values.map { JobInfo(it.id, it.label, it.status, it.ownerId) }
+            infos = records.values.map { it.toJobInfo() }
             snapshots = records.values.map(::snapshot)
         }
         onChanged(infos)

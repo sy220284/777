@@ -28,7 +28,6 @@ import com.labteto.dshmobile.local.model.withEphemeralContext
 import com.labteto.dshmobile.local.recordAutomation
 import com.labteto.dshmobile.local.runtime.AUTOMATION_CHAT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
-import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -597,7 +596,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
-        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
         profile = profile,
     )
 }

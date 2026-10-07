@@ -14,6 +14,21 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
+    fun expressionVariationKeepsNaturalSamplingAndUsesRestrainedRange() {
+        assertEquals(0.85, CharacterBehaviorTuning().roleplayTemperature(), 0.0001)
+        assertEquals(
+            0.55,
+            CharacterBehaviorTuning(expressionVariation = 0).roleplayTemperature(),
+            0.0001,
+        )
+        assertEquals(
+            1.15,
+            CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(),
+            0.0001,
+        )
+    }
+
+    @Test
     fun persistenceAndNoveltyOnlyChangeBehaviorTiming() {
         val tuned = CharacterBehaviorTuning(persistence = 100, novelty = 100)
         assertTrue(tuned.transientTtl(5) > CharacterBehaviorTuning().transientTtl(5))
@@ -51,6 +66,7 @@ class CharacterBehaviorTuningTest {
             loreAdherence = -999,
             relationshipPace = 101,
             updatedAt = Long.MIN_VALUE,
+            expressionVariation = 999,
         ).normalized()
 
         assertEquals(0, normalized.intimacy)
@@ -63,6 +79,7 @@ class CharacterBehaviorTuningTest {
         assertEquals(0, normalized.loreAdherence)
         assertEquals(100, normalized.relationshipPace)
         assertEquals(0L, normalized.updatedAt)
+        assertEquals(100, normalized.expressionVariation)
     }
 
     @Test

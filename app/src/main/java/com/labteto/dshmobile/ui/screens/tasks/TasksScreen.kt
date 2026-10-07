@@ -91,6 +91,7 @@ private fun WorkTasksScreen(
         mutableStateOf(System.currentTimeMillis() + 60L * 60_000L)
     }
     val customHoursState = rememberSaveable { mutableStateOf("6") }
+    val notifyState = rememberSaveable { mutableStateOf(true) }
     val createErrorState = rememberSaveable { mutableStateOf<String?>(null) }
     val editorState = TaskEditorStateRefs(
         editingTaskId = editingTaskIdState,
@@ -98,6 +99,7 @@ private fun WorkTasksScreen(
         cadence = cadenceState,
         firstRunAt = firstRunAtState,
         customHours = customHoursState,
+        notify = notifyState,
         createError = createErrorState,
     )
     fun resetEditor() {
@@ -107,6 +109,7 @@ private fun WorkTasksScreen(
         cadenceState.value = AutomationCadence.ONCE
         firstRunAtState.value = System.currentTimeMillis() + 60L * 60_000L
         customHoursState.value = "6"
+        notifyState.value = true
         createErrorState.value = null
     }
     fun startCreate() {
@@ -185,6 +188,7 @@ private fun WorkTasksScreen(
                                         System.currentTimeMillis() + 60_000L,
                                     )
                                     customHoursState.value = customHoursForTask(task)
+                                    notifyState.value = task.notify
                                     createErrorState.value = null
                                     showCreate = true
                                 },

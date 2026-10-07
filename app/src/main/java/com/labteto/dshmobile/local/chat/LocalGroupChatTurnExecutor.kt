@@ -21,7 +21,6 @@ import com.labteto.dshmobile.local.model.withChatTurnContext
 import com.labteto.dshmobile.local.model.withTailEphemeralContext
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
-import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.GROUP_POST_TURN_PENDING_BATCH
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -224,7 +223,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                temperature = persona.behaviorTuning.roleplayTemperature(),
             )
             val finalContent = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
@@ -253,7 +252,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         publishPreview = false,
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                        temperature = persona.behaviorTuning.roleplayTemperature(),
                     )
                 },
                 appendEvent = { type, data ->

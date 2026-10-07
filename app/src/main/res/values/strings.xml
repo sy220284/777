@@ -216,6 +216,7 @@
     <string name="jobs_title">后台任务</string>
     <string name="jobs_empty">没有后台任务</string>
     <string name="jobs_running">运行中</string>
+    <string name="jobs_waiting_message">等待消息</string>
     <string name="jobs_completed">已完成</string>
     <string name="jobs_killed">已终止</string>
     <string name="jobs_failed">失败</string>
@@ -1014,6 +1015,14 @@
     <string name="local_run_plan">计划</string>
     <string name="local_run_tasks_progress">任务 · %1$d/%2$d</string>
     <string name="local_run_background">后台任务</string>
+    <string name="local_run_agent_direct_title">直接调用后台子代理</string>
+    <string name="local_run_agent_direct_body">把一项独立任务交给后台子代理；它会保留自己的进度，完成后仍可继续追加指令。</string>
+    <string name="local_run_agent_task_hint">例如：审计当前实现并列出仍需修复的问题</string>
+    <string name="local_run_agent_start">启动子代理</string>
+    <string name="local_run_agent_message_hint">继续给这个子代理追加指令…</string>
+    <string name="local_run_agent_send">发送指令</string>
+    <string name="local_run_agent_dormant_hint">正在等待新消息；发送后会从上次状态继续。</string>
+    <string name="local_run_agent_pending_messages">待处理消息 %1$d 条</string>
     <string name="local_run_resources">资源</string>
     <string name="local_run_job_view">查看</string>
     <string name="local_run_job_hide">收起</string>
@@ -1490,5 +1499,77 @@
     <string name="audit_group_partial">部分角色回复未成功，已收到的内容已保留</string>
     <string name="audit_group_retry_member">重试 %1$s</string>
     <string name="audit_group_retry_request">@%1$s 请继续回应刚才未完成的问题。</string>
+
+    <!-- 最终 UI 改造：单列侧栏、运行中心、能力中心与模型输入 -->
+    <string name="local_drawer_persona_gallery_hint">人物、故事线与资料</string>
+    <string name="local_drawer_diary_hint">共同经历与角色视角</string>
+    <string name="local_drawer_group_chat_hint">多人角色对话</string>
+    <string name="local_drawer_chat_tasks_hint">计划、免打扰与互动节奏</string>
+    <string name="local_drawer_workspace_hint">文件与任务产物</string>
+    <string name="local_drawer_run_center_hint">进度、智能体与后台任务</string>
+    <string name="local_drawer_work_tasks_hint">定时、计划与主动执行</string>
+    <string name="local_drawer_tools_hint">能力、连接与扩展</string>
+    <string name="local_run_needs_attention">需要你处理 · %1$d</string>
+    <string name="local_run_agent_inherits_context">默认沿用当前任务的模型与执行边界；启动后可在这里继续发消息。</string>
+
+    <string name="tools_capability_code_hint">定义、引用、诊断与工作区符号</string>
+    <string name="tools_capability_vision_hint">图片与屏幕内容理解</string>
+    <string name="tools_capability_code_detail">代码任务中按需自动启用，不需要手动选择 LSP 命令。</string>
+    <string name="tools_capability_code_features">可用能力：跳转定义、查找引用、查找实现、类型说明、代码诊断与工作区符号。</string>
+    <string name="tools_capability_vision_detail">图片和屏幕理解继续走现有模型与视觉能力链，避免建立第二套执行路径。</string>
+    <string name="tools_capability_vision_features">可用能力：读取图片附件；任务需要时分析屏幕；存在虚拟屏幕任务时按上下文调用视觉能力。</string>
+    <string name="tools_capability_open_settings">打开相关设置</string>
+    <string name="tools_github_capabilities">连接后，Agent 可处理 PR、Issue、Actions、仓库代码读取与受控修改。</string>
+    <string name="tools_github_write_approval">涉及写入的操作继续遵守现有确认与权限边界。</string>
+    <string name="tools_webhook_title">Webhook</string>
+    <string name="tools_webhook_hint">允许本机其他应用触发 777 自动任务</string>
+    <string name="tools_webhook_enabled">已开启</string>
+    <string name="tools_webhook_disabled">已关闭</string>
+    <string name="tools_webhook_local_only_hint">仅监听本机 127.0.0.1，不开放局域网入口。</string>
+    <string name="tools_webhook_address">地址：127.0.0.1:%1$d/run</string>
+    <string name="tools_webhook_token_hint">访问令牌：%1$s</string>
+    <string name="tools_webhook_port">端口</string>
+    <string name="tools_webhook_port_hint">可用范围 1024–65535；运行中请先停止再修改。</string>
+    <string name="tools_webhook_start">启动</string>
+    <string name="tools_webhook_stop">停止</string>
+    <string name="tools_webhook_copy_token">复制令牌</string>
+    <string name="tools_webhook_rotate_token">轮换访问令牌</string>
+    <string name="tools_webhook_start_failed">Webhook 启动失败</string>
+    <string name="tools_webhook_stopped">Webhook 已停止</string>
+    <string name="tools_webhook_stop_failed">Webhook 停止失败</string>
+    <string name="tools_webhook_copy_token_failed">复制访问令牌失败</string>
+    <string name="tools_webhook_rotate_token_failed">轮换访问令牌失败</string>
+
+    <string name="local_model_image_mode_title">图片处理方式</string>
+    <string name="local_model_image_mode_auto">自动</string>
+    <string name="local_model_image_mode_native">原生</string>
+    <string name="local_model_image_mode_tool">工具</string>
+    <string name="local_model_image_mode_auto_hint">优先使用当前模型直接读取图片；不适合原生输入时自动走视觉工具。</string>
+    <string name="local_model_image_mode_native_hint">只使用当前模型自身的图片输入能力。</string>
+    <string name="local_model_image_mode_tool_hint">图片先由视觉工具解析，再将结果交给当前模型。</string>
+
+
+    <string name="tasks_notify_title">执行完成后通知</string>
+    <string name="tasks_notify_hint">这项任务完成或产生结果时发送通知</string>
+    <string name="tasks_chat_policy_action">互动策略</string>
+    <string name="tasks_chat_policy_title">互动策略</string>
+    <string name="tasks_chat_policy_subtitle">控制主动互动的打扰边界与联系节奏。</string>
+    <string name="tasks_chat_policy_quiet_hours">免打扰</string>
+    <string name="tasks_chat_policy_quiet_hours_value">%1$s — %2$s</string>
+    <string name="tasks_chat_quiet_start">开始 %1$s</string>
+    <string name="tasks_chat_quiet_end">结束 %1$s</string>
+    <string name="tasks_chat_policy_min_gap">最短主动联系间隔</string>
+    <string name="tasks_chat_policy_min_gap_hint">避免短时间连续主动联系；6 小时适合大多数角色。</string>
+    <string name="tasks_chat_gap_hours">%1$d 小时</string>
+    <string name="tasks_chat_min_gap_hint">避免短时间连续主动联系；6 小时适合大多数角色。</string>
+    <string name="tasks_chat_max_unanswered">连续未回复</string>
+    <string name="tasks_chat_max_unanswered_hint">连续 %1$d 次没有收到回复后暂停主动联系。</string>
+    <string name="tasks_chat_policy_save_failed">互动策略保存失败，请检查任务状态后重试。</string>
+
+
+    <string name="local_character_tuning_expression_variation">表达变化度</string>
+    <string name="local_character_tuning_expression_variation_low">稳定</string>
+    <string name="local_character_tuning_expression_variation_high">丰富</string>
+
 </resources>
 

@@ -19,7 +19,6 @@ import com.labteto.dshmobile.local.model.withEphemeralContext
 import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.chatSystemPrompt
 import com.labteto.dshmobile.local.runtime.CHAT_RECENT_HISTORY_MESSAGES
-import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -240,7 +239,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     ),
                     persistOverflowHistory = true,
                     requestLog = eventLog,
-                    temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                    temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
                     previewGuard = {
                         runtimeStateStore.currentSessionId == sessionId &&
                             runtimeStateStore.state.value.sessionId == sessionId
@@ -285,7 +284,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
                         requestLog = eventLog,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
                         previewGuard = {
                             runtimeStateStore.currentSessionId == sessionId &&
                                 runtimeStateStore.state.value.sessionId == sessionId

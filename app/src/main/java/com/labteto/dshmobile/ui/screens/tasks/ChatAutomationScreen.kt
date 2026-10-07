@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import android.app.TimePickerDialog
+import android.content.Context
+import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,10 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -38,6 +45,7 @@ import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
@@ -108,6 +116,7 @@ internal fun ChatAutomationScreen(
     }
     var draft by rememberSaveable { mutableStateOf("") }
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
     val planMention = stringResource(R.string.tasks_chat_plan_mention)
 
@@ -182,6 +191,7 @@ internal fun ChatAutomationScreen(
                                 editingTaskId = task.id
                                 draft = "$planMention $editSeed"
                             },
+                            onPolicy = { policyTaskId = task.id },
                             onOpenSession = onOpenSession,
                             onPause = { viewModel.pause(task.id) },
                             onResume = { viewModel.resume(task.id) },
@@ -294,6 +304,14 @@ internal fun ChatAutomationScreen(
             }
         }
     }
+
+    tasks.firstOrNull { it.id == policyTaskId }?.let { task ->
+        ChatAutomationPolicySheet(
+            task = task,
+            viewModel = viewModel,
+            onDismiss = { policyTaskId = null },
+        )
+    }
 }
 
 @Composable
@@ -314,6 +332,7 @@ private fun ChatAutomationEventRow(
     scheduleDescription: String,
     currentSessionId: String,
     onEdit: () -> Unit,
+    onPolicy: () -> Unit,
     onOpenSession: (String) -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -368,6 +387,18 @@ private fun ChatAutomationEventRow(
                 )
             }
             if (task.targetSessionId == currentSessionId) {
+                if (
+                    task.recurringMinutes != null ||
+                    task.scheduleType == AutomationScheduleType.SILENCE ||
+                    task.scheduleType == AutomationScheduleType.WINDOW
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.tasks_chat_policy_action),
+                        onClick = onPolicy,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Small,
+                    )
+                }
                 DsButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
@@ -422,6 +453,243 @@ private fun ChatAutomationEventRow(
             }
         }
     }
+}
+
+@Composable
+private fun ChatAutomationPolicySheet(
+    task: AutomationTask,
+    viewModel: TasksViewModel,
+    onDismiss: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val context = LocalContext.current
+    val saveFailedMessage = stringResource(R.string.tasks_chat_policy_save_failed)
+    var quietEnabled by remember(task.id) { mutableStateOf(task.quietHoursEnabled) }
+    var quietStartMinute by remember(task.id) {
+        mutableStateOf(task.quietStartHour * 60 + task.quietStartMinute)
+    }
+    var quietEndMinute by remember(task.id) {
+        mutableStateOf(task.quietEndHour * 60 + task.quietEndMinute)
+    }
+    var minGapMinutes by remember(task.id) { mutableStateOf(task.proactiveMinGapMinutes) }
+    var maxUnanswered by remember(task.id) { mutableStateOf(task.proactiveMaxUnanswered) }
+    var notify by remember(task.id) { mutableStateOf(task.notify) }
+    var saveError by remember(task.id) { mutableStateOf<String?>(null) }
+    val gapOptions = listOf(60L, 120L, 240L, 360L, 720L, 1_440L)
+
+    DsBottomSheet(
+        title = stringResource(R.string.tasks_chat_policy_title),
+        subtitle = stringResource(R.string.tasks_chat_policy_subtitle),
+        onDismiss = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.tasks_chat_policy_quiet_hours),
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    stringResource(
+                        R.string.tasks_chat_policy_quiet_hours_value,
+                        formatMinute(quietStartMinute),
+                        formatMinute(quietEndMinute),
+                    ),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+            Switch(
+                checked = quietEnabled,
+                onCheckedChange = { quietEnabled = it },
+            )
+        }
+        if (quietEnabled) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(
+                        R.string.tasks_chat_quiet_start,
+                        formatMinute(quietStartMinute),
+                    ),
+                    onClick = {
+                        showAutomationTimePicker(context, quietStartMinute) {
+                            quietStartMinute = it
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                )
+                DsButton(
+                    text = stringResource(
+                        R.string.tasks_chat_quiet_end,
+                        formatMinute(quietEndMinute),
+                    ),
+                    onClick = {
+                        showAutomationTimePicker(context, quietEndMinute) {
+                            quietEndMinute = it
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+
+        Text(
+            stringResource(R.string.tasks_chat_policy_min_gap),
+            style = DsType.small13Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
+        gapOptions.chunked(3).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                row.forEach { minutes ->
+                    DsButton(
+                        text = stringResource(R.string.tasks_chat_gap_hours, minutes / 60L),
+                        onClick = { minGapMinutes = minutes },
+                        modifier = Modifier.weight(1f),
+                        variant = if (minGapMinutes == minutes) {
+                            DsButtonVariant.Info
+                        } else {
+                            DsButtonVariant.Outline
+                        },
+                        size = DsButtonSize.Small,
+                    )
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.tasks_chat_policy_min_gap_hint),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+        )
+
+        Text(
+            stringResource(R.string.tasks_chat_max_unanswered),
+            style = DsType.small13Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            (1..5).forEach { count ->
+                DsButton(
+                    text = count.toString(),
+                    onClick = { maxUnanswered = count },
+                    modifier = Modifier.weight(1f),
+                    variant = if (maxUnanswered == count) {
+                        DsButtonVariant.Info
+                    } else {
+                        DsButtonVariant.Outline
+                    },
+                    size = DsButtonSize.Small,
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.tasks_chat_max_unanswered_hint, maxUnanswered),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.tasks_notify_title),
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    stringResource(R.string.tasks_notify_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+            Switch(
+                checked = notify,
+                onCheckedChange = { notify = it },
+            )
+        }
+
+        }
+        saveError?.let {
+            Text(
+                it,
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.error,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            DsButton(
+                text = stringResource(R.string.common_cancel),
+                onClick = onDismiss,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+            DsButton(
+                text = stringResource(R.string.tasks_save),
+                onClick = {
+                    val saved = viewModel.updateChatPolicy(
+                        task = task,
+                        quietHoursEnabled = quietEnabled,
+                        quietStartHour = quietStartMinute / 60,
+                        quietStartMinute = quietStartMinute % 60,
+                        quietEndHour = quietEndMinute / 60,
+                        quietEndMinute = quietEndMinute % 60,
+                        proactiveMinGapMinutes = minGapMinutes,
+                        proactiveMaxUnanswered = maxUnanswered,
+                        notify = notify,
+                    )
+                    if (saved) {
+                        onDismiss()
+                    } else {
+                        saveError = saveFailedMessage
+                    }
+                },
+                size = DsButtonSize.Small,
+            )
+        }
+    }
+}
+
+private fun showAutomationTimePicker(
+    context: Context,
+    initialMinuteOfDay: Int,
+    onPicked: (Int) -> Unit,
+) {
+    TimePickerDialog(
+        context,
+        { _, hour, minute -> onPicked(hour * 60 + minute) },
+        initialMinuteOfDay / 60,
+        initialMinuteOfDay % 60,
+        AndroidDateFormat.is24HourFormat(context),
+    ).show()
 }
 
 @Composable

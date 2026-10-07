@@ -514,7 +514,6 @@ class WebhookPlugin(
                     simpleToolProperties(
                         mapOf(
                             "port" to "integer",
-                            "allow_lan" to "boolean",
                         ),
                     ),
                 ),
@@ -524,13 +523,13 @@ class WebhookPlugin(
                 metadata = ToolMetadata(
                     family = "Webhook",
                     discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
-                    requirements = listOf("默认仅监听 127.0.0.1；如需局域网监听必须显式传 allow_lan=true 并经过网络工具审批"),
+                    requirements = listOf("仅监听 127.0.0.1；远程访问请使用加密中继"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(
                         controller.start(
                             port = input["port"]?.jsonPrimitive?.content?.toIntOrNull() ?: 8765,
-                            allowLan = input["allow_lan"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
+                            allowLan = false,
                         ),
                     )
                 },
@@ -546,12 +545,12 @@ class WebhookPlugin(
                 metadata = ToolMetadata(
                     family = "Webhook",
                     discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
-                    requirements = listOf("默认仅监听 127.0.0.1；如需局域网监听必须显式传 allow_lan=true 并经过网络工具审批"),
+                    requirements = listOf("仅监听 127.0.0.1；远程访问请使用加密中继"),
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     val state = controller.status()
                     ToolResult(
-                        "enabled=${state.enabled}\\nport=${state.port}\\nallow_lan=${state.allowLan}\\ntoken=${state.tokenHint ?: "none"}",
+                        "enabled=${state.enabled}\\nport=${state.port}\\ntoken=${state.tokenHint ?: "none"}",
                     )
                 },
             ),
@@ -566,7 +565,7 @@ class WebhookPlugin(
                 metadata = ToolMetadata(
                     family = "Webhook",
                     discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
-                    requirements = listOf("默认仅监听 127.0.0.1；如需局域网监听必须显式传 allow_lan=true 并经过网络工具审批"),
+                    requirements = listOf("仅监听 127.0.0.1；远程访问请使用加密中继"),
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.stop().toString())
@@ -586,7 +585,7 @@ class WebhookPlugin(
                 metadata = ToolMetadata(
                     family = "Webhook",
                     discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
-                    requirements = listOf("默认仅监听 127.0.0.1；如需局域网监听必须显式传 allow_lan=true 并经过网络工具审批"),
+                    requirements = listOf("仅监听 127.0.0.1；远程访问请使用加密中继"),
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.copyTokenToClipboard())
@@ -603,7 +602,7 @@ class WebhookPlugin(
                 metadata = ToolMetadata(
                     family = "Webhook",
                     discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
-                    requirements = listOf("默认仅监听 127.0.0.1；如需局域网监听必须显式传 allow_lan=true 并经过网络工具审批"),
+                    requirements = listOf("仅监听 127.0.0.1；远程访问请使用加密中继"),
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.rotateToken())

@@ -1330,4 +1330,36 @@ class HarnessJobPersistenceTest {
         assertTrue(manager.output("job-duplicate").contains("[completed]"))
     }
 
+    @Test
+    fun jobInfoProjectsDirectAgentUiCapabilities() = runTest {
+        var latest = emptyList<JobInfo>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { latest = it },
+            idFactory = { "job-agent" },
+        )
+
+        manager.startPersistent(
+            label = "子代理：审计",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerId = "session-a",
+            continuable = true,
+        ) { _, _ -> "第一轮完成" }
+        advanceUntilIdle()
+
+        val dormant = latest.single()
+        assertTrue(dormant.isAgent)
+        assertTrue(dormant.canMessage)
+        assertTrue(dormant.continuable)
+        assertTrue(dormant.status == "dormant")
+        assertTrue(dormant.pendingMessageCount == 0)
+
+        manager.send("job-agent", "继续核查", "session-a")
+
+        val queued = latest.single()
+        assertTrue(queued.canMessage)
+        assertTrue(queued.pendingMessageCount == 1)
+    }
+
 }

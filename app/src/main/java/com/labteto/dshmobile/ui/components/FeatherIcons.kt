@@ -230,6 +230,20 @@ internal object FeatherIcons {
         }
     }
 
+    /** `zap` — external trigger / webhook. */
+    val Zap: ImageVector by lazy {
+        feather("Zap") {
+            moveTo(13f, 2f)
+            lineTo(3f, 14f)
+            lineTo(12f, 14f)
+            lineTo(11f, 22f)
+            lineTo(21f, 10f)
+            lineTo(12f, 10f)
+            lineTo(13f, 2f)
+            close()
+        }
+    }
+
     /** `clock` — scheduled / automation work. */
     val Clock: ImageVector by lazy {
         feather("Clock") {

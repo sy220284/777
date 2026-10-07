@@ -52,6 +52,7 @@ import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.model.DeepSeekBillingSchedule
 import com.labteto.dshmobile.local.model.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
+import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -64,6 +65,8 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
@@ -138,6 +141,37 @@ internal fun LocalModelSettingsCard(
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
         ChatGptAccountPanel(chatGpt, viewModel, report)
+        Text(
+            stringResource(R.string.local_model_image_mode_title),
+            style = DsType.small13Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
+        DsSegmented(
+            segments = listOf(
+                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
+                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.local_model_image_mode_native)),
+                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.local_model_image_mode_tool)),
+            ),
+            selectedKey = local.imageInputMode.name,
+            onSelect = { key ->
+                runCatching { LocalImageInputMode.valueOf(key) }
+                    .getOrNull()
+                    ?.let(viewModel::configureImageInputMode)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            stretch = true,
+        )
+        Text(
+            stringResource(
+                when (local.imageInputMode) {
+                    LocalImageInputMode.AUTO -> R.string.local_model_image_mode_auto_hint
+                    LocalImageInputMode.NATIVE -> R.string.local_model_image_mode_native_hint
+                    LocalImageInputMode.TOOL -> R.string.local_model_image_mode_tool_hint
+                },
+            ),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+        )
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (local.modelProfiles.isEmpty()) {

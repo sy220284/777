@@ -137,12 +137,13 @@ class TasksViewModel @Inject constructor(
         quietEndMinute: Int,
         proactiveMinGapMinutes: Long,
         proactiveMaxUnanswered: Int,
+        notify: Boolean? = null,
     ): Boolean = runCatching {
         scheduler.updateTask(
             id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
             quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
-            proactiveMinGapMinutes, proactiveMaxUnanswered,
+            proactiveMinGapMinutes, proactiveMaxUnanswered, notify,
         )
     }.getOrDefault(false).also { if (it) refresh() }
     fun createAt(
@@ -161,6 +162,7 @@ class TasksViewModel @Inject constructor(
         quietEndMinute: Int = LocalAutomationPolicyProjection.defaults.quietEndMinute,
         proactiveMinGapMinutes: Long = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
         proactiveMaxUnanswered: Int = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
+        notify: Boolean = true,
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
@@ -189,23 +191,23 @@ class TasksViewModel @Inject constructor(
             when {
                 scheduleType == AutomationScheduleType.WINDOW -> scheduler.scheduleWindow(
                     id, prompt.trim(), requireNotNull(windowStartMinuteOfDay),
-                    requireNotNull(windowEndMinuteOfDay), true, requireNotNull(targetSessionId),
+                    requireNotNull(windowEndMinuteOfDay), notify, requireNotNull(targetSessionId),
                     actorName, quietHoursEnabled, quietStartHour, quietStartMinute,
                     quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 scheduleType == AutomationScheduleType.SILENCE -> scheduler.scheduleSilence(
-                    id, prompt.trim(), requireNotNull(silenceMinutes), true,
+                    id, prompt.trim(), requireNotNull(silenceMinutes), notify,
                     requireNotNull(targetSessionId), actorName, quietHoursEnabled,
                     quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
                     proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 recurringMinutes == null -> scheduler.scheduleOnce(
-                    id, prompt.trim(), firstRunAt, true, mode, targetSessionId, actorName,
+                    id, prompt.trim(), firstRunAt, notify, mode, targetSessionId, actorName,
                     quietHoursEnabled, quietStartHour, quietStartMinute, quietEndHour,
                     quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 else -> scheduler.schedulePeriodic(
-                    id, prompt.trim(), recurringMinutes, firstRunAt, true, mode,
+                    id, prompt.trim(), recurringMinutes, firstRunAt, notify, mode,
                     targetSessionId, actorName, quietHoursEnabled, quietStartHour,
                     quietStartMinute, quietEndHour, quietEndMinute, proactiveMinGapMinutes,
                     proactiveMaxUnanswered,
@@ -215,6 +217,30 @@ class TasksViewModel @Inject constructor(
             refresh()
         }.isSuccess
     }
+    fun updateChatPolicy(
+        task: AutomationTask,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        notify: Boolean,
+    ): Boolean = runCatching {
+        scheduler.updateChatInteractionPolicy(
+            id = task.id,
+            quietHoursEnabled = quietHoursEnabled,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+            notify = notify,
+        )
+    }.getOrDefault(false).also { if (it) refresh() }
+
     private fun canPlanChat(snapshot: LocalHarnessTaskState): Boolean =
         snapshot.usageMode == LocalUsageMode.CHAT &&
             !snapshot.groupChat.enabled &&

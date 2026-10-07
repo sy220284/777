@@ -112,6 +112,10 @@ class SettingsViewModel @Inject constructor(
         localHarness.configureChatStyleGuard(enabled)
     }
 
+    fun configureImageInputMode(mode: com.labteto.dshmobile.local.model.LocalImageInputMode) {
+        localHarness.configureImageInputMode(mode)
+    }
+
     fun addChatStyleGuardPhrase(phrase: String): Boolean =
         localHarness.addChatStyleGuardPhrase(phrase)
 
