@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 /** Work-owned subagent and workflow composition bound to the originating Work run. */
 internal class LocalWorkSubagentRuntime(
@@ -41,6 +42,7 @@ internal class LocalWorkSubagentRuntime(
         mode: String,
         requiredEvidence: List<String>,
         modelOverride: String?,
+        outputSchema: JsonObject?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
@@ -59,6 +61,7 @@ internal class LocalWorkSubagentRuntime(
                             continuable = false,
                             virtualScreen = false,
                             historyMode = LocalSubagentHistoryMode.ISOLATED,
+                            outputSchema = outputSchema,
                         ),
                     ),
                 ).requireCompletedOutput()

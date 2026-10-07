@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.agent
 
+import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -57,8 +59,19 @@ internal fun validateLocalSubagentLaunchSpec(
     require(spec.backgroundJobId == null || spec.capabilities.continuable) {
         "SUBAGENT_BACKGROUND_REQUIRES_CONTINUATION：持久子代理必须显式 continuable"
     }
-    require(spec.capabilities.outputSchema == null || structuredOutputSupported) {
-        "SUBAGENT_OUTPUT_SCHEMA_NOT_SUPPORTED：当前运行时尚未启用结构化子代理结果"
+    spec.capabilities.outputSchema?.let { schema ->
+        require(structuredOutputSupported) {
+            "SUBAGENT_OUTPUT_SCHEMA_NOT_SUPPORTED：当前运行时尚未启用结构化子代理结果"
+        }
+        require(schema.toString().length <= MAX_SUBAGENT_OUTPUT_SCHEMA_CHARS) {
+            "SUBAGENT_OUTPUT_SCHEMA_TOO_LARGE：结构化结果 schema 超过大小上限"
+        }
+        JsonSchemaValidator.validateSchema(
+            schema = schema,
+            requireObjectRoot = true,
+        )?.let { problem ->
+            throw IllegalArgumentException("SUBAGENT_OUTPUT_SCHEMA_INVALID：$problem")
+        }
     }
     spec.capabilities.toolAllowlist?.let { allowlist ->
         require(allowlist.none(String::isBlank)) {
@@ -68,6 +81,8 @@ internal fun validateLocalSubagentLaunchSpec(
     return spec
 }
 
+
+private const val MAX_SUBAGENT_OUTPUT_SCHEMA_CHARS = 32_768
 
 internal fun validateLocalSubagentToolAllowlist(
     source: JsonArray,

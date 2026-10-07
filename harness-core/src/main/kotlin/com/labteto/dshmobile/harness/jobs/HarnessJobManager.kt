@@ -182,10 +182,13 @@ class HarnessJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         require(resumeKind.isNotBlank()) { "持久任务恢复类型不能为空" }
+        require(resumePayload.length <= MAX_RESUME_PAYLOAD) {
+            "持久任务恢复元数据过大：最多允许 $MAX_RESUME_PAYLOAD 个字符"
+        }
         return startInternal(
             label = label,
             resumeKind = resumeKind.take(MAX_RESUME_KIND),
-            resumePayload = resumePayload.take(MAX_RESUME_PAYLOAD),
+            resumePayload = resumePayload,
             ownerId = ownerId,
             continuable = continuable,
             expectedDurationMillis = null,

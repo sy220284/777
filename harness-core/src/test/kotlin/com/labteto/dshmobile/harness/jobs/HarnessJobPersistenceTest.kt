@@ -214,6 +214,33 @@ class HarnessJobPersistenceTest {
 
 
     @Test
+    fun persistentStartRejectsOversizedResumePayloadWithoutTruncation() = runTest {
+        var ran = false
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+        )
+
+        val failure = runCatching {
+            manager.startPersistent(
+                label = "oversized",
+                resumeKind = "subagent_readonly",
+                resumePayload = "x".repeat(64_001),
+            ) { _, _ ->
+                ran = true
+                "done"
+            }
+        }.exceptionOrNull()
+
+        runCurrent()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("恢复元数据过大"))
+        assertFalse(ran)
+        assertTrue(manager.list() == "没有后台任务")
+    }
+
+    @Test
     fun timedEphemeralStartDoesNotLaunchWithoutDurableDeadlineEvidence() = runTest {
         var ran = false
         val manager = HarnessJobManager(

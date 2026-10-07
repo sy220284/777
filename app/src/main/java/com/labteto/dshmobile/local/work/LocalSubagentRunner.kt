@@ -32,6 +32,9 @@ import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
+import com.labteto.dshmobile.local.agent.LocalStructuredSubagentOutputException
+import com.labteto.dshmobile.local.agent.localStructuredSubagentInstruction
+import com.labteto.dshmobile.local.agent.validateLocalStructuredSubagentOutput
 import com.labteto.dshmobile.local.agent.boundedSubagentContext
 import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
@@ -147,7 +150,10 @@ internal class LocalSubagentRunner(
         recoveredSoftStepLimit: Int? = null,
         resumeAfterCompletion: Boolean = false,
     ): LocalSubagentResult {
-        val validated = validateLocalSubagentLaunchSpec(spec)
+        val validated = validateLocalSubagentLaunchSpec(
+            spec,
+            structuredOutputSupported = true,
+        )
         return resourceScheduler.withResource(
             HarnessResourceKind.AGENT,
             owner = "subagent:" + validated.task.take(80),
@@ -373,6 +379,12 @@ internal class LocalSubagentRunner(
                     ) 1 else 0
                     history.insert(index, insertion)
                 }
+                capabilities.outputSchema?.let { schema ->
+                    history.append(buildJsonObject {
+                        put("role", "system")
+                        put("content", localStructuredSubagentInstruction(schema))
+                    })
+                }
                 history.append(buildJsonObject { put("role", "user"); put("content", task) })
             }
             if (recoveringHistory) {
@@ -555,11 +567,13 @@ internal class LocalSubagentRunner(
                             } else {
                                 null
                             }
-                            pendingTerminalOutput?.let { terminal ->
-                                persistContinuationCheckpoint(
-                                    step = absoluteStep,
-                                    terminalOutput = terminal,
-                                )
+                            if (capabilities.outputSchema == null) {
+                                pendingTerminalOutput?.let { terminal ->
+                                    persistContinuationCheckpoint(
+                                        step = absoluteStep,
+                                        terminalOutput = terminal,
+                                    )
+                                }
                             }
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
@@ -630,15 +644,17 @@ internal class LocalSubagentRunner(
                             }
                         }
                         is AgentEvent.TurnCompleted -> {
-                            eventLog().append("subagent/end", buildJsonObject {
-                                put("agent_id", subagentId)
-                                put("status", "completed")
-                                put("steps", recoveredBaseStep + event.steps)
-                            })
-                            persistContinuationCheckpoint(
-                                step = recoveredBaseStep + event.steps,
-                                terminalOutput = event.answer.ifBlank { "子代理已结束，但没有返回文字。" },
-                            )
+                            if (capabilities.outputSchema == null) {
+                                eventLog().append("subagent/end", buildJsonObject {
+                                    put("agent_id", subagentId)
+                                    put("status", "completed")
+                                    put("steps", recoveredBaseStep + event.steps)
+                                })
+                                persistContinuationCheckpoint(
+                                    step = recoveredBaseStep + event.steps,
+                                    terminalOutput = event.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                                )
+                            }
                         }
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -716,9 +732,57 @@ internal class LocalSubagentRunner(
 
             val result = loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
+                val answer = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
+                val outputSchema = capabilities.outputSchema
+                if (outputSchema == null) {
+                    return LocalSubagentResult(
+                        status = LocalSubagentStatus.COMPLETED,
+                        output = answer,
+                    )
+                }
+
+                val structured = validateLocalStructuredSubagentOutput(answer, outputSchema)
+                val failure = structured.exceptionOrNull() as? LocalStructuredSubagentOutputException
+                if (failure != null) {
+                    val absoluteSteps = recoveredBaseStep + result.steps
+                    eventLog().append("subagent/end", buildJsonObject {
+                        put("agent_id", subagentId)
+                        put("status", "failed")
+                        put("steps", absoluteSteps)
+                        put("code", failure.failure.code)
+                        put("detail", failure.failure.detail.take(2_000))
+                    })
+                    persistContinuationCheckpoint(step = absoluteSteps)
+                    return LocalSubagentResult(
+                        status = LocalSubagentStatus.FAILED,
+                        output =
+                            "[subagent][$subagentId][${failure.failure.code}] " +
+                                "结构化结果校验失败：${failure.failure.detail}",
+                        errorCode = failure.failure.code,
+                    )
+                }
+                val verified = structured.getOrThrow()
+                val absoluteSteps = recoveredBaseStep + result.steps
+                eventLog().append("subagent/structured-result", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("step", absoluteSteps)
+                    put("schema_digest", verified.schemaDigest)
+                    put("result_digest", verified.resultDigest)
+                })
+                eventLog().append("subagent/end", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("status", "completed")
+                    put("steps", absoluteSteps)
+                    put("structured", true)
+                })
+                persistContinuationCheckpoint(
+                    step = absoluteSteps,
+                    terminalOutput = verified.canonicalJson,
+                )
                 return LocalSubagentResult(
                     status = LocalSubagentStatus.COMPLETED,
-                    output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                    output = verified.canonicalJson,
+                    structuredOutput = verified.value,
                 )
             }
 

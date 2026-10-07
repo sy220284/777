@@ -68,6 +68,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         model: String?,
         maxSteps: Int,
         virtualScreen: Boolean,
+        outputSchema: JsonObject? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -81,6 +82,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             virtualScreen = virtualScreen,
             historyMode = LocalSubagentHistoryMode.ISOLATED,
             maxDepth = 1,
+            outputSchema = outputSchema,
         )
         validateLocalSubagentLaunchSpec(
             LocalSubagentLaunchSpec(
@@ -90,6 +92,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 backgroundJobId = "pending",
                 capabilities = capabilities,
             ),
+            structuredOutputSupported = true,
         )
         val payload = buildJsonObject {
             put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
@@ -254,6 +257,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 backgroundJobId = snapshot.id,
                 capabilities = capabilities,
             ),
+            structuredOutputSupported = true,
         )
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
