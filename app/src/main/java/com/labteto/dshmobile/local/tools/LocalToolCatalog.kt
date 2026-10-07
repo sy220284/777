@@ -61,7 +61,7 @@ object LocalToolCatalog {
         add(tool("job_kill", "停止一个后台任务", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
-        add(tool("web_search", "通过 DeepSeek 官方搜索能力查询最新网页信息", properties(
+        add(tool("web_search", "搜索最新公开网页信息；默认使用免密公共搜索，连接失败时可使用已配置的 DeepSeek 备用通道", properties(
             "queries" to buildJsonObject {
                 put("type", "array")
                 put("description", "1 到 4 个搜索词")
