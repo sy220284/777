@@ -353,20 +353,36 @@ internal class LocalAgentTeamRuntime(
     }
 
     private suspend fun waitForChange(sessionId: String, timeoutMs: Int): String {
-        val baseline = maxOf(
-            eventLogFor(sessionId).latestSequence(),
-            jobs.snapshotInfos().maxOfOrNull { info -> info.id.hashCode().toLong() } ?: Long.MIN_VALUE,
-        )
+        val baseline = teamChangeFingerprint(sessionId)
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             delay(WAIT_POLL_MS)
-            val next = eventLogFor(sessionId).latestSequence()
-            if (next > baseline) {
-                return "Team 状态已变化：event_seq=$next"
+            val next = teamChangeFingerprint(sessionId)
+            if (next != baseline) {
+                return "Team 状态已变化：event_seq=${next.eventSequence}"
             }
         }
         return "Team 等待超时：${timeoutMs}ms"
+    }
+
+    private data class TeamChangeFingerprint(
+        val eventSequence: Long,
+        val memberActivity: List<String>,
+    )
+
+    private fun teamChangeFingerprint(sessionId: String): TeamChangeFingerprint {
+        val memberJobs = project(sessionId).members.map(LocalTeamMemberSnapshot::jobId).toSet()
+        val activity = jobs.snapshotInfos()
+            .asSequence()
+            .filter { it.id in memberJobs }
+            .sortedBy { it.id }
+            .map { "${it.id}:${it.status}" }
+            .toList()
+        return TeamChangeFingerprint(
+            eventSequence = eventLogFor(sessionId).latestSequence(),
+            memberActivity = activity,
+        )
     }
 
     private fun renderMembers(sessionId: String): String {
