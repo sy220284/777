@@ -435,7 +435,7 @@ class HarnessJobManager(
     fun send(id: String, message: String, ownerId: String? = null): String {
         val clean = message.trim()
         require(clean.isNotEmpty()) { "消息不能为空" }
-        var interrupted = false
+        var queuedForActivation = false
         var previousInbox: List<JobInboxMessage> = emptyList()
         var previousUpdatedAt = 0L
         val record = synchronized(lock) {
@@ -445,7 +445,7 @@ class HarnessJobManager(
             if (!found.label.startsWith(AGENT_PREFIX)) {
                 return "目标不是后台代理：$id"
             }
-            interrupted =
+            queuedForActivation =
                 found.status in setOf("interrupted", "idle") && !found.resumeKind.isNullOrBlank()
             if (found.status !in setOf("running", "interrupted", "idle")) {
                 return "目标后台代理当前不可接收消息：$id [${found.status}]"
@@ -478,8 +478,8 @@ class HarnessJobManager(
         } else {
             publish()
         }
-        return if (interrupted) {
-            "消息已持久排队，后台代理将在恢复后接收：$id"
+        return if (queuedForActivation) {
+            "消息已持久排队，后台代理将在激活后接收：$id"
         } else {
             "消息已发送给后台代理：$id"
         }
