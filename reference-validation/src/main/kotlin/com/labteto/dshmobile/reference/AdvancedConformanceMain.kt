@@ -5,6 +5,7 @@ import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.harness.session.SessionReducer
 import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -72,6 +73,11 @@ fun main(args: Array<String>) {
     }
     File(args.single()).apply {
         parentFile?.mkdirs()
-        writeText(Json { prettyPrint = true }.encodeToString(result))
+        writeText(
+            Json { prettyPrint = true }.encodeToString(
+                JsonObject.serializer(),
+                result,
+            ),
+        )
     }
 }
