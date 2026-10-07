@@ -69,11 +69,20 @@ internal object LocalDocumentContent {
                 normalizedMediaType.startsWith("text/") ||
                 normalizedMediaType in plainTextMediaTypes ->
                 extractPlainText(file, extension, maxChars)
-            extension in wordOpenXmlExtensions -> extractDocx(file, maxChars)
-            extension in excelOpenXmlExtensions -> extractXlsx(file, maxChars)
-            extension in powerPointOpenXmlExtensions -> extractPptx(file, maxChars)
-            extension in openDocumentExtensions -> extractOpenDocument(file, extension, maxChars)
-            extension == "epub" -> extractEpub(file, maxChars)
+            extension in wordOpenXmlExtensions ||
+                normalizedMediaType in WORD_OPEN_XML_MEDIA_TYPES ->
+                extractDocx(file, maxChars)
+            extension in excelOpenXmlExtensions ||
+                normalizedMediaType in EXCEL_OPEN_XML_MEDIA_TYPES ->
+                extractXlsx(file, maxChars)
+            extension in powerPointOpenXmlExtensions ||
+                normalizedMediaType in POWERPOINT_OPEN_XML_MEDIA_TYPES ->
+                extractPptx(file, maxChars)
+            extension in openDocumentExtensions ||
+                normalizedMediaType.startsWith("application/vnd.oasis.opendocument.") ->
+                extractOpenDocument(file, extension, maxChars)
+            extension == "epub" || normalizedMediaType == "application/epub+zip" ->
+                extractEpub(file, maxChars)
             extension == "rtf" || normalizedMediaType == "application/rtf" -> extractRtf(file, maxChars)
             extension == "pdf" || normalizedMediaType == "application/pdf" -> extractPdfBestEffort(file, maxChars)
             extension in zipLikeExtensions || normalizedMediaType == "application/zip" ->
@@ -81,7 +90,19 @@ internal object LocalDocumentContent {
             extension == "gz" || normalizedMediaType in setOf("application/gzip", "application/x-gzip") ->
                 extractGzip(file, displayName, maxChars)
             extension == "tar" -> extractTar(file, maxChars)
-            extension in legacyOfficeExtensions -> extractLegacyOffice(file, extension, maxChars)
+            extension in legacyOfficeExtensions ||
+                normalizedMediaType in LEGACY_OFFICE_MEDIA_TYPES ->
+                extractLegacyOffice(
+                    file,
+                    extension.ifBlank {
+                        when (normalizedMediaType) {
+                            "application/msword" -> "doc"
+                            "application/vnd.ms-excel" -> "xls"
+                            else -> "ppt"
+                        }
+                    },
+                    maxChars,
+                )
             else -> LocalDocumentText(
                 formatLabel = extension.ifBlank { normalizedMediaType.ifBlank { "二进制文件" } }.uppercase(),
                 text = "",
@@ -700,6 +721,14 @@ internal object LocalDocumentContent {
     }
 
     private fun decodeText(bytes: ByteArray): String = when {
+        bytes.size >= 4 &&
+            bytes[0] == 0xff.toByte() && bytes[1] == 0xfe.toByte() &&
+            bytes[2] == 0x00.toByte() && bytes[3] == 0x00.toByte() ->
+            String(bytes, 4, bytes.size - 4, Charset.forName("UTF-32LE"))
+        bytes.size >= 4 &&
+            bytes[0] == 0x00.toByte() && bytes[1] == 0x00.toByte() &&
+            bytes[2] == 0xfe.toByte() && bytes[3] == 0xff.toByte() ->
+            String(bytes, 4, bytes.size - 4, Charset.forName("UTF-32BE"))
         bytes.size >= 3 &&
             bytes[0] == 0xef.toByte() && bytes[1] == 0xbb.toByte() && bytes[2] == 0xbf.toByte() ->
             String(bytes, 3, bytes.size - 3, StandardCharsets.UTF_8)
@@ -707,7 +736,21 @@ internal object LocalDocumentContent {
             String(bytes, 2, bytes.size - 2, StandardCharsets.UTF_16LE)
         bytes.size >= 2 && bytes[0] == 0xfe.toByte() && bytes[1] == 0xff.toByte() ->
             String(bytes, 2, bytes.size - 2, StandardCharsets.UTF_16BE)
-        else -> String(bytes, StandardCharsets.UTF_8)
+        else -> decodeUnknownTextEncoding(bytes)
+    }
+
+    private fun decodeUnknownTextEncoding(bytes: ByteArray): String {
+        val utf8 = String(bytes, StandardCharsets.UTF_8)
+        val utf8Replacement = utf8.count { it == '\uFFFD' }
+        if (utf8Replacement == 0 || utf8Replacement.toDouble() / utf8.length.coerceAtLeast(1) <= 0.01) {
+            return utf8
+        }
+        val gb18030 = runCatching { String(bytes, Charset.forName("GB18030")) }.getOrNull()
+        if (gb18030 != null) {
+            val gbReplacement = gb18030.count { it == '\uFFFD' }
+            if (gbReplacement < utf8Replacement) return gb18030
+        }
+        return String(bytes, Charset.forName("windows-1252"))
     }
 
     private fun attr(attributes: String, name: String): String? =
@@ -727,4 +770,30 @@ internal object LocalDocumentContent {
             ?: (start + length).coerceAtMost(bytes.size)
         return String(bytes, start, (end - start).coerceAtLeast(0), StandardCharsets.US_ASCII)
     }
+
+    private val WORD_OPEN_XML_MEDIA_TYPES = setOf(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-word.document.macroenabled.12",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    )
+
+    private val EXCEL_OPEN_XML_MEDIA_TYPES = setOf(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel.sheet.macroenabled.12",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    )
+
+    private val POWERPOINT_OPEN_XML_MEDIA_TYPES = setOf(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.ms-powerpoint.presentation.macroenabled.12",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+        "application/vnd.openxmlformats-officedocument.presentationml.template",
+    )
+
+    private val LEGACY_OFFICE_MEDIA_TYPES = setOf(
+        "application/msword",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-powerpoint",
+    )
+
 }
