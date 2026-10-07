@@ -50,6 +50,7 @@ import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
@@ -128,9 +129,9 @@ internal fun WorkspaceMenu(
     onDelete: () -> Unit,
 ) {
     DsBottomSheet(title = null, onDismiss = onDismiss) {
-        SheetRow(title = stringResource(R.string.chatlist_workspace_new_session), onClick = onNewSession)
-        SheetRow(title = stringResource(R.string.chatlist_workspace_rename), onClick = onRename)
-        SheetRow(title = stringResource(R.string.chatlist_workspace_delete), onClick = onDelete)
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_new_session), onClick = onNewSession)
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_rename), onClick = onRename)
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_delete), onClick = onDelete, danger = true)
     }
 }
 
@@ -307,20 +308,20 @@ internal fun SessionRowItem(
         if (menuOpen) {
             DsBottomSheet(title = null, onDismiss = { menuOpen = false }) {
                 if (archived) {
-                    SheetRow(title = stringResource(R.string.archived_restore)) {
+                    DsSheetChoiceRow(title = stringResource(R.string.archived_restore)) {
                         menuOpen = false
                         scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
                     }
                 } else {
-                    SheetRow(title = stringResource(R.string.chatlist_session_rename)) {
+                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_rename)) {
                         menuOpen = false
                         renameOpen = true
                     }
-                    SheetRow(title = stringResource(R.string.chatlist_session_fork)) {
+                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_fork)) {
                         menuOpen = false
                         scope.launch { actions.fork(session.sessionId) }
                     }
-                    SheetRow(title = stringResource(R.string.chatlist_session_archive)) {
+                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_archive), danger = true) {
                         menuOpen = false
                         archiveConfirmOpen = true
                     }
