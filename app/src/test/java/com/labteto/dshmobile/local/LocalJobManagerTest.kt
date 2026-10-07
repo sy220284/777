@@ -291,6 +291,44 @@ class LocalJobManagerTest {
     }
 
     @Test
+    fun idlePersistentAgentStaysIdleAcrossRestartUntilNewMessageArrives() = runTest {
+        val root = createTempDir(prefix = "persistent-agent-idle-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-idle-agent",
+                        label = "子代理：持续审计",
+                        status = "idle",
+                        output = "上一轮已完成",
+                        resumeKind = "subagent_readonly",
+                        resumePayload = """{"session_id":"session-a"}""",
+                        ownerId = "session-a",
+                        continuationState = """{"version":1,"background_job_id":"job-idle-agent","agent_id":"sa-idle","step":2,"history":[]}""",
+                    ),
+                ),
+            )
+
+            val restarted = LocalJobManager(this, store) { }
+
+            assertTrue(restarted.output("job-idle-agent", "session-a").contains("[idle]"))
+            assertTrue(restarted.interruptedSnapshots().isEmpty())
+            assertTrue(restarted.resumableSnapshots().isEmpty())
+
+            val sent = restarted.send("job-idle-agent", "继续下一轮", "session-a")
+
+            assertTrue(sent.contains("持久排队"))
+            assertEquals("job-idle-agent", restarted.resumableSnapshots().single().id)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
         val root = createTempDir(prefix = "persistent-jobs-")
         try {
