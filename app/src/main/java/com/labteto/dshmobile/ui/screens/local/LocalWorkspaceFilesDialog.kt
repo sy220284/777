@@ -441,11 +441,15 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     val colors = DsTheme.colors
     val fileName = file.path.substringAfterLast('/')
     val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
-    val icon = when (extension) {
+    val dark = colors.bgBase.luminance() < 0.5f
+    val fileIconRes = when (extension) {
         "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "go", "rs", "swift",
-        "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" -> FeatherIcons.Code
-        "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" -> FeatherIcons.Image
-        else -> FeatherIcons.FileText
+        "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" ->
+            if (dark) R.drawable.ic_kimi_filecode_dark else R.drawable.ic_kimi_filecode_light
+        "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" ->
+            if (dark) R.drawable.ic_kimi_fileimage_dark else R.drawable.ic_kimi_fileimage_light
+        else ->
+            if (dark) R.drawable.ic_kimi_filetxt_dark else R.drawable.ic_kimi_filetxt_light
     }
     Surface(
         onClick = onClick,
@@ -458,25 +462,16 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 62.dp)
+                .heightIn(min = 70.dp)
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = DsShapes.row,
-                color = colors.bgModulePlatform,
-            ) {
-                androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = colors.labelSecondary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
+            Image(
+                painter = painterResource(fileIconRes),
+                contentDescription = null,
+                modifier = Modifier.size(width = 38.dp, height = 50.dp),
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
