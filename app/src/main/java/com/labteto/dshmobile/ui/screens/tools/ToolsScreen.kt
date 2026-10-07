@@ -375,6 +375,7 @@ fun ToolsScreen(
     var capabilityDetail by remember { mutableStateOf<String?>(null) }
     var webhookPort by remember { mutableStateOf("8765") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
+    var showPluginBrowser by remember { mutableStateOf(false) }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -389,7 +390,9 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = handleRootSystemBack, onBack = onClose)
+    BackHandler(enabled = showPluginBrowser || handleRootSystemBack) {
+        if (showPluginBrowser) showPluginBrowser = false else onClose()
+    }
     LaunchedEffect(state.notice, noticeMessage) {
         when (state.notice) {
             ToolsNotice.CONNECTED -> {
@@ -420,6 +423,18 @@ fun ToolsScreen(
         }
     }
 
+    if (showPluginBrowser) {
+        PluginInventoryBrowser(
+            localIds = state.localPlugins,
+            remote = state.remotePlugins,
+            onBack = { showPluginBrowser = false },
+            onManageConnections = {
+                showPluginBrowser = false
+                showExternalConfig = true
+            },
+            onReturnToChat = onClose,
+        )
+    } else {
     Box(Modifier.fillMaxSize()) {
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -477,6 +492,7 @@ fun ToolsScreen(
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             status = capabilityStateLabel(builtinAvailable),
                             state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
+                            onClick = { showPluginBrowser = true },
                         )
 
                         val terminalAvailable = "android-runtime" in state.localPlugins
@@ -628,6 +644,7 @@ fun ToolsScreen(
             }
         }
         DsToastHost(toast, Modifier.safeDrawingPadding())
+    }
     }
 
     if (showGitHubConfig) {
