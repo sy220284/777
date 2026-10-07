@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
@@ -77,10 +78,16 @@ internal fun PluginInventoryBrowser(
         InventoryRow("local:$id", label, installedStatus, remote = false)
     }
     val connected = remote?.entries.orEmpty().map { plugin ->
+        val status = when {
+            !plugin.enabled -> stringResource(R.string.tools_plugin_disabled)
+            plugin.fiberPhase == PluginFiberPhase.ACTIVE -> stringResource(R.string.tools_plugin_active)
+            plugin.fiberPhase == PluginFiberPhase.FAILED -> stringResource(R.string.tools_plugin_failed)
+            else -> stringResource(R.string.tools_plugin_enabled)
+        }
         InventoryRow(
             "remote:${plugin.moduleName}",
             plugin.moduleName,
-            connectionStatus,
+            status,
             remote = true,
         )
     }
