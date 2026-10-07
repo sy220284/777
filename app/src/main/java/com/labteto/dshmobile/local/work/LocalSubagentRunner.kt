@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.validateLocalSubagentToolAllowlist
 import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
@@ -246,6 +247,12 @@ internal class LocalSubagentRunner(
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
+        val initialToolSchemas = schemas(
+            allowMutation,
+            virtualScreenId != null,
+            enabledOptionalTools,
+        )
+        validateLocalSubagentToolAllowlist(initialToolSchemas, capabilities)
 
         eventLog().append("subagent/start", buildJsonObject {
             put("agent_id", subagentId)
@@ -302,11 +309,7 @@ internal class LocalSubagentRunner(
                 maxLanguageServers = snapshot.kernel.resources.maxLanguageServers,
             ),
             toolNames = filterLocalSubagentSchemas(
-                schemas(
-                    allowMutation,
-                    virtualScreenId != null,
-                    enabledOptionalTools,
-                ),
+                initialToolSchemas,
                 capabilities,
             ).mapNotNull { element ->
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
