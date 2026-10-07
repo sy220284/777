@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal enum class LocalTeamMemberPhase { PROVISIONING, ACTIVE, FAILED }
+internal enum class LocalTeamMemberContext { FRESH, FORK }
 internal enum class LocalTeamTaskStatus { PENDING, IN_PROGRESS, COMPLETED, DELETED }
 
 internal data class LocalTeamMemberSnapshot(
@@ -33,6 +34,8 @@ internal data class LocalTeamMemberSnapshot(
     val jobId: String,
     val name: String,
     val description: String,
+    val provider: String,
+    val context: LocalTeamMemberContext,
     val phase: LocalTeamMemberPhase,
     val error: String? = null,
 )
@@ -60,6 +63,7 @@ internal data class LocalTeamProjection(
     val members: List<LocalTeamMemberSnapshot> = emptyList(),
     val tasks: List<LocalTeamTaskSnapshot> = emptyList(),
     val pendingMessages: List<LocalTeamMessageSnapshot> = emptyList(),
+    val deliveredMessageIds: List<String> = emptyList(),
     val failure: String? = null,
     val asOfSequence: Long = -1L,
 )
@@ -84,7 +88,7 @@ internal class LocalAgentTeamRuntime(
 ) {
     private val teamProjection = projectionRegistry.register(
         name = "work.agent-team",
-        stateVersion = 1,
+        stateVersion = OFFICIAL_TEAM_PROJECTION_STATE_VERSION,
         initial = { LocalTeamProjection() },
         reducer = SessionReducer<LocalTeamProjection> { state, event ->
             applyEvent(state, event)
@@ -168,8 +172,8 @@ internal class LocalAgentTeamRuntime(
         require(before.members.size < MAX_TEAMMATES) {
             "TEAM_MEMBER_LIMIT：最多允许 $MAX_TEAMMATES 个 teammate（包括 failed）"
         }
-        val memberId = "member-" + UUID.randomUUID().toString().replace("-", "").take(16)
-        val jobId = "job-team-" + UUID.randomUUID().toString().replace("-", "").take(16)
+        val memberId = TEAM_MEMBER_ID_PREFIX + UUID.randomUUID().toString().replace("-", "").take(16)
+        val jobId = teamJobId(memberId)
         val provisioning = LocalTeamMemberSnapshot(
             id = memberId,
             jobId = jobId,
@@ -180,6 +184,8 @@ internal class LocalAgentTeamRuntime(
                 maxChars = MAX_DESCRIPTION_CHARS,
                 allowEmpty = true,
             ),
+            provider = LOCAL_SUBAGENT_PROVIDER,
+            context = LocalTeamMemberContext.FRESH,
             phase = LocalTeamMemberPhase.PROVISIONING,
         )
         appendMember(binding.sessionId, provisioning)
@@ -277,9 +283,10 @@ internal class LocalAgentTeamRuntime(
         eventLogFor(sessionId).append(
             TEAM_MESSAGE_DELIVERED,
             buildJsonObject {
-                put("team_id", sessionId)
-                put("message_id", message.id)
-                put("target_id", member.id)
+                put("version", TEAM_EVENT_VERSION)
+                put("teamId", sessionId)
+                put("messageId", message.id)
+                put("targetId", member.id)
             },
         )
         return true
@@ -576,7 +583,7 @@ internal class LocalAgentTeamRuntime(
             stream
                 .filter { event ->
                     event.type in TEAM_EVENTS &&
-                        event.data["team_id"]?.jsonPrimitive?.contentOrNull == sessionId
+                        event.data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId
                 }
                 .map { event ->
                     SessionEvent(
@@ -627,6 +634,9 @@ internal class LocalAgentTeamRuntime(
                     require(state.pendingMessages.none { it.id == message.id }) {
                         "TEAM_MESSAGE_QUEUED_TWICE：" + message.id
                     }
+                    require(message.id !in state.deliveredMessageIds) {
+                        "TEAM_MESSAGE_QUEUED_AFTER_DELIVERY：" + message.id
+                    }
                     require(
                         state.members.any { member ->
                             member.id == message.targetId &&
@@ -647,10 +657,14 @@ internal class LocalAgentTeamRuntime(
                     advanced.copy(pendingMessages = state.pendingMessages + message)
                 }
                 TEAM_MESSAGE_DELIVERED -> {
-                    val id = event.data["message_id"]?.jsonPrimitive?.contentOrNull
-                        ?: error("TEAM_MESSAGE_DELIVERED 缺少 message_id")
-                    val targetId = event.data["target_id"]?.jsonPrimitive?.contentOrNull
-                        ?: error("TEAM_MESSAGE_DELIVERED 缺少 target_id")
+                    validateTeamEnvelope(event.data)
+                    val id = event.data["messageId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_DELIVERED 缺少 messageId")
+                    val targetId = event.data["targetId"]?.jsonPrimitive?.contentOrNull
+                        ?: error("TEAM_MESSAGE_DELIVERED 缺少 targetId")
+                    require(id !in state.deliveredMessageIds) {
+                        "TEAM_MESSAGE_DELIVERED_TWICE：" + id
+                    }
                     val queued = state.pendingMessages.firstOrNull { it.id == id }
                         ?: error("TEAM_MESSAGE_DELIVERED_BEFORE_QUEUE：" + id)
                     require(queued.targetId == targetId) {
@@ -658,6 +672,7 @@ internal class LocalAgentTeamRuntime(
                     }
                     advanced.copy(
                         pendingMessages = state.pendingMessages.filterNot { it.id == id },
+                        deliveredMessageIds = state.deliveredMessageIds + id,
                     )
                 }
                 else -> advanced
@@ -670,7 +685,7 @@ internal class LocalAgentTeamRuntime(
         members: List<LocalTeamMemberSnapshot>,
         next: LocalTeamMemberSnapshot,
     ) {
-        require(next.id.isNotBlank() && next.jobId.isNotBlank()) { "TEAM_MEMBER_ID_INVALID" }
+        require(next.id.isNotBlank() && next.jobId == teamJobId(next.id)) { "TEAM_MEMBER_ID_INVALID" }
         require(next.name.isNotBlank()) { "TEAM_MEMBER_NAME_INVALID" }
         val byName = members.firstOrNull { it.name == next.name && it.id != next.id }
         require(byName == null) { "TEAM_MEMBER_NAME_CONFLICT：${next.name}" }
@@ -681,10 +696,14 @@ internal class LocalAgentTeamRuntime(
             }
             return
         }
-        require(previous.name == next.name && previous.description == next.description) {
-            "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：${next.id}"
+        require(
+            previous.name == next.name &&
+                previous.provider == next.provider &&
+                previous.context == next.context
+        ) {
+            "TEAM_MEMBER_IMMUTABLE_FIELDS_CHANGED：" + next.id
         }
-        require(previous.jobId == next.jobId) { "TEAM_MEMBER_JOB_CHANGED：${next.id}" }
+        require(previous.jobId == next.jobId) { "TEAM_MEMBER_JOB_CHANGED：" + next.id }
         require(previous.phase == LocalTeamMemberPhase.PROVISIONING) {
             "TEAM_MEMBER_PHASE_FINAL：${next.id}"
         }
@@ -876,74 +895,128 @@ internal class LocalAgentTeamRuntime(
         }
 
     private fun LocalTeamMemberSnapshot.toEvent(teamId: String): JsonObject = buildJsonObject {
-        put("team_id", teamId)
-        put("id", id)
-        put("job_id", jobId)
-        put("name", name)
-        put("description", description)
-        put("phase", phase.name.lowercase())
-        error?.let { put("error", it) }
+        put("version", TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("member", buildJsonObject {
+            put("id", id)
+            put("name", name)
+            put("description", description)
+            put("provider", provider)
+            put("context", context.name.lowercase())
+            put("phase", phase.name.lowercase())
+            error?.let { put("error", it) }
+        })
     }
 
     private fun LocalTeamTaskSnapshot.toEvent(teamId: String): JsonObject = buildJsonObject {
-        put("team_id", teamId)
-        put("id", id)
-        put("revision", revision)
-        put("subject", subject)
-        put("description", description)
-        put("status", status.name.lowercase())
-        ownerId?.let { put("owner_id", it) }
-        put("blocked_by", JsonArray(blockedBy.map(::JsonPrimitive)))
-        put("write_scopes", JsonArray(writeScopes.map(::JsonPrimitive)))
+        put("version", TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("task", buildJsonObject {
+            put("id", id)
+            put("revision", revision)
+            put("subject", subject)
+            put("description", description)
+            put("status", status.name.lowercase())
+            ownerId?.let { put("ownerId", it) }
+            put("blockedBy", JsonArray(blockedBy.map(::JsonPrimitive)))
+            put("writeScopes", JsonArray(writeScopes.map(::JsonPrimitive)))
+        })
     }
 
     private fun LocalTeamMessageSnapshot.toEvent(teamId: String): JsonObject = buildJsonObject {
-        put("team_id", teamId)
-        put("id", id)
-        put("sender_id", senderId)
-        put("sender_name", senderName)
-        put("target_id", targetId)
-        put("content", content)
+        put("version", TEAM_EVENT_VERSION)
+        put("teamId", teamId)
+        put("message", buildJsonObject {
+            put("id", id)
+            put("senderId", senderId)
+            put("senderName", senderName)
+            put("targetId", targetId)
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "text")
+                    put("text", content)
+                })
+            })
+        })
     }
 
-    private fun decodeMember(data: JsonObject): LocalTeamMemberSnapshot = LocalTeamMemberSnapshot(
-        id = data.requiredTeamString("id"),
-        jobId = data.requiredTeamString("job_id"),
-        name = data.requiredTeamString("name"),
-        description = data.optionalTeamString("description").orEmpty(),
-        phase = runCatching {
-            LocalTeamMemberPhase.valueOf(data.requiredTeamString("phase").uppercase())
-        }.getOrElse { error("TEAM_MEMBER_PHASE_INVALID") },
-        error = data.optionalTeamString("error"),
-    )
+    private fun validateTeamEnvelope(data: JsonObject) {
+        require(data["version"]?.jsonPrimitive?.intOrNull == TEAM_EVENT_VERSION) {
+            "TEAM_EVENT_VERSION_UNSUPPORTED"
+        }
+        require(!data["teamId"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) {
+            "TEAM_EVENT_TEAM_ID_REQUIRED"
+        }
+    }
 
-    private fun decodeTask(data: JsonObject): LocalTeamTaskSnapshot = LocalTeamTaskSnapshot(
-        id = data.requiredTeamString("id"),
-        revision = data["revision"]?.jsonPrimitive?.intOrNull
-            ?: error("TEAM_TASK_REVISION_REQUIRED"),
-        subject = data.requiredTeamString("subject"),
-        description = data.optionalTeamString("description").orEmpty(),
-        status = runCatching {
-            LocalTeamTaskStatus.valueOf(data.requiredTeamString("status").uppercase())
-        }.getOrElse { error("TEAM_TASK_STATUS_INVALID") },
-        ownerId = data.optionalTeamString("owner_id"),
-        blockedBy = data.teamStringArray("blocked_by"),
-        writeScopes = data.teamStringArray("write_scopes"),
-    )
+    private fun decodeMember(data: JsonObject): LocalTeamMemberSnapshot {
+        validateTeamEnvelope(data)
+        val member = data["member"] as? JsonObject ?: error("TEAM_MEMBER_EVENT 缺少 member")
+        val id = member.requiredTeamString("id")
+        return LocalTeamMemberSnapshot(
+            id = id,
+            jobId = teamJobId(id),
+            name = member.requiredTeamString("name"),
+            description = member.optionalTeamString("description").orEmpty(),
+            provider = member.requiredTeamString("provider"),
+            context = runCatching {
+                LocalTeamMemberContext.valueOf(member.requiredTeamString("context").uppercase())
+            }.getOrElse { error("TEAM_MEMBER_CONTEXT_INVALID") },
+            phase = runCatching {
+                LocalTeamMemberPhase.valueOf(member.requiredTeamString("phase").uppercase())
+            }.getOrElse { error("TEAM_MEMBER_PHASE_INVALID") },
+            error = member.optionalTeamString("error"),
+        )
+    }
 
-    private fun decodeMessage(data: JsonObject): LocalTeamMessageSnapshot = LocalTeamMessageSnapshot(
-        id = data.requiredTeamString("id"),
-        senderId = data.requiredTeamString("sender_id"),
-        senderName = data.requiredTeamString("sender_name"),
-        targetId = data.requiredTeamString("target_id"),
-        content = data.requiredTeamString("content"),
-    )
+    private fun decodeTask(data: JsonObject): LocalTeamTaskSnapshot {
+        validateTeamEnvelope(data)
+        val task = data["task"] as? JsonObject ?: error("TEAM_TASK_EVENT 缺少 task")
+        return LocalTeamTaskSnapshot(
+            id = task.requiredTeamString("id"),
+            revision = task["revision"]?.jsonPrimitive?.intOrNull
+                ?: error("TEAM_TASK_REVISION_REQUIRED"),
+            subject = task.requiredTeamString("subject"),
+            description = task.optionalTeamString("description").orEmpty(),
+            status = runCatching {
+                LocalTeamTaskStatus.valueOf(task.requiredTeamString("status").uppercase())
+            }.getOrElse { error("TEAM_TASK_STATUS_INVALID") },
+            ownerId = task.optionalTeamString("ownerId"),
+            blockedBy = task.teamStringArray("blockedBy"),
+            writeScopes = task.teamStringArray("writeScopes"),
+        )
+    }
+
+    private fun decodeMessage(data: JsonObject): LocalTeamMessageSnapshot {
+        validateTeamEnvelope(data)
+        val message = data["message"] as? JsonObject ?: error("TEAM_MESSAGE_QUEUED 缺少 message")
+        val blocks = message["content"] as? JsonArray ?: error("TEAM_MESSAGE_CONTENT_INVALID")
+        val text = blocks.joinToString("\n") { block ->
+            val obj = block as? JsonObject ?: error("TEAM_MESSAGE_CONTENT_INVALID")
+            require(obj.requiredTeamString("type") == "text") { "TEAM_MESSAGE_CONTENT_UNSUPPORTED" }
+            obj["text"]?.jsonPrimitive?.contentOrNull ?: error("TEAM_MESSAGE_CONTENT_INVALID")
+        }
+        return LocalTeamMessageSnapshot(
+            id = message.requiredTeamString("id"),
+            senderId = message.requiredTeamString("senderId"),
+            senderName = message.requiredTeamString("senderName"),
+            targetId = message.requiredTeamString("targetId"),
+            content = text,
+        )
+    }
+
+    private fun teamJobId(memberId: String): String {
+        require(memberId.startsWith(TEAM_MEMBER_ID_PREFIX)) { "TEAM_MEMBER_ID_INVALID" }
+        return TEAM_JOB_ID_PREFIX + memberId.removePrefix(TEAM_MEMBER_ID_PREFIX)
+    }
 
     internal companion object {
         const val TEAM_MEMBER_EVENT = "team/member"
         const val TEAM_TASK_EVENT = "team/task"
-        const val TEAM_MESSAGE_QUEUED = "team/message-queued"
-        const val TEAM_MESSAGE_DELIVERED = "team/message-delivered"
+        const val TEAM_MESSAGE_QUEUED = "team/message/queued"
+        const val TEAM_MESSAGE_DELIVERED = "team/message/delivered"
+        const val TEAM_EVENT_VERSION = 2
+        const val OFFICIAL_TEAM_PROJECTION_STATE_VERSION = 4
         val TEAM_EVENTS = setOf(
             TEAM_MEMBER_EVENT,
             TEAM_TASK_EVENT,
@@ -961,6 +1034,9 @@ internal class LocalAgentTeamRuntime(
             "team_interrupt",
             "team_wait",
         )
+        private const val TEAM_MEMBER_ID_PREFIX = "member-"
+        private const val TEAM_JOB_ID_PREFIX = "job-team-"
+        private const val LOCAL_SUBAGENT_PROVIDER = "local-subagent"
         private const val MAX_TEAMMATES = 16
         private const val MAX_NAME_CHARS = 48
         private const val MAX_SUBJECT_CHARS = 240
