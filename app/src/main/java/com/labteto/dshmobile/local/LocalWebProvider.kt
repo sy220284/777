@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.web.LOCAL_WEB_MAX_RESPONSE_BYTES
 import com.labteto.dshmobile.local.web.LOCAL_WEB_USER_AGENT
 import com.labteto.dshmobile.local.web.LocalWebDiagnostics
 import com.labteto.dshmobile.local.web.LocalWebSearchClient
+import com.labteto.dshmobile.local.web.LocalKeylessWebSearchClient
 import com.labteto.dshmobile.local.web.isRetryableWebTransportFailure
 import com.labteto.dshmobile.local.web.isTextualWebMediaType
 import com.labteto.dshmobile.local.web.readBoundedWebBody
@@ -45,6 +46,7 @@ class LocalWebProvider @Inject constructor(
     usageTracker: DeepSeekUsageTracker,
 ) {
     private val searchClient = LocalWebSearchClient(http, json, usageTracker)
+    private val keylessSearchClient = LocalKeylessWebSearchClient(http)
     private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
     private val diagnostics = LocalWebDiagnostics(targetResolver)
 
@@ -293,6 +295,39 @@ class LocalWebProvider @Inject constructor(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,
     ): String = searchClient.search(apiKey, queries, usageContext)
+
+    /** A keyless search first; an explicitly configured DeepSeek credential is only a fallback. */
+    suspend fun searchWithFallback(
+        queries: List<String>,
+        usageContext: TokenUsageContext? = null,
+        fallbackKey: suspend () -> String? = { null },
+    ): String {
+        return try {
+            keylessSearchClient.search(queries)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (publicFailure: Exception) {
+            val key = fallbackKey()
+                ?: throw LocalWebException(
+                    "SEARCH_UNAVAILABLE",
+                    "免密搜索失败，且未配置可用的备用搜索服务：" +
+                        (publicFailure.message ?: "网络不可达").take(220),
+                    publicFailure,
+                )
+            try {
+                searchClient.search(key, queries, usageContext)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (fallbackFailure: Exception) {
+                throw LocalWebException(
+                    "SEARCH_UNAVAILABLE",
+                    "免密搜索及备用 DeepSeek 搜索均失败：" +
+                        (fallbackFailure.message ?: "服务不可达").take(220),
+                    fallbackFailure,
+                )
+            }
+        }
+    }
 
     fun fallbackQuery(input: String): String {
         val normalized = normalizeInput(input)
