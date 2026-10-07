@@ -940,7 +940,7 @@ internal fun LocalConversationSurface(
     }
     if (showAttachmentPicker) {
         DsBottomSheet(
-            title = stringResource(R.string.chat_composer_add_attachment),
+            title = stringResource(R.string.local_composer_more_actions),
             onDismiss = { showAttachmentPicker = false },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
