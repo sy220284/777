@@ -45,6 +45,8 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.screens.main.RenameDialog
+import com.labteto.dshmobile.ui.screens.main.ConfirmDialog
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -77,6 +79,8 @@ internal fun LocalModeDrawer(
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: suspend (Set<String>) -> Int,
+    onRenameSession: (String, String) -> Boolean,
+    onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
@@ -91,6 +95,8 @@ internal fun LocalModeDrawer(
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
+    var renameTargetId by remember { mutableStateOf<String?>(null) }
+    var deleteCandidateId by remember { mutableStateOf<String?>(null) }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -313,11 +319,13 @@ internal fun LocalModeDrawer(
                                     onSwitchSession(session.id)
                                 }
                             },
-                            onLongClick = {
+                            onSelectMultiple = {
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { requestDelete(setOf(session.id)) },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateId = session.id },
                         )
                     }
                 }
@@ -347,11 +355,13 @@ internal fun LocalModeDrawer(
                                     onSwitchSession(session.id)
                                 }
                             },
-                            onLongClick = {
+                            onSelectMultiple = {
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { requestDelete(setOf(session.id)) },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateId = session.id },
                         )
                     }
                 }
@@ -447,6 +457,30 @@ internal fun LocalModeDrawer(
                 }
             }
         }
+        renameTargetId?.let { id ->
+            RenameDialog(
+                initial = sessionTitleOverrides[id]
+                    ?: sessions.firstOrNull { it.id == id }?.title.orEmpty(),
+                title = stringResource(R.string.chatlist_session_rename),
+                onDismiss = { renameTargetId = null },
+                onConfirm = { title ->
+                    if (onRenameSession(id, title)) renameTargetId = null
+                },
+            )
+        }
+        deleteCandidateId?.let { id ->
+            ConfirmDialog(
+                title = stringResource(R.string.local_delete_session),
+                body = stringResource(R.string.local_delete_session_confirm_message),
+                confirmLabel = stringResource(R.string.local_delete_session),
+                onDismiss = { deleteCandidateId = null },
+                onConfirm = {
+                    deleteCandidateId = null
+                    requestDelete(setOf(id))
+                },
+            )
+        }
+
     }
 }
 
