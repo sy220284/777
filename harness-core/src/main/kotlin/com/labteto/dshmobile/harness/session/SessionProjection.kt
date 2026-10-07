@@ -18,7 +18,7 @@ class SessionProjection<S>(
     val stateVersion: Int = 1,
 ) {
     init {
-        require(stateVersion >= 1) { "会话投影状态版本必须大于 0" }
+        require(stateVersion >= 0) { "会话投影状态版本必须是非负整数" }
     }
 
     fun fold(events: Iterable<SessionEvent>): S =
@@ -49,9 +49,29 @@ class SessionProjection<S>(
  * keep that handle and therefore retain compile-time state ownership while the shared registry
  * enforces globally unique projection names and state-version metadata.
  */
+data class SessionProjectionRegistrySnapshot(
+    val values: Map<String, Any?>,
+    val asOfSequence: Long,
+    val stateVersions: Map<String, Int>,
+)
+
+/**
+ * Explicit-composition registry for reusable Session projections.
+ *
+ * Same-name registrations at the same state version share the first registered unit and are
+ * reference-counted, matching the pinned official Harness contract. A different state version is
+ * rejected rather than silently mixing incompatible persisted semantics. Feature owners still keep
+ * typed handles; the registry-level snapshot is an untyped carrier view over one exact event cut.
+ */
 class SessionProjectionRegistry {
+    private data class Registration(
+        val projection: SessionProjection<*>,
+        val stateVersion: Int,
+        var refs: Int,
+    )
+
     private val lock = Any()
-    private val registeredNames = linkedSetOf<String>()
+    private val registrations = linkedMapOf<String, Registration>()
 
     fun <S> register(
         name: String,
@@ -61,33 +81,113 @@ class SessionProjectionRegistry {
     ): RegisteredSessionProjection<S> {
         val canonicalName = name.trim()
         require(canonicalName.isNotEmpty()) { "会话投影名称不能为空" }
-        require(stateVersion >= 1) { "会话投影状态版本必须大于 0" }
-        synchronized(lock) {
-            require(registeredNames.add(canonicalName)) {
-                "会话投影名称重复：$canonicalName"
+        require(stateVersion >= 0) { "会话投影状态版本必须是非负整数" }
+
+        val registration = synchronized(lock) {
+            val existing = registrations[canonicalName]
+            if (existing == null) {
+                Registration(
+                    projection = SessionProjection(
+                        initial = initial,
+                        reducer = reducer,
+                        stateVersion = stateVersion,
+                    ),
+                    stateVersion = stateVersion,
+                    refs = 1,
+                ).also { registrations[canonicalName] = it }
+            } else {
+                require(existing.stateVersion == stateVersion) {
+                    "会话投影 $canonicalName 已以 stateVersion=${existing.stateVersion} 注册，" +
+                        "拒绝共享 stateVersion=$stateVersion"
+                }
+                existing.refs += 1
+                existing
             }
         }
+
+        @Suppress("UNCHECKED_CAST")
+        val projection = registration.projection as SessionProjection<S>
         return RegisteredSessionProjection(
             name = canonicalName,
-            projection = SessionProjection(
-                initial = initial,
-                reducer = reducer,
-                stateVersion = stateVersion,
-            ),
+            projection = projection,
+            onDispose = { release(canonicalName, registration) },
         )
     }
 
-    fun names(): List<String> = synchronized(lock) { registeredNames.toList() }
+    fun names(): List<String> = synchronized(lock) { registrations.keys.toList() }
+
+    /**
+     * Fold every currently registered projection over one materialized event list and return one
+     * consistent cut. The materialization is intentional: every unit must observe the identical
+     * prefix even when the caller supplied a one-shot Iterable.
+     */
+    fun foldSnapshot(events: Iterable<SessionEvent>): SessionProjectionRegistrySnapshot {
+        val eventCut = events.toList()
+        val current = synchronized(lock) { registrations.toMap() }
+        val values = linkedMapOf<String, Any?>()
+        val versions = linkedMapOf<String, Int>()
+        var sharedWatermark: Long? = null
+
+        current.forEach { (name, registration) ->
+            @Suppress("UNCHECKED_CAST")
+            val projection = registration.projection as SessionProjection<Any?>
+            val snapshot = projection.foldSnapshot(eventCut)
+            val watermark = sharedWatermark
+            if (watermark == null) {
+                sharedWatermark = snapshot.asOfSequence
+            } else {
+                check(watermark == snapshot.asOfSequence) {
+                    "会话投影一致切面撕裂：$name=${snapshot.asOfSequence}，期望=$watermark"
+                }
+            }
+            values[name] = snapshot.state
+            versions[name] = snapshot.stateVersion
+        }
+
+        val asOfSequence = sharedWatermark
+            ?: eventCut.lastOrNull()?.sequence
+            ?: -1L
+        return SessionProjectionRegistrySnapshot(
+            values = values,
+            asOfSequence = asOfSequence,
+            stateVersions = versions,
+        )
+    }
+
+    private fun release(
+        name: String,
+        registration: Registration,
+    ) {
+        synchronized(lock) {
+            val live = registrations[name]
+            if (live !== registration) return
+            live.refs -= 1
+            if (live.refs <= 0) {
+                registrations.remove(name)
+            }
+        }
+    }
 }
 
 class RegisteredSessionProjection<S> internal constructor(
     val name: String,
     private val projection: SessionProjection<S>,
-) {
+    private val onDispose: () -> Unit = {},
+) : AutoCloseable {
+    private var disposed = false
+
     val stateVersion: Int get() = projection.stateVersion
 
     fun fold(events: Iterable<SessionEvent>): SessionProjectionSnapshot<S> =
         projection.foldSnapshot(events)
+
+    override fun close() {
+        if (disposed) return
+        disposed = true
+        onDispose()
+    }
+
+    fun dispose() = close()
 }
 
 class SessionQuery(
