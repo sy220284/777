@@ -230,7 +230,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
-        val outputSchema = payload["output_schema"] as? JsonObject
+        val outputSchema = payload["output_schema"]?.let { raw ->
+            raw as? JsonObject ?: error("持久子代理 output_schema 损坏")
+        }
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
