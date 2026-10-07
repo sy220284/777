@@ -220,19 +220,11 @@ internal class LocalSubagentRunner(
         val history = LocalModelHistoryBuffer().apply {
             reset(
                 recoveredHistory
-                    ?: buildLocalSubagentInitialHistory(
-                        baseHistory =
-                            if (inheritHistory) {
-                                inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-                            } else {
-                                emptyList()
-                            },
-                        task = task,
-                        inheritParentHistory = inheritHistory,
-                        allowMutation = allowMutation,
-                        context = contextSnapshot(task),
-                        outputSchema = capabilities.outputSchema,
-                    ),
+                    ?: if (inheritHistory) {
+                        inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+                    } else {
+                        emptyList()
+                    },
             )
         }
         val claimedMessageIds = linkedSetOf<String>().apply {
@@ -380,6 +372,18 @@ internal class LocalSubagentRunner(
 
         var primaryFailure: Exception? = null
         try {
+            if (!recoveringHistory) {
+                history.reset(
+                    buildLocalSubagentInitialHistory(
+                        baseHistory = history.snapshot(),
+                        task = task,
+                        inheritParentHistory = inheritHistory,
+                        allowMutation = allowMutation,
+                        context = contextSnapshot(task),
+                        outputSchema = capabilities.outputSchema,
+                    ),
+                )
+            }
             if (recoveringHistory) {
                 history.reset(
                     history.snapshot().filterNot { message ->
