@@ -596,6 +596,7 @@ internal class LocalSubagentRunner(
                                 backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "completed")
                                 put("steps", durableEvent.steps)
+                                put("answer", durableEvent.answer.take(SUBAGENT_EVENT_CHARS))
                             })
                         }
                         is AgentEvent.TurnStepLimit -> {
