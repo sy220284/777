@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.jobs
 
+import com.labteto.dshmobile.harness.jobs.JobInboxMessage
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
 import java.io.FileOutputStream
@@ -68,6 +69,16 @@ internal class LocalPersistentJobStore(
                     snapshot.resumeKind?.let { put("resume_kind", it) }
                     snapshot.resumePayload?.let { put("resume_payload", it) }
                     snapshot.ownerId?.let { put("owner_session_id", it) }
+                    if (snapshot.inbox.isNotEmpty()) {
+                        put("inbox", buildJsonArray {
+                            snapshot.inbox.takeLast(MAX_PERSISTED_INBOX_MESSAGES).forEach { message ->
+                                add(buildJsonObject {
+                                    put("id", message.id.take(MAX_PERSISTED_INBOX_ID_CHARS))
+                                    put("content", message.content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS))
+                                })
+                            }
+                        })
+                    }
                     if (snapshot.startedAt > 0L) put("started_at", snapshot.startedAt)
                     if (snapshot.deadlineAt > 0L) put("deadline_at", snapshot.deadlineAt)
                     put("updated_at", snapshot.updatedAt)
@@ -97,6 +108,19 @@ internal class LocalPersistentJobStore(
             val status = item["status"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val resumeKind = item["resume_kind"]?.jsonPrimitive?.contentOrNull
             val resumePayload = item["resume_payload"]?.jsonPrimitive?.contentOrNull
+            val inbox = item["inbox"]?.jsonArray?.map { rawMessage ->
+                val message = rawMessage.jsonObject
+                val messageId = message["id"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 id")
+                val content = message["content"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("后台代理Inbox消息缺少 content")
+                JobInboxMessage(
+                    id = messageId.take(MAX_PERSISTED_INBOX_ID_CHARS),
+                    content = content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                )
+            }?.takeLast(MAX_PERSISTED_INBOX_MESSAGES).orEmpty()
             JobSnapshot(
                 id = id,
                 label = label,
@@ -109,6 +133,7 @@ internal class LocalPersistentJobStore(
                 startedAt = item["started_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 deadlineAt = item["deadline_at"]?.jsonPrimitive?.longOrNull ?: 0L,
                 updatedAt = item["updated_at"]?.jsonPrimitive?.longOrNull ?: 0L,
+                inbox = inbox,
             )
         }
 
@@ -155,6 +180,9 @@ internal class LocalPersistentJobStore(
     private companion object {
         const val MAX_RECORDS = 64
         const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
+        const val MAX_PERSISTED_INBOX_MESSAGES = 32
+        const val MAX_PERSISTED_INBOX_ID_CHARS = 64
+        const val MAX_PERSISTED_INBOX_MESSAGE_CHARS = 4_000
         val LEGACY_OWNER_INFERENCE_KINDS = setOf("web_fetch", "subagent_readonly")
     }
 }
