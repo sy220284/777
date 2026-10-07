@@ -428,14 +428,20 @@ internal class LocalSubagentRunner(
                     history.insert(index, insertion)
                 }
                 outputSchema?.let { schema ->
-                    history.append(buildJsonObject {
+                    val structuredPrompt = buildJsonObject {
                         put("role", "system")
                         put(
                             "content",
                             "【结构化输出】最终回答必须只输出一份合法 JSON，不要使用 Markdown 代码围栏、解释文字或前后缀。" +
                                 "输出必须符合以下 JSON Schema 子集：\n" + schema.toString(),
                         )
-                    })
+                    }
+                    val insertionIndex = history.snapshot()
+                        .takeWhile { message ->
+                            message["role"]?.jsonPrimitive?.contentOrNull == "system"
+                        }
+                        .size
+                    history.insert(insertionIndex, structuredPrompt)
                 }
                 history.append(buildJsonObject { put("role", "user"); put("content", task) })
             }
