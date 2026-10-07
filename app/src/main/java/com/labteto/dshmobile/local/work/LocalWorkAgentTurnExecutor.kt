@@ -88,6 +88,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val workMemoryRuntime: LocalWorkMemoryRuntime,
     private val workModelHistoryRuntime: LocalWorkModelHistoryRuntime,
+    private val workSessionProjection: LocalWorkSessionProjectionRuntime,
     private val workToolResultRuntime: LocalWorkToolResultRuntime,
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
 ) {
@@ -317,7 +318,7 @@ internal class LocalWorkAgentTurnExecutor(
                                     binding,
                                 )
                             },
-                            contextPolicy = LocalWorkRequestContextPolicy(structuredWorkState(snapshot, runEventLog)),
+                            contextPolicy = LocalWorkRequestContextPolicy(structuredWorkState(snapshot, runEventLog, workSessionProjection)),
                             admission = binding.executionControl.asModelAdmissionPort(),
                         ).also {
                             if (nativeImagesSent) {

@@ -3,15 +3,8 @@ package com.labteto.dshmobile.harness.tools
 import com.labteto.dshmobile.harness.registry.RegistryEntries
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 
 enum class ToolAccess {
     READ_ONLY,
@@ -268,105 +261,22 @@ class ToolRegistry private constructor(
         require(parameterType == "object") {
             "工具 parameters 根类型必须是 object：${tool.name}"
         }
+        JsonSchemaValidator.validateSchema(
+            schema = parameters,
+            requireObjectRoot = true,
+        )?.let { problem ->
+            throw IllegalArgumentException(
+                "工具 parameters schema 非法：${tool.name}：$problem"
+            )
+        }
     }
 
     private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
         val function = tool.schema["function"] as? JsonObject ?: return null
         val parameters = function["parameters"] as? JsonObject ?: return null
-        return validateJsonValue(input, parameters, "$")
+        return JsonSchemaValidator.validateTrusted(input, parameters)
     }
 
-    private fun validateJsonValue(
-        value: JsonElement,
-        schema: JsonObject,
-        path: String,
-    ): String? {
-        val expectedType = schema["type"]?.let { (it as? JsonPrimitive)?.content }
-        when (expectedType) {
-            "object" -> {
-                val obj = value as? JsonObject ?: return "$path 必须是对象"
-                val properties = schema["properties"] as? JsonObject ?: JsonObject(emptyMap())
-                val required = (schema["required"] as? JsonArray).orEmpty()
-                    .mapNotNull { (it as? JsonPrimitive)?.content }
-                required.firstOrNull { it !in obj }?.let { return "$path 缺少必填字段 $it" }
-
-                val additional = schema["additionalProperties"]
-                if ((additional as? JsonPrimitive)?.booleanOrNull == false) {
-                    obj.keys.firstOrNull { it !in properties }?.let {
-                        return "$path 包含未声明字段 $it"
-                    }
-                }
-
-                obj.forEach { (key, child) ->
-                    val childSchema = properties[key] as? JsonObject
-                    if (childSchema != null) {
-                        validateJsonValue(child, childSchema, "$path.$key")?.let { return it }
-                    } else if (additional is JsonObject) {
-                        validateJsonValue(child, additional, "$path.$key")?.let { return it }
-                    }
-                }
-            }
-            "array" -> {
-                val array = value as? JsonArray ?: return "$path 必须是数组"
-                schema["minItems"]?.jsonPrimitive?.longOrNull?.let { minimum ->
-                    if (array.size < minimum) return "$path 至少需要 $minimum 项"
-                }
-                schema["maxItems"]?.jsonPrimitive?.longOrNull?.let { maximum ->
-                    if (array.size > maximum) return "$path 最多允许 $maximum 项"
-                }
-                val itemSchema = schema["items"] as? JsonObject
-                if (itemSchema != null) {
-                    array.forEachIndexed { index, child ->
-                        validateJsonValue(child, itemSchema, "$path[$index]")?.let { return it }
-                    }
-                }
-            }
-            "string" -> {
-                val primitive = value as? JsonPrimitive
-                if (primitive == null || !primitive.isString) return "$path 必须是字符串"
-                schema["minLength"]?.jsonPrimitive?.longOrNull?.let { minimum ->
-                    if (primitive.content.length < minimum) return "$path 长度不能小于 $minimum"
-                }
-                schema["maxLength"]?.jsonPrimitive?.longOrNull?.let { maximum ->
-                    if (primitive.content.length > maximum) return "$path 长度不能大于 $maximum"
-                }
-            }
-            "integer" -> {
-                val primitive = value as? JsonPrimitive
-                val number = primitive?.takeIf { !it.isString }?.longOrNull
-                    ?: return "$path 必须是整数"
-                schema["minimum"]?.jsonPrimitive?.longOrNull?.let { minimum ->
-                    if (number < minimum) return "$path 不能小于 $minimum"
-                }
-                schema["maximum"]?.jsonPrimitive?.longOrNull?.let { maximum ->
-                    if (number > maximum) return "$path 不能大于 $maximum"
-                }
-            }
-            "number" -> {
-                val primitive = value as? JsonPrimitive
-                val number = primitive?.takeIf { !it.isString }?.doubleOrNull
-                if (number == null || !number.isFinite()) return "$path 必须是有限数字"
-                schema["minimum"]?.jsonPrimitive?.doubleOrNull?.let { minimum ->
-                    if (number < minimum) return "$path 不能小于 $minimum"
-                }
-                schema["maximum"]?.jsonPrimitive?.doubleOrNull?.let { maximum ->
-                    if (number > maximum) return "$path 不能大于 $maximum"
-                }
-            }
-            "boolean" -> {
-                val primitive = value as? JsonPrimitive
-                if (primitive == null || primitive.isString || primitive.booleanOrNull == null) {
-                    return "$path 必须是布尔值"
-                }
-            }
-        }
-
-        val enumValues = schema["enum"] as? JsonArray
-        if (enumValues != null && enumValues.none { it == value }) {
-            return "$path 不在允许枚举值中"
-        }
-        return null
-    }
 
 
     private companion object {

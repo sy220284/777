@@ -4,10 +4,14 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -23,6 +27,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
     private val modelGateway: LocalModelGateway,
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val teams: LocalAgentTeamRuntime,
 ) {
     internal suspend fun execute(
         call: LocalToolCall,
@@ -36,6 +41,8 @@ internal class LocalWorkAgentControlBuiltinRuntime(
         val snapshot = run.aggregateSnapshot()
         val runner = subagents.runner(run)
 
+        teams.execute(call, run)?.let { return it }
+
         return when (call.name) {
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
@@ -44,43 +51,58 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
+                val outputSchema = args["output_schema"] as? JsonObject
                 if (args.boolean("run_in_background", false)) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
+                        outputSchema = outputSchema,
                         sessionId = run.sessionId,
                         boundState = snapshot,
                         historySnapshot = run.runHandle.modelHistory::snapshot,
                     )
                 } else {
                     runner.run(
-                        task = task,
-                        inheritHistory = false,
-                        allowMutation = false,
-                        modelOverride = model,
-                        maxSteps = maxSteps,
-                        virtualScreen = virtualScreen,
+                        LocalSubagentLaunchSpec(
+                            task = task,
+                            modelOverride = model,
+                            maxSteps = maxSteps,
+                            capabilities = LocalSubagentCapabilities(
+                                allowMutation = false,
+                                continuable = false,
+                                virtualScreen = virtualScreen,
+                                historyMode = LocalSubagentHistoryMode.ISOLATED,
+                                outputSchema = outputSchema,
+                            ),
+                        ),
                     )
                 }
             }
             "subagent_fork", "fork_subagent" -> runner.run(
-                task = args.string("task"),
-                inheritHistory = true,
-                allowMutation = allowMutation,
-                parentCallId = call.id,
-                modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
-                maxSteps = snapshot.subagentMaxSteps,
+                LocalSubagentLaunchSpec(
+                    task = args.string("task"),
+                    modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
+                    maxSteps = snapshot.subagentMaxSteps,
+                    parentCallId = call.id,
+                    capabilities = LocalSubagentCapabilities(
+                        allowMutation = allowMutation,
+                        continuable = false,
+                        virtualScreen = false,
+                        historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
+                        outputSchema = args["output_schema"] as? JsonObject,
+                    ),
+                ),
             )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
             }
             "list_agents" -> jobs.listAgents(run.sessionId)
-            "send_message" -> jobs.send(
-                args.string("agent_id"),
-                args.string("message"),
-                run.sessionId,
+            "send_message" -> persistentJobs.sendMessage(
+                agentId = args.string("agent_id"),
+                message = args.string("message"),
+                sessionId = run.sessionId,
             )
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), run.sessionId)
             "workflow" -> subagents.runWorkflow(
@@ -94,6 +116,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
+                outputSchema = args["output_schema"] as? JsonObject,
                 binding = run,
                 runner = runner,
             )
@@ -112,6 +135,6 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             "send_message",
             "interrupt_agent",
             "workflow",
-        )
+        ) + LocalAgentTeamRuntime.TOOL_NAMES
     }
 }
