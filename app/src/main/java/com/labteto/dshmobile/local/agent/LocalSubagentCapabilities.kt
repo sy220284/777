@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
@@ -285,6 +284,10 @@ private fun matchesType(value: JsonElement, type: String): Boolean = when (type)
     "null" -> value is JsonNull
     else -> false
 }
+
+private val COMMON_SCHEMA_KEYS = setOf("type", "enum", "description", "title")
+private val OBJECT_SCHEMA_KEYS = setOf("properties", "required", "additionalProperties")
+private val ARRAY_SCHEMA_KEYS = setOf("items")
 
 private val SUPPORTED_TYPES = setOf(
     "object",
