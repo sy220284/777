@@ -173,7 +173,10 @@ class HarnessJobManager(
             val found = records[id] ?: return "后台任务不存在：$id"
             if ((ownerId ?: found.ownerId) in removingOwners) return "会话正在移除，无法恢复后台任务"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
-            if (found.status != "interrupted") return "后台任务无需恢复：$id [${found.status}]"
+            val resumable =
+                found.status == "interrupted" ||
+                    (found.status == "idle" && found.inbox.isNotEmpty())
+            if (!resumable) return "后台任务无需恢复：$id [${found.status}]"
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
@@ -207,6 +210,28 @@ class HarnessJobManager(
     fun interruptedSnapshots(): List<JobSnapshot> = synchronized(lock) {
         records.values
             .filter { it.status == "interrupted" && !it.resumeKind.isNullOrBlank() }
+            .map(::snapshot)
+    }
+
+    fun resumableSnapshots(): List<JobSnapshot> = synchronized(lock) {
+        records.values
+            .filter { record ->
+                !record.resumeKind.isNullOrBlank() &&
+                    (
+                        record.status == "interrupted" ||
+                            (record.status == "idle" && record.inbox.isNotEmpty())
+                    )
+            }
+            .map(::snapshot)
+    }
+
+    fun pendingAgentMessageSnapshots(): List<JobSnapshot> = synchronized(lock) {
+        records.values
+            .filter { record ->
+                record.label.startsWith(AGENT_PREFIX) &&
+                    record.inbox.isNotEmpty() &&
+                    record.status in setOf("running", "idle", "interrupted")
+            }
             .map(::snapshot)
     }
 
@@ -307,11 +332,19 @@ class HarnessJobManager(
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 currentCoroutineContext().ensureActive()
                 synchronized(lock) {
-                    if (record.status != "running") throw CancellationException("后台任务已停止")
-                    record.output = result
-                    record.status = "completed"
-                    record.continuationState = null
-                    record.updatedAt = System.currentTimeMillis()
+                    when (record.status) {
+                        "running" -> {
+                            record.output = result
+                            record.status = "completed"
+                            record.continuationState = null
+                            record.updatedAt = System.currentTimeMillis()
+                        }
+                        "idle" -> {
+                            record.output = result
+                            record.updatedAt = System.currentTimeMillis()
+                        }
+                        else -> throw CancellationException("后台任务已停止")
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 synchronized(lock) {
@@ -377,10 +410,13 @@ class HarnessJobManager(
             val record = records[id]
                 ?.takeIf { ownerId == null || it.ownerId == ownerId }
                 ?: return "后台任务不存在：$id"
-            if (record.status != "running") return "后台任务已结束：$id [${record.status}]"
+            if (record.status !in setOf("running", "idle", "interrupted")) {
+                return "后台任务已结束：$id [${record.status}]"
+            }
             record.status = "cancelled"
             record.output = "任务已取消"
             record.continuationState = null
+            record.inbox.clear()
             record.updatedAt = System.currentTimeMillis()
             record.job
         }
@@ -403,8 +439,8 @@ class HarnessJobManager(
                 return "目标不是后台代理：$id"
             }
             interrupted =
-                found.status == "interrupted" && !found.resumeKind.isNullOrBlank()
-            if (found.status != "running" && !interrupted) {
+                found.status in setOf("interrupted", "idle") && !found.resumeKind.isNullOrBlank()
+            if (found.status !in setOf("running", "interrupted", "idle")) {
                 return "目标后台代理当前不可接收消息：$id [${found.status}]"
             }
             previousInbox = found.inbox.toList()
@@ -444,6 +480,42 @@ class HarnessJobManager(
 
     fun peekMessages(id: String): List<JobInboxMessage> = synchronized(lock) {
         records[id]?.inbox?.toList().orEmpty()
+    }
+
+    fun parkPersistent(
+        id: String,
+        output: String,
+        ownerId: String? = null,
+    ) {
+        var previousOutput = ""
+        var previousStatus = ""
+        var previousUpdatedAt = 0L
+        val record = synchronized(lock) {
+            val found = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: error("后台代理不存在：$id")
+            check(!found.resumeKind.isNullOrBlank()) { "后台代理不是持久任务：$id" }
+            check(found.status == "running") { "后台代理当前不可进入等待态：$id [${found.status}]" }
+            previousOutput = found.output
+            previousStatus = found.status
+            previousUpdatedAt = found.updatedAt
+            found.status = "idle"
+            found.output = output.takeLast(MAX_OUTPUT)
+            found.updatedAt = System.currentTimeMillis()
+            found
+        }
+        try {
+            persistCurrentSnapshots()
+        } catch (error: Exception) {
+            synchronized(lock) {
+                record.status = previousStatus
+                record.output = previousOutput
+                record.updatedAt = previousUpdatedAt
+            }
+            notifyChanged()
+            throw IllegalStateException("后台代理等待态持久化失败", error)
+        }
+        notifyChanged()
     }
 
     fun updateContinuationState(
@@ -604,7 +676,10 @@ class HarnessJobManager(
     private fun pruneRetainedLocked() {
         if (records.size < maxRetainedJobs) return
         val removable = records.values
-            .filter { !it.occupiesSlot() }
+            .filter { record ->
+                !record.occupiesSlot() &&
+                    !(record.status in setOf("idle", "interrupted") && !record.resumeKind.isNullOrBlank())
+            }
             .map { it.id }
         for (id in removable) {
             if (records.size < maxRetainedJobs) break
