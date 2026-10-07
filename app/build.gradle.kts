@@ -297,6 +297,10 @@ if (System.getenv("CI") == "true") {
             events("started", "failed")
             showStandardStreams = false
         }
+        if (name == "testDebugUnitTest") {
+            // 该任务在健康基线中约半秒完成；两分钟只用于快速识别挂死/死锁。
+            timeout.set(java.time.Duration.ofMinutes(2))
+        }
     }
 }
 
