@@ -326,7 +326,18 @@ internal class LocalAgentTeamRuntime(
                 }
                 next.copy(status = LocalTeamTaskStatus.COMPLETED)
             }
-            "delete" -> next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null)
+            "delete" -> {
+                val dependents = state.tasks.filter { task ->
+                    task.status != LocalTeamTaskStatus.DELETED &&
+                        task.id != current.id &&
+                        current.id in task.blockedBy
+                }
+                require(dependents.isEmpty()) {
+                    "TEAM_TASK_DELETE_BLOCKED：仍被依赖：" +
+                        dependents.joinToString(",") { it.id }
+                }
+                next.copy(status = LocalTeamTaskStatus.DELETED, ownerId = null)
+            }
             "set_dependencies" -> next.copy(
                 blockedBy = normalizeTaskIds(
                     blockedBy ?: error("TEAM_TASK_DEPENDENCIES_REQUIRED：blocked_by 必填"),
@@ -434,7 +445,7 @@ internal class LocalAgentTeamRuntime(
     }
 
     private fun resolveOwner(state: LocalTeamProjection, ownerName: String?): LocalTeamMemberSnapshot {
-        val name = ownerName?.trim().takeUnless(String?::isNullOrBlank)
+        val name = ownerName?.trim()?.takeIf(String::isNotBlank)
             ?: error("TEAM_TASK_OWNER_REQUIRED：claim 必须指定 owner")
         return state.members.singleOrNull {
             it.name == name && it.phase == LocalTeamMemberPhase.ACTIVE
