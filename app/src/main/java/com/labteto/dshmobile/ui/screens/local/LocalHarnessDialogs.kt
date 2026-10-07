@@ -449,7 +449,51 @@ internal fun ChatPersonaDialog(
         corrections = generated.corrections.joinToString("\n")
     }
 
-    DsBottomSheet(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss, scrollable = true, dismissEnabled = !aiGenerating && !saving) {
+    DsBottomSheet(
+        title = stringResource(R.string.local_persona_title),
+        onDismiss = onDismiss,
+        scrollable = true,
+        dismissEnabled = !aiGenerating && !saving,
+        footer = {
+        DsButton(
+            text = stringResource(R.string.local_persona_save),
+            onClick = {
+                saving = true
+                saveError = null
+                coroutineScope.launch {
+                    val result = runCatching {
+                        onSave(
+                            runtimeProfile.copy(
+                                name = name,
+                                portrait = portrait,
+                                lifeContext = lifeContext,
+                                attentionBiases = lines(attention),
+                                perceptionBlindSpots = lines(blindSpots),
+                                quirks = lines(quirks),
+                                limitations = lines(limitations),
+                                coreValues = lines(coreValues),
+                                coreTension = coreTension,
+                                stableTraits = lines(stableTraits),
+                                mutableTraits = lines(mutableTraits),
+                                initialUserImpression = initialUserImpression,
+                                voiceSamples = lines(voiceSamples),
+                                worldSetting = worldSetting,
+                                hardConstraints = lines(constraints),
+                                bannedPhrases = lines(banned),
+                                corrections = lines(corrections),
+                            ),
+                        )
+                    }.getOrElse { Result.failure(it) }
+                    result.onSuccess { onDismiss() }
+                        .onFailure { saveError = it.message ?: "保存失败" }
+                    saving = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = name.isNotBlank() && !aiGenerating && !saving,
+        )
+        },
+    ) {
         Text(
             stringResource(R.string.local_persona_intro_v3),
             style = DsType.small13.withReadingWeight(),
@@ -554,43 +598,7 @@ internal fun ChatPersonaDialog(
         PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
         PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
 
-        DsButton(
-            text = stringResource(R.string.local_persona_save),
-            onClick = {
-                saving = true
-                saveError = null
-                coroutineScope.launch {
-                    val result = runCatching {
-                        onSave(
-                            runtimeProfile.copy(
-                                name = name,
-                                portrait = portrait,
-                                lifeContext = lifeContext,
-                                attentionBiases = lines(attention),
-                                perceptionBlindSpots = lines(blindSpots),
-                                quirks = lines(quirks),
-                                limitations = lines(limitations),
-                                coreValues = lines(coreValues),
-                                coreTension = coreTension,
-                                stableTraits = lines(stableTraits),
-                                mutableTraits = lines(mutableTraits),
-                                initialUserImpression = initialUserImpression,
-                                voiceSamples = lines(voiceSamples),
-                                worldSetting = worldSetting,
-                                hardConstraints = lines(constraints),
-                                bannedPhrases = lines(banned),
-                                corrections = lines(corrections),
-                            ),
-                        )
-                    }.getOrElse { Result.failure(it) }
-                    result.onSuccess { onDismiss() }
-                        .onFailure { saveError = it.message ?: "保存失败" }
-                    saving = false
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = name.isNotBlank() && !aiGenerating && !saving,
-        )
+
         saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
     }
 }
