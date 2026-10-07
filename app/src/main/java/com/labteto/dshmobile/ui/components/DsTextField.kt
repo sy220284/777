@@ -20,7 +20,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
- * Kimi-style form field used outside the conversation composer.
+ * 统一 form field used outside the conversation composer.
  *
  * Business pages use this wrapper instead of styling Material fields independently. The underlying
  * platform primitive remains responsible for IME, focus and accessibility behavior while 777 owns

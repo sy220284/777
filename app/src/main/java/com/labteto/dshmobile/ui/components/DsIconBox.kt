@@ -21,7 +21,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 /**
  * Compatibility labels kept for callers that already classify a capability.
  *
- * Kimi's navigation language is monochrome: families no longer paint colored containers.
+ * 当前导航规范 is monochrome: families no longer paint colored containers.
  * Accent/semantic color is reserved for selected or live state elsewhere in the row.
  */
 enum class DsIconFamily {

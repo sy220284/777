@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Kimi default surfaces with retained optional accent palettes; originally ported from
+ * 当前默认 surfaces with retained optional accent palettes; originally ported from
  * packages/client/ui-theme/src/styles/design-platform.css (harness repo).
  * Static primitive scales + semantic alias tokens for light and dark.
  */
@@ -51,16 +51,16 @@ object Ds {
     val FamilyPurpleDeep = Color(0xFF4A4370)
     val FamilyCyanDeep = Color(0xFF3D5872)
 
-    // Kimi interaction blue. The UI itself stays monochrome; blue is reserved for selection,
+    // 默认交互蓝. The UI itself stays monochrome; blue is reserved for selection,
     // links, focus and primary interactive state.
-    val Kimi50 = Color(0xFFF2F7FF)
-    val Kimi100 = Color(0xFFE8F2FF)
-    val Kimi200 = Color(0xFFCFE3FF)
-    val Kimi400 = Color(0xFF5A9BFF)
-    val Kimi500 = Color(0xFF356BFD)
-    val Kimi600 = Color(0xFF1783FF)
-    val Kimi700 = Color(0xFF126AD1)
-    val Kimi900 = Color(0xFF132F57)
+    val 77750 = Color(0xFFF2F7FF)
+    val 777100 = Color(0xFFE8F2FF)
+    val 777200 = Color(0xFFCFE3FF)
+    val 777400 = Color(0xFF5A9BFF)
+    val 777500 = Color(0xFF356BFD)
+    val 777600 = Color(0xFF1783FF)
+    val 777700 = Color(0xFF126AD1)
+    val 777900 = Color(0xFF132F57)
 
     // DeepSeek reference scale kept for compatibility with existing saved settings.
     val Deepseek50 = Color(0xFFEDF3FE)
@@ -126,10 +126,10 @@ object DsLight {
     val labelTertiary = Color(0xFF8F909A)
     val labelCaption = Color(0xFFC6C6D0)
     val labelDimmed = Color(0xFFE2E2E6)
-    val accent = Ds.Kimi600
+    val accent = Ds.777600
     val onAccent = Color(0xFFFFFFFF)
-    val accentTertiary = Ds.Kimi100
-    val accentHover = Ds.Kimi500
+    val accentTertiary = Ds.777100
+    val accentHover = Ds.777500
     val hover = Color(0x0F1E3230) // rgba(30,50,48,.06)
     val hoverSolid = Color(0xFFF1F1EF)
     val hoverAccent = Color(0x241E3230) // rgba(30,50,48,.14)
@@ -137,8 +137,8 @@ object DsLight {
     val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
     val buttonPrimaryHover = Ds.Bluish750
     val buttonPrimaryDimmed = Ds.Bluish100
-    val buttonInfoFill = Ds.Kimi600
-    val buttonInfoHover = Ds.Kimi500
+    val buttonInfoFill = Ds.777600
+    val buttonInfoHover = Ds.777500
     val error = Ds.Red600
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red50
@@ -165,7 +165,7 @@ object DsLight {
     val composerCard = Color(0xFFFFFFFF)
     val sidebar = Color(0xFFF7F7F7)
     val sidebarNavActive = Color(0xFFECECEC)
-    val sidebarNavAccent = Ds.Kimi100
+    val sidebarNavAccent = Ds.777100
     val sidebarNavHover = Color(0xFFF1F1F1)
     val tipSurface = Color(0xFFF5F5F5)
     val codeBlockBg = Ds.Bluish50
@@ -193,10 +193,10 @@ object DsDark {
     val labelTertiary = Color(0xFF909096)
     val labelCaption = Ds.Bluish600
     val labelDimmed = Ds.Bluish750
-    val accent = Ds.Kimi400
+    val accent = Ds.777400
     val onAccent = Color(0xFF0C1A19)
-    val accentTertiary = Ds.Kimi900
-    val accentHover = Ds.Kimi500
+    val accentTertiary = Ds.777900
+    val accentHover = Ds.777500
     val hover = Color(0x14FFFFFF) // rgba(255,255,255,.08)
     val hoverSolid = Ds.Bluish850
     val hoverAccent = Color(0x3DFFFFFF) // rgba(255,255,255,.24)
@@ -204,8 +204,8 @@ object DsDark {
     val dangerHover = Color(0x26DE7A72) // rgba(222,122,114,.15)
     val buttonPrimaryHover = Ds.Bluish100
     val buttonPrimaryDimmed = Ds.Bluish750
-    val buttonInfoFill = Ds.Kimi400
-    val buttonInfoHover = Ds.Kimi500
+    val buttonInfoFill = Ds.777400
+    val buttonInfoHover = Ds.777500
     val error = Ds.Red400
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red900

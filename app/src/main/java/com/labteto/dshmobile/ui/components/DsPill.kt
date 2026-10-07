@@ -26,7 +26,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-/** Compact Kimi-style tag/trigger: neutral by default, blue only for the selected state. */
+/** Compact 统一 tag/trigger: neutral by default, blue only for the selected state. */
 @Composable
 fun DsPill(
     text: String,

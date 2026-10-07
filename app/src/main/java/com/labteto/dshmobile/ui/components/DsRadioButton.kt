@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.ui.theme.DsTheme
 
-/** Kimi-style single-select control with neutral idle state and blue selection. */
+/** 统一 single-select control with neutral idle state and blue selection. */
 @Composable
 fun DsRadioButton(
     selected: Boolean,

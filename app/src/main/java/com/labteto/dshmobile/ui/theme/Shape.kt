@@ -5,7 +5,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * Kimi-aligned semantic radius scale:
+ * 统一 semantic radius scale:
  * 6 chip / 8 tooltip / 10 row / 12 menu / 14 control+block /
  * 16 dialog+approval / 18 composer+bubble / 20 sheet / full capsule.
  *

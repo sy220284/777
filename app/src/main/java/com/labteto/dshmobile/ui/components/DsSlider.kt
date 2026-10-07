@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /**
- * Kimi-style value control: blue active rail, neutral inactive rail, no colored tick decoration.
+ * 统一 value control: blue active rail, neutral inactive rail, no colored tick decoration.
  */
 @Composable
 fun DsSlider(
