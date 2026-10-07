@@ -538,7 +538,7 @@ class LocalRequestReconstructionTest {
             put("header_seq", headerSequence)
             put("attempt", attempt)
             put("recovery_round", recoveryRound)
-            put("model", "deepseek-chat")
+            put("model", modelOverride ?: "deepseek-chat")
             put("base_url", "https://example.invalid")
             put("profile_id", "profile-test")
             put("provider", "test")
