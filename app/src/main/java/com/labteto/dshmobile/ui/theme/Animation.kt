@@ -52,13 +52,13 @@ object DsAnimations {
      * Composer single-row ↔ two-row reveal. Short and unbouncy so it follows the platform IME
      * instead of finishing with a delayed spring settle.
      */
-    val composerReveal: FiniteAnimationSpec<IntSize> = tween(220, easing = FastOutSlowInEasing)
+    val composerReveal: FiniteAnimationSpec<IntSize> = tween(190, easing = FastOutSlowInEasing)
 
     /** Controls fade slightly faster than the geometry changes. */
     val composerFade: FiniteAnimationSpec<Float> = tween(120, easing = FastOutSlowInEasing)
 
     /** Chevron rotation on a disclosure row. */
-    val chevron: AnimationSpec<Float> = tween(160, easing = FastOutSlowInEasing)
+    val chevron: AnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
@@ -85,7 +85,7 @@ object DsAnimations {
     val panelSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
 
     /** Full-page hierarchy transition. Short enough to preserve direct manipulation on a phone. */
-    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(210, easing = FastOutSlowInEasing)
+    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
 
     /** Page opacity settles slightly before geometry so navigation never feels floaty. */
     val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
@@ -103,7 +103,7 @@ object DsAnimations {
 
     /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
     val featurePagePeer: FiniteAnimationSpec<IntOffset> =
-        tween(165, easing = FastOutSlowInEasing)
+        tween(160, easing = FastOutSlowInEasing)
 
     /** Incoming page opacity: finishes before the larger geometry motion. */
     val featurePageEnterFade: FiniteAnimationSpec<Float> =
@@ -120,7 +120,7 @@ object DsAnimations {
     )
 
     /** Maximum direct-manipulation offset while a predictive-back gesture is in progress. */
-    val predictiveBackMaxOffset: Dp = 28.dp
+    val predictiveBackMaxOffset: Dp = 32.dp
 
     /** One half of the restrained breathing loop used only by live loading/running semantics. */
     val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)

@@ -88,8 +88,8 @@ fun DsButton(
     )
     
     val (fill, content) = when (variant) {
-        DsButtonVariant.Primary -> colors.accent to colors.onAccent
-        DsButtonVariant.Info -> colors.accentTertiary to colors.accent
+        DsButtonVariant.Primary -> colors.buttonInfoFill to colors.onAccent
+        DsButtonVariant.Info -> colors.bgModulePlatform to colors.labelPrimary
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Danger -> colors.error to colors.onAccent
@@ -100,8 +100,8 @@ fun DsButton(
             else -> fill.copy(alpha = 0.4f)
         }
         hovered -> when (variant) {
-            DsButtonVariant.Primary -> colors.accentHover
-            DsButtonVariant.Info -> colors.hoverAccent
+            DsButtonVariant.Primary -> colors.buttonInfoHover
+            DsButtonVariant.Info -> colors.hoverSolid
             DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.hover
             DsButtonVariant.Danger -> lerp(colors.error, Color.Black, 0.15f)
         }
