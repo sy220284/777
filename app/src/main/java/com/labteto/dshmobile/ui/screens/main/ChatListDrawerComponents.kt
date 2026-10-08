@@ -250,7 +250,7 @@ internal fun SessionRowItem(
             ) {
                 Text(
                     text = sessionTitle(session),
-                    style = DsType.navigationItem.withReadingWeight(),
+                    style = DsType.drawerSession.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -266,7 +266,7 @@ internal fun SessionRowItem(
                         ?.let { folder ->
                             Text(
                                 folder,
-                                style = DsType.navigationSupporting.withReadingWeight(),
+                                style = DsType.navigationSupporting.withReadingWeight().copy(fontFamily = DsType.contentFont),
                                 color = colors.labelCaption,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -403,7 +403,7 @@ internal fun SearchResultRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = sessionTitle(hit.session),
-                style = DsType.navigationItem.withReadingWeight(),
+                style = DsType.drawerSession.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -426,7 +426,7 @@ internal fun SearchResultRow(
         hit.snippet?.let {
             Text(
                 text = it,
-                style = DsType.caption11.withReadingWeight(),
+                style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
                 color = colors.labelSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

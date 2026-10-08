@@ -278,7 +278,7 @@ internal fun LocalMessageRow(
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
                             speaker,
-                            style = DsType.small13Strong.withReadingWeight(),
+                            style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = colors.characterAccent,
                         )
                     }
@@ -380,7 +380,7 @@ private fun LocalAssistantMessageContent(
                 if (innerThought != null) {
                     Text(
                         text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,
-                        style = DsType.small13.withReadingWeight(),
+                        style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                         color = DsTheme.colors.labelTertiary,
                     )
                 }
@@ -503,7 +503,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
             )
             Text(
                 file.name,
-                style = DsType.small13.withReadingWeight(),
+                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                 color = colors.labelPrimary,
             )
         }

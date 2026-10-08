@@ -8,6 +8,7 @@ on:
     paths:
       - 'tools/dev/**'
       - 'tools/runtime/**'
+      - 'tools/fonts/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
       - '.github/actions/setup-android-cached/**'
@@ -25,6 +26,7 @@ on:
     paths:
       - 'tools/dev/**'
       - 'tools/runtime/**'
+      - 'tools/fonts/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
       - '.github/actions/setup-android-cached/**'

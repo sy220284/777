@@ -104,7 +104,7 @@ class ConnectionPersistenceAndroidTest {
         val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
         val defaults = store.settingsOnce()
         assertEquals(1.0f, defaults.textScale)
-        assertEquals(1, defaults.textWeightAdjustment)
+        assertEquals(0, defaults.textWeightAdjustment)
         assertEquals(0.5f, defaults.wallpaperSurfaceTransparency)
 
         store.setSetting {
