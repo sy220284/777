@@ -379,9 +379,7 @@ jobs:
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
             adb shell am force-stop com.sy220284.dshmobile.debug || true
-            adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
-            sleep 2
-            adb shell pidof com.sy220284.dshmobile.debug
+            bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb install -r .ci/device-apks/app-optimized.apk
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
@@ -433,9 +431,7 @@ jobs:
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
           adb shell am force-stop com.sy220284.dshmobile.debug || true
-          adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
-          sleep 2
-          adb shell pidof com.sy220284.dshmobile.debug
+          bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb install -r .ci/device-apks/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
