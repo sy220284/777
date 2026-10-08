@@ -1150,22 +1150,22 @@ internal fun LocalConversationSurface(
             }
             if (state.usageMode == LocalUsageMode.WORK) {
                 LocalComposerSheetSlider(
-                    title = "规划",
-                    labels = listOf("关", "开始规划"),
+                    title = stringResource(R.string.local_composer_plan_title),
+                    labels = listOf(stringResource(R.string.local_composer_plan_off), stringResource(R.string.local_composer_plan_start)),
                     selectedIndex = if (state.planMode) 1 else 0,
                     enabled = !state.running,
-                    hint = "仅下次任务进入规划；计划提交后自动关闭",
+                    hint = stringResource(R.string.local_composer_plan_tip),
                     onSelect = { index -> if ((index == 1) != state.planMode) onPlanModeChange(index == 1) },
                 )
                 LocalComposerSheetSlider(
-                    title = "自动批准",
-                    labels = listOf("默认", "手动", "自动"),
+                    title = stringResource(R.string.local_composer_approval_title),
+                    labels = listOf(stringResource(R.string.local_composer_approval_default), stringResource(R.string.local_composer_approval_manual), stringResource(R.string.local_composer_approval_auto)),
                     selectedIndex = when (approvalMode) {
                         LocalApprovalMode.DEFAULT -> 0
                         LocalApprovalMode.MANUAL -> 1
                         LocalApprovalMode.AUTO -> 2
                     },
-                    hint = "默认：安全操作自动通过，其余操作需要确认。状态持久保存",
+                    hint = stringResource(R.string.local_composer_approval_tip),
                     onSelect = { index ->
                         when (index) {
                             0 -> onDefaultApproval()
