@@ -16,7 +16,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun liveInstancesOnSamePathNeverReuseCommittedSequence() {
-        val root = createTempDir(prefix = "session-log-multi-instance-")
+        val root = kotlin.io.path.createTempDirectory("session-log-multi-instance-").toFile()
         try {
             val file = File(root, "session.events.jsonl")
             val first = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })
@@ -34,7 +34,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun clearRebasesOtherLiveInstanceBeforeItsNextAppend() {
-        val root = createTempDir(prefix = "session-log-clear-instance-")
+        val root = kotlin.io.path.createTempDirectory("session-log-clear-instance-").toFile()
         try {
             val file = File(root, "session.events.jsonl")
             val first = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })
@@ -54,7 +54,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun manyLiveInstancesStayStrictlyMonotonicAcrossRotations() {
-        val root = createTempDir(prefix = "session-log-many-instances-")
+        val root = kotlin.io.path.createTempDirectory("session-log-many-instances-").toFile()
         try {
             val file = File(root, "session.events.jsonl")
             val logs = List(8) { index ->
@@ -83,7 +83,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun concurrentWritersStayMonotonicAndLosslessAcrossRotations() {
-        val root = createTempDir(prefix = "session-log-concurrent-writers-")
+        val root = kotlin.io.path.createTempDirectory("session-log-concurrent-writers-").toFile()
         val pool = Executors.newFixedThreadPool(8)
         val start = CountDownLatch(1)
         val ready = CountDownLatch(8)
@@ -134,7 +134,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun repeatedClearFromDifferentInstancesNeverLetsStaleCountersLeakBack() {
-        val root = createTempDir(prefix = "session-log-chaotic-clear-")
+        val root = kotlin.io.path.createTempDirectory("session-log-chaotic-clear-").toFile()
         try {
             val file = File(root, "session.events.jsonl")
             val logs = List(8) { index ->
@@ -167,7 +167,7 @@ class SessionEventLogMultiInstanceTest {
 
     @Test
     fun latestSequenceTracksOtherLiveInstancesAndClear() {
-        val root = createTempDir(prefix = "session-log-latest-sequence-")
+        val root = kotlin.io.path.createTempDirectory("session-log-latest-sequence-").toFile()
         try {
             val file = File(root, "session.events.jsonl")
             val first = SessionEventLog(file, json, maxBytes = 4_096, clock = { 1L })

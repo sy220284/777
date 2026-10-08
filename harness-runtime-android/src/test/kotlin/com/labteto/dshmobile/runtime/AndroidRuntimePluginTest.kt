@@ -18,7 +18,7 @@ import org.junit.Test
 class AndroidRuntimePluginTest {
     @Test
     fun pluginRegistersRuntimeToolsAndExecutesOnlyAfterApproval() = runBlocking {
-        val root = createTempDir(prefix = "runtime-plugin-")
+        val root = kotlin.io.path.createTempDirectory("runtime-plugin-").toFile()
         try {
             val registry = PluginRegistry()
             registry.install(AndroidRuntimePlugin(root))
@@ -56,7 +56,7 @@ class AndroidRuntimePluginTest {
 
     @Test
     fun persistentTerminalSurvivesAcrossToolCalls() = runBlocking {
-        val root = createTempDir(prefix = "runtime-terminal-")
+        val root = kotlin.io.path.createTempDirectory("runtime-terminal-").toFile()
         try {
             val registry = PluginRegistry()
             registry.install(AndroidRuntimePlugin(root))
@@ -119,8 +119,8 @@ class AndroidRuntimePluginTest {
 
     @Test
     fun processWorkingDirectoryCannotEscapeWorkspace() = runBlocking {
-        val root = createTempDir(prefix = "runtime-boundary-")
-        val outside = createTempDir(prefix = "runtime-outside-")
+        val root = kotlin.io.path.createTempDirectory("runtime-boundary-").toFile()
+        val outside = kotlin.io.path.createTempDirectory("runtime-outside-").toFile()
         try {
             val registry = PluginRegistry()
             registry.install(AndroidRuntimePlugin(root))
@@ -145,7 +145,7 @@ class AndroidRuntimePluginTest {
 
     @Test
     fun readingFinalOutputReleasesTerminalLeaseWithoutStatusOrExplicitClose() = runBlocking {
-        val root = createTempDir(prefix = "runtime-terminal-lease-")
+        val root = kotlin.io.path.createTempDirectory("runtime-terminal-lease-").toFile()
         try {
             val scheduler = HarnessResourceScheduler(
                 HarnessResourceBudget(

@@ -53,8 +53,8 @@ there as `LICENSE.xterm` and `LICENSE.addon-fit`.
 
 ## Bundled Node.js runtime
 
-The Android Harness bundles Node.js 24.18.0 from the official Termux `termux-main`
-`nodejs-lts` package. The build verifies Termux's signed package index and each package
+The Android Harness bundles Node.js 26.4.0 from the official Termux `termux-main`
+`nodejs` package. The build verifies Termux's signed package index and each package
 SHA-256 before packaging. Node.js core is distributed under the MIT license and includes
 additional notices for its bundled dependencies.
 

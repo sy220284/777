@@ -8,7 +8,7 @@
 
 这里的“只允许”约束的是依赖来源。本地不会通过 `apt`、Google Android 仓库、Gradle/Maven 在线解析、Node 官网等渠道补齐开发依赖。
 
-项目源码统一使用 Kotlin；构建环境接受 JDK 21+，CI 与兜底 Artifact 固定使用 JDK 21 LTS；项目编译目标固定为 JVM 21。Node 接受 22+，不锁 minor / patch。
+项目源码统一使用 Kotlin；构建环境接受 JDK 27+，CI 与兜底 Artifact 固定使用 JDK 27（非 LTS）；项目编译目标固定为 JVM 21。Node 接受 24+，不锁 minor / patch。
 
 ## 按需下载模型
 
@@ -26,7 +26,7 @@
 → Gradle --offline 真实构建
 ```
 
-已有且版本满足要求的工具直接复用。例如宿主已经有完整 JDK 21 或更高版本，就不会要求重新下载 JDK Artifact。
+已有且版本满足要求的工具直接复用。例如宿主已经有完整 JDK 27 或更高版本，就不会要求重新下载 JDK Artifact。
 
 AI / Agent 查询缺失项：
 
@@ -64,17 +64,17 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-jdk-latest` | JDK 21 LTS 兜底包，包含 `java` / `javac`；本机 JDK 21+ 可直接复用 |
+| `777-toolchain-jdk-latest` | JDK 27（非 LTS） 兜底包，包含 `java` / `javac`；本机 JDK 27+ 可直接复用 |
 | `777-toolchain-android-core-latest` | Android command-line tools、platform-tools、API 37 platform、build-tools 37.0.0、licenses |
-| `777-toolchain-gradle-runtime-latest` | Gradle 9.6.0 完整分发 |
-| `777-toolchain-gradle-deps-part-01..04-latest` | Gradle Wrapper 分发缓存、Kotlin 2.2.10、AGP 9.4.0 与项目依赖离线缓存；4 个固定分片 |
+| `777-toolchain-gradle-runtime-latest` | Gradle 9.8.1 完整分发 |
+| `777-toolchain-gradle-deps-part-01..04-latest` | Gradle Wrapper 分发缓存、Kotlin 2.4.20、AGP 9.4.0 与项目依赖离线缓存；4 个固定分片 |
 | `777-toolchain-runtime-cache-latest` | 777 APK Runtime 构建缓存 |
 
 完整验证的扩展组件：
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-node-latest` | Node.js 22+ |
+| `777-toolchain-node-latest` | Node.js 24+ |
 | `777-toolchain-actionlint-latest` | actionlint 1.7.12 |
 | `777-toolchain-emulator-latest` | Android Emulator |
 | `777-toolchain-android-image-16-part-01..06-latest` | Android 16 x86_64 system image；6 个固定分片 |
@@ -204,19 +204,19 @@ Gradle 离线缓存  ~/.local/share/777-dev/gradle-user-home
 
 `build` 要求：
 
-- JDK 21 或更高版本，且必须有 `javac`。
+- JDK 27 或更高版本，且必须有 `javac`。
 - Android command-line tools。
 - platform-tools。
 - API 37 platform。
 - build-tools 37.0.0。
-- Gradle 9.6.0。
+- Gradle 9.8.1。
 - Gradle 离线依赖缓存。
 - Gradle Wrapper 分发缓存。
 - 777 Runtime 构建缓存。
 
 `full` 额外要求：
 
-- Node.js 22+。
+- Node.js 24+。
 - actionlint 1.7.12。
 - Android Emulator。
 - Android 16 x86_64 system image。
@@ -272,7 +272,7 @@ bash tools/dev/ai-toolchain.sh gradle :app:assembleOptimized
 ```text
 bootstrap
 → 先 plan
-→ 证明已有 JDK 21+ 时不会要求下载 JDK
+→ 证明已有 JDK 27+ 时不会要求下载 JDK
 → 只下载 build 当前缺的 Android / Gradle / Runtime 组件
 → 安装
 → plan 必须变成 missing_artifacts=[]

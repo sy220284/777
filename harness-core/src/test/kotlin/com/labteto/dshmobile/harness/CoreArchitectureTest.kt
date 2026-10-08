@@ -459,7 +459,7 @@ executor = HarnessToolExecutor { _, _, _ ->
 
     @Test
     fun legacySessionMigratesWithCheckpointAndRestarts() {
-        val root = createTempDir(prefix = "session-store-")
+        val root = kotlin.io.path.createTempDirectory("session-store-").toFile()
         try {
             File(root, "s1.json").writeText("""{"title":"旧会话","value":7}""")
             val store = VersionedSessionStore(root, json)
@@ -481,7 +481,7 @@ executor = HarnessToolExecutor { _, _, _ ->
 
     @Test
     fun firstSuccessfulWriteSeedsRecoverableBackupAndLeavesNoTempFile() {
-        val root = createTempDir(prefix = "seed-session-backup-")
+        val root = kotlin.io.path.createTempDirectory("seed-session-backup-").toFile()
         try {
             val store = VersionedSessionStore(root, json, clock = { 10L })
             store.write("s1", buildJsonObject { put("value", 7) }, updatedAt = 7L)
@@ -500,7 +500,7 @@ executor = HarnessToolExecutor { _, _, _ ->
 
     @Test
     fun missingPrimaryRecoversFromRotatedBackup() {
-        val root = createTempDir(prefix = "missing-session-primary-")
+        val root = kotlin.io.path.createTempDirectory("missing-session-primary-").toFile()
         try {
             val store = VersionedSessionStore(root, json)
             store.write("s1", buildJsonObject { put("value", 1) }, updatedAt = 1L)
@@ -519,7 +519,7 @@ executor = HarnessToolExecutor { _, _, _ ->
 
     @Test
     fun corruptPrimaryRecoversFromLastGoodBackup() {
-        val root = createTempDir(prefix = "recover-session-")
+        val root = kotlin.io.path.createTempDirectory("recover-session-").toFile()
         try {
             val store = VersionedSessionStore(root, json, clock = { 999L })
             store.write("s1", buildJsonObject { put("value", 1) }, updatedAt = 1L)
@@ -541,7 +541,7 @@ executor = HarnessToolExecutor { _, _, _ ->
 
     @Test
     fun futureSessionIsRejected() {
-        val root = createTempDir(prefix = "future-session-")
+        val root = kotlin.io.path.createTempDirectory("future-session-").toFile()
         try {
             File(root, "future.json").writeText(
                 json.encodeToString(

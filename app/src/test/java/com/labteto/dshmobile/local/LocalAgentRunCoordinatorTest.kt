@@ -620,7 +620,7 @@ class LocalAgentRunCoordinatorTest {
     private fun withCoordinator(
         block: (LocalAgentRunCoordinator, LocalSessionEventLog) -> Unit,
     ) {
-        val root = createTempDir(prefix = "agent-run-coordinator-")
+        val root = kotlin.io.path.createTempDirectory("agent-run-coordinator-").toFile()
         try {
             val log = LocalSessionEventLog(
                 file = File(root, "s1.events.jsonl"),

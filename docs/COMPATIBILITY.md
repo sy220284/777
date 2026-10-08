@@ -10,7 +10,7 @@ minSdk: 36
 targetSdk: 36
 compileSdk: 37
 Java / JVM target: 21
-Kotlin: 2.2.10
+Kotlin: 2.4.20
 AGP: 9.4.0
 ```
 

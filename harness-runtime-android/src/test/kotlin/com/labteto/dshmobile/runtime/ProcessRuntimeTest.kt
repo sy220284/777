@@ -27,7 +27,7 @@ class ProcessRuntimeTest {
 
     @Test
     fun extraSearchPathCommandCanActuallyExecute() = runTest {
-        val dir = createTempDir(prefix = "runtime-path-")
+        val dir = kotlin.io.path.createTempDirectory("runtime-path-").toFile()
         try {
             val command = File(dir, "runtime-hello").apply {
                 writeText("#!/bin/sh\nprintf bundled")
@@ -61,7 +61,7 @@ class ProcessRuntimeTest {
 
     @Test
     fun sharedResolverAndEnvironmentExposeBundledRuntimeToOtherProcessClients() {
-        val dir = createTempDir(prefix = "runtime-shared-")
+        val dir = kotlin.io.path.createTempDirectory("runtime-shared-").toFile()
         try {
             val command = File(dir, "bundled-tool").apply {
                 writeText("#!/bin/sh\nprintf shared")
@@ -121,7 +121,7 @@ class ProcessRuntimeTest {
 
     @Test(timeout = 5000)
     fun timeoutStopsInheritedDescendants() = kotlinx.coroutines.runBlocking {
-        val directory = createTempDir(prefix = "process-group-test-")
+        val directory = kotlin.io.path.createTempDirectory("process-group-test-").toFile()
         try {
             val marker = File(directory, "unexpected-output")
             val result = AndroidProcessRuntime().execute(ProcessRequest(

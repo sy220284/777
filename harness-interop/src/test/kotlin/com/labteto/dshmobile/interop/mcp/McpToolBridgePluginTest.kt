@@ -322,8 +322,8 @@ class McpToolBridgePluginTest {
 
     @Test
     fun stdioConnectUsesApprovedCommandAndKeepsWorkingDirectoryInsideWorkspace() = runTest {
-        val root = createTempDir(prefix = "mcp-stdio-root-")
-        val outside = createTempDir(prefix = "mcp-stdio-outside-")
+        val root = kotlin.io.path.createTempDirectory("mcp-stdio-root-").toFile()
+        val outside = kotlin.io.path.createTempDirectory("mcp-stdio-outside-").toFile()
         try {
             var capturedCommand: List<String>? = null
             var capturedDirectory: File? = null

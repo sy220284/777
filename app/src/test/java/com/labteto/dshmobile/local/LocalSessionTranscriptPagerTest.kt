@@ -175,7 +175,7 @@ class LocalSessionTranscriptPagerTest {
     )
 
     private fun withLog(block: (LocalSessionEventLog) -> Unit) {
-        val root = createTempDir(prefix = "transcript-pager-")
+        val root = kotlin.io.path.createTempDirectory("transcript-pager-").toFile()
         try {
             val log = LocalSessionEventLog(
                 file = File(root, "session.events.jsonl"),

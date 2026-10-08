@@ -16,7 +16,7 @@ import org.junit.Test
 class LocalFileAttachmentMultimodalTest {
     @Test
     fun activeTextFileIsMaterializedForDirectChatWithoutToolAccess() = runTest {
-        val root = createTempDir(prefix = "file-multimodal-")
+        val root = kotlin.io.path.createTempDirectory("file-multimodal-").toFile()
         try {
             val file = File(root, ".dsh/attachments/note.txt").apply {
                 parentFile?.mkdirs()
@@ -54,7 +54,7 @@ class LocalFileAttachmentMultimodalTest {
 
     @Test
     fun olderFileBodyIsNotInjectedAgainOnEveryTurn() = runTest {
-        val root = createTempDir(prefix = "file-history-")
+        val root = kotlin.io.path.createTempDirectory("file-history-").toFile()
         try {
             val file = File(root, ".dsh/attachments/history.md").apply {
                 parentFile?.mkdirs()

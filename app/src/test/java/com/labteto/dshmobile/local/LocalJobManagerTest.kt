@@ -233,7 +233,7 @@ class LocalJobManagerTest {
 
     @Test
     fun corruptPrimaryRecoversPreviousPersistentSnapshotFromBackup() = runTest {
-        val root = createTempDir(prefix = "persistent-jobs-backup-")
+        val root = kotlin.io.path.createTempDirectory("persistent-jobs-backup-").toFile()
         try {
             val file = File(root, "jobs.json")
             val store = LocalPersistentJobStore(
@@ -275,7 +275,7 @@ class LocalJobManagerTest {
 
     @Test
     fun interruptedNonPersistentJobReportsEarlyTerminationAgainstRequestedDeadline() = runTest {
-        val root = createTempDir(prefix = "interrupted-shell-deadline-")
+        val root = kotlin.io.path.createTempDirectory("interrupted-shell-deadline-").toFile()
         try {
             val store = LocalPersistentJobStore(
                 file = File(root, "jobs.json"),
@@ -311,7 +311,7 @@ class LocalJobManagerTest {
 
     @Test
     fun legacyPersistentPayloadRecoversSessionOwnershipForDeletion() = runTest {
-        val root = createTempDir(prefix = "legacy-persistent-job-owner-")
+        val root = kotlin.io.path.createTempDirectory("legacy-persistent-job-owner-").toFile()
         try {
             val file = File(root, "jobs.json")
             val store = LocalPersistentJobStore(
@@ -343,7 +343,7 @@ class LocalJobManagerTest {
 
     @Test
     fun persistentStoreRoundTripsAgentInbox() = runTest {
-        val root = createTempDir(prefix = "persistent-agent-inbox-")
+        val root = kotlin.io.path.createTempDirectory("persistent-agent-inbox-").toFile()
         try {
             val store = LocalPersistentJobStore(
                 file = File(root, "jobs.json"),
@@ -395,7 +395,7 @@ class LocalJobManagerTest {
 
     @Test
     fun legacyPersistentStoreDefaultsContinuableToFalse() = runTest {
-        val root = createTempDir(prefix = "legacy-continuable-default-")
+        val root = kotlin.io.path.createTempDirectory("legacy-continuable-default-").toFile()
         try {
             val file = File(root, "jobs.json")
             file.writeText(
@@ -417,7 +417,7 @@ class LocalJobManagerTest {
 
     @Test
     fun persistentStoreRestoresRunningJobAsInterrupted() = runTest {
-        val root = createTempDir(prefix = "persistent-jobs-")
+        val root = kotlin.io.path.createTempDirectory("persistent-jobs-").toFile()
         try {
             val file = File(root, "jobs.json")
             val store = LocalPersistentJobStore(
@@ -448,7 +448,7 @@ class LocalJobManagerTest {
 
     @Test
     fun restoredContinuableAgentKeepsRunCenterCapabilitiesInSnapshotProjection() = runTest {
-        val root = createTempDir(prefix = "restored-agent-ui-projection-")
+        val root = kotlin.io.path.createTempDirectory("restored-agent-ui-projection-").toFile()
         try {
             val store = LocalPersistentJobStore(
                 file = File(root, "jobs.json"),

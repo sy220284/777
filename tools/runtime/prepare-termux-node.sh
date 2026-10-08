@@ -13,10 +13,10 @@ if [ "$TERMUX_REPO_FALLBACK" != "$TERMUX_REPO" ]; then
 fi
 TERMUX_KEY_COMMIT="93c8e0b136bf39e2eb1735f9187f43d7e029bb2e"
 TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
-NODE_PACKAGE="nodejs-lts"
-NODE_PACKAGE_VERSION="24.18.0-1"
-NODE_RUNTIME_VERSION="24.18.0"
-RUNTIME_PACKAGES=(nodejs-lts libc++ openssl c-ares libicu libsqlite zlib)
+NODE_PACKAGE="nodejs"
+NODE_PACKAGE_VERSION="26.4.0-1"
+NODE_RUNTIME_VERSION="26.4.0"
+RUNTIME_PACKAGES=(nodejs libc++ openssl c-ares libicu libsqlite zlib libffi)
 SYSTEM_LIBS=(
   libc.so libdl.so libm.so liblog.so libandroid.so libpthread.so librt.so
 )
