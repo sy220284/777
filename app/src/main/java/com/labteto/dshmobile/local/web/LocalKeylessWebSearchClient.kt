@@ -68,7 +68,7 @@ internal fun parseKeylessSearchRss(query: String, xml: String): String {
     // Android's default DocumentBuilderFactory does not support FEATURE_SECURE_PROCESSING.
     // Reject all DTD declarations before parsing, so unsupported optional parser features never
     // become a reason to fail legitimate RSS or to allow external entity expansion.
-    if (Regex("""<!\\s*(DOCTYPE|ENTITY)\\b""", RegexOption.IGNORE_CASE).containsMatchIn(xml)) {
+    if (Regex("""<!\s*(DOCTYPE|ENTITY)\b""", RegexOption.IGNORE_CASE).containsMatchIn(xml)) {
         throw LocalWebException("INVALID_RESPONSE", "公共搜索 RSS 禁止 DTD/实体声明")
     }
     val document = try {
