@@ -220,7 +220,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 27
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
@@ -250,7 +250,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
@@ -280,7 +280,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 27
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -317,7 +317,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 27
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -357,7 +357,7 @@ jobs:
         with:
           name: android-x86_64-test-apks
           path: .ci/device-apks
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools'
       - name: Enable KVM acceleration
@@ -397,7 +397,7 @@ jobs:
         with:
           name: android-x86_64-test-apks
           path: .ci/device-apks
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools emulator platforms;android-37.0 build-tools;37.0.0 system-images;android-37.0;google_apis_ps16k;x86_64'
       - name: Enable KVM acceleration

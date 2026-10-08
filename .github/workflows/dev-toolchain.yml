@@ -10,6 +10,7 @@ on:
       - 'tools/runtime/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
+      - '.github/actions/setup-android-cached/**'
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/verification-metadata.xml'
@@ -26,6 +27,7 @@ on:
       - 'tools/runtime/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
+      - '.github/actions/setup-android-cached/**'
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/verification-metadata.xml'
@@ -73,7 +75,7 @@ jobs:
           distribution: temurin
           java-version: 27
 
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
 

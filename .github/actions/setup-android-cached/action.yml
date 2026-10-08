@@ -1,0 +1,53 @@
+name: 配置 Android SDK 并复用版本化命令行工具缓存
+description: 复用与 SDK 22.0 匹配的命令行工具；首次下载后立即存入版本化缓存，防止 Gradle 长构建超时导致缓存丢失
+inputs:
+  packages:
+    description: 交给 setup-android 安装的 SDK 组件清单
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: 恢复 Android command-line tools 22.0 缓存
+      id: cmdline-cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: /usr/local/lib/android/sdk/cmdline-tools/22.0
+        key: android-cmdline-tools-${{ runner.os }}-x64-15859902-22.0-v1
+
+    - name: 校验缓存中的 SDK 命令行工具版本
+      if: steps.cmdline-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        tools_dir=/usr/local/lib/android/sdk/cmdline-tools/22.0
+        if [ ! -x "$tools_dir/bin/sdkmanager" ] || \
+           [ ! -f "$tools_dir/source.properties" ] || \
+           ! grep -qx 'Pkg.Revision=22.0' "$tools_dir/source.properties"; then
+          echo '::error::Android SDK 22.0 缓存不完整或版本不符；请修复缓存或升级缓存键版本。'
+          exit 1
+        fi
+        echo '已命中并校验 command-line tools 22.0 缓存，无需重复下载。'
+
+    - name: 配置 Android 37 SDK（优先复用缓存）
+      uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      env:
+        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      with:
+        cmdline-tools-version: '15859902'
+        packages: ${{ inputs.packages }}
+
+    - name: 验证安装后的 command-line tools 22.0
+      shell: bash
+      run: |
+        set -euo pipefail
+        tools_dir=/usr/local/lib/android/sdk/cmdline-tools/22.0
+        test -x "$tools_dir/bin/sdkmanager"
+        test -f "$tools_dir/source.properties"
+        grep -qx 'Pkg.Revision=22.0' "$tools_dir/source.properties"
+
+    - name: 首次安装后立即保存命令行工具缓存
+      if: steps.cmdline-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: /usr/local/lib/android/sdk/cmdline-tools/22.0
+        key: android-cmdline-tools-${{ runner.os }}-x64-15859902-22.0-v1
