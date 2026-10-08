@@ -141,6 +141,7 @@ internal fun LocalConversationComposer(
             onSend(input, attachments.toList())
         }
         if (!result.accepted) return
+        capabilityPanel = null
         onClearTeamDispatch()
         onInputChange("")
         onClearAttachments()
@@ -156,6 +157,7 @@ internal fun LocalConversationComposer(
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
             onClick = {
+                capabilityPanel = null
                 // Both collapsed and expanded composers open the same complete action sheet.
                 // Release IME focus before showing it so the sheet never overlays the keyboard.
                 keyboardController?.hide()
