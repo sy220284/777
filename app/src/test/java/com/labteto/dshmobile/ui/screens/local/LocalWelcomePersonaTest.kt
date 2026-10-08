@@ -20,26 +20,25 @@ class LocalWelcomePersonaTest {
     fun savedPortraitsComeFirstAndDoNotDuplicateInstalledPreset() {
         val presets = PersonaPresetCatalog.presets.take(2)
         val saved = listOf(
-            PersonaGalleryEntry(
-                id = "chibi",
-                persona = PersonaProfile(name = "自定义Q版"),
-                portraitPath = "/private/chibi.webp",
-            ),
-            PersonaGalleryEntry(
-                id = "installed",
-                persona = presets.first().persona,
-                portraitPath = "/private/installed.webp",
-            ),
-            PersonaGalleryEntry(
-                id = "no-image",
-                persona = PersonaProfile(name = "无图人物"),
-            ),
+            PersonaGalleryEntry(id = "chibi", persona = PersonaProfile(name = "自定义Q版"), portraitPath = "/private/chibi.webp"),
+            PersonaGalleryEntry(id = "installed", persona = presets.first().persona, portraitPath = "/private/installed.webp"),
+            PersonaGalleryEntry(id = "no-image", persona = PersonaProfile(name = "无图人物")),
         )
         val result = welcomePersonaArtworks(saved, presets)
         assertEquals(3, result.size)
         assertEquals("saved:chibi", result[0].id)
         assertEquals("saved:installed", result[1].id)
         assertEquals("preset:${presets[1].id}", result[2].id)
+    }
+
+    @Test
+    fun fiveHolographicCharactersHaveDedicatedArtworkAndUniqueIds() {
+        val showcase = welcomeMotionPersonas
+        assertEquals(listOf("神里绫华", "三月七", "沈星回", "夏以昼", "可莉"), showcase.map { it.name })
+        assertEquals(5, showcase.map { it.id }.distinct().size)
+        assertEquals(5, showcase.map { it.assetPath }.distinct().size)
+        assertTrue(showcase.all { it.assetPath.startsWith("persona-motion/") && it.assetPath.endsWith(".webp") })
+        assertTrue(showcase.none { it.assetPath.startsWith("persona-presets/") })
     }
 
     @Test
