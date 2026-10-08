@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.model
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -24,32 +23,8 @@ internal object LocalReasoningModeStore {
         }
     }
 
-    fun isSupported(profile: LocalModelProfile?, withTools: Boolean = false): Boolean {
-        if (profile == null || profile.authKind != LocalModelAuthKind.API_KEY) return false
-        val host = runCatching { URI(normalizeModelBaseUrl(profile.baseUrl)).host }
-            .getOrNull()?.lowercase() ?: return false
-        val model = profile.model.lowercase()
-        if (host == "api.deepseek.com") {
-            return profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
-                model in setOf("deepseek-flash", "deepseek-v4-pro")
-        }
-        if (host == "api.openai.com") {
-            val supportsOff = model in setOf(
-                "gpt-5.5",
-                "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-                "gpt-6-sol", "gpt-6-luna",
-            )
-            // Reasoning with function calls on these Chat Completions routes is unsupported.
-            // Responses is the correct protocol for tool-enabled high-effort turns.
-            if (withTools && profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
-                model != "gpt-5.5"
-            ) return false
-            return supportsOff && profile.protocol in setOf(
-                LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.RESPONSES,
-            )
-        }
-        return false
-    }
+    fun isSupported(profile: LocalModelProfile?, withTools: Boolean = false): Boolean =
+        LocalReasoningRequestPolicy.resolve(profile, withTools) != null
 
     fun enabled(sessionId: String): Boolean {
         if (sessionId.isBlank()) return true
@@ -68,8 +43,7 @@ internal object LocalReasoningModeStore {
         sessionId: String,
         profile: LocalModelProfile?,
         withTools: Boolean = false,
-    ): String? =
-        if (isSupported(profile, withTools)) {
-            if (enabled(sessionId)) "high" else "none"
-        } else null
+    ): String? = LocalReasoningRequestPolicy.resolve(profile, withTools)?.let { policy ->
+        if (enabled(sessionId)) policy.enabledEffort else policy.disabledEffort
+    }
 }

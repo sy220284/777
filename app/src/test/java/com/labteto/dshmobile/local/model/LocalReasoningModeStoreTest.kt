@@ -27,6 +27,14 @@ class LocalReasoningModeStoreTest {
         assertEquals("high", LocalReasoningModeStore.effortFor("work-turn", responses, withTools = true))
     }
 
+    @Test fun explicitReasoningCapabilityDoesNotClaimMandatoryReasoningModels() {
+        val mandatory = LocalModelProfile("next", "gpt-6.1-sol", "https://api.openai.com/v1")
+        assertFalse(LocalReasoningModeStore.isSupported(mandatory))
+        assertNull(LocalReasoningModeStore.effortFor("mandatory", mandatory))
+        val custom = LocalModelProfile("local", "gpt-6-sol", "https://localhost:1234/v1")
+        assertFalse(LocalReasoningModeStore.isSupported(custom))
+    }
+
     @Test fun unsupportedAndPlanRoutesAreNeverSentUnsafeControls() {
         val unknown = LocalModelProfile("unknown", "custom-model", "https://example.com")
         assertFalse(LocalReasoningModeStore.isSupported(unknown))

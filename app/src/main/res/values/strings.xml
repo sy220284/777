@@ -1765,6 +1765,7 @@
     <string name="persona_form_character">性格与变化</string>
     <string name="persona_form_expression">关系与表达</string>
     <string name="persona_form_boundaries">世界与边界</string>
+    <string name="local_reasoning_auto">自动</string>
     <string name="local_reasoning_switch_title">深度思考与推理</string>
     <string name="local_reasoning_switch_hint">控制下一轮模型的真实思考模式；执行中的请求不受影响</string>
     <string name="local_reasoning_switch_unsupported">当前模型或协议暂不支持此开关；工具推理请改用支持的 Responses 路线</string>

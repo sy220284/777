@@ -87,8 +87,10 @@ class DeepSeekClient @Inject constructor(
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
                     })
+                    if (reasoningEffort != "none") put("reasoning_effort", reasoningEffort)
+                } else {
+                    put("reasoning_effort", reasoningEffort)
                 }
-                put("reasoning_effort", reasoningEffort)
             } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
                 (tools.isNotEmpty() || temperature != null)
@@ -192,8 +194,10 @@ class DeepSeekClient @Inject constructor(
                     put("thinking", buildJsonObject {
                         put("type", if (reasoningEffort == "none") "disabled" else "enabled")
                     })
+                    if (reasoningEffort != "none") put("reasoning_effort", reasoningEffort)
+                } else {
+                    put("reasoning_effort", reasoningEffort)
                 }
-                put("reasoning_effort", reasoningEffort)
             } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
                 (tools.isNotEmpty() || temperature != null)

@@ -1129,7 +1129,8 @@ internal fun LocalConversationSurface(
                     else R.string.local_reasoning_switch_unsupported,
                 ),
                 icon = FeatherIcons.Activity,
-                switchChecked = reasoningEnabled,
+                switchChecked = if (reasoningAvailable) reasoningEnabled else null,
+                trailingText = if (reasoningAvailable) null else stringResource(R.string.local_reasoning_auto),
                 enabled = reasoningAvailable && !state.running,
                 onClick = {
                     val next = !reasoningEnabled
