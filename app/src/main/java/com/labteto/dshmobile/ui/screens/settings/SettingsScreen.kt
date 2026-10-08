@@ -374,7 +374,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.comfortable),
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
                 when (shownPage) {
@@ -755,7 +755,8 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MEMORY -> {
-                        MemoryOverviewCard(localHarness, memories.size)
+                        SettingsGroupTitle(stringResource(R.string.settings_memory_status))
+                        MemoryOverviewCard(localHarness)
                         AppSettingsSection {
                             AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.advanced_memory_settings),
                                 onClick = { page = SettingsDestination.MEMORY_SETTINGS })

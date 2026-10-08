@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.tools
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -461,7 +463,7 @@ fun ToolsScreen(
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
                     modifier = Modifier.padding(
-                        horizontal = DsSpacing.large,
+                        horizontal = DsSpacing.comfortable,
                         vertical = DsSpacing.medium,
                     ),
                 )
@@ -481,7 +483,7 @@ fun ToolsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.large),
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
@@ -492,8 +494,8 @@ fun ToolsScreen(
                         )
                         Text(
                             stringResource(R.string.tools_capability_group_hint),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.labelSecondary,
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -1000,9 +1002,9 @@ private fun ToolCapabilityRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 70.dp)
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Surface(
                 modifier = Modifier.size(40.dp),
@@ -1027,46 +1029,59 @@ private fun ToolCapabilityRow(
                     }
                 }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                Text(
-                    title,
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    subtitle,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
-                StateDot(state, size = 7.dp)
-                Text(
-                    status,
-                    style = DsType.caption11Strong.withReadingWeight(),
-                    color = if (state == StateDotState.Done) colors.labelSecondary else colors.labelTertiary,
-                    maxLines = 1,
-                )
-                if (onClick != null) {
-                    Icon(
-                        FeatherIcons.ChevronRight,
-                        contentDescription = null,
-                        tint = colors.labelCaption,
-                        modifier = Modifier.size(16.dp),
+            BoxWithConstraints(Modifier.weight(1f)) {
+                val stackedStatus = maxWidth < 200.dp || LocalDensity.current.fontScale > 1.15f
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        Text(
+                            title,
+                            modifier = Modifier.weight(1f),
+                            style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (!stackedStatus) ToolCapabilityStatus(status, state)
+                    }
+                    Text(
+                        subtitle,
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (stackedStatus) ToolCapabilityStatus(status, state)
                 }
             }
+            if (onClick != null) {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun ToolCapabilityStatus(status: String, state: StateDotState) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+    ) {
+        StateDot(state, size = 7.dp)
+        Text(
+            status,
+            style = DsType.xsmall12.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

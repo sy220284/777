@@ -573,8 +573,10 @@ internal fun ChatPersonaDialog(
             }
         }
 
-        PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
-        PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+        PersonaFormSection(stringResource(R.string.persona_form_basics)) {
+            PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
+            PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+        }
         DsButton(
             text = stringResource(
                 if (advancedOpen) R.string.local_persona_hide_more else R.string.local_persona_show_more
@@ -584,22 +586,41 @@ internal fun ChatPersonaDialog(
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
-        PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
-        PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
-        PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
-        PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
-        PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
-        PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
-        PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
-        PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
-        PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
-        PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-        PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
-        PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
-        PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
-        PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
-        PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
+        PersonaFormSection(stringResource(R.string.persona_form_life)) {
+            PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
+            PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
+            PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
+            PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
+            PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
         }
+        PersonaFormSection(stringResource(R.string.persona_form_character)) {
+            PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
+            PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
+            PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
+            PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_expression)) {
+            PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
+            PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
+            PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
+            PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
+            PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
+            PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
+        }
+        }
+    }
+}
+
+@Composable
+private fun PersonaFormSection(title: String, content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.small),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+    ) {
+        Text(title, style = DsType.base16Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
+        content()
     }
 }
 

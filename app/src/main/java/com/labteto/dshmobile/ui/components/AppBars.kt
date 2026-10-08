@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -54,58 +55,49 @@ fun DsTopBar(
     backIcon: ImageVector = FeatherIcons.ChevronLeft,
 ) {
     val colors = DsTheme.colors
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = DsMetrics.topBarHeight),
-    ) {
-        DsIconButton(
-            icon = backIcon,
-            contentDescription = backContentDescription,
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterStart),
-            containerColor = colors.bgLayer1,
-            iconSize = 24.dp,
-            tint = colors.labelPrimary,
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 58.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            Text(
-                title,
-                style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
-                color = colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    it,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if ((actionIcon != null || actionPainter != null) && onAction != null) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight)) {
             DsIconButton(
-                icon = actionIcon,
-                iconPainter = actionPainter,
-                contentDescription = actionContentDescription,
-                onClick = onAction,
-                enabled = actionEnabled,
-                modifier = Modifier.align(Alignment.CenterEnd),
+                icon = backIcon,
+                contentDescription = backContentDescription,
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.CenterStart),
                 containerColor = colors.bgLayer1,
                 iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )
-        } else {
-            Box(Modifier.align(Alignment.CenterEnd).size(DsSpacing.touchTarget))
+            Text(
+                title,
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 58.dp),
+                style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
+                color = colors.labelPrimary,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if ((actionIcon != null || actionPainter != null) && onAction != null) {
+                DsIconButton(
+                    icon = actionIcon,
+                    iconPainter = actionPainter,
+                    contentDescription = actionContentDescription,
+                    onClick = onAction,
+                    enabled = actionEnabled,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    containerColor = colors.bgLayer1,
+                    iconSize = 24.dp,
+                    tint = colors.labelPrimary,
+                )
+            } else {
+                Box(Modifier.align(Alignment.CenterEnd).size(DsSpacing.touchTarget))
+            }
+        }
+        subtitle?.takeIf(String::isNotBlank)?.let {
+            Text(
+                it,
+                modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.tiny, bottom = DsSpacing.small),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
         }
     }
 }

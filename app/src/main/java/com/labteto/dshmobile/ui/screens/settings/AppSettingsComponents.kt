@@ -56,7 +56,7 @@ internal fun SettingsGroupTitle(text: String) {
         text = text,
         style = DsType.navigationSection.withReadingWeight(),
         color = DsTheme.colors.labelSecondary,
-        modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small, bottom = DsSpacing.tiny),
+        modifier = Modifier.padding(start = DsSpacing.comfortable, top = DsSpacing.medium, bottom = DsSpacing.small),
     )
 }
 
@@ -66,7 +66,7 @@ internal fun AppSettingsDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = 54.dp, end = DsSpacing.medium)
+            .padding(start = DsSpacing.comfortable + 24.dp + DsSpacing.medium, end = DsSpacing.comfortable)
             .height(1.dp)
             .background(colors.borderL1),
     )
@@ -87,7 +87,7 @@ internal fun AppSettingsRow(
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {

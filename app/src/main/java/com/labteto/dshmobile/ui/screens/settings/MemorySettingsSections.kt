@@ -85,7 +85,6 @@ import kotlinx.serialization.json.contentOrNull
 @Composable
 internal fun MemoryOverviewCard(
     local: LocalHarnessSettingsState,
-    recordCount: Int,
 ) {
     AppSettingsSection {
         AppSettingsRow(null, stringResource(R.string.advanced_auto_recall),
@@ -93,9 +92,6 @@ internal fun MemoryOverviewCard(
         AppSettingsDivider()
         AppSettingsRow(null, stringResource(R.string.advanced_auto_memory),
             value = stringResource(if (local.autoMemory) R.string.common_enabled else R.string.common_disabled))
-        AppSettingsDivider()
-        AppSettingsRow(null, stringResource(R.string.advanced_manage_memory),
-            value = stringResource(R.string.advanced_memory_active_count, recordCount))
     }
 }
 
