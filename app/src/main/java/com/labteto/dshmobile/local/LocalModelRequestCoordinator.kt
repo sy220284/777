@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
@@ -66,7 +68,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val foregroundCompaction: LocalForegroundHistoryCompactionRuntime,
+    @ApplicationContext context: Context,
 ) {
+    init { LocalReasoningModeStore.attach(context) }
+
     private val resourceScheduler
         get() = runtimeStateStore.resourceScheduler
     private val streamingPreviewStore

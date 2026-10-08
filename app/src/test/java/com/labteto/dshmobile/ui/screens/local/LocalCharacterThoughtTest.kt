@@ -14,7 +14,11 @@ class LocalCharacterThoughtTest {
     }
 
     @Test fun halfStreamHeaderNeverLeaksControlMarkers() {
-        assertEquals(null to "", extractLocalCharacterThought("【心声：我有点"))
+        assertEquals(null to "", extractLocalCharacterThought("【心声：我有点", streaming = true))
+    }
+
+    @Test fun finalIncompleteHeaderDoesNotHideTheReply() {
+        assertEquals(null to "【心声：我有点", extractLocalCharacterThought("【心声：我有点"))
     }
 
     @Test fun thoughtIsLimitedByCodePointsWithoutSplittingEmoji() {

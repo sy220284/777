@@ -109,6 +109,26 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun semanticMilestonesKeepToolOutcomesAndUnlabelledOperations() {
+        val nodes = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "读取文件"),
+            message("t1", "tool", "private raw content", toolName = "read"),
+            message("p2", "progress", "执行验证"),
+            message("t2", "tool", "工具执行失败", toolName = "bash"),
+        )))
+        assertEquals(2, nodes.size)
+        assertEquals(1, nodes[0].count)
+        assertEquals(AgentOperationKind.Inspect, nodes[0].kind)
+        assertTrue(nodes[1].failed)
+        assertTrue(nodes.all { it.toolContent == null })
+        val unlabelled = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("t3", "tool", "done", toolName = "read"),
+            message("t4", "tool", "done", toolName = "grep"),
+        )))
+        assertEquals(2, unlabelled.size)
+    }
+
+    @Test
     fun workProcessNodesIgnoreReasoningAndKeepEachToolResult() {
         val nodes = buildWorkProcessNodes(
             listOf(

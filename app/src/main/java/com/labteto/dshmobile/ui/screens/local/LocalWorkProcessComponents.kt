@@ -124,6 +124,24 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
     return nodes
 }
 
+/** Associate durable tool results with their semantic milestone without exposing raw output. */
+internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> {
+    val result = mutableListOf<LocalWorkProcessNode>()
+    nodes.forEach { node ->
+        val milestone = result.lastOrNull()
+        if (node.summary == null && milestone?.summary != null) {
+            result[result.lastIndex] = milestone.copy(
+                operationKinds = (milestone.operationKinds + node.operationKinds).distinct(),
+                failed = milestone.failed || node.failed,
+                count = milestone.count + node.count,
+            )
+        } else {
+            result += node.copy(toolContent = null)
+        }
+    }
+    return result
+}
+
 internal fun visibleWorkProcessNodes(
     nodes: List<LocalWorkProcessNode>,
     showAll: Boolean,
@@ -193,7 +211,7 @@ internal fun WorkProcessRow(
         expanded = running
     }
     val semanticNodes = remember(nodes) {
-        nodes.filter { it.summary != null || it.failed }.ifEmpty { nodes.takeLast(1) }
+        semanticWorkProcessNodes(nodes)
     }
     val firstReasoningTimestamp = messages.firstOrNull {
         it.role == "reasoning" && it.createdAt > 0L
@@ -310,7 +328,7 @@ internal fun WorkProcessRow(
             ) {
                 visibleNodes.forEachIndexed { visibleIndex, node ->
                     val rowRunning = running && visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
-                        !node.failed
+                        node.count == 0 && !node.failed
                     WorkContentBlock(node, rowRunning)
                 }
                 if (collapsedHiddenCount > 0) {

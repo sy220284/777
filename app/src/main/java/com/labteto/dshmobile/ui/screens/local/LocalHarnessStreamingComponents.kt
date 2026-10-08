@@ -58,6 +58,7 @@ internal fun LocalStreamingChatTurn(
                     createdAt = 0L,
                 ),
                 chatMode = true,
+                streaming = true,
                 groupMode = false,
                 canEdit = false,
                 canRegenerate = false,

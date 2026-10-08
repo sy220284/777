@@ -140,6 +140,7 @@ internal fun LocalMessageRow(
     onEdit: (LocalHarnessMessage) -> Unit,
     onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    streaming: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -282,9 +283,10 @@ internal fun LocalMessageRow(
                     }
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
-                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent).second else visibleContent
+                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
                 LocalAssistantMessageContent(
                     message = message,
+                    streaming = streaming,
                     workspacePath = workspacePath,
                     groupMode = groupMode,
                     chatMode = chatMode,
@@ -358,6 +360,7 @@ private fun LocalUserMessageContent(
 @Composable
 private fun LocalAssistantMessageContent(
     message: LocalHarnessMessage,
+    streaming: Boolean,
     workspacePath: String,
     groupMode: Boolean,
     chatMode: Boolean,
@@ -372,7 +375,7 @@ private fun LocalAssistantMessageContent(
                     block.text
                 }
                 firstText = false
-                val (innerThought, body) = if (chatMode) extractLocalCharacterThought(text) else null to text
+                val (innerThought, body) = if (chatMode) extractLocalCharacterThought(text, streaming) else null to text
                 if (innerThought != null) {
                     Text(
                         text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,

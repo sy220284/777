@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -38,6 +39,11 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
             color = if (node.failed) colors.error else if (running) colors.labelPrimary else colors.labelSecondary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            stringResource(agentOperationStatusRes(running, node.failed)),
+            style = DsType.caption11.withReadingWeight(),
+            color = if (node.failed) colors.error else colors.labelTertiary,
         )
     }
 }
