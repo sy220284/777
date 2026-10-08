@@ -25,13 +25,12 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-/** Tool content remains verbatim evidence; no guessed progress, result counts or screenshots. */
 /** Compact, user-readable work milestone. Raw tools and commands stay in Run Center. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val summary = node.summary ?: if (node.failed) {
         stringResource(R.string.local_reasoning_work_failed)
-    } else return
+    } else stringResource(agentOperationLabelRes(node.kind))
     val colors = DsTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),

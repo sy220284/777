@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.model.withModelAdmissionTracking
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.long
 import java.io.ByteArrayOutputStream
+import java.net.URI
 import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -79,9 +80,14 @@ class DeepSeekClient @Inject constructor(
             put("stream", false)
             temperature?.let { put("temperature", it) }
             if (reasoningEffort != null) {
-                put("thinking", buildJsonObject {
-                    put("type", if (reasoningEffort == "none") "disabled" else "enabled")
-                })
+                val officialDeepSeek = runCatching {
+                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
+                }.getOrDefault(false)
+                if (officialDeepSeek) {
+                    put("thinking", buildJsonObject {
+                        put("type", if (reasoningEffort == "none") "disabled" else "enabled")
+                    })
+                }
                 put("reasoning_effort", reasoningEffort)
             } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
@@ -179,9 +185,14 @@ class DeepSeekClient @Inject constructor(
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
             if (reasoningEffort != null) {
-                put("thinking", buildJsonObject {
-                    put("type", if (reasoningEffort == "none") "disabled" else "enabled")
-                })
+                val officialDeepSeek = runCatching {
+                    URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
+                }.getOrDefault(false)
+                if (officialDeepSeek) {
+                    put("thinking", buildJsonObject {
+                        put("type", if (reasoningEffort == "none") "disabled" else "enabled")
+                    })
+                }
                 put("reasoning_effort", reasoningEffort)
             } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
