@@ -97,7 +97,7 @@ data class AppSettings(
     /** User reading scale layered on top of Android's system font scale. */
     val textScale: Float = 1.0f,
     /** 0=standard, 1=slightly bold, 2=bold. Applied across semantic app text roles while preserving hierarchy. */
-    val textWeightAdjustment: Int = 0,
+    val textWeightAdjustment: Int = 1,
     /** 0=clearer/more opaque, 1=more transparent; 0.5 preserves the previous visual baseline. */
     val wallpaperSurfaceTransparency: Float = 0.5f,
 )
