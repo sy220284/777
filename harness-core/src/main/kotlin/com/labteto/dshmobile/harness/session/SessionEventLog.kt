@@ -140,22 +140,6 @@ class SessionEventLog(
     }
 
     /**
-     * Compatibility alias for callers that historically expected a chronological page.
-     *
-     * New code must choose an explicit direction via [pageBeforeChronological] or
-     * [pageBeforeNewestFirst]. The old name hid an important contract and previously allowed a
-     * second reversal to feed descending sequence values into SessionProjection.
-     */
-    @Deprecated(
-        message = "方向语义不明确；请显式使用 pageBeforeChronological 或 pageBeforeNewestFirst",
-        replaceWith = ReplaceWith("pageBeforeChronological(sequenceExclusive, limit)"),
-    )
-    fun pageBefore(
-        sequenceExclusive: Long = Long.MAX_VALUE,
-        limit: Int = DEFAULT_PAGE_EVENTS,
-    ): List<SessionEvent> = pageBeforeChronological(sequenceExclusive, limit)
-
-    /**
      * Return one chronological page strictly older than [sequenceExclusive].
      *
      * Returned sequence values are strictly increasing. Use this for projection/fold inputs and

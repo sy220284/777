@@ -61,15 +61,6 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
-    @Deprecated(
-        message = "方向语义不明确；请显式使用 pageBeforeChronological 或 pageBeforeNewestFirst",
-        replaceWith = ReplaceWith("pageBeforeChronological(sequenceExclusive, limit)"),
-    )
-    fun pageBefore(
-        sequenceExclusive: Long = Long.MAX_VALUE,
-        limit: Int = 80,
-    ): List<Event> = pageBeforeChronological(sequenceExclusive, limit)
-
     /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
     fun pageBeforeChronological(
         sequenceExclusive: Long = Long.MAX_VALUE,
