@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -90,22 +92,29 @@ internal fun LocalWorkStreamingTailFollower(
     listState: LazyListState,
     enabled: Boolean,
 ) {
-    LaunchedEffect(listState, enabled) {
-        if (!enabled) return@LaunchedEffect
+    // This detects actual drag gestures, so programmatic tail-follow scrolling does
+    // not accidentally disable itself. A reader who scrolls upward keeps their place.
+    val readerDragging by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(listState, enabled, readerDragging) {
+        if (!enabled || readerDragging) return@LaunchedEffect
+        var following = false
         snapshotFlow {
             val info = listState.layoutInfo
             val tail = info.visibleItemsInfo.lastOrNull()
-            Triple(info.totalItemsCount, tail?.index, tail?.size)
-        }.distinctUntilChanged().collect {
-            val info = listState.layoutInfo
-            val tail = info.visibleItemsInfo.lastOrNull() ?: return@collect
-            if (tail.index != info.totalItemsCount - 1 || listState.isScrollInProgress) {
+            val isTail = tail?.index == info.totalItemsCount - 1
+            val gap = if (isTail && tail != null) {
+                tail.offset + tail.size - info.viewportEndOffset
+            } else null
+            gap
+        }.distinctUntilChanged().collect { gap ->
+            if (gap == null) {
+                following = false
                 return@collect
             }
-            val bottomGap = tail.offset + tail.size - info.viewportEndOffset
-            if (bottomGap in 1..128) {
-                listState.scrollBy(bottomGap.toFloat())
-            }
+            // Establish the initial anchor only near the bottom. Once anchored,
+            // follow even a whole Markdown paragraph arriving in one large burst.
+            if (gap in -128..64) following = true
+            if (following && gap > 0) listState.scrollBy(gap.toFloat())
         }
     }
 }
