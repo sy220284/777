@@ -2,11 +2,14 @@ package com.labteto.dshmobile.ui.screens.settings
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -325,21 +330,22 @@ internal fun ChatGptAccountPanel(
                     Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
 
-                DsButton(
-                    text = stringResource(R.string.chatgpt_manage_usage),
-                    onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
-                )
 
+                // 账户快捷操作：同一排四等宽入口，窄屏和字体放大时允许文字折行。
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
-                    DsButton(
-                        text = if (selected.signedIn && !selected.sharingEnabled) enablePlanLabel else reauthorizeLabel,
+                    ChatGptAccountAction(
+                        label = stringResource(R.string.chatgpt_action_view_usage),
+                        icon = FeatherIcons.Activity,
+                        onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ChatGptAccountAction(
+                        label = stringResource(R.string.chatgpt_action_reconnect),
+                        icon = FeatherIcons.RefreshCw,
                         onClick = {
                             viewModel.connectChatGpt(
                                 selected.id,
@@ -348,28 +354,25 @@ internal fun ChatGptAccountPanel(
                         },
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Outline,
                     )
-                    DsButton(
-                        text = stringResource(R.string.chatgpt_disconnect),
+                    ChatGptAccountAction(
+                        label = stringResource(R.string.chatgpt_action_disconnect),
+                        icon = FeatherIcons.X,
                         onClick = {
                             viewModel.disconnectChatGptAccount(selected.id) { error -> error?.let(report) }
                         },
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        danger = true,
+                    )
+                    ChatGptAccountAction(
+                        label = stringResource(R.string.chatgpt_action_add_account),
+                        icon = FeatherIcons.Plus,
+                        onClick = { viewModel.connectChatGpt { error -> error?.let(report) } },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                DsButton(
-                    text = stringResource(R.string.chatgpt_add_account),
-                    onClick = { viewModel.connectChatGpt { error -> error?.let(report) } },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
-                )
             }
 
             if (busy) {
@@ -467,6 +470,45 @@ internal fun ChatGptAccountPanel(
                     showWelcome = false
                 },
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** 账户页专用紧凑操作：沿用 Ds 颜色、圆角、间距和文字规格。 */
+@Composable
+private fun ChatGptAccountAction(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false,
+) {
+    val colors = DsTheme.colors
+    val labelColor = (if (danger) colors.error else colors.labelPrimary)
+        .copy(alpha = if (enabled) 1f else 0.45f)
+
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 64.dp),
+        shape = DsShapes.row,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.bgModulePlatform),
+        contentColor = labelColor,
+        border = BorderStroke(1.dp, colors.borderL2),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 2.dp, vertical = DsSpacing.small),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                text = label,
+                style = DsType.caption11Strong.withReadingWeight(),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
             )
         }
     }
