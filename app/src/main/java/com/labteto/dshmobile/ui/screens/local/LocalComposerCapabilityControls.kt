@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -34,24 +37,30 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 internal fun composerReasoningLabel(
     mode: LocalReasoningUiMode,
     modes: List<LocalReasoningUiMode>,
-): String = when {
-    modes.isEmpty() -> "默认"
-    mode == LocalReasoningUiMode.DEFAULT && LocalReasoningUiMode.DEEP in modes -> "高"
-    mode == LocalReasoningUiMode.DEFAULT -> "默认"
-    mode == LocalReasoningUiMode.FAST -> if (LocalReasoningUiMode.LOW in modes ||
-        LocalReasoningUiMode.FAST in modes && LocalReasoningUiMode.DEEP in modes) "关" else "基础"
-    mode == LocalReasoningUiMode.LOW -> "低"
-    mode == LocalReasoningUiMode.DEEP -> "高"
-    else -> "极高"
+    needsBasicReasoning: Boolean = false,
+): Int = when {
+    modes.isEmpty() -> R.string.local_composer_reasoning_default
+    mode == LocalReasoningUiMode.DEFAULT &&
+        LocalReasoningUiMode.DEFAULT !in modes -> R.string.local_composer_reasoning_high
+    mode == LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
+    mode == LocalReasoningUiMode.FAST ->
+        if (needsBasicReasoning) R.string.local_composer_reasoning_basic
+        else R.string.local_composer_reasoning_short_off
+    mode == LocalReasoningUiMode.LOW -> R.string.local_composer_reasoning_low
+    mode == LocalReasoningUiMode.DEEP -> R.string.local_composer_reasoning_high
+    else -> R.string.local_composer_reasoning_max
 }
 
-private fun reasoningModeLabel(mode: LocalReasoningUiMode): String = when (mode) {
-    LocalReasoningUiMode.DEFAULT -> "默认"
-    LocalReasoningUiMode.FAST -> "关闭"
-    LocalReasoningUiMode.LOW -> "低"
-    LocalReasoningUiMode.DEEP -> "高"
-    LocalReasoningUiMode.MAX -> "极高"
-}
+private fun reasoningModeLabel(mode: LocalReasoningUiMode, needsBasicReasoning: Boolean): Int =
+    when (mode) {
+        LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
+        LocalReasoningUiMode.FAST ->
+            if (needsBasicReasoning) R.string.local_composer_reasoning_basic
+            else R.string.local_composer_reasoning_off
+        LocalReasoningUiMode.LOW -> R.string.local_composer_reasoning_low
+        LocalReasoningUiMode.DEEP -> R.string.local_composer_reasoning_high
+        LocalReasoningUiMode.MAX -> R.string.local_composer_reasoning_max
+    }
 
 @Composable
 internal fun LocalComposerCapabilityActions(
@@ -63,28 +72,31 @@ internal fun LocalComposerCapabilityActions(
 ) {
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
+    val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
         DsComposerAction(
             icon = FeatherIcons.Gauge,
-            contentDescription = "思考强度：" + composerReasoningLabel(reasoningMode, modes),
+            contentDescription = stringResource(R.string.local_composer_reasoning_action,
+                stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning))),
             onClick = { onSelectPanel("reasoning") },
             tint = colors.labelPrimary,
             containerColor = Color.Transparent,
         )
         Text(
-            text = composerReasoningLabel(reasoningMode, modes),
+            text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelSecondary,
         )
         DsComposerAction(
             icon = FeatherIcons.Globe,
-            contentDescription = if (networkSearchEnabled) "联网搜索：开启" else "联网搜索：关闭",
+            contentDescription = stringResource(if (networkSearchEnabled)
+                R.string.local_composer_web_on_action else R.string.local_composer_web_off_action),
             onClick = { onSelectPanel("web") },
             tint = if (networkSearchEnabled) colors.labelPrimary else colors.labelTertiary,
             containerColor = Color.Transparent,
         )
         Text(
-            text = if (networkSearchEnabled) "联网" else "离线",
+            text = stringResource(if (networkSearchEnabled) R.string.local_composer_web_online else R.string.local_composer_web_offline),
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelSecondary,
         )
@@ -104,6 +116,7 @@ internal fun LocalComposerCapabilityPanel(
 ) {
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
+    val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     Surface(
         modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
         shape = DsShapes.menu,
@@ -115,12 +128,12 @@ internal fun LocalComposerCapabilityPanel(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
             if (panel == "reasoning") {
-                Text("思考强度", style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(R.string.local_composer_reasoning_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
                 if (modes.isEmpty()) {
-                    Text("当前模型或协议使用模型默认档位，暂不支持手动调整",
+                    Text(stringResource(R.string.local_composer_reasoning_unsupported),
                         style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                 } else {
-                    val effectiveMode = if (reasoningMode == LocalReasoningUiMode.DEFAULT) {
+                    val effectiveMode = if (reasoningMode == LocalReasoningUiMode.DEFAULT && reasoningMode !in modes) {
                         if (LocalReasoningUiMode.DEEP in modes) LocalReasoningUiMode.DEEP else modes.first()
                     } else reasoningMode.takeIf { it in modes } ?: modes.first()
                     var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
@@ -130,24 +143,24 @@ internal fun LocalComposerCapabilityPanel(
                         value = chosen,
                         onValueChange = { chosen = it },
                         onValueChangeFinished = {
-                            onReasoningModeChange(modes[chosen.toInt().coerceIn(0, modes.lastIndex)])
+                            onReasoningModeChange(modes[chosen.roundToInt().coerceIn(0, modes.lastIndex)])
                         },
                         valueRange = 0f..modes.lastIndex.toFloat(),
                         steps = (modes.size - 2).coerceAtLeast(0),
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         modes.forEach { mode ->
-                            Text(reasoningModeLabel(mode), style = DsType.caption11.withReadingWeight(),
+                            Text(stringResource(reasoningModeLabel(mode, basicReasoning)), style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelSecondary)
                         }
                     }
                     if (reasoningMode == LocalReasoningUiMode.DEFAULT) {
-                        Text("当前使用模型默认档位；滑动后按所选档位发送",
+                        Text(stringResource(R.string.local_composer_reasoning_default_tip),
                             style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                     }
                 }
             } else {
-                Text("联网搜索", style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                Text(stringResource(R.string.local_composer_web_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
                 var selected by remember(networkSearchEnabled) {
                     mutableFloatStateOf(if (networkSearchEnabled) 1f else 0f)
                 }
@@ -158,10 +171,10 @@ internal fun LocalComposerCapabilityPanel(
                     valueRange = 0f..1f,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("关闭", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                    Text("开启", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(stringResource(R.string.local_composer_web_off), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(stringResource(R.string.local_composer_web_on), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
-                Text("与工具管理中的联网搜索设置同步，下一次工具调用生效",
+                Text(stringResource(R.string.local_composer_web_tip),
                     style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
             }
         }
