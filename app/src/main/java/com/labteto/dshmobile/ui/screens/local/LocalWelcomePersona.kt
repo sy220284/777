@@ -112,7 +112,7 @@ internal fun WelcomePersonaCarousel(gallery: List<PersonaGalleryEntry>) {
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Crossfade(targetState = selected, animationSpec = tween(200), label = "欢迎页人物轮换") { artwork ->
+        Crossfade(targetState = selected, animationSpec = tween(200), label = "home-persona-cycle") { artwork ->
             val context = LocalContext.current
             val bitmap by produceState<ImageBitmap?>(
                 initialValue = null,
