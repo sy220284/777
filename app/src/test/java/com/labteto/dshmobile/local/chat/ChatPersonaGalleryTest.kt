@@ -12,6 +12,7 @@ import org.junit.rules.TemporaryFolder
 
 class ChatPersonaGalleryTest {
     @get:Rule val temporary = TemporaryFolder()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test
     fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {
@@ -138,6 +139,95 @@ class ChatPersonaGalleryTest {
         val merged = mergeGalleryStories(base, incoming)
 
         assertEquals(1, merged.history.size)
+    }
+
+    @Test
+    fun interruptedPhysicalDeletionCompletesFromDurableTombstoneOnRestart() {
+        val root = temporary.newFolder("crash-after-gallery-tombstone")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val first = LocalHarnessMessage("m1", "user", "敏感历史", createdAt = 1L)
+        val second = LocalHarnessMessage("m2", "assistant", "保留历史", createdAt = 2L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(first, second), chatState = ChatCharacterState(), notes = "",
+        )
+        val entry = saved.entry
+        val storyId = checkNotNull(saved.storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        val updated = document.copy(entries = document.entries.map { item ->
+            if (item.id != entry.id) item else item.copy(
+                stories = item.stories.map { story ->
+                    if (story.id != storyId) story else story.copy(
+                        excludedMessageKeys = listOf(galleryMessageArchiveKey(first)),
+                    )
+                },
+            )
+        })
+        // Simulate a crash after the metadata transaction, before the archive rewrite.
+        file.writeText(json.encodeToString(GalleryDocument.serializer(), updated))
+        val recovered = ChatPersonaGalleryStore(file, json)
+        val page = recovered.loadStoryHistory(entry.id, storyId, 100)
+        assertEquals(listOf("m2"), page.messages.map { it.id })
+        assertEquals(1, page.totalCount)
+        val secondRestart = ChatPersonaGalleryStore(file, json)
+        assertEquals(listOf("m2"), secondRestart.loadStoryHistory(entry.id, storyId, 100).messages.map { it.id })
+    }
+
+    @Test
+    fun deleteJournalCleansOrphanOnlyAfterMetadataCommit() {
+        val root = temporary.newFolder("archive-delete-recovery")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("m1", "assistant", "历史", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val archive = File(File(File(root, "persona-history-v5"), saved.entry.id), storyId + ".jsonl")
+        assertTrue(archive.isFile)
+        val pending = PersonaGalleryArchiveDeletionJournal(file, json)
+        pending.queue(saved.entry.id, storyId)
+        // A failed metadata commit must preserve referenced history.
+        val intact = ChatPersonaGalleryStore(file, json)
+        assertEquals(1, intact.loadStoryHistory(saved.entry.id, storyId, 10).totalCount)
+        assertTrue(archive.isFile)
+
+        pending.queue(saved.entry.id, storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        file.writeText(json.encodeToString(GalleryDocument.serializer(),
+            document.copy(entries = document.entries.map { entry ->
+                if (entry.id != saved.entry.id) entry else entry.copy(stories = emptyList())
+            }),
+        ))
+        // Crash after the durable metadata commit; startup finishes the physical deletion.
+        val recovered = ChatPersonaGalleryStore(file, json)
+        assertTrue(recovered.list().single().stories.isEmpty())
+        assertTrue(!archive.exists())
+    }
+
+    @Test
+    fun deletingMissingMessageDoesNotReportSuccessOrLeaveTombstone() {
+        val file = File(temporary.newFolder("missing-message"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val existing = LocalHarnessMessage("existing", "assistant", "需要保留的历史", createdAt = 1L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(existing), chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val missingKey = galleryMessageArchiveKey(
+            LocalHarnessMessage("missing", "assistant", "从未存在", createdAt = 2L),
+        )
+
+        assertFalse(gallery.deleteHistoryMessage(saved.entry.id, storyId, missingKey))
+        val storyAfter = gallery.list().single().stories.single { it.id == storyId }
+        assertFalse(missingKey in storyAfter.excludedMessageKeys)
+        assertEquals(listOf("existing"), gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.map { it.id })
+
+        assertTrue(gallery.deleteHistoryMessage(saved.entry.id, storyId, galleryMessageArchiveKey(existing)))
+        assertTrue(gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.isEmpty())
     }
 
     @Test

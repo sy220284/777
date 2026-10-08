@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.io.NetworkInputTooLargeException
+import com.labteto.dshmobile.local.io.readBoundedLine
+
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
@@ -117,7 +120,15 @@ class OpenAiResponsesClient @Inject constructor(
                 val reader = responseBody.charStream().buffered()
                 run {
                     while (true) {
-                        val line = reader.readLine() ?: break
+                        val line = try {
+                            readBoundedLine(reader, MAX_SSE_LINE_CHARS)
+                        } catch (failure: NetworkInputTooLargeException) {
+                            throw LocalModelException(
+                                code = "MODEL_RESPONSE_TOO_LARGE",
+                                message = "Responses API 流式响应单行超过安全上限",
+                                retryable = false,
+                            )
+                        } ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
                         if (totalBytes > MAX_STREAM_BYTES) {
                             throw LocalModelException(
@@ -893,6 +904,7 @@ class OpenAiResponsesClient @Inject constructor(
         const val RESPONSES_OUTPUT_KEY = "_dsh_responses_output"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
+        private const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
         private const val MAX_PROMPT_CACHE_KEY_CHARS = 64
         private val SUPPORTED_PROMPT_CACHE_TTLS = setOf("30m")

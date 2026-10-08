@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-
-
 internal data class LocalGroupGalleryProjectionFailure(
     val galleryId: String,
     val detail: String,
@@ -12,36 +10,30 @@ internal data class LocalGroupGalleryProjectionResult(
     val failures: List<LocalGroupGalleryProjectionFailure>,
 )
 
-/**
- * Project the durable Session member state into Persona Gallery.
- *
- * Session is the source of truth. Gallery is a cross-session projection, so recovery simply
- * re-applies the current Session state instead of replaying a second pending/applied state machine.
- */
+/** Session owns durable member facts; Gallery receives one atomic projection per group batch. */
 internal fun projectGroupGalleryState(
     groupChat: LocalGroupChatState,
     galleryStore: ChatPersonaGalleryStore,
 ): LocalGroupGalleryProjectionResult {
     if (!groupChat.enabled) return LocalGroupGalleryProjectionResult(0, emptyList())
 
-    var projected = 0
-    val failures = mutableListOf<LocalGroupGalleryProjectionFailure>()
-    groupChat.members.forEach { member ->
-        if (member.galleryId.isBlank() || member.chatState.updatedAt <= 0L) return@forEach
-        val privateState = member.chatState.copy(
+    val updates = groupChat.members.mapNotNull { member ->
+        if (member.galleryId.isBlank() || member.chatState.updatedAt <= 0L) return@mapNotNull null
+        member.galleryId to member.chatState.copy(
             scene = ChatSceneState(),
             continuity = ChatContinuityState(),
         )
-        try {
-            if (galleryStore.updateGroupChatState(member.galleryId, privateState) != null) {
-                projected += 1
-            }
-        } catch (error: Exception) {
-            failures += LocalGroupGalleryProjectionFailure(
-                galleryId = member.galleryId,
-                detail = error.message.orEmpty().take(1_000),
-            )
-        }
     }
-    return LocalGroupGalleryProjectionResult(projected, failures)
+    if (updates.isEmpty()) return LocalGroupGalleryProjectionResult(0, emptyList())
+    return try {
+        val written = galleryStore.updateGroupChatStates(updates)
+        LocalGroupGalleryProjectionResult(updates.count { it.first in written }, emptyList())
+    } catch (error: Exception) {
+        LocalGroupGalleryProjectionResult(
+            0,
+            updates.map { it.first }.distinct().map { id ->
+                LocalGroupGalleryProjectionFailure(id, error.message.orEmpty().take(1_000))
+            },
+        )
+    }
 }

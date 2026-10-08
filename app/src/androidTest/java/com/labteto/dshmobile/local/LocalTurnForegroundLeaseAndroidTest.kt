@@ -18,6 +18,24 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LocalTurnForegroundLeaseAndroidTest {
     @Test
+    fun rejectedForegroundStartDoesNotExecuteProtectedTurn() = runBlocking {
+        val rejected = object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
+            override fun getApplicationContext(): Context = this
+            override fun startForegroundService(service: Intent): ComponentName {
+                throw IllegalStateException("foreground start denied")
+            }
+        }
+        var executed = false
+        val failure = runCatching {
+            LocalExecutionService.withTurn(rejected, "session", { null }) {
+                executed = true
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(!executed)
+    }
+
+    @Test
     fun overlappingTurnsOfTheSameSessionReleaseOnlyTheirOwnHold() = runBlocking {
         val context = RecordingContext()
         LocalExecutionService.withTurn(context, "session", { null }) {

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.automation
 
+import com.labteto.dshmobile.observability.AppLog
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -269,8 +271,15 @@ class HarnessWebhookService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ensureForeground()
         val persisted = controller.runtimeConfig()
+        val promoted = runCatching { ensureForeground() }
+            .onFailure { AppLog.error("HarnessWebhookService", "Webhook 前台服务提升失败", it) }
+            .isSuccess
+        if (!promoted) {
+            controller.markStartFailed(persisted.port)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         if (!persisted.enabled) {
             stopSelf()
             return START_NOT_STICKY

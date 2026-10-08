@@ -5,11 +5,11 @@
 ## 777
 
 ```text
-App baseline: 0.12.0-777.22
+App baseline: `.github/release-version` 为唯一事实源（当前 0.12.0-777.215）
 minSdk: 36
 targetSdk: 36
 compileSdk: 37
-Java: 17
+Java / JVM target: 21
 Kotlin: 2.2.10
 AGP: 9.4.0
 ```
