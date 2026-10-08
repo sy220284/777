@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.util.concurrent.ConcurrentHashMap
 
-internal enum class LocalReasoningMode { DEFAULT, FAST, DEEP }
+internal enum class LocalReasoningMode { DEFAULT, FAST, LOW, DEEP, MAX }
 
 /** Persistent user selection; absence never overrides provider defaults. */
 internal class LocalReasoningPreferences(private val preferences: SharedPreferences) {
@@ -63,6 +63,8 @@ internal object LocalReasoningModeStore {
             when (mode(sessionId)) {
                 LocalReasoningMode.DEFAULT -> null
                 LocalReasoningMode.DEEP -> policy.enabledEffort
+                LocalReasoningMode.LOW -> policy.lowEffort
+                LocalReasoningMode.MAX -> policy.maxEffort
                 LocalReasoningMode.FAST -> policy.disabledEffort
             }
         }

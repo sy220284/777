@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -119,6 +121,41 @@ class LocalWorkPlanModeCoordinatorTest {
         assertFalse(runtime.state.value.work.planMode)
         org.junit.Assert.assertEquals(originalHistory, runtime.foregroundRunHandle.modelHistory.snapshot())
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("broken"))
+    }
+
+    @Test
+    fun restoredPendingPlanReviewOrApprovalCannotReleaseReadOnlyMode() {
+        val runtime = LocalRuntimeStateStore()
+        val ownerState = runtime.initialize(LocalHarnessState(
+            loading = false, sessionId = "pending-plan", usageMode = LocalUsageMode.WORK,
+        ))
+        val logs = LocalSessionEventLogRegistry(
+            sessionsRoot = File(temporary.root, "pending-plan-logs").apply { mkdirs() },
+            json = json,
+        )
+        val coordinator = LocalWorkPlanModeCoordinator(runtime, LocalWorkRunRegistry(runtime), logs)
+        ownerState.value = ownerState.value.copy(work = LocalWorkState(
+            planMode = true,
+            pendingQuestion = LocalQuestion(
+                callId = "plan-review", question = "Harness 已完成计划，是否批准并进入执行模式？",
+            ),
+        ))
+
+        assertFalse(coordinator.setEnabled(false))
+        assertTrue(runtime.state.value.work.planMode)
+        assertTrue(logs.get("pending-plan").latest("plan/mode") == null)
+
+        ownerState.value = ownerState.value.copy(work = LocalWorkState(
+            planMode = true,
+            pendingApproval = LocalApproval(
+                callId = "tool-approval", toolName = "bash", summary = "执行",
+                arguments = "{}", access = "process",
+            ),
+        ))
+        assertFalse(coordinator.setEnabled(false))
+        assertTrue(runtime.state.value.work.planMode)
+        assertTrue(logs.get("pending-plan").latest("plan/mode") == null)
+        logs.clearAndEvict(setOf("pending-plan"))
     }
 
     private fun fixture(): Fixture {

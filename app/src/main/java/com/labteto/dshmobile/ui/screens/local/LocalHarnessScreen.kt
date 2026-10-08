@@ -151,6 +151,8 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
+    val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
@@ -262,6 +264,8 @@ fun LocalHarnessScreen(
         approve = viewModel::approve,
         deny = viewModel::deny,
         enableAutoApproval = viewModel::enableAutoApproval,
+        useDefaultApproval = viewModel::useDefaultApproval,
+        setNetworkSearchEnabled = viewModel::setNetworkSearchEnabled,
         enableAutoApprovalForPending = viewModel::enableAutoApprovalForPending,
         enableDeviceApprovalLease = viewModel::enableDeviceApprovalLease,
         disableDeviceApprovalLease = viewModel::disableDeviceApprovalLease,
@@ -329,9 +333,11 @@ fun LocalHarnessScreen(
             state = activeConversationState,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
+            approvalMode = approvalMode,
+            networkSearchEnabled = networkSearchEnabled,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
-            modeIntro = modeIntro,
+            modeIntro = modeIntro?.let(::LocalModeIntro),
             pinnedSessionIds = pinnedSessionIds,
             sessionTitleOverrides = sessionTitleOverrides,
             actions = shellActions,

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalReasoningControls
+import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +10,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun allUiModesPreserveTheirDeepSeekRequestEffort() {
+        val session = "reasoning-explicit-ui-mapping-test"
+        val route = LocalModelProfile("mapping-ds", "deepseek-flash", "https://api.deepseek.com")
+        val choices = listOf(
+            LocalReasoningUiMode.DEFAULT to null,
+            LocalReasoningUiMode.FAST to "none",
+            LocalReasoningUiMode.LOW to "low",
+            LocalReasoningUiMode.DEEP to "high",
+            LocalReasoningUiMode.MAX to "max",
+        )
+        try {
+            for ((mode, effort) in choices) {
+                LocalReasoningControls.setMode(session, mode)
+                assertEquals(mode, LocalReasoningControls.mode(session))
+                assertEquals(effort, LocalReasoningModeStore.effortFor(session, route))
+            }
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
     @Test fun absentPreferencePreservesProviderDefaultAndMandatoryModelsUseLow() {
         val route = LocalModelProfile("astra", "gpt-6-astra", "https://api.openai.com/v1",
             protocol = LocalModelProtocol.RESPONSES)
@@ -39,6 +63,78 @@ class LocalReasoningModeStoreTest {
         assertEquals("none", LocalReasoningModeStore.effortFor(session, route))
         LocalReasoningModeStore.setEnabled(session, true)
         assertEquals("high", LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.LOW)
+        assertEquals("low", LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+        assertEquals("max", LocalReasoningModeStore.effortFor(session, route))
+        val openAi = LocalModelProfile("api", "gpt-6-luna", "https://api.openai.com/v1")
+        assertNull("unsupported effort must preserve the new route default",
+            LocalReasoningModeStore.effortFor(session, openAi))
+        assertEquals(listOf(LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST, LocalReasoningUiMode.LOW,
+            LocalReasoningUiMode.DEEP, LocalReasoningUiMode.MAX),
+            LocalReasoningControls.availableModes(route, LocalUsageMode.CHAT))
+    }
+
+    @Test fun switchingRoutesProjectsUnsupportedSavedEffortToDefaultWithoutLosingChoice() {
+        val deepSeek = LocalModelProfile("projection-ds", "deepseek-flash", "https://api.deepseek.com")
+        val openAi = LocalModelProfile("projection-api", "gpt-6-luna", "https://api.openai.com/v1")
+        val session = "reasoning-route-projection-test"
+        LocalReasoningControls.setMode(session, LocalReasoningUiMode.MAX)
+        try {
+            for (usageMode in LocalUsageMode.entries) {
+                for (route in listOf(deepSeek, openAi, openAi.copy(model = "unknown-model"))) {
+                    val modes = LocalReasoningControls.availableModes(route, usageMode)
+                    val effective = LocalReasoningControls.effectiveMode(LocalReasoningControls.mode(session), modes)
+                    val effort = LocalReasoningModeStore.effortFor(session, route, usageMode == LocalUsageMode.WORK)
+                    assertEquals(if (effort == "max") LocalReasoningUiMode.MAX else LocalReasoningUiMode.DEFAULT, effective)
+                }
+            }
+            assertEquals(LocalReasoningUiMode.MAX, LocalReasoningControls.mode(session))
+            assertEquals("max", LocalReasoningModeStore.effortFor(session, deepSeek))
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
+    @Test fun savedLowUsesMandatoryModelsBasicPositionAndStillSendsLow() {
+        val session = "reasoning-mandatory-low-test"
+        val route = LocalModelProfile("basic", "gpt-6-astra", "https://api.openai.com/v1", protocol = LocalModelProtocol.RESPONSES)
+        LocalReasoningControls.setMode(session, LocalReasoningUiMode.LOW)
+        try {
+            for (usageMode in LocalUsageMode.entries) {
+                assertEquals(LocalReasoningUiMode.FAST, LocalReasoningControls.effectiveMode(
+                    LocalReasoningControls.mode(session), LocalReasoningControls.availableModes(route, usageMode),
+                    LocalReasoningControls.requiresBasicReasoning(route, usageMode),
+                ))
+                assertEquals("low", LocalReasoningModeStore.effortFor(session, route, usageMode == LocalUsageMode.WORK))
+            }
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
+    @Test fun everySupportedRouteOffersDefaultAndRestoringItRemovesRequestOverride() {
+        val session = "reasoning-restore-default-test"
+        val routes = listOf(
+            LocalModelProfile("restore-ds", "deepseek-flash", "https://api.deepseek.com"),
+            LocalModelProfile("restore-v4", "deepseek-v4-pro", "https://api.deepseek.com"),
+            LocalModelProfile("restore-api", "gpt-6-luna", "https://api.openai.com/v1", protocol = LocalModelProtocol.RESPONSES),
+        )
+        try {
+            for (route in routes) {
+                for (usageMode in LocalUsageMode.entries) {
+                    val modes = LocalReasoningControls.availableModes(route, usageMode)
+                    assertEquals(LocalReasoningUiMode.DEFAULT, modes.first())
+                    LocalReasoningControls.setMode(session, LocalReasoningUiMode.DEEP)
+                    assertEquals("high", LocalReasoningModeStore.effortFor(session, route, usageMode == LocalUsageMode.WORK))
+                    LocalReasoningControls.setMode(session, modes.first())
+                    assertEquals(LocalReasoningUiMode.DEFAULT, LocalReasoningControls.mode(session))
+                    assertNull(LocalReasoningModeStore.effortFor(session, route, usageMode == LocalUsageMode.WORK))
+                }
+            }
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
     }
 
     @Test fun chatCompletionWithToolsIsNotExposedAsHighReasoning() {

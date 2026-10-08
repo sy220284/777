@@ -11,6 +11,8 @@ import java.net.URI
 internal data class LocalReasoningSelection(
     val enabledEffort: String,
     val disabledEffort: String,
+    val lowEffort: String? = null,
+    val maxEffort: String? = null,
 )
 
 internal object LocalReasoningRequestPolicy {
@@ -28,7 +30,7 @@ internal object LocalReasoningRequestPolicy {
         if (profile.authKind == LocalModelAuthKind.API_KEY && host == "api.deepseek.com" &&
             profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
             model in setOf("deepseek-flash", "deepseek-v4-pro")
-        ) return LocalReasoningSelection("high", "none")
+        ) return LocalReasoningSelection("high", "none", "low", "max")
         if (host != "api.openai.com") return null
         if (profile.protocol !in setOf(
             LocalModelProtocol.CHAT_COMPLETIONS,
@@ -45,6 +47,6 @@ internal object LocalReasoningRequestPolicy {
         if (withTools && profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
             model != "gpt-5.5"
         ) return null
-        return LocalReasoningSelection("high", minimumEffort)
+        return LocalReasoningSelection("high", minimumEffort, "low")
     }
 }

@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
@@ -39,8 +41,13 @@ class LocalHarnessViewModel @Inject constructor(
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
     private val projects: LocalProjectUiFacade,
+    private val approvalPreferences: LocalApprovalPreferences,
+    private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    val approvalMode = approvalPreferences.approvalMode
+    val networkSearchEnabled = networkSearchSettings.enabled
+    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
     val shellState = state.projectShellState(viewModelScope)
@@ -260,6 +267,7 @@ class LocalHarnessViewModel @Inject constructor(
     }
     fun approve(callId: String) = runtime.work.answerApproval(callId, true)
     fun deny(callId: String) = runtime.work.answerApproval(callId, false)
+    fun useDefaultApproval() = runtime.work.useDefaultApproval()
     fun enableAutoApproval() = runtime.work.enableAutoApproval()
     fun enableAutoApprovalForPending(callId: String) = runtime.work.enableAutoApprovalForPending(callId)
     fun enableDeviceApprovalLease(callId: String) = runtime.work.enableDeviceApprovalLease(callId)

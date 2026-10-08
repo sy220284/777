@@ -38,6 +38,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.ui.components.DsButton
@@ -79,6 +80,11 @@ internal fun LocalConversationComposer(
     teamDispatchSelected: Boolean = false,
     onClearTeamDispatch: () -> Unit = {},
     onStop: () -> Unit,
+    reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
+    onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
+    networkSearchEnabled: Boolean = true,
+    onNetworkSearchChange: (Boolean) -> Unit = {},
+    onRequestWorkWebSearch: () -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
     onDisableAutoApprove: () -> Unit,
@@ -92,9 +98,13 @@ internal fun LocalConversationComposer(
     // Keep real TextField focus across session projection changes. Otherwise the IME can remain
     // visible while the composer is incorrectly reset to its idle one-row state.
     var focused by remember { mutableStateOf(false) }
+    var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+    LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
 
-    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() || teamDispatchSelected
+    // Opening the input reveals the two capabilities; idle chats retain their compact row.
+    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() ||
+        teamDispatchSelected || capabilityPanel != null
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
         groupChatReady &&
@@ -134,6 +144,7 @@ internal fun LocalConversationComposer(
             onSend(input, attachments.toList())
         }
         if (!result.accepted) return
+        capabilityPanel = null
         onClearTeamDispatch()
         onInputChange("")
         onClearAttachments()
@@ -149,6 +160,7 @@ internal fun LocalConversationComposer(
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
             onClick = {
+                capabilityPanel = null
                 // Both collapsed and expanded composers open the same complete action sheet.
                 // Release IME focus before showing it so the sheet never overlays the keyboard.
                 keyboardController?.hide()
@@ -345,6 +357,21 @@ internal fun LocalConversationComposer(
             state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
+            capabilityControls = { showLabels ->
+                LocalComposerCapabilityActions(
+                    profile = activeModelProfile,
+                    usageMode = state.usageMode,
+                    reasoningMode = reasoningMode,
+                    networkSearchEnabled = networkSearchEnabled,
+                    running = state.running,
+                    showLabels = showLabels,
+                    openPanel = capabilityPanel,
+                    onSelectPanel = { capabilityPanel = it },
+                    onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
+                    onNetworkSearchChange = { if (!state.running) onNetworkSearchChange(it) },
+                    onWorkSearchRequested = onRequestWorkWebSearch,
+                )
+            },
             stopControl = { StopControl() },
             sendControl = { queue -> SendControl(queue) },
         )

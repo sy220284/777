@@ -53,6 +53,18 @@ class LocalApprovalPreferencesAndroidTest {
     }
 
     @Test
+    fun defaultManualAndAutoAllPersistAcrossRecreation() {
+        val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        val modes = listOf(LocalApprovalMode.DEFAULT, LocalApprovalMode.MANUAL, LocalApprovalMode.AUTO)
+        for (mode in modes) {
+            LocalApprovalPreferences(shared).setApprovalMode(mode)
+            val nextProcess = LocalApprovalPreferences(shared)
+            assertEquals(mode, nextProcess.currentMode())
+            assertEquals(mode == LocalApprovalMode.AUTO, nextProcess.isSafeAutoApprovalEnabled())
+        }
+    }
+
+    @Test
     fun legacyBooleanMigratesToEquivalentMode() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
         shared.edit().putBoolean("safe_auto_approval", true).commit()
