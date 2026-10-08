@@ -65,6 +65,9 @@ private val WORK_PROCESS_TECHNICAL_LINE = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
+private val WORK_PROCESS_GENERIC_LABELS = setOf(
+    "运行任务步骤", "处理当前步骤", "检查相关内容", "查找相关信息",
+)
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
@@ -80,7 +83,8 @@ internal data class LocalWorkProcessNode(
 
 internal fun localWorkProcessSummary(content: String): String? {
     val compact = WORK_PROCESS_WHITESPACE.replace(content.trim(), " ")
-    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
+    if (compact.isBlank() || compact in WORK_PROCESS_GENERIC_LABELS ||
+        WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
     val readable = WORK_PROCESS_PATH.replace(compact, "…")
     return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
@@ -119,18 +123,32 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
 internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> {
     val result = mutableListOf<LocalWorkProcessNode>()
     nodes.forEach { node ->
-        val milestone = result.lastOrNull()
-        if (node.summary == null && milestone?.summary != null) {
-            result[result.lastIndex] = milestone.copy(
-                operationKinds = (milestone.operationKinds + node.operationKinds).distinct(),
-                failed = milestone.failed || node.failed,
-                count = milestone.count + node.count,
-            )
-        } else {
-            result += node.copy(toolContent = null)
+        val previous = result.lastOrNull()
+        when {
+            node.summary == null && previous?.summary != null -> {
+                // A tool completed after the narration that described it.
+                result[result.lastIndex] = previous.copy(
+                    operationKinds = (previous.operationKinds + node.operationKinds).distinct(),
+                    failed = previous.failed || node.failed,
+                    count = previous.count + node.count,
+                )
+            }
+            node.summary != null && previous?.summary == null && result.isNotEmpty() -> {
+                // Some providers persist the operation before its visible explanation.
+                // Attach consecutive unlabelled tools to the next real progress sentence.
+                val start = result.indexOfLast { it.summary != null } + 1
+                val tools = result.subList(start, result.size).toList()
+                result.subList(start, result.size).clear()
+                result += node.copy(
+                    operationKinds = tools.flatMap { it.operationKinds }.distinct(),
+                    failed = tools.any { it.failed } || node.failed,
+                    count = tools.sumOf { it.count } + node.count,
+                )
+            }
+            else -> result += node.copy(toolContent = null)
         }
     }
-    return result
+    return result.map { it.copy(toolContent = null) }
 }
 
 /**
