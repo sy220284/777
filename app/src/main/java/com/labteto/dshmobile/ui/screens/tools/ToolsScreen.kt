@@ -44,6 +44,7 @@ import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.presentation.LocalWebhookUiState
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
@@ -51,6 +52,7 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
@@ -59,6 +61,8 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
+import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
+import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -107,9 +111,13 @@ internal class ToolsOperationGate {
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
     private val sessionStore: SessionStore,
+    private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
+    val networkSearchEnabled: StateFlow<Boolean> = networkSearchSettings.enabled
+
+    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     private val operationGate = ToolsOperationGate()
 
     private fun launchOperation(block: suspend () -> Unit) {
@@ -369,6 +377,7 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var serverId by remember { mutableStateOf("") }
@@ -380,6 +389,7 @@ fun ToolsScreen(
     var showExternalConfig by remember { mutableStateOf(false) }
     var showWebhookConfig by remember { mutableStateOf(false) }
     var capabilityDetail by remember { mutableStateOf<String?>(null) }
+    var showAgentSettings by remember { mutableStateOf(false) }
     var webhookPort by remember { mutableStateOf("8765") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
@@ -398,8 +408,12 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showPluginBrowser || handleRootSystemBack) {
-        if (showPluginBrowser) showPluginBrowser = false else onClose()
+    BackHandler(enabled = showPluginBrowser || showAgentSettings || handleRootSystemBack) {
+        when {
+            showAgentSettings -> showAgentSettings = false
+            showPluginBrowser -> showPluginBrowser = false
+            else -> onClose()
+        }
     }
     LaunchedEffect(state.notice, noticeMessage) {
         when (state.notice) {
@@ -431,7 +445,26 @@ fun ToolsScreen(
         }
     }
 
-    if (showPluginBrowser) {
+    if (showAgentSettings) {
+        val agentSettingsViewModel: SettingsViewModel = hiltViewModel()
+        val agentSettings by agentSettingsViewModel.localHarnessState.collectAsStateWithLifecycle()
+        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                DsTopBar(
+                    title = stringResource(R.string.advanced_agent_settings),
+                    onBack = { showAgentSettings = false },
+                    backContentDescription = stringResource(R.string.common_back),
+                )
+                Column(
+                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                ) {
+                    LocalAgentSettingsCard(agentSettings, agentSettingsViewModel, toast.second)
+                }
+                DsToastHost(toast)
+            }
+        }
+    } else if (showPluginBrowser) {
         PluginInventoryBrowser(
             localIds = state.localPlugins,
             skills = state.skills,
@@ -499,6 +532,30 @@ fun ToolsScreen(
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                        ToolCapabilityRow(
+                            icon = FeatherIcons.Globe,
+                            title = stringResource(R.string.tools_network_search),
+                            subtitle = stringResource(R.string.tools_network_search_hint),
+                            status = stringResource(
+                                if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
+                            ),
+                            state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
+                            onClick = { viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
+                            trailing = {
+                                DsSwitch(
+                                    checked = networkSearchEnabled,
+                                    onCheckedChange = viewModel::setNetworkSearchEnabled,
+                                )
+                            },
+                        )
+                        ToolCapabilityRow(
+                            icon = FeatherIcons.Sliders,
+                            title = stringResource(R.string.advanced_agent_settings),
+                            subtitle = stringResource(R.string.tools_agent_settings_hint),
+                            status = stringResource(R.string.tools_capability_available),
+                            state = StateDotState.Done,
+                            onClick = { showAgentSettings = true },
+                        )
                         val builtinAvailable = "local-builtin" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
@@ -989,6 +1046,7 @@ private fun ToolCapabilityRow(
     icon: ImageVector? = null,
     iconPainter: Painter? = null,
     onClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     Surface(
@@ -1056,7 +1114,9 @@ private fun ToolCapabilityRow(
                     if (stackedStatus) ToolCapabilityStatus(status, state)
                 }
             }
-            if (onClick != null) {
+            if (trailing != null) {
+                trailing()
+            } else if (onClick != null) {
                 Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = null,

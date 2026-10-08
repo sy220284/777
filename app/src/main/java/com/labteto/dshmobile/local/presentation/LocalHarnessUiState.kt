@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.presentation
 
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
@@ -22,8 +23,8 @@ data class LocalHarnessSettingsState(
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
     val modelSelection: LocalModelSelectionState = LocalModelSelectionState(),
-    val mainMaxSteps: Int = 16,
-    val subagentMaxSteps: Int = 20,
+    val mainMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS,
+    val subagentMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS,
     val modelAttempts: Int = 3,
     val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
     val userRules: String = "",
