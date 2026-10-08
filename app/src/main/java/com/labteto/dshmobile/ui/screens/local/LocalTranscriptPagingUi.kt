@@ -81,7 +81,7 @@ internal fun LocalComposerTailFollower(
 }
 
 /**
- * Follows the *growth* of the current streaming message only while the reader remains
+ * Follows the *growth* of a Chat or Work streaming message while the reader remains
  * near the conversation bottom. Observing item size instead of scroll offset prevents
  * ordinary manual scrolling from being mistaken for new model output.
  */
