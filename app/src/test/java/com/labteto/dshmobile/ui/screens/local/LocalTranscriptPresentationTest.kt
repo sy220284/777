@@ -180,6 +180,33 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun genericExecutionLabelsAreNotTreatedAsNarratedStages() {
+        assertEquals(null, localWorkProcessSummary("运行任务步骤"))
+        assertEquals(null, localWorkProcessSummary("处理当前步骤"))
+        assertEquals("已经定位问题", localWorkProcessSummary("已经定位问题"))
+    }
+
+    @Test
+    fun hiddenFailedMilestoneRemainsVisibleInRecentSteps() {
+        val nodes = listOf(
+            LocalWorkProcessNode(summary = "初始化", failed = true),
+            *List(8) { LocalWorkProcessNode(summary = "阶段$it") }.toTypedArray(),
+        )
+        val visible = visibleWorkProcessNodes(nodes, showAll = false, collapsedLimit = 5)
+        assertEquals(5, visible.size)
+        assertTrue(visible.first().failed)
+        assertEquals("阶段7", visible.last().summary)
+    }
+
+    @Test
+    fun inlineWorkStreamDisplaysOnlyUncommittedSuffix() {
+        assertEquals("下一段", inlineWorkPreviewText("已有内容下一段", "已有内容"))
+        assertEquals("", inlineWorkPreviewText("已有内容", "已有内容"))
+        assertEquals("", inlineWorkPreviewText("已有", "已有内容"))
+        assertEquals("不同阶段", inlineWorkPreviewText("不同阶段", "已有内容"))
+    }
+
+    @Test
     fun collapsedFocusKeepsLatestFailureEvenWhenLaterStageSucceeds() {
         val failed = LocalWorkProcessNode(summary = "校验文件", failed = true)
         val later = LocalWorkProcessNode(summary = "已读取其他文件")
