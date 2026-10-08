@@ -302,6 +302,7 @@ tasks.matching {
 // Resource and lint model consumers need declared generation dependencies.
 tasks.matching {
     (it.name.contains("Resources") || it.name.endsWith("SourceSetPaths") ||
+        it.name.startsWith("extractDeepLinks") ||
         it.name.startsWith("lint", ignoreCase = true)) && it.name != "generateUiFontSubset"
 }.configureEach { dependsOn(generateUiFontSubset) }
 
