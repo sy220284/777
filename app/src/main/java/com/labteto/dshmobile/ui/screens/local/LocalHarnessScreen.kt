@@ -347,8 +347,6 @@ fun LocalHarnessScreen(
             onUseWorkCapability = ::useWorkCapability,
             composerHandoff = composerHandoff,
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
-            onOpenPlugins = { toolsStartAtSkills = false; toolsStartAtPlugins = true; pushFeature(LocalFeaturePage.TOOLS) },
-            onOpenSkills = { toolsStartAtSkills = true; toolsStartAtPlugins = false; pushFeature(LocalFeaturePage.TOOLS) },
         ),
         localChatFeatureUiContribution(
             gallery = gallery,

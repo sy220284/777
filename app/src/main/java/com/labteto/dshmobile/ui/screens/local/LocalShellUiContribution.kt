@@ -35,8 +35,6 @@ internal fun localShellFeatureUiContribution(
     composerHandoff: List<String>,
     onUseWorkCapability: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
-    onOpenPlugins: () -> Unit,
-    onOpenSkills: () -> Unit,
     onOpenDrawer: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
@@ -51,8 +49,6 @@ internal fun localShellFeatureUiContribution(
             composerHandoff = composerHandoff,
             onUseWorkCapability = onUseWorkCapability,
             onConsumeComposerHandoff = onConsumeComposerHandoff,
-            onOpenPlugins = onOpenPlugins,
-            onOpenSkills = onOpenSkills,
             onOpenDrawer = onOpenDrawer,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
@@ -80,11 +76,7 @@ internal fun localShellFeatureUiContribution(
             onStop = actions.stop,
             onNewSession = onNewSession,
             onExitGroupChat = actions.exitGroupChat,
-            onOpenWorkspace = { onPushFeature(LocalFeaturePage.WORKSPACE) },
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
-            onOpenTasks = { onPushFeature(LocalFeaturePage.TASKS) },
-            onOpenTools = { onPushFeature(LocalFeaturePage.TOOLS) },
-            onOpenPersonaGallery = { onPushFeature(LocalFeaturePage.PERSONA_GALLERY) },
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),

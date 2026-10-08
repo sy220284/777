@@ -146,11 +146,7 @@ internal fun LocalConversationSurface(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
-    onOpenWorkspace: () -> Unit,
     onOpenRunCenter: () -> Unit,
-    onOpenTasks: () -> Unit,
-    onOpenTools: () -> Unit,
-    onOpenPersonaGallery: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -175,8 +171,6 @@ internal fun LocalConversationSurface(
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
     onConsumeComposerHandoff: () -> Unit = {},
-    onOpenPlugins: () -> Unit = onOpenTools,
-    onOpenSkills: () -> Unit = onOpenTools,
     onOpenDrawer: (() -> Unit)? = null,
     onUseWorkCapability: ((String) -> Unit)? = null,
 ) {
@@ -202,7 +196,6 @@ internal fun LocalConversationSurface(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
-    var expandedAttachmentActions by rememberSaveable { mutableStateOf(false) }
     var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -833,8 +826,6 @@ internal fun LocalConversationSurface(
                 }),
                 MenuItem(stringResource(R.string.local_attachment_image), FeatherIcons.Image, onClick = { imagePicker.launch(arrayOf("image/*")) }),
                 MenuItem(stringResource(R.string.local_attachment_file), FeatherIcons.Folder, onClick = { filePicker.launch(arrayOf("*/*")) }),
-                MenuItem(stringResource(R.string.composer_plugins), FeatherIcons.Tool, onClick = onOpenPlugins),
-                MenuItem(stringResource(R.string.skills_title), FeatherIcons.BookOpen, onClick = onOpenSkills),
             ),
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
@@ -1094,21 +1085,6 @@ internal fun LocalConversationSurface(
                 }
             }
             DsSheetChoiceRow(
-                title = stringResource(R.string.composer_plugins),
-                subtitle = stringResource(R.string.composer_plugins_hint),
-                icon = FeatherIcons.Tool,
-                onClick = { showAttachmentPicker = false; onOpenPlugins() },
-            )
-            DsSheetChoiceRow(
-                title = stringResource(R.string.skills_title),
-                subtitle = stringResource(R.string.composer_skills_hint),
-                icon = FeatherIcons.BookOpen,
-                onClick = {
-                    showAttachmentPicker = false
-                    onOpenSkills()
-                },
-            )
-            DsSheetChoiceRow(
                 title = stringResource(R.string.composer_web),
                 trailingText = stringResource(R.string.composer_web_auto),
                 icon = FeatherIcons.Globe,
@@ -1118,32 +1094,17 @@ internal fun LocalConversationSurface(
                     else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
-            DsButton(
-                text = stringResource(R.string.app_extended_capabilities),
-                variant = DsButtonVariant.Ghost,
-                icon = FeatherIcons.ChevronDown,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { expandedAttachmentActions = !expandedAttachmentActions },
-            )
-            if (expandedAttachmentActions) {
-            if (state.usageMode == LocalUsageMode.CHAT) {
+            if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 DsSheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
                     icon = FeatherIcons.User,
                     onClick = {
                         showAttachmentPicker = false
-                        if (state.groupChat.enabled) onOpenPersonaGallery() else showPersonaPicker = true
+                        showPersonaPicker = true
                     },
                 )
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.local_group_chat_title),
-                    icon = FeatherIcons.Users,
-                    onClick = {
-                        showAttachmentPicker = false
-                        if (state.groupChat.enabled) showGroupMemberPicker = true else onNewSession()
-                    },
-                )
-            } else {
+            }
+            if (state.usageMode == LocalUsageMode.WORK) {
                 DsSheetChoiceRow(
                     title = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
                     icon = FeatherIcons.List,
@@ -1157,25 +1118,6 @@ internal fun LocalConversationSurface(
                         if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
                     },
                 )
-            }
-            DsSheetChoiceRow(
-                title = stringResource(R.string.tools_title),
-                subtitle = stringResource(R.string.tools_subtitle),
-                icon = FeatherIcons.Tool,
-                onClick = {
-                    showAttachmentPicker = false
-                    onOpenTools()
-                },
-            )
-            DsSheetChoiceRow(
-                title = stringResource(if (state.usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title),
-                icon = FeatherIcons.Clock,
-                onClick = {
-                    showAttachmentPicker = false
-                    onOpenTasks()
-                },
-            )
-            if (state.usageMode == LocalUsageMode.WORK) {
                 LocalAgentSwarmLaunchEntry(
                     selected = teamDispatchSelected,
                     onClick = {
@@ -1183,23 +1125,6 @@ internal fun LocalConversationSurface(
                         showAttachmentPicker = false
                     },
                 )
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.chatlist_workspace_files),
-                    icon = FeatherIcons.List,
-                    onClick = {
-                        showAttachmentPicker = false
-                        onOpenWorkspace()
-                    },
-                )
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.local_run_center),
-                    icon = FeatherIcons.Activity,
-                    onClick = {
-                        showAttachmentPicker = false
-                        onOpenRunCenter()
-                    },
-                )
-            }
             }
         }
     }
