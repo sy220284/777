@@ -277,6 +277,12 @@ fun LocalHarnessScreen(
         startBackgroundAgent = viewModel::startBackgroundAgent,
         sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
     )
+    val projectActions = LocalProjectUiActions(
+        catalog = viewModel.projectCatalog,
+        create = viewModel::createProject,
+        select = viewModel::selectProject,
+        updateInstructions = viewModel::updateProjectInstructions,
+    )
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = viewModel::switchSession,
     )
@@ -321,6 +327,12 @@ fun LocalHarnessScreen(
             actions = workActions,
             onFilesModeChange = { filesMode = it },
             onPushFeature = ::pushFeature,
+            onPopFeature = ::popFeature,
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+        localProjectFeatureUiContribution(
+            actions = projectActions,
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -513,6 +525,7 @@ fun LocalHarnessScreen(
                 onRenameSession = viewModel::renameSession,
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
+                onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
