@@ -209,6 +209,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
     fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
     internal suspend fun startBackgroundAgent(task: String): LocalWorkUiActionResult {

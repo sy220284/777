@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationFiles
@@ -94,6 +95,7 @@ internal data class LocalWorkFeatureUiActions(
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val backgroundJobOutput: (String) -> String,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
+    val toolActivitiesForUi: (String) -> List<LocalToolActivityUiItem>,
     val stopBackgroundJob: (String) -> String,
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,
