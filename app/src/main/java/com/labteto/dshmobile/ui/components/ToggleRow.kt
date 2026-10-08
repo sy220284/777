@@ -39,9 +39,9 @@ fun ToggleRow(label: String, checked: Boolean, hint: String? = null, onChange: (
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+            Text(label, style = DsType.navigationItem.withReadingWeight(), color = colors.labelPrimary)
             if (hint != null) {
-                Text(hint, style = DsType.small13.withReadingWeight(), color = colors.labelCaption)
+                Text(hint, style = DsType.navigationSupporting.withReadingWeight(), color = colors.labelSecondary)
             }
         }
         DsSwitch(checked = checked, onCheckedChange = { onChange() })
