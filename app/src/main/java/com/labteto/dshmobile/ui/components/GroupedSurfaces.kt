@@ -152,7 +152,7 @@ fun DsCategoryRow(
                 color = colors.labelSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 96.dp),
+                modifier = Modifier.widthIn(max = if (compactWithValue) 76.dp else 96.dp),
             )
         }
         if (trailing != null) {
