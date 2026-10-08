@@ -907,7 +907,10 @@ internal fun PersonaGalleryScreen(
                             color = DsTheme.colors.labelSecondary,
                         )
                     }
-                    if (currentGalleryId == selected.id && currentHasUnsavedChanges) {
+                    if (
+                        canSave && currentGalleryId == selected.id && currentHasUnsavedChanges &&
+                        (currentGalleryStoryId == null || currentGalleryStoryId == selectedStoryId)
+                    ) {
                         DsButton(
                             text = stringResource(R.string.persona_gallery_pending_progress),
                             onClick = { showMoreActions = true },

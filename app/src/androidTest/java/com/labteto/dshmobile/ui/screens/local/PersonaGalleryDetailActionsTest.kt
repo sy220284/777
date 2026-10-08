@@ -74,6 +74,7 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithText("导出人物卡").assertDoesNotExist()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").assertIsDisplayed()
+        compose.onNodeWithText("保存本次对话进展").assertDoesNotExist()
         compose.onNodeWithText("人物检查").performScrollTo().assertIsDisplayed()
         pressBack()
         compose.onNodeWithText("人物详情").assertIsDisplayed()
