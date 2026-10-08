@@ -281,6 +281,7 @@ internal fun LocalMessageRow(
                     }
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
+                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent).second else visibleContent
                 LocalAssistantMessageContent(
                     message = message,
                     workspacePath = workspacePath,
@@ -300,13 +301,13 @@ internal fun LocalMessageRow(
                             onSelectVariant = selectVariantWithFeedback,
                         )
                     }
-                    if (visibleContent.isNotBlank()) {
+                    if (copyableContent.isNotBlank()) {
                         CompactMessageAction(
                             icon = if (copied) FeatherIcons.Check else FeatherIcons.MessageCopy,
                             iconSize = 22.dp,
                             contentDescription = if (copied) copiedMessage else stringResource(R.string.chat_copy_answer),
                             onClick = {
-                                clipboard.setText(AnnotatedString(visibleContent))
+                                clipboard.setText(AnnotatedString(copyableContent))
                                 copied = true
                                 Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                             },
@@ -370,9 +371,17 @@ private fun LocalAssistantMessageContent(
                     block.text
                 }
                 firstText = false
-                if (text.isNotBlank()) {
+                val (innerThought, body) = if (chatMode) extractLocalCharacterThought(text) else null to text
+                if (innerThought != null) {
+                    Text(
+                        text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,
+                        style = DsType.small13.withReadingWeight(),
+                        color = DsTheme.colors.labelTertiary,
+                    )
+                }
+                if (body.isNotBlank()) {
                     MarkdownText(
-                        text,
+                        body,
                         bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
                     )
                 }

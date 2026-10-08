@@ -163,12 +163,15 @@ internal fun WorkProcessRow(
 
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    val latestNode = nodes.last()
-    val processFailed = nodes.any { it.failed }
-    val preview = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
-    val collapsedHiddenCount = (nodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
-    val visibleNodes = visibleWorkProcessNodes(nodes, showAllNodes)
-    val visibleStartIndex = nodes.size - visibleNodes.size
+    val semanticNodes = remember(nodes) {
+        nodes.filter { it.summary != null || it.failed }.ifEmpty { nodes.takeLast(1) }
+    }
+    val latestNode = semanticNodes.last()
+    val preview = semanticNodes.lastOrNull { !it.summary.isNullOrBlank() }?.summary
+        ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
+    val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
+    val visibleStartIndex = semanticNodes.size - visibleNodes.size
     val disclosureState = stringResource(
         if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
@@ -200,7 +203,7 @@ internal fun WorkProcessRow(
         ) {
             WorkOperationIcon(
                 kind = latestNode.kind,
-                running = processStatus == DsStatus.Running && latestNode.toolContent == null,
+                running = processStatus == DsStatus.Running,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -221,7 +224,7 @@ internal fun WorkProcessRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            DsPill(text = stringResource(R.string.local_work_process_steps, nodes.size))
+            DsPill(text = stringResource(R.string.local_work_process_steps, semanticNodes.size))
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = stringResource(
@@ -244,8 +247,8 @@ internal fun WorkProcessRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 visibleNodes.forEachIndexed { visibleIndex, node ->
-                    val rowRunning = running && visibleStartIndex + visibleIndex == nodes.lastIndex &&
-                        node.toolContent == null && !node.failed
+                    val rowRunning = running && visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
+                        !node.failed
                     WorkContentBlock(node, rowRunning)
                 }
                 if (collapsedHiddenCount > 0) {

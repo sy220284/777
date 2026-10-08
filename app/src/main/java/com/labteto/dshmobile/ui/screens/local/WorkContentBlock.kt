@@ -26,63 +26,26 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Tool content remains verbatim evidence; no guessed progress, result counts or screenshots. */
+/** Compact, user-readable work milestone. Raw tools and commands stay in Run Center. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
+    val summary = node.summary ?: if (node.failed) {
+        stringResource(R.string.local_reasoning_work_failed)
+    } else return
     val colors = DsTheme.colors
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.bgLayer1,
-        tonalElevation = 0.dp,
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Column(
-            modifier = Modifier.padding(DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                WorkOperationIcon(node.kind, running)
-                Text(
-                    stringResource(agentOperationLabelRes(node.kind)),
-                    modifier = Modifier.weight(1f),
-                    style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                )
-                Text(
-                    stringResource(agentOperationStatusRes(running, node.failed)),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = if (node.failed) colors.error else colors.labelTertiary,
-                )
-            }
-            if (node.toolContent != null) {
-                val heading = when (node.kind) {
-                    AgentOperationKind.Search -> R.string.app_tool_search_results
-                    AgentOperationKind.Web -> R.string.app_tool_web_content
-                    AgentOperationKind.Update -> R.string.app_tool_code_changes
-                    AgentOperationKind.Execute -> R.string.app_tool_terminal_output
-                    AgentOperationKind.Inspect -> R.string.app_tool_file_content
-                    AgentOperationKind.Image -> R.string.app_tool_image_result
-                    AgentOperationKind.Delegate -> R.string.app_tool_agent_result
-                    else -> R.string.local_team_activity
-                }
-                Text(stringResource(heading), style = DsType.caption11, color = colors.labelTertiary)
-                SelectionContainer {
-                    Text(
-                        truncateWithoutSplittingSurrogatePair(node.toolContent, 2400),
-                        style = DsType.small13.withReadingWeight().let {
-                            if (node.kind == AgentOperationKind.Execute || node.kind == AgentOperationKind.Update) {
-                                it.copy(fontFamily = DsType.codeFont)
-                            } else it
-                        },
-                        color = colors.labelSecondary,
-                        maxLines = if (node.kind == AgentOperationKind.Search) 12 else 18,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            } else {
-                node.summary?.let {
-                    Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-                }
-            }
-        }
+        WorkOperationIcon(node.kind, running)
+        Text(
+            summary,
+            modifier = Modifier.weight(1f),
+            style = DsType.small13.withReadingWeight(),
+            color = if (node.failed) colors.error else if (running) colors.labelPrimary else colors.labelSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

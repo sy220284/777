@@ -73,6 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -179,6 +180,11 @@ internal fun LocalConversationSurface(
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current
+    var reasoningEnabled by remember(state.sessionId) {
+        LocalReasoningModeStore.attach(appContext)
+        mutableStateOf(LocalReasoningModeStore.enabled(state.sessionId))
+    }
     val drafts = rememberSaveable(
         saver = listSaver(
             save = { cache -> cache.save() },
@@ -1113,6 +1119,22 @@ internal fun LocalConversationSurface(
                     showAttachmentPicker = false
                     if (onUseWorkCapability != null) onUseWorkCapability(webPrompt)
                     else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
+                },
+            )
+            val reasoningAvailable = LocalReasoningModeStore.isSupported(activeModelProfile)
+            DsSheetChoiceRow(
+                title = stringResource(R.string.local_reasoning_switch_title),
+                subtitle = stringResource(
+                    if (reasoningAvailable) R.string.local_reasoning_switch_hint
+                    else R.string.local_reasoning_switch_unsupported,
+                ),
+                icon = FeatherIcons.Activity,
+                switchChecked = reasoningEnabled,
+                enabled = reasoningAvailable && !state.running,
+                onClick = {
+                    val next = !reasoningEnabled
+                    LocalReasoningModeStore.setEnabled(state.sessionId, next)
+                    reasoningEnabled = next
                 },
             )
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
