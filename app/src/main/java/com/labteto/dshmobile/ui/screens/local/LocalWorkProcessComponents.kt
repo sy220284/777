@@ -206,7 +206,7 @@ internal fun WorkProcessRow(
     LaunchedEffect(messages.first().id, running) {
         expanded = running
     }
-    // Do not merge prose into tool rows: the dialogue must read in event order.
+    // Keep event order, but merge tool outcomes into their immediately preceding narration.
     val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
     val firstReasoningTimestamp = messages.firstOrNull {
         it.role == "reasoning" && it.createdAt > 0L
@@ -220,15 +220,15 @@ internal fun WorkProcessRow(
             .takeIf { it in 1_000L..600_000L }
             ?.div(1_000L)
     } else null
-    val latestNode = workProcessFocus(semanticNodes)
+    val latestNode = if (running) semanticNodes.last() else workProcessFocus(semanticNodes)
     val activeStage = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
     val headerLabel = when {
         processStatus == DsStatus.Warning || processStatus == DsStatus.Failed ->
             stringResource(R.string.local_work_failed_stage, activeStage)
+        running && latestNode.summary != null -> activeStage
         thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
         messages.any { it.role == "reasoning" } ->
             stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought)
-        running && latestNode.summary != null -> activeStage
         running -> stringResource(R.string.local_work_process) + " · " +
             stringResource(R.string.agent_operation_status_running)
         else -> stringResource(R.string.local_work_process)
