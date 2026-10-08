@@ -157,7 +157,7 @@ class AutomationReceiptTest {
             targetSessionId = "session",
         )
 
-        assertTrue(usesChainedChatScheduling(task))
+        assertTrue(usesChainedAutomationScheduling(task))
         assertEquals(
             99_000L,
             nextAnchoredAutomationRun(

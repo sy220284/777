@@ -1677,5 +1677,6 @@
     <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
     <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
     <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
+    <string name="tasks_schedule_monthly">每月</string>
 </resources>
 

@@ -835,6 +835,7 @@ private fun chatScheduleDescription(task: AutomationTask): String = when (task.s
         R.string.tasks_chat_schedule_weekly,
         shortTime(task.nextRunAt),
     )
+    AutomationScheduleType.MONTHLY -> stringResource(R.string.tasks_schedule_monthly) + " · " + shortTime(task.nextRunAt)
     AutomationScheduleType.INTERVAL, AutomationScheduleType.LEGACY -> {
         val minutes = task.recurringMinutes
         when {
