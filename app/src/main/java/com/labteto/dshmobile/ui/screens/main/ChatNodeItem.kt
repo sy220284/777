@@ -372,6 +372,10 @@ private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
     val results = context.nodes.filterIsInstance<ToolResultNode>().associateBy { it.callId }
     val failed = peers.any { results[it.callId]?.isError == true }
     val running = context.running && peers.any { results[it.callId] == null }
+    // Successful tool calls are represented by their narrated milestone.
+    // Keep outstanding and failed calls visible so the reader never misses action.
+    if (!failed && !running) return
+    if (peers.firstOrNull()?.seq != node.seq) return
     val state = when {
         failed -> DisclosureState.Error
         running -> DisclosureState.Running
@@ -380,7 +384,7 @@ private fun ToolCallRow(node: ToolCallNode, context: ChatNodeContext) {
     DisclosureRow(
         title = stringResource(agentOperationLabelRes(node.name)),
         summary = stringResource(agentOperationStatusRes(running = running, failed = failed)),
-        icon = FeatherIcons.Tool,
+        icon = if (failed) FeatherIcons.AlertTriangle else FeatherIcons.Activity,
         state = state,
         expanded = false,
         onToggle = null,
