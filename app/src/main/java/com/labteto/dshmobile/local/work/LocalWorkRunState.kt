@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelState
@@ -17,8 +18,8 @@ import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
  */
 internal data class LocalWorkRunState(
     val modelState: LocalModelState = LocalModelState(),
-    val mainMaxSteps: Int = 16,
-    val subagentMaxSteps: Int = 20,
+    val mainMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS,
+    val subagentMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS,
     val workspacePath: String = "",
     val sessionId: String,
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,

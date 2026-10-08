@@ -27,6 +27,7 @@ internal class LocalToolSchemaProjection(
             if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
         val tools = registry.names()
             .mapNotNull(registry::get)
+            .filter { tool -> executionCoordinator.isNetworkSearchPermitted(tool.name) }
             .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
             .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
             .filter { tool -> allowMutation || tool.name != "download_file" }
@@ -53,6 +54,7 @@ internal class LocalToolSchemaProjection(
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
         val tools = registry.names()
             .mapNotNull(registry::get)
+            .filter { tool -> executionCoordinator.isNetworkSearchPermitted(tool.name) }
             .filter { tool ->
                 !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
             }

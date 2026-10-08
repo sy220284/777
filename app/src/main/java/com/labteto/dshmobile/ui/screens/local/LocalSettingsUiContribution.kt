@@ -8,6 +8,7 @@ internal fun localSettingsFeatureUiContribution(
     settingsDestination: SettingsDestination,
     updateStatus: String?,
     onCheckUpdate: () -> Unit,
+    onOpenRemote: () -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPopFeature: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
@@ -26,6 +27,7 @@ internal fun localSettingsFeatureUiContribution(
 ) { page ->
     check(page == LocalFeaturePage.SETTINGS) { "Settings received non-SETTINGS route: $page" }
     SettingsScreen(
+        onRemoteControl = onOpenRemote,
         onClose = {
             onSettingsDestinationChange(SettingsDestination.ROOT)
             onPopFeature()

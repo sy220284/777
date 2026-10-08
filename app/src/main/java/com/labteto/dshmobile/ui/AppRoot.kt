@@ -146,6 +146,21 @@ fun AppRoot(
             )
 
             RootOverlay.SETTINGS -> SettingsScreen(
+                onRemoteControl = {
+                    overlay = null
+                    overlayReturn = null
+                    if (rootSurface == RootSurface.REMOTE) {
+                        viewModel.disconnectRemote()
+                        relayClaimed = false
+                        rootSurface = RootSurface.LOCAL
+                    } else {
+                        relayClaimed = false
+                        rootSurface = RootSurface.REMOTE
+                        autoScanPair = true
+                        overlay = RootOverlay.PAIR
+                    }
+                },
+                remoteControlActive = rootSurface == RootSurface.REMOTE,
                 onClose = {
                     overlay = overlayReturn
                     overlayReturn = null

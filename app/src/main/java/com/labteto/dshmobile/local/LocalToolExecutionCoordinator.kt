@@ -44,7 +44,11 @@ internal class LocalToolExecutionCoordinator(
         LocalToolExecutionIdentity,
     ) -> Unit = { _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
+    private val networkSearchEnabled: () -> Boolean = { true },
 ) {
+    internal fun isNetworkSearchPermitted(name: String): Boolean =
+        networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
+
     fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
         synchronized(target) { target.clear() }
     }
@@ -58,7 +62,8 @@ internal class LocalToolExecutionCoordinator(
     ) {
         synchronized(target) {
             target += names.filter { name ->
-                registry.get(name)?.let(LocalToolRouter::isOptional) == true
+                registry.get(name)?.takeIf { isNetworkSearchPermitted(it.name) }
+                    ?.let(LocalToolRouter::isOptional) == true
             }
         }
     }
@@ -70,6 +75,7 @@ internal class LocalToolExecutionCoordinator(
         // GitHub pre-activation has its own intent and credential gate. Generic keyword matches
         // must not reactivate it from a negated current input or an older GitHub request.
         val tools = registry.names().mapNotNull(registry::get).filterNot(::isGitHubConnectorTool)
+            .filter { isNetworkSearchPermitted(it.name) }
         enableOptionalTools(
             LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
             target,
@@ -102,7 +108,7 @@ internal class LocalToolExecutionCoordinator(
     ) {
         val resolvedTarget = target ?: enabledOptionalTools
         // Model-independent default network capabilities for every Work turn.
-        enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
+        if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget)
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
     }
@@ -121,6 +127,7 @@ internal class LocalToolExecutionCoordinator(
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
         val tools = registry.names().mapNotNull(registry::get)
+            .filter { isNetworkSearchPermitted(it.name) }
         return LocalToolRouter.capabilitySummary(tools, enabledOptional)
     }
 
@@ -130,6 +137,7 @@ internal class LocalToolExecutionCoordinator(
     ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
         val tools = registry.names().mapNotNull(registry::get)
+            .filter { isNetworkSearchPermitted(it.name) }
         return LocalToolRouter.visibleSchemas(
             tools = tools,
             enabledOptional = enabledOptionalSnapshot(),
@@ -148,7 +156,9 @@ internal class LocalToolExecutionCoordinator(
         target: MutableSet<String> = enabledOptionalTools,
     ): String {
         val tools = registry.names().mapNotNull(registry::get)
-        val matches = LocalToolRouter.search(tools, query)
+        val matches = LocalToolRouter.search(
+            tools.filter { isNetworkSearchPermitted(it.name) }, query,
+        )
         if (matches.isEmpty()) {
             return "未找到匹配的扩展能力；可换用联网、下载、记忆、会话、GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
         }
@@ -186,6 +196,12 @@ internal class LocalToolExecutionCoordinator(
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
+        if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
+            content = "网络搜索已关闭，请先在能力中心开启网络搜索。",
+            isError = true,
+            errorCode = "NETWORK_SEARCH_DISABLED",
+            recoveryHint = "前往能力中心开启网络搜索，或使用现有本地资料完成任务。",
+        )
         val registered = registry.get(call.name)
             ?: return AgentToolResult(
                 content = "未知工具：" + call.name,
@@ -340,6 +356,7 @@ internal class LocalToolExecutionCoordinator(
 
     private companion object {
         val DEFAULT_NETWORK_TOOLS = listOf("web_search", "web_fetch")
+        val NETWORK_SEARCH_TOOLS = setOf("web_search", "web_fetch")
         const val GITHUB_TOOL_FAMILY = "GitHub"
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,

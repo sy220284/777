@@ -62,6 +62,56 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun disabledNetworkSearchBlocksDiscoverySchemasAndExecution() = runBlocking {
+        var networkEnabled = false
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            for (name in listOf("web_search", "web_fetch", "http_request")) {
+                register(tool(
+                    name = name,
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "网络",
+                    keywords = setOf("联网", "网页搜索"),
+                ) {
+                    executed++
+                    ToolResult("ok")
+                })
+            }
+        }
+        val coordinator = coordinator(registry, networkSearchEnabled = { networkEnabled })
+        val detached = linkedSetOf<String>()
+        coordinator.prepareWorkTurnCapabilities("联网搜索", emptyList(), { false }, detached)
+        assertFalse("web_search" in detached)
+        assertFalse("web_fetch" in detached)
+        coordinator.enableOptionalTools(listOf("web_search", "web_fetch"))
+        coordinator.searchCapabilities("联网 网页搜索")
+        assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
+        assertFalse("web_fetch" in coordinator.enabledOptionalSnapshot())
+        val schemas = LocalToolSchemaProjection(registry, coordinator).modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = false,
+            history = emptyList(),
+            enabledOptional = setOf("web_search", "web_fetch", "http_request"),
+        )
+        assertEquals(listOf("http_request"), LocalToolSchemaProjection(registry, coordinator).names(schemas))
+        for (name in listOf("web_search", "web_fetch")) {
+            val result = coordinator.execute(
+                LocalToolCall("test-$name", name, JsonObject(emptyMap()), "{}"),
+                allowMutation = true,
+            )
+            assertEquals("NETWORK_SEARCH_DISABLED", result.errorCode)
+        }
+        assertEquals(0, executed)
+        networkEnabled = true
+        coordinator.enableOptionalTools(listOf("web_search", "web_fetch"))
+        assertTrue("web_search" in coordinator.enabledOptionalSnapshot())
+        assertTrue("web_fetch" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun workEnablesNetworkToolsByDefaultWithoutEnablingWrites() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool(
@@ -730,6 +780,7 @@ class LocalToolExecutionCoordinatorTest {
             LocalToolExecutionIdentity,
         ) -> Unit = { _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
+        networkSearchEnabled: () -> Boolean = { true },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
@@ -738,6 +789,7 @@ class LocalToolExecutionCoordinatorTest {
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
         executionIdFactory = executionIdFactory,
+        networkSearchEnabled = networkSearchEnabled,
     )
 
     private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(

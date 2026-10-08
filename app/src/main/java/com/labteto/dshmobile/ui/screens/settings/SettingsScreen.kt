@@ -127,7 +127,6 @@ enum class SettingsDestination {
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
-    AGENT_SETTINGS,
     PROJECT_SETTINGS,
     SESSION_STORAGE,
     DIAGNOSTICS,
@@ -155,7 +154,6 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
-    SettingsDestination.AGENT_SETTINGS,
     SettingsDestination.PROJECT_SETTINGS,
     SettingsDestination.SESSION_STORAGE,
     SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
@@ -215,6 +213,8 @@ internal fun settingsInkColors(colors: DsColors): DsColors =
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    onRemoteControl: () -> Unit,
+    remoteControlActive: Boolean = false,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
@@ -351,7 +351,6 @@ fun SettingsScreen(
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
-        SettingsDestination.AGENT_SETTINGS -> stringResource(R.string.advanced_agent_settings)
         SettingsDestination.PROJECT_SETTINGS -> stringResource(R.string.advanced_project_config)
         SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
@@ -459,6 +458,16 @@ fun SettingsScreen(
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
                                 onClick = { page = SettingsDestination.PERMISSIONS },
+                                compact = true,
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.RemoteControl,
+                                title = stringResource(
+                                    if (remoteControlActive) R.string.chatlist_exit_remote_control
+                                    else R.string.local_remote_control,
+                                ),
+                                onClick = onRemoteControl,
                                 compact = true,
                             )
                             AppSettingsDivider()
@@ -884,12 +893,6 @@ fun SettingsScreen(
                     SettingsDestination.ADVANCED -> {
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
-                                title = stringResource(R.string.advanced_agent_settings),
-                                onClick = { page = SettingsDestination.AGENT_SETTINGS },
-                            )
-                            AppSettingsDivider()
-                            AppSettingsRow(
                                 icon = FeatherIcons.GitBranch,
                                 title = stringResource(R.string.advanced_project_config),
                                 onClick = { page = SettingsDestination.PROJECT_SETTINGS },
@@ -907,10 +910,6 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.DIAGNOSTICS },
                             )
                         }
-                    }
-
-                    SettingsDestination.AGENT_SETTINGS -> {
-                        LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                     }
 
                     SettingsDestination.PROJECT_SETTINGS -> {
