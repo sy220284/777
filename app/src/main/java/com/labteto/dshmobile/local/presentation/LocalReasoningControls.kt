@@ -21,6 +21,11 @@ internal object LocalReasoningControls {
         val policy = LocalReasoningRequestPolicy.resolve(profile, mode == LocalUsageMode.WORK)
             ?: return emptyList()
         return buildList {
+            // Only DeepSeek's documented provider default is known to equal HIGH.
+            // Other providers keep an explicit "Default" position to avoid false claims.
+            if (profile.model.trim().lowercase() !in setOf("deepseek-flash", "deepseek-v4-pro")) {
+                add(LocalReasoningUiMode.DEFAULT)
+            }
             add(LocalReasoningUiMode.FAST)
             if (policy.lowEffort != null) add(LocalReasoningUiMode.LOW)
             add(LocalReasoningUiMode.DEEP)
