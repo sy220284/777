@@ -1,11 +1,18 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalAgentRuntimeLimitsTest {
+    @Test
+    fun freshAgentDefaultsAre128StepsForBothLoops() {
+        assertEquals(128, LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS)
+        assertEquals(128, LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS)
+    }
+
     @Test
     fun configuredStepsCanCrossLegacy128Limit() {
         assertEquals(256, LocalAgentRuntimeLimits.normalizeMainSteps(256))
