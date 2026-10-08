@@ -69,10 +69,10 @@ fun DsTopBar(
             )
             Text(
                 title,
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 58.dp),
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = DsSpacing.touchTarget),
                 style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 2,
+                maxLines = 3,
                 textAlign = TextAlign.Center,
                 overflow = TextOverflow.Ellipsis,
             )

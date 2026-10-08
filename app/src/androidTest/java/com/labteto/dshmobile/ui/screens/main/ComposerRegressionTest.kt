@@ -152,8 +152,9 @@ class ComposerRegressionTest {
         val expandedHeight = composer.fetchSemanticsNode().boundsInRoot.height
 
         compose.onNodeWithContentDescription(
-            context.getString(R.string.chat_composer_attach_file),
+            context.getString(R.string.local_composer_more_actions),
         ).performClick()
+        compose.onNodeWithText(context.getString(R.string.chat_composer_attach_file)).performClick()
         compose.waitForIdle()
 
         field.assertIsFocused()
