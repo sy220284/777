@@ -47,6 +47,35 @@ class LocalGroupGalleryStateSyncTest {
     }
 
     @Test
+    fun multipleMembersCommitTogetherAndAbsentEntryIsSkipped() {
+        val gallery = ChatPersonaGalleryStore(File(temporary.root, "group-multi.json"), json)
+        val first = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "s1",
+            history = emptyList(), chatState = ChatCharacterState(), notes = "",
+        ).entry
+        val second = gallery.save(
+            persona = PersonaProfile(name = "阿明"), sourceSessionId = "s2",
+            history = emptyList(), chatState = ChatCharacterState(), notes = "",
+        ).entry
+        fun member(id: String, name: String, trust: Int) = LocalGroupChatMember(
+            galleryId = id, personaId = id, displayName = name,
+            chatState = ChatCharacterState(
+                dynamics = RelationshipDynamics(trust = trust), updatedAt = 1234L,
+            ),
+        )
+        val group = LocalGroupChatState(
+            mode = LocalChatMode.GROUP,
+            members = listOf(member(first.id, "阿青", 70), member(second.id, "阿明", 80), member("absent", "无", 99)),
+        )
+        val result = projectGroupGalleryState(group, gallery)
+        assertEquals(2, result.projected)
+        assertTrue(result.failures.isEmpty())
+        val entries = gallery.list().associateBy { it.id }
+        assertEquals(70, entries.getValue(first.id).groupChatState.dynamics.trust)
+        assertEquals(80, entries.getValue(second.id).groupChatState.dynamics.trust)
+    }
+
+    @Test
     fun emptySessionMemberStateDoesNotOverwriteExistingGalleryState() {
         val gallery = ChatPersonaGalleryStore(File(temporary.root, "gallery.json"), json)
         val saved = gallery.save(

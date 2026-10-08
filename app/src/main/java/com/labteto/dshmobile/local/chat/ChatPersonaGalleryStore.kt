@@ -325,6 +325,34 @@ class ChatPersonaGalleryStore internal constructor(
         return updated
     }
 
+    /**
+     * One document transaction for a group projection. Session remains the authoritative fact;
+     * a failed write leaves all members pending for the existing recovery path.
+     */
+    @Synchronized
+    internal fun updateGroupChatStates(states: List<Pair<String, ChatCharacterState>>): Set<String> {
+        if (states.isEmpty()) return emptySet()
+        val changes = states.toMap()
+        val document = readNormalized()
+        val found = linkedSetOf<String>()
+        val updated = document.entries.map { entry ->
+            val state = changes[entry.id] ?: return@map entry
+            found += entry.id
+            val merged = mergeChatState(
+                entry.groupChatState,
+                state.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
+            )
+            entry.copy(
+                groupChatState = merged,
+                updatedAt = maxOf(entry.updatedAt, System.currentTimeMillis(), merged.updatedAt),
+            )
+        }
+        if (found.isNotEmpty()) {
+            documentStore.write(document.copy(version = 5, entries = updated))
+        }
+        return found
+    }
+
     @Synchronized
     fun updateGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
         val doc = readNormalized()
