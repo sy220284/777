@@ -428,6 +428,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     recoveredClaimedMessageIds = recoveredClaimedIds,
                     recoveredStep = continuation?.step ?: 0,
                     recoveredSoftStepLimit = continuation?.softStepLimit,
+                    recoveredEnabledOptionalTools = continuation?.enabledOptionalTools.orEmpty(),
                     resumeAfterCompletion =
                         shouldColdResumeCompletedSubagent(continuation, pendingIds),
                     onCheckpointProgress = { step, totalLimit ->

@@ -119,19 +119,59 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun inlineConversationPreservesNarrationToolNarrationSequence() {
+    fun inlineConversationMergesToolResultIntoItsNarratedStage() {
         val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
             message("p1", "progress", "先检查相关文件"),
             message("t1", "tool", "/private/path/raw.txt", toolName = "read"),
             message("p2", "progress", "发现问题，开始修复"),
             message("t2", "tool", "ok", toolName = "edit_file"),
         )))
-        assertEquals(4, projected.size)
-        assertEquals(listOf("先检查相关文件", null, "发现问题，开始修复", null),
+        assertEquals(2, projected.size)
+        assertEquals(listOf("先检查相关文件", "发现问题，开始修复"),
             projected.map { it.summary })
-        assertEquals(AgentOperationKind.Inspect, projected[1].kind)
-        assertEquals(AgentOperationKind.Update, projected[3].kind)
+        assertEquals(AgentOperationKind.Inspect, projected[0].kind)
+        assertEquals(AgentOperationKind.Update, projected[1].kind)
+        assertEquals(listOf(1, 1), projected.map { it.count })
         assertTrue(projected.all { it.toolContent == null })
+    }
+
+    @Test
+    fun multipleToolOutcomesUseOneStepAndPreserveFailure() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "核对两份文件并测试"),
+            message("t1", "tool", "ok", toolName = "read"),
+            message("t2", "tool", "工具执行失败", toolName = "bash"),
+        )))
+        assertEquals(1, projected.size)
+        assertEquals(2, projected.single().count)
+        assertEquals(listOf(AgentOperationKind.Inspect, AgentOperationKind.Execute),
+            projected.single().operationKinds)
+        assertTrue(projected.single().failed)
+        assertEquals(null, projected.single().toolContent)
+    }
+
+    @Test
+    fun semanticStageRetainsItsOwnOperationKindsAfterMergingEarlierTools() {
+        val merged = semanticWorkProcessNodes(listOf(
+            LocalWorkProcessNode(operationKinds = listOf(AgentOperationKind.Inspect), count = 1),
+            LocalWorkProcessNode(summary = "检查完成，进入执行", operationKinds = listOf(AgentOperationKind.Execute), count = 1),
+        ))
+        assertEquals(1, merged.size)
+        assertEquals(listOf(AgentOperationKind.Inspect, AgentOperationKind.Execute), merged.single().operationKinds)
+        assertEquals(2, merged.single().count)
+    }
+
+    @Test
+    fun workStepAlsoSupportsToolBeforeNarrationWithoutRepeatingGenericLabel() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("t1", "tool", "ok", toolName = "bash"),
+            message("t2", "tool", "ok", toolName = "read"),
+            message("p1", "progress", "完成两项检查，正在核对结果"),
+        )))
+        assertEquals(1, projected.size)
+        assertEquals("完成两项检查，正在核对结果", projected.single().summary)
+        assertEquals(2, projected.single().count)
+        assertEquals(null, projected.single().toolContent)
     }
 
     @Test
@@ -148,6 +188,33 @@ class LocalTranscriptPresentationTest {
         assertTrue(shouldShowInlineWorkPreview("开始修复新问题", "正在检查项目的最新代码"))
         assertFalse(shouldShowInlineWorkPreview("  ", null))
         assertTrue(shouldShowInlineWorkPreview("现在重新运行测试", null))
+    }
+
+    @Test
+    fun genericExecutionLabelsAreNotTreatedAsNarratedStages() {
+        assertEquals(null, localWorkProcessSummary("运行任务步骤"))
+        assertEquals(null, localWorkProcessSummary("处理当前步骤"))
+        assertEquals("已经定位问题", localWorkProcessSummary("已经定位问题"))
+    }
+
+    @Test
+    fun hiddenFailedMilestoneRemainsVisibleInRecentSteps() {
+        val nodes = listOf(
+            LocalWorkProcessNode(summary = "初始化", failed = true),
+            *List(8) { LocalWorkProcessNode(summary = "阶段$it") }.toTypedArray(),
+        )
+        val visible = visibleWorkProcessNodes(nodes, showAll = false, collapsedLimit = 5)
+        assertEquals(5, visible.size)
+        assertTrue(visible.first().failed)
+        assertEquals("阶段7", visible.last().summary)
+    }
+
+    @Test
+    fun inlineWorkStreamDisplaysOnlyUncommittedSuffix() {
+        assertEquals("下一段", inlineWorkPreviewText("已有内容下一段", "已有内容"))
+        assertEquals("", inlineWorkPreviewText("已有内容", "已有内容"))
+        assertEquals("", inlineWorkPreviewText("已有", "已有内容"))
+        assertEquals("不同阶段", inlineWorkPreviewText("不同阶段", "已有内容"))
     }
 
     @Test

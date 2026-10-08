@@ -21,6 +21,8 @@ import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalShellTool
+import com.labteto.dshmobile.local.tools.toolCapabilityTarget
+import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.long
@@ -274,10 +276,13 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     runtimeStateStore.historyBudgetFor(binding.aggregateSnapshot()).maxHistoryChars,
                 ),
             )
-            "capability_search" -> if (binding == null) {
-                root.execution.searchCapabilities(args.string("query"))
-            } else {
-                root.execution.searchCapabilities(args.string("query"), binding.enabledOptionalTools)
+            "capability_search" -> {
+                val target = toolCapabilityTarget(currentCoroutineContext(), binding?.enabledOptionalTools)
+                if (target == null) {
+                    root.execution.searchCapabilities(args.string("query"))
+                } else {
+                    root.execution.searchCapabilities(args.string("query"), target)
+                }
             }
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readModelSkill)
                 ?: workspace.modelSkillCatalog()

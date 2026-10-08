@@ -165,6 +165,7 @@ internal class LocalSubagentRunner(
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
         recoveredSoftStepLimit: Int? = null,
+        recoveredEnabledOptionalTools: Set<String> = emptySet(),
         resumeAfterCompletion: Boolean = false,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
     ): LocalSubagentResult {
@@ -191,6 +192,7 @@ internal class LocalSubagentRunner(
                     recoveredClaimedMessageIds = recoveredClaimedMessageIds,
                     recoveredStep = recoveredStep,
                     recoveredSoftStepLimit = recoveredSoftStepLimit,
+                    recoveredEnabledOptionalTools = recoveredEnabledOptionalTools,
                     resumeAfterCompletion = resumeAfterCompletion,
                     onCheckpointProgress = onCheckpointProgress,
                 )
@@ -207,6 +209,7 @@ internal class LocalSubagentRunner(
         recoveredClaimedMessageIds: Set<String>,
         recoveredStep: Int,
         recoveredSoftStepLimit: Int?,
+        recoveredEnabledOptionalTools: Set<String>,
         resumeAfterCompletion: Boolean,
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
     ): LocalSubagentResult {
@@ -277,7 +280,13 @@ internal class LocalSubagentRunner(
         val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
-        val enabledOptionalTools = linkedSetOf<String>()
+        val enabledOptionalTools = linkedSetOf<String>().apply {
+            addAll(recoveredEnabledOptionalTools)
+            // Explicit allowed_tools may name optional tools that are not yet active.
+            // Offer only these requested candidates; the effective schemas still enforce
+            // subagent access, network switch, prompt budget and the strict allowlist.
+            addAll(capabilities.toolAllowlist.orEmpty())
+        }
         val initialToolSchemas = schemas(
             allowMutation,
             virtualScreenId != null,
@@ -373,6 +382,7 @@ internal class LocalSubagentRunner(
                         history = durableModelHistorySnapshot(history.snapshot()),
                         claimedMessageIds = claimedMessageIds,
                         softStepLimit = totalBudgetLimit,
+                        enabledOptionalTools = enabledOptionalTools.toSet(),
                         terminalOutput = terminalOutput,
                         resultId = resultId,
                         resultFirst = previousResultId == null,

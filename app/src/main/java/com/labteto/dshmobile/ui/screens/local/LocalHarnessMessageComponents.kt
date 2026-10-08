@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -384,10 +385,12 @@ private fun LocalAssistantMessageContent(
                     )
                 }
                 if (body.isNotBlank()) {
-                    MarkdownText(
-                        body,
-                        bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
-                    )
+                    SelectionContainer {
+                        MarkdownText(
+                            body,
+                            bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                        )
+                    }
                 }
             }
             is LocalMessageBlock.Image -> LocalTranscriptImage(
@@ -567,17 +570,17 @@ internal fun ChatThinkingRow(
     messages: List<LocalHarnessMessage>,
     streaming: Boolean = false,
 ) {
-    if (messages.isEmpty() || !streaming) return
+    if (messages.isEmpty()) return
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        StateDot(StateDotState.Running, size = 8.dp)
+        StateDot(if (streaming) StateDotState.Running else StateDotState.Done, size = 8.dp)
         Text(
-            stringResource(R.string.local_process_thinking),
+            stringResource(if (streaming) R.string.local_process_thinking else R.string.local_work_thought),
             style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            color = DsTheme.colors.labelSecondary,
         )
     }
 }

@@ -35,4 +35,50 @@ class MarkdownTableTest {
     fun separatorRequiresRealDashCells() {
         assertTrue(isTableSeparator("| --- | :---: | ---: |"))
     }
+    @Test
+    fun nestedMixedListsKeepIndentationAndListKinds() {
+        val blocks = parseMarkdown("- 第一项\n  - 子项\n  1. 子序号\n- 第二项")
+        val list = blocks.single() as MdBlock.MdList
+        assertEquals(listOf("第一项", "子项", "子序号", "第二项"), list.items)
+        assertEquals(listOf(0, 1, 1, 0), list.levels)
+        assertEquals(listOf(false, false, true, false), list.numbered)
+    }
+
+    @Test
+    fun semanticCalloutsIdentifyImportantAndWarningWithoutChangingOrdinaryQuotes() {
+        assertEquals(MarkdownCalloutKind.QUOTE,
+            markdownCalloutKind(listOf("这里是一段需要清晰阅读的引用")))
+        assertEquals(MarkdownCalloutKind.IMPORTANT,
+            markdownCalloutKind(listOf("[!IMPORTANT]", "这里是重点")))
+        assertEquals(MarkdownCalloutKind.WARNING,
+            markdownCalloutKind(listOf("[!CAUTION]", "这里是注意事项")))
+        assertEquals(MarkdownCalloutKind.TIP,
+            markdownCalloutKind(listOf("[!TIP]", "这里是建议")))
+    }
+
+    @Test
+    fun longUnclosedFencedCodeStaysOneCodeBlock() {
+        val parsed = parseMarkdown("```kotlin\nval longLine = 1000")
+        assertEquals(1, parsed.size)
+        assertEquals("kotlin", (parsed.single() as MdBlock.Code).lang)
+        assertEquals("val longLine = 1000", (parsed.single() as MdBlock.Code).code)
+    }
+
+    @Test
+    fun unfinishedStreamingQuoteAndCodeFenceRemainReadable() {
+        val blocks = parseMarkdown(
+            """
+            > [!IMPORTANT]
+            > 应注意这一点
+
+            ```kotlin
+            val x = 1
+            """.trimIndent(),
+        )
+        assertEquals(2, blocks.size)
+        val quote = blocks[0] as MdBlock.Blockquote
+        assertEquals(MarkdownCalloutKind.IMPORTANT, markdownCalloutKind(quote.lines))
+        assertEquals("val x = 1", (blocks[1] as MdBlock.Code).code)
+    }
+
 }

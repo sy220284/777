@@ -613,6 +613,14 @@ internal object FeatherIcons {
     }
 
     /** `check` — selected row/model state. */
+    /** Neutral milestone completion; consistent with Feather's 24px stroke system. */
+    val CheckCircle: ImageVector by lazy {
+        feather("CheckCircle") {
+            circle(12f, 12f, 10f)
+            moveTo(8f, 12f); lineTo(11f, 15f); lineTo(16f, 10f)
+        }
+    }
+
     val Check: ImageVector by lazy {
         feather("Check") {
             moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f)
