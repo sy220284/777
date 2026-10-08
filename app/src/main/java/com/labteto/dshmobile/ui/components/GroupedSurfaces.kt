@@ -142,13 +142,30 @@ fun DsCategoryRow(
                 )
             }
             if (compactWithValue) {
-                Text(
-                    text = requireNotNull(value),
-                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                    color = colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // Keep the entire title column wide at accessibility font scales.
+                // The count and navigation affordance share the secondary row.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = requireNotNull(value),
+                        style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (trailing != null) {
+                        Spacer(Modifier.width(DsSpacing.small))
+                        trailing()
+                    } else if (onClick != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = FeatherIcons.ChevronRight,
+                            contentDescription = null,
+                            tint = colors.labelCaption,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
         }
         if (!compactWithValue) {
@@ -164,17 +181,19 @@ fun DsCategoryRow(
                 )
             }
         }
-        if (trailing != null) {
-            Spacer(Modifier.width(DsSpacing.small))
-            trailing()
-        } else if (onClick != null) {
-            Spacer(Modifier.width(6.dp))
-            Icon(
-                imageVector = FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = colors.labelCaption,
-                modifier = Modifier.size(16.dp),
-            )
+        if (!compactWithValue) {
+            if (trailing != null) {
+                Spacer(Modifier.width(DsSpacing.small))
+                trailing()
+            } else if (onClick != null) {
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
     }
 }
