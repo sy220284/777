@@ -166,7 +166,7 @@ internal class LocalToolExecutionCoordinator(
             target += matches.map(HarnessTool::name)
         }
         return buildString {
-            appendLine("已为当前回合启用 " + matches.size + " 个扩展工具：")
+            appendLine("已登记 " + matches.size + " 个候选扩展工具；具体能否使用以下一次模型请求实际提供的工具表为准：")
             matches.forEach { tool ->
                 append("- ").append(tool.name)
                 LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
@@ -174,6 +174,7 @@ internal class LocalToolExecutionCoordinator(
                 }
                 appendLine()
             }
+            append("候选工具仍受当前代理权限、可用性与模型工具表预算限制。")
         }.trimEnd()
     }
 

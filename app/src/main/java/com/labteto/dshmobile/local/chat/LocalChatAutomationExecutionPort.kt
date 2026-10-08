@@ -79,6 +79,30 @@ internal class LocalChatAutomationOwnership(
     }
 }
 
+/**
+ * The outer budget may expire after the visible slot was claimed but before the caller observes
+ * the result. Roll back on *every* failed acquire, even if the inner visible-owner timeout already
+ * attempted cleanup. The owner-checked release remains idempotent for another task's slot.
+ */
+internal suspend fun acquireAutomationVisibleTurnWithinBudget(
+    targetSessionId: String,
+    automationJob: Job?,
+    budget: LocalChatAutomationTimeoutBudget,
+    acquireVisibleTurn: suspend (String, Job?) -> Boolean,
+    releaseVisibleTurn: (String, Job?) -> Unit,
+): Boolean = try {
+    withTimeout(budget.remainingMillis()) {
+        acquireVisibleTurn(targetSessionId, automationJob)
+    }
+} catch (error: Throwable) {
+    try {
+        releaseVisibleTurn(targetSessionId, automationJob)
+    } catch (releaseError: Throwable) {
+        if (releaseError !== error) error.addSuppressed(releaseError)
+    }
+    throw error
+}
+
 internal suspend fun acquireAutomationChatOwnership(
     targetSessionId: String,
     automationJob: Job?,
@@ -86,9 +110,13 @@ internal suspend fun acquireAutomationChatOwnership(
     acquireVisibleTurn: suspend (String, Job?) -> Boolean,
     releaseVisibleTurn: (String, Job?) -> Unit,
 ): LocalChatAutomationOwnership {
-    val visibleTurnOwned = withTimeout(budget.remainingMillis()) {
-        acquireVisibleTurn(targetSessionId, automationJob)
-    }
+    val visibleTurnOwned = acquireAutomationVisibleTurnWithinBudget(
+        targetSessionId = targetSessionId,
+        automationJob = automationJob,
+        budget = budget,
+        acquireVisibleTurn = acquireVisibleTurn,
+        releaseVisibleTurn = releaseVisibleTurn,
+    )
     val sessionLease = try {
         budget.acquireSession(targetSessionId, LocalSessionRuntimeKind.AUTOMATION_CHAT)
     } catch (error: Throwable) {

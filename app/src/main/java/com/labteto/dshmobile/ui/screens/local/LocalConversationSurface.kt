@@ -409,7 +409,7 @@ internal fun LocalConversationSurface(
     )
     LocalWorkStreamingTailFollower(
         listState = listState,
-        enabled = showStreamingTail && state.usageMode == LocalUsageMode.WORK,
+        enabled = showStreamingTail,
     )
 
     LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
