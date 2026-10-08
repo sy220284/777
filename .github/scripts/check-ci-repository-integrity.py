@@ -175,7 +175,7 @@ for control_path in critical_architecture_controls:
 # before the cheap static smoke gates. The final merge gate remains authoritative.
 def ci_job_source(lane: str) -> str:
     match = re.search(
-        rf"(?ms)^  {re.escape(lane)}:\\n(.*?)(?=^  [a-z][a-z0-9-]*:\\n|\\Z)",
+        rf"(?ms)^  {re.escape(lane)}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
         CI,
     )
     if match is None:

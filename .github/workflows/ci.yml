@@ -135,7 +135,7 @@ jobs:
 
   static-gates:
     needs: scope
-    if: ${{ needs.scope.outputs.run_static == 'true' }}
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_static == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
