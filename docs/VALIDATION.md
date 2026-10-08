@@ -15,7 +15,7 @@
 ## 当前基线
 
 ```text
-777: 版本以 `.github/release-version` 为准（本次基线 0.12.0-777.164）
+777: 版本以 `.github/release-version` 为准（运行时以 `.github/release-version` 及实际构建产物为准）
 Android: min 36 / target 36 / compile 37
 Source language: Kotlin
 Build JDK: >= 21（CI / Artifact 基线为 JDK 21 LTS）

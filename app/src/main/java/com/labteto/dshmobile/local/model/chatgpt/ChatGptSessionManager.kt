@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
+import com.labteto.dshmobile.local.io.readBoundedBody
+
 import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import java.io.IOException
 import javax.inject.Inject
@@ -93,7 +95,7 @@ class ChatGptSessionManager @Inject constructor(
                 .build()
             withCancellableHttpResponse(http.newCall(discovery)) { response ->
                 if (!response.isSuccessful) return@withCancellableHttpResponse null
-                val body = response.body?.string().orEmpty()
+                val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
                 runCatching {
                     json.parseToJsonElement(body).jsonObject["revocation_endpoint"]
                         ?.jsonPrimitive?.contentOrNull
@@ -141,7 +143,7 @@ class ChatGptSessionManager @Inject constructor(
             .get()
             .build()
         withCancellableHttpResponse(http.newCall(request)) { response ->
-            val body = response.body?.string().orEmpty()
+            val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
             if (!response.isSuccessful) {
                 throw IOException("读取 ChatGPT 模型列表失败（HTTP ${response.code}）")
             }
@@ -195,7 +197,7 @@ class ChatGptSessionManager @Inject constructor(
             .header("Accept", "application/json")
             .build()
         withCancellableHttpResponse(http.newCall(request)) { response ->
-            val body = response.body?.string().orEmpty()
+            val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
             val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             if (!response.isSuccessful) {
                 val code = root?.get("error")?.jsonPrimitive?.contentOrNull
@@ -238,6 +240,7 @@ class ChatGptSessionManager @Inject constructor(
     }
 
     private companion object {
+        const val MAX_AUTH_RESPONSE_BYTES = 4 * 1024 * 1024
         const val REFRESH_EARLY_SECONDS = 90L
         const val REVOKE_ATTEMPTS = 3
         const val REVOKE_RETRY_BASE_MILLIS = 300L
