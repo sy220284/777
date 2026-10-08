@@ -151,6 +151,21 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun workStepAlsoSupportsToolBeforeNarrationWithoutRepeatingGenericLabel() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("t1", "tool", "ok", toolName = "bash"),
+            message("t2", "tool", "ok", toolName = "read"),
+            message("p1", "progress", "完成两项检查，正在核对结果"),
+        )))
+        assertEquals(1, projected.size)
+        assertEquals("完成两项检查，正在核对结果", projected.single().summary)
+        assertEquals(2, projected.single().count)
+        assertEquals(null, projected.single().toolContent)
+        assertEquals(null, localWorkProcessSummary("运行任务步骤"))
+        assertEquals(null, localWorkProcessSummary("处理当前步骤"))
+    }
+
+    @Test
     fun knownToolProvidersShowFriendlyNamesWithoutLeakingCommands() {
         assertEquals("GitHub", userFacingWorkToolProvider("mcp__GitHub__fetch"))
         assertEquals("Figma", userFacingWorkToolProvider("mcp__Figma__use_figma"))
