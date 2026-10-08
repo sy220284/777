@@ -130,6 +130,7 @@ fun DsCategoryRow(
                 color = colors.labelPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
             subtitle?.let {
                 Text(
