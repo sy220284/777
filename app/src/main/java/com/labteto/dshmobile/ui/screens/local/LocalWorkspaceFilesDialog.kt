@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,8 +23,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -40,6 +46,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
@@ -53,8 +63,19 @@ import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal enum class LocalFilesMode { WORKSPACE, CONVERSATION }
+
+private class FileSelectionUi(
+    val active: Boolean,
+    val selected: Set<String>,
+    val toggle: (String) -> Unit,
+    val begin: (String) -> Unit,
+)
+
+private val LocalFileSelectionUi = compositionLocalOf<FileSelectionUi?> { null }
 
 @Composable
 internal fun LocalWorkspaceFilesDialog(
@@ -78,6 +99,57 @@ internal fun LocalWorkspaceFilesDialog(
         mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
     }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
+    val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
+    var sharing by remember { mutableStateOf(false) }
+    var shareError by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
+    val chooserTitle = stringResource(R.string.local_files_share_chooser)
+    val failedText = stringResource(R.string.local_files_share_failed)
+    val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
+    val shareableFiles = when (mode) {
+        LocalFilesMode.WORKSPACE -> when (section) {
+            0 -> workspace.filter { it.path.substringBeforeLast('/', "") == directory }
+            1 -> conversation.involved
+            else -> conversation.artifacts
+        }
+        LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).distinctBy { it.path }
+    }.filter { isShareableWorkspacePath(it.path) }
+    val visibleSharePaths = shareableFiles.map { it.path }.distinct()
+
+    LaunchedEffect(visibleSharePaths) {
+        selected.retainAll(visibleSharePaths.toSet())
+    }
+
+    fun toggle(path: String) {
+        if (path !in visibleSharePaths || !isShareableWorkspacePath(path)) return
+        if (path in selected) selected.remove(path)
+        else if (selected.size < MAX_LOCAL_SHARE_FILES) selected.add(path)
+        else shareError = limitText
+    }
+
+    fun share(paths: List<String>) {
+        if (sharing || paths.isEmpty()) return
+        sharing = true
+        shareError = null
+        scope.launch {
+            try {
+                val intent = withContext(Dispatchers.IO) {
+                    createLocalWorkspaceShareIntent(context, workspacePath, paths)
+                }
+                context.startActivity(Intent.createChooser(intent, chooserTitle))
+                selected.clear()
+                selecting = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                shareError = failedText
+            } finally {
+                sharing = false
+            }
+        }
+    }
+
     val readFilesFailed = stringResource(R.string.local_files_read_failed)
     val previewFailed = stringResource(R.string.local_files_preview_failed)
 
@@ -99,6 +171,8 @@ internal fun LocalWorkspaceFilesDialog(
     }
 
     suspend fun reload() {
+        selected.clear()
+        selecting = false
         loading = true
         error = null
         preview = null
@@ -128,6 +202,11 @@ internal fun LocalWorkspaceFilesDialog(
 
     fun navigateBack() {
         when {
+            selecting -> {
+                selecting = false
+                selected.clear()
+                shareError = null
+            }
             preview != null || previewPath != null -> {
                 preview = null
                 previewPath = null
@@ -142,7 +221,8 @@ internal fun LocalWorkspaceFilesDialog(
     val hasInternalBackLayer =
         preview != null ||
             previewPath != null ||
-            (mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty())
+            (mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty()) ||
+            selecting
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
     Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
@@ -196,6 +276,95 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
+                if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
+                    if (selecting) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            Text(
+                                stringResource(R.string.local_files_selected_count, selected.size),
+                                modifier = Modifier.weight(1f),
+                                style = DsType.small13Strong.withReadingWeight(),
+                                color = DsTheme.colors.labelPrimary,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.common_cancel),
+                                onClick = { selecting = false; selected.clear(); shareError = null },
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Ghost,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(
+                                horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            DsButton(
+                                text = stringResource(R.string.local_files_select_all),
+                                onClick = {
+                                    selected.clear()
+                                    selected.addAll(visibleSharePaths.take(MAX_LOCAL_SHARE_FILES))
+                                    shareError = if (visibleSharePaths.size > MAX_LOCAL_SHARE_FILES) limitText else null
+                                },
+                                modifier = Modifier.weight(1f),
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Outline,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.local_files_share_selected),
+                                onClick = { share(selected.toList()) },
+                                modifier = Modifier.weight(1f),
+                                enabled = selected.isNotEmpty() && !sharing,
+                                size = DsButtonSize.Small,
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            DsButton(
+                                text = stringResource(R.string.local_files_select),
+                                onClick = { selecting = true },
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Ghost,
+                            )
+                        }
+                    }
+                }
+                if (preview != null && isShareableWorkspacePath(preview!!.file.path)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        DsButton(
+                            text = stringResource(R.string.local_files_share_one),
+                            onClick = { share(listOf(preview!!.file.path)) },
+                            enabled = !sharing,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                }
+                shareError?.let {
+                    Text(
+                        it,
+                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall),
+                        style = DsType.small13.withReadingWeight(),
+                        color = DsTheme.colors.error,
+                    )
+                }
+
+                CompositionLocalProvider(
+                    LocalFileSelectionUi provides FileSelectionUi(
+                        active = selecting,
+                        selected = selected.toSet(),
+                        toggle = ::toggle,
+                        begin = { path -> selecting = true; toggle(path) },
+                    ),
+                ) {
                 when {
                     loading -> {
                         DsPageLoadingState(
@@ -249,6 +418,8 @@ internal fun LocalWorkspaceFilesDialog(
                     else -> ConversationLocalFileList(conversation) { file ->
                                 openPreview(file.path)
                     }
+                }
+
                 }
 
                 if (previewLoading) {
@@ -439,6 +610,10 @@ private fun LocalDirectoryRow(
 @Composable
 private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     val colors = DsTheme.colors
+    val controls = LocalFileSelectionUi.current
+    val canShare = isShareableWorkspacePath(file.path)
+    val selecting = canShare && controls?.active == true
+    val selected = controls?.selected?.contains(file.path) == true
     val fileName = file.path.substringAfterLast('/')
     val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
     val dark = colors.bgBase.luminance() < 0.5f
@@ -455,10 +630,13 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
             if (dark) R.drawable.ic_ui_filetxt_dark else R.drawable.ic_ui_filetxt_light
     }
     Surface(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium),
+            .padding(horizontal = DsSpacing.medium)
+            .combinedClickable(
+                onClick = { if (selecting) controls?.toggle?.invoke(file.path) else onClick() },
+                onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
+            ),
         shape = DsShapes.row,
         color = colors.bgBase,
     ) {
@@ -494,12 +672,19 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = colors.labelCaption,
-                modifier = Modifier.size(16.dp),
-            )
+            if (selecting) {
+                DsCheckbox(
+                    checked = selected,
+                    onCheckedChange = { controls?.toggle?.invoke(file.path) },
+                )
+            } else {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
     }
 }
