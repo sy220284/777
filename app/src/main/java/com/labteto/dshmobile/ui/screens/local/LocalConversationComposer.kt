@@ -38,6 +38,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.ui.components.DsButton
@@ -79,6 +80,10 @@ internal fun LocalConversationComposer(
     teamDispatchSelected: Boolean = false,
     onClearTeamDispatch: () -> Unit = {},
     onStop: () -> Unit,
+    reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
+    onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
+    networkSearchEnabled: Boolean = true,
+    onNetworkSearchChange: (Boolean) -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
     onDisableAutoApprove: () -> Unit,
@@ -92,9 +97,11 @@ internal fun LocalConversationComposer(
     // Keep real TextField focus across session projection changes. Otherwise the IME can remain
     // visible while the composer is incorrectly reset to its idle one-row state.
     var focused by remember { mutableStateOf(false) }
+    var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
-    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() || teamDispatchSelected
+    // Both capability icons remain visible in the composer bottom row, even before focus.
+    val expanded = true
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
         groupChatReady &&
@@ -239,6 +246,17 @@ internal fun LocalConversationComposer(
         animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
+        capabilityPanel?.let { panel ->
+            LocalComposerCapabilityPanel(
+                panel = panel,
+                profile = activeModelProfile,
+                usageMode = state.usageMode,
+                reasoningMode = reasoningMode,
+                onReasoningModeChange = onReasoningModeChange,
+                networkSearchEnabled = networkSearchEnabled,
+                onNetworkSearchChange = onNetworkSearchChange,
+            )
+        }
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -345,6 +363,15 @@ internal fun LocalConversationComposer(
             state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
+            capabilityControls = {
+                LocalComposerCapabilityActions(
+                    profile = activeModelProfile,
+                    usageMode = state.usageMode,
+                    reasoningMode = reasoningMode,
+                    networkSearchEnabled = networkSearchEnabled,
+                    onSelectPanel = { name -> capabilityPanel = if (capabilityPanel == name) null else name },
+                )
+            },
             stopControl = { StopControl() },
             sendControl = { queue -> SendControl(queue) },
         )
