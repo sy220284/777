@@ -88,7 +88,7 @@ def build(font_file, res, ui, directory):
     chars = requested & available
     key = hashlib.sha256((origin + "|" + ",".join(map(str, sorted(chars))) + "|v2").encode()).hexdigest()
     directory.mkdir(parents=True, exist_ok=True)
-    manifest = directory / "subset-manifest.json"
+    manifest = directory.parents[1] / "ui-font-subset-manifest.json"
     targets = [directory / f"ui_noto_sc_{w}.ttf" for w in WEIGHTS]
     if all(p.is_file() for p in targets) and manifest.is_file():
         if json.loads(manifest.read_text(encoding="utf-8")).get("fingerprint") == key:
