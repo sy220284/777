@@ -353,6 +353,7 @@ fun SettingsScreen(
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = page == SettingsDestination.ROOT,
+                    plainBackButton = page == SettingsDestination.ROOT,
                     modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
@@ -379,71 +380,76 @@ fun SettingsScreen(
                 ) {
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
-                        // The main settings view is a calm navigation list.
-                        // The first card contains frequently used destinations; details belong to subpages.
-                        AppSettingsSection {
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
                             AppSettingsRow(
                                 icon = FeatherIcons.User,
                                 title = stringResource(R.string.settings_account),
                                 onClick = { accountReturnPage = SettingsDestination.ROOT; page = SettingsDestination.ACCOUNT },
+                                compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Bell,
                                 title = stringResource(R.string.settings_page_notifications),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
+                                compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_appearance),
                                 onClick = { page = SettingsDestination.APPEARANCE },
+                                compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.MessageCircle,
                                 title = stringResource(R.string.settings_page_session),
                                 onClick = { page = SettingsDestination.SESSION },
+                                compact = true,
                             )
-                            AppSettingsDivider()
+                        }
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
                             AppSettingsRow(
                                 icon = FeatherIcons.Globe,
                                 title = stringResource(R.string.settings_page_models),
                                 onClick = { page = SettingsDestination.MODELS },
+                                compact = true,
                             )
-                        }
-
-                        SettingsGroupTitle(stringResource(R.string.settings_group_models))
-                        AppSettingsSection {
+                            AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Clock,
+                                icon = FeatherIcons.CreditCard,
                                 title = stringResource(R.string.settings_page_model_usage),
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
+                                compact = true,
                             )
-                        }
-
-                        SettingsGroupTitle(stringResource(R.string.settings_group_experience))
-                        AppSettingsSection {
+                            AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,
                                 title = stringResource(R.string.settings_page_memory),
                                 onClick = { page = SettingsDestination.MEMORY },
+                                compact = true,
                             )
                         }
-
-                        SettingsGroupTitle(stringResource(R.string.settings_group_system))
-                        AppSettingsSection {
-                            AppSettingsRow(icon = FeatherIcons.Shield,
-                                title = stringResource(R.string.settings_page_permissions),
-                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
-                                onClick = { page = SettingsDestination.PERMISSIONS })
-                        }
-                        SettingsGroupTitle(stringResource(R.string.settings_group_maintenance))
-                        AppSettingsSection {
+                        AppSettingsMenuGroup(stringResource(R.string.settings_group_system_maintenance)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = FeatherIcons.Shield,
+                                title = stringResource(R.string.settings_page_permissions),
+                                value = stringResource(when {
+                                    deviceCapabilities.loading -> R.string.common_loading
+                                    deviceCapabilities.error != null -> R.string.settings_permissions_check_failed
+                                    deviceCapabilities.accessibility && deviceCapabilities.notifications && deviceCapabilities.virtualDisplay -> R.string.settings_permissions_ready
+                                    else -> R.string.settings_permissions_needs_setup
+                                }),
+                                onClick = { page = SettingsDestination.PERMISSIONS },
+                                compact = true,
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.SettingsOutline,
                                 title = stringResource(R.string.settings_page_advanced),
                                 onClick = { page = SettingsDestination.ADVANCED },
+                                compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
@@ -451,6 +457,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_update_check),
                                 value = updateStatus,
                                 onClick = onCheckUpdate,
+                                compact = true,
                             )
                         }
                         Text(
@@ -1136,14 +1143,6 @@ private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
     settings.notifyNeedsAction,
     settings.notifyLocalJobs,
 ).count { it }
-
-private fun deviceCapabilitiesState(state: DeviceCapabilitiesState): StateDotState = when {
-    state.loading -> StateDotState.Running
-    state.error != null -> StateDotState.Error
-    state.accessibility && state.notifications && state.virtualDisplay -> StateDotState.Done
-    state.accessibility || state.notifications -> StateDotState.Warning
-    else -> StateDotState.Idle
-}
 
 private const val MAX_CUSTOM_CHAT_FILTERS = 50
 private const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32

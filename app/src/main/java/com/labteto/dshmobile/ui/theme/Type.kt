@@ -60,6 +60,10 @@ object DsType {
     val navigationItem = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 26.sp)
     val navigationSupporting = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 22.sp)
     val navigationSection = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 22.sp)
+    val drawerItem = navigationItem.copy(fontWeight = FontWeight.Medium)
+    val drawerSession = navigationItem.copy(fontWeight = FontWeight.Normal)
+    val drawerSection = navigationSection.copy(fontWeight = FontWeight.Normal)
+    val settingsItem = navigationItem.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium)
 
     // Composer / rows / chat
     // User and assistant body text deliberately share the exact same metrics. Role distinction comes

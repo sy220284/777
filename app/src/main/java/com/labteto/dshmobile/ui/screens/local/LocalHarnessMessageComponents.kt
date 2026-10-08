@@ -93,6 +93,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -149,6 +150,13 @@ internal fun LocalMessageRow(
     val variantSelectionFailedMessage = stringResource(R.string.local_select_variant_failed)
     val variantScope = rememberCoroutineScope()
     var selectingVariant by remember(message.id) { mutableStateOf(false) }
+    var copied by remember(message.id, message.content) { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1500)
+            copied = false
+        }
+    }
     val selectVariantWithFeedback: (String, Int) -> Unit = { id, index ->
         if (!selectingVariant) {
             selectingVariant = true
@@ -295,16 +303,19 @@ internal fun LocalMessageRow(
                     }
                     if (visibleContent.isNotBlank()) {
                         CompactMessageAction(
-                            icon = FeatherIcons.Copy,
-                            contentDescription = stringResource(R.string.chat_copy_answer),
+                            icon = if (copied) FeatherIcons.Check else FeatherIcons.MessageCopy,
+                            iconSize = 22.dp,
+                            contentDescription = if (copied) copiedMessage else stringResource(R.string.chat_copy_answer),
                             onClick = {
                                 clipboard.setText(AnnotatedString(visibleContent))
+                                copied = true
                                 Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                             },
                         )
                     }
                     if (canRegenerate) CompactMessageAction(
-                        icon = FeatherIcons.RefreshCw,
+                        icon = FeatherIcons.Retry,
+                        iconSize = 22.dp,
                         contentDescription = stringResource(R.string.local_regenerate_reply),
                         onClick = {
                             if (!onRegenerate(message.id)) {
@@ -518,6 +529,7 @@ internal fun CompactMessageAction(
     contentDescription: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    iconSize: androidx.compose.ui.unit.Dp = 18.dp,
 ) {
     val colors = DsTheme.colors
     Surface(
@@ -531,8 +543,8 @@ internal fun CompactMessageAction(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = colors.labelTertiary.copy(alpha = if (enabled) 0.82f else 0.34f),
-                modifier = Modifier.size(18.dp),
+                tint = if (enabled) colors.labelTertiary else colors.labelTertiary.copy(alpha = 0.38f),
+                modifier = Modifier.size(iconSize),
             )
         }
     }
