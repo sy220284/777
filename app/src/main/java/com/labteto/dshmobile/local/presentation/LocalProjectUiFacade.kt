@@ -6,7 +6,7 @@ import javax.inject.Singleton
 
 /** Narrow ProjectFeature presentation API: no direct store or mutable domain state is exposed. */
 @Singleton
-internal class LocalProjectUiFacade @Inject constructor(
+class LocalProjectUiFacade @Inject constructor(
     private val runtime: LocalProjectFeatureRuntime,
 ) {
     val catalog get() = runtime.catalog
