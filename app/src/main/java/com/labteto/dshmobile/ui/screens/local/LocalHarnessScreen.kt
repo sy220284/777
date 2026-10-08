@@ -176,6 +176,9 @@ fun LocalHarnessScreen(
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
+    var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
+    var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
@@ -213,6 +216,24 @@ fun LocalHarnessScreen(
             .filterNot { it == LocalFeaturePage.HOME }
             .forEach { featureStateHolder.removeState(it.name) }
         featureStack = localFeatureHome()
+    }
+
+    fun handoffWorkCapability(prompt: String) {
+        composerHandoff = listOf(shell.sessionId, prompt)
+        taskMode = null
+        toolsStartAtPlugins = false
+        toolsStartAtSkills = false
+        resetFeatureNavigation()
+    }
+
+    fun useWorkCapability(prompt: String) {
+        if (shell.usageMode == LocalUsageMode.WORK && !shell.loading) {
+            handoffWorkCapability(prompt)
+        } else {
+            pendingWorkCapability = prompt
+            workCapabilityConfirmed = false
+            workCapabilityFailed = false
+        }
     }
 
     val shellActions = LocalShellFeatureUiActions(
@@ -307,6 +328,7 @@ fun LocalHarnessScreen(
             onPushFeature = ::pushFeature,
             onNewSession = { showNewSessionMode = true },
             onOpenDrawer = { scope.launch { drawerState.open() } },
+            onUseWorkCapability = ::useWorkCapability,
             composerHandoff = composerHandoff,
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
             onOpenPlugins = { toolsStartAtSkills = false; toolsStartAtPlugins = true; pushFeature(LocalFeaturePage.TOOLS) },
@@ -338,11 +360,7 @@ fun LocalHarnessScreen(
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
-            onCreateViaChat = { prompt ->
-                composerHandoff = listOf(shell.sessionId, prompt)
-                taskMode = null
-                resetFeatureNavigation()
-            },
+            onCreateViaChat = ::useWorkCapability,
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
             onResetNavigation = ::resetFeatureNavigation,
@@ -353,12 +371,7 @@ fun LocalHarnessScreen(
         localToolsFeatureUiContribution(
             startAtPlugins = toolsStartAtPlugins,
             startAtSkills = toolsStartAtSkills,
-            onUseCapability = { prompt ->
-                composerHandoff = listOf(shell.sessionId, prompt)
-                toolsStartAtPlugins = false
-                toolsStartAtSkills = false
-                resetFeatureNavigation()
-            },
+            onUseCapability = ::useWorkCapability,
             onTaskModeChange = { taskMode = it },
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
@@ -408,6 +421,19 @@ fun LocalHarnessScreen(
                 delay(250)
                 if (!shell.loading && shell.usageMode != pending) pendingUsageMode = null
             }
+        }
+    }
+
+    LaunchedEffect(workCapabilityConfirmed, pendingUsageMode, shell.loading, shell.usageMode, shell.sessionId) {
+        val prompt = pendingWorkCapability ?: return@LaunchedEffect
+        if (!workCapabilityConfirmed) return@LaunchedEffect
+        if (shell.usageMode == LocalUsageMode.WORK && !shell.loading) {
+            handoffWorkCapability(prompt)
+            pendingWorkCapability = null
+            workCapabilityConfirmed = false
+        } else if (pendingUsageMode == null && !shell.loading) {
+            workCapabilityConfirmed = false
+            workCapabilityFailed = true
         }
     }
 
@@ -567,6 +593,23 @@ fun LocalHarnessScreen(
                 LocalFeaturePageContent(renderedPage, featureContributions)
             }
         }
+    }
+
+    if (pendingWorkCapability != null) {
+        LocalWorkCapabilitySheet(
+            switching = workCapabilityConfirmed,
+            failed = workCapabilityFailed,
+            enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+            onContinue = {
+                workCapabilityConfirmed = true
+                workCapabilityFailed = false
+                switchUsageMode(LocalUsageMode.WORK)
+            },
+            onDismiss = {
+                pendingWorkCapability = null
+                workCapabilityConfirmed = false
+            },
+        )
     }
 
     if (showNewSessionMode) {

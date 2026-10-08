@@ -178,6 +178,7 @@ internal fun LocalConversationSurface(
     onOpenPlugins: () -> Unit = onOpenTools,
     onOpenSkills: () -> Unit = onOpenTools,
     onOpenDrawer: (() -> Unit)? = null,
+    onUseWorkCapability: ((String) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
@@ -1113,7 +1114,8 @@ internal fun LocalConversationSurface(
                 icon = FeatherIcons.Globe,
                 onClick = {
                     showAttachmentPicker = false
-                    drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
+                    if (onUseWorkCapability != null) onUseWorkCapability(webPrompt)
+                    else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
             DsButton(

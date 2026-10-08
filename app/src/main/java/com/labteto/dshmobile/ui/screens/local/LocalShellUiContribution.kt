@@ -33,6 +33,7 @@ internal fun localShellFeatureUiContribution(
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
     composerHandoff: List<String>,
+    onUseWorkCapability: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
     onOpenPlugins: () -> Unit,
     onOpenSkills: () -> Unit,
@@ -48,6 +49,7 @@ internal fun localShellFeatureUiContribution(
         LocalConversationSurface(
             state = surface,
             composerHandoff = composerHandoff,
+            onUseWorkCapability = onUseWorkCapability,
             onConsumeComposerHandoff = onConsumeComposerHandoff,
             onOpenPlugins = onOpenPlugins,
             onOpenSkills = onOpenSkills,
