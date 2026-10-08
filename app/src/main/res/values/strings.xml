@@ -1791,6 +1791,7 @@
     <string name="local_composer_web_title">联网搜索</string>
     <string name="local_composer_web_work_only">普通聊天暂不支持联网工具，请切换到工作模式</string>
     <string name="local_composer_web_work_label">仅工作</string>
+    <string name="local_composer_web_to_work">切换到工作模式搜索</string>
     <string name="local_composer_web_online">联网</string>
     <string name="local_composer_web_offline">离线</string>
     <string name="local_composer_web_on_action">联网搜索：开启</string>
