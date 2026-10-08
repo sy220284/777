@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -21,8 +22,8 @@ enum class LocalUsageMode {
 data class LocalHarnessState(
     val loading: Boolean = true,
     val modelState: LocalModelState = LocalModelState(),
-    val mainMaxSteps: Int = 16,
-    val subagentMaxSteps: Int = 20,
+    val mainMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_MAIN_MAX_STEPS,
+    val subagentMaxSteps: Int = LocalAgentRuntimeSettings.DEFAULT_SUBAGENT_MAX_STEPS,
     val workspacePath: String = "",
     val sessionId: String = "",
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
