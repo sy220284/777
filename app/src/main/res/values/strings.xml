@@ -1675,8 +1675,16 @@
     <string name="settings_approval_mode_manual">手动批准</string>
     <string name="settings_approval_mode_auto">全自动</string>
     <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
+    <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
     <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
     <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
-    <string name="tasks_schedule_monthly">每月</string>
+    <string name="local_project_management_title">项目管理</string>
+    <string name="local_project_back">返回</string>
+    <string name="local_project_new_session_hint">切换项目只影响之后新建的项目会话，已有会话保留原项目归属。</string>
+    <string name="local_project_name_hint">新项目名称</string>
+    <string name="local_project_create">创建项目</string>
+    <string name="local_project_instruction_label">项目指令 · %1$s</string>
+    <string name="local_project_instruction_hint">本项目长期工作规则</string>
+    <string name="local_project_save_instruction">保存项目指令</string>
 </resources>
 
