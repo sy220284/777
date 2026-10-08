@@ -11,11 +11,25 @@ import com.labteto.dshmobile.local.model.LocalReasoningModeStore
  * Narrow presentation façade for the conversation's native reasoning-mode switch.
  * UI doesn't own model provider policy or preference persistence.
  */
-internal enum class LocalReasoningUiMode { DEFAULT, FAST, DEEP }
+internal enum class LocalReasoningUiMode { DEFAULT, FAST, LOW, DEEP, MAX }
 
 internal object LocalReasoningControls {
     fun mode(sessionId: String): LocalReasoningUiMode =
         LocalReasoningUiMode.valueOf(LocalReasoningModeStore.mode(sessionId).name)
+
+    fun availableModes(profile: LocalModelProfile?, mode: LocalUsageMode): List<LocalReasoningUiMode> {
+        val policy = LocalReasoningRequestPolicy.resolve(profile, mode == LocalUsageMode.WORK)
+            ?: return emptyList()
+        return buildList {
+            add(LocalReasoningUiMode.FAST)
+            if (policy.lowEffort != null) add(LocalReasoningUiMode.LOW)
+            add(LocalReasoningUiMode.DEEP)
+            if (policy.maxEffort != null) add(LocalReasoningUiMode.MAX)
+        }
+    }
+
+    fun setMode(sessionId: String, mode: LocalReasoningUiMode) =
+        LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.valueOf(mode.name))
 
     fun restoreDefault(sessionId: String) = LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.DEFAULT)
 
