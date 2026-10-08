@@ -34,4 +34,42 @@ class LocalWorkArtifactProjectionTest {
         val declaration = event(9, "unconfirmed.md").copy(type = "tool/call")
         assertTrue(projectLocalWorkArtifacts(listOf(declaration)).isEmpty())
     }
+
+    @Test fun completedWorkspaceResultsBecomeVisibleWithoutSyntheticPathFields() {
+        val succeeded = LocalSessionEventLog.Event(
+            sequence = 12, type = "tool/result", createdAt = 12,
+            data = buildJsonObject {
+                put("id", "call-12")
+                put("name", "write_file")
+                put("content", "已写入 reports/final.md（17 字节）")
+                put("is_error", false)
+            },
+        )
+        val artifacts = projectLocalWorkArtifacts(listOf(succeeded))
+        assertEquals(1, artifacts.size)
+        assertEquals("reports/final.md", artifacts.single().reference)
+        assertEquals("call-12", artifacts.single().sourceCallId)
+    }
+
+    @Test fun failedOrUntrustedToolTextCannotFabricateArtifacts() {
+        fun emitted(seq: Long, name: String, content: String, failed: Boolean = false) =
+            LocalSessionEventLog.Event(
+                sequence = seq, type = "tool/result", createdAt = seq,
+                data = buildJsonObject {
+                    put("id", "call-$seq")
+                    put("name", name)
+                    put("content", content)
+                    put("is_error", failed)
+                },
+            )
+        val artifacts = projectLocalWorkArtifacts(listOf(
+            emitted(1, "read_file", "已写入 fake.md（10 字节）"),
+            emitted(2, "write_file", "写入失败：blocked.md"),
+            emitted(3, "present", "成果已确认：failed.md（10 字节）", failed = true),
+            emitted(4, "edit_file", "已编辑 ../escape.md"),
+            emitted(5, "present", "成果已确认：docs/confirmed.md（8 字节）"),
+        ))
+        assertEquals(listOf("docs/confirmed.md"), artifacts.map { it.reference })
+    }
+
 }
