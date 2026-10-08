@@ -269,7 +269,11 @@ class HarnessWebhookService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ensureForeground()
+        if (!runCatching { ensureForeground() }.isSuccess) {
+            controller.markStartFailed(intent?.getIntExtra(WebhookController.EXTRA_PORT, -1) ?: -1)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val persisted = controller.runtimeConfig()
         if (!persisted.enabled) {
             stopSelf()
