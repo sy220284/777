@@ -1,18 +1,35 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.Manifest
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.ui.components.DS_COMPOSER_FIELD_TAG
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
+import org.junit.rules.RuleChain
 
 /** Check a real cold-started shell, including its initial asynchronous state. */
 class LocalColdStartupRegressionTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private val compose = createAndroidComposeRule<MainActivity>()
+    private val notificationPermission = object : ExternalResource() {
+        override fun before() {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            // MainActivity requests this permission on first launch. Resolve the system
+            // dialog before launching so it cannot pause the lifecycle being tested.
+            instrumentation.uiAutomation.grantRuntimePermission(
+                instrumentation.targetContext.packageName,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+    }
+    @get:Rule val rules: RuleChain = RuleChain.outerRule(notificationPermission).around(compose)
 
     @Test
     fun coldLaunchRendersComposerWithNoModeIntroduction() {
@@ -39,9 +56,12 @@ class LocalColdStartupRegressionTest {
                     automation.executeShellCommand("logcat -d -b crash -t 60"),
                 ).bufferedReader().use { it.readText().takeLast(8_000) }
             }.getOrElse { "unavailable: ${it.message}" }
+            val hierarchy = runCatching {
+                compose.onRoot(useUnmergedTree = true).printToString().take(8_000)
+            }.getOrElse { "unavailable: ${it.message}" }
             throw AssertionError(
                 "MainActivity did not render its composer within 30 seconds. " +
-                    "Crash buffer:\n$crashBuffer",
+                    "Crash buffer:\n$crashBuffer\nCompose hierarchy:\n$hierarchy",
                 failure,
             )
         }
