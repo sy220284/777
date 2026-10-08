@@ -533,8 +533,8 @@ class DeepSeekClient @Inject constructor(
         const val MODEL_READ_TIMEOUT_SECONDS = 180L
         const val MODEL_WRITE_TIMEOUT_SECONDS = 60L
         const val MODEL_CALL_TIMEOUT_SECONDS = 210L
-        private const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
-        const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
+        const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
+        private const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
     }
 }
 
