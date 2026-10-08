@@ -151,6 +151,7 @@ fun ChatListDrawer(
     val hostInfo by store.hostInfo.collectAsStateWithLifecycle()
 
     var query by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
     // Persisted, not remembered: the order you read your sessions in is a preference, and it used
     // to reset every time the drawer was closed.
     val sessionSort by hostsStore.sessionSort.collectAsStateWithLifecycle(initialValue = SORT_MANUAL)
@@ -232,6 +233,15 @@ fun ChatListDrawer(
             Spacer(Modifier.width(DsSpacing.small))
             Text(stringResource(R.string.app_name), style = DsType.title22.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
+                icon = FeatherIcons.Search,
+                contentDescription = stringResource(R.string.common_search),
+                onClick = { searchOpen = true },
+                tint = colors.labelPrimary,
+                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
+                shadowElevation = 2.dp,
+            )
+            Spacer(Modifier.width(DsSpacing.xsmall))
+            DsIconButton(
                 icon = FeatherIcons.Plus,
                 contentDescription = stringResource(R.string.chatlist_new_session),
                 onClick = { newSessionOpen = true },
@@ -241,23 +251,25 @@ fun ChatListDrawer(
             )
         }
 
+        if (searchOpen) {
         DsTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
-            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.navigationSupporting.withReadingWeight()) },
-            leadingIcon = {
-                Icon(
-                    FeatherIcons.Search,
-                    contentDescription = null,
-                    tint = colors.labelTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
-            singleLine = true,
-            shape = DsShapes.pillFull,
-            flat = true,
-        )
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
+                placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.navigationSupporting.withReadingWeight()) },
+                leadingIcon = {
+                    Icon(
+                        FeatherIcons.Search,
+                        contentDescription = null,
+                        tint = colors.labelTertiary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                singleLine = true,
+                shape = DsShapes.pillFull,
+                flat = true,
+            )
+            }
         if (!contentSearchAvailable && query.isNotBlank()) {
             Text(
                 stringResource(R.string.chatlist_search_content_off),
@@ -472,7 +484,7 @@ fun ChatListDrawer(
                     },
                 )
                 DsCategoryRow(
-                    icon = FeatherIcons.Sliders,
+                    icon = FeatherIcons.Gear,
                     title = stringResource(R.string.settings_title),
                     iconFamily = DsIconFamily.Neutral,
                     titleTextStyle = DsType.navigationItem,

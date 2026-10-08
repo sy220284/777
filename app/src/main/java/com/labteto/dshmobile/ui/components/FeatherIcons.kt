@@ -349,6 +349,20 @@ internal object FeatherIcons {
         }
     }
 
+    /** settings — compact settings entry. */
+    val Gear: ImageVector by lazy {
+        feather("Gear") {
+            circle(12f, 12f, 3f)
+            moveTo(19.4f, 15f); lineTo(21f, 16f); lineTo(19f, 19f); lineTo(17.4f, 18f)
+            moveTo(15f, 19.4f); lineTo(16f, 21f); lineTo(12f, 22f); lineTo(11f, 20.2f)
+            moveTo(9f, 19.4f); lineTo(8f, 21f); lineTo(4f, 19f); lineTo(5.6f, 17.4f)
+            moveTo(4.6f, 15f); lineTo(3f, 16f); lineTo(1f, 12f); lineTo(3f, 11f)
+            moveTo(4.6f, 9f); lineTo(3f, 8f); lineTo(5f, 4f); lineTo(6.6f, 5.6f)
+            moveTo(9f, 4.6f); lineTo(8f, 3f); lineTo(12f, 1f); lineTo(13f, 3f)
+            moveTo(15f, 4.6f); lineTo(16f, 3f); lineTo(20f, 5f); lineTo(18.4f, 6.6f)
+            moveTo(19.4f, 9f); lineTo(21f, 8f); lineTo(23f, 12f); lineTo(21f, 13f)
+        }
+    }
     /** `map-pin`-like push pin — pinned conversation state. */
     val Pin: ImageVector by lazy {
         feather("Pin") {
