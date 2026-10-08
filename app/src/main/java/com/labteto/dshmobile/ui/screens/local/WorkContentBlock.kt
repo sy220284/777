@@ -48,15 +48,19 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         Text(
             summary,
             modifier = Modifier.weight(1f),
-            style = DsType.small13.withReadingWeight(),
-            color = if (node.failed) colors.error else if (running) colors.labelPrimary else colors.labelSecondary,
-            maxLines = 2,
+            style = if (node.summary != null) DsType.mdSmall.withReadingWeight()
+                else DsType.small13.withReadingWeight(),
+            color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
+                else colors.labelSecondary,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            stringResource(agentOperationStatusRes(running, node.failed)),
-            style = DsType.caption11.withReadingWeight(),
-            color = if (node.failed) colors.error else colors.labelTertiary,
-        )
+        if (node.failed || running) {
+            Text(
+                stringResource(agentOperationStatusRes(running, node.failed)),
+                style = DsType.caption11.withReadingWeight(),
+                color = if (node.failed) colors.error else colors.accent,
+            )
+        }
     }
 }
