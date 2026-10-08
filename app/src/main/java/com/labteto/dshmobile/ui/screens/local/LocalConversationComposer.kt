@@ -125,10 +125,8 @@ internal fun LocalConversationComposer(
     }
 
     fun submit() {
-        if (!state.configured) {
-            onConfigure()
-            return
-        }
+        // Sending is a conversation action, even when the model is not configured.
+        // Let the send coordinator reject it with visible feedback and keep the draft.
         val result = if (
             state.usageMode == LocalUsageMode.WORK && teamDispatchSelected
         ) {
