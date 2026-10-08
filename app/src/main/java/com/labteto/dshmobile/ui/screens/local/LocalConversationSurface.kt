@@ -73,7 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
-import com.labteto.dshmobile.local.model.LocalReasoningModeStore
+import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -182,8 +182,8 @@ internal fun LocalConversationSurface(
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     var reasoningEnabled by remember(state.sessionId) {
-        LocalReasoningModeStore.attach(appContext)
-        mutableStateOf(LocalReasoningModeStore.enabled(state.sessionId))
+        LocalReasoningControls.attach(appContext)
+        mutableStateOf(LocalReasoningControls.enabled(state.sessionId))
     }
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -1121,9 +1121,7 @@ internal fun LocalConversationSurface(
                     else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
-            val reasoningAvailable = LocalReasoningModeStore.isSupported(
-                activeModelProfile, withTools = state.usageMode == LocalUsageMode.WORK,
-            )
+            val reasoningAvailable = LocalReasoningControls.isSupported(activeModelProfile, state.usageMode)
             DsSheetChoiceRow(
                 title = stringResource(R.string.local_reasoning_switch_title),
                 subtitle = stringResource(
@@ -1135,7 +1133,7 @@ internal fun LocalConversationSurface(
                 enabled = reasoningAvailable && !state.running,
                 onClick = {
                     val next = !reasoningEnabled
-                    LocalReasoningModeStore.setEnabled(state.sessionId, next)
+                    LocalReasoningControls.setEnabled(state.sessionId, next)
                     reasoningEnabled = next
                 },
             )

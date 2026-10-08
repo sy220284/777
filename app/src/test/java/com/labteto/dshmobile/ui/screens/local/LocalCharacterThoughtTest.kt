@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.chat.extractLocalCharacterThought
+import com.labteto.dshmobile.local.presentation.extractLocalCharacterThought
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

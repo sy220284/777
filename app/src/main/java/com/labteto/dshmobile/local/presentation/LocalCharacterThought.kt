@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.chat
+package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 
