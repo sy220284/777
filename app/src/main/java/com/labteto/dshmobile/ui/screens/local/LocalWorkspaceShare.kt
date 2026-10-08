@@ -21,18 +21,18 @@ internal fun isShareableWorkspacePath(path: String): Boolean {
 
 /** Verify every chosen file again immediately before sending an Android share intent. */
 internal fun resolveLocalWorkspaceShareFiles(root: File, paths: List<String>): List<File> {
-    require(paths.isNotEmpty()) { "请先选择文件" }
-    require(paths.size <= MAX_LOCAL_SHARE_FILES) { "单次最多分享 $MAX_LOCAL_SHARE_FILES 个文件" }
+    require(paths.isNotEmpty()) { "share_selection_empty" }
+    require(paths.size <= MAX_LOCAL_SHARE_FILES) { "share_selection_limit" }
     val canonicalRoot = root.canonicalFile
-    require(canonicalRoot.isDirectory) { "工作区暂时不可用" }
+    require(canonicalRoot.isDirectory) { "share_workspace_missing" }
     val resolved = paths.distinct().map { path ->
-        require(isShareableWorkspacePath(path)) { "不能分享应用内部资料或无效文件" }
+        require(isShareableWorkspacePath(path)) { "share_invalid_relative_path" }
         val requested = File(canonicalRoot, path)
         val actual = requested.canonicalFile
         require(actual.toPath().startsWith(canonicalRoot.toPath()) &&
             actual.toPath() == requested.toPath().normalize()
-        ) { "文件已移动，或超出了工作区范围" }
-        require(actual.isFile && actual.canRead()) { "文件已不存在或无法读取：${path.substringAfterLast('/')}" }
+        ) { "share_outside_workspace" }
+        require(actual.isFile && actual.canRead()) { "share_file_missing" }
         actual
     }
     return resolved
@@ -66,7 +66,7 @@ internal fun createLocalWorkspaceShareIntent(
 ): Intent {
     val appWorkspace = File(context.filesDir, "local-harness/workspace").canonicalFile
     require(workspacePath.isNotBlank() && File(workspacePath).canonicalFile == appWorkspace) {
-        "工作区位置已变化，请重新打开文件列表"
+        "share_workspace_changed"
     }
     val files = resolveLocalWorkspaceShareFiles(appWorkspace, selectedPaths)
     val uris = files.map { file ->
