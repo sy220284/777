@@ -38,15 +38,28 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
  * Section headers live outside it so the content reads as a menu, not stacked cards.
  */
 @Composable
-internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
+internal fun AppSettingsSection(compact: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     val colors = DsTheme.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         tonalElevation = 0.dp,
     ) {
         Column(Modifier.padding(vertical = DsSpacing.tiny), content = content)
+    }
+}
+
+@Composable
+internal fun AppSettingsMenuGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Text(
+            text = title,
+            style = DsType.navigationSection.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+            modifier = Modifier.padding(start = DsSpacing.medium),
+        )
+        AppSettingsSection(compact = true, content = content)
     }
 }
 
@@ -80,14 +93,15 @@ internal fun AppSettingsRow(
     value: String? = null,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val colors = DsTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = if (compact) 56.dp else 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+            .padding(horizontal = DsSpacing.comfortable, vertical = if (compact) DsSpacing.small else DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
@@ -95,14 +109,14 @@ internal fun AppSettingsRow(
             Icon(
                 it,
                 contentDescription = null,
-                tint = colors.labelPrimary,
-                modifier = Modifier.size(24.dp),
+                tint = if (compact) colors.labelSecondary else colors.labelPrimary,
+                modifier = Modifier.size(if (compact) 22.dp else 24.dp),
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
             Text(
                 title,
-                style = DsType.navigationItem.withReadingWeight(),
+                style = (if (compact) DsType.settingsItem else DsType.navigationItem).withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

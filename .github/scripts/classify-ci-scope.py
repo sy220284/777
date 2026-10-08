@@ -38,7 +38,7 @@ class CiPlan:
         }
 
 
-DOC_ROOT_FILES = {"screen.png", "LICENSE"}
+DOC_ROOT_FILES = {"LICENSE"}
 REPO_METADATA_FILES = {
     ".editorconfig",
     ".gitignore",

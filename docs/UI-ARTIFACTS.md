@@ -6,12 +6,12 @@
 
 | 文件 | 对应界面 |
 |---|---|
-| `docs/images/home.png` | 首页 / 本机会话入口 |
-| `docs/images/chat.png` | 对话内容区 |
-| `docs/images/session-info.png` | 会话详情 |
-| `docs/images/subagent.png` | 子代理 |
-| `docs/images/trajectory.png` | 执行轨迹 |
-| `docs/images/banner.jpg` | 项目横幅 |
+| `docs/images/banner.jpg` | README 项目横幅 |
+| `docs/images/current/navigation.png` | 当前导航与会话 |
+| `docs/images/current/chat.png` | 当前角色聊天 |
+| `docs/images/current/work.png` | 当前工作执行 |
+| `docs/images/current/character-tuning.png` | 当前人物行为调节 |
+| `docs/images/current/usage.png` | 当前模型价格与消耗 |
 
 ## 当前还应补齐的基准
 

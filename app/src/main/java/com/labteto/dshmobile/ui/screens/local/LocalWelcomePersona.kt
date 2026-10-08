@@ -14,11 +14,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -42,7 +41,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -50,6 +48,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
+import com.labteto.dshmobile.ui.artwork.characterArtworkSampleSize
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.Dispatchers
@@ -100,7 +99,7 @@ internal fun nextWelcomePersonaIndex(current: Int, total: Int): Int =
 /** Dedicated welcome-screen artwork comes from the same catalog as the launch experience. */
 internal val welcomeMotionPersonas = hologramCharacterArtworks
 
-/** A restrained gallery preview: slow breathing, quiet crossfade and one discreet name label. */
+/** Pure artwork gallery with subtle movement: no visible text overlaps the image. */
 @Composable
 internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<PersonaGalleryEntry>) {
     var index by rememberSaveable { mutableStateOf(0) }
@@ -171,6 +170,7 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
+                    filterQuality = FilterQuality.High,
                     modifier = Modifier.fillMaxSize().graphicsLayer {
                         if (motionEnabled) {
                             val magnitude = breathing.value - 0.5f
@@ -182,12 +182,6 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
                 )
             }
         }
-        Text(
-            text = stringResource(selection.nameRes),
-            color = Color.White.copy(alpha = 0.84f),
-            fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 15.dp),
-        )
     }
 }
 
@@ -196,8 +190,8 @@ private fun decodeWelcomeMotionArtwork(assets: AssetManager, path: String): Imag
     return runCatching {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(assets, path)) { decoder, info, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            var sample = 1
-            while (maxOf(info.size.width, info.size.height) / sample > 1000) sample *= 2
+            // 1200×1560 previews supply genuine display pixels without resampling down.
+            val sample = characterArtworkSampleSize(maxOf(info.size.width, info.size.height), 2000)
             if (sample > 1) decoder.setTargetSampleSize(sample)
         }.asImageBitmap()
     }.getOrNull()
