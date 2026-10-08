@@ -325,8 +325,8 @@ if "- '.github/release-version'" in CI or '- ".github/release-version"' in CI:
 # Release freshness must reuse the same path classifier.
 if "classify-ci-scope.py" not in RELEASE or "--release-safe" not in RELEASE:
     violations.append("Release freshness must reuse classify-ci-scope.py --release-safe")
-if "*/30 * * * *" in RELEASE:
-    violations.append("Release fallback polling must not run every 30 minutes")
+if "cron: '*/30 * * * *'" not in RELEASE:
+    violations.append("Release fallback polling must run every 30 minutes")
 
 # Cleanup should be event-driven with a low-frequency fallback.
 if "release:" not in CLEANUP or "types: [published]" not in CLEANUP:
