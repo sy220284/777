@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,9 @@ import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -133,7 +137,16 @@ internal fun LocalComposerCapabilityActions(
             expanded = openPanel != null && !running,
             onDismissRequest = { onSelectPanel(null) },
             modifier = Modifier.widthIn(min = 260.dp, max = 320.dp),
-            properties = PopupProperties(focusable = false),
+            shape = DsShapes.menu,
+            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+            tonalElevation = 0.dp,
+            border = BorderStroke(1.dp, colors.borderL1),
+            properties = PopupProperties(
+                focusable = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                clippingEnabled = true,
+            ),
         ) {
             openPanel?.let { panel ->
                 LocalComposerCapabilityPanel(
