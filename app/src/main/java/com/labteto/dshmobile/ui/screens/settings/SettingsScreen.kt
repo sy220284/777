@@ -215,6 +215,8 @@ internal fun settingsInkColors(colors: DsColors): DsColors =
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    onRemoteControl: () -> Unit,
+    remoteControlActive: Boolean = false,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
@@ -459,6 +461,16 @@ fun SettingsScreen(
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
                                 onClick = { page = SettingsDestination.PERMISSIONS },
+                                compact = true,
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.RemoteControl,
+                                title = stringResource(
+                                    if (remoteControlActive) R.string.chatlist_exit_remote_control
+                                    else R.string.local_remote_control,
+                                ),
+                                onClick = onRemoteControl,
                                 compact = true,
                             )
                             AppSettingsDivider()
