@@ -28,7 +28,6 @@ import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
@@ -267,7 +266,6 @@ internal fun RemoteRelayStatus(
         ) {
             DsIconBox(
                 icon = if (failed) FeatherIcons.AlertTriangle else FeatherIcons.Device,
-                family = if (failed) DsIconFamily.Amber else DsIconFamily.Accent,
                 active = !failed,
             )
             Text(

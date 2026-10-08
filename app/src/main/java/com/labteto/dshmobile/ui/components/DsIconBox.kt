@@ -18,27 +18,11 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
 
-/**
- * Compatibility labels kept for callers that already classify a capability.
- *
- * 当前导航规范 is monochrome: families no longer paint colored containers.
- * Accent/semantic color is reserved for selected or live state elsewhere in the row.
- */
-enum class DsIconFamily {
-    Accent,
-    Purple,
-    Cyan,
-    Amber,
-    Green,
-    Neutral,
-}
-
 /** Compact monochrome 24-grid glyph holder used by grouped rows. */
 @Composable
 fun DsIconBox(
     icon: ImageVector? = null,
     iconPainter: Painter? = null,
-    family: DsIconFamily = DsIconFamily.Neutral,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     active: Boolean = false,

@@ -16,14 +16,12 @@ object DsSpacing {
     /** 8dp - Small spacing for related items within a component */
     val small = 8.dp
     
-    /** 8dp - Compact spacing for related items within a component (alias for small) */
-    val compact = 8.dp
+
     
     /** 12dp - Medium spacing between component elements */
     val medium = 12.dp
     
-    /** 12dp - Standard spacing between component elements (alias for medium) */
-    val standard = 12.dp
+
     
     /** 16dp - Comfortable spacing for screen padding and section content */
     val comfortable = 16.dp
@@ -45,12 +43,7 @@ object DsSpacing {
 object DsMetrics {
     const val drawerWidthFraction = 0.85f
     val screenHorizontal = 16.dp
-    val drawerHorizontal = 16.dp
+
     val topBarHeight = 56.dp
-    val rowHeight = 56.dp
-    val compactRowHeight = 48.dp
-    val iconButton = 44.dp
-    val icon = 20.dp
-    val sectionGap = 24.dp
-    val majorSectionGap = 32.dp
+
 }

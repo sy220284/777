@@ -441,31 +441,6 @@ fun DsContextActionMenu(
     }
 }
 
-/**
- * Shared free-floating popup primitive. Focusable popups receive outside-pointer dismissal from
- * Compose, which keeps drag/select overlays consistent with dropdown menus and future popups.
- */
-@Composable
-fun DsFloatingPopup(
-    onDismiss: () -> Unit,
-    alignment: Alignment = Alignment.TopStart,
-    offset: IntOffset = IntOffset.Zero,
-    content: @Composable () -> Unit,
-) {
-    Popup(
-        alignment = alignment,
-        offset = offset,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(
-            focusable = true,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            clippingEnabled = true,
-        ),
-        content = content,
-    )
-}
-
 @Preview(showBackground = true, widthDp = 360)
 @Composable
 private fun DsMenuPreview() {

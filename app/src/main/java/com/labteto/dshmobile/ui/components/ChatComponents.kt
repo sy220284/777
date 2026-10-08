@@ -28,7 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,7 +41,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
-import java.util.Locale
 
 /**
  * Right-aligned user message bubble: r22, `userBubble` fill, hairline edge, 16/24 text.
@@ -163,41 +161,6 @@ fun ConnectionBanner(message: String) {
     }
 }
 
-/** Centered run statistics with tabular numerals. */
-@Composable
-fun StatsLine(
-    turns: Int,
-    steps: Int,
-    llmMs: Long? = null,
-    ttftMs: Long? = null,
-    tokPerSec: Double? = null,
-) {
-    val colors = DsTheme.colors
-    val text = buildString {
-        append("Turns $turns")
-        append(" · Steps $steps")
-        append(" · LLM ${formatDuration(llmMs)}")
-        append(" · TTFT ${formatDuration(ttftMs)}")
-        append(" · ${formatRate(tokPerSec)} tok/s")
-    }
-    Text(
-        text,
-        style = DsType.statsText.withReadingWeight().copy(color = colors.labelCaption, fontFeatureSettings = "tnum"),
-        color = colors.labelCaption,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-private fun formatDuration(ms: Long?): String = when {
-    ms == null -> "—"
-    ms >= 1000 -> "%.1fs".format(Locale.US, ms / 1000.0)
-    else -> "${ms}ms"
-}
-
-private fun formatRate(perSec: Double?): String =
-    perSec?.let { "%.1f".format(Locale.US, it) } ?: "—"
-
 @Preview(showBackground = true, widthDp = 360)
 @Composable
 private fun ChatComponentsPreview() {
@@ -209,7 +172,6 @@ private fun ChatComponentsPreview() {
             UserBubble("Build the shared component library.")
             ThinkingRow("Working through the diff…", expanded = false, onToggle = {}, streaming = true)
             ConnectionBanner("Connection lost — retrying…")
-            StatsLine(turns = 3, steps = 12, llmMs = 2100, ttftMs = 420, tokPerSec = 18.4)
         }
     }
 }

@@ -33,7 +33,7 @@ RULES = (
     (
         re.compile(r"\bPopup\s*\("),
         {"components/Overlays.kt"},
-        "use DsFloatingPopup or another shared Ds* popup primitive",
+        "use DsPopupMenu/DsContextActionMenu or another shared Ds* popup primitive",
     ),
     (
         re.compile(r"\bOutlinedCard\s*\("),

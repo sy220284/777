@@ -18,7 +18,6 @@ class FeatherIconsTest {
     private val glyphs: Map<String, ImageVector> = mapOf(
         "Terminal" to FeatherIcons.Terminal,
         "FileText" to FeatherIcons.FileText,
-        "FilePlus" to FeatherIcons.FilePlus,
         "Edit3" to FeatherIcons.Edit3,
         "Search" to FeatherIcons.Search,
         "Globe" to FeatherIcons.Globe,
