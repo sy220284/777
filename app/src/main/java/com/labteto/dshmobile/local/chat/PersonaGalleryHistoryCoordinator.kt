@@ -72,6 +72,9 @@ internal class PersonaGalleryHistoryCoordinator(
         ) to removed
     }
 
+    fun containsMessage(entryId: String, storyId: String, messageKey: String): Boolean =
+        store.containsMessage(entryId, storyId, messageKey)
+
     fun deleteMessage(
         entryId: String,
         story: PersonaGalleryStory,
