@@ -102,7 +102,12 @@ internal enum class TableAlignment { START, CENTER, END }
 internal sealed interface MdBlock {
     data class Paragraph(val lines: List<String>) : MdBlock
     data class Heading(val level: Int, val text: String) : MdBlock
-    data class MdList(val items: List<String>, val ordered: Boolean) : MdBlock
+    data class MdList(
+        val items: List<String>,
+        val ordered: Boolean,
+        val levels: List<Int> = emptyList(),
+        val numbered: List<Boolean> = emptyList(),
+    ) : MdBlock
     data class Blockquote(val lines: List<String>) : MdBlock
     data class Code(val lang: String?, val code: String) : MdBlock
     data class Table(
@@ -138,23 +143,22 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
                 blocks += MdBlock.Heading(level, text)
                 i++
             }
-            trimmed.startsWith("- ") || trimmed.startsWith("* ") -> {
+            isMarkdownListItem(trimmed) -> {
                 val items = mutableListOf<String>()
+                val levels = mutableListOf<Int>()
+                val numbered = mutableListOf<Boolean>()
                 while (i < lines.size) {
-                    val t = lines[i].trimStart()
-                    if (!t.startsWith("- ") && !t.startsWith("* ")) break
-                    items += t.removePrefix("- ").removePrefix("* ").trim()
+                    val source = lines[i]
+                    val item = source.trimStart()
+                    if (!isMarkdownListItem(item)) break
+                    val isNumbered = ORDERED_REGEX.containsMatchIn(item)
+                    numbered += isNumbered
+                    levels += ((source.length - item.length) / 2).coerceIn(0, 6)
+                    items += if (isNumbered) ORDERED_REGEX.replace(item, "").trim()
+                        else item.drop(2).trim()
                     i++
                 }
-                blocks += MdBlock.MdList(items, ordered = false)
-            }
-            ORDERED_REGEX.containsMatchIn(trimmed) -> {
-                val items = mutableListOf<String>()
-                while (i < lines.size && ORDERED_REGEX.containsMatchIn(lines[i].trimStart())) {
-                    items += ORDERED_REGEX.replace(lines[i].trim(), "").trim()
-                    i++
-                }
-                blocks += MdBlock.MdList(items, ordered = true)
+                blocks += MdBlock.MdList(items, numbered.firstOrNull() == true, levels, numbered)
             }
             trimmed.startsWith(">") -> {
                 val quote = mutableListOf<String>()
@@ -191,13 +195,15 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
     return blocks
 }
 
+private fun isMarkdownListItem(text: String): Boolean =
+    text.startsWith("- ") || text.startsWith("* ") || text.startsWith("+ ") ||
+        ORDERED_REGEX.containsMatchIn(text)
+
 private fun isSpecialLine(line: String): Boolean {
     val trimmed = line.trimStart()
     return trimmed.startsWith("```") ||
         HEADING_REGEX.matches(trimmed) ||
-        trimmed.startsWith("- ") ||
-        trimmed.startsWith("* ") ||
-        ORDERED_REGEX.containsMatchIn(trimmed) ||
+        isMarkdownListItem(trimmed) ||
         trimmed.startsWith(">") ||
         trimmed.startsWith("|")
 }
@@ -401,14 +407,25 @@ private fun buildInlineContent(
 @Composable
 private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
-    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val counters = IntArray(7)
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         block.items.forEachIndexed { index, item ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            val level = block.levels.getOrElse(index) { 0 }.coerceIn(0, 6)
+            val ordered = block.numbered.getOrElse(index) { block.ordered }
+            val marker = if (ordered) {
+                counters[level]++
+                for (next in level + 1 until counters.size) counters[next] = 0
+                "${counters[level]}."
+            } else "•"
+            Row(
+                Modifier.fillMaxWidth().padding(start = (level * 15).dp),
+                verticalAlignment = Alignment.Top,
+            ) {
                 Text(
-                    if (block.ordered) "${index + 1}." else "•",
+                    marker,
                     style = bodyStyle.withReadingWeight().copy(color = colors.labelSecondary),
-                    textAlign = if (block.ordered) TextAlign.End else TextAlign.Start,
-                    modifier = Modifier.width(if (block.ordered) 28.dp else 18.dp),
+                    textAlign = if (ordered) TextAlign.End else TextAlign.Start,
+                    modifier = Modifier.width(if (ordered) 28.dp else 18.dp),
                 )
                 Spacer(Modifier.width(6.dp))
                 InlineMarkdown(item, bodyStyle.copy(color = colors.labelPrimary), Modifier.weight(1f))
