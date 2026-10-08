@@ -38,11 +38,11 @@
     <string name="local_empty_workspace_title">工作空间还是空的</string>
     <string name="local_empty_workspace_body">完成任务、生成报告或编辑文件后，这里就会显示你的工作文件。</string>
     <string name="local_empty_involved_title">还没有涉及文件</string>
-    <string name="local_empty_involved_body">当前任务读取或修改过的文件会集中出现在这里。</string>
+    <string name="local_empty_involved_body">AI 在这次工作中读过或修改过的文件，会显示在这里。</string>
     <string name="local_empty_artifacts_title">还没有产物</string>
     <string name="local_empty_artifacts_body">AI 完成报告、图片或文档后，你可以在这里查看。</string>
     <string name="local_empty_conversation_files_title">当前会话没有文件</string>
-    <string name="local_empty_conversation_files_body">发送附件或让 Agent 生成文件后，可以从这里快速打开。</string>
+    <string name="local_empty_conversation_files_body">发送图片、附件或让 AI 生成文件后，就可以在这里打开。</string>
     <string name="local_files_refresh_action">重新检查</string>
     <string name="local_run_center_empty_title">还没有正在进行的任务</string>
     <string name="local_run_center_empty_body">把一件事交给 AI 助手后，可以随时在这里查看进度、继续补充要求或打开完成的内容。</string>
