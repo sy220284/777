@@ -1693,5 +1693,12 @@
     <string name="local_research_agent_general">通用助手</string>
     <string name="local_research_agent_research">资料研究</string>
     <string name="local_research_agent_readonly_hint">按来源核查事实并报告证据与不确定性；保持只读工具权限。</string>
+    <string name="local_tool_activity_title">工具活动</string>
+    <string name="local_tool_phase_declared">已声明</string>
+    <string name="local_tool_phase_running">执行中</string>
+    <string name="local_tool_phase_completed">已完成</string>
+    <string name="local_tool_phase_failed">失败</string>
+    <string name="local_tool_phase_unknown">结果未确认</string>
+    <string name="local_tool_phase_cancelled">已取消</string>
 </resources>
 

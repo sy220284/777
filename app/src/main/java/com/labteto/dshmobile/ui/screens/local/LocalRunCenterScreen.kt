@@ -24,6 +24,8 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -58,6 +60,7 @@ internal fun LocalRunCenterScreen(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
+    onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
@@ -73,8 +76,13 @@ internal fun LocalRunCenterScreen(
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
+    var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
     LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos) {
-        artifacts = withContext(Dispatchers.IO) { onArtifacts(state.sessionId) }
+        val (recentArtifacts, recentTools) = withContext(Dispatchers.IO) {
+            onArtifacts(state.sessionId) to onToolActivities(state.sessionId)
+        }
+        artifacts = recentArtifacts
+        toolActivities = recentTools
     }
 
     Surface(
@@ -97,7 +105,7 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
-            if (!state.hasRunCenterContent() && artifacts.isEmpty()) {
+            if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 DsPageEmptyState(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center_empty_title),
@@ -121,6 +129,28 @@ internal fun LocalRunCenterScreen(
                         onOpenResults = onOpenResults,
                         showHeader = false,
                     )
+                    if (toolActivities.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.local_tool_activity_title),
+                            style = DsType.base16Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        toolActivities.forEach { activity ->
+                            val phase = when (activity.phase) {
+                                LocalToolUiPhase.DECLARED -> R.string.local_tool_phase_declared
+                                LocalToolUiPhase.RUNNING -> R.string.local_tool_phase_running
+                                LocalToolUiPhase.COMPLETED -> R.string.local_tool_phase_completed
+                                LocalToolUiPhase.FAILED -> R.string.local_tool_phase_failed
+                                LocalToolUiPhase.OUTCOME_UNKNOWN -> R.string.local_tool_phase_unknown
+                                LocalToolUiPhase.CANCELLED -> R.string.local_tool_phase_cancelled
+                            }
+                            Text(
+                                text = activity.name + " · " + stringResource(phase),
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
+                    }
                     if (artifacts.isNotEmpty()) {
                         Text(
                             stringResource(R.string.local_artifacts_title),
