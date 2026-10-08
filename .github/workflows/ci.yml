@@ -108,7 +108,7 @@ jobs:
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 ;;
-              .github/scripts/verify-android16-apk.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py)
+              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
@@ -168,6 +168,7 @@ jobs:
           python3 .github/scripts/check-kotlin-risk-patterns.py
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
+          bash .github/scripts/run-android-instrumentation.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
         run: |
@@ -374,7 +375,7 @@ jobs:
           script: |
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
-            adb shell am instrument -w -r com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+            bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
             adb shell am force-stop com.sy220284.dshmobile.debug || true
             adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
             sleep 2
@@ -428,7 +429,7 @@ jobs:
           adb shell settings put global animator_duration_scale 0
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
-          adb shell am instrument -w -r com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
+          bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
           adb shell am force-stop com.sy220284.dshmobile.debug || true
           adb shell monkey -p com.sy220284.dshmobile.debug -c android.intent.category.LAUNCHER 1
           sleep 2

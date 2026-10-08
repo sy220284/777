@@ -608,7 +608,7 @@ internal fun LocalConversationSurface(
                 if (transcriptItems.isEmpty() && (state.usageMode == LocalUsageMode.WORK || (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            EmptyLocalHarness(gallery = gallery) { suggestion ->
+                            EmptyLocalHarness { suggestion ->
                                 drafts.putBoundedLocalDraft(state.sessionId, suggestion)
                             }
                         }
@@ -1212,7 +1212,6 @@ internal fun localComposerAttachmentDecision(
 
 @Composable
 private fun EmptyLocalHarness(
-    gallery: List<PersonaGalleryEntry>,
     onSuggestion: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -1225,7 +1224,6 @@ private fun EmptyLocalHarness(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        WelcomePersonaCarousel(gallery = gallery)
         Text(
             stringResource(R.string.local_welcome_title),
             style = DsType.large20.withReadingWeight(),

@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -143,6 +144,7 @@ internal fun PluginInventoryBrowser(
                 placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             if (!skillsOnly) LazyRow(
+                modifier = Modifier.testTag("plugin-category-list"),
                 contentPadding = PaddingValues(horizontal = DsSpacing.comfortable),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {

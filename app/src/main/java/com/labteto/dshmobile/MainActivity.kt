@@ -4,9 +4,6 @@ import android.app.UiModeManager
 import android.content.Intent
 import android.graphics.drawable.ColorDrawable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Modifier
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,11 +15,6 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.ui.AppRoot
-import com.labteto.dshmobile.ui.artwork.HologramCharacterArtwork
-import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
-import com.labteto.dshmobile.ui.launch.LaunchCharacterScreen
-import com.labteto.dshmobile.ui.launch.nextLaunchArtworkIndex
-import com.labteto.dshmobile.ui.launch.shouldShowLaunchArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -37,7 +29,6 @@ class MainActivity : AppCompatActivity() {
     private val requestedSession = mutableStateOf<String?>(null)
     private val requestedLocalSession = mutableStateOf<String?>(null)
     private var appliedApplicationNightMode: Int? = null
-    private val activeLaunchArtwork = mutableStateOf<HologramCharacterArtwork?>(null)
     private var requestedNotificationPermission = false
 
     private val notificationPermission = registerForActivityResult(
@@ -55,36 +46,20 @@ class MainActivity : AppCompatActivity() {
             ?: notificationSession(intent)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
-        if (shouldShowLaunchArtwork(
-                savedInstanceState != null,
-                intent.action,
-                intent.hasCategory(Intent.CATEGORY_LAUNCHER),
-                requestedSession.value != null || requestedLocalSession.value != null,
-            )) {
-            val gallery = getSharedPreferences("launch_artwork_gallery", MODE_PRIVATE)
-            val index = gallery.getInt("next_index", 0).coerceIn(0, hologramCharacterArtworks.lastIndex)
-            activeLaunchArtwork.value = hologramCharacterArtworks[index]
-            gallery.edit().putInt("next_index", nextLaunchArtworkIndex(index, hologramCharacterArtworks.size)).apply()
-        }
-        if (activeLaunchArtwork.value != null) {
-            window.setBackgroundDrawable(ColorDrawable(getColor(R.color.launch_hero_background)))
-        } else {
-            applyWindowBackground(storedTheme)
-        }
+        applyWindowBackground(storedTheme)
         enableEdgeToEdge()
         notifications.ensureChannels()
 
         // Keep runtime appearance aligned with persisted settings.
         lifecycleScope.launch {
             hostsStore.settings.collect { settings ->
-                if (activeLaunchArtwork.value == null) applyWindowBackground(settings.themePreference)
+                applyWindowBackground(settings.themePreference)
                 applyNightMode(settings.themePreference)
             }
         }
 
         setContent {
-            Box(Modifier.fillMaxSize()) {
-                AppRoot(
+            AppRoot(
                 requestedSessionId = requestedSession.value,
                 requestedLocalSessionId = requestedLocalSession.value,
                 onSessionRequestConsumed = {
@@ -96,19 +71,8 @@ class MainActivity : AppCompatActivity() {
                     requestedLocalSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
                 },
-                )
-                activeLaunchArtwork.value?.let { artwork ->
-                    LaunchCharacterScreen(artwork) { dismissLaunchArtwork() }
-                }
-            }
+            )
         }
-        if (activeLaunchArtwork.value == null) requestNotificationPermissionOnce()
-    }
-
-    private fun dismissLaunchArtwork() {
-        if (activeLaunchArtwork.value == null) return
-        activeLaunchArtwork.value = null
-        applyWindowBackground(DshApplication.storedThemePreference(this))
         requestNotificationPermissionOnce()
     }
 
@@ -138,7 +102,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        dismissLaunchArtwork()
         requestedSession.value = notificationSession(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
     }
