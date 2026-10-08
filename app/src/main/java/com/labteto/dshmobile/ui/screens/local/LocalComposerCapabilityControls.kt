@@ -73,6 +73,7 @@ internal fun LocalComposerCapabilityActions(
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
+    val webAvailable = usageMode == LocalUsageMode.WORK
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
         DsComposerAction(
             icon = FeatherIcons.Gauge,
@@ -89,14 +90,22 @@ internal fun LocalComposerCapabilityActions(
         )
         DsComposerAction(
             icon = FeatherIcons.Globe,
-            contentDescription = stringResource(if (networkSearchEnabled)
-                R.string.local_composer_web_on_action else R.string.local_composer_web_off_action),
+            contentDescription = stringResource(when {
+                !webAvailable -> R.string.local_composer_web_work_only
+                networkSearchEnabled -> R.string.local_composer_web_on_action
+                else -> R.string.local_composer_web_off_action
+            }),
             onClick = { onSelectPanel("web") },
+            enabled = webAvailable,
             tint = if (networkSearchEnabled) colors.labelPrimary else colors.labelTertiary,
             containerColor = Color.Transparent,
         )
         Text(
-            text = stringResource(if (networkSearchEnabled) R.string.local_composer_web_online else R.string.local_composer_web_offline),
+            text = stringResource(when {
+                !webAvailable -> R.string.local_composer_web_work_label
+                networkSearchEnabled -> R.string.local_composer_web_online
+                else -> R.string.local_composer_web_offline
+            }),
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelSecondary,
         )
@@ -161,6 +170,10 @@ internal fun LocalComposerCapabilityPanel(
                 }
             } else {
                 Text(stringResource(R.string.local_composer_web_title), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                if (usageMode != LocalUsageMode.WORK) {
+                    Text(stringResource(R.string.local_composer_web_work_only),
+                        style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                } else {
                 var selected by remember(networkSearchEnabled) {
                     mutableFloatStateOf(if (networkSearchEnabled) 1f else 0f)
                 }
@@ -176,6 +189,7 @@ internal fun LocalComposerCapabilityPanel(
                 }
                 Text(stringResource(R.string.local_composer_web_tip),
                     style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                }
             }
         }
     }
