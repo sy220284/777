@@ -33,6 +33,7 @@ internal data class LocalModelAdapterRequest(
     val messages: List<LocalCanonicalMessage>,
     val tools: List<LocalCanonicalToolDefinition>,
     val temperature: Double?,
+    val reasoningEffort: String? = null,
     val allowImageGeneration: Boolean = false,
     val promptCacheComparisonResponseId: String? = null,
     val promptCacheKey: String? = null,
@@ -76,6 +77,7 @@ internal class OpenAiCompatibleChatAdapter @Inject constructor(
                 messages = messages,
                 tools = tools,
                 temperature = request.temperature,
+                reasoningEffort = request.reasoningEffort,
                 onDelta = onDelta,
             )
         } else {
@@ -86,6 +88,7 @@ internal class OpenAiCompatibleChatAdapter @Inject constructor(
                 messages = messages,
                 tools = tools,
                 temperature = request.temperature,
+                reasoningEffort = request.reasoningEffort,
             )
         }
         return LocalCanonicalModelCodec.canonicalizeReply(reply, id, request.route.fingerprint)
@@ -117,6 +120,7 @@ internal class OpenAiResponsesAdapter @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = request.temperature,
+            reasoningEffort = request.reasoningEffort,
             planSharing = request.route.authKind == LocalModelAuthKind.CHATGPT_PLAN,
             promptCacheComparisonResponseId = request.promptCacheComparisonResponseId,
             promptCacheKey = request.promptCacheKey,

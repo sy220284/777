@@ -10,6 +10,16 @@ import org.junit.Test
 
 class LocalTranscriptPresentationTest {
     @Test
+    fun durableWorkFinalAnswerSuppressesTransientDuplicateTail() {
+        val answer = LocalTranscriptItem.Message(message("final", "assistant", "任务已完成"))
+        val progress = LocalTranscriptItem.WorkProcess(listOf(message("p1", "progress", "处理中")))
+        assertFalse(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.WORK, answer))
+        assertTrue(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.WORK, progress))
+        assertTrue(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.CHAT, answer))
+        assertFalse(shouldShowWorkStreamingTail(false, com.labteto.dshmobile.local.LocalUsageMode.WORK, progress))
+    }
+
+    @Test
     fun groupsCurrentWorkProcessAndLeavesFinalAnswerStandalone() {
         val items = buildLocalTranscript(
             listOf(
@@ -109,6 +119,66 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun inlineConversationPreservesNarrationToolNarrationSequence() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "先检查相关文件"),
+            message("t1", "tool", "/private/path/raw.txt", toolName = "read"),
+            message("p2", "progress", "发现问题，开始修复"),
+            message("t2", "tool", "ok", toolName = "edit_file"),
+        )))
+        assertEquals(4, projected.size)
+        assertEquals(listOf("先检查相关文件", null, "发现问题，开始修复", null),
+            projected.map { it.summary })
+        assertEquals(AgentOperationKind.Inspect, projected[1].kind)
+        assertEquals(AgentOperationKind.Update, projected[3].kind)
+        assertTrue(projected.all { it.toolContent == null })
+    }
+
+    @Test
+    fun knownToolProvidersShowFriendlyNamesWithoutLeakingCommands() {
+        assertEquals("GitHub", userFacingWorkToolProvider("mcp__GitHub__fetch"))
+        assertEquals("Figma", userFacingWorkToolProvider("mcp__Figma__use_figma"))
+        assertEquals(null, userFacingWorkToolProvider("bash"))
+        assertEquals(null, userFacingWorkToolProvider("custom_secret_runner"))
+    }
+
+    @Test
+    fun inlineWorkStreamingDoesNotDuplicateCommittedNarration() {
+        assertFalse(shouldShowInlineWorkPreview("正在检查", "正在检查项目的最新代码"))
+        assertTrue(shouldShowInlineWorkPreview("开始修复新问题", "正在检查项目的最新代码"))
+        assertFalse(shouldShowInlineWorkPreview("  ", null))
+        assertTrue(shouldShowInlineWorkPreview("现在重新运行测试", null))
+    }
+
+    @Test
+    fun collapsedFocusKeepsLatestFailureEvenWhenLaterStageSucceeds() {
+        val failed = LocalWorkProcessNode(summary = "校验文件", failed = true)
+        val later = LocalWorkProcessNode(summary = "已读取其他文件")
+        assertEquals(failed, workProcessFocus(listOf(failed, later)))
+        assertEquals(later, workProcessFocus(listOf(later)))
+    }
+
+    @Test
+    fun semanticMilestonesKeepToolOutcomesAndUnlabelledOperations() {
+        val nodes = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "读取文件"),
+            message("t1", "tool", "private raw content", toolName = "read"),
+            message("p2", "progress", "执行验证"),
+            message("t2", "tool", "工具执行失败", toolName = "bash"),
+        )))
+        assertEquals(2, nodes.size)
+        assertEquals(1, nodes[0].count)
+        assertEquals(AgentOperationKind.Inspect, nodes[0].kind)
+        assertTrue(nodes[1].failed)
+        assertTrue(nodes.all { it.toolContent == null })
+        val unlabelled = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("t3", "tool", "done", toolName = "read"),
+            message("t4", "tool", "done", toolName = "grep"),
+        )))
+        assertEquals(2, unlabelled.size)
+    }
+
+    @Test
     fun workProcessNodesIgnoreReasoningAndKeepEachToolResult() {
         val nodes = buildWorkProcessNodes(
             listOf(
@@ -184,6 +254,16 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun technicalProgressCannotExposeRawCommandsOrPaths() {
+        assertEquals(null, localWorkProcessSummary("git status --short"))
+        assertEquals(null, localWorkProcessSummary("/private/path/config.json"))
+        assertEquals("已经读取 … 并校验", localWorkProcessSummary(
+            "已经读取 /private/path/config.json 并校验",
+        ))
+        assertEquals("准备继续", localWorkProcessSummary("准备继续"))
+    }
+
+    @Test
     fun reasoningOnlyWorkProcessProducesNoUserFacingNode() {
         val nodes = buildWorkProcessNodes(
             listOf(message("r1", "reasoning", "这段自由推理不能出现在界面里")),
@@ -220,7 +300,7 @@ class LocalTranscriptPresentationTest {
         val recent = visibleWorkProcessNodes(nodes, showAll = false)
         val all = visibleWorkProcessNodes(nodes, showAll = true)
         assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
-        assertEquals(5, recent.first().count)
+        assertEquals(8, recent.first().count)
         assertEquals(12, recent.last().count)
         assertEquals(12, all.size)
     }

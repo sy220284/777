@@ -54,6 +54,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalChatBranchInfo
+import com.labteto.dshmobile.local.presentation.extractLocalCharacterThought
 import com.labteto.dshmobile.local.presentation.editableChatUserText
 import com.labteto.dshmobile.local.presentation.groupMessageVisibleContent
 import com.labteto.dshmobile.local.session.LocalConversationMode
@@ -139,6 +140,7 @@ internal fun LocalMessageRow(
     onEdit: (LocalHarnessMessage) -> Unit,
     onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    streaming: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -281,8 +283,10 @@ internal fun LocalMessageRow(
                     }
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
+                val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
                 LocalAssistantMessageContent(
                     message = message,
+                    streaming = streaming,
                     workspacePath = workspacePath,
                     groupMode = groupMode,
                     chatMode = chatMode,
@@ -300,13 +304,13 @@ internal fun LocalMessageRow(
                             onSelectVariant = selectVariantWithFeedback,
                         )
                     }
-                    if (visibleContent.isNotBlank()) {
+                    if (copyableContent.isNotBlank()) {
                         CompactMessageAction(
                             icon = if (copied) FeatherIcons.Check else FeatherIcons.MessageCopy,
                             iconSize = 22.dp,
                             contentDescription = if (copied) copiedMessage else stringResource(R.string.chat_copy_answer),
                             onClick = {
-                                clipboard.setText(AnnotatedString(visibleContent))
+                                clipboard.setText(AnnotatedString(copyableContent))
                                 copied = true
                                 Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                             },
@@ -356,6 +360,7 @@ private fun LocalUserMessageContent(
 @Composable
 private fun LocalAssistantMessageContent(
     message: LocalHarnessMessage,
+    streaming: Boolean,
     workspacePath: String,
     groupMode: Boolean,
     chatMode: Boolean,
@@ -370,9 +375,17 @@ private fun LocalAssistantMessageContent(
                     block.text
                 }
                 firstText = false
-                if (text.isNotBlank()) {
+                val (innerThought, body) = if (chatMode) extractLocalCharacterThought(text, streaming) else null to text
+                if (innerThought != null) {
+                    Text(
+                        text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,
+                        style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                        color = DsTheme.colors.labelTertiary,
+                    )
+                }
+                if (body.isNotBlank()) {
                     MarkdownText(
-                        text,
+                        body,
                         bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
                     )
                 }

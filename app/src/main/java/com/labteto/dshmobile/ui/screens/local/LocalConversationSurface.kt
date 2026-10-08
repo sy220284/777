@@ -73,6 +73,8 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
+import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -179,6 +181,11 @@ internal fun LocalConversationSurface(
     // stable root work surface from rootSurfaceColor above.
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current
+    var reasoningMode by remember(state.sessionId) {
+        LocalReasoningControls.attach(appContext)
+        mutableStateOf(LocalReasoningControls.mode(state.sessionId))
+    }
     val drafts = rememberSaveable(
         saver = listSaver(
             save = { cache -> cache.save() },
@@ -239,7 +246,13 @@ internal fun LocalConversationSurface(
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
     val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
-    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
+    val showStreamingTail = shouldShowWorkStreamingTail(
+        running = state.running,
+        usageMode = state.usageMode,
+        lastItem = transcriptItems.lastOrNull(),
+    )
+    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
+        (if (showStreamingTail) 1 else 0)
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -389,8 +402,12 @@ internal fun LocalConversationSurface(
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
+    LocalWorkStreamingTailFollower(
+        listState = listState,
+        enabled = showStreamingTail && state.usageMode == LocalUsageMode.WORK,
+    )
 
-    LaunchedEffect(state.messages.size, transcriptItems.size) {
+    LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
         if (transcriptItems.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             if (lastVisible >= transcriptLastListIndex - 2) {
@@ -694,12 +711,26 @@ internal fun LocalConversationSurface(
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
                     }
                 }
-                if (state.usageMode == LocalUsageMode.CHAT && state.running) {
-                    item(key = "streaming:${state.sessionId}") {
-                        LocalStreamingChatTurn(
-                            sessionId = state.sessionId,
-                            streamingState = streamingState,
-                        )
+                if (showStreamingTail) {
+                    if (state.usageMode == LocalUsageMode.CHAT) {
+                        item(key = "streaming:${state.sessionId}") {
+                            LocalStreamingChatTurn(
+                                sessionId = state.sessionId,
+                                streamingState = streamingState,
+                            )
+                        }
+                    } else {
+                        item(key = "work-streaming:${state.sessionId}") {
+                            LocalStreamingWorkPreview(
+                                sessionId = state.sessionId,
+                                streamingState = streamingState,
+                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                                lastDurableNarrative = (transcriptItems.lastOrNull() as?
+                                    LocalTranscriptItem.WorkProcess)?.messages?.lastOrNull {
+                                    it.role == "progress" || it.role == "assistant"
+                                }?.content,
+                            )
+                        }
                     }
                 }
             }
@@ -717,15 +748,6 @@ internal fun LocalConversationSurface(
                         )
                     }
                 },
-            )
-        }
-
-        if (state.usageMode == LocalUsageMode.WORK && state.running) {
-            LocalStreamingWorkPreview(
-                sessionId = state.sessionId,
-                streamingState = streamingState,
-                surfaceColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
             )
         }
 
@@ -1115,6 +1137,37 @@ internal fun LocalConversationSurface(
                     else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
+            val reasoningAvailable = LocalReasoningControls.isSupported(activeModelProfile, state.usageMode)
+            DsSheetChoiceRow(
+                title = stringResource(R.string.local_reasoning_switch_title),
+                subtitle = stringResource(
+                    when {
+                        !reasoningAvailable -> R.string.local_reasoning_switch_unsupported
+                        reasoningMode == LocalReasoningUiMode.DEFAULT -> R.string.local_reasoning_default_hint
+                        LocalReasoningControls.requiresBasicReasoning(activeModelProfile, state.usageMode) -> R.string.local_reasoning_basic_hint
+                        else -> R.string.local_reasoning_switch_hint
+                    },
+                ),
+                icon = FeatherIcons.Activity,
+                switchChecked = if (reasoningAvailable) reasoningMode == LocalReasoningUiMode.DEEP else null,
+                trailingText = if (reasoningAvailable) null else stringResource(R.string.local_reasoning_auto),
+                enabled = reasoningAvailable && !state.running,
+                onClick = {
+                    val next = reasoningMode != LocalReasoningUiMode.DEEP
+                    LocalReasoningControls.setEnabled(state.sessionId, next)
+                    reasoningMode = LocalReasoningControls.mode(state.sessionId)
+                },
+            )
+            if (reasoningAvailable && reasoningMode != LocalReasoningUiMode.DEFAULT) {
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_reasoning_restore_default),
+                    enabled = !state.running,
+                    onClick = {
+                        LocalReasoningControls.restoreDefault(state.sessionId)
+                        reasoningMode = LocalReasoningUiMode.DEFAULT
+                    },
+                )
+            }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 DsSheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
