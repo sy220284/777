@@ -7,4 +7,5 @@
     <color name="window_background_dark">#10100F</color>
     <color name="window_background_matte_black">#10100F</color>
     <color name="window_background">#F7F8F6</color>
+    <color name="launch_hero_background">#090D1C</color>
 </resources>

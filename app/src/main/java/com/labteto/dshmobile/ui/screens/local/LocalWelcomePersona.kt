@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.Dispatchers
@@ -108,22 +109,8 @@ internal fun welcomePersonaArtworks(
 internal fun nextWelcomePersonaIndex(current: Int, total: Int): Int =
     if (total <= 1) 0 else (current.coerceIn(0, total - 1) + 1) % total
 
-internal data class WelcomeMotionPersona(
-    val id: String,
-    val name: String,
-    val assetPath: String,
-    val accent: Color,
-    val highlight: Color,
-)
-
-/** Custom-made holographic illustrations, never the standard preset gallery paintings. */
-internal val welcomeMotionPersonas: List<WelcomeMotionPersona> = listOf(
-    WelcomeMotionPersona("ayaka", "神里绫华", "persona-motion/ayaka.webp", Color(0xFF86D7FF), Color(0xFFB5A6FF)),
-    WelcomeMotionPersona("march7", "三月七", "persona-motion/march7.webp", Color(0xFFFFA8E7), Color(0xFF8ACBFF)),
-    WelcomeMotionPersona("shenxinghui", "沈星回", "persona-motion/shenxinghui.webp", Color(0xFFF6DFAD), Color(0xFF94BEFF)),
-    WelcomeMotionPersona("xiayizhou", "夏以昼", "persona-motion/xiayizhou.webp", Color(0xFFFF957B), Color(0xFFFFC184)),
-    WelcomeMotionPersona("klee", "可莉", "persona-motion/klee.webp", Color(0xFFFFA06C), Color(0xFFFFE1A0)),
-)
+/** Dedicated welcome-screen artwork comes from the same catalog as the launch experience. */
+internal val welcomeMotionPersonas = hologramCharacterArtworks
 
 /** Showcase only: tapping does not bind a chat persona or send a message. */
 @Composable
@@ -179,7 +166,7 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
             scan.snapTo(1.25f)
         }
     }
-    val label = stringResource(R.string.local_welcome_persona_switch, selection.name)
+    val label = stringResource(R.string.local_welcome_persona_switch, stringResource(selection.nameRes))
     val radius = RoundedCornerShape(26.dp)
     Box(
         modifier = Modifier
@@ -288,7 +275,7 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(selection.name, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(selection.nameRes), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.local_welcome_persona_hint), color = selection.accent.copy(alpha = 0.94f), fontSize = 11.sp)
         }
     }

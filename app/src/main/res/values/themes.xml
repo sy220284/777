@@ -6,8 +6,8 @@
 
     <!-- Manifest launch theme used while the platform hands off to MainActivity. -->
     <style name="Theme.DshMobile.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/window_background</item>
-        <item name="android:windowBackground">@color/window_background</item>
+        <item name="windowSplashScreenBackground">@color/launch_hero_background</item>
+        <item name="android:windowBackground">@color/launch_hero_background</item>
         <!--
             Keep the system splash visually blank. Omitting this attribute lets Android fall back to
             the launcher icon on supported launch paths, which reintroduces the unwanted brand flash.
