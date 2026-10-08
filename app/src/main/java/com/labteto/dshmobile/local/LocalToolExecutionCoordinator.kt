@@ -116,10 +116,6 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
-    private companion object {
-        val DEFAULT_NETWORK_TOOLS = listOf("web_search", "web_fetch")
-    }
-
     private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
         tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
 
@@ -343,6 +339,7 @@ internal class LocalToolExecutionCoordinator(
     }
 
     private companion object {
+        val DEFAULT_NETWORK_TOOLS = listOf("web_search", "web_fetch")
         const val GITHUB_TOOL_FAMILY = "GitHub"
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
