@@ -138,7 +138,7 @@ internal fun ExecutionStatusCard(
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    Text(goal.description, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                    Text(goal.description, style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont), color = colors.labelPrimary)
                     Text(localGoalStatusLabel(goal.status), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
@@ -178,7 +178,7 @@ internal fun ExecutionStatusCard(
                     (if (showAll) state.plan else state.plan.take(5)).forEachIndexed { index, step ->
                         Text(
                             (index + 1).toString().padStart(2, '0') + "  " + step,
-                            style = DsType.small13.withReadingWeight(),
+                            style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = colors.labelSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -202,7 +202,7 @@ internal fun ExecutionStatusCard(
                         }
                         Text(
                             marker + "  " + todo.content,
-                            style = DsType.small13.withReadingWeight(),
+                            style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = if (todo.status == "completed") {
                                 colors.labelTertiary
                             } else {
@@ -272,7 +272,7 @@ internal fun ExecutionStatusCard(
                         )
                         Text(
                             state.handoffSummary.orEmpty(),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = colors.labelSecondary,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
@@ -373,9 +373,9 @@ private fun RunCenterJobsSection(
                         Text(
                             job.label,
                             style = if (job.isAgent) {
-                                DsType.small13Strong.withReadingWeight()
+                                DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont)
                             } else {
-                                DsType.small13.withReadingWeight()
+                                DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont)
                             },
                             color = if (job.isAgent || attention) colors.labelPrimary else colors.labelSecondary,
                             modifier = Modifier.weight(1f),
@@ -424,7 +424,7 @@ private fun RunCenterJobsSection(
                             expandedJobOutput.ifBlank {
                                 stringResource(R.string.local_run_job_output_empty)
                             },
-                            style = DsType.caption11.withReadingWeight(),
+                            style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = colors.labelSecondary,
                             maxLines = 12,
                             overflow = TextOverflow.Ellipsis,
@@ -488,7 +488,7 @@ private fun RunCenterJobsSection(
                                 if (agentMessageFeedback.isNotBlank()) {
                                     Text(
                                         agentMessageFeedback,
-                                        style = DsType.caption11.withReadingWeight(),
+                                        style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
                                         color = colors.labelSecondary,
                                     )
                                 }

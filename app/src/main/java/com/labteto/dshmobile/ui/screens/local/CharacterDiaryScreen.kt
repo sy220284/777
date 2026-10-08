@@ -324,7 +324,7 @@ private fun CharacterDiaryEntryCard(entry: ChatDiaryEntry) {
 
         Text(
             entry.event,
-            style = DsType.base16Strong.withReadingWeight(),
+            style = DsType.base16Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
             color = colors.labelPrimary,
         )
 
@@ -365,7 +365,7 @@ private fun CharacterDiaryNarrativeBlock(label: String, text: String) {
         )
         Text(
             text,
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.std14.withReadingWeight().copy(fontFamily = DsType.contentFont),
             color = colors.labelSecondary,
         )
     }

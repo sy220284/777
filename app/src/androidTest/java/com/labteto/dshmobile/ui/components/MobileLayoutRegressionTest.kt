@@ -156,6 +156,7 @@ class MobileLayoutRegressionTest {
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { getLayouts ->
                 assertTrue(getLayouts(layouts))
             }
+        assertTrue("No text layout returned for: $text", layouts.isNotEmpty())
         assertTrue(
             "Text overflow for: $text, layouts: ${layouts.map { "size=${it.size} lines=${it.lineCount} overflowWidth=${it.didOverflowWidth} overflowHeight=${it.didOverflowHeight}" }}",
             layouts.all { !it.hasVisualOverflow },

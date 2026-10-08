@@ -64,8 +64,18 @@ component_ready() {
         [ -d "$GRADLE_USER_HOME/wrapper/dists" ]
       ;;
     runtime-cache)
-      [ -n "${DEV777_REPO_ROOT:-}" ] &&
-        [ -d "$DEV777_REPO_ROOT/.gradle/runtime-cache" ]
+      [ -n "${DEV777_REPO_ROOT:-}" ] || return 1
+      [ -d "$DEV777_REPO_ROOT/.gradle/runtime-cache" ] || return 1
+      # Old Runtime Artifacts predate UI font generation. Treat them as missing, so
+      # `plan` actually requests the current Artifact rather than failing at Gradle time.
+      if [ -f "$DEV777_REPO_ROOT/tools/fonts/generate.sh" ]; then
+        local font_dir="$DEV777_REPO_ROOT/.gradle/runtime-cache/ui-fonttools-python"
+        PYTHONPATH="$font_dir" python3 -c '
+import os, sys, fontTools
+assert fontTools.__version__ == sys.argv[2]
+assert os.path.realpath(fontTools.__file__).startswith(os.path.realpath(sys.argv[1]) + os.sep)
+' "$font_dir" "$FONTTOOLS_VERSION" >/dev/null 2>&1
+      fi
       ;;
     node)
       node_bin="$TOOLS_ROOT/node-current/bin/node"

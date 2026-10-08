@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -77,8 +76,7 @@ fun DsCategoryRow(
     titleTextStyle: TextStyle? = null,
 ) {
     val colors = DsTheme.colors
-    // Place metadata below the title whenever it exists. The row can be embedded in
-    // constrained panes even when the device-wide font scale and width look normal.
+    // Keep metadata below the category title at every font scale and viewport width.
     val compactWithValue = value != null
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -147,7 +145,7 @@ fun DsCategoryRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = requireNotNull(value),
-                        style = DsType.small13.withReadingWeight(),
+                        style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                         color = colors.labelSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -166,19 +164,6 @@ fun DsCategoryRow(
                         )
                     }
                 }
-            }
-        }
-        if (!compactWithValue) {
-            value?.let {
-                Spacer(Modifier.width(DsSpacing.small))
-                Text(
-                    text = it,
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 96.dp),
-                )
             }
         }
         if (!compactWithValue) {
