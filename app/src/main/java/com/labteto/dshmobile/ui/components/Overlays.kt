@@ -291,6 +291,39 @@ fun DsMenu(anchor: @Composable () -> Unit, items: List<MenuItem>) {
  * Shared anchored popup primitive. All dropdown-style overlays route through this function so
  * tapping anywhere outside the menu always dismisses it.
  */
+/**
+ * Anchored popup for custom compact controls (sliders etc.).
+ * The same dismissal and surface tokens as normal popup menus.
+ */
+@Composable
+fun DsPopupMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    focusable: Boolean = true,
+    containerColor: Color? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = DsTheme.colors
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        modifier = modifier,
+        shape = DsShapes.menu,
+        containerColor = containerColor ?: colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+        tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, colors.borderL1),
+        properties = PopupProperties(
+            focusable = focusable,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            clippingEnabled = true,
+        ),
+    ) {
+        content()
+    }
+}
+
 @Composable
 fun DsPopupMenu(
     expanded: Boolean,
