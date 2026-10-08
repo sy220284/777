@@ -142,6 +142,7 @@ private fun NavigationScreenshot() {
             onRenameSession = { _, _ -> true },
             onTogglePinSession = {},
             onWorkspaceFiles = {},
+            onProjects = {},
             onOpenRunCenter = {},
             groupMemberCount = 3,
             onOpenGroupChat = {},
