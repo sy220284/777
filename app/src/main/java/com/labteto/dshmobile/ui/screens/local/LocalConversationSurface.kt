@@ -1151,17 +1151,22 @@ internal fun LocalConversationSurface(
                 )
             }
             if (state.usageMode == LocalUsageMode.WORK) {
+                val waitingForPlanApproval = state.pendingQuestion?.let(::localPlanReviewOf) != null
                 LocalComposerSheetSlider(
                     title = stringResource(R.string.local_composer_plan_title),
                     labels = listOf(stringResource(R.string.local_composer_plan_off), stringResource(R.string.local_composer_plan_start)),
-                    selectedIndex = if (state.planMode && state.pendingQuestion?.let(::localPlanReviewOf) == null) 1 else 0,
-                    enabled = !state.running,
+                    selectedIndex = if (state.planMode && !waitingForPlanApproval) 1 else 0,
+                    enabled = !state.running && !waitingForPlanApproval,
                     hint = stringResource(
-                        if (state.pendingQuestion?.let(::localPlanReviewOf) != null)
+                        if (waitingForPlanApproval)
                             R.string.local_composer_plan_waiting_approval
                         else R.string.local_composer_plan_tip,
                     ),
-                    onSelect = { index -> if ((index == 1) != state.planMode) onPlanModeChange(index == 1) },
+                    onSelect = { index ->
+                        if (!waitingForPlanApproval && (index == 1) != state.planMode) {
+                            onPlanModeChange(index == 1)
+                        }
+                    },
                 )
                 LocalComposerSheetSlider(
                     title = stringResource(R.string.local_composer_approval_title),

@@ -48,6 +48,9 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
                 before.loading ||
                 before.usageMode != LocalUsageMode.WORK ||
                 before.kernel.running ||
+                // A restored pending interaction must not silently release plan read-only limits.
+                before.work.pendingQuestion != null ||
+                before.work.pendingApproval != null ||
                 workRunRegistry.live(sessionId) != null
             ) return false
             if (before.work.planMode == enabled) return true
