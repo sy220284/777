@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -126,7 +127,9 @@ fun DsCategoryRow(
         ) {
             Text(
                 text = title,
-                style = (titleTextStyle ?: DsType.std14).withReadingWeight(),
+                style = (titleTextStyle ?: DsType.std14)
+                    .let { if (compactWithValue) it.copy(fontSize = 14.sp) else it }
+                    .withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
