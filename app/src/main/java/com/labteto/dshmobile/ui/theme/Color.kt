@@ -11,78 +11,33 @@ import androidx.compose.ui.graphics.Color
 // ---- Primitive scales (identical in light & dark) ---------------------------
 
 object Ds {
-    // Neutral-bluish UI scale. Dark stops carry a faint green cast (墨) so surfaces sit
-    // comfortably under the celadon accent; light stops pick up the same paper cast.
-    val Bluish00 = Color(0xFFFFFFFF)
+    // Neutral-bluish neutral scale retained for active semantic colors.
     val Bluish50 = Color(0xFFF9FAF9)
-    val Bluish60 = Color(0xFFF5F7F6)
     val Bluish75 = Color(0xFFF0F3F1)
     val Bluish100 = Color(0xFFEAEFEC)
-    val Bluish150 = Color(0xFFE8EDEA)
-    val Bluish200 = Color(0xFFE0E6E2)
-    val Bluish300 = Color(0xFFCFD6D2)
-    val Bluish400 = Color(0xFFADB6B1)
-    val Bluish500 = Color(0xFF97A19C)
     val Bluish600 = Color(0xFF818B87)
-    val Bluish700 = Color(0xFF616B67)
     val Bluish750 = Color(0xFF424A47)
     val Bluish800 = Color(0xFF2C3836)
     val Bluish850 = Color(0xFF242F2D)
     val Bluish875 = Color(0xFF1E2826)
     val Bluish900 = Color(0xFF182120)
-    val Bluish950 = Color(0xFF141A19)
     val Bluish1000 = Color(0xFF0F1514)
-
-    // Legacy celadon scale remains available for saved appearance presets.
-    val Celadon50 = Color(0xFFEDF6F5)
-    val Celadon100 = Color(0xFFDCEEEC)
-    val Celadon200 = Color(0xFFBFE0DD)
-    val Celadon300 = Color(0xFF93CCC7)
-    val Celadon400 = Color(0xFF63B3AC)
-    val Celadon500 = Color(0xFF4AA39C)
-    val Celadon600 = Color(0xFF3E8E8C)
-    val Celadon700 = Color(0xFF35726F)
-    val Celadon800 = Color(0xFF2E5A58)
-    val Celadon900 = Color(0xFF28403F)
-
-    // Function-family hues for icon containers and badges (muted, 同一饱和度带).
-    val FamilyPurple = Color(0xFF9B8EC9)
-    val FamilyCyan = Color(0xFF6FA3C2)
-    val FamilyPurpleDeep = Color(0xFF4A4370)
-    val FamilyCyanDeep = Color(0xFF3D5872)
 
     // 默认交互蓝. The UI itself stays monochrome; blue is reserved for selection,
     // links, focus and primary interactive state.
-    val AccentBlue50 = Color(0xFFF2F7FF)
     val AccentBlue100 = Color(0xFFE8F2FF)
-    val AccentBlue200 = Color(0xFFCFE3FF)
     val AccentBlue400 = Color(0xFF5A9BFF)
     val AccentBlue500 = Color(0xFF356BFD)
     val AccentBlue600 = Color(0xFF1783FF)
-    val AccentBlue700 = Color(0xFF126AD1)
     val AccentBlue900 = Color(0xFF132F57)
 
-    // DeepSeek reference scale kept for compatibility with existing saved settings.
-    val Deepseek50 = Color(0xFFEDF3FE)
-    val Deepseek100 = Color(0xFFE4EDFD)
-    val Deepseek200 = Color(0xFFD3E2FF)
-    val Deepseek300 = Color(0xFFB7C8FE)
-    val Deepseek400 = Color(0xFF679EFE)
-    val Deepseek450 = Color(0xFF5686FE)
-    val Deepseek500 = Color(0xFF4176E6)
-    val Deepseek600 = Color(0xFF4868B2)
-    val Deepseek800 = Color(0xFF34415B)
-    val Deepseek900 = Color(0xFF283142)
-
-    // Semantic (muted to the same satiation band as the celadon accent)
+    // Semantic status colors
     val Green100 = Color(0xFFE6F4EC)
     val Green400 = Color(0xFF5BAF85)
     val Green500 = Color(0xFF3F9A6E)
     val Green900 = Color(0xFF233C2C)
     val Red50 = Color(0xFFFBF1F0)
-    val Red100 = Color(0xFFF8E2E0)
     val Red400 = Color(0xFFDE7A72)
-    val Red500 = Color(0xFFC94A42)
     val Red600 = Color(0xFFC0443C)
     val Red900 = Color(0xFF571916)
     val Amber100 = Color(0xFFFBF3E4)
@@ -90,16 +45,6 @@ object Ds {
     val Amber500 = Color(0xFFC89041)
     val Amber600 = Color(0xFFB07E33)
     val Amber900 = Color(0xFF27241F)
-
-    // Syntax colors (shiki.css, light theme)
-    val SyntaxConstant = Color(0xFF1C7ED6)
-    val SyntaxString = Color(0xFF2F9E44)
-    val SyntaxComment = Color(0xFF868E96)
-    val SyntaxKeyword = Color(0xFFD6336C)
-    val SyntaxParameter = Color(0xFFE8590C)
-    val SyntaxFunction = Color(0xFF6741D9)
-    val SyntaxPunctuation = Color(0xFF495057)
-    val SyntaxLink = Color(0xFF1971C2)
 
     // Context meter tints
     val MeterSystem = Color(0xFFADB2B8)
@@ -152,7 +97,7 @@ object DsLight {
     val toastBg = Ds.Bluish800
     val tooltipBg = Ds.Bluish850
     /**
-     * One step darker than the harness's own `--dsw-specific-bubble` (`Celadon100`), and the one
+     * One step darker than the harness's own `--dsw-specific-bubble` (pale celadon), and the one
      * deliberate divergence in this table.
      *
      * The web value is 1.06:1 against the white transcript — legible there only because the bubble
