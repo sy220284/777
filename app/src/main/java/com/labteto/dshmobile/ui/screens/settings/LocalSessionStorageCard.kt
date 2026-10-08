@@ -30,7 +30,6 @@ internal fun LocalSessionStorageCard(
     val colors = DsTheme.colors
     SettingsCard(
         title = stringResource(R.string.settings_local_session_storage),
-        icon = FeatherIcons.Clock,
     ) {
         if (status == null) {
             Text(

@@ -30,7 +30,7 @@ object DsType {
     // Clear Realm navigation hierarchy. General UI is sans-serif; serif stays literary-only.
     val largeTitle28 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 34.sp)
     val title22 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 30.sp)
-    val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
+    val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp)
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp)
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
@@ -53,6 +53,7 @@ object DsType {
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp)
     val dockTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 24.sp)
+    val sectionTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp)
     val statsText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 20.sp)
 }
 

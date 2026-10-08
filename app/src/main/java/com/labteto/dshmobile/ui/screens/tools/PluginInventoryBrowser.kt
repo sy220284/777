@@ -140,7 +140,7 @@ internal fun PluginInventoryBrowser(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
-                placeholder = stringResource(R.string.tools_catalog_search),
+                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             if (!skillsOnly) LazyRow(
                 contentPadding = PaddingValues(horizontal = DsSpacing.comfortable),
@@ -245,6 +245,24 @@ internal fun PluginInventoryBrowser(
         DsBottomSheet(
             title = item.name,
             onDismiss = { selectedRow = null },
+            scrollable = true,
+            footer = {
+                val usePrompt = stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                DsButton(
+                    text = stringResource(
+                        if (onUseCapability != null && item.available) R.string.plugin_use
+                        else if (item.remote) R.string.tools_external_services
+                        else R.string.tools_catalog_return_chat,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    size = DsButtonSize.Large,
+                    onClick = {
+                        selectedRow = null
+                        if (onUseCapability != null && item.available) onUseCapability(usePrompt)
+                        else if (item.remote) onManageConnections() else onReturnToChat()
+                    },
+                )
+            },
         ) {
             Text(
                 item.id.removePrefix("local:").removePrefix("remote:"),
@@ -259,20 +277,7 @@ internal fun PluginInventoryBrowser(
             if (item.id.startsWith("skill:") && !item.available) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
             }
-            val usePrompt = stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-            DsButton(
-                text = stringResource(
-                    if (onUseCapability != null && item.available) R.string.plugin_use
-                    else if (item.remote) R.string.tools_external_services
-                    else R.string.tools_catalog_return_chat,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    selectedRow = null
-                    if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                    else if (item.remote) onManageConnections() else onReturnToChat()
-                },
-            )
+
         }
     }
 }
