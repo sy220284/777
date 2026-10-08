@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.chat.extractLocalCharacterThought
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -18,5 +19,12 @@ class LocalCharacterThoughtTest {
 
     @Test fun normalConversationIsNotModified() {
         assertEquals(null to "你好", extractLocalCharacterThought("你好"))
+    }
+
+    @Test fun invalidOrOversizedHeaderDoesNotHideTheReply() {
+        val malformed = "【心声：" + "想".repeat(300) + "】正文"
+        assertEquals(null to malformed, extractLocalCharacterThought(malformed))
+        val unterminated = "【心声：" + "想".repeat(300)
+        assertEquals(null to unterminated, extractLocalCharacterThought(unterminated))
     }
 }

@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelDelta
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -19,6 +21,46 @@ import org.junit.Test
 
 class DeepSeekClientTest {
     private val client = DeepSeekClient(OkHttpClient(), Json { ignoreUnknownKeys = true })
+
+
+    @Test
+    fun reasoningOverrideMatchesEachProviderWireContract() = runBlocking {
+        val requests = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            requests += Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder()
+                .request(chain.request())
+                .protocol(Protocol.HTTP_1_1)
+                .code(200)
+                .message("OK")
+                .body(
+                    """{"choices":[{"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}"""
+                        .toResponseBody("application/json".toMediaType()),
+                )
+                .build()
+        }.build()
+        val testClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+        val history = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "test")
+        })
+        testClient.complete(
+            apiKey = "test", baseUrl = "https://api.deepseek.com", model = "deepseek-flash",
+            messages = history, tools = JsonArray(emptyList()), reasoningEffort = "none",
+        )
+        val deepSeekPayload = Json.parseToJsonElement(requests.last()).jsonObject
+        assertEquals("disabled", deepSeekPayload["thinking"]?.jsonObject
+            ?.get("type")?.jsonPrimitive?.content)
+        assertEquals("none", deepSeekPayload["reasoning_effort"]?.jsonPrimitive?.content)
+
+        testClient.complete(
+            apiKey = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-5.6-sol",
+            messages = history, tools = JsonArray(emptyList()), reasoningEffort = "high",
+        )
+        val openAiPayload = Json.parseToJsonElement(requests.last()).jsonObject
+        assertFalse("OpenAI Chat rejects DeepSeek thinking", openAiPayload.containsKey("thinking"))
+        assertEquals("high", openAiPayload["reasoning_effort"]?.jsonPrimitive?.content)
+    }
 
     @Test
     fun parsesToolCallAndReasoning() {
