@@ -150,67 +150,70 @@ internal class LocalChatAutomationVisibleTurnOwner @Inject constructor(
         automationJob: Job?,
     ): Boolean {
         val handle = runtimeStateStore.foregroundRunHandle
-        return synchronized(handle.lock) {
-            val before = runtimeStateStore.state.value
+        val before = synchronized(handle.lock) {
+            val current = runtimeStateStore.state.value
             if (
                 runtimeStateStore.sessionTransitioning ||
                 !isAutomationVisibleTurnOwner(
-                    handle, session.id, runtimeStateStore.currentSessionId, before, automationJob,
+                    handle, session.id, runtimeStateStore.currentSessionId, current, automationJob,
                 )
-            ) return@synchronized false
-            val eventLog = sessionStorage.eventLogs.get(session.id)
-            val nextChatState = chatComposition.turnCoordinator.applyDeterministicInteractionState(
-                previous = before.chat.chatState.withoutLegacyConversationContext(),
+            ) null else current
+        } ?: return false
+        // Session navigation cancels and joins this Job before rebinding the visible slot.
+        // The non-suspending commit is therefore protected by its owning Job and Session lease;
+        // never hold the shared foreground lock during durable EventLog / snapshot disk writes.
+        val eventLog = sessionStorage.eventLogs.get(session.id)
+        val nextChatState = chatComposition.turnCoordinator.applyDeterministicInteractionState(
+            previous = before.chat.chatState.withoutLegacyConversationContext(),
+            userMessage = "",
+            assistantMessage = content,
+        ).withoutLegacyConversationContext()
+        modelHistory.history.append(reply.message)
+        modelHistory.refreshMetrics(session.id)
+        transcriptRuntime.applyMessages(session.id, listOf(proactiveMessage), assistantEventSequence)
+        chatState.update { current ->
+            val baseContext = current.chat.chatContext.applySceneTurn(
                 userMessage = "",
                 assistantMessage = content,
-            ).withoutLegacyConversationContext()
-            modelHistory.history.append(reply.message)
-            modelHistory.refreshMetrics(session.id)
-            transcriptRuntime.applyMessages(session.id, listOf(proactiveMessage), assistantEventSequence)
-            chatState.update { current ->
-                val baseContext = current.chat.chatContext.applySceneTurn(
-                    userMessage = "",
-                    assistantMessage = content,
-                    sequence = assistantEventSequence,
+                sequence = assistantEventSequence,
+            )
+            val pending = ChatPendingTurn(
+                sequence = assistantEventSequence,
+                assistantMessageId = proactiveMessage.id,
+                branchHeadId = proactiveMessage.id,
+                userMessage = "",
+                assistantMessage = content,
+                generation = baseContext.generation,
+            )
+            val nextContext = baseContext.enqueuePendingDurably(pending, eventLog)
+            val nextBranches = if (
+                runtimeStateStore.foregroundRunHandle.pendingInputs.size() == 0 &&
+                before.transcriptIndex.branchingEligible &&
+                before.chat.chatBranches.nodes.isNotEmpty()
+            ) {
+                appendMaterializedChatBranchMessage(
+                    current = current.chat.chatBranches,
+                    activeMessages = emptyList(),
+                    message = proactiveMessage,
+                    parentId = before.transcriptIndex.latestDialogueMessageId,
+                    chatState = nextChatState,
+                    chatContext = nextContext,
+                    replySuggestions = current.chat.replySuggestions,
                 )
-                val pending = ChatPendingTurn(
-                    sequence = assistantEventSequence,
-                    assistantMessageId = proactiveMessage.id,
-                    branchHeadId = proactiveMessage.id,
-                    userMessage = "",
-                    assistantMessage = content,
-                    generation = baseContext.generation,
-                )
-                val nextContext = baseContext.enqueuePendingDurably(pending, eventLog)
-                val nextBranches = if (
-                    runtimeStateStore.foregroundRunHandle.pendingInputs.size() == 0 &&
-                    before.transcriptIndex.branchingEligible &&
-                    before.chat.chatBranches.nodes.isNotEmpty()
-                ) {
-                    appendMaterializedChatBranchMessage(
-                        current = current.chat.chatBranches,
-                        activeMessages = emptyList(),
-                        message = proactiveMessage,
-                        parentId = before.transcriptIndex.latestDialogueMessageId,
-                        chatState = nextChatState,
-                        chatContext = nextContext,
-                        replySuggestions = current.chat.replySuggestions,
-                    )
-                } else {
-                    current.chat.chatBranches
-                }
-                current.copy(
-                    chat = current.chat.copy(
-                        chatState = nextChatState,
-                        chatContext = nextContext,
-                        chatBranches = nextBranches,
-                    ),
-                )
+            } else {
+                current.chat.chatBranches
             }
-            modelHistory.checkpoint(session.id, "chat/proactive-automation")
-            sessionStorage.enqueueCurrentSnapshot(session.id)
-            true
+            current.copy(
+                chat = current.chat.copy(
+                    chatState = nextChatState,
+                    chatContext = nextContext,
+                    chatBranches = nextBranches,
+                ),
+            )
         }
+        modelHistory.checkpoint(session.id, "chat/proactive-automation")
+        sessionStorage.enqueueCurrentSnapshot(session.id)
+        return true
     }
 
     internal fun release(targetSessionId: String, automationJob: Job?) {
