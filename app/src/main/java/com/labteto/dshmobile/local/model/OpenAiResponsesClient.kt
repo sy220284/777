@@ -54,6 +54,7 @@ class OpenAiResponsesClient @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        reasoningEffort: String? = null,
         planSharing: Boolean,
         allowImageGeneration: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
@@ -68,6 +69,7 @@ class OpenAiResponsesClient @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = temperature,
+            reasoningEffort = reasoningEffort,
             planSharing = planSharing,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
@@ -271,6 +273,7 @@ class OpenAiResponsesClient @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double?,
+        reasoningEffort: String? = null,
         planSharing: Boolean = true,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
@@ -284,6 +287,9 @@ class OpenAiResponsesClient @Inject constructor(
         put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
+        reasoningEffort?.let { effort ->
+            put("reasoning", buildJsonObject { put("effort", effort) })
+        }
         if (!planSharing) {
             promptCacheKey?.trim()?.takeIf(String::isNotBlank)?.let { key ->
                 put("prompt_cache_key", key.take(MAX_PROMPT_CACHE_KEY_CHARS))

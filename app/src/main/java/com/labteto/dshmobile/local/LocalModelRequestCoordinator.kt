@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheMode
@@ -120,6 +121,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             snapshot.modelState.baseUrl,
         )
         val runSurface = frozenProfile.toRunModelSurface()
+        // Freeze per-turn model reasoning preference before admission and retries.
+        val reasoningEffort = LocalReasoningModeStore.effortFor(snapshot.sessionId, frozenProfile)
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
@@ -398,6 +401,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             )
             put("request_envelope_fingerprint", requestEnvelopeFingerprint)
             put("plan_mode", snapshot.work.planMode)
+            reasoningEffort?.let { put("reasoning_effort", it) }
             temperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
@@ -676,6 +680,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         add(JsonPrimitive(activeEvidence.resolvedToolSurfaceDigest))
                         add(JsonPrimitive(activeEvidence.contextDigest))
                         add(JsonPrimitive(temperature?.toString() ?: "null"))
+                        add(JsonPrimitive(reasoningEffort ?: "default"))
                         add(JsonPrimitive(cacheComparisonResponseId ?: "null"))
                         add(JsonPrimitive(promptCacheKey ?: "null"))
                         add(JsonPrimitive(promptCacheTtl ?: "null"))
@@ -755,6 +760,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 tools = tools,
                                 streaming = true,
                                 temperature = temperature,
+                                reasoningEffort = reasoningEffort,
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
                             promptCacheTtl = promptCacheTtl,

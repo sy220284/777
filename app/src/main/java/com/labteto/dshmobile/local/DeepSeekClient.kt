@@ -68,6 +68,7 @@ class DeepSeekClient @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
+        reasoningEffort: String? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
@@ -77,7 +78,12 @@ class DeepSeekClient @Inject constructor(
             put("messages", JsonArray(messages))
             put("stream", false)
             temperature?.let { put("temperature", it) }
-            if (
+            if (reasoningEffort != null) {
+                put("thinking", buildJsonObject {
+                    put("type", if (reasoningEffort == "none") "disabled" else "enabled")
+                })
+                put("reasoning_effort", reasoningEffort)
+            } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
                 (tools.isNotEmpty() || temperature != null)
             ) {
@@ -160,6 +166,7 @@ class DeepSeekClient @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray = LocalToolCatalog.specs,
         temperature: Double? = null,
+        reasoningEffort: String? = null,
         onDelta: (LocalModelDelta) -> Unit = { },
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val requestId = UUID.randomUUID().toString()
@@ -171,7 +178,12 @@ class DeepSeekClient @Inject constructor(
             put("stream", true)
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
-            if (
+            if (reasoningEffort != null) {
+                put("thinking", buildJsonObject {
+                    put("type", if (reasoningEffort == "none") "disabled" else "enabled")
+                })
+                put("reasoning_effort", reasoningEffort)
+            } else if (
                 toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
                 (tools.isNotEmpty() || temperature != null)
             ) {
