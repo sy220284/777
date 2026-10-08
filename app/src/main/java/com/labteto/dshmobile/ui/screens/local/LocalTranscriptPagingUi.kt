@@ -80,6 +80,36 @@ internal fun LocalComposerTailFollower(
     }
 }
 
+/**
+ * Follows the *growth* of the current streaming message only while the reader remains
+ * near the conversation bottom. Observing item size instead of scroll offset prevents
+ * ordinary manual scrolling from being mistaken for new model output.
+ */
+@Composable
+internal fun LocalWorkStreamingTailFollower(
+    listState: LazyListState,
+    enabled: Boolean,
+) {
+    LaunchedEffect(listState, enabled) {
+        if (!enabled) return@LaunchedEffect
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val tail = info.visibleItemsInfo.lastOrNull()
+            Triple(info.totalItemsCount, tail?.index, tail?.size)
+        }.distinctUntilChanged().collect {
+            val info = listState.layoutInfo
+            val tail = info.visibleItemsInfo.lastOrNull() ?: return@collect
+            if (tail.index != info.totalItemsCount - 1 || listState.isScrollInProgress) {
+                return@collect
+            }
+            val bottomGap = tail.offset + tail.size - info.viewportEndOffset
+            if (bottomGap in 1..128) {
+                listState.scrollBy(bottomGap.toFloat())
+            }
+        }
+    }
+}
+
 internal fun LazyListState.conversationViewportExtent(): Int {
     val info = layoutInfo
     return info.viewportEndOffset - info.viewportStartOffset

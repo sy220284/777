@@ -402,6 +402,10 @@ internal fun LocalConversationSurface(
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
+    LocalWorkStreamingTailFollower(
+        listState = listState,
+        enabled = showStreamingTail && state.usageMode == LocalUsageMode.WORK,
+    )
 
     LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
         if (transcriptItems.isNotEmpty()) {
