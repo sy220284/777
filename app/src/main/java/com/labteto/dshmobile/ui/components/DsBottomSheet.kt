@@ -110,7 +110,7 @@ fun DsBottomSheet(
             }
             if (scrollable) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),

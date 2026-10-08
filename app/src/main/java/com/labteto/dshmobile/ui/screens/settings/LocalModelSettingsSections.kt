@@ -89,6 +89,7 @@ internal fun LocalModelSettingsCard(
     local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
+    onOpenAccount: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
@@ -132,8 +133,12 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    SettingsCard(stringResource(R.string.advanced_model_settings), FeatherIcons.Globe) {
-        ChatGptAccountPanel(chatGpt, viewModel, report)
+    AppSettingsSection {
+        AppSettingsRow(FeatherIcons.User, stringResource(R.string.settings_account),
+            value = stringResource(if (chatGpt.connected) R.string.chatgpt_connected else R.string.chatgpt_not_connected),
+            onClick = onOpenAccount)
+    }
+    SettingsCard(stringResource(R.string.advanced_model_settings)) {
         Text(
             stringResource(R.string.local_model_image_mode_title),
             style = DsType.small13Strong.withReadingWeight(),
@@ -242,11 +247,47 @@ internal fun LocalModelSettingsCard(
 
     if (showEditor) {
         DsBottomSheet(
-            title = stringResource(R.string.local_model_add),
+            title = stringResource(if (editingProfileId == null) R.string.local_model_add else R.string.local_model_edit),
             subtitle = stringResource(R.string.local_model_preset_hint),
             onDismiss = { showEditor = false; editorGeneration++ },
+            dismissEnabled = !saving,
+            scrollable = true,
+            footer = {
+                DsButton(stringResource(R.string.advanced_save_model_settings), onClick = {
+                    if (!savedRoute && apiKey.isBlank()) {
+                        testStatus = "请填写该模型的密钥"
+                    } else {
+                        saving = true
+                        val savedGeneration = editorGeneration
+                        val savedKey = apiKey
+                        val savedModel = model
+                        val savedUrl = baseUrl
+                        val savedProtocol = protocol
+                        val savedProfileId = editingProfileId
+                        val savedContextWindowOverride = contextWindowTokens.toIntOrNull() ?: 0
+                        scope.launch {
+                            try {
+                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId, savedContextWindowOverride)
+                                if (showEditor && editorGeneration == savedGeneration) {
+                                    apiKey = ""
+                                    showEditor = false
+                                }
+                                report(modelSavedMessage)
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                if (showEditor && editorGeneration == savedGeneration) testStatus = error.message ?: "保存失败"
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    }
+                }, modifier = Modifier.fillMaxWidth(), size = DsButtonSize.Large, loading = saving,
+                    enabled = !testing && !saving && model.isNotBlank() && baseUrl.isNotBlank() &&
+                        (savedRoute || apiKey.isNotBlank()))
+            },
         ) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+            Column(Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelPrimary)
@@ -343,38 +384,7 @@ internal fun LocalModelSettingsCard(
                         }
                     }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(), variant = DsButtonVariant.Outline)
-                DsButton(stringResource(R.string.advanced_save_model_settings), onClick = {
-                    if (!savedRoute && apiKey.isBlank()) {
-                        testStatus = "请填写该模型的密钥"
-                    } else {
-                        saving = true
-                        val savedGeneration = editorGeneration
-                        val savedKey = apiKey
-                        val savedModel = model
-                        val savedUrl = baseUrl
-                        val savedProtocol = protocol
-                        val savedProfileId = editingProfileId
-                        val savedContextWindowOverride = contextWindowTokens.toIntOrNull() ?: 0
-                        scope.launch {
-                            try {
-                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId, savedContextWindowOverride)
-                                if (showEditor && editorGeneration == savedGeneration) {
-                                    apiKey = ""
-                                    showEditor = false
-                                }
-                                report(modelSavedMessage)
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                throw cancelled
-                            } catch (error: Exception) {
-                                if (showEditor && editorGeneration == savedGeneration) testStatus = error.message ?: "保存失败"
-                            } finally {
-                                saving = false
-                            }
-                        }
-                    }
-                }, modifier = Modifier.fillMaxWidth(),
-                    enabled = !testing && !saving && model.isNotBlank() && baseUrl.isNotBlank() &&
-                        (savedRoute || apiKey.isNotBlank()))
+
             }
         }
     }
@@ -438,7 +448,7 @@ internal fun DeepSeekPricingCard(
         stringResource(R.string.pricing_builtin_source)
     }
 
-    SettingsCard(stringResource(R.string.pricing_deepseek_title), FeatherIcons.Globe) {
+    SettingsCard(stringResource(R.string.pricing_deepseek_title)) {
         Text(
             stringResource(R.string.pricing_current_period, periodLabel),
             style = DsType.small13Strong.withReadingWeight(),

@@ -179,6 +179,51 @@ internal fun LocalRunCenterScreen(
         DsBottomSheet(
             title = stringResource(R.string.local_run_agent_direct_title),
             subtitle = stringResource(R.string.local_run_agent_direct_body),
+            scrollable = true,
+            dismissEnabled = !startingAgent,
+            footer = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.common_cancel),
+                        onClick = {
+                            showAgentLauncher = false
+                            agentFeedback = ""
+                        },
+                        enabled = !startingAgent,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Large,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsButton(
+                        text = stringResource(R.string.local_run_agent_start),
+                        onClick = {
+                            val task = agentTask.trim()
+                            if (task.isNotEmpty() && !startingAgent) {
+                                scope.launch {
+                                    startingAgent = true
+                                    try {
+                                        val result = if (researchPreset) onStartResearchAgent(task) else onStartBackgroundAgent(task)
+                                        agentFeedback = result.message
+                                        if (result.accepted) {
+                                            agentTask = ""
+                                            showAgentLauncher = false
+                                        }
+                                    } finally {
+                                        startingAgent = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = agentTask.isNotBlank() && !startingAgent,
+                        loading = startingAgent,
+                        size = DsButtonSize.Large,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            },
             onDismiss = {
                 if (!startingAgent) {
                     showAgentLauncher = false
@@ -225,55 +270,17 @@ internal fun LocalRunCenterScreen(
             }
             Text(
                 stringResource(R.string.local_run_agent_inherits_context),
-                style = DsType.caption11.withReadingWeight(),
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             agentFeedback.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                DsButton(
-                    text = stringResource(R.string.common_cancel),
-                    onClick = {
-                        showAgentLauncher = false
-                        agentFeedback = ""
-                    },
-                    enabled = !startingAgent,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                )
-                DsButton(
-                    text = stringResource(R.string.local_run_agent_start),
-                    onClick = {
-                        val task = agentTask.trim()
-                        if (task.isNotEmpty() && !startingAgent) {
-                            scope.launch {
-                                startingAgent = true
-                                try {
-                                    val result = if (researchPreset) onStartResearchAgent(task) else onStartBackgroundAgent(task)
-                                    agentFeedback = result.message
-                                    if (result.accepted) {
-                                        agentTask = ""
-                                        showAgentLauncher = false
-                                    }
-                                } finally {
-                                    startingAgent = false
-                                }
-                            }
-                        }
-                    },
-                    enabled = agentTask.isNotBlank() && !startingAgent,
-                    loading = startingAgent,
-                    size = DsButtonSize.Small,
-                )
-            }
+
         }
     }
 }

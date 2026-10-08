@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.settings
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsSwitch
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,9 +60,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
@@ -89,24 +87,15 @@ internal fun MemoryOverviewCard(
     local: LocalHarnessSettingsState,
     recordCount: Int,
 ) {
-    SettingsCard(stringResource(R.string.advanced_memory_overview), FeatherIcons.BookOpen) {
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsStatusPill(
-                state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
-                label = stringResource(
-                    if (local.autoRecall) R.string.advanced_auto_recall_on
-                    else R.string.advanced_auto_recall_off,
-                ),
-            )
-            DsStatusPill(
-                state = if (local.autoMemory) DsStatus.Done else DsStatus.Neutral,
-                label = stringResource(
-                    if (local.autoMemory) R.string.advanced_auto_memory_on
-                    else R.string.advanced_auto_memory_off,
-                ),
-            )
-            DsPill(text = stringResource(R.string.advanced_memory_active_count, recordCount))
-        }
+    AppSettingsSection {
+        AppSettingsRow(null, stringResource(R.string.advanced_auto_recall),
+            value = stringResource(if (local.autoRecall) R.string.common_enabled else R.string.common_disabled))
+        AppSettingsDivider()
+        AppSettingsRow(null, stringResource(R.string.advanced_auto_memory),
+            value = stringResource(if (local.autoMemory) R.string.common_enabled else R.string.common_disabled))
+        AppSettingsDivider()
+        AppSettingsRow(null, stringResource(R.string.advanced_manage_memory),
+            value = stringResource(R.string.advanced_memory_active_count, recordCount))
     }
 }
 
@@ -138,7 +127,7 @@ internal fun LocalMemorySettingsCard(
     var userRules by remember(local.userRules) { mutableStateOf(local.userRules) }
     var showRulesEditor by remember { mutableStateOf(false) }
 
-    SettingsCard(stringResource(R.string.advanced_memory_settings), FeatherIcons.BookOpen) {
+    SettingsCard(stringResource(R.string.advanced_memory_settings)) {
         DsValueRow(
             label = stringResource(R.string.advanced_user_rules),
             value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
@@ -186,6 +175,19 @@ internal fun LocalMemorySettingsCard(
             title = stringResource(R.string.advanced_user_rules),
             subtitle = stringResource(R.string.advanced_user_rules_hint),
             onDismiss = { showRulesEditor = false },
+            scrollable = true,
+            footer = {
+                DsButton(
+                    text = stringResource(R.string.common_save),
+                    onClick = {
+                        viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory)
+                        report(memorySavedMessage)
+                        showRulesEditor = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    size = DsButtonSize.Large,
+                )
+            },
         ) {
             DsTextField(
                 value = userRules,
@@ -198,15 +200,7 @@ internal fun LocalMemorySettingsCard(
                     Text(stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000))
                 },
             )
-            DsButton(
-                text = stringResource(R.string.common_save),
-                onClick = {
-                    viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory)
-                    report(memorySavedMessage)
-                    showRulesEditor = false
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+
         }
     }
 }
@@ -241,14 +235,14 @@ internal fun MemoryManagementCard(
         folders.mapNotNull { folder -> folder.records.firstOrNull()?.id?.let { it to folder } }.toMap()
     }
 
-    SettingsCard(stringResource(R.string.advanced_manage_memory), FeatherIcons.BookOpen) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
         if (records.isEmpty()) {
             Text(
                 stringResource(R.string.advanced_memory_empty),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            return@SettingsCard
+            return@Column
         }
 
         Text(
@@ -256,12 +250,11 @@ internal fun MemoryManagementCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        DsTextField(
+        com.labteto.dshmobile.ui.components.DsSearchField(
             value = query,
             onValueChange = { query = it.take(200) },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(R.string.advanced_memory_search)) },
+            placeholder = stringResource(R.string.advanced_memory_search),
         )
 
         DsButton(
@@ -279,26 +272,17 @@ internal fun MemoryManagementCard(
             MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
             MemoryFilter.FACT to R.string.advanced_kind_fact,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
-            filterOptions.chunked(2).forEach { rowOptions ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                ) {
-                    rowOptions.forEach { (candidate, label) ->
-                        val count = records.count { it.kind.matchesFilter(candidate) }
-                        DsPill(
-                            text = stringResource(
-                                R.string.advanced_memory_filter_count,
-                                stringResource(label),
-                                count,
-                            ),
-                            selected = filter == candidate,
-                            onClick = { filter = candidate },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            filterOptions.forEach { (candidate, label) ->
+                com.labteto.dshmobile.ui.components.DsFilterChip(
+                    text = stringResource(R.string.advanced_memory_filter_count,
+                        stringResource(label), records.count { it.kind.matchesFilter(candidate) }),
+                    selected = filter == candidate,
+                    onClick = { filter = candidate },
+                )
             }
         }
 
@@ -339,16 +323,11 @@ internal fun MemoryManagementCard(
                     modifier = Modifier.padding(DsSpacing.medium),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DsPill(text = memoryKindLabel(record.kind), selected = true)
-                        DsPill(text = memoryScopeLabel(record.scope))
-                        if (record.pinned) {
-                            DsPill(text = stringResource(R.string.advanced_pinned), warn = true)
-                        }
-                    }
+                    Text(
+                        listOfNotNull(memoryKindLabel(record.kind), memoryScopeLabel(record.scope),
+                            stringResource(R.string.advanced_pinned).takeIf { record.pinned }).joinToString(" · "),
+                        style = DsType.small13.withReadingWeight(), color = colors.labelTertiary,
+                    )
                     Text(
                         record.content,
                         style = DsType.std14.withReadingWeight(),
@@ -406,12 +385,40 @@ internal fun MemoryManagementCard(
 
     val editing = records.firstOrNull { it.id == editingId }
     if (editing != null) {
-        var content by remember(editing.id, editing.updatedAt) { mutableStateOf(editing.content) }
-        var pinned by remember(editing.id, editing.updatedAt) { mutableStateOf(editing.pinned) }
+        var content by remember(editing.id) { mutableStateOf(editing.content) }
+        var pinned by remember(editing.id) { mutableStateOf(editing.pinned) }
+        var saving by remember(editing.id) { mutableStateOf(false) }
+        var saveError by remember(editing.id) { mutableStateOf<String?>(null) }
         DsBottomSheet(
             title = stringResource(R.string.advanced_edit_memory),
             subtitle = memoryScopeLabel(editing.scope) + " · " + memoryKindLabel(editing.kind),
             onDismiss = { editingId = null },
+            dismissEnabled = !saving,
+            scrollable = true,
+            footer = {
+                saveError?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
+                DsButton(
+                    text = stringResource(R.string.common_save),
+                    onClick = {
+                        saving = true
+                        saveError = null
+                        viewModel.updateMemory(
+                            id = editing.id,
+                            content = content,
+                            pinned = pinned,
+                        ) { error ->
+                            saving = false
+                            saveError = error
+                            if (error == null) editingId = null
+                            report(error ?: memoryUpdatedMessage)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    size = DsButtonSize.Large,
+                    enabled = !saving,
+                    loading = saving,
+                )
+            },
         ) {
             DsTextField(
                 value = content,
@@ -420,6 +427,7 @@ internal fun MemoryManagementCard(
                 label = { Text(stringResource(R.string.advanced_memory_content)) },
                 minLines = 4,
                 maxLines = 8,
+                enabled = !saving,
             )
             Row(
                 Modifier.fillMaxWidth(),
@@ -430,22 +438,9 @@ internal fun MemoryManagementCard(
                     Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
-                DsSwitch(checked = pinned, onCheckedChange = { pinned = it })
+                DsSwitch(checked = pinned, onCheckedChange = { pinned = it }, enabled = !saving)
             }
-            DsButton(
-                text = stringResource(R.string.common_save),
-                onClick = {
-                    viewModel.updateMemory(
-                        id = editing.id,
-                        content = content,
-                        pinned = pinned,
-                    ) { error ->
-                        report(error ?: memoryUpdatedMessage)
-                    }
-                    editingId = null
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+
         }
     }
 }

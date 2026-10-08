@@ -54,7 +54,7 @@ internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
 internal fun SettingsGroupTitle(text: String) {
     Text(
         text = text,
-        style = DsType.small13.withReadingWeight(),
+        style = DsType.sectionTitle.withReadingWeight(),
         color = DsTheme.colors.labelTertiary,
         modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small, bottom = DsSpacing.tiny),
     )
@@ -110,7 +110,7 @@ internal fun AppSettingsRow(
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

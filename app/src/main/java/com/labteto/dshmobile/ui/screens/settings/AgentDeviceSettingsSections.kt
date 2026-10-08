@@ -97,7 +97,7 @@ internal fun DeviceCapabilitiesCard(
         },
     )
 
-    SettingsCard(stringResource(R.string.advanced_device_capabilities), FeatherIcons.Device) {
+    SettingsCard(stringResource(R.string.advanced_device_capabilities)) {
         DsStatusPill(state = overallState, label = overallLabel)
         CapabilityRow(
             label = stringResource(R.string.advanced_accessibility),
