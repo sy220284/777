@@ -48,6 +48,14 @@ class MarkdownTableTest {
     }
 
     @Test
+    fun longUnclosedFencedCodeStaysOneCodeBlock() {
+        val parsed = parseMarkdown("```kotlin\nval longLine = 1000")
+        assertEquals(1, parsed.size)
+        assertEquals("kotlin", (parsed.single() as MdBlock.Code).lang)
+        assertEquals("val longLine = 1000", (parsed.single() as MdBlock.Code).code)
+    }
+
+    @Test
     fun unfinishedStreamingQuoteAndCodeFenceRemainReadable() {
         val blocks = parseMarkdown(
             """
