@@ -89,15 +89,19 @@ internal fun LocalStreamingChatTurn(
  * authoritative: suppress text already committed as a progress/final row and do not repeat
  * empty loading cards when a work timeline exists.
  */
-internal fun shouldShowInlineWorkPreview(
-    draft: String,
-    lastDurableNarrative: String?,
-): Boolean {
-    val text = draft.trim()
-    if (text.isEmpty()) return false
+internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?): String {
     val committed = lastDurableNarrative?.trim().orEmpty()
-    return committed.isEmpty() || !committed.startsWith(text)
+    val candidate = draft.trim()
+    if (candidate.isEmpty()) return ""
+    if (committed.isEmpty()) return candidate
+    if (committed.startsWith(candidate)) return ""
+    // During an event-log commit, only render the genuinely new suffix.
+    if (candidate.startsWith(committed)) return candidate.removePrefix(committed).trimStart()
+    return candidate
 }
+
+internal fun shouldShowInlineWorkPreview(draft: String, lastDurableNarrative: String?): Boolean =
+    inlineWorkPreviewText(draft, lastDurableNarrative).isNotBlank()
 
 @Composable
 internal fun LocalStreamingWorkPreview(
@@ -108,8 +112,8 @@ internal fun LocalStreamingWorkPreview(
 ) {
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
-    val text = stream.assistant
-    val visiblePreview = shouldShowInlineWorkPreview(text, lastDurableNarrative)
+    val text = inlineWorkPreviewText(stream.assistant, lastDurableNarrative)
+    val visiblePreview = text.isNotBlank()
     if (!visiblePreview && hasDurableProgress) return
 
     Column(
