@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -48,8 +49,8 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         Text(
             summary,
             modifier = Modifier.weight(1f),
-            style = if (node.summary != null) DsType.mdSmall.withReadingWeight()
-                else DsType.small13.withReadingWeight(),
+            style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
+                .withReadingWeight().copy(fontFamily = FontFamily.Default),
             color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
                 else colors.labelSecondary,
             maxLines = 3,
