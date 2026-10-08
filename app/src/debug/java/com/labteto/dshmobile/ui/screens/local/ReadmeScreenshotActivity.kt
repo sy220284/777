@@ -136,7 +136,6 @@ private fun NavigationScreenshot() {
             running = false,
             onUsageModeChange = {},
             onNewSession = {},
-            onRemote = {},
             onSwitchSession = {},
             onDeleteSessions = { 0 },
             onRenameSession = { _, _ -> true },
