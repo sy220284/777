@@ -108,6 +108,7 @@ internal fun nextAnchoredAutomationRun(
             nextCalendarAnchoredRun(anchor, afterMillis, Calendar.DAY_OF_YEAR, 1)
         AutomationScheduleType.WEEKLY ->
             nextCalendarAnchoredRun(anchor, afterMillis, Calendar.WEEK_OF_YEAR, 1)
+        AutomationScheduleType.MONTHLY -> nextMonthlyAnchoredRun(anchor, afterMillis)
         AutomationScheduleType.INTERVAL -> {
             val minutes = task.recurringMinutes ?: return null
             nextIntervalAnchoredRun(anchor, afterMillis, minutes)
@@ -152,6 +153,25 @@ private fun nextCalendarAnchoredRun(
             }
         }
         else -> error("不支持的日历锚定字段：$field")
+    }
+    return candidate.timeInMillis
+}
+
+// Preserve the original calendar day across short months and leap years.
+internal fun nextMonthlyAnchoredRun(anchorMillis: Long, afterMillis: Long): Long {
+    if (anchorMillis > afterMillis) return anchorMillis
+    val anchor = Calendar.getInstance().apply { timeInMillis = anchorMillis }
+    val reference = Calendar.getInstance().apply { timeInMillis = afterMillis }
+    val candidate = (anchor.clone() as Calendar).apply {
+        set(Calendar.YEAR, reference.get(Calendar.YEAR))
+        set(Calendar.MONTH, reference.get(Calendar.MONTH))
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.DAY_OF_MONTH, minOf(anchor.get(Calendar.DAY_OF_MONTH), getActualMaximum(Calendar.DAY_OF_MONTH)))
+    }
+    if (candidate.timeInMillis <= afterMillis) {
+        candidate.set(Calendar.DAY_OF_MONTH, 1)
+        candidate.add(Calendar.MONTH, 1)
+        candidate.set(Calendar.DAY_OF_MONTH, minOf(anchor.get(Calendar.DAY_OF_MONTH), candidate.getActualMaximum(Calendar.DAY_OF_MONTH)))
     }
     return candidate.timeInMillis
 }

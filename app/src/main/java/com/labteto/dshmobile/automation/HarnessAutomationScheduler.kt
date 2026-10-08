@@ -166,8 +166,11 @@ class HarnessAutomationScheduler @Inject constructor(
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
         require(intervalMinutes >= 15L) { "Android 后台周期任务最短间隔为 15 分钟" }
         checkedAutomationMinutesToMillis(intervalMinutes, "任务周期", allowZero = false)
-        require(scheduleType != AutomationScheduleType.SILENCE) {
-            "沉默触发请使用 scheduleSilence"
+        require(scheduleType !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW)) {
+            "特殊触发类型请使用对应排程入口"
+        }
+        if (scheduleType == AutomationScheduleType.MONTHLY) {
+            require(intervalMinutes == 30L * 24L * 60L) { "月度任务的兼容周期必须为 30 天" }
         }
         validateChatPolicy(
             mode = mode,
@@ -201,7 +204,7 @@ class HarnessAutomationScheduler @Inject constructor(
             proactiveMaxUnanswered = proactiveMaxUnanswered,
         )
         store.upsert(task)
-        if (usesChainedChatScheduling(task)) {
+        if (usesChainedAutomationScheduling(task)) {
             enqueueOneTime(id, firstRun)
         } else {
             enqueuePeriodic(id, intervalMinutes, firstRun)
@@ -355,7 +358,7 @@ class HarnessAutomationScheduler @Inject constructor(
         val now = System.currentTimeMillis()
         val runAt = when {
             task.scheduleType == AutomationScheduleType.SILENCE -> now
-            usesChainedChatScheduling(task) ->
+            usesChainedAutomationScheduling(task) ->
                 nextAnchoredAutomationRun(task, now) ?: now
             else -> task.nextRunAt.coerceAtLeast(now)
         }
@@ -368,7 +371,7 @@ class HarnessAutomationScheduler @Inject constructor(
             )
         } ?: return false
 
-        if (usesChainedChatScheduling(resumed) || resumed.recurringMinutes == null) {
+        if (usesChainedAutomationScheduling(resumed) || resumed.recurringMinutes == null) {
             enqueueOneTime(id, runAt)
         } else {
             enqueuePeriodic(id, requireNotNull(resumed.recurringMinutes), runAt)
@@ -449,6 +452,10 @@ class HarnessAutomationScheduler @Inject constructor(
                 require(recurringMinutes == 7L * 24L * 60L) { "每周任务周期必须为 7 天" }
                 recurringMinutes
             }
+            AutomationScheduleType.MONTHLY -> {
+                require(recurringMinutes == 30L * 24L * 60L) { "月度任务的兼容周期必须为 30 天" }
+                recurringMinutes
+            }
             AutomationScheduleType.INTERVAL -> {
                 require(recurringMinutes != null) { "自定义周期不能为空" }
                 recurringMinutes
@@ -502,7 +509,7 @@ class HarnessAutomationScheduler @Inject constructor(
             )
         } ?: return false
         if (updated.status != AutomationStatus.PAUSED) {
-            if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
+            if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun)
             } else {
                 enqueuePeriodic(id, requireNotNull(updated.recurringMinutes), nextRun)
@@ -582,7 +589,7 @@ class HarnessAutomationScheduler @Inject constructor(
                     }
                 } ?: return@forEach
                 if (updated.status != AutomationStatus.SCHEDULED || !resumedFromWaiting) return@forEach
-                if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
+                if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
                     enqueueOneTime(updated.id, updated.nextRunAt)
                 } else {
                     enqueuePeriodic(

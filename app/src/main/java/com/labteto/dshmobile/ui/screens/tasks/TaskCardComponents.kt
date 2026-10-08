@@ -135,6 +135,7 @@ internal fun TaskCard(
             formatMinuteOfDay(task.windowEndMinuteOfDay ?: 22 * 60),
         )
         AutomationScheduleType.WEEKLY -> stringResource(R.string.tasks_schedule_weekly)
+        AutomationScheduleType.MONTHLY -> stringResource(R.string.tasks_schedule_monthly)
         AutomationScheduleType.INTERVAL -> {
             val minutes = task.recurringMinutes ?: 0L
             if (minutes % 60L == 0L) {

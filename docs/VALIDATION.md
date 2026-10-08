@@ -347,6 +347,9 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Vision 与“测试连接”必须复用同一协议路由，禁止 Responses-only 模型在旁路功能中退回 `/chat/completions`。
 - Responses SSE 的顶层 `error`、`response.failed`、`response.incomplete`、refusal 与 completed 均需保留真实语义；标准 Responses 错误不得映射成 ChatGPT 套餐错误。
 - DeepSeek 官方网页搜索只允许读取 DeepSeek 官方 API Key，不得把 OpenAI、Gemini、Qwen、ChatGPT OAuth 等当前模型凭据误发给 DeepSeek 搜索接口。
+- Work 默认暴露 web_search、web_fetch，切换模型不得清除默认联网工具；网络工具不会扩大文件/进程权限。
+- web_search 默认走无密钥 Bing RSS 公共搜索，失败后只可使用明确配置的 DeepSeek 官方 API Key 备用；任何模型账户凭据不得转发给公共搜索服务。
+- Chat 与群聊无需模型支持工具调用；只有在明确联网或实时信息意图时才发起应用层检索，群聊一轮最多一次，并且结果仅进入当轮临时上下文，不进入长期会话历史。
 - system message 不进入 Responses input，转换为 `instructions`。
 - 文本、图片、function tool、function_call_output 和 continuation item 转换。
 - 切换到 Responses 时，旧 Chat Completions 的每个 tool_call 都转换为同 call_id 的 function_call；原始 Responses output 优先重放，不重复添加调用。

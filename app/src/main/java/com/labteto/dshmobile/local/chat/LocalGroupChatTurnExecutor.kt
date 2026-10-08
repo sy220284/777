@@ -65,6 +65,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
     private val chatPersistence: LocalChatPersistence,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val webContext: LocalChatWebContextProvider,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
@@ -624,6 +625,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val rotated = members.drop(cursor) + members.take(cursor)
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
+            // Search at most once for the group turn; reuse only within the current turn.
+            val sharedWebContext = webContext.forInput(input)
             val groupMemoryContexts = responders.associate { member ->
                 val persona = chatPersonaStore.get(member.personaId)
                 val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
@@ -637,7 +640,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         viewerName = persona.name,
                         groupAudience = true,
                     )
-                }.orEmpty()
+                }.orEmpty() + sharedWebContext
             }
             val groupPromptTokens = responders.maxOfOrNull { member ->
                 val persona = chatPersonaStore.get(member.personaId)

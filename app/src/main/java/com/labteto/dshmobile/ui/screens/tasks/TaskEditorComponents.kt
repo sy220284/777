@@ -111,8 +111,8 @@ internal fun ColumnScope.TaskEditorPane(
             CadenceRow(
                 first = AutomationCadence.WEEKLY,
                 firstLabel = stringResource(R.string.tasks_schedule_weekly),
-                second = AutomationCadence.CUSTOM,
-                secondLabel = stringResource(R.string.tasks_schedule_custom),
+                second = AutomationCadence.MONTHLY,
+                secondLabel = stringResource(R.string.tasks_schedule_monthly),
                 selected = cadence,
                 onSelect = {
                     cadence = it
@@ -130,6 +130,11 @@ internal fun ColumnScope.TaskEditorPane(
                 },
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            DsButton(
+                text = stringResource(R.string.tasks_schedule_custom),
+                onClick = { cadence = AutomationCadence.CUSTOM },
+                variant = if (cadence == AutomationCadence.CUSTOM) DsButtonVariant.Outline else DsButtonVariant.Ghost,
             )
             if (cadence == AutomationCadence.CUSTOM) {
                 DsTextField(
@@ -195,12 +200,14 @@ internal fun ColumnScope.TaskEditorPane(
                             AutomationCadence.ONCE -> null
                             AutomationCadence.DAILY -> 24L * 60L
                             AutomationCadence.WEEKLY -> 7L * 24L * 60L
+                            AutomationCadence.MONTHLY -> 30L * 24L * 60L
                             AutomationCadence.CUSTOM -> customHours.toLongOrNull()?.times(60L)
                         }
                         val scheduleType = when (cadence) {
                             AutomationCadence.ONCE -> AutomationScheduleType.ONCE
                             AutomationCadence.DAILY -> AutomationScheduleType.DAILY
                             AutomationCadence.WEEKLY -> AutomationScheduleType.WEEKLY
+                            AutomationCadence.MONTHLY -> AutomationScheduleType.MONTHLY
                             AutomationCadence.CUSTOM -> AutomationScheduleType.INTERVAL
                         }
                         val ok = editingTaskId?.let { id ->
@@ -237,6 +244,17 @@ internal fun ColumnScope.TaskEditorPane(
 
                 )
             }
+    if (showSchedulePicker) {
+        TaskSchedulePicker(
+            initialMillis = firstRunAt,
+            onPicked = { picked ->
+                firstRunAt = picked
+                createError = null
+                showSchedulePicker = false
+            },
+            onDismiss = { showSchedulePicker = false },
+        )
+    }
     if (showSchedulePicker) {
         TaskSchedulePicker(
             initialMillis = firstRunAt,
