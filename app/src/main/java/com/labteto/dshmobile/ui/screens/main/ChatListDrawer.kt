@@ -230,7 +230,7 @@ fun ChatListDrawer(
         ) {
             SidebarAvatarPicker()
             Spacer(Modifier.width(DsSpacing.small))
-            Text(stringResource(R.string.app_name), style = DsType.large20.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.app_name), style = DsType.title22.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = FeatherIcons.Plus,
                 contentDescription = stringResource(R.string.chatlist_new_session),
@@ -245,7 +245,7 @@ fun ChatListDrawer(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(bottom = DsSpacing.small),
-            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14.withReadingWeight()) },
+            placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.navigationSupporting.withReadingWeight()) },
             leadingIcon = {
                 Icon(
                     FeatherIcons.Search,
@@ -272,7 +272,7 @@ fun ChatListDrawer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
-                SectionHeader(stringResource(R.string.chatlist_title))
+                SectionHeader(stringResource(R.string.chatlist_title), titleTextStyle = DsType.navigationSection)
             }
             DsPill(
                 text = (historySessions.size + if (currentListSession != null) 1 else 0).toString(),
@@ -287,12 +287,12 @@ fun ChatListDrawer(
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             if (query.isNotBlank()) {
-                item(key = "search-header") { SectionHeader(stringResource(R.string.common_search)) }
+                item(key = "search-header") { SectionHeader(stringResource(R.string.common_search), titleTextStyle = DsType.navigationSection) }
                 if (searchHits.items.isEmpty()) {
                     item(key = "search-empty") {
                         Text(
                             stringResource(R.string.chatlist_search_empty),
-                            style = DsType.std14.withReadingWeight(),
+                            style = DsType.navigationSupporting.withReadingWeight(),
                             color = colors.labelTertiary,
                             modifier = Modifier.padding(vertical = DsSpacing.small),
                         )
@@ -402,7 +402,7 @@ fun ChatListDrawer(
                 Spacer(Modifier.width(DsSpacing.small))
                 Text(
                     stringResource(R.string.chatlist_new_workspace),
-                    style = DsType.std14.withReadingWeight(),
+                    style = DsType.navigationItem.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -425,6 +425,7 @@ fun ChatListDrawer(
                     icon = FeatherIcons.FileText,
                     title = stringResource(R.string.chatlist_workspace_files),
                     iconFamily = DsIconFamily.Cyan,
+                    titleTextStyle = DsType.navigationItem,
                     onClick = if (currentSessionId != null && connection.host != null) {
                         {
                             val sessionId = currentSessionId
@@ -444,6 +445,7 @@ fun ChatListDrawer(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
                     iconFamily = DsIconFamily.Amber,
+                    titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
                         onOpenTasks()
@@ -453,6 +455,7 @@ fun ChatListDrawer(
                     icon = FeatherIcons.Tool,
                     title = stringResource(R.string.tools_title),
                     iconFamily = DsIconFamily.Neutral,
+                    titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
                         onOpenTools()
@@ -462,6 +465,7 @@ fun ChatListDrawer(
                     icon = FeatherIcons.Device,
                     title = stringResource(R.string.chatlist_exit_remote_control),
                     iconFamily = DsIconFamily.Cyan,
+                    titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
                         onOpenLocalHarness()
@@ -471,6 +475,7 @@ fun ChatListDrawer(
                     icon = FeatherIcons.Sliders,
                     title = stringResource(R.string.settings_title),
                     iconFamily = DsIconFamily.Neutral,
+                    titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
                         onOpenSettings()
