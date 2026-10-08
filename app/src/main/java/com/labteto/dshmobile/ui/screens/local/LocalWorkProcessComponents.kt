@@ -65,9 +65,6 @@ private val WORK_PROCESS_TECHNICAL_LINE = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
-private val WORK_PROCESS_GENERIC_LABELS = setOf(
-    "运行任务步骤", "处理当前步骤", "检查相关内容", "查找相关信息",
-)
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
@@ -83,8 +80,7 @@ internal data class LocalWorkProcessNode(
 
 internal fun localWorkProcessSummary(content: String): String? {
     val compact = WORK_PROCESS_WHITESPACE.replace(content.trim(), " ")
-    if (compact.isBlank() || compact in WORK_PROCESS_GENERIC_LABELS ||
-        WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
+    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
     val readable = WORK_PROCESS_PATH.replace(compact, "…")
     return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
