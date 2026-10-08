@@ -119,21 +119,38 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun inlineConversationPreservesNarrationToolNarrationSequence() {
+    fun inlineConversationMergesToolResultIntoItsNarratedStage() {
         val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
             message("p1", "progress", "先检查相关文件"),
             message("t1", "tool", "/private/path/raw.txt", toolName = "read"),
             message("p2", "progress", "发现问题，开始修复"),
             message("t2", "tool", "ok", toolName = "edit_file"),
         )))
-        assertEquals(4, projected.size)
-        assertEquals(listOf("先检查相关文件", null, "发现问题，开始修复", null),
+        assertEquals(2, projected.size)
+        assertEquals(listOf("先检查相关文件", "发现问题，开始修复"),
             projected.map { it.summary })
-        assertEquals(AgentOperationKind.Inspect, projected[1].kind)
-        assertEquals(AgentOperationKind.Update, projected[3].kind)
+        assertEquals(AgentOperationKind.Inspect, projected[0].kind)
+        assertEquals(AgentOperationKind.Update, projected[1].kind)
+        assertEquals(listOf(1, 1), projected.map { it.count })
         assertTrue(projected.all { it.toolContent == null })
     }
 
+    @Test
+    fun multipleToolOutcomesUseOneStepAndPreserveFailure() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "核对两份文件并测试"),
+            message("t1", "tool", "ok", toolName = "read"),
+            message("t2", "tool", "工具执行失败", toolName = "bash"),
+        )))
+        assertEquals(1, projected.size)
+        assertEquals(2, projected.single().count)
+        assertEquals(listOf(AgentOperationKind.Inspect, AgentOperationKind.Execute),
+            projected.single().operationKinds)
+        assertTrue(projected.single().failed)
+        assertEquals(null, projected.single().toolContent)
+    }
+
+    @Test
     @Test
     fun knownToolProvidersShowFriendlyNamesWithoutLeakingCommands() {
         assertEquals("GitHub", userFacingWorkToolProvider("mcp__GitHub__fetch"))
