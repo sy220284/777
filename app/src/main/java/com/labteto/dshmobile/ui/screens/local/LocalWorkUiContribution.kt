@@ -45,6 +45,7 @@ internal fun localWorkFeatureUiContribution(
                 onArtifacts = actions.artifactsForUi,
                 onToolActivities = actions.toolActivitiesForUi,
                 onEventSequence = actions.eventSequenceForUi,
+                onToolEvidence = actions.toolEvidenceForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
                 onStartResearchAgent = actions.startResearchAgent,

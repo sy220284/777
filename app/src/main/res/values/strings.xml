@@ -1777,5 +1777,27 @@
     <string name="persona_gallery_notes_edit">编辑</string>
     <string name="persona_gallery_notes_done">收起</string>
     <string name="persona_gallery_notes_empty">记下关键经历，下次继续更容易衔接。</string>
+    <string name="local_reasoning_auto">自动</string>
+    <string name="local_reasoning_switch_title">深度思考与推理</string>
+    <string name="local_reasoning_switch_hint">控制下一轮模型的真实思考模式；执行中的请求不受影响</string>
+    <string name="local_reasoning_switch_unsupported">当前模型或协议暂不支持此开关；工具推理请改用支持的 Responses 路线</string>
+    <string name="local_character_inner_thought">心声</string>
+    <string name="local_reasoning_work_failed">这一步执行失败，详情请查看任务进度</string>
+    <string name="local_work_thinking">正在思考…</string>
+    <string name="local_work_thought">已思考</string>
+    <string name="local_work_thought_seconds">思考了 %1$d 秒</string>
+    <string name="local_reasoning_default_hint">当前使用模型默认档位；打开后下一轮使用深度思考</string>
+    <string name="local_reasoning_basic_hint">关闭深度思考后使用快速档，仍保留模型必需的基础推理</string>
+    <string name="local_reasoning_restore_default">恢复模型默认档位</string>
+    <string name="local_work_failed_stage">失败：%1$s</string>
+    <string name="local_work_process_stage_operations">%1$d 阶段 · %2$d 次操作</string>
+    <string name="local_tool_activity_details">查看执行详情</string>
+    <string name="local_tool_activity_evidence">声明 #%1$s → 开始 #%2$s → 结果 #%3$s</string>
+    <string name="local_tool_activity_result">执行结果预览（最多 4000 字）</string>
+    <string name="local_tool_activity_arguments">调用参数</string>
+    <string name="local_tool_activity_error">错误：%1$s</string>
+    <string name="local_tool_activity_pending_result">尚未收到执行结果</string>
+    <string name="local_tool_activity_full_result">持久化执行结果</string>
+    <string name="local_tool_activity_evidence_error">完整记录读取失败，当前显示结果预览</string>
 </resources>
 

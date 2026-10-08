@@ -83,6 +83,7 @@ class LocalModelGateway @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        reasoningEffort: String? = null,
         profile: LocalModelProfile? = null,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
@@ -94,6 +95,7 @@ class LocalModelGateway @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = temperature,
+            reasoningEffort = reasoningEffort,
             streaming = false,
             onDelta = {},
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
@@ -108,6 +110,7 @@ class LocalModelGateway @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        reasoningEffort: String? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
         profile: LocalModelProfile? = null,
         promptCacheComparisonResponseId: String? = null,
@@ -120,6 +123,7 @@ class LocalModelGateway @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = temperature,
+            reasoningEffort = reasoningEffort,
             streaming = true,
             onDelta = onDelta,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
@@ -202,6 +206,7 @@ class LocalModelGateway @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double?,
+        reasoningEffort: String? = null,
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit,
         promptCacheComparisonResponseId: String? = null,
@@ -214,6 +219,7 @@ class LocalModelGateway @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = temperature,
+            reasoningEffort = reasoningEffort,
             streaming = streaming,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
@@ -244,6 +250,7 @@ internal fun prepareLocalModelAdapterRequest(
     tools: JsonArray,
     temperature: Double?,
     streaming: Boolean,
+    reasoningEffort: String? = null,
     promptCacheComparisonResponseId: String? = null,
     promptCacheKey: String? = null,
     promptCacheTtl: String? = null,
@@ -277,7 +284,10 @@ internal fun prepareLocalModelAdapterRequest(
         canonicalMessages.map { it.copy(replay = null) }
     }
     val routedTemperature = temperature
-        ?.takeIf { route.capabilities.temperature }
+        ?.takeIf {
+            route.capabilities.temperature &&
+                (reasoningEffort == null || reasoningEffort == "none")
+        }
         .takeUnless {
             route.protocol == LocalModelProtocol.RESPONSES &&
                 LocalModelPresets.toolCallingModeFor(
@@ -291,6 +301,7 @@ internal fun prepareLocalModelAdapterRequest(
             messages = routedMessages,
             tools = canonicalTools,
             temperature = routedTemperature,
+            reasoningEffort = reasoningEffort,
             allowImageGeneration = allowImageGeneration && route.protocol == LocalModelProtocol.RESPONSES,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
                 ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },

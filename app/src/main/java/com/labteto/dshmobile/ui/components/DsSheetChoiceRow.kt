@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,15 +38,19 @@ fun DsSheetChoiceRow(
     trailingText: String? = null,
     icon: ImageVector? = null,
     selected: Boolean = false,
+    switchChecked: Boolean? = null,
     danger: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val colors = DsTheme.colors
     Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(
+            if (switchChecked != null) Modifier.toggleable(
+                value = switchChecked, enabled = enabled, role = Role.Switch,
+                onValueChange = { onClick() },
+            ) else Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        ),
         shape = DsShapes.row,
         color = if (selected) colors.bgModulePlatform else androidx.compose.ui.graphics.Color.Transparent,
         tonalElevation = 0.dp,
@@ -79,19 +87,28 @@ fun DsSheetChoiceRow(
                     )
                 }
             }
-            trailingText?.let {
-                Text(it, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+            if (switchChecked != null) {
+                DsSwitch(
+                    checked = switchChecked,
+                    onCheckedChange = null,
+                    modifier = Modifier.clearAndSetSemantics { },
+                    enabled = enabled,
+                )
+            } else {
+                trailingText?.let {
+                    Text(it, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+                }
+                if (enabled || trailingText == null) Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = when {
+                        danger -> colors.error
+                        selected -> colors.accent
+                        else -> colors.labelCaption
+                    },
+                    modifier = Modifier.size(16.dp),
+                )
             }
-            Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = when {
-                    danger -> colors.error
-                    selected -> colors.accent
-                    else -> colors.labelCaption
-                },
-                modifier = Modifier.size(16.dp),
-            )
         }
     }
 }

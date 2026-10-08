@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,7 +51,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -64,10 +64,15 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
-internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 180
+internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 5
+internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 260
 
 private val WORK_PROCESS_WHITESPACE = Regex("\\s+")
+private val WORK_PROCESS_TECHNICAL_LINE = Regex(
+    "^(?:[>$#]\\s*|(?:git|curl|grep|rg|adb|gradle|npm|python|bash|sh)\\s+|[\\\\/]|\\x60{3})",
+    RegexOption.IGNORE_CASE,
+)
+private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
@@ -83,8 +88,9 @@ internal data class LocalWorkProcessNode(
 
 internal fun localWorkProcessSummary(content: String): String? {
     val compact = WORK_PROCESS_WHITESPACE.replace(content.trim(), " ")
-    if (compact.isBlank()) return null
-    return truncateWithoutSplittingSurrogatePair(compact, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
+    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
+    val readable = WORK_PROCESS_PATH.replace(compact, "…")
+    return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
 
 internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<LocalWorkProcessNode> {
@@ -117,6 +123,31 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
     return nodes
 }
 
+/** Associate durable tool results with their semantic milestone without exposing raw output. */
+internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> {
+    val result = mutableListOf<LocalWorkProcessNode>()
+    nodes.forEach { node ->
+        val milestone = result.lastOrNull()
+        if (node.summary == null && milestone?.summary != null) {
+            result[result.lastIndex] = milestone.copy(
+                operationKinds = (milestone.operationKinds + node.operationKinds).distinct(),
+                failed = milestone.failed || node.failed,
+                count = milestone.count + node.count,
+            )
+        } else {
+            result += node.copy(toolContent = null)
+        }
+    }
+    return result
+}
+
+/**
+ * Compose projection keeps the exact persisted event order: narration, tool outcome,
+ * narration, tool outcome. The Run Center retains raw results and diagnostic details.
+ */
+internal fun conversationWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> =
+    nodes.map { it.copy(toolContent = null) }
+
 internal fun visibleWorkProcessNodes(
     nodes: List<LocalWorkProcessNode>,
     showAll: Boolean,
@@ -125,6 +156,9 @@ internal fun visibleWorkProcessNodes(
     if (showAll || nodes.size <= collapsedLimit.coerceAtLeast(1)) return nodes
     return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
 }
+
+internal fun workProcessFocus(nodes: List<LocalWorkProcessNode>): LocalWorkProcessNode =
+    nodes.lastOrNull { it.failed } ?: nodes.last()
 
 internal fun workProcessStatus(
     nodes: List<LocalWorkProcessNode>,
@@ -145,13 +179,26 @@ internal fun WorkProcessRow(
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
-    if (nodes.isEmpty()) return
+    if (nodes.isEmpty()) {
+        // Do not render private reasoning; keep a visible thinking state until progress arrives.
+        if (messages.any { it.role == "reasoning" }) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                WorkOperationIcon(AgentOperationKind.Generic, running = running)
+                Text(
+                    stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought),
+                    style = DsType.small13.withReadingWeight(),
+                    color = DsTheme.colors.labelTertiary,
+                )
+            }
+        }
+        return
+    }
     val processStatus = workProcessStatus(nodes, running)
-    val processStatusLabel = stringResource(when (processStatus) {
-        DsStatus.Running -> R.string.agent_operation_status_running
-        DsStatus.Warning, DsStatus.Failed -> R.string.audit_attempt_failed
-        else -> R.string.agent_operation_status_done
-    })
     val processSurface = if (backgroundState.hasImage) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
@@ -161,14 +208,40 @@ internal fun WorkProcessRow(
         Color.Transparent
     }
 
-    var expanded by remember(messages.first().id) { mutableStateOf(false) }
+    var expanded by remember(messages.first().id) { mutableStateOf(running) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    val latestNode = nodes.last()
-    val processFailed = nodes.any { it.failed }
-    val preview = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
-    val collapsedHiddenCount = (nodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
-    val visibleNodes = visibleWorkProcessNodes(nodes, showAllNodes)
-    val visibleStartIndex = nodes.size - visibleNodes.size
+    // Reveal live milestones by default; collapse to the result-first summary on completion.
+    LaunchedEffect(messages.first().id, running) {
+        expanded = running
+    }
+    // Do not merge prose into tool rows: the dialogue must read in event order.
+    val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
+    val firstReasoningTimestamp = messages.firstOrNull {
+        it.role == "reasoning" && it.createdAt > 0L
+    }?.createdAt
+    val firstProgressTimestamp = messages.firstOrNull {
+        (it.role == "progress" || it.role == "tool") && it.createdAt > 0L
+    }?.createdAt
+    // Persisted event timestamps must be present and ordered. Unknown durations stay hidden.
+    val thinkingSeconds = if (firstReasoningTimestamp != null && firstProgressTimestamp != null) {
+        (firstProgressTimestamp - firstReasoningTimestamp)
+            .takeIf { it in 1_000L..600_000L }
+            ?.div(1_000L)
+    } else null
+    val latestNode = workProcessFocus(semanticNodes)
+    val activeStage = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    val headerLabel = when {
+        processStatus == DsStatus.Warning || processStatus == DsStatus.Failed ->
+            stringResource(R.string.local_work_failed_stage, activeStage)
+        thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
+        messages.any { it.role == "reasoning" } ->
+            stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought)
+        running -> stringResource(R.string.local_work_process) + " · " +
+            stringResource(R.string.agent_operation_status_running)
+        else -> stringResource(R.string.local_work_process)
+    }
+    val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
+    val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
     val disclosureState = stringResource(
         if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
@@ -200,28 +273,25 @@ internal fun WorkProcessRow(
         ) {
             WorkOperationIcon(
                 kind = latestNode.kind,
-                running = processStatus == DsStatus.Running && latestNode.toolContent == null,
+                running = processStatus == DsStatus.Running && !latestNode.failed,
             )
-            Column(
+            Text(
+                headerLabel,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    stringResource(R.string.local_work_process) + " · " + processStatusLabel,
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    preview,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            DsPill(text = stringResource(R.string.local_work_process_steps, nodes.size))
+                style = DsType.small13.withReadingWeight(),
+                color = if (processStatus == DsStatus.Warning || processStatus == DsStatus.Failed) {
+                    colors.error
+                } else colors.labelSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(R.string.local_work_process_stage_operations,
+                    semanticNodes.size, nodes.sumOf { it.count }),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+                maxLines = 1,
+            )
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = stringResource(
@@ -243,10 +313,22 @@ internal fun WorkProcessRow(
                 modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                visibleNodes.forEachIndexed { visibleIndex, node ->
-                    val rowRunning = running && visibleStartIndex + visibleIndex == nodes.lastIndex &&
-                        node.toolContent == null && !node.failed
-                    WorkContentBlock(node, rowRunning)
+                visibleNodes.forEach { node ->
+                    if (node.summary != null) {
+                        // Model-authored, user-facing status narrative, never provider reasoning.
+                        Text(
+                            text = node.summary,
+                            style = DsType.mdBody.withReadingWeight(),
+                            color = colors.labelPrimary,
+                            modifier = Modifier.fillMaxWidth().padding(
+                                horizontal = DsSpacing.small,
+                                vertical = DsSpacing.small,
+                            ),
+                        )
+                    } else {
+                        // A completed tool outcome keeps its own icon/status and never leaks arguments.
+                        WorkContentBlock(node, running = false)
+                    }
                 }
                 if (collapsedHiddenCount > 0) {
                     DsButton(

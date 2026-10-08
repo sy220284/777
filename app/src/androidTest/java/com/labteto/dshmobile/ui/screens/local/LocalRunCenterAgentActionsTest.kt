@@ -50,14 +50,19 @@ class LocalRunCenterAgentActionsTest {
                 )
             }
         }
-        val running = "audit-tool · " + context.getString(R.string.local_tool_phase_running)
-        val completed = "audit-tool · " + context.getString(R.string.local_tool_phase_completed)
+        // DsSheetChoiceRow deliberately uses distinct title/subtitle semantics nodes.
+        // Verify the actual service row stays visible while its event-derived phase changes.
+        val running = context.getString(R.string.local_tool_phase_running)
+        val completed = context.getString(R.string.local_tool_phase_completed)
         compose.waitUntil(timeoutMillis = 5_000) {
-            compose.onAllNodesWithText(running).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("audit-tool").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithText(running).fetchSemanticsNodes().isNotEmpty()
         }
         sequence.incrementAndGet()
         compose.waitUntil(timeoutMillis = 5_000) {
-            compose.onAllNodesWithText(completed).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("audit-tool").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithText(completed).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithText(running).fetchSemanticsNodes().isEmpty()
         }
     }
 

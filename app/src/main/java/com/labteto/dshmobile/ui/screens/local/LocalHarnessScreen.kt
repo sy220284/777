@@ -298,6 +298,7 @@ fun LocalHarnessScreen(
         artifactsForUi = viewModel::artifactsForUi,
         toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
+        toolEvidenceForUi = viewModel::toolEvidenceForUi,
         stopBackgroundJob = viewModel::stopBackgroundJob,
         startBackgroundAgent = viewModel::startBackgroundAgent,
         startResearchAgent = viewModel::startResearchAgent,

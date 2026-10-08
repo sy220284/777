@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.session.RegisteredSessionProjection
 import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.harness.session.SessionProjectionSnapshot
 import com.labteto.dshmobile.harness.session.SessionReducer
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import javax.inject.Inject
@@ -48,6 +49,8 @@ internal data class LocalToolActivity(
     val declaredSequence: Long? = null,
     val startedSequence: Long? = null,
     val finishedSequence: Long? = null,
+    val argumentsPreview: String? = null,
+    val resultPreview: String? = null,
 )
 
 internal data class LocalToolActivityState(
@@ -67,7 +70,7 @@ internal class LocalToolActivityProjectionRuntime @Inject constructor(
     private val projection: RegisteredSessionProjection<LocalToolActivityState> =
         sessionStorage.projectionRegistry.register(
             name = "tool.activity",
-            stateVersion = 1,
+            stateVersion = 2,
             initial = { LocalToolActivityState() },
             reducer = SessionReducer(::reduceLocalToolActivity),
         )
@@ -117,6 +120,7 @@ internal fun reduceLocalToolActivity(
                 LocalToolActivityPhase.DECLARED
             },
             executionId = previous?.executionId,
+            argumentsPreview = event.data["arguments"]?.toString()?.let { truncateWithoutSplittingSurrogatePair(it, 2_000) },
             declaredSequence = event.sequence,
             startedSequence = previous?.startedSequence,
         )
@@ -154,6 +158,8 @@ internal fun reduceLocalToolActivity(
                 errorCode = errorCode,
                 sideEffect = event.data["side_effect"]?.jsonPrimitive?.contentOrNull,
                 finishedSequence = event.sequence,
+                resultPreview = event.data["content"]?.jsonPrimitive?.contentOrNull
+                    ?.let { truncateWithoutSplittingSurrogatePair(it, 4_000) },
             )
         }
         else -> return state

@@ -216,6 +216,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
     fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
+    fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
+        runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
     fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
     fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)

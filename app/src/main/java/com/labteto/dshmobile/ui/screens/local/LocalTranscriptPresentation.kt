@@ -134,4 +134,15 @@ private fun isWorkProcessMessage(messages: List<LocalHarnessMessage>, index: Int
     return false
 }
 
+/**
+ * A durable final assistant answer already owns the tail. It must not be duplicated by the
+ * transient streaming preview while the execution coordinator is closing the turn.
+ */
+internal fun shouldShowWorkStreamingTail(
+    running: Boolean,
+    usageMode: com.labteto.dshmobile.local.LocalUsageMode,
+    lastItem: LocalTranscriptItem?,
+): Boolean = running && !(usageMode == com.labteto.dshmobile.local.LocalUsageMode.WORK &&
+    (lastItem as? LocalTranscriptItem.Message)?.message?.role == "assistant")
+
 private val WORK_PROCESS_ROLES = setOf("reasoning", "tool", "progress")
