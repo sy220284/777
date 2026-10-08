@@ -29,6 +29,7 @@ class LocalRunCenterAgentActionsTest {
                 LocalRunCenterScreen(
                     state = LocalWorkUiState(sessionId = "session-a"),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
@@ -73,6 +74,7 @@ class LocalRunCenterAgentActionsTest {
                         ),
                     ),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
@@ -116,6 +118,7 @@ class LocalRunCenterAgentActionsTest {
                         ),
                     ),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
