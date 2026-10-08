@@ -43,7 +43,7 @@ internal fun LocalConversationComposerExpandedRow(
         ) + fadeOut(DsAnimations.composerFade),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val showLabels = maxWidth >= 420.dp
+            val showLabels = maxWidth >= 290.dp
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
