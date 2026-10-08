@@ -139,6 +139,8 @@ private fun NavigationScreenshot() {
             onRemote = {},
             onSwitchSession = {},
             onDeleteSessions = { 0 },
+            onRenameSession = { _, _ -> true },
+            onTogglePinSession = {},
             onWorkspaceFiles = {},
             onOpenRunCenter = {},
             groupMemberCount = 3,
