@@ -61,7 +61,7 @@ internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 260
 
 private val WORK_PROCESS_WHITESPACE = Regex("\\s+")
 private val WORK_PROCESS_TECHNICAL_LINE = Regex(
-    "^(?:[>$#]\\s*|(?:git|curl|grep|rg|adb|gradle|npm|python|bash|sh)\\s+|[\\\\/]|\\x60{3})",
+    "^(?:[>$#]\\s*|(?:git|curl|grep|rg|adb|gradle|npm|python|bash|sh)\\s+|[\\\\/]|\\x60{3}|(?:运行任务步骤|处理当前步骤|检查相关内容|查找相关信息|正在运行任务步骤)$)",
     RegexOption.IGNORE_CASE,
 )
 private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
@@ -160,7 +160,12 @@ internal fun visibleWorkProcessNodes(
     collapsedLimit: Int = LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT,
 ): List<LocalWorkProcessNode> {
     if (showAll || nodes.size <= collapsedLimit.coerceAtLeast(1)) return nodes
-    return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
+    val limit = collapsedLimit.coerceAtLeast(1)
+    val recent = nodes.takeLast(limit)
+    val failed = nodes.indexOfLast { it.failed }
+    if (failed < 0 || failed >= nodes.size - limit) return recent
+    // Show a hidden failed milestone alongside the newest steps.
+    return listOf(nodes[failed]) + nodes.takeLast((limit - 1).coerceAtLeast(0))
 }
 
 internal fun workProcessFocus(nodes: List<LocalWorkProcessNode>): LocalWorkProcessNode =
@@ -215,10 +220,11 @@ internal fun WorkProcessRow(
     }
 
     var expanded by remember(messages.first().id) { mutableStateOf(running) }
+    var manuallyToggled by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    // Reveal live milestones by default; collapse to the result-first summary on completion.
+    // Automatically fold only if the reader has not chosen their own disclosure state.
     LaunchedEffect(messages.first().id, running) {
-        expanded = running
+        if (!manuallyToggled) expanded = running
     }
     // Keep event order, but merge tool outcomes into their immediately preceding narration.
     val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
@@ -247,8 +253,8 @@ internal fun WorkProcessRow(
             stringResource(R.string.agent_operation_status_running)
         else -> stringResource(R.string.local_work_process)
     }
-    val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
+    val collapsedHiddenCount = (semanticNodes.size - visibleWorkProcessNodes(semanticNodes, false).size).coerceAtLeast(0)
     val disclosureState = stringResource(
         if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
@@ -272,7 +278,10 @@ internal fun WorkProcessRow(
                 .fillMaxWidth()
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
-                .clickable(role = Role.Button) { expanded = !expanded }
+                .clickable(role = Role.Button) {
+                    manuallyToggled = true
+                    expanded = !expanded
+                }
                 .semantics { stateDescription = disclosureState }
                 .padding(horizontal = DsSpacing.xsmall, vertical = DsSpacing.xsmall),
             verticalAlignment = Alignment.CenterVertically,
