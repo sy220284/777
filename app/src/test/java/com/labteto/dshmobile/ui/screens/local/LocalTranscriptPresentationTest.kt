@@ -151,7 +151,6 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    @Test
     fun knownToolProvidersShowFriendlyNamesWithoutLeakingCommands() {
         assertEquals("GitHub", userFacingWorkToolProvider("mcp__GitHub__fetch"))
         assertEquals("Figma", userFacingWorkToolProvider("mcp__Figma__use_figma"))
