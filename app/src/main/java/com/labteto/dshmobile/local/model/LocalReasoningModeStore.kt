@@ -63,8 +63,8 @@ internal object LocalReasoningModeStore {
             when (mode(sessionId)) {
                 LocalReasoningMode.DEFAULT -> null
                 LocalReasoningMode.DEEP -> policy.enabledEffort
-                LocalReasoningMode.LOW -> policy.lowEffort ?: policy.enabledEffort
-                LocalReasoningMode.MAX -> policy.maxEffort ?: policy.enabledEffort
+                LocalReasoningMode.LOW -> policy.lowEffort
+                LocalReasoningMode.MAX -> policy.maxEffort
                 LocalReasoningMode.FAST -> policy.disabledEffort
             }
         }
