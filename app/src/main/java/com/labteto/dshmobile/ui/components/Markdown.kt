@@ -44,8 +44,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -371,7 +369,7 @@ private fun buildInlineContent(
             is InlineSegment.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
             is InlineSegment.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
             is InlineSegment.Code -> builder.withStyle(
-                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color),
+                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.inlineCode),
             ) { append(segment.text) }
             is InlineSegment.Link -> {
                 builder.pushStringAnnotation("url", segment.url)
@@ -404,21 +402,65 @@ private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     }
 }
 
+internal enum class MarkdownCalloutKind { QUOTE, NOTE, IMPORTANT, WARNING, TIP }
+
+internal fun markdownCalloutKind(lines: List<String>): MarkdownCalloutKind = when (
+    lines.firstOrNull()?.trim()?.uppercase()
+) {
+    "[!NOTE]" -> MarkdownCalloutKind.NOTE
+    "[!IMPORTANT]" -> MarkdownCalloutKind.IMPORTANT
+    "[!WARNING]", "[!CAUTION]" -> MarkdownCalloutKind.WARNING
+    "[!TIP]" -> MarkdownCalloutKind.TIP
+    else -> MarkdownCalloutKind.QUOTE
+}
+
 @Composable
 private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 2.dp)) {
+    val kind = remember(block.lines) { markdownCalloutKind(block.lines) }
+    val title = when (kind) {
+        MarkdownCalloutKind.NOTE -> "说明"
+        MarkdownCalloutKind.IMPORTANT -> "重点"
+        MarkdownCalloutKind.WARNING -> "注意"
+        MarkdownCalloutKind.TIP -> "提示"
+        MarkdownCalloutKind.QUOTE -> null
+    }
+    val stripeColor = when (kind) {
+        MarkdownCalloutKind.WARNING -> colors.warn
+        MarkdownCalloutKind.IMPORTANT -> colors.accent
+        else -> colors.labelSecondary
+    }
+    val content = if (title != null) block.lines.drop(1) else block.lines
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(DsShapes.block)
+            .background(colors.tipSurface)
+            .height(IntrinsicSize.Min)
+            .padding(vertical = 10.dp, horizontal = 12.dp),
+    ) {
         Box(
             Modifier
-                .width(2.dp)
+                .width(3.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(1.dp))
-                .background(colors.citation),
+                .clip(RoundedCornerShape(2.dp))
+                .background(stripeColor),
         )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            block.lines.forEach { line ->
-                InlineMarkdown(line, bodyStyle.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (title != null) Text(
+                title,
+                style = DsType.mdSmall.withReadingWeight().copy(fontWeight = FontWeight.SemiBold),
+                color = if (kind == MarkdownCalloutKind.WARNING) colors.warnLabel
+                    else if (kind == MarkdownCalloutKind.IMPORTANT) colors.accent
+                    else colors.labelPrimary,
+            )
+            content.forEach { line ->
+                InlineMarkdown(
+                    line,
+                    bodyStyle.copy(color = colors.labelPrimary),
+                    Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -450,7 +492,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             TableAlignment.END -> TextAlign.End
         }
 
-        Row(Modifier.background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))) {
+        Row(Modifier.background(colors.tipSurface)) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
@@ -461,7 +503,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
                     ),
                     Modifier
                         .width(widths[column])
-                        .border(0.5.dp, colors.borderL1)
+                        .border(0.5.dp, colors.borderL2)
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 )
             }
@@ -477,7 +519,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
                         ),
                         Modifier
                             .width(widths[column])
-                            .border(0.5.dp, colors.borderL1)
+                            .border(0.5.dp, colors.borderL2)
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
@@ -511,14 +553,9 @@ private fun CodeBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                when {
-                    allowCopy && lang != null -> "$lang · copy"
-                    allowCopy -> "copy"
-                    lang != null -> lang
-                    else -> "code"
-                },
-                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
-                color = colors.labelCaption,
+                lang ?: "代码",
+                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont),
+                color = colors.labelSecondary,
                 modifier = Modifier.weight(1f),
             )
             if (allowCopy) {
@@ -531,9 +568,9 @@ private fun CodeBlock(
                 ) {
                     Icon(
                         FeatherIcons.Copy,
-                        contentDescription = "Copy code",
-                        tint = colors.labelTertiary,
-                        modifier = Modifier.size(16.dp),
+                        contentDescription = "复制代码",
+                        tint = colors.labelSecondary,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
