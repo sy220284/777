@@ -81,7 +81,7 @@ internal fun LocalRunCenterScreen(
                 backContentDescription = stringResource(R.string.common_back),
                 largeTitle = false,
                 actionIcon = null,
-                actionPainter = painterResource(R.drawable.ic_kimi_create_subagent),
+                actionPainter = painterResource(R.drawable.ic_ui_create_subagent),
                 actionContentDescription = stringResource(R.string.local_run_agent_start),
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),

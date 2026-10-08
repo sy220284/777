@@ -71,7 +71,7 @@ class LocalToolCatalogTest {
     }
 
     @Test
-    fun teamCatalogExposesKimiStyleLifecycleMessagesAndStopAll() {
+    fun teamCatalogExposesLifecycleMessagesAndStopAll() {
         val names = LocalToolCatalog.specs.mapNotNull {
             it.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
         }.toSet()

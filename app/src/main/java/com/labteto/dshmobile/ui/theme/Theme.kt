@@ -263,7 +263,7 @@ fun DshTheme(
         ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
         ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
     }
-    // 旧 celadon 持久值由 AccentPalettes.of 迁移为 Kimi 默认；显式色卡覆盖 accent 家族
+    // 旧 celadon 持久值由 AccentPalettes.of 迁移为 默认蓝；显式色卡覆盖 accent 家族
     val palette = AccentPalettes.of(accentKey)
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)

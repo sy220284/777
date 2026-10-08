@@ -29,7 +29,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
-/** Quiet Kimi-style content plate used for status and dense tool content. */
+/** Quiet 统一 content plate used for status and dense tool content. */
 @Composable
 fun DsCard(
     modifier: Modifier = Modifier,

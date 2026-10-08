@@ -117,6 +117,10 @@ enum class SettingsDestination {
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
+    AGENT_SETTINGS,
+    PROJECT_SETTINGS,
+    SESSION_STORAGE,
+    DIAGNOSTICS,
 }
 
 private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
@@ -134,6 +138,10 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
+    SettingsDestination.AGENT_SETTINGS,
+    SettingsDestination.PROJECT_SETTINGS,
+    SettingsDestination.SESSION_STORAGE,
+    SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
 }
 
 internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
@@ -273,7 +281,7 @@ fun SettingsScreen(
     LaunchedEffect(page) {
         scrollState.scrollTo(0)
         if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
-        if (page == SettingsDestination.ADVANCED) {
+        if (page == SettingsDestination.SESSION_STORAGE) {
             localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
         }
     }
@@ -303,6 +311,10 @@ fun SettingsScreen(
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
+        SettingsDestination.AGENT_SETTINGS -> stringResource(R.string.advanced_agent_settings)
+        SettingsDestination.PROJECT_SETTINGS -> stringResource(R.string.advanced_project_config)
+        SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
+        SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -316,8 +328,8 @@ fun SettingsScreen(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = false,
-                    modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
+                    largeTitle = page == SettingsDestination.ROOT,
+                    modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
@@ -332,91 +344,76 @@ fun SettingsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(scrollState)
-                        .padding(horizontal = DsSpacing.large),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
+                        .padding(horizontal = DsSpacing.comfortable),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
-                        Text(stringResource(R.string.settings_group_models), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        KimiSettingsSection {
-                            KimiSettingsRow(
+                        // The main settings view is a calm navigation list.
+                        // The first card contains frequently used destinations; details belong to subpages.
+                        AppSettingsSection {
+                            AppSettingsRow(
+                                icon = FeatherIcons.Device,
+                                title = stringResource(R.string.settings_page_permissions),
+                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
+                                onClick = { page = SettingsDestination.PERMISSIONS },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.Bell,
+                                title = stringResource(R.string.settings_page_notifications),
+                                onClick = { page = SettingsDestination.NOTIFICATIONS },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.Sliders,
+                                title = stringResource(R.string.settings_page_appearance),
+                                onClick = { page = SettingsDestination.APPEARANCE },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.MessageCircle,
+                                title = stringResource(R.string.settings_page_session),
+                                onClick = { page = SettingsDestination.SESSION },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
                                 icon = FeatherIcons.Globe,
                                 title = stringResource(R.string.settings_page_models),
-                                subtitle = stringResource(R.string.settings_models_subtitle),
-                                value = localHarness.model.takeIf { it.isNotBlank() },
                                 onClick = { page = SettingsDestination.MODELS },
                             )
-                            KimiSettingsRow(
+                        }
+
+                        SettingsGroupTitle(stringResource(R.string.settings_group_models))
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
-                                subtitle = stringResource(R.string.settings_model_usage_subtitle),
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                             )
                         }
 
-                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        KimiSettingsSection {
-                            KimiSettingsRow(
+                        SettingsGroupTitle(stringResource(R.string.settings_group_experience))
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,
                                 title = stringResource(R.string.settings_page_memory),
-                                subtitle = stringResource(R.string.settings_memory_subtitle),
-                                value = memories.size.toString(),
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
-                            KimiSettingsRow(
-                                icon = FeatherIcons.Sliders,
-                                title = stringResource(R.string.settings_page_appearance),
-                                subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
-                                value = appearanceThemeLabel(settings.themePreference),
-                                onClick = { page = SettingsDestination.APPEARANCE },
-                            )
-                            KimiSettingsRow(
-                                icon = FeatherIcons.MessageCircle,
-                                title = stringResource(R.string.settings_page_session),
-                                subtitle = stringResource(R.string.settings_session_subtitle),
-                                value = stringResource(
-                                    if (sessionSort == "updated") {
-                                        R.string.chatlist_sort_updated
-                                    } else {
-                                        R.string.chatlist_sort_manual
-                                    },
-                                ),
-                                onClick = { page = SettingsDestination.SESSION },
-                            )
                         }
 
-                        Text(stringResource(R.string.settings_group_system), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        KimiSettingsSection {
-                            KimiSettingsRow(
-                                icon = FeatherIcons.Device,
-                                title = stringResource(R.string.settings_page_permissions),
-                                subtitle = stringResource(R.string.settings_permissions_subtitle),
-                                onClick = { page = SettingsDestination.PERMISSIONS },
-                                trailing = {
-                                    StateDot(deviceCapabilitiesState(deviceCapabilities))
-                                },
-                            )
-                            KimiSettingsRow(
-                                icon = FeatherIcons.Bell,
-                                title = stringResource(R.string.settings_page_notifications),
-                                subtitle = stringResource(R.string.settings_notifications_subtitle),
-                                value = enabledNotificationCount(settings).toString(),
-                                onClick = { page = SettingsDestination.NOTIFICATIONS },
-                            )
-                        }
-
-                        Text(stringResource(R.string.settings_group_maintenance), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-                        KimiSettingsSection {
-                            KimiSettingsRow(
+                        SettingsGroupTitle(stringResource(R.string.settings_group_maintenance))
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_advanced),
-                                subtitle = stringResource(R.string.settings_advanced_subtitle),
                                 onClick = { page = SettingsDestination.ADVANCED },
                             )
-                            KimiSettingsRow(
+                            AppSettingsDivider()
+                            AppSettingsRow(
                                 icon = FeatherIcons.RefreshCw,
                                 title = stringResource(R.string.settings_update_check),
-                                subtitle = updateStatus,
+                                value = updateStatus,
                                 onClick = onCheckUpdate,
                             )
                         }
@@ -424,8 +421,7 @@ fun SettingsScreen(
                             "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.labelCaption,
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                                 .padding(top = DsSpacing.small)
                                 .wrapContentWidth(Alignment.CenterHorizontally),
                         )
@@ -439,8 +435,8 @@ fun SettingsScreen(
                                 stringResource(R.string.chatlist_sort_manual),
                             ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
                         }
-                        KimiSettingsSection {
-                            KimiSettingsRow(
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_chat_style_guard),
                                 subtitle = stringResource(R.string.settings_chat_style_guard_hint),
@@ -457,12 +453,11 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.Sliders) {
-                            AppearanceReadingPreview()
-                        }
                         SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Sliders) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
                             AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_reading_preferences), FeatherIcons.BookOpen) {
                             ReadingPreferencesRow(
                                 settings = settings,
                                 onTextScaleChange = { value ->
@@ -477,6 +472,8 @@ fun SettingsScreen(
                                     }
                                 },
                             )
+                        }
+                        SettingsCard(stringResource(R.string.settings_background_image), FeatherIcons.Sliders) {
                             BackgroundRow(
                                 path = settings.backgroundImagePath,
                                 adaptiveContrast = settings.backgroundAdaptiveContrast,
@@ -486,6 +483,9 @@ fun SettingsScreen(
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) },
                                 onClear = { viewModel.clearBackgroundImage() },
                             )
+                        }
+                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.MessageCircle) {
+                            AppearanceReadingPreview()
                         }
                     }
 
@@ -622,14 +622,14 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
-                        KimiSettingsSection {
-                            KimiSettingsRow(
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_pricing),
                                 subtitle = stringResource(R.string.settings_pricing_subtitle),
                                 onClick = { page = SettingsDestination.PRICING },
                             )
-                            KimiSettingsRow(
+                            AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
@@ -790,8 +790,42 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.ADVANCED -> {
+                        AppSettingsSection {
+                            AppSettingsRow(
+                                icon = FeatherIcons.Sliders,
+                                title = stringResource(R.string.advanced_agent_settings),
+                                onClick = { page = SettingsDestination.AGENT_SETTINGS },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.GitBranch,
+                                title = stringResource(R.string.advanced_project_config),
+                                onClick = { page = SettingsDestination.PROJECT_SETTINGS },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.Clock,
+                                title = stringResource(R.string.settings_local_session_storage),
+                                onClick = { page = SettingsDestination.SESSION_STORAGE },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.Info,
+                                title = stringResource(R.string.settings_runtime_diagnostics),
+                                onClick = { page = SettingsDestination.DIAGNOSTICS },
+                            )
+                        }
+                    }
+
+                    SettingsDestination.AGENT_SETTINGS -> {
                         LocalAgentSettingsCard(localHarness, viewModel, toast.second)
+                    }
+
+                    SettingsDestination.PROJECT_SETTINGS -> {
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
+                    }
+
+                    SettingsDestination.SESSION_STORAGE -> {
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
                             busy = localSessionStorageBusy,
@@ -811,18 +845,23 @@ fun SettingsScreen(
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onCleanup = onClose,
                         )
-                        SettingsCard(stringResource(R.string.settings_runtime_diagnostics), FeatherIcons.Info) {
-                            KimiSettingsRow(
+                    }
+
+                    SettingsDestination.DIAGNOSTICS -> {
+                        AppSettingsSection {
+                            AppSettingsRow(
                                 icon = FeatherIcons.GitBranch,
                                 title = stringResource(R.string.settings_network_diagnostic),
                                 onClick = { showDiagnostic = true },
                             )
-                            KimiSettingsRow(
+                            AppSettingsDivider()
+                            AppSettingsRow(
                                 icon = FeatherIcons.Device,
                                 title = stringResource(R.string.settings_environment_capabilities),
                                 onClick = { showEnvironment = true },
                             )
-                            KimiSettingsRow(
+                            AppSettingsDivider()
+                            AppSettingsRow(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
                                 subtitle = stringResource(R.string.settings_export_diagnostics_hint),
@@ -936,8 +975,18 @@ internal fun SettingsCard(
             Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
             Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         }
-        KimiSettingsSection {
-            content()
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = DsShapes.block,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tonalElevation = 0.dp,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                content()
+            }
         }
     }
 }

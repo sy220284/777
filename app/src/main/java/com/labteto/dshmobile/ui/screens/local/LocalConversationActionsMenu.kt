@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.ui.components.FeatherIcons
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,11 +10,11 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
+/** Session actions remain anchored beside the tapped icon, matching the context-menu surface. */
 @Composable
 internal fun ConversationActionsMenu(
     pinned: Boolean,
@@ -36,17 +34,16 @@ internal fun ConversationActionsMenu(
         DsPopupMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
-            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU, base = colors.bgBase),
             items = listOf(
-                MenuItem(
-                    text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
-                    icon = FeatherIcons.Pin,
-                    onClick = onTogglePin,
-                ),
                 MenuItem(
                     text = stringResource(R.string.common_rename),
                     icon = FeatherIcons.Edit3,
                     onClick = onRename,
+                ),
+                MenuItem(
+                    text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
+                    icon = FeatherIcons.Pin,
+                    onClick = onTogglePin,
                 ),
                 MenuItem(
                     text = stringResource(R.string.local_delete_session),

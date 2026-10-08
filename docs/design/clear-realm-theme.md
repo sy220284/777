@@ -1,6 +1,6 @@
 # 澄境（Clear Realm）主题
 
-> 历史视觉方案：当前默认前端已经切换到 `docs/UI-UX.zh-CN.md` 与 `docs/design/mobile-ui.md` 定义的 Kimi 3.1.3 参考基线。本文仅用于追溯既有澄境设计思路，不再作为默认 UI 权威事实源。
+> 历史视觉方案：当前默认前端已经切换到 `docs/UI-UX.zh-CN.md` 与 `docs/design/mobile-ui.md` 定义的移动端前端规范。本文仅用于追溯既有澄境设计思路，不再作为默认 UI 权威事实源。
 
 本文记录 777 早期手机端澄境视觉主题。
 

@@ -20,7 +20,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -40,7 +40,12 @@ internal fun NetworkDiagnosticDialog(
     var result by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
     val failedText = stringResource(R.string.settings_runtime_network_diagnostic_failed)
-    DsDialog(title = stringResource(R.string.settings_runtime_network_diagnostic_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.settings_runtime_network_diagnostic_title),
+        onDismiss = { if (!running) onDismiss() },
+        scrollable = true,
+        dismissEnabled = !running,
+    ) {
         Text(
             stringResource(R.string.settings_runtime_network_diagnostic_intro),
             style = DsType.small13.withReadingWeight(),
@@ -92,7 +97,11 @@ internal fun EnvironmentInfoDialog(
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     val eventTime = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()) }
     val emptyEvents = stringResource(R.string.settings_diagnostic_empty)
-    DsDialog(title = stringResource(R.string.settings_runtime_environment_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.settings_runtime_environment_title),
+        onDismiss = onDismiss,
+        scrollable = true,
+    ) {
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
             style = DsType.small13.withReadingWeight(),

@@ -30,7 +30,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 enum class DsStatus { Running, Done, Warning, Failed, Neutral }
 
 /**
- * Kimi-style status label: the chip stays neutral and semantic color is confined to the 6dp dot.
+ * 统一 status label: the chip stays neutral and semantic color is confined to the 6dp dot.
  * Running owns the only motion; settled history is static.
  */
 @Composable

@@ -70,7 +70,7 @@ import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -100,12 +100,13 @@ internal fun PersonaGallerySavePromptDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(
             if (isUpdate) R.string.persona_gallery_unsaved_update_title
             else R.string.persona_gallery_new_character_title,
         ),
-        onDismiss = onDismiss,
+        onDismiss = { if (!busy) onDismiss() },
+        dismissEnabled = !busy,
     ) {
         PersonaHero(
             persona = persona,
@@ -379,7 +380,7 @@ internal fun PersonaGalleryScreen(
     }
 
     if (showExportFormatDialog && selected != null) {
-        DsDialog(
+        DsBottomSheet(
             title = stringResource(R.string.persona_gallery_export_format_title),
             onDismiss = { showExportFormatDialog = false },
         ) {

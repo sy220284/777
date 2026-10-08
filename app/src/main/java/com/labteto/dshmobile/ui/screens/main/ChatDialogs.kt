@@ -18,6 +18,7 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -32,7 +33,7 @@ internal fun RenameDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember(initial) { mutableStateOf(initial) }
-    DsDialog(title = title, onDismiss = onDismiss) {
+    DsBottomSheet(title = title, onDismiss = onDismiss) {
         DsTextField(
             value = text,
             onValueChange = { text = it },
@@ -51,7 +52,7 @@ internal fun RenameDialog(
                 text = stringResource(R.string.common_save),
                 onClick = { onConfirm(text.trim()) },
                 variant = DsButtonVariant.Info,
-                enabled = text.isNotBlank(),
+                enabled = text.trim().isNotEmpty(),
             )
         }
     }

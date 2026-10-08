@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.ui.theme.DsTheme
 
-/** Kimi-style multi-select control with one shared selection color. */
+/** 统一 multi-select control with one shared selection color. */
 @Composable
 fun DsCheckbox(
     checked: Boolean,

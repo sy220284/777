@@ -24,7 +24,7 @@ import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -98,7 +98,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
             }
             key(terminal.id) { TerminalScreen(store, key, terminal, Modifier.weight(1f)) }
             rename?.let { title ->
-                DsDialog(
+                DsBottomSheet(
                     title = stringResource(R.string.common_rename),
                     onDismiss = { if (!busy) rename = null },
                 ) {

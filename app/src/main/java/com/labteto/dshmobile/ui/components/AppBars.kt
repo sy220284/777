@@ -31,7 +31,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
- * Kimi-style mobile page bar.
+ * 统一 mobile page bar.
  *
  * The title stays optically centered while Back and the optional action keep fixed 48dp hit areas.
  * Root pages may request [largeTitle], but it only raises typographic weight/size instead of creating
@@ -50,6 +50,7 @@ fun DsTopBar(
     onAction: (() -> Unit)? = null,
     largeTitle: Boolean = false,
     actionPainter: Painter? = null,
+    backIcon: ImageVector = FeatherIcons.ArrowLeft,
 ) {
     val colors = DsTheme.colors
     Box(
@@ -58,7 +59,7 @@ fun DsTopBar(
             .heightIn(min = DsMetrics.topBarHeight),
     ) {
         DsIconButton(
-            icon = FeatherIcons.ArrowLeft,
+            icon = backIcon,
             contentDescription = backContentDescription,
             onClick = onBack,
             modifier = Modifier.align(Alignment.CenterStart),
@@ -102,7 +103,7 @@ fun DsTopBar(
     }
 }
 
-/** Kimi-style compact peer selector: neutral track, white selected segment, no chromatic category fill. */
+/** 统一 compact peer selector: neutral track, white selected segment, no chromatic category fill. */
 @Composable
 fun DsSegmentedTabs(
     labels: List<String>,

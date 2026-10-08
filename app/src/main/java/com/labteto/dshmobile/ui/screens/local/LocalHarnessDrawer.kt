@@ -45,6 +45,8 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.screens.main.RenameDialog
+import com.labteto.dshmobile.ui.screens.main.ConfirmDialog
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -77,6 +79,8 @@ internal fun LocalModeDrawer(
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: suspend (Set<String>) -> Int,
+    onRenameSession: (String, String) -> Boolean,
+    onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
@@ -91,6 +95,8 @@ internal fun LocalModeDrawer(
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
+    var renameTargetId by remember { mutableStateOf<String?>(null) }
+    var deleteCandidateId by remember { mutableStateOf<String?>(null) }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -208,20 +214,7 @@ internal fun LocalModeDrawer(
                         onClick = onNewSession,
                         tint = colors.labelPrimary,
                     )
-                    DsIconButton(
-                        icon = FeatherIcons.Search,
-                        contentDescription = stringResource(R.string.chatlist_search_hint),
-                        onClick = {
-                            if (searchOpen) {
-                                searchOpen = false
-                                historyQuery = ""
-                                keyboardController?.hide()
-                            } else {
-                                searchOpen = true
-                            }
-                        },
-                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
-                    )
+
                 }
 
                 LocalUsageModePill(
@@ -230,26 +223,7 @@ internal fun LocalModeDrawer(
                     onSelect = onUsageModeChange,
                 )
 
-                DsExpandableColumn(visible = searchOpen) {
-                    DsTextField(
-                        value = historyQuery,
-                        onValueChange = { historyQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(searchFocusRequester),
-                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
-                        leadingIcon = {
-                            Icon(
-                                FeatherIcons.Search,
-                                contentDescription = null,
-                                tint = colors.labelTertiary,
-                            )
-                        },
-                        singleLine = true,
-                        shape = DsShapes.block,
-                        flat = true,
-                    )
-                }
+
 
                 DrawerContextCard(
                     usageMode = usageMode,
@@ -313,11 +287,13 @@ internal fun LocalModeDrawer(
                                     onSwitchSession(session.id)
                                 }
                             },
-                            onLongClick = {
+                            onSelectMultiple = {
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { requestDelete(setOf(session.id)) },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateId = session.id },
                         )
                     }
                 }
@@ -347,11 +323,13 @@ internal fun LocalModeDrawer(
                                     onSwitchSession(session.id)
                                 }
                             },
-                            onLongClick = {
+                            onSelectMultiple = {
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { requestDelete(setOf(session.id)) },
+                            onRename = { renameTargetId = session.id },
+                            onTogglePinned = { onTogglePinSession(session.id) },
+                            onDelete = { deleteCandidateId = session.id },
                         )
                     }
                 }
@@ -434,19 +412,88 @@ internal fun LocalModeDrawer(
                         }
                     }
                 } else {
-                    DrawerGlobalAction(
-                        icon = FeatherIcons.Device,
-                        title = stringResource(R.string.local_remote_control),
-                        onClick = onRemote,
-                    )
-                    DrawerGlobalAction(
-                        icon = FeatherIcons.Sliders,
-                        title = stringResource(R.string.settings_title),
-                        onClick = onSettings,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        if (searchOpen) {
+                            DsTextField(
+                                value = historyQuery,
+                                onValueChange = { historyQuery = it },
+                                modifier = Modifier.weight(1f).focusRequester(searchFocusRequester),
+                                placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                                leadingIcon = {
+                                    Icon(
+                                        FeatherIcons.Search,
+                                        contentDescription = null,
+                                        tint = colors.labelTertiary,
+                                    )
+                                },
+                                singleLine = true,
+                                shape = DsShapes.pillFull,
+                                flat = true,
+                            )
+                        } else {
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                onClick = { searchOpen = true },
+                                color = colors.bgLayer1,
+                                shape = DsShapes.pillFull,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(FeatherIcons.Search, contentDescription = null, tint = colors.labelSecondary)
+                                    Text(
+                                        stringResource(R.string.chatlist_search_hint),
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.labelTertiary,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        DsIconButton(
+                            icon = FeatherIcons.Device,
+                            contentDescription = stringResource(R.string.local_remote_control),
+                            onClick = onRemote,
+                        )
+                        DsIconButton(
+                            icon = FeatherIcons.Sliders,
+                            contentDescription = stringResource(R.string.settings_title),
+                            onClick = onSettings,
+                        )
+                    }
                 }
             }
         }
+        renameTargetId?.let { id ->
+            RenameDialog(
+                initial = sessionTitleOverrides[id]
+                    ?: sessions.firstOrNull { it.id == id }?.title.orEmpty(),
+                title = stringResource(R.string.chatlist_session_rename),
+                onDismiss = { renameTargetId = null },
+                onConfirm = { title ->
+                    if (onRenameSession(id, title)) renameTargetId = null
+                },
+            )
+        }
+        deleteCandidateId?.let { id ->
+            ConfirmDialog(
+                title = stringResource(R.string.local_delete_session),
+                body = stringResource(R.string.local_delete_session_confirm_message),
+                confirmLabel = stringResource(R.string.local_delete_session),
+                onDismiss = { deleteCandidateId = null },
+                onConfirm = {
+                    deleteCandidateId = null
+                    requestDelete(setOf(id))
+                },
+            )
+        }
+
     }
 }
 

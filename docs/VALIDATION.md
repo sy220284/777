@@ -314,7 +314,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 专项验证必须用同一组语义契约覆盖所有已注册协议，而不是只验证“请求能返回文本”：
 
 - Chat Completions、Responses API Key、ChatGPT 套餐 Responses、Anthropic Messages 均验证文本、图片、工具调用、工具续轮、usage、截断、错误和取消。
-- DeepSeek、MiniMax、Kimi、GLM、Gemini OpenAI-compatible、Qwen 的既有协议必须保持 Chat Completions，不因新增 Adapter 改写供应商 payload。
+- DeepSeek、MiniMax、月之暗面、GLM、Gemini OpenAI-compatible、Qwen 的既有协议必须保持 Chat Completions，不因新增 Adapter 改写供应商 payload。
 - 官方 Claude 档案使用 Anthropic Messages；旧官方 Claude 档案迁移到原生协议，自定义兼容地址保留用户保存的协议。
 - Anthropic 流式事件至少覆盖 `message_start/content_block_start/content_block_delta/content_block_stop/message_delta/message_stop`；`text_delta`、`thinking_delta`、`signature_delta`、`input_json_delta` 必须按块正确组装。
 - Anthropic thinking/signature 和 tool_use 仅在相同 adapter + auth/profile + baseUrl + model 路由中无损 replay；切换账户、模型、地址或协议后不得把供应商私有状态发往新路由。

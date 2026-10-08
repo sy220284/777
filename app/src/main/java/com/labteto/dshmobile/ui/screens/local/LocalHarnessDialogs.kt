@@ -28,7 +28,8 @@ import com.labteto.dshmobile.ui.agentApprovalPurposeRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -46,10 +47,9 @@ internal fun NewSessionModeDialog(
 ) {
     val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
-        dismissOnScrimTap = true,
     ) {
         Text(
             stringResource(
@@ -62,44 +62,24 @@ internal fun NewSessionModeDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsButton(
-            text = stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_continue
-                } else {
-                    R.string.local_new_session_continue
-                },
+        DsSheetChoiceRow(
+            title = stringResource(
+                if (chatMode) R.string.local_new_session_chat_continue
+                else R.string.local_new_session_continue,
+            ),
+            subtitle = stringResource(
+                if (chatMode) R.string.local_new_session_chat_continue_hint
+                else R.string.local_new_session_continue_hint,
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
-            modifier = Modifier.fillMaxWidth(),
         )
-        Text(
-            stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_continue_hint
-                } else {
-                    R.string.local_new_session_continue_hint
-                },
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_new_session_independent),
+            subtitle = stringResource(
+                if (chatMode) R.string.local_new_session_chat_independent_hint
+                else R.string.local_new_session_independent_hint,
             ),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
-        )
-        DsButton(
-            text = stringResource(R.string.local_new_session_independent),
             onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-        Text(
-            stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_independent_hint
-                } else {
-                    R.string.local_new_session_independent_hint
-                },
-            ),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
         )
     }
 }
@@ -111,26 +91,22 @@ internal fun GroupNewSessionDialog(
     onNewSingle: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
-        dismissOnScrimTap = true,
     ) {
         Text(
             stringResource(R.string.local_group_new_session_intro),
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsButton(
-            text = stringResource(R.string.local_group_new_group),
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_group_new_group),
             onClick = onNewGroup,
-            modifier = Modifier.fillMaxWidth(),
         )
-        DsButton(
-            text = stringResource(R.string.local_group_new_single),
+        DsSheetChoiceRow(
+            title = stringResource(R.string.local_group_new_single),
             onClick = onNewSingle,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
         )
     }
 }
@@ -146,7 +122,7 @@ internal fun ChatPersonaPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss, scrollable = true) {
         Text(
             stringResource(R.string.local_persona_picker_intro),
             style = DsType.small13.withReadingWeight(),
@@ -258,7 +234,7 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    DsDialog(title = stringResource(R.string.local_approval_title), onDismiss = onDeny) {
+    DsBottomSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -354,17 +330,16 @@ internal fun QuestionDialog(
 ) {
     val colors = DsTheme.colors
     var answer by rememberSaveable(question) { mutableStateOf("") }
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
+        scrollable = true,
     ) {
         Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
         options.forEach { option ->
-            DsButton(
-                text = option,
+            DsSheetChoiceRow(
+                title = option,
                 onClick = { onAnswer(option) },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
             )
         }
         DsTextField(
@@ -423,6 +398,7 @@ internal fun ChatPersonaDialog(
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
     fun lines(value: String): List<String> = value.lineSequence()
         .map(String::trim)
@@ -450,7 +426,54 @@ internal fun ChatPersonaDialog(
         corrections = generated.corrections.joinToString("\n")
     }
 
-    DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.local_persona_title),
+        onDismiss = onDismiss,
+        scrollable = true,
+        dismissEnabled = !aiGenerating && !saving,
+        footer = {
+            saveError?.let {
+                Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
+            }
+        DsButton(
+            text = stringResource(R.string.local_persona_save),
+            onClick = {
+                saving = true
+                saveError = null
+                coroutineScope.launch {
+                    val result = runCatching {
+                        onSave(
+                            runtimeProfile.copy(
+                                name = name,
+                                portrait = portrait,
+                                lifeContext = lifeContext,
+                                attentionBiases = lines(attention),
+                                perceptionBlindSpots = lines(blindSpots),
+                                quirks = lines(quirks),
+                                limitations = lines(limitations),
+                                coreValues = lines(coreValues),
+                                coreTension = coreTension,
+                                stableTraits = lines(stableTraits),
+                                mutableTraits = lines(mutableTraits),
+                                initialUserImpression = initialUserImpression,
+                                voiceSamples = lines(voiceSamples),
+                                worldSetting = worldSetting,
+                                hardConstraints = lines(constraints),
+                                bannedPhrases = lines(banned),
+                                corrections = lines(corrections),
+                            ),
+                        )
+                    }.getOrElse { Result.failure(it) }
+                    result.onSuccess { onDismiss() }
+                        .onFailure { saveError = it.message ?: saveFailedText }
+                    saving = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = name.isNotBlank() && !aiGenerating && !saving,
+        )
+        },
+    ) {
         Text(
             stringResource(R.string.local_persona_intro_v3),
             style = DsType.small13.withReadingWeight(),
@@ -497,15 +520,19 @@ internal fun ChatPersonaDialog(
                         aiSucceeded = false
                         aiError = null
                         coroutineScope.launch {
-                            onAutoFill(aiDescription)
-                                .onSuccess { generated ->
-                                    applyGenerated(generated)
-                                    aiSucceeded = true
-                                }
-                                .onFailure { error ->
-                                    aiError = error.message ?: "persona_autofill_failed"
-                                }
-                            aiGenerating = false
+                            try {
+                                runCatching { onAutoFill(aiDescription) }
+                                    .getOrElse { Result.failure(it) }
+                                    .onSuccess { generated ->
+                                        applyGenerated(generated)
+                                        aiSucceeded = true
+                                    }
+                                    .onFailure { error ->
+                                        aiError = error.message ?: "persona_autofill_failed"
+                                    }
+                            } finally {
+                                aiGenerating = false
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -555,44 +582,7 @@ internal fun ChatPersonaDialog(
         PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
         PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
 
-        DsButton(
-            text = stringResource(R.string.local_persona_save),
-            onClick = {
-                saving = true
-                saveError = null
-                coroutineScope.launch {
-                    val result = runCatching {
-                        onSave(
-                            runtimeProfile.copy(
-                                name = name,
-                                portrait = portrait,
-                                lifeContext = lifeContext,
-                                attentionBiases = lines(attention),
-                                perceptionBlindSpots = lines(blindSpots),
-                                quirks = lines(quirks),
-                                limitations = lines(limitations),
-                                coreValues = lines(coreValues),
-                                coreTension = coreTension,
-                                stableTraits = lines(stableTraits),
-                                mutableTraits = lines(mutableTraits),
-                                initialUserImpression = initialUserImpression,
-                                voiceSamples = lines(voiceSamples),
-                                worldSetting = worldSetting,
-                                hardConstraints = lines(constraints),
-                                bannedPhrases = lines(banned),
-                                corrections = lines(corrections),
-                            ),
-                        )
-                    }.getOrElse { Result.failure(it) }
-                    result.onSuccess { onDismiss() }
-                        .onFailure { saveError = it.message ?: "保存失败" }
-                    saving = false
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = name.isNotBlank() && !aiGenerating && !saving,
-        )
-        saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
+
     }
 }
 

@@ -49,10 +49,12 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconFamily
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -127,10 +129,10 @@ internal fun WorkspaceMenu(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    DsDialog(title = null, onDismiss = onDismiss) {
-        SheetRow(title = stringResource(R.string.chatlist_workspace_new_session), onClick = onNewSession)
-        SheetRow(title = stringResource(R.string.chatlist_workspace_rename), onClick = onRename)
-        SheetRow(title = stringResource(R.string.chatlist_workspace_delete), onClick = onDelete)
+    DsBottomSheet(title = null, onDismiss = onDismiss) {
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_new_session), onClick = onNewSession)
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_rename), onClick = onRename)
+        DsSheetChoiceRow(title = stringResource(R.string.chatlist_workspace_delete), onClick = onDelete, danger = true)
     }
 }
 
@@ -304,29 +306,40 @@ internal fun SessionRowItem(
             }
         }
 
-        if (menuOpen) {
-            DsDialog(title = null, onDismiss = { menuOpen = false }) {
-                if (archived) {
-                    SheetRow(title = stringResource(R.string.archived_restore)) {
-                        menuOpen = false
-                        scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
-                    }
-                } else {
-                    SheetRow(title = stringResource(R.string.chatlist_session_rename)) {
-                        menuOpen = false
-                        renameOpen = true
-                    }
-                    SheetRow(title = stringResource(R.string.chatlist_session_fork)) {
-                        menuOpen = false
-                        scope.launch { actions.fork(session.sessionId) }
-                    }
-                    SheetRow(title = stringResource(R.string.chatlist_session_archive)) {
-                        menuOpen = false
-                        archiveConfirmOpen = true
-                    }
-                }
-            }
-        }
+        DsPopupMenu(
+            expanded = menuOpen,
+            onDismiss = { menuOpen = false },
+            items = if (archived) {
+                listOf(
+                    MenuItem(
+                        text = stringResource(R.string.archived_restore),
+                        icon = FeatherIcons.RefreshCw,
+                        onClick = {
+                            scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
+                        },
+                    ),
+                )
+            } else {
+                listOf(
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_rename),
+                        icon = FeatherIcons.Edit3,
+                        onClick = { renameOpen = true },
+                    ),
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_fork),
+                        icon = FeatherIcons.GitBranch,
+                        onClick = { scope.launch { actions.fork(session.sessionId) } },
+                    ),
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_archive),
+                        icon = FeatherIcons.Trash2,
+                        danger = true,
+                        onClick = { archiveConfirmOpen = true },
+                    ),
+                )
+            },
+        )
     }
 
     if (restoreFailed) {
@@ -435,7 +448,7 @@ internal fun NewSessionDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.chatlist_new_session_in), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_new_session_in), onDismiss = onDismiss) {
         if (workspaces.isEmpty()) {
             Text(
                 stringResource(R.string.chatlist_no_workspaces),
@@ -464,7 +477,7 @@ internal fun ManageWorkspacesDialog(
     onDismiss: () -> Unit,
     onPick: (WorkspaceRow) -> Unit,
 ) {
-    DsDialog(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_manage_workspaces), onDismiss = onDismiss) {
         LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
             items(workspaces, key = { it.workspaceId }) { workspace ->
                 SheetRow(
@@ -480,7 +493,7 @@ internal fun ManageWorkspacesDialog(
 @Composable
 internal fun NewWorkspaceDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var pathText by remember { mutableStateOf("") }
-    DsDialog(title = stringResource(R.string.chatlist_new_workspace), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.chatlist_new_workspace), onDismiss = onDismiss) {
         DsTextField(
             value = pathText,
             onValueChange = { pathText = it },

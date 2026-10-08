@@ -43,7 +43,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
- * Kimi-style grouped surface: quiet white sheet on the neutral page background.
+ * 统一 grouped surface: quiet white sheet on the neutral page background.
  * Rows own interaction feedback; the group itself carries no decorative border or shadow.
  */
 @Composable
@@ -65,7 +65,7 @@ fun DsGroupCard(
 /**
  * Compact disclosure row used across settings, tools and feature indexes.
  *
- * [iconFamily] stays in the signature for source compatibility, but the Kimi visual language keeps
+ * [iconFamily] stays in the signature for source compatibility, but the 当前视觉规范 keeps
  * function icons monochrome. Selection and semantic state are expressed by row/background/status,
  * never by assigning a different color family to each function.
  */

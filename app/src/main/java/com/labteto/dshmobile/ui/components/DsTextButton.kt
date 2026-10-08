@@ -12,7 +12,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /**
- * Quiet Kimi-style text action.
+ * Quiet 统一 text action.
  *
  * Use for compact toolbar and dialog actions where a filled button would add too much visual
  * weight. Business screens should not depend on Material TextButton styling directly.

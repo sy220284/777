@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /**
- * Kimi-style binary control.
+ * 统一 binary control.
  *
  * Material owns accessibility, focus and touch behavior; the Design System owns every visible
  * state so feature pages never expose a second switch language.

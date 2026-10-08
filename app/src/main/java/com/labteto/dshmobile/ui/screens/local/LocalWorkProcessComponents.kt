@@ -246,7 +246,7 @@ internal fun WorkProcessRow(
                 visibleNodes.forEachIndexed { visibleIndex, node ->
                     val rowRunning = running && visibleStartIndex + visibleIndex == nodes.lastIndex &&
                         node.toolContent == null && !node.failed
-                    KimiWorkContentBlock(node, rowRunning)
+                    WorkContentBlock(node, rowRunning)
                 }
                 if (collapsedHiddenCount > 0) {
                     DsButton(
@@ -267,7 +267,7 @@ internal fun WorkProcessRow(
 }
 
 @Composable
-private fun KimiAnimatedToolIcon(
+private fun AnimatedToolIcon(
     resId: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -304,20 +304,20 @@ internal fun WorkOperationIcon(
     running: Boolean,
 ) {
     val animatedRes = when (kind) {
-        AgentOperationKind.Inspect -> R.drawable.kimi_anim_tool_file
-        AgentOperationKind.Search -> R.drawable.kimi_anim_tool_search
-        AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.kimi_anim_tool_code
-        AgentOperationKind.Web -> R.drawable.kimi_anim_tool_web
-        AgentOperationKind.Generic -> R.drawable.kimi_anim_tool_think
-        AgentOperationKind.Delegate -> R.drawable.kimi_anim_tool_create_subagent
-        AgentOperationKind.Image -> R.drawable.kimi_anim_tool_image
-        AgentOperationKind.External -> R.drawable.kimi_anim_tool_mcp
-        AgentOperationKind.Background -> R.drawable.kimi_anim_tool_task
-        AgentOperationKind.Device -> R.drawable.kimi_anim_tool_browser
+        AgentOperationKind.Inspect -> R.drawable.work_anim_tool_file
+        AgentOperationKind.Search -> R.drawable.work_anim_tool_search
+        AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.work_anim_tool_code
+        AgentOperationKind.Web -> R.drawable.work_anim_tool_web
+        AgentOperationKind.Generic -> R.drawable.work_anim_tool_think
+        AgentOperationKind.Delegate -> R.drawable.work_anim_tool_create_subagent
+        AgentOperationKind.Image -> R.drawable.work_anim_tool_image
+        AgentOperationKind.External -> R.drawable.work_anim_tool_mcp
+        AgentOperationKind.Background -> R.drawable.work_anim_tool_task
+        AgentOperationKind.Device -> R.drawable.work_anim_tool_browser
         else -> null
     }
     if (running && animatedRes != null) {
-        KimiAnimatedToolIcon(
+        AnimatedToolIcon(
             resId = animatedRes,
             modifier = Modifier.size(34.dp),
         )
@@ -326,13 +326,13 @@ internal fun WorkOperationIcon(
     when (kind) {
         AgentOperationKind.Delegate -> DsIconBox(
             icon = null,
-            iconPainter = painterResource(R.drawable.ic_kimi_create_subagent),
+            iconPainter = painterResource(R.drawable.ic_ui_create_subagent),
             active = running,
             modifier = Modifier.size(30.dp),
         )
         AgentOperationKind.External -> DsIconBox(
             icon = null,
-            iconPainter = painterResource(R.drawable.ic_kimi_plugin),
+            iconPainter = painterResource(R.drawable.ic_ui_plugin),
             active = running,
             modifier = Modifier.size(30.dp),
         )

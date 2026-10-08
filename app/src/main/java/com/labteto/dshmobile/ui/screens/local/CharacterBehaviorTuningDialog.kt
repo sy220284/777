@@ -47,7 +47,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsSlider
 import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -171,7 +171,50 @@ internal fun CharacterBehaviorTuningDialog(
         if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
 
-    DsDialog(title = null, onDismiss = { if (!saving) onDismiss() }) {
+    DsBottomSheet(
+        title = null,
+        onDismiss = { if (!saving) onDismiss() },
+        scrollable = true,
+        dismissEnabled = !saving,
+        footer = {
+            saveError?.let {
+                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
+            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsButton(
+                text = stringResource(R.string.local_character_tuning_restore),
+                onClick = { draft = CharacterBehaviorTuning(updatedAt = draft.updatedAt) },
+                variant = DsButtonVariant.Ghost,
+                enabled = !saving,
+            )
+            Spacer(Modifier.width(DsSpacing.small))
+            DsButton(
+                text = stringResource(R.string.local_character_tuning_done),
+                onClick = {
+                    if (saving) return@DsButton
+                    val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
+                    saving = true
+                    saveError = null
+                    coroutineScope.launch {
+                        try {
+                            runCatching { onSave(submitted) }
+                                .getOrElse { Result.failure(it) }
+                                .onSuccess { onDismiss() }
+                                .onFailure { saveError = it.message ?: saveFailedText }
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = !saving,
+            )
+        }
+        },
+    ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
@@ -444,38 +487,6 @@ internal fun CharacterBehaviorTuningDialog(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DsButton(
-                text = stringResource(R.string.local_character_tuning_restore),
-                onClick = { draft = CharacterBehaviorTuning(updatedAt = draft.updatedAt) },
-                variant = DsButtonVariant.Ghost,
-                enabled = !saving,
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            DsButton(
-                text = stringResource(R.string.local_character_tuning_done),
-                onClick = {
-                    if (saving) return@DsButton
-                    val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
-                    saving = true
-                    saveError = null
-                    coroutineScope.launch {
-                        onSave(submitted)
-                            .onSuccess { onDismiss() }
-                            .onFailure { saveError = it.message ?: saveFailedText }
-                        saving = false
-                    }
-                },
-                enabled = !saving,
-            )
-        }
-        saveError?.let {
-            Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
-        }
     }
 }
 
