@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
@@ -77,6 +78,8 @@ fun DsCategoryRow(
     titleTextStyle: TextStyle? = null,
 ) {
     val colors = DsTheme.colors
+    // Preserve full category titles beside their values at large accessibility font scales.
+    val compactWithValue = value != null && LocalDensity.current.fontScale >= 1.2f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
@@ -109,11 +112,14 @@ fun DsCategoryRow(
                     Modifier
                 },
             )
-            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.medium),
+            .padding(
+                horizontal = if (compactWithValue) DsSpacing.xsmall else DsSpacing.small,
+                vertical = DsSpacing.medium,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DsIconBox(icon = icon, iconPainter = iconPainter)
-        Spacer(Modifier.width(DsSpacing.medium))
+        Spacer(Modifier.width(if (compactWithValue) DsSpacing.tiny else DsSpacing.medium))
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
@@ -134,29 +140,59 @@ fun DsCategoryRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (compactWithValue) {
+                // Keep the entire title column wide at accessibility font scales.
+                // The count and navigation affordance share the secondary row.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = requireNotNull(value),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (trailing != null) {
+                        Spacer(Modifier.width(DsSpacing.small))
+                        trailing()
+                    } else if (onClick != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = FeatherIcons.ChevronRight,
+                            contentDescription = null,
+                            tint = colors.labelCaption,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
         }
-        value?.let {
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(
-                text = it,
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 96.dp),
-            )
+        if (!compactWithValue) {
+            value?.let {
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(
+                    text = it,
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 96.dp),
+                )
+            }
         }
-        if (trailing != null) {
-            Spacer(Modifier.width(DsSpacing.small))
-            trailing()
-        } else if (onClick != null) {
-            Spacer(Modifier.width(6.dp))
-            Icon(
-                imageVector = FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = colors.labelCaption,
-                modifier = Modifier.size(16.dp),
-            )
+        if (!compactWithValue) {
+            if (trailing != null) {
+                Spacer(Modifier.width(DsSpacing.small))
+                trailing()
+            } else if (onClick != null) {
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
     }
 }
