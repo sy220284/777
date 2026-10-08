@@ -206,7 +206,7 @@ internal fun LocalModeDrawer(
                     Spacer(Modifier.width(DsSpacing.small))
                     Text(
                         stringResource(R.string.app_name),
-                        style = DsType.large20.withReadingWeight(),
+                        style = DsType.title22.withReadingWeight(),
                         color = colors.labelPrimary,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
@@ -339,7 +339,7 @@ internal fun LocalModeDrawer(
                     item(key = "drawer-no-sessions") {
                         Text(
                             stringResource(R.string.chatlist_search_empty),
-                            style = DsType.small13.withReadingWeight(),
+                            style = DsType.navigationSupporting.withReadingWeight(),
                             color = colors.labelTertiary,
                             modifier = Modifier.padding(
                                 horizontal = DsSpacing.small,
@@ -372,7 +372,7 @@ internal fun LocalModeDrawer(
                         ) {
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),
-                                style = DsType.small13Strong.withReadingWeight(),
+                                style = DsType.navigationSupporting.withReadingWeight(),
                                 color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f),
                             )

@@ -140,7 +140,7 @@ internal fun DrawerContextCard(
             ) {
                 Text(
                     title,
-                    style = DsType.base16Strong.withReadingWeight(),
+                    style = DsType.navigationItem.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -148,8 +148,8 @@ internal fun DrawerContextCard(
                 subtitle?.takeIf(String::isNotBlank)?.let {
                     Text(
                         it,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelTertiary,
+                        style = DsType.navigationSupporting.withReadingWeight(),
+                        color = colors.labelSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -255,7 +255,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = 56.dp)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -276,7 +276,7 @@ internal fun DrawerQuickAction(
         )
         Text(
             title,
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.navigationItem.withReadingWeight(),
             color = colors.labelPrimary,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -329,7 +329,7 @@ internal fun DrawerGlobalAction(
         )
         Text(
             title,
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.navigationItem.withReadingWeight(),
             color = colors.labelPrimary,
             modifier = Modifier.weight(1f),
             maxLines = 1,
@@ -357,15 +357,15 @@ internal fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.caption11.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
+            style = DsType.navigationSection.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
         count?.let {
             Text(
                 it.toString(),
-                style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelCaption,
+                style = DsType.navigationSupporting.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary,
             )
         }
     }
@@ -451,7 +451,7 @@ internal fun LocalSessionDrawerRow(
                 ) {
                     Text(
                         displayTitle,
-                        style = if (current) DsType.std14Strong else DsType.std14,
+                        style = DsType.navigationItem.withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

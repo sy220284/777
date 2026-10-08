@@ -54,8 +54,8 @@ internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
 internal fun SettingsGroupTitle(text: String) {
     Text(
         text = text,
-        style = DsType.sectionTitle.withReadingWeight(),
-        color = DsTheme.colors.labelTertiary,
+        style = DsType.navigationSection.withReadingWeight(),
+        color = DsTheme.colors.labelSecondary,
         modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small, bottom = DsSpacing.tiny),
     )
 }
@@ -85,7 +85,7 @@ internal fun AppSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
@@ -96,22 +96,22 @@ internal fun AppSettingsRow(
                 it,
                 contentDescription = null,
                 tint = colors.labelPrimary,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
             Text(
                 title,
-                style = DsType.std14.withReadingWeight(),
+                style = DsType.navigationItem.withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    style = DsType.navigationSupporting.withReadingWeight(),
+                    color = colors.labelSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -121,9 +121,9 @@ internal fun AppSettingsRow(
             Text(
                 it,
                 modifier = Modifier.widthIn(max = 108.dp),
-                style = DsType.std14.withReadingWeight(),
-                color = colors.labelTertiary,
-                maxLines = 1,
+                style = DsType.navigationSupporting.withReadingWeight(),
+                color = colors.labelSecondary,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
             )

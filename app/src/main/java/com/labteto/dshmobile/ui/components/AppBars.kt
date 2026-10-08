@@ -77,7 +77,7 @@ fun DsTopBar(
         ) {
             Text(
                 title,
-                style = (if (largeTitle) DsType.large20 else DsType.headline17).withReadingWeight(),
+                style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -28,6 +28,16 @@ class AppearancePolicyTest {
     }
 
     @Test
+    fun navigationTypographyUsesReadableSizesAndWeights() {
+        assertTrue(DsType.navigationItem.fontSize > DsType.std14.fontSize)
+        assertTrue(DsType.navigationSupporting.fontSize > DsType.small13.fontSize)
+        assertTrue(DsType.navigationSection.fontSize > DsType.caption11.fontSize)
+        assertTrue(DsType.navigationItem.fontWeight!! >= FontWeight.SemiBold)
+        assertTrue(DsType.mdBody.fontWeight!! >= FontWeight.Medium)
+        assertTrue(DsType.chatBody.fontWeight!! >= FontWeight.Medium)
+    }
+
+    @Test
     fun wallpaperTransparencyPreferenceHasVisibleMonotonicRange() {
         val opaque = resolveWallpaperAlpha(
             adaptiveAlpha = 0.58f,

@@ -190,7 +190,7 @@ val LocalDsColors = staticCompositionLocalOf { DsThemeTokens.light }
 
 data class DsReadingPreferences(
     val textScale: Float = 1f,
-    val textWeightAdjustment: Int = 0,
+    val textWeightAdjustment: Int = 1,
 )
 
 val LocalDsReadingPreferences = staticCompositionLocalOf { DsReadingPreferences() }
@@ -247,7 +247,7 @@ fun DshTheme(
     backgroundPath: String? = null,
     backgroundAdaptiveContrast: Boolean = true,
     textScale: Float = 1f,
-    textWeightAdjustment: Int = 0,
+    textWeightAdjustment: Int = 1,
     wallpaperSurfaceTransparency: Float = 0.5f,
     content: @Composable () -> Unit,
 ) {
