@@ -53,6 +53,8 @@ internal data class LocalShellFeatureUiActions(
     val approve: (String) -> Unit,
     val deny: (String) -> Unit,
     val enableAutoApproval: () -> Unit,
+    val useDefaultApproval: () -> Unit,
+    val setNetworkSearchEnabled: (Boolean) -> Unit,
     val enableAutoApprovalForPending: (String) -> Unit,
     val enableDeviceApprovalLease: (String) -> Unit,
     val disableDeviceApprovalLease: () -> Unit,
