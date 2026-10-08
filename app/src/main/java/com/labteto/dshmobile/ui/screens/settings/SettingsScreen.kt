@@ -672,7 +672,7 @@ fun SettingsScreen(
                         ChatGptAccountPanel(account, viewModel, toast.second)
                     }
                     SettingsDestination.MODELS -> {
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second, onOpenAccount = { accountReturnPage = SettingsDestination.MODELS; page = SettingsDestination.ACCOUNT })
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                     }
 
