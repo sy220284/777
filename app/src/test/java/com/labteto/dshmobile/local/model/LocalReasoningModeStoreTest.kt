@@ -10,6 +10,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun allUiModesPreserveTheirDeepSeekRequestEffort() {
+        val session = "reasoning-explicit-ui-mapping-test"
+        val route = LocalModelProfile("mapping-ds", "deepseek-flash", "https://api.deepseek.com")
+        val choices = listOf(
+            LocalReasoningUiMode.DEFAULT to null,
+            LocalReasoningUiMode.FAST to "none",
+            LocalReasoningUiMode.LOW to "low",
+            LocalReasoningUiMode.DEEP to "high",
+            LocalReasoningUiMode.MAX to "max",
+        )
+        try {
+            for ((mode, effort) in choices) {
+                LocalReasoningControls.setMode(session, mode)
+                assertEquals(mode, LocalReasoningControls.mode(session))
+                assertEquals(effort, LocalReasoningModeStore.effortFor(session, route))
+            }
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
     @Test fun absentPreferencePreservesProviderDefaultAndMandatoryModelsUseLow() {
         val route = LocalModelProfile("astra", "gpt-6-astra", "https://api.openai.com/v1",
             protocol = LocalModelProtocol.RESPONSES)

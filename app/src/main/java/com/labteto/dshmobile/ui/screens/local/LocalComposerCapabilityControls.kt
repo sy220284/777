@@ -19,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -186,7 +189,15 @@ internal fun LocalComposerCapabilityPanel(
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
                 }
+                val sliderTitle = stringResource(R.string.local_composer_reasoning_title)
+                val sliderState = stringResource(reasoningModeLabel(
+                    modes[chosen.roundToInt().coerceIn(0, modes.lastIndex)], basicReasoning,
+                ))
                 Slider(
+                    modifier = Modifier.semantics {
+                        contentDescription = sliderTitle
+                        stateDescription = sliderState
+                    },
                     value = chosen,
                     onValueChange = { chosen = it },
                     onValueChangeFinished = {
@@ -221,7 +232,15 @@ internal fun LocalComposerCapabilityPanel(
                 var selected by remember(networkSearchEnabled) {
                     mutableFloatStateOf(if (networkSearchEnabled) 1f else 0f)
                 }
+                val sliderTitle = stringResource(R.string.local_composer_web_title)
+                val sliderState = stringResource(
+                    if (selected >= 0.5f) R.string.local_composer_web_on else R.string.local_composer_web_off,
+                )
                 Slider(
+                    modifier = Modifier.semantics {
+                        contentDescription = sliderTitle
+                        stateDescription = sliderState
+                    },
                     value = selected,
                     onValueChange = { selected = it },
                     onValueChangeFinished = { onNetworkSearchChange(selected >= 0.5f) },

@@ -15,7 +15,13 @@ internal enum class LocalReasoningUiMode { DEFAULT, FAST, LOW, DEEP, MAX }
 
 internal object LocalReasoningControls {
     fun mode(sessionId: String): LocalReasoningUiMode =
-        LocalReasoningUiMode.valueOf(LocalReasoningModeStore.mode(sessionId).name)
+        when (LocalReasoningModeStore.mode(sessionId)) {
+            LocalReasoningMode.DEFAULT -> LocalReasoningUiMode.DEFAULT
+            LocalReasoningMode.FAST -> LocalReasoningUiMode.FAST
+            LocalReasoningMode.LOW -> LocalReasoningUiMode.LOW
+            LocalReasoningMode.DEEP -> LocalReasoningUiMode.DEEP
+            LocalReasoningMode.MAX -> LocalReasoningUiMode.MAX
+        }
 
     fun availableModes(profile: LocalModelProfile?, mode: LocalUsageMode): List<LocalReasoningUiMode> {
         val supported = profile ?: return emptyList()
@@ -45,7 +51,13 @@ internal object LocalReasoningControls {
     }
 
     fun setMode(sessionId: String, mode: LocalReasoningUiMode) =
-        LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.valueOf(mode.name))
+        LocalReasoningModeStore.setMode(sessionId, when (mode) {
+            LocalReasoningUiMode.DEFAULT -> LocalReasoningMode.DEFAULT
+            LocalReasoningUiMode.FAST -> LocalReasoningMode.FAST
+            LocalReasoningUiMode.LOW -> LocalReasoningMode.LOW
+            LocalReasoningUiMode.DEEP -> LocalReasoningMode.DEEP
+            LocalReasoningUiMode.MAX -> LocalReasoningMode.MAX
+        })
 
     fun restoreDefault(sessionId: String) = LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.DEFAULT)
 
