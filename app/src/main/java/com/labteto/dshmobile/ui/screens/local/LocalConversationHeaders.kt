@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -69,7 +70,7 @@ internal fun ChatSurfaceHeader(
         ) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .widthIn(max = 188.dp)
                     .heightIn(min = DsSpacing.touchTarget)
                     .clip(DsShapes.row)
                     .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
@@ -81,7 +82,7 @@ internal fun ChatSurfaceHeader(
                 if (!groupEnabled) {
                     LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
                         style = DsType.base16Strong.withReadingWeight(),
@@ -166,7 +167,6 @@ internal fun ChatSurfaceHeader(
 
 @Composable
 internal fun WorkSurfaceHeader(
-    sessionTitle: String,
     modelLabel: String,
     configured: Boolean,
     running: Boolean,
@@ -185,7 +185,7 @@ internal fun WorkSurfaceHeader(
     ) {
         Row(
             modifier = Modifier
-                .weight(1f)
+                .widthIn(max = 168.dp)
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
                 .clickable(enabled = !running, role = Role.Button, onClick = onModelClick)
@@ -194,31 +194,14 @@ internal fun WorkSurfaceHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            Icon(
-                FeatherIcons.Sliders,
-                contentDescription = null,
-                tint = colors.labelSecondary,
-                modifier = Modifier.size(16.dp),
+            Text(
+                if (configured) modelLabel else stringResource(R.string.local_model_setup),
+                style = DsType.base16Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                Text(
-                    sessionTitle,
-                    style = DsType.base16Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    if (configured) modelLabel else stringResource(R.string.local_model_setup),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             Icon(
                 FeatherIcons.ChevronDown,
                 contentDescription = null,
@@ -226,6 +209,7 @@ internal fun WorkSurfaceHeader(
                 modifier = Modifier.size(16.dp),
             )
         }
+        Spacer(Modifier.weight(1f))
         if (running) {
             StateDot(StateDotState.Running, size = 8.dp)
             Spacer(Modifier.width(DsSpacing.xsmall))
