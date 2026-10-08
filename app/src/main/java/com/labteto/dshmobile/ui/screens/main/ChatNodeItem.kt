@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.main
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -292,7 +293,7 @@ private fun AssistantMessage(node: AssistantMessageNode, context: ChatNodeContex
         }
 
         if (finalText.isNotBlank()) {
-            MarkdownText(finalText)
+            SelectionContainer { MarkdownText(finalText) }
         }
         if (node.interrupted) {
             DsPill(text = stringResource(R.string.chat_stopped), warn = true)
