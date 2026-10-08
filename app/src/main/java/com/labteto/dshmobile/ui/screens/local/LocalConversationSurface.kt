@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -603,7 +602,7 @@ internal fun LocalConversationSurface(
                 if (transcriptItems.isEmpty() && (state.usageMode == LocalUsageMode.WORK || (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            EmptyLocalHarness { suggestion ->
+                            EmptyLocalHarness(gallery = gallery) { suggestion ->
                                 drafts.putBoundedLocalDraft(state.sessionId, suggestion)
                             }
                         }
@@ -1160,7 +1159,10 @@ internal fun localComposerAttachmentDecision(
 }
 
 @Composable
-private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
+private fun EmptyLocalHarness(
+    gallery: List<PersonaGalleryEntry>,
+    onSuggestion: (String) -> Unit,
+) {
     val colors = DsTheme.colors
     val filesPrompt = stringResource(R.string.local_prompt_files)
     val researchPrompt = stringResource(R.string.local_prompt_research)
@@ -1171,14 +1173,7 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Box(
-            Modifier.size(48.dp).clip(CircleShape).background(
-                Brush.radialGradient(listOf(colors.accent.copy(alpha = 0.7f), colors.accent)),
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(stringResource(R.string.app_name).take(1), style = DsType.headline17.withReadingWeight(), color = colors.onAccent)
-        }
+        WelcomePersonaCarousel(gallery = gallery)
         Text(
             stringResource(R.string.local_welcome_title),
             style = DsType.large20.withReadingWeight(),
