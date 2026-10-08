@@ -316,6 +316,7 @@ fun LocalHarnessScreen(
         onProjectSessionAccepted = ::resetFeatureNavigation,
         create = viewModel::createProject,
         select = viewModel::selectProject,
+        rename = viewModel::renameProject,
         updateInstructions = viewModel::updateProjectInstructions,
     )
     val automationActions = LocalAutomationFeatureUiActions(

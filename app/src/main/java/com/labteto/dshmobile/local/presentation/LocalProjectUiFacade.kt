@@ -14,5 +14,6 @@ class LocalProjectUiFacade @Inject internal constructor(
     fun backupAndResetCatalog() = runtime.backupAndResetCatalog()
     fun create(name: String): String = runtime.create(name)
     fun select(id: String) = runtime.select(id)
+    fun rename(id: String, name: String) = runtime.rename(id, name)
     fun updateInstructions(id: String, instructions: String) = runtime.updateInstructions(id, instructions)
 }

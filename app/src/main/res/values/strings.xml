@@ -1682,6 +1682,8 @@
     <string name="local_project_new_session_hint">切换项目只影响之后新建的项目会话，已有会话保留原项目归属。</string>
     <string name="local_project_name_hint">新项目名称</string>
     <string name="local_project_create">创建项目</string>
+    <string name="local_project_rename">保存项目名称</string>
+    <string name="local_project_rename_hint">当前项目名称</string>
     <string name="local_project_instruction_label">项目指令 · %1$s</string>
     <string name="local_project_instruction_hint">本项目长期工作规则</string>
     <string name="local_project_save_instruction">保存项目指令</string>

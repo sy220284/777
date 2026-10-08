@@ -56,6 +56,7 @@ class LocalHarnessViewModel @Inject constructor(
     )
     internal fun createProject(name: String) = projects.create(name)
     internal fun selectProject(id: String) = projects.select(id)
+    internal fun renameProject(id: String, name: String) = projects.rename(id, name)
     internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,

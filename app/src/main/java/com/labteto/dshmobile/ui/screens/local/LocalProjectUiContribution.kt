@@ -32,6 +32,7 @@ internal data class LocalProjectUiActions(
     val onProjectSessionAccepted: () -> Unit,
     val create: (String) -> String,
     val select: (String) -> Unit,
+    val rename: (String, String) -> Unit,
     val updateInstructions: (String, String) -> Unit,
 )
 
@@ -56,7 +57,7 @@ internal fun localProjectFeatureUiContribution(
 }
 
 @Composable
-private fun LocalProjectScreen(
+internal fun LocalProjectScreen(
     actions: LocalProjectUiActions,
     onBack: () -> Unit,
 ) {
@@ -66,6 +67,9 @@ private fun LocalProjectScreen(
     var newName by remember { mutableStateOf("") }
     var instructionDraft by remember(active?.id, active?.instructions) {
         mutableStateOf(active?.instructions.orEmpty())
+    }
+    var nameDraft by remember(active?.id, active?.name) {
+        mutableStateOf(active?.name.orEmpty())
     }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -122,6 +126,21 @@ private fun LocalProjectScreen(
             enabled = newName.isNotBlank(),
         ) { Text(stringResource(R.string.local_project_create)) }
         active?.let { project ->
+            OutlinedTextField(
+                value = nameDraft,
+                onValueChange = { nameDraft = it.take(80) },
+                label = { Text(stringResource(R.string.local_project_rename_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Button(
+                onClick = {
+                    runCatching { actions.rename(project.id, nameDraft) }
+                        .onSuccess { error = null }
+                        .onFailure { error = it.message }
+                },
+                enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
+            ) { Text(stringResource(R.string.local_project_rename)) }
             Text(stringResource(R.string.local_project_instruction_label, project.name))
             OutlinedTextField(
                 value = instructionDraft,
