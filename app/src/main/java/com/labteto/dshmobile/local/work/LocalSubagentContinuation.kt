@@ -170,11 +170,16 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
         ?.takeLast(MAX_CLAIMED_MESSAGE_IDS)
         ?.toSet()
         .orEmpty()
-    val rawEnabledTools = if (version >= 2) data["enabled_optional_tools"] as? JsonArray ?: return null else null
+    val rawEnabledTools = if (version >= 2) {
+        data["enabled_optional_tools"] as? JsonArray ?: return null
+    } else {
+        null
+    }
     val enabledTools = rawEnabledTools?.map { element ->
         val name = (element as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
         name?.takeIf { it.isNotBlank() && it.length <= 128 } ?: return null
-    }?.takeIf { it.size <= 48 }?.toSet() ?: if (version == 1) emptySet() else return null
+    }?.takeIf { it.size <= 48 }?.toSet()
+        ?: if (version == 1) emptySet() else return null
     return LocalSubagentHistoryCheckpoint(
         history = history,
         claimedMessageIds = claimed,

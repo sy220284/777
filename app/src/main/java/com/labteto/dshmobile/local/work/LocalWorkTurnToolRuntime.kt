@@ -156,8 +156,18 @@ internal class LocalWorkTurnToolRuntime(
     private fun parallelFailure(
         call: LocalToolCall,
         detail: String,
-    ): AgentToolResult {
-        val access = registry.get(LocalToolPolicy.canonical(call.name))?.access
+    ): AgentToolResult = parallelToolFailure(
+        call = call,
+        access = registry.get(LocalToolPolicy.canonical(call.name))?.access,
+        detail = detail,
+    )
+}
+
+internal fun parallelToolFailure(
+    call: LocalToolCall,
+    access: ToolAccess?,
+    detail: String,
+): AgentToolResult {
         val sideEffect = if (
             access in setOf(
                 ToolAccess.WORKSPACE_WRITE,
