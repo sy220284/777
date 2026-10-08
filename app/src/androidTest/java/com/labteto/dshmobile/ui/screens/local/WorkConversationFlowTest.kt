@@ -3,6 +3,8 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
@@ -20,7 +22,7 @@ class WorkConversationFlowTest {
         val running = mutableStateOf(true)
         val events = listOf(
             LocalHarnessMessage("p1", "progress", "我先检查当前消息流。", createdAt = 1L),
-            LocalHarnessMessage("t1", "tool", "/private/args/secret",
+            LocalHarnessMessage("t1", "tool", "/internal/test/arguments",
                 toolName = "mcp__GitHub__fetch", createdAt = 2L),
             LocalHarnessMessage("p2", "progress", "已经定位问题，正在更新实现。", createdAt = 3L),
             LocalHarnessMessage("t2", "tool", "internal tool output",
@@ -29,9 +31,10 @@ class WorkConversationFlowTest {
         compose.setContent { DshTheme { WorkProcessRow(events, running.value) } }
         compose.onNodeWithText("我先检查当前消息流。").assertExists()
         compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("已经定位问题，正在更新实现。").assertExists()
+        compose.onNodeWithText("工作进行中").assertExists()
+        compose.onAllNodesWithText("已经定位问题，正在更新实现。").assertCountEquals(1)
         compose.onNodeWithText("Figma", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("/private/args/secret", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("/internal/test/arguments", substring = true).assertDoesNotExist()
         compose.onNodeWithText("internal tool output", substring = true).assertDoesNotExist()
 
         compose.runOnIdle { running.value = false }
@@ -70,7 +73,7 @@ class WorkConversationFlowTest {
             requestId = "r1",
             usageMode = LocalUsageMode.WORK,
             assistant = "现在继续验证修复结果。",
-            reasoning = "private hidden reasoning",
+            reasoning = "internal reasoning text",
         ))
         compose.setContent {
             DshTheme {
@@ -83,7 +86,7 @@ class WorkConversationFlowTest {
             }
         }
         compose.onNodeWithText("现在继续验证修复结果。").assertExists()
-        compose.onNodeWithText("private hidden reasoning", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("internal reasoning text", substring = true).assertDoesNotExist()
         stream.value = stream.value.copy(assistant = "我先检查当前消息流。")
         compose.waitForIdle()
         compose.onNodeWithText("我先检查当前消息流。").assertDoesNotExist()
