@@ -1051,11 +1051,11 @@ internal fun SettingsCard(
 private fun LabelledValue(label: String, value: String) {
     val colors = DsTheme.colors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelSecondary, modifier = Modifier.weight(1f))
+        Text(label, style = DsType.navigationSupporting.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
         Text(
             value,
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
+            style = DsType.navigationSupporting.withReadingWeight(),
+            color = colors.labelSecondary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1.4f),
