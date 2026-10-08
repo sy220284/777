@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -419,10 +421,10 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
     val kind = remember(block.lines) { markdownCalloutKind(block.lines) }
     val title = when (kind) {
-        MarkdownCalloutKind.NOTE -> "说明"
-        MarkdownCalloutKind.IMPORTANT -> "重点"
-        MarkdownCalloutKind.WARNING -> "注意"
-        MarkdownCalloutKind.TIP -> "提示"
+        MarkdownCalloutKind.NOTE -> stringResource(R.string.markdown_callout_note)
+        MarkdownCalloutKind.IMPORTANT -> stringResource(R.string.markdown_callout_important)
+        MarkdownCalloutKind.WARNING -> stringResource(R.string.markdown_callout_warning)
+        MarkdownCalloutKind.TIP -> stringResource(R.string.markdown_callout_tip)
         MarkdownCalloutKind.QUOTE -> null
     }
     val stripeColor = when (kind) {
@@ -553,7 +555,7 @@ private fun CodeBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                lang ?: "代码",
+                lang ?: stringResource(R.string.markdown_code_language),
                 style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont),
                 color = colors.labelSecondary,
                 modifier = Modifier.weight(1f),
@@ -568,7 +570,7 @@ private fun CodeBlock(
                 ) {
                     Icon(
                         FeatherIcons.Copy,
-                        contentDescription = "复制代码",
+                        contentDescription = stringResource(R.string.markdown_copy_code),
                         tint = colors.labelSecondary,
                         modifier = Modifier.size(18.dp),
                     )
