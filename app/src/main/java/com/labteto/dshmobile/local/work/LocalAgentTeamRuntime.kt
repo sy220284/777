@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -38,6 +39,21 @@ internal enum class LocalTeamMemberPhase {
     DISMISSED,
     FAILED,
 }
+internal fun recoverTeamStartPhase(
+    previous: LocalTeamMemberPhase,
+    job: LocalJobInfo?,
+    admitted: Boolean,
+    cancelled: Boolean,
+): LocalTeamMemberPhase {
+    if (job == null) return if (cancelled) previous else LocalTeamMemberPhase.FAILED
+    if (job.status in setOf("failed", "cancelled", "killed")) return LocalTeamMemberPhase.FAILED
+    if (
+        previous == LocalTeamMemberPhase.CREATED || admitted ||
+        job.pendingMessageCount > 0 || job.status in setOf("running", "stopping")
+    ) return LocalTeamMemberPhase.ACTIVE
+    return if (cancelled) previous else LocalTeamMemberPhase.FAILED
+}
+
 internal enum class LocalTeamMemberContext { FRESH, FORK }
 internal enum class LocalTeamTaskStatus { PENDING, IN_PROGRESS, COMPLETED, DELETED }
 
@@ -412,6 +428,7 @@ internal class LocalAgentTeamRuntime(
             startingMembers.add(binding.sessionId to member.id)
             Triple(member, cleanTask, provisioning)
         }
+        var launchAdmitted = false
         return try {
             val existingJob = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
             if (member.phase == LocalTeamMemberPhase.DISABLED && existingJob != null) {
@@ -434,6 +451,7 @@ internal class LocalAgentTeamRuntime(
                     )
                     "[TEAM_MEMBER_RESUME_REJECTED] " + admission.message
                 } else {
+                    launchAdmitted = true
                     appendMember(
                         binding.sessionId,
                         provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
@@ -461,6 +479,7 @@ internal class LocalAgentTeamRuntime(
                     )
                     "[TEAM_MEMBER_START_REJECTED] " + started.message
                 } else {
+                    launchAdmitted = true
                     appendMember(
                         binding.sessionId,
                         provisioning.copy(phase = LocalTeamMemberPhase.ACTIVE),
@@ -469,14 +488,28 @@ internal class LocalAgentTeamRuntime(
                 }
             }
         } catch (error: Exception) {
+            val job = jobs.snapshotInfos().firstOrNull { it.id == member.jobId }
+            val recoveredPhase = recoverTeamStartPhase(
+                previous = member.phase,
+                job = job,
+                admitted = launchAdmitted,
+                cancelled = error is CancellationException,
+            )
             runCatching {
-                appendMember(
-                    binding.sessionId,
-                    provisioning.copy(
-                        phase = LocalTeamMemberPhase.FAILED,
-                        error = error.message.orEmpty().take(MAX_ERROR_CHARS),
-                    ),
-                )
+                synchronized(commandLock) {
+                    val current = project(binding.sessionId).members.singleOrNull { it.id == member.id }
+                    if (current?.phase == LocalTeamMemberPhase.PROVISIONING) {
+                        appendMember(
+                            binding.sessionId,
+                            provisioning.copy(
+                                phase = recoveredPhase,
+                                error = if (recoveredPhase == LocalTeamMemberPhase.FAILED) {
+                                    error.message.orEmpty().take(MAX_ERROR_CHARS)
+                                } else null,
+                            ),
+                        )
+                    }
+                }
             }
             throw error
         } finally {
