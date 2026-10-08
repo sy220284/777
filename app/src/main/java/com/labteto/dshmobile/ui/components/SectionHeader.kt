@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -26,12 +27,13 @@ fun SectionHeader(
     title: String,
     action: String? = null,
     onAction: (() -> Unit)? = null,
+    titleTextStyle: TextStyle? = null,
 ) {
     val colors = DsTheme.colors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
-            style = DsType.std14Strong.withReadingWeight(),
+            style = (titleTextStyle ?: DsType.std14Strong).withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
