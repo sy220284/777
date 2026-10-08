@@ -177,11 +177,6 @@ internal fun DrawerQuickActions(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-            DrawerQuickAction(
-                icon = FeatherIcons.Folder,
-                title = stringResource(R.string.local_project_management_title),
-                onClick = onProjects,
-            )
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
@@ -206,6 +201,11 @@ internal fun DrawerQuickActions(
                     onClick = onOpenDiary,
                 )
             } else {
+                DrawerQuickAction(
+                    icon = FeatherIcons.Folder,
+                    title = stringResource(R.string.local_project_management_title),
+                    onClick = onProjects,
+                )
                 DrawerQuickAction(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center),
