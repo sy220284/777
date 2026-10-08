@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Clear Realm night canvas; keep splash and Compose hand-off identical. -->
-    <color name="window_background">#10100F</color>
-</resources>
