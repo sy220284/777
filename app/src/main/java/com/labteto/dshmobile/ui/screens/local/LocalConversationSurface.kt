@@ -64,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -174,6 +175,10 @@ internal fun LocalConversationSurface(
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onUseWorkCapability: ((String) -> Unit)? = null,
+    approvalMode: LocalApprovalMode = LocalApprovalMode.DEFAULT,
+    networkSearchEnabled: Boolean = true,
+    onNetworkSearchChange: (Boolean) -> Unit = {},
+    onDefaultApproval: () -> Unit = {},
 ) {
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
@@ -885,6 +890,13 @@ internal fun LocalConversationSurface(
             teamDispatchSelected = teamDispatchSelected,
             onClearTeamDispatch = { teamDispatchSelected = false },
             onStop = onStop,
+            reasoningMode = reasoningMode,
+            onReasoningModeChange = { mode ->
+                LocalReasoningControls.setMode(state.sessionId, mode)
+                reasoningMode = LocalReasoningControls.mode(state.sessionId)
+            },
+            networkSearchEnabled = networkSearchEnabled,
+            onNetworkSearchChange = onNetworkSearchChange,
             onPlanModeChange = onPlanModeChange,
             onAutoApprove = onAutoApprove,
             onDisableAutoApprove = onDisableAutoApprove,
@@ -1088,7 +1100,6 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        val webPrompt = stringResource(R.string.composer_web_prompt)
         DsBottomSheet(
             title = null,
             onDismiss = { showAttachmentPicker = false },
@@ -1127,47 +1138,6 @@ internal fun LocalConversationSurface(
                     )
                 }
             }
-            DsSheetChoiceRow(
-                title = stringResource(R.string.composer_web),
-                trailingText = stringResource(R.string.composer_web_auto),
-                icon = FeatherIcons.Globe,
-                onClick = {
-                    showAttachmentPicker = false
-                    if (onUseWorkCapability != null) onUseWorkCapability(webPrompt)
-                    else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
-                },
-            )
-            val reasoningAvailable = LocalReasoningControls.isSupported(activeModelProfile, state.usageMode)
-            DsSheetChoiceRow(
-                title = stringResource(R.string.local_reasoning_switch_title),
-                subtitle = stringResource(
-                    when {
-                        !reasoningAvailable -> R.string.local_reasoning_switch_unsupported
-                        reasoningMode == LocalReasoningUiMode.DEFAULT -> R.string.local_reasoning_default_hint
-                        LocalReasoningControls.requiresBasicReasoning(activeModelProfile, state.usageMode) -> R.string.local_reasoning_basic_hint
-                        else -> R.string.local_reasoning_switch_hint
-                    },
-                ),
-                icon = FeatherIcons.Activity,
-                switchChecked = if (reasoningAvailable) reasoningMode == LocalReasoningUiMode.DEEP else null,
-                trailingText = if (reasoningAvailable) null else stringResource(R.string.local_reasoning_auto),
-                enabled = reasoningAvailable && !state.running,
-                onClick = {
-                    val next = reasoningMode != LocalReasoningUiMode.DEEP
-                    LocalReasoningControls.setEnabled(state.sessionId, next)
-                    reasoningMode = LocalReasoningControls.mode(state.sessionId)
-                },
-            )
-            if (reasoningAvailable && reasoningMode != LocalReasoningUiMode.DEFAULT) {
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.local_reasoning_restore_default),
-                    enabled = !state.running,
-                    onClick = {
-                        LocalReasoningControls.restoreDefault(state.sessionId)
-                        reasoningMode = LocalReasoningUiMode.DEFAULT
-                    },
-                )
-            }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 DsSheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
@@ -1179,17 +1149,29 @@ internal fun LocalConversationSurface(
                 )
             }
             if (state.usageMode == LocalUsageMode.WORK) {
-                DsSheetChoiceRow(
-                    title = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
-                    icon = FeatherIcons.List,
-                    onClick = { onPlanModeChange(!state.planMode); showAttachmentPicker = false },
+                LocalComposerSheetSlider(
+                    title = "规划",
+                    labels = listOf("关", "开始规划"),
+                    selectedIndex = if (state.planMode) 1 else 0,
+                    enabled = !state.running,
+                    hint = "仅下次任务进入规划；计划提交后自动关闭",
+                    onSelect = { index -> if ((index == 1) != state.planMode) onPlanModeChange(index == 1) },
                 )
-                DsSheetChoiceRow(
-                    title = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
-                    icon = FeatherIcons.Shield,
-                    onClick = {
-                        showAttachmentPicker = false
-                        if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
+                LocalComposerSheetSlider(
+                    title = "自动批准",
+                    labels = listOf("默认", "手动", "自动"),
+                    selectedIndex = when (approvalMode) {
+                        LocalApprovalMode.DEFAULT -> 0
+                        LocalApprovalMode.MANUAL -> 1
+                        LocalApprovalMode.AUTO -> 2
+                    },
+                    hint = "默认：安全操作自动通过，其余操作需要确认。状态持久保存",
+                    onSelect = { index ->
+                        when (index) {
+                            0 -> onDefaultApproval()
+                            1 -> onDisableAutoApprove()
+                            2 -> onAutoApprove()
+                        }
                     },
                 )
                 LocalAgentSwarmLaunchEntry(
