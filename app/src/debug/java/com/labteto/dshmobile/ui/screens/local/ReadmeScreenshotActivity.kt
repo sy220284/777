@@ -141,6 +141,7 @@ private fun NavigationScreenshot() {
             onDeleteSessions = { 0 },
             onWorkspaceFiles = {},
             onOpenRunCenter = {},
+            onProjects = {},
             groupMemberCount = 3,
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
