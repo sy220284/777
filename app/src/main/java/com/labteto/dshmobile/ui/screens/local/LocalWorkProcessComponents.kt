@@ -240,7 +240,6 @@ internal fun WorkProcessRow(
     } else latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
     val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
-    val visibleStartIndex = semanticNodes.size - visibleNodes.size
     val disclosureState = stringResource(
         if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
@@ -336,10 +335,7 @@ internal fun WorkProcessRow(
                 modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                visibleNodes.forEachIndexed { visibleIndex, node ->
-                    val rowRunning = running &&
-                        visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
-                        node.summary != null && !node.failed
+                visibleNodes.forEach { node ->
                     if (node.summary != null) {
                         // Model-authored, user-facing status narrative, never provider reasoning.
                         Text(

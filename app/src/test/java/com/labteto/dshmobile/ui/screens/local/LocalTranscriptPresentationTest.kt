@@ -125,6 +125,14 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun knownToolProvidersShowFriendlyNamesWithoutLeakingCommands() {
+        assertEquals("GitHub", userFacingWorkToolProvider("mcp__GitHub__fetch"))
+        assertEquals("Figma", userFacingWorkToolProvider("mcp__Figma__use_figma"))
+        assertEquals(null, userFacingWorkToolProvider("bash"))
+        assertEquals(null, userFacingWorkToolProvider("custom_secret_runner"))
+    }
+
+    @Test
     fun inlineWorkStreamingDoesNotDuplicateCommittedNarration() {
         assertFalse(shouldShowInlineWorkPreview("正在检查", "正在检查项目的最新代码"))
         assertTrue(shouldShowInlineWorkPreview("开始修复新问题", "正在检查项目的最新代码"))
