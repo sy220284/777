@@ -108,6 +108,12 @@ internal suspend fun exitWorkPlanMode(
 ): String {
     if (!state.snapshot().planMode) return "当前未启用规划模式"
 
+    // Submitting the finished plan ends planning even while approval is pending.
+    // Keep the persisted event and the visible Work state in sync before awaiting.
+    eventLog.append("plan/mode", buildJsonObject { put("active", false) })
+    state.update { current -> current.copy(planMode = false) }
+    persist()
+
     val answer = interactions.awaitQuestion(
         LocalQuestion(
             callId = call.id,
@@ -116,6 +122,10 @@ internal suspend fun exitWorkPlanMode(
         ),
     )
     if (answer != "批准并进入执行模式") {
+        // Continue-planning feedback explicitly re-enters the read-only state.
+        eventLog.append("plan/mode", buildJsonObject { put("active", true) })
+        state.update { current -> current.copy(planMode = true) }
+        persist()
         return "用户要求继续规划。反馈：$answer"
     }
 
