@@ -15,7 +15,7 @@ import org.junit.Test
 class WorkConversationFlowTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun liveTimelineAlternatesUserFacingNarrationAndToolIdentity() {
+    @Test fun liveTimelineCollapsesToolRowsIntoNarratedMilestones() {
         val running = mutableStateOf(true)
         val events = listOf(
             LocalHarnessMessage("p1", "progress", "我先检查当前消息流。", createdAt = 1L),
@@ -27,9 +27,9 @@ class WorkConversationFlowTest {
         )
         compose.setContent { DshTheme { WorkProcessRow(events, running.value) } }
         compose.onNodeWithText("我先检查当前消息流。").assertExists()
-        compose.onNodeWithText("GitHub", substring = true).assertExists()
+        compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
         compose.onNodeWithText("已经定位问题，正在更新实现。").assertExists()
-        compose.onNodeWithText("Figma", substring = true).assertExists()
+        compose.onNodeWithText("Figma", substring = true).assertDoesNotExist()
         compose.onNodeWithText("/private/args/secret", substring = true).assertDoesNotExist()
         compose.onNodeWithText("internal tool output", substring = true).assertDoesNotExist()
 
