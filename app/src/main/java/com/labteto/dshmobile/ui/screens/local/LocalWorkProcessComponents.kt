@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -145,7 +146,25 @@ internal fun WorkProcessRow(
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
-    if (nodes.isEmpty()) return
+    if (nodes.isEmpty()) {
+        // Do not render private reasoning; keep a visible thinking state until progress arrives.
+        if (running && messages.any { it.role == "reasoning" }) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                WorkOperationIcon(AgentOperationKind.Generic, running = true)
+                Text(
+                    stringResource(R.string.local_work_thinking),
+                    style = DsType.small13.withReadingWeight(),
+                    color = DsTheme.colors.labelTertiary,
+                )
+            }
+        }
+        return
+    }
     val processStatus = workProcessStatus(nodes, running)
     val processStatusLabel = stringResource(when (processStatus) {
         DsStatus.Running -> R.string.agent_operation_status_running
@@ -161,8 +180,12 @@ internal fun WorkProcessRow(
         Color.Transparent
     }
 
-    var expanded by remember(messages.first().id) { mutableStateOf(false) }
+    var expanded by remember(messages.first().id) { mutableStateOf(running) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
+    // Reveal live milestones by default; collapse to the result-first summary on completion.
+    LaunchedEffect(messages.first().id, running) {
+        expanded = running
+    }
     val semanticNodes = remember(nodes) {
         nodes.filter { it.summary != null || it.failed }.ifEmpty { nodes.takeLast(1) }
     }

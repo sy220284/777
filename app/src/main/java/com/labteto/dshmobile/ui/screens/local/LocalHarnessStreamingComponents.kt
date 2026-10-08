@@ -118,7 +118,10 @@ internal fun LocalStreamingWorkPreview(
                     Spacer(Modifier.width(DsSpacing.small))
                 }
                 Text(
-                    stringResource(R.string.local_streaming_status),
+                    stringResource(
+                        if (preview.isBlank() && stream.reasoning.isNotBlank()) R.string.local_work_thinking
+                        else R.string.local_streaming_status,
+                    ),
                     style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
