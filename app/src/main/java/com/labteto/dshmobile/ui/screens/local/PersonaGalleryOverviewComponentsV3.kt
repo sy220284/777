@@ -340,7 +340,11 @@ internal fun PersonaGalleryAddPanel(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
-                            LocalPersonaHeaderAvatar(preset.persona.name, "")
+                            LocalPersonaHeaderAvatar(
+                                name = preset.persona.name,
+                                portraitPath = "",
+                                presetAssetPath = preset.artwork?.assetPath,
+                            )
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     preset.persona.name,
