@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="local_persona_show_more">展开详细设定</string>
+    <string name="local_persona_hide_more">收起详细设定</string>
+    <string name="local_workspace_internal_only_title">这里暂时没有工作文件</string>
+    <string name="local_workspace_internal_only_body">目前只有应用运行需要的内部资料。完成任务后，你生成或修改的文件会出现在这里。</string>
+    <string name="local_workspace_internal_only_show">查看内部资料</string>
     <string name="persona_gallery_manage">管理</string>
     <string name="persona_gallery_manage_done">完成</string>
     <string name="persona_gallery_add">添加人物</string>
@@ -31,13 +36,19 @@
     <string name="persona_gallery_detail_more">人物资料与管理</string>
     <string name="persona_gallery_detail_less">收起人物资料与管理</string>
     <string name="local_empty_workspace_title">工作空间还是空的</string>
-    <string name="local_empty_workspace_body">Agent 创建或修改文件后，会在这里按目录显示。</string>
+    <string name="local_empty_workspace_body">完成任务、生成报告或编辑文件后，这里就会显示你的工作文件。</string>
     <string name="local_empty_involved_title">还没有涉及文件</string>
-    <string name="local_empty_involved_body">当前任务读取或修改过的文件会集中出现在这里。</string>
+    <string name="local_empty_involved_body">AI 在这次工作中读过或修改过的文件，会显示在这里。</string>
     <string name="local_empty_artifacts_title">还没有产物</string>
-    <string name="local_empty_artifacts_body">任务生成的报告、图片、文档等可交付内容会显示在这里。</string>
+    <string name="local_empty_artifacts_body">AI 完成报告、图片或文档后，你可以在这里查看。</string>
     <string name="local_empty_conversation_files_title">当前会话没有文件</string>
-    <string name="local_empty_conversation_files_body">发送附件或让 Agent 生成文件后，可以从这里快速打开。</string>
+    <string name="local_empty_conversation_files_body">发送图片、附件或让 AI 生成文件后，就可以在这里打开。</string>
+    <string name="local_files_refresh_action">重新检查</string>
+    <string name="local_run_center_empty_title">还没有正在进行的任务</string>
+    <string name="local_run_center_empty_body">把一件事交给 AI 助手后，可以随时在这里查看进度、继续补充要求或打开完成的内容。</string>
+    <string name="persona_gallery_portrait_actions_title">人物相片</string>
+    <string name="persona_gallery_portrait_long_press_hint">长按相片可更换或移除</string>
+    <string name="persona_gallery_portrait_photo_empty">轻点添加人物相片</string>
     <string name="local_files_select">选择文件</string>
     <string name="local_files_select_all">全选当前列表</string>
     <string name="local_files_selected_count">已选 %1$d 个文件</string>
@@ -46,10 +57,4 @@
     <string name="local_files_share_chooser">分享到</string>
     <string name="local_files_share_failed">分享未能打开，请确认文件还在工作区，再试一次。</string>
     <string name="local_files_share_limit">一次最多分享 %1$d 个文件</string>
-    <string name="local_files_refresh_action">重新检查</string>
-    <string name="local_run_center_empty_title">当前没有正在执行的工作</string>
-    <string name="local_run_center_empty_body">开始 Work 任务或启动后台子代理后，这里会显示当前阶段、待处理消息、后台任务和结果。</string>
-    <string name="persona_gallery_portrait_actions_title">人物相片</string>
-    <string name="persona_gallery_portrait_long_press_hint">长按相片可更换或移除</string>
-    <string name="persona_gallery_portrait_photo_empty">轻点添加人物相片</string>
 </resources>

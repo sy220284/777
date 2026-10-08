@@ -204,6 +204,7 @@ internal fun DrawerQuickActions(
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.local_project_management_title),
+                    subtitle = stringResource(R.string.local_drawer_projects_plain_hint),
                     onClick = onProjects,
                 )
                 DrawerQuickAction(
@@ -214,6 +215,7 @@ internal fun DrawerQuickActions(
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.chatlist_workspace_files),
+                    subtitle = stringResource(R.string.local_drawer_workspace_plain_hint),
                     onClick = onWorkspaceFiles,
                 )
                 DrawerQuickAction(
@@ -274,14 +276,27 @@ internal fun DrawerQuickAction(
             tint = colors.labelSecondary,
             modifier = Modifier.size(22.dp),
         )
-        Text(
-            title,
-            style = DsType.navigationItem.withReadingWeight(),
-            color = colors.labelPrimary,
+        Column(
             modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            Text(
+                title,
+                style = DsType.navigationItem.withReadingWeight(),
+                color = colors.labelPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let {
+                Text(
+                    it,
+                    style = DsType.navigationSupporting.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         badge?.let { DsPill(text = it) }
     }
 }
