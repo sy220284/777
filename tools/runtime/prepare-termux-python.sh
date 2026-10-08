@@ -418,7 +418,9 @@ prepare_arch() {
 
       patch_python_runtime "$stdlib_dir"
       # 解释器内部自测扩展与正常 Python 脚本执行无关，禁止装入 APK。
-      find "$stdlib_dir/lib-dynload" -maxdepth 1 -type f -name '_test*.so' -delete
+      if [ -d "$stdlib_dir/lib-dynload" ]; then
+        find "$stdlib_dir/lib-dynload" -maxdepth 1 -type f -name '_test*.so' -delete
+      fi
       # Patched stdlib source must be authoritative. Precompiled bytecode from the
       # Termux package can otherwise keep compiled-in Termux paths even after the
       # .py source has been rewritten for this app.

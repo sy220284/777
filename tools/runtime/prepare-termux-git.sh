@@ -379,7 +379,9 @@ prepare_arch() {
         mkdir -p "$home_dir/share/git-core"
         cp -aL "$prefix/share/git-core/templates" "$home_dir/share/git-core/"
         # 应用禁止执行 Git hooks，保留模板目录，但删除无用途的示例钩子。
-        find "$home_dir/share/git-core/templates/hooks" -maxdepth 1 -type f -name '*.sample' -delete
+        if [ -d "$home_dir/share/git-core/templates/hooks" ]; then
+          find "$home_dir/share/git-core/templates/hooks" -maxdepth 1 -type f -name '*.sample' -delete
+        fi
       fi
     fi
 
