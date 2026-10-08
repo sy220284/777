@@ -32,8 +32,17 @@ internal object LocalReasoningControls {
     }
 
     /** Project unsupported saved choices to the same default used by effortFor, without rewriting them. */
-    fun effectiveMode(mode: LocalReasoningUiMode, availableModes: List<LocalReasoningUiMode>): LocalReasoningUiMode =
-        mode.takeIf { it in availableModes } ?: LocalReasoningUiMode.DEFAULT
+    fun effectiveMode(
+        mode: LocalReasoningUiMode,
+        availableModes: List<LocalReasoningUiMode>,
+        needsBasicReasoning: Boolean = false,
+    ): LocalReasoningUiMode = when {
+        mode in availableModes -> mode
+        // Mandatory-reasoning routes expose LOW through their FAST/basic position.
+        mode == LocalReasoningUiMode.LOW && needsBasicReasoning && LocalReasoningUiMode.FAST in availableModes ->
+            LocalReasoningUiMode.FAST
+        else -> LocalReasoningUiMode.DEFAULT
+    }
 
     fun setMode(sessionId: String, mode: LocalReasoningUiMode) =
         LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.valueOf(mode.name))

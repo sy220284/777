@@ -39,7 +39,7 @@ internal fun composerReasoningLabel(
     mode: LocalReasoningUiMode,
     modes: List<LocalReasoningUiMode>,
     needsBasicReasoning: Boolean = false,
-): Int = when (LocalReasoningControls.effectiveMode(mode, modes)) {
+): Int = when (LocalReasoningControls.effectiveMode(mode, modes, needsBasicReasoning)) {
     LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
     LocalReasoningUiMode.FAST ->
         if (needsBasicReasoning) R.string.local_composer_reasoning_basic
@@ -182,7 +182,7 @@ internal fun LocalComposerCapabilityPanel(
                 Text(stringResource(R.string.local_composer_reasoning_unsupported),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             } else {
-                val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes)
+                val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
                 }

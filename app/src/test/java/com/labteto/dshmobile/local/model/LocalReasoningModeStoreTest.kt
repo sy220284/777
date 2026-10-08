@@ -75,6 +75,23 @@ class LocalReasoningModeStoreTest {
         }
     }
 
+    @Test fun savedLowUsesMandatoryModelsBasicPositionAndStillSendsLow() {
+        val session = "reasoning-mandatory-low-test"
+        val route = LocalModelProfile("basic", "gpt-6-astra", "https://api.openai.com/v1", protocol = LocalModelProtocol.RESPONSES)
+        LocalReasoningControls.setMode(session, LocalReasoningUiMode.LOW)
+        try {
+            for (usageMode in LocalUsageMode.entries) {
+                assertEquals(LocalReasoningUiMode.FAST, LocalReasoningControls.effectiveMode(
+                    LocalReasoningControls.mode(session), LocalReasoningControls.availableModes(route, usageMode),
+                    LocalReasoningControls.requiresBasicReasoning(route, usageMode),
+                ))
+                assertEquals("low", LocalReasoningModeStore.effortFor(session, route, usageMode == LocalUsageMode.WORK))
+            }
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
     @Test fun everySupportedRouteOffersDefaultAndRestoringItRemovesRequestOverride() {
         val session = "reasoning-restore-default-test"
         val routes = listOf(
