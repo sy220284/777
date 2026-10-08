@@ -39,7 +39,13 @@ class ConnectionService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForeground(NOTIFICATION_ID, buildNotification())
+        val promoted = runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+            .onFailure { AppLog.error("ConnectionService", "后台连接前台服务提升失败", it) }
+            .isSuccess
+        if (!promoted) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         if (connectionManager.state.value.host == null) {
             scope.launch { connectionManager.restoreDesiredConnectionIfNeeded() }
         }
@@ -49,8 +55,12 @@ class ConnectionService : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) {
         // Android 15+ ends the dataSync foreground budget; stop within seconds.
         AppLog.warn("ConnectionService", "后台连接前台服务达到系统时限，保留 WorkManager 定期恢复")
-        KeepAliveWorker.schedule(applicationContext)
-        stopSelf(startId)
+        try {
+            runCatching { KeepAliveWorker.schedule(applicationContext) }
+                .onFailure { AppLog.error("ConnectionService", "定期恢复任务调度失败", it) }
+        } finally {
+            stopSelf(startId)
+        }
     }
 
     override fun onDestroy() {

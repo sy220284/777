@@ -145,7 +145,10 @@ internal class LocalWorkAgentTurnExecutor(
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
             heldSession = foregroundSessionId
-            check(LocalExecutionService.holdTurn(context, foregroundSessionId)) { "前台执行服务启动失败" }
+            if (!LocalExecutionService.holdTurn(context, foregroundSessionId)) {
+                binding.state.update { it.copy(error = "前台执行服务启动失败，当前 Work 回合已停止") }
+                error("前台执行服务启动失败")
+            }
             binding.state.update {
                 it.copy(
                     work = it.work.copy(

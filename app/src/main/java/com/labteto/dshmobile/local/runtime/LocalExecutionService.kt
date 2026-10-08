@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 class LocalExecutionService : Service() {
     @Inject lateinit var notifications: DshNotifications
     @Inject lateinit var hostsStore: HostsStore
+    @Inject lateinit var runtimeStateStore: LocalRuntimeStateStore
 
     private data class Hold(
         val key: String,
@@ -58,7 +59,10 @@ class LocalExecutionService : Service() {
         // A startForegroundService call must be promoted immediately even when this intent ends up
         // removing the final hold. It is stopped again below when the active set becomes empty.
         val promoted = runCatching { startForeground(NOTIFICATION_ID, buildNotification(intent)) }
-            .onFailure { AppLog.error("LocalExecutionService", "前台执行服务提升失败", it) }
+            .onFailure {
+                AppLog.error("LocalExecutionService", "前台执行服务提升失败", it)
+                runtimeStateStore.projection.publishError("前台任务保护启动失败，请保持应用在前台并检查系统限制")
+            }
             .isSuccess
         if (!promoted) {
             dispatchedActive = false
