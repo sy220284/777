@@ -184,9 +184,9 @@ class LocalChatAutomationVisibleTurnOwnerTest {
                 },
             )
         }
-        assertSame(timedOut, result.exceptionOrNull())
-        assertNull(handle.job)
-        assertEquals(1, cleanups)
+        assertTrue("超时必须传回原取消异常，实际=${result.exceptionOrNull()}", result.exceptionOrNull() === timedOut)
+        assertNull("外层取消后必须释放当前任务句柄", handle.job)
+        assertEquals("外层取消应恰好清理一次", 1, cleanups)
         owner.cancel()
     }
 
@@ -212,8 +212,8 @@ class LocalChatAutomationVisibleTurnOwnerTest {
                 },
             )
         }
-        assertSame(failure, result.exceptionOrNull())
-        assertSame(current, handle.job)
+        assertTrue("预检错误必须原样传回，实际=${result.exceptionOrNull()}", result.exceptionOrNull() === failure)
+        assertSame("预检失败不可覆盖已有前台任务", current, handle.job)
         assertEquals(0, cleanups)
         current.cancel()
         attempted.cancel()
