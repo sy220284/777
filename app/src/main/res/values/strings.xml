@@ -1799,5 +1799,8 @@
     <string name="local_tool_activity_pending_result">尚未收到执行结果</string>
     <string name="local_tool_activity_full_result">持久化执行结果</string>
     <string name="local_tool_activity_evidence_error">完整记录读取失败，当前显示结果预览</string>
+    <string name="tools_network_search">网络搜索</string>
+    <string name="tools_network_search_hint">关闭后智能体无法搜索和抓取网页；GitHub 等其他联网能力不受影响</string>
+    <string name="tools_agent_settings_hint">主循环、子循环步数、重试次数与子智能体模型</string>
 </resources>
 
