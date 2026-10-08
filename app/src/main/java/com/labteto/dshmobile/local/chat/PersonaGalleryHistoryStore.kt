@@ -124,6 +124,22 @@ internal class PersonaGalleryHistoryStore(
         }
     }
 
+    /** Verify the key before committing a durable exclusion; missing keys must be no-ops. */
+    @Synchronized
+    fun containsMessage(entryId: String, storyId: String, messageKey: String): Boolean {
+        val file = archiveFile(entryId, storyId)
+        repairTornTail(file)
+        if (!file.isFile) return false
+        return file.bufferedReader().use { reader ->
+            while (true) {
+                val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: return@use false
+                val message = decode(line) ?: continue
+                if (galleryMessageArchiveKey(message) == messageKey) return@use true
+            }
+            false
+        }
+    }
+
     @Synchronized
     fun deleteMessage(entryId: String, storyId: String, messageKey: String): Boolean {
         val file = archiveFile(entryId, storyId)
