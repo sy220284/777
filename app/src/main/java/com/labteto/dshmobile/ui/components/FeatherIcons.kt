@@ -134,15 +134,6 @@ internal object FeatherIcons {
         }
     }
 
-    /** `file-plus` — creating a file. */
-    val FilePlus: ImageVector by lazy {
-        feather("FilePlus") {
-            documentOutline()
-            moveTo(12f, 18f); lineTo(12f, 12f)
-            moveTo(9f, 15f); lineTo(15f, 15f)
-        }
-    }
-
     /** `edit-3` — editing a file. */
     val Edit3: ImageVector by lazy {
         feather("Edit3") {
