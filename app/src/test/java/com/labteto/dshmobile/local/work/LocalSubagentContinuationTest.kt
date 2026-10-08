@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -258,6 +260,58 @@ class LocalSubagentContinuationTest {
             shouldSettleCompletedSubagentCheckpoint(decoded, emptySet()),
         )
         assertEquals("sa-team-seed", localPersistentSubagentId("job-team-seed"))
+    }
+
+    @Test
+    fun checkpointRestoresPerChildEnabledTools() {
+        val encoded = encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-tools",
+            agentId = "sa-tools",
+            step = 2,
+            history = listOf(buildJsonObject {
+                put("role", "tool")
+                put("content", "已登记候选工具")
+            }),
+            claimedMessageIds = emptySet(),
+            enabledOptionalTools = setOf("web_fetch", "github_status"),
+        )
+        val decoded = requireNotNull(decodeLocalSubagentHistoryCheckpoint(encoded))
+        assertEquals(setOf("web_fetch", "github_status"), decoded.enabledOptionalTools)
+    }
+
+    @Test
+    fun oldCheckpointRemainsReadableWithEmptyToolCapabilities() {
+        val encoded = encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-old",
+            agentId = "sa-old",
+            step = 1,
+            history = listOf(buildJsonObject { put("role", "user"); put("content", "任务") }),
+            claimedMessageIds = emptySet(),
+        )
+        val old = buildJsonObject {
+            encoded.forEach { (key, value) ->
+                if (key != "enabled_optional_tools") put(key, value)
+            }
+            put("version", 1)
+        }
+        val decoded = requireNotNull(decodeLocalSubagentHistoryCheckpoint(old))
+        assertEquals(emptySet<String>(), decoded.enabledOptionalTools)
+    }
+
+    @Test
+    fun invalidToolCheckpointFailsClosed() {
+        val encoded = encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-tools",
+            agentId = "sa-tools",
+            step = 1,
+            history = listOf(buildJsonObject { put("role", "user") }),
+            claimedMessageIds = emptySet(),
+        )
+        val corrupt = buildJsonObject {
+            encoded.forEach { (key, value) -> if (key != "enabled_optional_tools") put(key, value) }
+            put("enabled_optional_tools", JsonArray(listOf(JsonPrimitive(""))))
+        }
+        assertNull(decodeLocalSubagentHistoryCheckpoint(corrupt))
     }
 
     @Test

@@ -120,17 +120,8 @@ internal class LocalWorkComposition @Inject constructor(
                     enabledOptional = enabledOptional,
                 )
             },
-            executeTool = { binding, call, allowMutation, _, enabledOptionalTools ->
-                if (LocalToolPolicy.canonical(call.name) == "capability_search") {
-                    AgentToolResult(
-                        tools.execution.searchCapabilities(
-                            call.arguments.string("query"),
-                            enabledOptionalTools,
-                        ),
-                    )
-                } else {
-                    turnToolRuntime.execute(binding, call, allowMutation)
-                }
+            executeTool = { binding, call, allowMutation, _, _ ->
+                turnToolRuntime.execute(binding, call, allowMutation)
             },
             pruneOutput = { binding, value -> toolResultRuntime.retain(binding, null, value) },
         )
