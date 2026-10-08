@@ -388,7 +388,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     .joinToString("\n\n")
                 val requestMessages = withChatTurnContext(
                     history = localHistory,
-                    stableContext = chatContext.stablePrompt,
+                    stableContext = chatTurnCoordinator.projectStablePrompt(boundState, chatContext.stablePrompt),
                     dynamicContext = dynamicContext,
                 )
                 boundEventLog.append("turn/start", buildJsonObject {

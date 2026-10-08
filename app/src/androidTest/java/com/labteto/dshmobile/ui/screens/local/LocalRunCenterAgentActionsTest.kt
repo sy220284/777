@@ -12,6 +12,10 @@ import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertTrue
+import java.util.concurrent.atomic.AtomicLong
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
+import androidx.compose.ui.test.onAllNodesWithText
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,12 +27,48 @@ class LocalRunCenterAgentActionsTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
+    fun toolStatusRefreshesWhenEventSequenceAdvancesWithoutWorkStateChange() {
+        val sequence = AtomicLong(1L)
+        compose.setContent {
+            DshTheme {
+                LocalRunCenterScreen(
+                    state = LocalWorkUiState(sessionId = "session-a"),
+                    onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
+                    onToolActivities = {
+                        listOf(LocalToolActivityUiItem(
+                            "call-1", "audit-tool",
+                            if (sequence.get() == 1L) LocalToolUiPhase.RUNNING else LocalToolUiPhase.COMPLETED,
+                        ))
+                    },
+                    onEventSequence = { sequence.get() },
+                    onStopJob = { "" },
+                    onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
+                    onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
+                    onOpenResults = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        val running = "audit-tool · " + context.getString(R.string.local_tool_phase_running)
+        val completed = "audit-tool · " + context.getString(R.string.local_tool_phase_completed)
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText(running).fetchSemanticsNodes().isNotEmpty()
+        }
+        sequence.incrementAndGet()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText(completed).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
     fun idleRunCenterStillExposesDirectAgentLaunch() {
         compose.setContent {
             DshTheme {
                 LocalRunCenterScreen(
                     state = LocalWorkUiState(sessionId = "session-a"),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
@@ -73,6 +113,7 @@ class LocalRunCenterAgentActionsTest {
                         ),
                     ),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
@@ -116,6 +157,7 @@ class LocalRunCenterAgentActionsTest {
                         ),
                     ),
                     onJobOutput = { "" },
+                    onArtifacts = { emptyList() },
                     onStopJob = { "" },
                     onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
                     onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },

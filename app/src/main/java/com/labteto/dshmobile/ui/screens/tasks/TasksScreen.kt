@@ -2,6 +2,8 @@ package com.labteto.dshmobile.ui.screens.tasks
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
@@ -56,6 +58,7 @@ import java.util.Date
 fun TasksScreen(
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit = {},
+    onCreateViaChat: ((String) -> Unit)? = null,
     initialMode: AutomationMode? = null,
     handleRootSystemBack: Boolean = true,
     viewModel: TasksViewModel = hiltViewModel(),
@@ -84,6 +87,7 @@ fun TasksScreen(
         viewModel = viewModel,
         onClose = onClose,
         onOpenSession = onOpenSession,
+        onCreateViaChat = onCreateViaChat,
         handleRootSystemBack = handleRootSystemBack,
     )
 }
@@ -94,12 +98,20 @@ private fun WorkTasksScreen(
     viewModel: TasksViewModel,
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
+    onCreateViaChat: ((String) -> Unit)?,
     handleRootSystemBack: Boolean,
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
+    val chatCreatePrompt = stringResource(R.string.tasks_create_chat_prompt)
+    val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by rememberSaveable { mutableStateOf(false) }
+    var selectedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedTask = visibleTasks.firstOrNull { it.id == selectedTaskId }
+    LaunchedEffect(visibleTasks, selectedTaskId) {
+        if (selectedTaskId != null && selectedTask == null) selectedTaskId = null
+    }
     var createMenuOpen by rememberSaveable { mutableStateOf(false) }
     val editingTaskIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val promptState = rememberSaveable { mutableStateOf("") }
@@ -133,8 +145,21 @@ private fun WorkTasksScreen(
         resetEditor()
         showCreate = true
     }
-    val navigateBack = { if (showCreate) resetEditor() else onClose() }
-    BackHandler(enabled = showCreate || handleRootSystemBack) { navigateBack() }
+    fun startEdit(task: AutomationTask) {
+        editingTaskIdState.value = task.id
+        promptState.value = task.prompt
+        cadenceState.value = cadenceForTask(task)
+        firstRunAtState.value = maxOf(
+            task.nextRunAt,
+            System.currentTimeMillis() + 60_000L,
+        )
+        customHoursState.value = customHoursForTask(task)
+        notifyState.value = task.notify
+        createErrorState.value = null
+        showCreate = true
+    }
+    val navigateBack = { if (showCreate) resetEditor() else if (selectedTaskId != null) selectedTaskId = null else onClose() }
+    BackHandler(enabled = showCreate || selectedTaskId != null || handleRootSystemBack) { navigateBack() }
 
     val toast = rememberDsToast()
     val noticeMessage = state.notice?.let { notice ->
@@ -165,13 +190,17 @@ private fun WorkTasksScreen(
             ) {
                 Box(Modifier.fillMaxWidth()) {
                     DsTopBar(
-                        title = stringResource(R.string.tasks_title),
+                        title = stringResource(
+                            if (showCreate) {
+                                if (editingTaskIdState.value != null) R.string.tasks_edit else R.string.tasks_new
+                            } else if (selectedTask != null) R.string.tasks_details else R.string.tasks_title,
+                        ),
                         onBack = navigateBack,
                         backContentDescription = stringResource(R.string.common_back),
                         largeTitle = false,
-                        backIcon = FeatherIcons.X,
+                        backIcon = if (showCreate || selectedTask != null) FeatherIcons.ChevronLeft else FeatherIcons.X,
                     )
-                    if (!showCreate) {
+                    if (!showCreate && selectedTask == null) {
                         Box(Modifier.align(Alignment.CenterEnd)) {
                             DsIconButton(
                                 icon = FeatherIcons.Plus,
@@ -188,12 +217,13 @@ private fun WorkTasksScreen(
                                         icon = FeatherIcons.Edit3,
                                         onClick = ::startCreate,
                                     ),
+                                ) + if (onCreateViaChat != null) listOf(
                                     MenuItem(
                                         text = stringResource(R.string.tasks_create_via_chat),
                                         icon = FeatherIcons.MessageCircle,
-                                        onClick = onClose,
+                                        onClick = createFromChat,
                                     ),
-                                ),
+                                ) else emptyList(),
                             )
                         }
                     }
@@ -208,34 +238,27 @@ private fun WorkTasksScreen(
                     )
                     visibleTasks.isEmpty() -> TaskEmptyState(
                         onManualCreate = ::startCreate,
-                        onCreateViaChat = onClose,
+                        onCreateViaChat = onCreateViaChat?.let { createFromChat },
                     )
+                    selectedTask != null -> Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                    ) {
+                        TaskCard(
+                            task = selectedTask,
+                            onCancel = { viewModel.cancel(selectedTask.id) },
+                            onPause = { viewModel.pause(selectedTask.id) },
+                            onResume = { viewModel.resume(selectedTask.id) },
+                            onRunNow = { viewModel.runNow(selectedTask.id) },
+                            onEdit = { startEdit(selectedTask) },
+                            onOpenSession = onOpenSession,
+                        )
+                    }
                     else -> LazyColumn(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                     ) {
                         items(visibleTasks, key = AutomationTask::id) { task ->
-                            TaskCard(
-                                task = task,
-                                onCancel = { viewModel.cancel(task.id) },
-                                onPause = { viewModel.pause(task.id) },
-                                onResume = { viewModel.resume(task.id) },
-                                onRunNow = { viewModel.runNow(task.id) },
-                                onEdit = {
-                                    editingTaskIdState.value = task.id
-                                    promptState.value = task.prompt
-                                    cadenceState.value = cadenceForTask(task)
-                                    firstRunAtState.value = maxOf(
-                                        task.nextRunAt,
-                                        System.currentTimeMillis() + 60_000L,
-                                    )
-                                    customHoursState.value = customHoursForTask(task)
-                                    notifyState.value = task.notify
-                                    createErrorState.value = null
-                                    showCreate = true
-                                },
-                                onOpenSession = onOpenSession,
-                            )
+                            TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
                         }
                     }
                 }
@@ -248,7 +271,7 @@ private fun WorkTasksScreen(
 @Composable
 private fun TaskEmptyState(
     onManualCreate: () -> Unit,
-    onCreateViaChat: () -> Unit,
+    onCreateViaChat: (() -> Unit)?,
 ) {
     val colors = DsTheme.colors
     Box(Modifier.fillMaxSize()) {
@@ -296,7 +319,7 @@ private fun TaskEmptyState(
                     )
                 }
             }
-            Surface(
+            if (onCreateViaChat != null) Surface(
                 onClick = onCreateViaChat,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 color = colors.bgModulePlatform,

@@ -100,7 +100,7 @@ internal fun ProjectSettingsCard(
     report: (String) -> Unit,
 ) {
     if (!state.available && state.error == null && !state.loading) return
-    SettingsCard(stringResource(R.string.advanced_project_config), FeatherIcons.Sliders) {
+    SettingsCard(stringResource(R.string.advanced_project_config)) {
         when {
             state.loading -> Text(stringResource(R.string.advanced_project_loading), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelTertiary)
             state.error != null -> {
@@ -347,7 +347,7 @@ internal fun ModelServicesCard(
     viewModel: SettingsViewModel,
 ) {
     if (state.providers.isEmpty() && state.error == null && !state.loading) return
-    SettingsCard(stringResource(R.string.advanced_model_services), FeatherIcons.Globe) {
+    SettingsCard(stringResource(R.string.advanced_model_services)) {
         Text(
             stringResource(R.string.advanced_model_services_hint),
             style = DsType.caption11.withReadingWeight(),

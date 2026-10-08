@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.project.ProjectContextPort
+import com.labteto.dshmobile.local.session.LocalConversationMode
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
@@ -23,10 +25,20 @@ internal data class LocalPreparedChatTurn(
 )
 
 @Singleton
-class LocalChatTurnCoordinator @Inject constructor(
+internal class LocalChatTurnCoordinator @Inject constructor(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
+    private val projects: ProjectContextPort,
 ) {
+    /** ProjectFeature owns instruction text; Chat only decides when the current session may use it. */
+    internal fun projectStablePrompt(snapshot: LocalHarnessState, base: String): String =
+        withChatProjectInstructions(
+            base = base,
+            mode = snapshot.conversationMode,
+            projectId = snapshot.projectId,
+            resolve = projects::instructionsFor,
+        )
+
     internal fun prepare(
         snapshot: LocalHarnessState,
         input: String,
@@ -60,7 +72,7 @@ class LocalChatTurnCoordinator @Inject constructor(
             persona = context.persona,
         )
         return LocalPreparedChatTurn(
-            context = context,
+            context = context.copy(stablePrompt = projectStablePrompt(snapshot, context.stablePrompt)),
             dynamicContext = ChatContextAssembler.assemble(
                 dynamicPrompt = context.dynamicPrompt,
                 relationshipMemory = relationshipMemory,
@@ -214,3 +226,20 @@ internal fun recentReplySuggestionDialogue(
         .takeLast(limit.coerceAtLeast(2))
 }
 
+
+/** Project instructions are a stable, session-scoped layer; unrelated Chat sessions stay isolated. */
+internal fun withChatProjectInstructions(
+    base: String,
+    mode: LocalConversationMode,
+    projectId: String?,
+    resolve: (String?) -> String,
+): String {
+    val id = projectId?.takeIf(String::isNotBlank)
+        ?.takeUnless { mode == LocalConversationMode.INDEPENDENT }
+        ?: return base
+    val instructions = resolve(id).trim().take(8_000)
+    if (instructions.isEmpty()) return base
+    return listOf(base, "【当前项目长期规则】\n$instructions")
+        .filter(String::isNotBlank)
+        .joinToString("\n\n")
+}

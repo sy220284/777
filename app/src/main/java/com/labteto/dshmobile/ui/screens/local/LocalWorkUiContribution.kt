@@ -42,8 +42,12 @@ internal fun localWorkFeatureUiContribution(
             LocalRunCenterScreen(
                 state = workState,
                 onJobOutput = actions.backgroundJobOutput,
+                onArtifacts = actions.artifactsForUi,
+                onToolActivities = actions.toolActivitiesForUi,
+                onEventSequence = actions.eventSequenceForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
+                onStartResearchAgent = actions.startResearchAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onOpenResults = {
                     onFilesModeChange(LocalFilesMode.CONVERSATION)

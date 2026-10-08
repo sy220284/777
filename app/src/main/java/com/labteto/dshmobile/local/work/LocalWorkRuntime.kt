@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
+import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
+import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
@@ -12,6 +16,7 @@ class LocalWorkRuntime @Inject internal constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val eventLogs: LocalSessionEventLogRegistry,
+    private val toolActivity: LocalToolActivityProjectionRuntime,
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
     private val execution: LocalWorkExecutionPort,
@@ -29,12 +34,43 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
+    internal fun artifactsForUi(sessionId: String): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
+        if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
+        return projectLocalWorkArtifacts(eventLogs.get(sessionId).pageBeforeChronological(limit = 384))
+    }
+
+    /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
+    internal fun eventSequenceForUi(sessionId: String): Long =
+        if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L
+
+    internal fun toolActivitiesForUi(sessionId: String): List<LocalToolActivityUiItem> {
+        if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
+        return toolActivity.snapshot(eventLogs.get(sessionId)).state.activities.takeLast(32).map { activity ->
+            val phase = when (activity.phase) {
+                LocalToolActivityPhase.DECLARED -> LocalToolUiPhase.DECLARED
+                LocalToolActivityPhase.RUNNING -> LocalToolUiPhase.RUNNING
+                LocalToolActivityPhase.COMPLETED -> LocalToolUiPhase.COMPLETED
+                LocalToolActivityPhase.FAILED -> LocalToolUiPhase.FAILED
+                LocalToolActivityPhase.OUTCOME_UNKNOWN -> LocalToolUiPhase.OUTCOME_UNKNOWN
+                LocalToolActivityPhase.CANCELLED -> LocalToolUiPhase.CANCELLED
+            }
+            LocalToolActivityUiItem(
+                callId = activity.callId,
+                name = activity.name,
+                phase = phase,
+                errorCode = activity.errorCode,
+            )
+        }
+    }
+
     internal fun backgroundJobOutputForUi(jobId: String): String =
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
     internal fun stopBackgroundJobForUi(jobId: String): String =
         runtimeStateStore.jobManager.kill(jobId, runtimeStateStore.currentSessionId)
     internal suspend fun startBackgroundAgentForUi(task: String): LocalWorkAgentUiResult =
         agentUi.startBackgroundAgent(task)
+    internal suspend fun startResearchAgentForUi(task: String): LocalWorkAgentUiResult =
+        agentUi.startResearchAgent(task)
     internal suspend fun sendBackgroundAgentMessageForUi(agentId: String, message: String): LocalWorkAgentUiResult =
         agentUi.sendMessage(agentId, message)
     internal suspend fun sendTeamMemberMessageForUi(memberId: String, message: String): LocalWorkAgentUiResult =

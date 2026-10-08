@@ -54,7 +54,7 @@ internal fun AppSettingsSection(content: @Composable ColumnScope.() -> Unit) {
 internal fun SettingsGroupTitle(text: String) {
     Text(
         text = text,
-        style = DsType.small13Strong.withReadingWeight(),
+        style = DsType.sectionTitle.withReadingWeight(),
         color = DsTheme.colors.labelTertiary,
         modifier = Modifier.padding(start = DsSpacing.medium, top = DsSpacing.small, bottom = DsSpacing.tiny),
     )
@@ -85,7 +85,7 @@ internal fun AppSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = 56.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
@@ -110,7 +110,7 @@ internal fun AppSettingsRow(
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -121,7 +121,7 @@ internal fun AppSettingsRow(
             Text(
                 it,
                 modifier = Modifier.widthIn(max = 108.dp),
-                style = DsType.caption11.withReadingWeight(),
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

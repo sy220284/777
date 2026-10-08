@@ -66,6 +66,10 @@ class LocalChatContextRefreshRaceTest {
         val turns = LocalChatTurnCoordinator(
             ChatTurnRunner(ChatPersonaStore(File(temporary.root, "personas.json"), json), ChatRelationshipEngine(), CharacterLoreEngine()),
             ChatInteractionPlanner(json),
+            object : com.labteto.dshmobile.local.project.ProjectContextPort {
+                override fun activeProjectId() = "local-workspace"
+                override fun instructionsFor(projectId: String?) = ""
+            },
         )
         var persisted = 0
         val profile = LocalModelProfile("profile-a", "model-a", "https://example.test/v1")

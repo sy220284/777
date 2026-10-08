@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsMetrics
@@ -50,7 +51,7 @@ fun DsTopBar(
     onAction: (() -> Unit)? = null,
     largeTitle: Boolean = false,
     actionPainter: Painter? = null,
-    backIcon: ImageVector = FeatherIcons.ArrowLeft,
+    backIcon: ImageVector = FeatherIcons.ChevronLeft,
 ) {
     val colors = DsTheme.colors
     Box(
@@ -63,6 +64,8 @@ fun DsTopBar(
             contentDescription = backContentDescription,
             onClick = onBack,
             modifier = Modifier.align(Alignment.CenterStart),
+            containerColor = colors.bgLayer1,
+            iconSize = 24.dp,
             tint = colors.labelPrimary,
         )
         Column(
@@ -77,6 +80,7 @@ fun DsTopBar(
                 style = (if (largeTitle) DsType.large20 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
@@ -84,6 +88,7 @@ fun DsTopBar(
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -95,6 +100,8 @@ fun DsTopBar(
                 onClick = onAction,
                 enabled = actionEnabled,
                 modifier = Modifier.align(Alignment.CenterEnd),
+                containerColor = colors.bgLayer1,
+                iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )
         } else {
@@ -146,6 +153,7 @@ fun DsSegmentedTabs(
                     style = (if (selected) DsType.small13Strong else DsType.small13).withReadingWeight(),
                     color = if (selected) colors.labelPrimary else colors.labelTertiary,
                     maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 )
             }
         }

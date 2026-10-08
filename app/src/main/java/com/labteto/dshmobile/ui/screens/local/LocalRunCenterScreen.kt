@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -36,6 +40,9 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal fun LocalWorkUiState.hasRunCenterContent(): Boolean =
     running ||
@@ -53,8 +60,12 @@ internal fun LocalWorkUiState.hasRunCenterContent(): Boolean =
 internal fun LocalRunCenterScreen(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
+    onArtifacts: (String) -> List<LocalArtifactUiItem>,
+    onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
+    onEventSequence: (String) -> Long = { 0L },
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
+    onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onOpenResults: () -> Unit,
     onDismiss: () -> Unit,
@@ -63,8 +74,30 @@ internal fun LocalRunCenterScreen(
     val scope = rememberCoroutineScope()
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
+    var researchPreset by remember(state.sessionId) { mutableStateOf(false) }
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
+    var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
+    var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
+    // Bounded, visible-only refresh reads the single Session EventLog cursor, including tool
+    // state changes that leave WorkState unchanged. No duplicate persistent event stream.
+    LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos) {
+        var lastSequence = Long.MIN_VALUE
+        while (true) {
+            val (sequence, recent) = withContext(Dispatchers.IO) {
+                val seq = onEventSequence(state.sessionId)
+                seq to if (seq != lastSequence) {
+                    onArtifacts(state.sessionId) to onToolActivities(state.sessionId)
+                } else null
+            }
+            if (recent != null) {
+                artifacts = recent.first
+                toolActivities = recent.second
+                lastSequence = sequence
+            }
+            delay(750)
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -86,7 +119,7 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
-            if (!state.hasRunCenterContent()) {
+            if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 DsPageEmptyState(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center_empty_title),
@@ -110,6 +143,47 @@ internal fun LocalRunCenterScreen(
                         onOpenResults = onOpenResults,
                         showHeader = false,
                     )
+                    if (toolActivities.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.local_tool_activity_title),
+                            style = DsType.base16Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        toolActivities.forEach { activity ->
+                            val phase = when (activity.phase) {
+                                LocalToolUiPhase.DECLARED -> R.string.local_tool_phase_declared
+                                LocalToolUiPhase.RUNNING -> R.string.local_tool_phase_running
+                                LocalToolUiPhase.COMPLETED -> R.string.local_tool_phase_completed
+                                LocalToolUiPhase.FAILED -> R.string.local_tool_phase_failed
+                                LocalToolUiPhase.OUTCOME_UNKNOWN -> R.string.local_tool_phase_unknown
+                                LocalToolUiPhase.CANCELLED -> R.string.local_tool_phase_cancelled
+                            }
+                            Text(
+                                text = activity.name + " · " + stringResource(phase),
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
+                    }
+                    if (artifacts.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.local_artifacts_title),
+                            style = DsType.base16Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        artifacts.forEach { artifact ->
+                            Text(
+                                artifact.reference,
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
+                        DsButton(
+                            text = stringResource(R.string.local_artifacts_open_files),
+                            onClick = onOpenResults,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
                 }
             }
         }
@@ -119,6 +193,51 @@ internal fun LocalRunCenterScreen(
         DsBottomSheet(
             title = stringResource(R.string.local_run_agent_direct_title),
             subtitle = stringResource(R.string.local_run_agent_direct_body),
+            scrollable = true,
+            dismissEnabled = !startingAgent,
+            footer = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.common_cancel),
+                        onClick = {
+                            showAgentLauncher = false
+                            agentFeedback = ""
+                        },
+                        enabled = !startingAgent,
+                        variant = DsButtonVariant.Ghost,
+                        size = DsButtonSize.Large,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsButton(
+                        text = stringResource(R.string.local_run_agent_start),
+                        onClick = {
+                            val task = agentTask.trim()
+                            if (task.isNotEmpty() && !startingAgent) {
+                                scope.launch {
+                                    startingAgent = true
+                                    try {
+                                        val result = if (researchPreset) onStartResearchAgent(task) else onStartBackgroundAgent(task)
+                                        agentFeedback = result.message
+                                        if (result.accepted) {
+                                            agentTask = ""
+                                            showAgentLauncher = false
+                                        }
+                                    } finally {
+                                        startingAgent = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = agentTask.isNotBlank() && !startingAgent,
+                        loading = startingAgent,
+                        size = DsButtonSize.Large,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            },
             onDismiss = {
                 if (!startingAgent) {
                     showAgentLauncher = false
@@ -137,57 +256,45 @@ internal fun LocalRunCenterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !startingAgent,
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(R.string.local_research_agent_general),
+                    onClick = { researchPreset = false },
+                    enabled = !startingAgent,
+                    variant = if (researchPreset) DsButtonVariant.Ghost else DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_research_agent_research),
+                    onClick = { researchPreset = true },
+                    enabled = !startingAgent,
+                    variant = if (researchPreset) DsButtonVariant.Outline else DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+            if (researchPreset) {
+                Text(
+                    stringResource(R.string.local_research_agent_readonly_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
             Text(
                 stringResource(R.string.local_run_agent_inherits_context),
-                style = DsType.caption11.withReadingWeight(),
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             agentFeedback.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                DsButton(
-                    text = stringResource(R.string.common_cancel),
-                    onClick = {
-                        showAgentLauncher = false
-                        agentFeedback = ""
-                    },
-                    enabled = !startingAgent,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                )
-                DsButton(
-                    text = stringResource(R.string.local_run_agent_start),
-                    onClick = {
-                        val task = agentTask.trim()
-                        if (task.isNotEmpty() && !startingAgent) {
-                            scope.launch {
-                                startingAgent = true
-                                try {
-                                    val result = onStartBackgroundAgent(task)
-                                    agentFeedback = result.message
-                                    if (result.accepted) {
-                                        agentTask = ""
-                                        showAgentLauncher = false
-                                    }
-                                } finally {
-                                    startingAgent = false
-                                }
-                            }
-                        }
-                    },
-                    enabled = agentTask.isNotBlank() && !startingAgent,
-                    loading = startingAgent,
-                    size = DsButtonSize.Small,
-                )
-            }
+
         }
     }
 }

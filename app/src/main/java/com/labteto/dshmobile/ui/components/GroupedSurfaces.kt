@@ -185,7 +185,7 @@ fun DsQuickActionTile(
         shape = DsShapes.block,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.medium),
+            modifier = Modifier.heightIn(min = 92.dp).padding(horizontal = DsSpacing.medium, vertical = DsSpacing.large),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {

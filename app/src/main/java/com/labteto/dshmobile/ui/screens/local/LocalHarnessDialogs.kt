@@ -44,6 +44,7 @@ internal fun NewSessionModeDialog(
     usageMode: LocalUsageMode,
     onDismiss: () -> Unit,
     onSelect: (LocalConversationMode) -> Unit,
+    projectAvailable: Boolean = true,
 ) {
     val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
@@ -73,6 +74,13 @@ internal fun NewSessionModeDialog(
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
+        if (!chatMode && projectAvailable) {
+            DsSheetChoiceRow(
+                title = stringResource(R.string.local_project_start_work_session),
+                subtitle = stringResource(R.string.local_project_new_session_hint),
+                onClick = { onSelect(LocalConversationMode.PROJECT) },
+            )
+        }
         DsSheetChoiceRow(
             title = stringResource(R.string.local_new_session_independent),
             subtitle = stringResource(

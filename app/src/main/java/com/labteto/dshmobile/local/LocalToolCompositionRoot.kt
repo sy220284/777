@@ -156,6 +156,12 @@ internal class LocalToolCompositionRoot @Inject constructor(
 
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
 
+    override fun installedSkills(): List<com.labteto.dshmobile.local.tools.LocalInstalledSkill> =
+        workspace.skills().map { name ->
+            val metadata = com.labteto.dshmobile.local.files.parseLocalSkillMetadata(name, workspace.readSkill(name).lineSequence().map { it.substringAfter(": ", it) }.joinToString("\n"))
+            com.labteto.dshmobile.local.tools.LocalInstalledSkill(name, metadata.description, metadata.modelInvocable)
+        }
+
     override suspend fun connectHttp(serverId: String, endpoint: String): String =
         plugins.connectMcpHttp(serverId, endpoint)
 

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
+import com.labteto.dshmobile.ui.theme.DsType
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -8,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextButton
@@ -34,15 +35,15 @@ internal fun JsonDisclosure(title: String, value: JsonElement, depth: Int = 0) {
             }
             DsTextButton(onClick = { clipboard.setText(AnnotatedString(value.toString())) }) { Text(stringResource(R.string.common_copy)) }
             when {
-                depth >= 8 -> SelectionContainer { Text(value.toString(), fontFamily = FontFamily.Monospace) }
+                depth >= 8 -> SelectionContainer { Text(value.toString(), fontFamily = DsType.codeFont) }
                 value is JsonObject -> value.forEach { (name, child) -> JsonDisclosure(name, child, depth + 1) }
                 value is JsonArray -> value.forEachIndexed { i, child -> JsonDisclosure(i.toString(), child, depth + 1) }
                 value is JsonPrimitive && value.isString -> {
                     val parsed = remember(value) { runCatching { Json.parseToJsonElement(value.content) }.getOrNull() }
                     if (parsed is JsonObject || parsed is JsonArray) JsonDisclosure("JSON", parsed, depth + 1)
-                    else SelectionContainer { Text(value.content, fontFamily = FontFamily.Monospace) }
+                    else SelectionContainer { Text(value.content, fontFamily = DsType.codeFont) }
                 }
-                else -> SelectionContainer { Text(value.toString(), fontFamily = FontFamily.Monospace) }
+                else -> SelectionContainer { Text(value.toString(), fontFamily = DsType.codeFont) }
             }
         }
     }

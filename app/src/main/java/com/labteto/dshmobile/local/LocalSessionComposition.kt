@@ -8,7 +8,7 @@ import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.memory.MemoryStore
-import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
+import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.runtime.MAX_HANDOFF_CHARS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -45,6 +45,7 @@ internal class LocalSessionComposition @Inject constructor(
     loader: LocalForegroundSessionLoader,
     wake: LocalForegroundTurnWakeCoordinator,
     memoryStore: MemoryStore,
+    projectContext: ProjectContextPort,
 ) : LocalSessionLifecyclePort {
     private val preferences = LocalHarnessPreferences.from(context)
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
@@ -107,7 +108,7 @@ internal class LocalSessionComposition @Inject constructor(
         startNextQueuedTurnIfIdle = wake::startNextIfIdle,
         sessionSummaries = loader::summaries,
         beforeEventLogsDeleted = sessionStorage.eventLogs::clearAndEvict,
-        localProjectId = LOCAL_PROJECT_ID,
+        activeProjectId = projectContext::activeProjectId,
     )
 
     override fun createSession(

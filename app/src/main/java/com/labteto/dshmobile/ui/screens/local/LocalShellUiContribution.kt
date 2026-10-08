@@ -32,6 +32,10 @@ internal fun localShellFeatureUiContribution(
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
+    composerHandoff: List<String>,
+    onUseWorkCapability: (String) -> Unit,
+    onConsumeComposerHandoff: () -> Unit,
+    onOpenDrawer: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
     val surface by state.collectAsStateWithLifecycle()
@@ -42,6 +46,10 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            composerHandoff = composerHandoff,
+            onUseWorkCapability = onUseWorkCapability,
+            onConsumeComposerHandoff = onConsumeComposerHandoff,
+            onOpenDrawer = onOpenDrawer,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
             streamingState = actions.streamingState,
@@ -68,11 +76,7 @@ internal fun localShellFeatureUiContribution(
             onStop = actions.stop,
             onNewSession = onNewSession,
             onExitGroupChat = actions.exitGroupChat,
-            onOpenWorkspace = { onPushFeature(LocalFeaturePage.WORKSPACE) },
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
-            onOpenTasks = { onPushFeature(LocalFeaturePage.TASKS) },
-            onOpenTools = { onPushFeature(LocalFeaturePage.TOOLS) },
-            onOpenPersonaGallery = { onPushFeature(LocalFeaturePage.PERSONA_GALLERY) },
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),

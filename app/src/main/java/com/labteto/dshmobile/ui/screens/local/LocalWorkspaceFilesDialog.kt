@@ -448,6 +448,9 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
             if (dark) R.drawable.ic_ui_filecode_dark else R.drawable.ic_ui_filecode_light
         "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" ->
             if (dark) R.drawable.ic_ui_fileimage_dark else R.drawable.ic_ui_fileimage_light
+        "pdf" -> if (dark) R.drawable.ic_ui_filepdf_dark else R.drawable.ic_ui_filepdf_light
+        "doc", "docx", "odt", "rtf" -> if (dark) R.drawable.ic_ui_fileword_dark else R.drawable.ic_ui_fileword_light
+        "xls", "xlsx", "ods", "csv" -> if (dark) R.drawable.ic_ui_fileexcel_dark else R.drawable.ic_ui_fileexcel_light
         else ->
             if (dark) R.drawable.ic_ui_filetxt_dark else R.drawable.ic_ui_filetxt_light
     }

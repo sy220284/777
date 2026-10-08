@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -73,6 +72,7 @@ import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.DsHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -80,7 +80,6 @@ import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -104,8 +103,13 @@ import kotlinx.coroutines.withContext
  */
 enum class SettingsDestination {
     ROOT,
+    ACCOUNT,
     SESSION,
     APPEARANCE,
+    APPEARANCE_THEME,
+    APPEARANCE_ACCENT,
+    APPEARANCE_READING,
+    APPEARANCE_BACKGROUND,
     CHAT,
     MODELS,
     MODEL_USAGE,
@@ -114,6 +118,8 @@ enum class SettingsDestination {
     USAGE_LOG,
     USAGE_DETAIL,
     MEMORY,
+    MEMORY_SETTINGS,
+    MEMORY_MANAGEMENT,
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
@@ -123,8 +129,9 @@ enum class SettingsDestination {
     DIAGNOSTICS,
 }
 
-private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
+internal fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
     SettingsDestination.ROOT -> null
+    SettingsDestination.ACCOUNT,
     SettingsDestination.SESSION,
     SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
@@ -133,6 +140,12 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
     SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.APPEARANCE_THEME,
+    SettingsDestination.APPEARANCE_ACCENT,
+    SettingsDestination.APPEARANCE_READING,
+    SettingsDestination.APPEARANCE_BACKGROUND -> SettingsDestination.APPEARANCE
+    SettingsDestination.MEMORY_SETTINGS,
+    SettingsDestination.MEMORY_MANAGEMENT -> SettingsDestination.MEMORY
     SettingsDestination.CHAT -> SettingsDestination.SESSION
     SettingsDestination.PRICING,
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
@@ -143,6 +156,9 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.SESSION_STORAGE,
     SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
 }
+
+internal fun SettingsDestination.navigationDepth(): Int =
+    parentDestination()?.let { it.navigationDepth() + 1 } ?: 0
 
 internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
     null -> emptyList()
@@ -226,6 +242,7 @@ fun SettingsScreen(
         }
     }
     var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var accountReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var usageDetailSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
         mutableStateOf<UsageDetailSelection?>(null)
     }
@@ -258,10 +275,11 @@ fun SettingsScreen(
             }
         }
     }
-    val scrollState = rememberScrollState()
 
     fun navigateBack() {
-        if (page == SettingsDestination.USAGE_DETAIL) {
+        if (page == SettingsDestination.ACCOUNT) {
+            page = accountReturnPage
+        } else if (page == SettingsDestination.USAGE_DETAIL) {
             if (usageDetailReturnPage == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
                 usageDetailSelection = usageDetailBackSelection
                 usageDetailBackSelection = null
@@ -279,8 +297,7 @@ fun SettingsScreen(
         viewModel.refreshRemoteSettings()
     }
     LaunchedEffect(page) {
-        scrollState.scrollTo(0)
-        if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
+        if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) viewModel.refreshMemories()
         if (page == SettingsDestination.SESSION_STORAGE) {
             localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
         }
@@ -295,8 +312,13 @@ fun SettingsScreen(
 
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
+        SettingsDestination.ACCOUNT -> stringResource(R.string.settings_account)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
+        SettingsDestination.APPEARANCE_THEME -> stringResource(R.string.settings_appearance)
+        SettingsDestination.APPEARANCE_ACCENT -> stringResource(R.string.settings_accent_theme)
+        SettingsDestination.APPEARANCE_READING -> stringResource(R.string.settings_reading_preferences)
+        SettingsDestination.APPEARANCE_BACKGROUND -> stringResource(R.string.settings_background_image)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
@@ -308,6 +330,8 @@ fun SettingsScreen(
             else -> stringResource(R.string.usage_group_detail)
         }
         SettingsDestination.MEMORY -> stringResource(R.string.settings_page_memory)
+        SettingsDestination.MEMORY_SETTINGS -> stringResource(R.string.advanced_memory_settings)
+        SettingsDestination.MEMORY_MANAGEMENT -> stringResource(R.string.advanced_manage_memory)
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
@@ -340,23 +364,28 @@ fun SettingsScreen(
                     },
                 )
 
+                DsHierarchyPage(
+                    page = page,
+                    pageKey = { it.name },
+                    depth = { it.navigationDepth() },
+                    modifier = Modifier.weight(1f),
+                ) { shownPage ->
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(scrollState)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = DsSpacing.comfortable),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
-                when (page) {
+                when (shownPage) {
                     SettingsDestination.ROOT -> {
                         // The main settings view is a calm navigation list.
                         // The first card contains frequently used destinations; details belong to subpages.
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Device,
-                                title = stringResource(R.string.settings_page_permissions),
-                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
-                                onClick = { page = SettingsDestination.PERMISSIONS },
+                                icon = FeatherIcons.User,
+                                title = stringResource(R.string.settings_account),
+                                onClick = { accountReturnPage = SettingsDestination.ROOT; page = SettingsDestination.ACCOUNT },
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
@@ -402,6 +431,13 @@ fun SettingsScreen(
                             )
                         }
 
+                        SettingsGroupTitle(stringResource(R.string.settings_group_system))
+                        AppSettingsSection {
+                            AppSettingsRow(icon = FeatherIcons.Shield,
+                                title = stringResource(R.string.settings_page_permissions),
+                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
+                                onClick = { page = SettingsDestination.PERMISSIONS })
+                        }
                         SettingsGroupTitle(stringResource(R.string.settings_group_maintenance))
                         AppSettingsSection {
                             AppSettingsRow(
@@ -428,7 +464,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.SESSION -> {
-                        SettingsCard(stringResource(R.string.chatlist_title), FeatherIcons.Clock) {
+                        SettingsCard(stringResource(R.string.chatlist_title)) {
                             ToggleRow(
                                 stringResource(R.string.chatlist_sort_updated),
                                 sessionSort == "updated",
@@ -453,39 +489,54 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Sliders) {
+                        AppSettingsSection {
+                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.settings_appearance),
+                                value = stringResource(when (settings.themePreference) {
+                                    "light" -> R.string.settings_appearance_light
+                                    "dark" -> R.string.settings_appearance_dark
+                                    "matte_black" -> R.string.settings_appearance_matte_black
+                                    else -> R.string.settings_appearance_system
+                                }), onClick = { page = SettingsDestination.APPEARANCE_THEME })
+                            AppSettingsDivider()
+                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.settings_accent_theme),
+                                onClick = { page = SettingsDestination.APPEARANCE_ACCENT })
+                            AppSettingsDivider()
+                            AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.settings_reading_preferences),
+                                value = stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
+                                onClick = { page = SettingsDestination.APPEARANCE_READING })
+                            AppSettingsDivider()
+                            AppSettingsRow(FeatherIcons.Image, stringResource(R.string.settings_background_image),
+                                onClick = { page = SettingsDestination.APPEARANCE_BACKGROUND })
+                        }
+                        SettingsCard(stringResource(R.string.settings_appearance_preview)) {
+                            AppearanceReadingPreview()
+                        }
+                    }
+                    SettingsDestination.APPEARANCE_THEME -> {
+                        SettingsCard(stringResource(R.string.settings_appearance)) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                        }
+                    }
+                    SettingsDestination.APPEARANCE_ACCENT -> {
+                        SettingsCard(stringResource(R.string.settings_accent_theme)) {
                             AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
                         }
-                        SettingsCard(stringResource(R.string.settings_reading_preferences), FeatherIcons.BookOpen) {
-                            ReadingPreferencesRow(
-                                settings = settings,
-                                onTextScaleChange = { value ->
-                                    viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) }
-                                },
-                                onTextWeightChange = { value ->
-                                    viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
-                                },
-                                onTransparencyChange = { value ->
-                                    viewModel.set {
-                                        it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f))
-                                    }
-                                },
+                    }
+                    SettingsDestination.APPEARANCE_READING -> {
+                        SettingsCard(stringResource(R.string.settings_reading_preferences)) {
+                            ReadingPreferencesRow(settings,
+                                onTextScaleChange = { value -> viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) } },
+                                onTextWeightChange = { value -> viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) } },
+                                onTransparencyChange = { value -> viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) } },
                             )
                         }
-                        SettingsCard(stringResource(R.string.settings_background_image), FeatherIcons.Sliders) {
-                            BackgroundRow(
-                                path = settings.backgroundImagePath,
-                                adaptiveContrast = settings.backgroundAdaptiveContrast,
-                                onAdaptiveContrastChange = { enabled ->
-                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
-                                },
-                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
-                                onClear = { viewModel.clearBackgroundImage() },
-                            )
-                        }
-                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.MessageCircle) {
-                            AppearanceReadingPreview()
+                        SettingsCard(stringResource(R.string.settings_appearance_preview)) { AppearanceReadingPreview() }
+                    }
+                    SettingsDestination.APPEARANCE_BACKGROUND -> {
+                        SettingsCard(stringResource(R.string.settings_background_image)) {
+                            BackgroundRow(settings.backgroundImagePath, settings.backgroundAdaptiveContrast,
+                                onAdaptiveContrastChange = { enabled -> viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) } },
+                                onPick = viewModel::setBackgroundImage, onClear = viewModel::clearBackgroundImage)
                         }
                     }
 
@@ -503,7 +554,7 @@ fun SettingsScreen(
                                 candidate !in customFilters &&
                                 customFilters.size < MAX_CUSTOM_CHAT_FILTERS
 
-                        SettingsCard(stringResource(R.string.settings_page_chat), FeatherIcons.Sliders) {
+                        SettingsCard(stringResource(R.string.settings_page_chat)) {
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
                                 localHarness.chatStyleGuardEnabled,
@@ -616,8 +667,12 @@ fun SettingsScreen(
                         }
                     }
 
+                    SettingsDestination.ACCOUNT -> {
+                        val account by viewModel.chatGptState.collectAsStateWithLifecycle()
+                        ChatGptAccountPanel(account, viewModel, toast.second)
+                    }
                     SettingsDestination.MODELS -> {
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second, onOpenAccount = { accountReturnPage = SettingsDestination.MODELS; page = SettingsDestination.ACCOUNT })
                         ModelServicesCard(modelServices, viewModel)
                     }
 
@@ -701,12 +756,24 @@ fun SettingsScreen(
 
                     SettingsDestination.MEMORY -> {
                         MemoryOverviewCard(localHarness, memories.size)
+                        AppSettingsSection {
+                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.advanced_memory_settings),
+                                onClick = { page = SettingsDestination.MEMORY_SETTINGS })
+                            AppSettingsDivider()
+                            AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.advanced_manage_memory),
+                                value = stringResource(R.string.advanced_memory_active_count, memories.size),
+                                onClick = { page = SettingsDestination.MEMORY_MANAGEMENT })
+                        }
+                    }
+                    SettingsDestination.MEMORY_SETTINGS -> {
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
+                    }
+                    SettingsDestination.MEMORY_MANAGEMENT -> {
                         MemoryManagementCard(memories, viewModel, toast.second)
                     }
 
                     SettingsDestination.PERMISSIONS -> {
-                        SettingsCard(stringResource(R.string.settings_approval_mode_title), FeatherIcons.Shield) {
+                        SettingsCard(stringResource(R.string.settings_approval_mode_title)) {
                             Text(
                                 stringResource(R.string.settings_approval_mode_subtitle),
                                 style = DsType.small13.withReadingWeight(),
@@ -738,7 +805,7 @@ fun SettingsScreen(
                                 color = colors.labelSecondary,
                             )
                         }
-                        SettingsCard(stringResource(R.string.settings_connection), FeatherIcons.GitBranch) {
+                        SettingsCard(stringResource(R.string.settings_connection)) {
                             ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
                             ToggleRow(
                                 stringResource(R.string.settings_background),
@@ -751,7 +818,7 @@ fun SettingsScreen(
 
                     SettingsDestination.NOTIFICATIONS -> {
                         // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
-                        SettingsCard(stringResource(R.string.settings_notifications_group_agent), FeatherIcons.Bell) {
+                        SettingsCard(stringResource(R.string.settings_notifications_group_agent)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_turn),
                                 settings.notifyTurnComplete,
@@ -768,7 +835,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_notifications_action_hint),
                             ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
                         }
-                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs), FeatherIcons.Bell) {
+                        SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
@@ -874,6 +941,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(DsSpacing.xlarge))
                 }
+                }
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
@@ -958,23 +1026,11 @@ private fun ChatFilterPhraseRow(
 @Composable
 internal fun SettingsCard(
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Column(Modifier.fillMaxWidth().animateContentSize(DsAnimations.expand)) {
-        Row(
-            Modifier.padding(
-                start = DsSpacing.small,
-                end = DsSpacing.small,
-                bottom = DsSpacing.small,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
-            Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-        }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        SettingsGroupTitle(title)
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,

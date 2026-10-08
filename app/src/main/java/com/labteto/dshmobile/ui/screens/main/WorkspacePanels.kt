@@ -327,7 +327,7 @@ private fun DocumentPreview(store: SessionStore, key: ComposerKey, tab: PreviewT
             }
             tab.text != null -> SelectionContainer(Modifier.weight(1f).verticalScroll(tab.scroll).padding(16.dp)) {
                 if (extension in setOf("md", "markdown")) MarkdownText(tab.text.orEmpty())
-                else Text(tab.text.orEmpty(), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                else Text(tab.text.orEmpty(), fontFamily = DsType.codeFont)
             }
         }
         if (!tab.eof && tab.text != null) DsTextButton(onClick = { load(true) }, enabled = !tab.busy) { Text(stringResource(R.string.panel_more)) }

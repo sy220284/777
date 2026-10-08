@@ -3,19 +3,30 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.R
 
 /**
- * DeepSeek Harness type scale (gradient-shadow-text.css):
- * sizes 11..24, system UI stack + mono code stack.
+ * Mobile type roles: page titles, body, supporting text and code have independent metrics.
+ * Reading preferences adjust weight without replacing the reference glyph families.
  */
 object DsType {
-    val uiFont = FontFamily.SansSerif
+    // Latin glyphs use the reference resource family; Android supplies missing CJK glyphs.
+    val uiFont = FontFamily(
+        Font(R.font.ui_latin_regular, FontWeight.Normal),
+        Font(R.font.ui_latin_medium, FontWeight.Medium),
+        Font(R.font.ui_latin_semibold, FontWeight.SemiBold),
+    )
     /** Android's CJK-aware serif family; centralised so a packaged subset can replace it later. */
     val titleFont = FontFamily.Serif
-    val codeFont = FontFamily.Monospace
+    val codeFont = FontFamily(
+        Font(R.font.code_mono_regular, FontWeight.Normal),
+        Font(R.font.code_mono_italic, FontWeight.Normal, FontStyle.Italic),
+    )
 
     // Markdown roles
     val mdH1 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 34.sp)
@@ -30,15 +41,15 @@ object DsType {
     // Clear Realm navigation hierarchy. General UI is sans-serif; serif stays literary-only.
     val largeTitle28 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 34.sp)
     val title22 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 30.sp)
-    val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
+    val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 24.sp)
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp)
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
-    val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 23.sp)
-    val std14Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 23.sp)
+    val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+    val std14Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
     val small13 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 21.sp)
     val small13Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp)
     val xsmall12 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp)
@@ -53,6 +64,7 @@ object DsType {
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp)
     val dockTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 24.sp)
+    val sectionTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp)
     val statsText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 20.sp)
 }
 

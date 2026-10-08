@@ -68,6 +68,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsBottomSheet
@@ -107,6 +108,43 @@ internal fun PersonaGallerySavePromptDialog(
         ),
         onDismiss = { if (!busy) onDismiss() },
         dismissEnabled = !busy,
+        scrollable = true,
+        footer = {
+            DsButton(
+                text = if (busy) {
+                    stringResource(R.string.persona_gallery_saving)
+                } else {
+                    stringResource(
+                        if (isUpdate) R.string.persona_gallery_save_update_enter
+                        else R.string.persona_gallery_save_enter,
+                    )
+                },
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onSaveCurrent()
+                            .onSuccess { onContinue() }
+                            .onFailure { error = it.message ?: saveFailedText }
+                        busy = false
+                    }
+                },
+                enabled = canSave && !busy,
+                modifier = Modifier.fillMaxWidth(),
+                size = DsButtonSize.Large,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_skip_save),
+                onClick = onContinue,
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+                size = DsButtonSize.Large,
+                enabled = !busy,
+            )
+            error?.let {
+                Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
+            }
+        },
     ) {
         PersonaHero(
             persona = persona,
@@ -123,38 +161,7 @@ internal fun PersonaGallerySavePromptDialog(
             style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
-        DsButton(
-            text = if (busy) {
-                stringResource(R.string.persona_gallery_saving)
-            } else {
-                stringResource(
-                    if (isUpdate) R.string.persona_gallery_save_update_enter
-                    else R.string.persona_gallery_save_enter,
-                )
-            },
-            onClick = {
-                busy = true
-                error = null
-                scope.launch {
-                    onSaveCurrent()
-                        .onSuccess { onContinue() }
-                        .onFailure { error = it.message ?: saveFailedText }
-                    busy = false
-                }
-            },
-            enabled = canSave && !busy,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        DsButton(
-            text = stringResource(R.string.persona_gallery_skip_save),
-            onClick = onContinue,
-            variant = DsButtonVariant.Ghost,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !busy,
-        )
-        error?.let {
-            Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
-        }
+
     }
 }
 

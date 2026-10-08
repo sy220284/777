@@ -143,6 +143,7 @@ private fun NavigationScreenshot() {
             onTogglePinSession = {},
             onWorkspaceFiles = {},
             onOpenRunCenter = {},
+            onProjects = {},
             groupMemberCount = 3,
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},

@@ -28,6 +28,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import com.labteto.dshmobile.ui.theme.DsMetrics
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -82,6 +84,7 @@ internal fun LocalModeDrawer(
     onRenameSession: (String, String) -> Boolean,
     onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
@@ -181,11 +184,12 @@ internal fun LocalModeDrawer(
     }
 
     ModalDrawerSheet(
+        drawerShape = androidx.compose.ui.graphics.RectangleShape,
         drawerContainerColor = colors.wallpaperSurface(
             WallpaperSurfaceLevel.DRAWER,
             base = colors.sidebar,
         ),
-        modifier = Modifier.fillMaxHeight().width(320.dp),
+        modifier = Modifier.fillMaxHeight().width(LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
@@ -212,6 +216,7 @@ internal fun LocalModeDrawer(
                         icon = FeatherIcons.Plus,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
+                        containerColor = colors.bgLayer1,
                         tint = colors.labelPrimary,
                     )
 
@@ -225,32 +230,7 @@ internal fun LocalModeDrawer(
 
 
 
-                DrawerContextCard(
-                    usageMode = usageMode,
-                    title = when {
-                        usageMode == LocalUsageMode.CHAT && groupChatEnabled ->
-                            stringResource(R.string.local_group_chat_title)
-                        usageMode == LocalUsageMode.CHAT ->
-                            currentPersonaName.ifBlank {
-                                stringResource(R.string.local_chat_no_persona)
-                            }
-                        else -> currentSessionTitle.ifBlank {
-                            stringResource(R.string.local_usage_work)
-                        }
-                    },
-                    subtitle = when {
-                        usageMode == LocalUsageMode.CHAT && groupChatEnabled ->
-                            stringResource(R.string.local_group_chat_member_count, groupMemberCount)
-                        usageMode == LocalUsageMode.CHAT ->
-                            currentStoryTitle ?: currentPersonaIdentity.takeIf(String::isNotBlank)
-                        running ->
-                            workModelLabel + " · " + stringResource(R.string.local_drawer_running)
-                        else -> workModelLabel
-                    },
-                    portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                    group = usageMode == LocalUsageMode.CHAT && groupChatEnabled,
-                    running = running,
-                )
+
 
             }
 
@@ -262,6 +242,27 @@ internal fun LocalModeDrawer(
                 contentPadding = PaddingValues(bottom = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
+                item(key = "drawer-feature-actions") {
+                    Column(
+                        modifier = Modifier.padding(top = DsSpacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        DrawerQuickActions(
+                            usageMode = usageMode,
+                            groupMemberCount = groupMemberCount,
+                            galleryCount = gallery.size,
+                            onOpenGroupChat = onOpenGroupChat,
+                            onOpenPersonaGallery = onOpenPersonaGallery,
+                            onOpenDiary = onOpenDiary,
+                            onTasks = onTasks,
+                            onWorkspaceFiles = onWorkspaceFiles,
+                            onProjects = onProjects,
+                            onOpenRunCenter = onOpenRunCenter,
+                            onTools = onTools,
+                        )
+                    }
+                }
+
                 if (sessionSections.pinned.isNotEmpty()) {
                     item(key = "drawer-pinned-heading") {
                         DrawerSectionTitle(
@@ -348,25 +349,7 @@ internal fun LocalModeDrawer(
                     }
                 }
 
-                item(key = "drawer-feature-actions") {
-                    Column(
-                        modifier = Modifier.padding(top = DsSpacing.medium),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                    ) {
-                        DrawerQuickActions(
-                            usageMode = usageMode,
-                            groupMemberCount = groupMemberCount,
-                            galleryCount = gallery.size,
-                            onOpenGroupChat = onOpenGroupChat,
-                            onOpenPersonaGallery = onOpenPersonaGallery,
-                            onOpenDiary = onOpenDiary,
-                            onTasks = onTasks,
-                            onWorkspaceFiles = onWorkspaceFiles,
-                            onOpenRunCenter = onOpenRunCenter,
-                            onTools = onTools,
-                        )
-                    }
-                }
+
             }
 
             Column(
@@ -460,11 +443,13 @@ internal fun LocalModeDrawer(
                             icon = FeatherIcons.Device,
                             contentDescription = stringResource(R.string.local_remote_control),
                             onClick = onRemote,
+                            containerColor = colors.bgLayer1,
                         )
                         DsIconButton(
                             icon = FeatherIcons.Sliders,
                             contentDescription = stringResource(R.string.settings_title),
                             onClick = onSettings,
+                            containerColor = colors.bgLayer1,
                         )
                     }
                 }

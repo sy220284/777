@@ -8,6 +8,7 @@ internal data class LocalWorkAgentUiResult(
 /** Narrow Work-owned actions surfaced to the Run Center UI. */
 internal interface LocalWorkAgentUiPort {
     suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult
+    suspend fun startResearchAgent(task: String): LocalWorkAgentUiResult
     suspend fun sendMessage(agentId: String, message: String): LocalWorkAgentUiResult
     suspend fun sendTeamMessage(memberId: String, message: String): LocalWorkAgentUiResult
     suspend fun stopTeamMember(memberId: String): LocalWorkAgentUiResult

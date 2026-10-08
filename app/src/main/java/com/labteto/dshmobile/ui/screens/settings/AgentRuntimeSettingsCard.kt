@@ -53,7 +53,7 @@ internal fun LocalAgentSettingsCard(
     val maximumLabel = stringResource(R.string.common_maximum)
     val reportSaved = { report(agentSavedMessage) }
 
-    SettingsCard(stringResource(R.string.advanced_agent_settings), FeatherIcons.Sliders) {
+    SettingsCard(stringResource(R.string.advanced_agent_settings)) {
         StepperRow(
             label = stringResource(R.string.advanced_main_steps),
             hint = stringResource(R.string.advanced_agent_limits_hint),

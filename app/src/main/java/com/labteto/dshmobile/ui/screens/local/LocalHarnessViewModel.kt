@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
+import com.labteto.dshmobile.local.presentation.LocalProjectUiFacade
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
 import com.labteto.dshmobile.local.presentation.projectWorkState
@@ -37,6 +38,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
+    private val projects: LocalProjectUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val state = runtime.state
@@ -46,6 +48,16 @@ class LocalHarnessViewModel @Inject constructor(
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
+    internal val projectCatalog = projects.catalog
+    internal val projectRecoveryNotice = projects.recoveryNotice
+    internal fun backupAndResetProjectCatalog() = projects.backupAndResetCatalog()
+    internal fun createProjectWorkSession() = runtime.session.createSession(
+        LocalConversationMode.PROJECT, LocalUsageMode.WORK,
+    )
+    internal fun createProject(name: String) = projects.create(name)
+    internal fun selectProject(id: String) = projects.select(id)
+    internal fun renameProject(id: String, name: String) = projects.rename(id, name)
+    internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,
@@ -202,10 +214,18 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+    fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
+    fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
     fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
     internal suspend fun startBackgroundAgent(task: String): LocalWorkUiActionResult {
         val result = runtime.work.startBackgroundAgentForUi(task)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
+    internal suspend fun startResearchAgent(task: String): LocalWorkUiActionResult {
+        val result = runtime.work.startResearchAgentForUi(task)
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
 

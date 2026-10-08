@@ -111,7 +111,7 @@ object Ds {
 object DsLight {
     // Paper canvas with white floating surfaces, matching the mobile-first hierarchy used
     // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF7F7F7)
+    val bgBase = Color(0xFFF5F5F5)
     val bgLayer1 = Color(0xFFFFFFFF)
     val bgLayer2 = Color(0xFFFFFFFF)
     val bgLayer3 = Color(0xFFFFFFFF)
@@ -119,7 +119,7 @@ object DsLight {
     val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
     val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
     val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
-    val brandPrimary = Ds.Bluish1000 // ink button fill
+    val brandPrimary = Color(0xFF191919) // ink button fill
     val onBrandPrimary = Color(0xFFFFFFFF)
     val labelPrimary = Color(0xFF121212)
     val labelSecondary = Color(0xFF353535)
@@ -163,7 +163,7 @@ object DsLight {
     val userBubble = Color(0xFFF5F5F5)
     val userBubbleHighlight = Color(0xFFEDEDED)
     val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF7F7F7)
+    val sidebar = Color(0xFFF5F5F5)
     val sidebarNavActive = Color(0xFFECECEC)
     val sidebarNavAccent = Ds.AccentBlue100
     val sidebarNavHover = Color(0xFFF1F1F1)

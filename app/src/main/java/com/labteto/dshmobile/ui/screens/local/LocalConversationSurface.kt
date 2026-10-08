@@ -18,6 +18,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -78,6 +83,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -94,7 +100,6 @@ import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -141,11 +146,7 @@ internal fun LocalConversationSurface(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
-    onOpenWorkspace: () -> Unit,
     onOpenRunCenter: () -> Unit,
-    onOpenTasks: () -> Unit,
-    onOpenTools: () -> Unit,
-    onOpenPersonaGallery: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -168,6 +169,10 @@ internal fun LocalConversationSurface(
     onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String, String) -> Unit,
     onCancelQuestion: (String) -> Unit,
+    composerHandoff: List<String> = emptyList(),
+    onConsumeComposerHandoff: () -> Unit = {},
+    onOpenDrawer: (() -> Unit)? = null,
+    onUseWorkCapability: ((String) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
@@ -181,6 +186,13 @@ internal fun LocalConversationSurface(
             restore = { saved -> LocalSessionDraftCache.restore(saved) },
         ),
     ) { LocalSessionDraftCache() }
+    LaunchedEffect(composerHandoff, state.sessionId) {
+        if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
+            val previous = drafts[state.sessionId].orEmpty()
+            drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
+            onConsumeComposerHandoff()
+        }
+    }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
@@ -280,6 +292,29 @@ internal fun LocalConversationSurface(
     val imageLimitMessage = stringResource(R.string.local_image_selection_limit, MAX_LOCAL_IMAGE_SELECTION)
     val imageImportFailedMessage = stringResource(R.string.local_image_import_failed)
     val fileImportFailedMessage = stringResource(R.string.local_file_import_failed)
+    val cameraFailedMessage = stringResource(R.string.composer_camera_failed)
+    val takePhoto = rememberLocalCameraCapture(
+        sessionId = state.sessionId,
+        onCaptured = { uri, release ->
+            scope.launch {
+                try {
+                    val imported = onImportAttachment(uri)
+                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
+                        LocalComposerAttachmentDecision.ACCEPT -> { attachments += imported; null }
+                        LocalComposerAttachmentDecision.DUPLICATE -> null
+                        LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    attachmentError = error.message ?: imageImportFailedMessage
+                } finally {
+                    release()
+                }
+            }
+        },
+        onFailure = { attachmentError = cameraFailedMessage },
+    )
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -370,59 +405,71 @@ internal fun LocalConversationSurface(
             Modifier.fillMaxWidth().background(topSurfaceColor)
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
-            if (state.usageMode == LocalUsageMode.CHAT) {
-                val hasSelectedPersona = !state.chatPersona.isUnboundChatPersona()
-                val personaDisplayName = if (hasSelectedPersona) {
-                    state.chatPersona.name
-                } else {
-                    stringResource(R.string.local_chat_no_persona)
-                }
-                val relationship = state.chatState.relationshipState.takeIf {
-                    hasSelectedPersona && it.isNotBlank()
-                }
-                val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
-                val contextSource = when (state.conversationMode) {
-                    LocalConversationMode.INDEPENDENT -> null
-                    else -> localConversationModeLabel(state.conversationMode)
-                }
-                ChatSurfaceHeader(
-                    personaName = personaDisplayName,
-                    portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                    secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
-                    groupEnabled = state.groupChat.enabled,
-                    groupMembers = state.groupChat.members,
-                    activeSpeakerName = state.groupActiveSpeakerName,
-                    running = state.running || state.loading,
-                    behaviorTuningCustomized = !state.chatState.behaviorTuning.isNatural(),
-                    onContextClick = {
-                        if (state.groupChat.enabled) showGroupMemberPicker = true
-                        else showPersonaPicker = true
-                    },
-                    onOpenCharacterTuning = { showCharacterTuning = true },
-                    onExitGroupChat = onExitGroupChat,
-                    onNewSession = onNewSession,
-                    sessionPinned = sessionPinned,
-                    onTogglePin = onTogglePinSession,
-                    onRenameSession = { renameSessionOpen = true },
-                    onDeleteSession = onDeleteSession,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onOpenDrawer != null) DsIconButton(
+                    icon = FeatherIcons.Menu,
+                    contentDescription = stringResource(R.string.app_open_navigation),
+                    onClick = onOpenDrawer,
+                    containerColor = colors.bgLayer1,
+                    tint = colors.labelPrimary,
                 )
-            } else {
-                WorkSurfaceHeader(
-                    sessionTitle = sessionTitle.takeIf(String::isNotBlank)
-                        ?: stringResource(R.string.local_usage_work),
-                    modelLabel = state.model,
-                    configured = state.configured,
-                    running = state.running,
-                    onModelClick = {
-                        if (state.configured) showModelPicker = true else onConfigure()
-                    },
-                    onOpenRunCenter = onOpenRunCenter,
-                    onNewSession = onNewSession,
-                    sessionPinned = sessionPinned,
-                    onTogglePin = onTogglePinSession,
-                    onRenameSession = { renameSessionOpen = true },
-                    onDeleteSession = onDeleteSession,
-                )
+                Column(Modifier.weight(1f)) {
+                    if (state.usageMode == LocalUsageMode.CHAT) {
+                        val hasSelectedPersona = !state.chatPersona.isUnboundChatPersona()
+                        val personaDisplayName = if (hasSelectedPersona) {
+                            state.chatPersona.name
+                        } else {
+                            stringResource(R.string.local_chat_no_persona)
+                        }
+                        val relationship = state.chatState.relationshipState.takeIf {
+                            hasSelectedPersona && it.isNotBlank()
+                        }
+                        val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
+                        val contextSource = when (state.conversationMode) {
+                            LocalConversationMode.INDEPENDENT -> null
+                            else -> localConversationModeLabel(state.conversationMode)
+                        }
+                        ChatSurfaceHeader(
+                            personaName = personaDisplayName,
+                            portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+                            secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
+                            groupEnabled = state.groupChat.enabled,
+                            groupMembers = state.groupChat.members,
+                            activeSpeakerName = state.groupActiveSpeakerName,
+                            running = state.running || state.loading,
+                            behaviorTuningCustomized = !state.chatState.behaviorTuning.isNatural(),
+                            tuningEnabled = hasSelectedPersona,
+                            onContextClick = {
+                                if (state.groupChat.enabled) showGroupMemberPicker = true
+                                else showPersonaPicker = true
+                            },
+                            onOpenCharacterTuning = { showCharacterTuning = true },
+                            onExitGroupChat = onExitGroupChat,
+                            onNewSession = onNewSession,
+                            sessionPinned = sessionPinned,
+                            onTogglePin = onTogglePinSession,
+                            onRenameSession = { renameSessionOpen = true },
+                            onDeleteSession = onDeleteSession,
+                        )
+                    } else {
+                        WorkSurfaceHeader(
+                            sessionTitle = sessionTitle.takeIf(String::isNotBlank)
+                                ?: stringResource(R.string.local_usage_work),
+                            modelLabel = state.model,
+                            configured = state.configured,
+                            running = state.running,
+                            onModelClick = {
+                                if (state.configured) showModelPicker = true else onConfigure()
+                            },
+                            onOpenRunCenter = onOpenRunCenter,
+                            onNewSession = onNewSession,
+                            sessionPinned = sessionPinned,
+                            onTogglePin = onTogglePinSession,
+                            onRenameSession = { renameSessionOpen = true },
+                            onDeleteSession = onDeleteSession,
+                        )
+                    }
+                }
             }
         }
 
@@ -559,7 +606,7 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
-                if (transcriptItems.isEmpty() && state.usageMode == LocalUsageMode.WORK) {
+                if (transcriptItems.isEmpty() && (state.usageMode == LocalUsageMode.WORK || (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
@@ -772,6 +819,14 @@ internal fun LocalConversationSurface(
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
+            attachmentMenuItems = listOf(
+                MenuItem(stringResource(R.string.composer_camera), FeatherIcons.Camera, onClick = {
+                    if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) attachmentError = imageLimitMessage
+                    else takePhoto()
+                }),
+                MenuItem(stringResource(R.string.local_attachment_image), FeatherIcons.Image, onClick = { imagePicker.launch(arrayOf("image/*")) }),
+                MenuItem(stringResource(R.string.local_attachment_file), FeatherIcons.Folder, onClick = { filePicker.launch(arrayOf("*/*")) }),
+            ),
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
             onConfigure = onConfigure,
@@ -990,118 +1045,84 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
+        val webPrompt = stringResource(R.string.composer_web_prompt)
         DsBottomSheet(
-            title = stringResource(R.string.local_composer_more_actions),
+            title = null,
             onDismiss = { showAttachmentPicker = false },
+            showDragHandle = false,
+            floating = true,
             scrollable = true,
         ) {
-            // The first row is a compact source picker; tools and work modes
-            // stay in a separate, full-width action list with clear hierarchy.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsQuickActionTile(
-                    icon = FeatherIcons.Image,
-                    label = stringResource(R.string.local_attachment_image),
-                    onClick = {
-                        showAttachmentPicker = false
-                        imagePicker.launch(arrayOf("image/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                DsQuickActionTile(
-                    icon = FeatherIcons.Paperclip,
-                    label = stringResource(R.string.local_attachment_file),
-                    onClick = {
-                        showAttachmentPicker = false
-                        filePicker.launch(arrayOf("*/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                if (state.usageMode == LocalUsageMode.CHAT) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                item {
                     DsQuickActionTile(
-                        icon = FeatherIcons.User,
-                        label = stringResource(R.string.local_persona_picker_title),
+                        icon = FeatherIcons.Camera,
+                        label = stringResource(R.string.composer_camera),
+                        modifier = Modifier.width(96.dp),
                         onClick = {
                             showAttachmentPicker = false
-                            if (state.groupChat.enabled) onOpenPersonaGallery()
-                            else showPersonaPicker = true
+                            if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) {
+                                attachmentError = imageLimitMessage
+                            } else takePhoto()
                         },
-                        modifier = Modifier.weight(1f),
                     )
+                }
+                item {
                     DsQuickActionTile(
-                        icon = FeatherIcons.Users,
-                        label = stringResource(R.string.local_group_chat_title),
-                        onClick = {
-                            showAttachmentPicker = false
-                            if (state.groupChat.enabled) showGroupMemberPicker = true
-                            else onNewSession()
-                        },
-                        modifier = Modifier.weight(1f),
+                        icon = FeatherIcons.Image,
+                        label = stringResource(R.string.local_attachment_image),
+                        modifier = Modifier.width(96.dp),
+                        onClick = { showAttachmentPicker = false; imagePicker.launch(arrayOf("image/*")) },
                     )
-                } else {
+                }
+                item {
                     DsQuickActionTile(
-                        icon = FeatherIcons.List,
-                        label = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
-                        onClick = {
-                            onPlanModeChange(!state.planMode)
-                            showAttachmentPicker = false
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    DsQuickActionTile(
-                        icon = FeatherIcons.Shield,
-                        label = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
-                        onClick = {
-                            showAttachmentPicker = false
-                            if (state.safeAutoApprovalEnabled) onDisableAutoApprove()
-                            else onAutoApprove()
-                        },
-                        modifier = Modifier.weight(1f),
+                        icon = FeatherIcons.Folder,
+                        label = stringResource(R.string.local_attachment_file),
+                        modifier = Modifier.width(96.dp),
+                        onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
                     )
                 }
             }
-
             DsSheetChoiceRow(
-                title = stringResource(R.string.tools_title),
-                subtitle = stringResource(R.string.tools_subtitle),
-                icon = FeatherIcons.Tool,
+                title = stringResource(R.string.composer_web),
+                trailingText = stringResource(R.string.composer_web_auto),
+                icon = FeatherIcons.Globe,
                 onClick = {
                     showAttachmentPicker = false
-                    onOpenTools()
+                    if (onUseWorkCapability != null) onUseWorkCapability(webPrompt)
+                    else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
-            DsSheetChoiceRow(
-                title = stringResource(if (state.usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title),
-                icon = FeatherIcons.Clock,
-                onClick = {
-                    showAttachmentPicker = false
-                    onOpenTasks()
-                },
-            )
+            if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_persona_picker_title),
+                    icon = FeatherIcons.User,
+                    onClick = {
+                        showAttachmentPicker = false
+                        showPersonaPicker = true
+                    },
+                )
+            }
             if (state.usageMode == LocalUsageMode.WORK) {
+                DsSheetChoiceRow(
+                    title = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
+                    icon = FeatherIcons.List,
+                    onClick = { onPlanModeChange(!state.planMode); showAttachmentPicker = false },
+                )
+                DsSheetChoiceRow(
+                    title = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
+                    icon = FeatherIcons.Shield,
+                    onClick = {
+                        showAttachmentPicker = false
+                        if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
+                    },
+                )
                 LocalAgentSwarmLaunchEntry(
                     selected = teamDispatchSelected,
                     onClick = {
                         teamDispatchSelected = !teamDispatchSelected
                         showAttachmentPicker = false
-                    },
-                )
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.chatlist_workspace_files),
-                    icon = FeatherIcons.List,
-                    onClick = {
-                        showAttachmentPicker = false
-                        onOpenWorkspace()
-                    },
-                )
-                DsSheetChoiceRow(
-                    title = stringResource(R.string.local_run_center),
-                    icon = FeatherIcons.Activity,
-                    onClick = {
-                        showAttachmentPicker = false
-                        onOpenRunCenter()
                     },
                 )
             }
@@ -1150,37 +1171,42 @@ private fun EmptyLocalHarness(onSuggestion: (String) -> Unit) {
     val filesPrompt = stringResource(R.string.local_prompt_files)
     val researchPrompt = stringResource(R.string.local_prompt_research)
     val tasksPrompt = stringResource(R.string.local_prompt_tasks)
+    var suggestionsOpen by remember { mutableStateOf(false) }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = DsSpacing.small, vertical = DsSpacing.xlarge),
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Text(stringResource(R.string.local_welcome_title), style = DsType.display24.withReadingWeight(), color = colors.labelPrimary)
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).background(
+                Brush.radialGradient(listOf(colors.accent.copy(alpha = 0.7f), colors.accent)),
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(stringResource(R.string.app_name).take(1), style = DsType.headline17.withReadingWeight(), color = colors.onAccent)
+        }
         Text(
-            stringResource(R.string.local_welcome_hint),
-            style = DsType.std14.withReadingWeight(),
-            color = colors.labelSecondary,
+            stringResource(R.string.local_welcome_title),
+            style = DsType.large20.withReadingWeight(),
+            color = colors.labelPrimary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.widthIn(max = 280.dp),
         )
-        Text(stringResource(R.string.local_suggestions_title), style = DsType.small13Strong.withReadingWeight(), color = colors.labelTertiary)
-        DsGroupCard {
-            DsCategoryRow(
-                icon = FeatherIcons.FileText,
-                title = stringResource(R.string.local_suggestion_files),
-                subtitle = stringResource(R.string.local_suggestion_files_hint),
-                onClick = { onSuggestion(filesPrompt) },
+        Box {
+            DsButton(
+                text = stringResource(R.string.local_suggestions_title),
+                icon = FeatherIcons.Sparkles,
+                variant = DsButtonVariant.Info,
+                onClick = { suggestionsOpen = true },
             )
-            DsCategoryRow(
-                icon = FeatherIcons.Globe,
-                title = stringResource(R.string.local_suggestion_research),
-                subtitle = stringResource(R.string.local_suggestion_research_hint),
-                onClick = { onSuggestion(researchPrompt) },
-            )
-            DsCategoryRow(
-                icon = FeatherIcons.CheckSquare,
-                title = stringResource(R.string.local_suggestion_tasks),
-                subtitle = stringResource(R.string.local_suggestion_tasks_hint),
-                onClick = { onSuggestion(tasksPrompt) },
+            DsPopupMenu(
+                expanded = suggestionsOpen,
+                onDismiss = { suggestionsOpen = false },
+                items = listOf(
+                    MenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
+                    MenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
+                    MenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
+                ),
             )
         }
     }
