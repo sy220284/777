@@ -813,14 +813,6 @@ internal fun LocalConversationSurface(
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
-            attachmentMenuItems = listOf(
-                MenuItem(stringResource(R.string.composer_camera), FeatherIcons.Camera, onClick = {
-                    if (attachments.count { it.mediaType.startsWith("image/") } >= MAX_LOCAL_IMAGE_SELECTION) attachmentError = imageLimitMessage
-                    else takePhoto()
-                }),
-                MenuItem(stringResource(R.string.local_attachment_image), FeatherIcons.Image, onClick = { imagePicker.launch(arrayOf("image/*")) }),
-                MenuItem(stringResource(R.string.local_attachment_file), FeatherIcons.Folder, onClick = { filePicker.launch(arrayOf("*/*")) }),
-            ),
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
             onConfigure = onConfigure,
