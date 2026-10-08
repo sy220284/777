@@ -35,7 +35,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         val claimed = awaitAutomationVisibleTurn(
             tryClaim = {
                 tryClaimAutomationVisibleTurn(
-                    handle, "chat", currentId, visible, false, pending, onClaimed = { claims++ },
+                    handle, "chat", { currentId }, { visible }, { false }, pending, onClaimed = { claims++ },
                 )
             },
             onBusy = {
@@ -58,18 +58,18 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         val owner = Job()
         assertEquals(
             AutomationVisibleClaim.DETACHED,
-            tryClaimAutomationVisibleTurn(handle, "chat", "chat", state(), true, owner),
+            tryClaimAutomationVisibleTurn(handle, "chat", { "chat" }, { state() }, { true }, owner),
         )
         assertEquals(
             AutomationVisibleClaim.DETACHED,
             tryClaimAutomationVisibleTurn(
-                handle, "chat", "chat", state().copy(usageMode = LocalUsageMode.WORK), false, owner,
+                handle, "chat", { "chat" }, { state().copy(usageMode = LocalUsageMode.WORK) }, { false }, owner,
             ),
         )
         handle.cancellationRequested = true
         assertEquals(
             AutomationVisibleClaim.DETACHED,
-            tryClaimAutomationVisibleTurn(handle, "chat", "chat", state(), false, owner),
+            tryClaimAutomationVisibleTurn(handle, "chat", { "chat" }, { state() }, { false }, owner),
         )
         assertNull(handle.job)
         owner.cancel()
@@ -85,7 +85,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         val claimed = awaitAutomationVisibleTurn(
             tryClaim = {
                 tryClaimAutomationVisibleTurn(
-                    handle, "chat", "chat", state(), false, pending, onClaimed = { claims++ },
+                    handle, "chat", { "chat" }, { state() }, { false }, pending, onClaimed = { claims++ },
                 )
             },
             onBusy = {
@@ -108,14 +108,14 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         var cleanups = 0
         assertFalse(
             releaseAutomationVisibleTurn(
-                handle, "chat", "chat", state(), stale, onReleased = { cleanups++ },
+                handle, "chat", { "chat" }, { state() }, stale, onReleased = { cleanups++ },
             ),
         )
         assertEquals(0, cleanups)
         assertSame(current, handle.job)
         assertTrue(
             releaseAutomationVisibleTurn(
-                handle, "chat", "chat", state(), current, onReleased = { cleanups++ },
+                handle, "chat", { "chat" }, { state() }, current, onReleased = { cleanups++ },
             ),
         )
         assertEquals(1, cleanups)
@@ -136,7 +136,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         var cleanups = 0
         assertFalse(
             releaseAutomationVisibleTurn(
-                handle, "chat", "new", state("new"), oldOwner,
+                handle, "chat", { "new" }, { state("new") }, oldOwner,
                 onReleased = { cleanups++ },
             ),
         )
@@ -152,7 +152,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         val failure = IllegalStateException("projection failure")
         val result = runCatching {
             tryClaimAutomationVisibleTurn(
-                handle, "chat", "chat", state(), false, owner,
+                handle, "chat", { "chat" }, { state() }, { false }, owner,
                 onClaimed = { throw failure },
             )
         }
@@ -178,7 +178,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
                 },
                 releaseVisibleTurn = { sessionId, releasedJob ->
                     releaseAutomationVisibleTurn(
-                        handle, sessionId, "chat", state(), releasedJob,
+                        handle, sessionId, { "chat" }, { state() }, releasedJob,
                         onReleased = { cleanups++ },
                     )
                 },
@@ -206,7 +206,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
                 acquireVisibleTurn = { _, _ -> throw failure },
                 releaseVisibleTurn = { id, job ->
                     releaseAutomationVisibleTurn(
-                        handle, id, "chat", state(), job,
+                        handle, id, { "chat" }, { state() }, job,
                         onReleased = { cleanups++ },
                     )
                 },
@@ -219,6 +219,69 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         attempted.cancel()
     }
 
+
+    @Test
+    fun sessionIdentityAndTransitionAreSampledWhileHoldingTheForegroundLock() {
+        val handle = handle()
+        val owner = Job()
+        var probes = 0
+        val claim = tryClaimAutomationVisibleTurn(
+            handle = handle,
+            targetSessionId = "chat",
+            currentSessionId = {
+                assertTrue(Thread.holdsLock(handle.lock))
+                probes++
+                "chat"
+            },
+            visibleState = {
+                assertTrue(Thread.holdsLock(handle.lock))
+                probes++
+                state()
+            },
+            transitioning = {
+                assertTrue(Thread.holdsLock(handle.lock))
+                probes++
+                true
+            },
+            automationJob = owner,
+        )
+        assertEquals(AutomationVisibleClaim.DETACHED, claim)
+        assertEquals(3, probes)
+        assertNull(handle.job)
+        owner.cancel()
+    }
+
+    @Test
+    fun releaseReadsLiveSessionIdentityUnderTheSameLock() {
+        val handle = handle()
+        val oldOwner = Job()
+        handle.job = oldOwner
+        var inspections = 0
+        var cleared = 0
+        assertFalse(
+            releaseAutomationVisibleTurn(
+                handle = handle,
+                targetSessionId = "chat",
+                currentSessionId = {
+                    assertTrue(Thread.holdsLock(handle.lock))
+                    inspections++
+                    "another"
+                },
+                visibleState = {
+                    assertTrue(Thread.holdsLock(handle.lock))
+                    inspections++
+                    state("another")
+                },
+                automationJob = oldOwner,
+                onReleased = { cleared++ },
+            ),
+        )
+        assertEquals(2, inspections)
+        assertEquals(0, cleared)
+        assertSame(oldOwner, handle.job)
+        oldOwner.cancel()
+    }
+
     @Test
     fun cancelledWaitDoesNotClaimOrReleaseAnotherOwner() = runBlocking {
         val handle = handle()
@@ -227,7 +290,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
         handle.job = existing
         val result = runCatching {
             awaitAutomationVisibleTurn(
-                tryClaim = { tryClaimAutomationVisibleTurn(handle, "chat", "chat", state(), false, pending) },
+                tryClaim = { tryClaimAutomationVisibleTurn(handle, "chat", { "chat" }, { state() }, { false }, pending) },
                 onBusy = { throw CancellationException("cancelled waiting") },
             )
         }

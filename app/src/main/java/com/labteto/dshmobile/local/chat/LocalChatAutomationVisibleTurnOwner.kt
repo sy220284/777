@@ -25,22 +25,24 @@ internal enum class AutomationVisibleClaim { CLAIMED, BUSY, DETACHED }
 internal fun tryClaimAutomationVisibleTurn(
     handle: LocalAgentRunHandle,
     targetSessionId: String,
-    currentSessionId: String,
-    visibleState: LocalHarnessState,
-    transitioning: Boolean,
+    currentSessionId: () -> String,
+    visibleState: () -> LocalHarnessState,
+    transitioning: () -> Boolean,
     automationJob: Job?,
     onClaimed: () -> Unit = {},
 ): AutomationVisibleClaim = synchronized(handle.lock) {
+    val currentId = currentSessionId()
+    val current = visibleState()
     if (
         automationJob?.isActive != true ||
         handle.sessionId != targetSessionId ||
-        currentSessionId != targetSessionId ||
-        visibleState.sessionId != targetSessionId ||
-        visibleState.usageMode != LocalUsageMode.CHAT ||
-        transitioning ||
+        currentId != targetSessionId ||
+        current.sessionId != targetSessionId ||
+        current.usageMode != LocalUsageMode.CHAT ||
+        transitioning() ||
         handle.cancellationRequested
     ) return@synchronized AutomationVisibleClaim.DETACHED
-    if (visibleState.loading || visibleState.kernel.running || handle.hasLiveJob()) {
+    if (current.loading || current.kernel.running || handle.hasLiveJob()) {
         return@synchronized AutomationVisibleClaim.BUSY
     }
     handle.job = automationJob
@@ -84,12 +86,12 @@ private fun isAutomationVisibleTurnOwner(
 internal fun releaseAutomationVisibleTurn(
     handle: LocalAgentRunHandle,
     targetSessionId: String,
-    currentSessionId: String,
-    visibleState: LocalHarnessState,
+    currentSessionId: () -> String,
+    visibleState: () -> LocalHarnessState,
     automationJob: Job?,
     onReleased: () -> Unit = {},
 ): Boolean = synchronized(handle.lock) {
-    if (!isAutomationVisibleTurnOwner(handle, targetSessionId, currentSessionId, visibleState, automationJob)) {
+    if (!isAutomationVisibleTurnOwner(handle, targetSessionId, currentSessionId(), visibleState(), automationJob)) {
         return@synchronized false
     }
     try {
@@ -121,9 +123,9 @@ internal class LocalChatAutomationVisibleTurnOwner @Inject constructor(
                         tryClaimAutomationVisibleTurn(
                             handle = handle,
                             targetSessionId = targetSessionId,
-                            currentSessionId = runtimeStateStore.currentSessionId,
-                            visibleState = runtimeStateStore.state.value,
-                            transitioning = runtimeStateStore.sessionTransitioning,
+                            currentSessionId = { runtimeStateStore.currentSessionId },
+                            visibleState = { runtimeStateStore.state.value },
+                            transitioning = { runtimeStateStore.sessionTransitioning },
                             automationJob = automationJob,
                             onClaimed = {
                                 runtimeStateStore.projection.setForegroundRunning(targetSessionId, true)
@@ -220,8 +222,8 @@ internal class LocalChatAutomationVisibleTurnOwner @Inject constructor(
         val released = releaseAutomationVisibleTurn(
             handle = runtimeStateStore.foregroundRunHandle,
             targetSessionId = targetSessionId,
-            currentSessionId = runtimeStateStore.currentSessionId,
-            visibleState = runtimeStateStore.state.value,
+            currentSessionId = { runtimeStateStore.currentSessionId },
+            visibleState = { runtimeStateStore.state.value },
             automationJob = automationJob,
             onReleased = {
                 runtimeStateStore.foregroundInteractions.cancelAll()
