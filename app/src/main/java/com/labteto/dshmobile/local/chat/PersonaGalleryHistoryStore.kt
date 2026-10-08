@@ -148,6 +148,44 @@ internal class PersonaGalleryHistoryStore(
         return true
     }
 
+    /**
+     * Idempotent recovery of durable metadata tombstones after a crash between the
+     * gallery write and the physical cold-archive rewrite.
+     */
+    @Synchronized
+    fun pruneExcluded(entryId: String, storyId: String, excluded: Set<String>): Int {
+        if (excluded.isEmpty()) return 0
+        val file = archiveFile(entryId, storyId)
+        repairTornTail(file)
+        if (!file.isFile) return 0
+        val temporary = File(file.parentFile, file.name + ".prune.tmp")
+        var removed = 0
+        try {
+            file.bufferedReader().use { input ->
+                temporary.bufferedWriter().use { output ->
+                    while (true) {
+                        val line = input.readLine() ?: break
+                        val message = decode(line)
+                            ?: error("人物历史归档含有无法解析的记录，拒绝覆盖原数据")
+                        if (galleryMessageArchiveKey(message) in excluded) {
+                            removed++
+                        } else {
+                            output.append(line)
+                            output.newLine()
+                        }
+                    }
+                }
+            }
+            if (removed > 0) {
+                rowCounts.remove(file.absolutePath)
+                replace(temporary, file)
+            }
+            return removed
+        } finally {
+            if (temporary.isFile) temporary.delete()
+        }
+    }
+
     @Synchronized
     fun deleteStory(entryId: String, storyId: String) {
         val file = archiveFile(entryId, storyId)

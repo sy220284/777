@@ -141,6 +141,39 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun interruptedPhysicalDeletionCompletesFromDurableTombstoneOnRestart() {
+        val root = temporary.newFolder("crash-after-gallery-tombstone")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val first = LocalHarnessMessage("m1", "user", "敏感历史", createdAt = 1L)
+        val second = LocalHarnessMessage("m2", "assistant", "保留历史", createdAt = 2L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(first, second), chatState = ChatCharacterState(), notes = "",
+        )
+        val entry = saved.entry
+        val storyId = checkNotNull(saved.storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        val updated = document.copy(entries = document.entries.map { item ->
+            if (item.id != entry.id) item else item.copy(
+                stories = item.stories.map { story ->
+                    if (story.id != storyId) story else story.copy(
+                        excludedMessageKeys = listOf(galleryMessageArchiveKey(first)),
+                    )
+                },
+            )
+        })
+        // Simulate a crash after the metadata transaction, before the archive rewrite.
+        file.writeText(json.encodeToString(GalleryDocument.serializer(), updated))
+        val recovered = ChatPersonaGalleryStore(file, json)
+        val page = recovered.loadStoryHistory(entry.id, storyId, 100)
+        assertEquals(listOf("m2"), page.messages.map { it.id })
+        assertEquals(1, page.totalCount)
+        val secondRestart = ChatPersonaGalleryStore(file, json)
+        assertEquals(listOf("m2"), secondRestart.loadStoryHistory(entry.id, storyId, 100).messages.map { it.id })
+    }
+
+    @Test
     fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
         val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
         val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
