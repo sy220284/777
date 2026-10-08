@@ -14,11 +14,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +41,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -102,7 +99,7 @@ internal fun nextWelcomePersonaIndex(current: Int, total: Int): Int =
 /** Dedicated welcome-screen artwork comes from the same catalog as the launch experience. */
 internal val welcomeMotionPersonas = hologramCharacterArtworks
 
-/** A restrained gallery preview: slow breathing, quiet crossfade and one discreet name label. */
+/** Pure artwork gallery with subtle movement: no visible text overlaps the image. */
 @Composable
 internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<PersonaGalleryEntry>) {
     var index by rememberSaveable { mutableStateOf(0) }
@@ -185,12 +182,6 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
                 )
             }
         }
-        Text(
-            text = stringResource(selection.nameRes),
-            color = Color.White.copy(alpha = 0.84f),
-            fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 15.dp),
-        )
     }
 }
 
