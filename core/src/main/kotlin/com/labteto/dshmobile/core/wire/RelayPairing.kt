@@ -65,6 +65,26 @@ object RelayPairing {
      */
     private const val CONNECT_MS = 8_000L
     private const val READ_MS = 12_000L
+    private const val MAX_PAIRING_RESPONSE_BYTES = 256 * 1024
+
+    private fun readPairingBody(body: okhttp3.ResponseBody?): String {
+        if (body == null) return ""
+        val input = body.byteStream()
+        val output = java.io.ByteArrayOutputStream(4 * 1024)
+        val buffer = ByteArray(4 * 1024)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            if (read == 0) continue
+            if (read > MAX_PAIRING_RESPONSE_BYTES - total) {
+                throw IOException("中继配对响应超过安全上限")
+            }
+            output.write(buffer, 0, read)
+            total += read
+        }
+        return String(output.toByteArray(), Charsets.UTF_8)
+    }
 
     /**
      * Read a scanned QR (or a pasted payload) as a pairing invitation.
@@ -237,15 +257,19 @@ object RelayPairing {
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    response.use { resp ->
-                        val answered = HttpOutcome.Answered(
-                            status = resp.code,
-                            body = resp.body?.string().orEmpty(),
-                            retryAfter = resp.header("Retry-After"),
-                            location = resp.header("Location"),
-                        )
-                        if (continuation.isActive) continuation.resume(answered)
+                    val outcome: HttpOutcome = try {
+                        response.use { resp ->
+                            HttpOutcome.Answered(
+                                status = resp.code,
+                                body = readPairingBody(resp.body),
+                                retryAfter = resp.header("Retry-After"),
+                                location = resp.header("Location"),
+                            )
+                        }
+                    } catch (error: IOException) {
+                        HttpOutcome.Failed(error)
                     }
+                    if (continuation.isActive) continuation.resume(outcome)
                 }
             })
         }

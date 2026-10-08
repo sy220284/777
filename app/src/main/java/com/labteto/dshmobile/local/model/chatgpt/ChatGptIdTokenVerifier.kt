@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
+import com.labteto.dshmobile.local.io.readBoundedBody
+
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.Signature
@@ -89,7 +91,7 @@ class ChatGptIdTokenVerifier @Inject constructor(
         val request = Request.Builder().url(CHATGPT_JWKS_URL).get().build()
         runInterruptible { http.newCall(request).execute() }.use { response ->
             require(response.isSuccessful) { "读取 OpenAI JWKS 失败（HTTP ${response.code}）" }
-            val body = response.body?.string().orEmpty()
+            val body = readBoundedBody(response.body, MAX_AUTH_RESPONSE_BYTES)
             json.parseToJsonElement(body).jsonObject
         }
     }
@@ -126,6 +128,7 @@ class ChatGptIdTokenVerifier @Inject constructor(
         }
 
     private companion object {
+        const val MAX_AUTH_RESPONSE_BYTES = 4 * 1024 * 1024
         const val CLOCK_SKEW_SECONDS = 60L
         const val JWKS_CACHE_MILLIS = 10 * 60_000L
     }

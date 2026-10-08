@@ -1,9 +1,37 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
+import com.labteto.dshmobile.local.io.NetworkInputTooLargeException
+import java.net.Socket
+import java.net.URI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertTrue
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChatGptOAuthCallbackServerTest {
+    @Test
+    fun rejectsOversizedSocketRequestBeforeMaterializingWholeLine() = runBlocking {
+        val listener = ChatGptOAuthCallbackServer().open()
+        try {
+            val waiting = async(Dispatchers.IO) {
+                runCatching { listener.await(5_000L) }.exceptionOrNull()
+            }
+            Socket("127.0.0.1", URI(listener.redirectUri).port).use { socket ->
+                val request = "GET /auth/callback?token=" + "x".repeat(32_768) + " HTTP/1.1\r\n\r\n"
+                runCatching {
+                    socket.getOutputStream().write(request.toByteArray(Charsets.UTF_8))
+                    socket.getOutputStream().flush()
+                }
+            }
+            assertTrue(waiting.await() is NetworkInputTooLargeException)
+        } finally {
+            listener.close()
+        }
+    }
+
     @Test
     fun parsesEncodedOAuthCallbackWithoutTreatingPlusAsLiteralSpace() {
         val params = ChatGptOAuthCallbackServer.parseQuery(

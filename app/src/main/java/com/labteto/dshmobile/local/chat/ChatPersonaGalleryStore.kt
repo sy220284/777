@@ -24,6 +24,27 @@ class ChatPersonaGalleryStore internal constructor(
         json,
     )
     private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
+    private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
+
+    private var excludedHistoryReconciled = false
+
+    private fun recoverDurableHistoryExclusions(document: GalleryDocument): GalleryDocument {
+        if (excludedHistoryReconciled) return document
+        val recovered = document.copy(
+            entries = document.entries.map { entry ->
+                entry.copy(stories = entry.stories.map { story ->
+                    if (story.excludedMessageKeys.isEmpty()) return@map story
+                    history.pruneExcluded(entry.id, story.id, story.excludedMessageKeys.toSet())
+                    val page = history.page(entry, story.id, PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES)
+                    story.copy(history = page.messages, historyTotalCount = page.totalCount)
+                })
+            },
+        )
+        if (recovered != document) documentStore.write(recovered)
+        excludedHistoryReconciled = true
+        return recovered
+    }
+
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
@@ -39,6 +60,7 @@ class ChatPersonaGalleryStore internal constructor(
         val restored = document.entries.filterNot { it.id == id }.toMutableList()
         previous?.let(restored::add)
         documentStore.write(document.copy(version = 5, entries = restored))
+        excludedHistoryReconciled = false
     }
 
     @Synchronized
@@ -296,6 +318,20 @@ class ChatPersonaGalleryStore internal constructor(
         val current = doc.entries.firstOrNull { it.id == id } ?: return 0
         val story = current.stories.firstOrNull { it.id == storyId } ?: return 0
         val now = System.currentTimeMillis()
+        // Persist the tombstone before changing physical history: an interruption is recoverable.
+        val protectedStory = story.copy(
+            excludedMessageKeys = mergePersonaLines(
+                story.excludedMessageKeys, keys.toList(), MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
+            ),
+            chatState = replacementChatState,
+            updatedAt = now,
+        )
+        val protectedEntry = current.copy(
+            stories = current.stories.map { if (it.id == storyId) protectedStory else it },
+            updatedAt = now,
+        )
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) protectedEntry else it }))
+        excludedHistoryReconciled = false
         val (updatedStory, removed) = history.exclude(
             entryId = id,
             story = story,
@@ -323,6 +359,34 @@ class ChatPersonaGalleryStore internal constructor(
         )
         documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
+    }
+
+    /**
+     * One document transaction for a group projection. Session remains the authoritative fact;
+     * a failed write leaves all members pending for the existing recovery path.
+     */
+    @Synchronized
+    internal fun updateGroupChatStates(states: List<Pair<String, ChatCharacterState>>): Set<String> {
+        if (states.isEmpty()) return emptySet()
+        val changes = states.toMap()
+        val document = readNormalized()
+        val found = linkedSetOf<String>()
+        val updated = document.entries.map { entry ->
+            val state = changes[entry.id] ?: return@map entry
+            found += entry.id
+            val merged = mergeChatState(
+                entry.groupChatState,
+                state.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
+            )
+            entry.copy(
+                groupChatState = merged,
+                updatedAt = maxOf(entry.updatedAt, System.currentTimeMillis(), merged.updatedAt),
+            )
+        }
+        if (found.isNotEmpty()) {
+            documentStore.write(document.copy(version = 5, entries = updated))
+        }
+        return found
     }
 
     @Synchronized
@@ -377,8 +441,10 @@ class ChatPersonaGalleryStore internal constructor(
     fun delete(id: String): Boolean {
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == id }))
-        history.deleteEntry(id)
+        val updated = doc.copy(version = 5, entries = doc.entries.filterNot { it.id == id })
+        archiveDeletionJournal.queue(id)
+        documentStore.write(updated)
+        archiveDeletionJournal.drain(updated, history)
         return true
     }
 
@@ -391,8 +457,10 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.filterNot { it.id == storyId },
             updatedAt = System.currentTimeMillis(),
         )
-        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
-        history.deleteStory(id, storyId)
+        val next = doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it })
+        archiveDeletionJournal.queue(id, storyId)
+        documentStore.write(next)
+        archiveDeletionJournal.drain(next, history)
         return true
     }
 
@@ -401,12 +469,26 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         val story = current.stories.firstOrNull { it.id == storyId } ?: return false
+        if (!history.containsMessage(id, storyId, messageKey)) return false
+        val now = System.currentTimeMillis()
+        val protectedStory = story.copy(
+            excludedMessageKeys = mergePersonaLines(
+                story.excludedMessageKeys, listOf(messageKey), MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
+            ),
+            updatedAt = now,
+        )
+        val protectedEntry = current.copy(
+            stories = current.stories.map { if (it.id == storyId) protectedStory else it },
+            updatedAt = now,
+        )
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) protectedEntry else it }))
+        excludedHistoryReconciled = false
         val updatedStory = history.deleteMessage(
             entryId = id,
-            story = story,
+            story = protectedStory,
             messageKey = messageKey,
-            updatedAt = System.currentTimeMillis(),
-        ) ?: return false
+            updatedAt = now,
+        ) ?: protectedStory
         val updated = current.copy(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
@@ -424,7 +506,9 @@ class ChatPersonaGalleryStore internal constructor(
         val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
-        return normalized
+        val recovered = recoverDurableHistoryExclusions(normalized)
+        archiveDeletionJournal.drain(recovered, history)
+        return recovered
     }
 
 

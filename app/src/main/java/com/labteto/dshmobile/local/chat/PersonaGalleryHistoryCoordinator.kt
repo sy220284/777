@@ -72,6 +72,9 @@ internal class PersonaGalleryHistoryCoordinator(
         ) to removed
     }
 
+    fun containsMessage(entryId: String, storyId: String, messageKey: String): Boolean =
+        store.containsMessage(entryId, storyId, messageKey)
+
     fun deleteMessage(
         entryId: String,
         story: PersonaGalleryStory,
@@ -113,6 +116,10 @@ internal class PersonaGalleryHistoryCoordinator(
             entry.copy(stories = entry.stories.map(::hot))
         },
     )
+
+    /** Replay durable message tombstones before exposing cold history after a restart. */
+    fun pruneExcluded(entryId: String, storyId: String, excluded: Set<String>): Int =
+        store.pruneExcluded(entryId, storyId, excluded)
 
     fun deleteEntry(entryId: String) = store.deleteEntry(entryId)
 

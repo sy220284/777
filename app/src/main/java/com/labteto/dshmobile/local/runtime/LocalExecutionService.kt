@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 class LocalExecutionService : Service() {
     @Inject lateinit var notifications: DshNotifications
     @Inject lateinit var hostsStore: HostsStore
+    @Inject lateinit var runtimeStateStore: LocalRuntimeStateStore
 
     private data class Hold(
         val key: String,
@@ -57,7 +58,17 @@ class LocalExecutionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // A startForegroundService call must be promoted immediately even when this intent ends up
         // removing the final hold. It is stopped again below when the active set becomes empty.
-        runCatching { startForeground(NOTIFICATION_ID, buildNotification(intent)) }
+        val promoted = runCatching { startForeground(NOTIFICATION_ID, buildNotification(intent)) }
+            .onFailure {
+                AppLog.error("LocalExecutionService", "前台执行服务提升失败", it)
+                runtimeStateStore.projection.publishError("前台任务保护启动失败，请保持应用在前台并检查系统限制")
+            }
+            .isSuccess
+        if (!promoted) {
+            dispatchedActive = false
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         when (intent?.action) {
             ACTION_TURN -> {
@@ -218,7 +229,7 @@ class LocalExecutionService : Service() {
             block: suspend () -> Unit,
         ) {
             val key = "turn:$sessionId:${java.util.UUID.randomUUID()}"
-            holdTurn(context, sessionId, key = key)
+            check(holdTurn(context, sessionId, key = key)) { "前台执行服务启动失败" }
             var outcome = OUTCOME_FAILED
             try {
                 block()
@@ -231,9 +242,8 @@ class LocalExecutionService : Service() {
             }
         }
 
-        fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId") {
-            dispatchedActive = true
-            dispatch(
+        fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId"): Boolean {
+            val submitted = dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_TURN)
@@ -242,6 +252,8 @@ class LocalExecutionService : Service() {
                     .putExtra(EXTRA_LABEL, context.getString(R.string.local_execution_notification_body))
                     .putExtra(EXTRA_STEP, step),
             )
+            if (submitted) dispatchedActive = true
+            return submitted
         }
 
         fun releaseTurn(context: Context, sessionId: String, outcome: String, key: String = "turn:$sessionId") {
@@ -259,8 +271,7 @@ class LocalExecutionService : Service() {
         fun syncJobs(context: Context, activeJobs: List<LocalJobInfo>): Boolean {
             val owned = activeJobs.filter { !it.ownerSessionId.isNullOrBlank() }
             if (owned.isEmpty() && !dispatchedActive) return true
-            if (owned.isNotEmpty()) dispatchedActive = true
-            return dispatch(
+            val submitted = dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_SYNC_JOBS)
@@ -271,6 +282,8 @@ class LocalExecutionService : Service() {
                         ArrayList(owned.map { it.ownerSessionId.orEmpty() }),
                     ),
             )
+            if (submitted && owned.isNotEmpty()) dispatchedActive = true
+            return submitted
         }
 
         private fun dispatch(context: Context, intent: Intent): Boolean =

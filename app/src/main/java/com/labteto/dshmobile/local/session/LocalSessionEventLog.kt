@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.io.readBoundedLine
+
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.session.SessionRepairResult
@@ -103,7 +105,7 @@ class LocalSessionEventLog(
                     else frozenInput).bufferedReader()
                     activeReader = reader
                     while (true) {
-                        val line = reader.readLine() ?: break
+                        val line = readBoundedLine(reader, MAX_DURABLE_EVENT_LINE_CHARS) ?: break
                         val event = runCatching {
                             json.decodeFromString(Event.serializer(), line)
                         }.getOrNull() ?: continue
@@ -197,5 +199,6 @@ class LocalSessionEventLog(
 
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
+        private const val MAX_DURABLE_EVENT_LINE_CHARS = 16 * 1024 * 1024
     }
 }

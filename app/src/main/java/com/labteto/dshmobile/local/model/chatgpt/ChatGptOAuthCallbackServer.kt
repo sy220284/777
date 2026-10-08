@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
+import com.labteto.dshmobile.local.io.readBoundedLine
+
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.InetAddress
@@ -45,7 +47,7 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
 
         private fun readCallback(socket: Socket): ChatGptOAuthCallback {
             val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
-            val requestLine = reader.readLine()?.take(MAX_REQUEST_LINE_CHARS)
+            val requestLine = readBoundedLine(reader, MAX_REQUEST_LINE_CHARS)
                 ?: error("ChatGPT OAuth 回调为空")
             val parts = requestLine.split(' ')
             require(parts.size >= 2 && parts[0] == "GET") { "ChatGPT OAuth 回调请求无效" }
@@ -65,8 +67,8 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
         }
 
         private fun writeCompletionPage(socket: Socket, success: Boolean) {
-            val title = if (success) "授权完成" else "授权未完成"
-            val body = if (success) "已返回神言神语，可以关闭此页面。" else "授权未完成，请返回神言神语查看详情。"
+            val title = if (success) "授权回调已接收" else "授权未完成"
+            val body = if (success) "请返回神言神语查看身份校验与连接结果。" else "授权未完成，请返回神言神语查看详情。"
             val html = "<!doctype html><meta charset=\"utf-8\"><title>$title</title>" +
                 "<body style=\"font-family:sans-serif;padding:32px\"><h2>$title</h2><p>$body</p></body>"
             val bytes = html.toByteArray(StandardCharsets.UTF_8)

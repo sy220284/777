@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.connection
 
+import com.labteto.dshmobile.observability.AppLog
+
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
@@ -526,9 +528,10 @@ class ConnectionManager @Inject constructor(
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                // Background keep-alive is best-effort; a settings read/service failure must not
-                // take down the already-established connection loop.
+            } catch (error: Exception) {
+                // A failed foreground service must not conceal loss of background protection.
+                AppLog.warn("ConnectionManager", "后台连接服务启动失败，改用周期恢复", error)
+                KeepAliveWorker.schedule(context)
             }
         }
     }

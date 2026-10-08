@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.io.readBoundedBody
+
 import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import android.content.Context
 import com.labteto.dshmobile.local.TokenPromptBreakdown
@@ -263,7 +265,7 @@ class DeepSeekPricingRepository @Inject constructor(
                 .build()
             val models = withCancellableHttpResponse(http.newCall(request)) { response ->
                 check(response.isSuccessful) { "官网返回 HTTP ${response.code}" }
-                val html = response.body?.string().orEmpty()
+                val html = readBoundedBody(response.body, MAX_PRICING_HTML_CHARS * 4)
                 check(html.isNotBlank()) { "官网价格页为空" }
                 check(html.length <= MAX_PRICING_HTML_CHARS) { "官网价格页异常过大" }
                 parseDeepSeekPricingPage(html)

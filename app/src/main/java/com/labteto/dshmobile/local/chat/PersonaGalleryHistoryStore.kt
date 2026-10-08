@@ -1,10 +1,13 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.io.readBoundedLine
+
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.util.LinkedHashMap
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -28,6 +31,16 @@ internal class PersonaGalleryHistoryStore(
 ) {
     init { root.mkdirs() }
 
+    private data class CountStamp(val modified: Long, val length: Long, val rows: Int)
+    private val rowCounts = object : LinkedHashMap<String, CountStamp>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CountStamp>?): Boolean =
+            size > 64
+    }
+
+    private fun rememberCount(file: File, count: Int) {
+        rowCounts[file.absolutePath] = CountStamp(file.lastModified(), file.length(), count)
+    }
+
     @Synchronized
     fun merge(
         entryId: String,
@@ -45,8 +58,9 @@ internal class PersonaGalleryHistoryStore(
         val known = linkedSetOf<String>()
         var total = 0
         if (file.isFile) {
-            file.useLines { lines ->
-                lines.forEach { line ->
+            file.bufferedReader().use { reader ->
+                while (true) {
+                    val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
                     decode(line)?.let { message ->
                         known += galleryMessageArchiveKey(message)
                         total++
@@ -69,6 +83,7 @@ internal class PersonaGalleryHistoryStore(
             FileOutputStream(file, true).use { it.fd.sync() }
             total += fresh.size
         }
+        rememberCount(file, total)
         return tailInternal(file, HOT_GALLERY_HISTORY_MESSAGES, knownTotal = total)
     }
 
@@ -100,9 +115,28 @@ internal class PersonaGalleryHistoryStore(
         repairTornTail(file)
         if (!file.isFile) return emptyList()
         return buildList {
-            file.useLines { lines ->
-                lines.forEach { line -> decode(line)?.let(::add) }
+            file.bufferedReader().use { reader ->
+                while (true) {
+                    val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
+                    decode(line)?.let(::add)
+                }
             }
+        }
+    }
+
+    /** Verify the key before committing a durable exclusion; missing keys must be no-ops. */
+    @Synchronized
+    fun containsMessage(entryId: String, storyId: String, messageKey: String): Boolean {
+        val file = archiveFile(entryId, storyId)
+        repairTornTail(file)
+        if (!file.isFile) return false
+        return file.bufferedReader().use { reader ->
+            while (true) {
+                val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
+                val message = decode(line) ?: continue
+                if (galleryMessageArchiveKey(message) == messageKey) return@use true
+            }
+            false
         }
     }
 
@@ -116,7 +150,7 @@ internal class PersonaGalleryHistoryStore(
         file.bufferedReader().use { input ->
             temporary.bufferedWriter().use { output ->
                 while (true) {
-                    val line = input.readLine() ?: break
+                    val line = readBoundedLine(input, MAX_ARCHIVE_LINE_BYTES) ?: break
                     val message = decode(line) ?: continue
                     if (!removed && galleryMessageArchiveKey(message) == messageKey) {
                         removed = true
@@ -131,13 +165,53 @@ internal class PersonaGalleryHistoryStore(
             temporary.delete()
             return false
         }
+        rowCounts.remove(file.absolutePath)
         replace(temporary, file)
         return true
+    }
+
+    /**
+     * Idempotent recovery of durable metadata tombstones after a crash between the
+     * gallery write and the physical cold-archive rewrite.
+     */
+    @Synchronized
+    fun pruneExcluded(entryId: String, storyId: String, excluded: Set<String>): Int {
+        if (excluded.isEmpty()) return 0
+        val file = archiveFile(entryId, storyId)
+        repairTornTail(file)
+        if (!file.isFile) return 0
+        val temporary = File(file.parentFile, file.name + ".prune.tmp")
+        var removed = 0
+        try {
+            file.bufferedReader().use { input ->
+                temporary.bufferedWriter().use { output ->
+                    while (true) {
+                        val line = readBoundedLine(input, MAX_ARCHIVE_LINE_BYTES) ?: break
+                        val message = decode(line)
+                            ?: error("人物历史归档含有无法解析的记录，拒绝覆盖原数据")
+                        if (galleryMessageArchiveKey(message) in excluded) {
+                            removed++
+                        } else {
+                            output.append(line)
+                            output.newLine()
+                        }
+                    }
+                }
+            }
+            if (removed > 0) {
+                rowCounts.remove(file.absolutePath)
+                replace(temporary, file)
+            }
+            return removed
+        } finally {
+            if (temporary.isFile) temporary.delete()
+        }
     }
 
     @Synchronized
     fun deleteStory(entryId: String, storyId: String) {
         val file = archiveFile(entryId, storyId)
+        rowCounts.remove(file.absolutePath)
         if (file.exists()) {
             check(file.delete()) { "人物故事冷归档无法删除：${file.path}" }
         }
@@ -152,6 +226,7 @@ internal class PersonaGalleryHistoryStore(
     fun deleteEntry(entryId: String) {
         val directory = entryDirectory(entryId)
         if (!directory.isDirectory) return
+        rowCounts.keys.removeAll { it.startsWith(directory.absolutePath + File.separator) }
         directory.walkBottomUp().forEach { target ->
             if (target.exists()) {
                 check(target.delete()) { "人物冷归档无法删除：${target.path}" }
@@ -195,6 +270,9 @@ internal class PersonaGalleryHistoryStore(
                     }
                 } else {
                     skipTrailingNewline = false
+                    if (reversed.size() >= MAX_ARCHIVE_LINE_BYTES) {
+                        error("人物冷归档单条消息超过安全上限")
+                    }
                     reversed.write(value)
                 }
             }
@@ -205,6 +283,11 @@ internal class PersonaGalleryHistoryStore(
     }
 
     private fun countRows(file: File): Int {
+        val length = file.length()
+        val modified = file.lastModified()
+        rowCounts[file.absolutePath]?.let { previous ->
+            if (previous.length == length && previous.modified == modified) return previous.rows
+        }
         var count = 0
         file.inputStream().buffered().use { input ->
             val buffer = ByteArray(16 * 1024)
@@ -222,6 +305,7 @@ internal class PersonaGalleryHistoryStore(
                 }
             }
         }
+        rememberCount(file, count)
         return count
     }
 
@@ -275,5 +359,6 @@ internal class PersonaGalleryHistoryStore(
     companion object {
         const val HOT_GALLERY_HISTORY_MESSAGES = 32
         const val MAX_HISTORY_PAGE = 2_000
+        private const val MAX_ARCHIVE_LINE_BYTES = 4 * 1024 * 1024
     }
 }
