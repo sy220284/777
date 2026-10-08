@@ -14,6 +14,7 @@ internal fun ContextComposer.composeWorkTurnContext(
     input: String,
     snapshot: LocalHarnessState,
     workspacePath: String,
+    projectInstructions: String = "",
 ): LocalWorkTurnPromptContext {
     val composed = composeParts(
         ContextRequest(
@@ -22,6 +23,7 @@ internal fun ContextComposer.composeWorkTurnContext(
             projectId = snapshot.projectId,
             lineageId = snapshot.lineageId,
             handoffSummary = snapshot.handoffSummary,
+            projectInstructions = projectInstructions,
         ),
     )
     return LocalWorkTurnPromptContext(
