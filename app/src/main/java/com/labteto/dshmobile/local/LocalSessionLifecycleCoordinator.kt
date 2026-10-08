@@ -72,7 +72,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val startNextQueuedTurnIfIdle: () -> Job?,
     private val sessionSummaries: () -> List<LocalSessionSummary>,
     private val beforeEventLogsDeleted: (Set<String>) -> Unit = {},
-    private val localProjectId: String,
+    private val activeProjectId: () -> String,
 ) {
     // Keep only the user's latest tap while a session is being persisted and restored.
     private val queuedUsageMode = AtomicReference<LocalUsageMode?>(null)
@@ -130,7 +130,7 @@ internal class LocalSessionLifecycleCoordinator(
                     }
                     val projectId = when (mode) {
                         LocalConversationMode.INDEPENDENT -> null
-                        LocalConversationMode.PROJECT -> sourceState.projectId ?: localProjectId
+                        LocalConversationMode.PROJECT -> activeProjectId()
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
                     val chatPlan = chatSessionLifecycle.prepareCreate(
