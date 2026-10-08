@@ -57,7 +57,14 @@ class LocalExecutionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // A startForegroundService call must be promoted immediately even when this intent ends up
         // removing the final hold. It is stopped again below when the active set becomes empty.
-        runCatching { startForeground(NOTIFICATION_ID, buildNotification(intent)) }
+        val promoted = runCatching { startForeground(NOTIFICATION_ID, buildNotification(intent)) }
+            .onFailure { AppLog.error("LocalExecutionService", "前台执行服务提升失败", it) }
+            .isSuccess
+        if (!promoted) {
+            dispatchedActive = false
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         when (intent?.action) {
             ACTION_TURN -> {
@@ -218,7 +225,7 @@ class LocalExecutionService : Service() {
             block: suspend () -> Unit,
         ) {
             val key = "turn:$sessionId:${java.util.UUID.randomUUID()}"
-            holdTurn(context, sessionId, key = key)
+            check(holdTurn(context, sessionId, key = key)) { "前台执行服务启动失败" }
             var outcome = OUTCOME_FAILED
             try {
                 block()
@@ -231,9 +238,9 @@ class LocalExecutionService : Service() {
             }
         }
 
-        fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId") {
+        fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId"): Boolean {
             dispatchedActive = true
-            dispatch(
+            return dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_TURN)

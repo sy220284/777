@@ -145,7 +145,7 @@ internal class LocalWorkAgentTurnExecutor(
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
             heldSession = foregroundSessionId
-            LocalExecutionService.holdTurn(context, foregroundSessionId)
+            check(LocalExecutionService.holdTurn(context, foregroundSessionId)) { "前台执行服务启动失败" }
             binding.state.update {
                 it.copy(
                     work = it.work.copy(
@@ -408,7 +408,7 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is AgentEvent.StepStarted -> {
                             activeStep = event.step
-                            LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)
+                            check(LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)) { "前台执行保护更新失败" }
                             activeToolCalls = emptyList()
                             completedToolCallIds.clear()
                             runEventLog.append("step/start", buildJsonObject {

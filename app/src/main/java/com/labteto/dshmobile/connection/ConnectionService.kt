@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.connection
 
+import com.labteto.dshmobile.observability.AppLog
+
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
@@ -42,6 +44,13 @@ class ConnectionService : Service() {
             scope.launch { connectionManager.restoreDesiredConnectionIfNeeded() }
         }
         return START_STICKY
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        // Android 15+ ends the dataSync foreground budget; stop within seconds.
+        AppLog.warn("ConnectionService", "后台连接前台服务达到系统时限，保留 WorkManager 定期恢复")
+        KeepAliveWorker.schedule(applicationContext)
+        stopSelf(startId)
     }
 
     override fun onDestroy() {
