@@ -1154,9 +1154,13 @@ internal fun LocalConversationSurface(
                 LocalComposerSheetSlider(
                     title = stringResource(R.string.local_composer_plan_title),
                     labels = listOf(stringResource(R.string.local_composer_plan_off), stringResource(R.string.local_composer_plan_start)),
-                    selectedIndex = if (state.planMode) 1 else 0,
+                    selectedIndex = if (state.planMode && state.pendingQuestion?.let(::localPlanReviewOf) == null) 1 else 0,
                     enabled = !state.running,
-                    hint = stringResource(R.string.local_composer_plan_tip),
+                    hint = stringResource(
+                        if (state.pendingQuestion?.let(::localPlanReviewOf) != null)
+                            R.string.local_composer_plan_waiting_approval
+                        else R.string.local_composer_plan_tip,
+                    ),
                     onSelect = { index -> if ((index == 1) != state.planMode) onPlanModeChange(index == 1) },
                 )
                 LocalComposerSheetSlider(
