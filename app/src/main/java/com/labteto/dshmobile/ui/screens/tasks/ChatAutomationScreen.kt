@@ -229,7 +229,8 @@ internal fun ChatAutomationScreen(
                             color = colors.labelSecondary,
                         )
                     }
-                    state.plannerSuggestions.isEmpty() -> item("suggestions-empty") {
+                    state.plannerSuggestions.isEmpty() &&
+                        state.plannerError != PlannerUiError.SUGGESTIONS_FAILED -> item("suggestions-empty") {
                         Text(
                             stringResource(R.string.tasks_chat_suggestions_empty),
                             modifier = Modifier.padding(horizontal = DsSpacing.large),
@@ -258,7 +259,7 @@ internal fun ChatAutomationScreen(
                     stringResource(it.messageRes()),
                     modifier = Modifier.padding(horizontal = DsSpacing.large),
                     style = DsType.small13.withReadingWeight(),
-                    color = colors.error,
+                    color = if (it == PlannerUiError.SUGGESTIONS_FAILED) colors.labelSecondary else colors.error,
                 )
             }
             DsConversationComposer {

@@ -10,6 +10,9 @@ import androidx.compose.foundation.verticalScroll
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -81,9 +84,17 @@ internal fun LocalProjectScreen(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DsButton(text = stringResource(R.string.local_project_back), onClick = onBack, variant = DsButtonVariant.Ghost)
-            Text(stringResource(R.string.local_project_management_title))
+            Text(
+                stringResource(R.string.local_project_management_title),
+                style = DsType.base16Strong.withReadingWeight(),
+                color = DsTheme.colors.labelPrimary,
+            )
         }
-        Text(stringResource(R.string.local_project_new_session_hint))
+        Text(
+            stringResource(R.string.local_project_new_session_hint),
+            style = DsType.small13.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+        )
         if (recovery != null) {
             Text(requireNotNull(recovery))
             DsButton(
@@ -103,6 +114,11 @@ internal fun LocalProjectScreen(
                     .onFailure { error = it.message }
             },
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            stringResource(R.string.local_project_select_hint),
+            style = DsType.std14Strong.withReadingWeight(),
+            color = DsTheme.colors.labelPrimary,
         )
         state.projects.forEach { project ->
             DsButton(
@@ -132,6 +148,11 @@ internal fun LocalProjectScreen(
             enabled = newName.isNotBlank(),
         )
         active?.let { project ->
+            Text(
+                stringResource(R.string.local_project_current_settings),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = DsTheme.colors.labelPrimary,
+            )
             DsTextField(
                 value = nameDraft,
                 onValueChange = { nameDraft = it.take(80) },
@@ -167,6 +188,8 @@ internal fun LocalProjectScreen(
                 enabled = instructionDraft != project.instructions,
             )
         }
-        error?.let { Text(it) }
+        error?.let {
+            Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
+        }
     }
 }

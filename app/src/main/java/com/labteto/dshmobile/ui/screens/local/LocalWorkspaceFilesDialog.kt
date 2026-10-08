@@ -354,6 +354,18 @@ private fun LocalFileList(
         file.path.removePrefix(prefix).takeIf { it.isNotEmpty() }?.substringBefore('/')
     }.distinct().sorted().toList()
     val filesByPath = files.associateBy(LocalWorkspaceFile::path)
+    var showInternalOnly by remember(directory, files) { mutableStateOf(false) }
+    if (directory.isEmpty() && children == listOf(".adsh") && !showInternalOnly) {
+        DsPageEmptyState(
+            icon = FeatherIcons.Folder,
+            title = stringResource(R.string.local_workspace_internal_only_title),
+            body = stringResource(R.string.local_workspace_internal_only_body),
+            actionText = stringResource(R.string.local_workspace_internal_only_show),
+            onAction = { showInternalOnly = true },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
     if (children.isEmpty()) {
         LocalFilesEmpty(
             title = stringResource(R.string.local_empty_workspace_title),

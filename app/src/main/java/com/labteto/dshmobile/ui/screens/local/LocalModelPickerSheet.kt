@@ -45,7 +45,10 @@ internal fun LocalModelPickerSheet(
         scrollable = true,
         footer = {
         DsButton(
-            text = stringResource(R.string.local_manage_model_config),
+            text = stringResource(
+                if (profiles.isEmpty()) R.string.local_model_picker_configure
+                else R.string.local_manage_model_config
+            ),
             onClick = {
                 onDismiss()
                 onConfigure()
@@ -55,7 +58,19 @@ internal fun LocalModelPickerSheet(
         )
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            if (profiles.isEmpty()) {
+                Text(
+                    stringResource(R.string.local_model_picker_empty_title),
+                    style = DsType.base16Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    stringResource(R.string.local_model_picker_empty_body),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
             profiles.forEach { profile ->
                 val selected = profile.id == activeProfileId
                 val detail = when {

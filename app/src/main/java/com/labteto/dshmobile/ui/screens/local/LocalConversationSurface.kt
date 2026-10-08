@@ -729,6 +729,41 @@ internal fun LocalConversationSurface(
             )
         }
 
+        if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(
+                    horizontal = DsSpacing.medium,
+                    vertical = DsSpacing.small,
+                ),
+                shape = DsShapes.row,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            ) {
+                Row(
+                    modifier = Modifier.padding(DsSpacing.medium),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.local_welcome_connect_title),
+                            style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        Text(
+                            stringResource(R.string.local_welcome_connect_body),
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.labelSecondary,
+                        )
+                    }
+                    DsButton(
+                        text = stringResource(R.string.local_welcome_connect_action),
+                        onClick = onConfigure,
+                        size = DsButtonSize.Small,
+                    )
+                }
+            }
+        }
+
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }
             ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
