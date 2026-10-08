@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
@@ -79,8 +78,8 @@ fun DsCategoryRow(
     titleTextStyle: TextStyle? = null,
 ) {
     val colors = DsTheme.colors
-    // Preserve full category titles beside their values at large accessibility font scales.
-    val compactWithValue = value != null && LocalDensity.current.fontScale >= 1.2f
+    // Keep metadata below the category title at every font scale and viewport width.
+    val compactWithValue = value != null
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
