@@ -51,7 +51,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -200,11 +199,6 @@ internal fun WorkProcessRow(
         return
     }
     val processStatus = workProcessStatus(nodes, running)
-    val processStatusLabel = stringResource(when (processStatus) {
-        DsStatus.Running -> R.string.agent_operation_status_running
-        DsStatus.Warning, DsStatus.Failed -> R.string.audit_attempt_failed
-        else -> R.string.agent_operation_status_done
-    })
     val processSurface = if (backgroundState.hasImage) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
@@ -235,9 +229,17 @@ internal fun WorkProcessRow(
             ?.div(1_000L)
     } else null
     val latestNode = workProcessFocus(semanticNodes)
-    val preview = if (latestNode.failed) {
-        stringResource(R.string.local_work_failed_stage, latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind)))
-    } else latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    val activeStage = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    val headerLabel = when {
+        processStatus == DsStatus.Warning || processStatus == DsStatus.Failed ->
+            stringResource(R.string.local_work_failed_stage, activeStage)
+        thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
+        messages.any { it.role == "reasoning" } ->
+            stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought)
+        running -> stringResource(R.string.local_work_process) + " · " +
+            stringResource(R.string.agent_operation_status_running)
+        else -> stringResource(R.string.local_work_process)
+    }
     val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
     val disclosureState = stringResource(
@@ -273,26 +275,23 @@ internal fun WorkProcessRow(
                 kind = latestNode.kind,
                 running = processStatus == DsStatus.Running && !latestNode.failed,
             )
-            Column(
+            Text(
+                headerLabel,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    stringResource(R.string.local_work_process) + " · " + processStatusLabel,
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    preview,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            DsPill(text = stringResource(R.string.local_work_process_stage_operations, semanticNodes.size, nodes.sumOf { it.count }))
+                style = DsType.small13.withReadingWeight(),
+                color = if (processStatus == DsStatus.Warning || processStatus == DsStatus.Failed) {
+                    colors.error
+                } else colors.labelSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(R.string.local_work_process_stage_operations,
+                    semanticNodes.size, nodes.sumOf { it.count }),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+                maxLines = 1,
+            )
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = stringResource(
@@ -305,27 +304,6 @@ internal fun WorkProcessRow(
             )
         }
 
-        if (messages.any { it.role == "reasoning" }) {
-            Row(
-                modifier = Modifier.padding(start = DsSpacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
-                Text(
-                    text = if (thinkingSeconds != null) {
-                        stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
-                    } else {
-                        stringResource(
-                            if (running && nodes.none { it.summary != null })
-                                R.string.local_work_thinking
-                            else R.string.local_work_thought,
-                        )
-                    },
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-            }
-        }
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),

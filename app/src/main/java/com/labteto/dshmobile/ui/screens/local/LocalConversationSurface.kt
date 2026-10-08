@@ -246,8 +246,13 @@ internal fun LocalConversationSurface(
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
     val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
+    val showStreamingTail = shouldShowWorkStreamingTail(
+        running = state.running,
+        usageMode = state.usageMode,
+        lastItem = transcriptItems.lastOrNull(),
+    )
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
-        (if (state.running) 1 else 0)
+        (if (showStreamingTail) 1 else 0)
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -702,7 +707,7 @@ internal fun LocalConversationSurface(
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
                     }
                 }
-                if (state.running) {
+                if (showStreamingTail) {
                     if (state.usageMode == LocalUsageMode.CHAT) {
                         item(key = "streaming:${state.sessionId}") {
                             LocalStreamingChatTurn(

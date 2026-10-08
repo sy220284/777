@@ -10,6 +10,16 @@ import org.junit.Test
 
 class LocalTranscriptPresentationTest {
     @Test
+    fun durableWorkFinalAnswerSuppressesTransientDuplicateTail() {
+        val answer = LocalTranscriptItem.Message(message("final", "assistant", "任务已完成"))
+        val progress = LocalTranscriptItem.WorkProcess(listOf(message("p1", "progress", "处理中")))
+        assertFalse(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.WORK, answer))
+        assertTrue(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.WORK, progress))
+        assertTrue(shouldShowWorkStreamingTail(true, com.labteto.dshmobile.local.LocalUsageMode.CHAT, answer))
+        assertFalse(shouldShowWorkStreamingTail(false, com.labteto.dshmobile.local.LocalUsageMode.WORK, progress))
+    }
+
+    @Test
     fun groupsCurrentWorkProcessAndLeavesFinalAnswerStandalone() {
         val items = buildLocalTranscript(
             listOf(
