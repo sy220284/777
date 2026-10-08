@@ -53,6 +53,6 @@ class LocalProjectRenameRegressionTest {
             assertEquals("新名称", catalog.value.projects.single().name)
             assertEquals("原项目规则", catalog.value.projects.single().instructions)
         }
-        compose.onNodeWithText("✓ 新名称").assertIsDisplayed()
+        compose.onNodeWithText("✓ 新名称").performScrollTo().assertIsDisplayed()
     }
 }
