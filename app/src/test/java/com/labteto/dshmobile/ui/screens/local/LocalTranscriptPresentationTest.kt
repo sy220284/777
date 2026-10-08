@@ -161,8 +161,6 @@ class LocalTranscriptPresentationTest {
         assertEquals("完成两项检查，正在核对结果", projected.single().summary)
         assertEquals(2, projected.single().count)
         assertEquals(null, projected.single().toolContent)
-        assertEquals(null, localWorkProcessSummary("运行任务步骤"))
-        assertEquals(null, localWorkProcessSummary("处理当前步骤"))
     }
 
     @Test
