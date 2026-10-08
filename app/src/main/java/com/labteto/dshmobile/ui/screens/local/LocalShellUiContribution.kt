@@ -32,6 +32,11 @@ internal fun localShellFeatureUiContribution(
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
+    composerHandoff: List<String>,
+    onConsumeComposerHandoff: () -> Unit,
+    onOpenPlugins: () -> Unit,
+    onOpenSkills: () -> Unit,
+    onOpenDrawer: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
     val surface by state.collectAsStateWithLifecycle()
@@ -42,6 +47,11 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            composerHandoff = composerHandoff,
+            onConsumeComposerHandoff = onConsumeComposerHandoff,
+            onOpenPlugins = onOpenPlugins,
+            onOpenSkills = onOpenSkills,
+            onOpenDrawer = onOpenDrawer,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
             streamingState = actions.streamingState,

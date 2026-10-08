@@ -176,13 +176,6 @@ internal fun DrawerQuickActions(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        var expanded by rememberSaveable(usageMode) { mutableStateOf(false) }
-        DrawerQuickAction(
-            icon = if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
-            title = stringResource(R.string.app_extended_capabilities),
-            onClick = { expanded = !expanded },
-        )
-        if (expanded) {
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
@@ -228,7 +221,6 @@ internal fun DrawerQuickActions(
                     onClick = onTools,
                 )
             }
-        }
     }
 }
 
@@ -257,7 +249,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -274,7 +266,7 @@ internal fun DrawerQuickAction(
             icon,
             contentDescription = null,
             tint = colors.labelSecondary,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(22.dp),
         )
         Text(
             title,
@@ -341,7 +333,7 @@ internal fun DrawerGlobalAction(
             FeatherIcons.ChevronRight,
             contentDescription = null,
             tint = colors.labelCaption,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -427,8 +419,8 @@ internal fun LocalSessionDrawerRow(
                     animateColorAsState(
                         targetValue = when {
                             selected -> colors.accentTertiary
-                            current -> colors.sidebarNavActive
-                            else -> Color.Transparent
+                            current -> colors.bgLayer1
+                            else -> colors.sidebar
                         },
                         animationSpec = DsAnimations.interactionColor,
                         label = "sessionRowBackground",
@@ -469,41 +461,7 @@ internal fun LocalSessionDrawerRow(
                     }
                 }
 
-                session.summaryPreview?.takeIf(String::isNotBlank)?.let { preview ->
-                    Text(
-                        preview,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelTertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                ) {
-                    Text(
-                        relativeTime(session.updatedAt),
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelCaption,
-                        maxLines = 1,
-                    )
-                    if (session.chatMode == LocalChatMode.GROUP.name) {
-                        DsPill(text = stringResource(R.string.local_group_chat_title))
-                    }
-                    if (running) {
-                        DsPill(
-                            text = stringResource(R.string.local_drawer_running),
-                            selected = true,
-                        )
-                    } else if (current) {
-                        DsPill(
-                            text = stringResource(R.string.local_current_session),
-                            selected = true,
-                        )
-                    }
-                }
             }
         }
         DsPopupMenu(

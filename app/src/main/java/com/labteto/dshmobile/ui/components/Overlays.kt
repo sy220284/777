@@ -328,7 +328,7 @@ fun DsPopupMenu(
                         Icon(
                             icon,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(22.dp),
                             tint = if (item.danger) colors.error else colors.labelSecondary,
                         )
                     }
@@ -338,7 +338,7 @@ fun DsPopupMenu(
                     item.onClick()
                 },
                 modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(DsShapes.row),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
             )
         }
     }

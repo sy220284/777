@@ -430,6 +430,20 @@ internal object FeatherIcons {
         }
     }
 
+    val ChevronLeft: ImageVector by lazy {
+        feather("ChevronLeft") {
+            moveTo(15f, 18f); lineTo(9f, 12f); lineTo(15f, 6f)
+        }
+    }
+
+    val Camera: ImageVector by lazy {
+        feather("Camera") {
+            moveTo(3f, 6f); lineTo(7f, 6f); lineTo(9f, 3f); lineTo(15f, 3f)
+            lineTo(17f, 6f); lineTo(21f, 6f); lineTo(21f, 20f); lineTo(3f, 20f); close()
+            circle(12f, 13f, 4f)
+        }
+    }
+
     /** `chevron-down` — compact selector disclosure. */
     val ChevronDown: ImageVector by lazy {
         feather("ChevronDown") {

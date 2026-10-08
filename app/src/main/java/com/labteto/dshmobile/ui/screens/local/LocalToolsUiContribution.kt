@@ -6,6 +6,9 @@ import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
 
 internal fun localToolsFeatureUiContribution(
+    startAtPlugins: Boolean,
+    startAtSkills: Boolean,
+    onUseCapability: (String) -> Unit,
     onTaskModeChange: (AutomationMode?) -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
@@ -26,6 +29,9 @@ internal fun localToolsFeatureUiContribution(
     check(page == LocalFeaturePage.TOOLS) { "Tools received non-TOOLS route: $page" }
     ToolsScreen(
         onClose = onPopFeature,
+        startAtPlugins = startAtPlugins,
+        startAtSkills = startAtSkills,
+        onUseCapability = onUseCapability,
         handleRootSystemBack = false,
         onOpenTasks = {
             onTaskModeChange(AutomationMode.WORK)

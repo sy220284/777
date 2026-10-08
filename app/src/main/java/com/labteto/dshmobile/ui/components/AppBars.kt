@@ -50,7 +50,7 @@ fun DsTopBar(
     onAction: (() -> Unit)? = null,
     largeTitle: Boolean = false,
     actionPainter: Painter? = null,
-    backIcon: ImageVector = FeatherIcons.ArrowLeft,
+    backIcon: ImageVector = FeatherIcons.ChevronLeft,
 ) {
     val colors = DsTheme.colors
     Box(
@@ -63,6 +63,8 @@ fun DsTopBar(
             contentDescription = backContentDescription,
             onClick = onBack,
             modifier = Modifier.align(Alignment.CenterStart),
+            containerColor = colors.bgLayer1,
+            iconSize = 24.dp,
             tint = colors.labelPrimary,
         )
         Column(
@@ -95,6 +97,8 @@ fun DsTopBar(
                 onClick = onAction,
                 enabled = actionEnabled,
                 modifier = Modifier.align(Alignment.CenterEnd),
+                containerColor = colors.bgLayer1,
+                iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )
         } else {

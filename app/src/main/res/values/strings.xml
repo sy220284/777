@@ -1677,5 +1677,32 @@
     <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
     <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
     <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
+    <string name="settings_account">账号</string>
+    <string name="tasks_create_chat_prompt">帮我创建一个定时任务。请先了解我的需求、执行时间和重复规则，确认后再创建。</string>
+    <string name="composer_camera">拍照</string>
+    <string name="composer_plugins">插件</string>
+    <string name="composer_plugins_hint">连接应用和数据，完成更多操作</string>
+    <string name="composer_skills_hint">复用专业能力，处理特定任务</string>
+    <string name="composer_web">联网搜索</string>
+    <string name="composer_web_auto">自动</string>
+    <string name="composer_web_prompt">请联网搜索，并提供来源： </string>
+    <string name="composer_camera_failed">拍照未完成，请重试或从照片中选择。</string>
+    <string name="plugin_use">使用</string>
+    <string name="plugin_use_prompt">请使用 %1$s（%2$s）帮我处理以下需求： </string>
+    <string name="plugin_category_work">效率与办公</string>
+    <string name="plugin_category_device">设备与自动化</string>
+    <string name="plugin_category_design">创意与图像</string>
+    <string name="plugin_terminal_hint">运行命令，处理本地文件</string>
+    <string name="plugin_code_hint">代码导航、诊断与分析</string>
+    <string name="plugin_device_hint">在授权范围内操作设备</string>
+    <string name="plugin_vision_hint">理解图片和屏幕内容</string>
+    <string name="plugin_automation_hint">安排任务与自动执行</string>
+    <string name="plugin_skills_hint">管理和使用本地专业技能</string>
+    <string name="plugin_external_hint">已连接的外部服务</string>
+    <string name="app_open_navigation">打开侧栏</string>
+    <string name="tasks_details">任务详情</string>
+    <string name="tasks_actions">任务操作</string>
+    <string name="skills_catalog_empty">暂无已安装技能</string>
+    <string name="skills_manual_only">此技能已关闭模型调用，请手动查看技能说明。</string>
 </resources>
 

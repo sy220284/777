@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
-import android.app.TimePickerDialog
-import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -563,7 +561,7 @@ private fun ChatAutomationPolicySheet(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    val context = LocalContext.current
+    var editingQuietStart by rememberSaveable(task.id) { mutableStateOf<Boolean?>(null) }
     val saveFailedMessage = stringResource(R.string.tasks_chat_policy_save_failed)
     var quietEnabled by remember(task.id) { mutableStateOf(task.quietHoursEnabled) }
     var quietStartMinute by remember(task.id) {
@@ -578,6 +576,17 @@ private fun ChatAutomationPolicySheet(
     var saveError by remember(task.id) { mutableStateOf<String?>(null) }
     val gapOptions = listOf(60L, 120L, 240L, 360L, 720L, 1_440L)
 
+    if (editingQuietStart != null) {
+        AutomationTimePickerSheet(
+            initialMinuteOfDay = if (editingQuietStart == true) quietStartMinute else quietEndMinute,
+            onPicked = {
+                if (editingQuietStart == true) quietStartMinute = it else quietEndMinute = it
+                editingQuietStart = null
+            },
+            onDismiss = { editingQuietStart = null },
+        )
+        return
+    }
     DsBottomSheet(
         title = stringResource(R.string.tasks_chat_policy_title),
         subtitle = stringResource(R.string.tasks_chat_policy_subtitle),
@@ -627,9 +636,7 @@ private fun ChatAutomationPolicySheet(
                         formatMinute(quietStartMinute),
                     ),
                     onClick = {
-                        showAutomationTimePicker(context, quietStartMinute) {
-                            quietStartMinute = it
-                        }
+                        editingQuietStart = true
                     },
                     modifier = Modifier.weight(1f),
                     variant = DsButtonVariant.Outline,
@@ -641,9 +648,7 @@ private fun ChatAutomationPolicySheet(
                         formatMinute(quietEndMinute),
                     ),
                     onClick = {
-                        showAutomationTimePicker(context, quietEndMinute) {
-                            quietEndMinute = it
-                        }
+                        editingQuietStart = false
                     },
                     modifier = Modifier.weight(1f),
                     variant = DsButtonVariant.Outline,
@@ -779,19 +784,6 @@ private fun ChatAutomationPolicySheet(
     }
 }
 
-private fun showAutomationTimePicker(
-    context: Context,
-    initialMinuteOfDay: Int,
-    onPicked: (Int) -> Unit,
-) {
-    TimePickerDialog(
-        context,
-        { _, hour, minute -> onPicked(hour * 60 + minute) },
-        initialMinuteOfDay / 60,
-        initialMinuteOfDay % 60,
-        AndroidDateFormat.is24HourFormat(context),
-    ).show()
-}
 
 @Composable
 private fun ChatAutomationVisualStatus.label(): String = stringResource(

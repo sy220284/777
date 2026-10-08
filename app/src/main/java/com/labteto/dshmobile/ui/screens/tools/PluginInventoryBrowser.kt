@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.labteto.dshmobile.ui.components.DsSearchField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -32,7 +36,8 @@ import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsFilterChip
+import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -48,16 +53,24 @@ private data class InventoryRow(
     val name: String,
     val detail: String,
     val remote: Boolean,
+    val icon: ImageVector = FeatherIcons.Globe,
+    val available: Boolean = true,
 )
 
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
+    skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
+    skillsOnly: Boolean = false,
+    loading: Boolean = false,
+    error: String? = null,
+    onRetry: (() -> Unit)? = null,
     remote: PluginInventorySnapshot?,
     onBack: () -> Unit,
     onManageConnections: () -> Unit,
     onReturnToChat: () -> Unit,
+    onUseCapability: ((String) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
@@ -75,7 +88,16 @@ internal fun PluginInventoryBrowser(
             "android-automation", "android-webhook" -> stringResource(R.string.tools_capability_automation)
             else -> id
         }
-        InventoryRow("local:$id", label, installedStatus, remote = false)
+        val (hint, icon) = when (id) {
+            "local-builtin" -> R.string.plugin_skills_hint to FeatherIcons.BookOpen
+            "android-runtime" -> R.string.plugin_terminal_hint to FeatherIcons.Terminal
+            "local-language-server" -> R.string.plugin_code_hint to FeatherIcons.Code
+            "android-device" -> R.string.plugin_device_hint to FeatherIcons.Device
+            "local-vision" -> R.string.plugin_vision_hint to FeatherIcons.Image
+            "android-automation", "android-webhook" -> R.string.plugin_automation_hint to FeatherIcons.Clock
+            else -> R.string.plugin_external_hint to FeatherIcons.Tool
+        }
+        InventoryRow("local:$id", label, stringResource(hint), remote = false, icon = icon)
     }
     val connected = remote?.entries.orEmpty().map { plugin ->
         val status = when {
@@ -89,60 +111,69 @@ internal fun PluginInventoryBrowser(
             plugin.moduleName,
             status,
             remote = true,
+            available = plugin.enabled && plugin.fiberPhase != PluginFiberPhase.FAILED,
         )
     }
-    val list = (if (selectedCategory == 0) local else connected)
-        .filter { item ->
+    val installedSkills = skills.map { skill ->
+        InventoryRow("skill:${skill.name}", skill.name, skill.description, remote = false, icon = FeatherIcons.BookOpen, available = skill.modelInvocable)
+    }
+    val list = (if (skillsOnly) installedSkills else when (selectedCategory) {
+        1 -> connected
+        2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
+        3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
+        4 -> local.filter { it.id == "local:local-vision" }
+        else -> local
+    }).filter { item ->
             query.isBlank() || item.name.contains(query.trim(), ignoreCase = true) ||
                 item.id.contains(query.trim(), ignoreCase = true)
         }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
-        Column(Modifier.fillMaxSize().padding(top = DsSpacing.medium)) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = DsSpacing.medium)) {
             DsTopBar(
-                title = stringResource(R.string.tools_catalog_title),
+                title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
                 modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
             )
-            DsTextField(
+            DsSearchField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
-                singleLine = true,
-                leadingIcon = {
-                    Icon(FeatherIcons.Search, contentDescription = null)
-                },
-                placeholder = { Text(stringResource(R.string.tools_catalog_search)) },
+                modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                placeholder = stringResource(R.string.tools_catalog_search),
             )
-            Row(
-                modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
+            if (!skillsOnly) LazyRow(
+                contentPadding = PaddingValues(horizontal = DsSpacing.comfortable),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
-                DsPill(
-                    text = stringResource(R.string.tools_catalog_installed),
-                    selected = selectedCategory == 0,
-                    onClick = { selectedCategory = 0 },
-                )
-                DsPill(
-                    text = stringResource(R.string.tools_catalog_connections),
-                    selected = selectedCategory == 1,
-                    onClick = { selectedCategory = 1 },
-                )
+                items(5) { category ->
+                    DsFilterChip(
+                        text = when (category) {
+                            1 -> connectionStatus
+                            2 -> stringResource(R.string.plugin_category_work)
+                            3 -> stringResource(R.string.plugin_category_device)
+                            4 -> stringResource(R.string.plugin_category_design)
+                            else -> installedStatus
+                        },
+                        selected = selectedCategory == category,
+                        onClick = { selectedCategory = category },
+                    )
+                }
             }
-            if (list.isEmpty()) {
+            if (loading || error != null || list.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(DsSpacing.xlarge),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        stringResource(R.string.tools_catalog_empty),
+                        error ?: stringResource(if (loading) R.string.common_loading else if (skillsOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
                         style = DsType.std14.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
-                    if (selectedCategory == 1) {
+                    if (error != null && onRetry != null) {
+                        DsButton(text = stringResource(R.string.common_retry), onClick = onRetry)
+                    } else if (!loading && !skillsOnly && selectedCategory == 1) {
                         DsButton(
                             text = stringResource(R.string.tools_external_services),
                             variant = DsButtonVariant.Info,
@@ -173,10 +204,10 @@ internal fun PluginInventoryBrowser(
                                     shape = DsShapes.row,
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.ic_ui_plugin),
+                                        imageVector = item.icon,
                                         contentDescription = null,
                                         tint = colors.labelSecondary,
-                                        modifier = Modifier.padding(DsSpacing.medium).size(24.dp),
+                                        modifier = Modifier.padding(8.dp).size(24.dp),
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {
@@ -193,10 +224,15 @@ internal fun PluginInventoryBrowser(
                                         style = DsType.small13.withReadingWeight(),
                                     )
                                 }
+                                val usePrompt = stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                                 DsButton(
-                                    text = stringResource(R.string.tools_catalog_details),
+                                    text = stringResource(if (onUseCapability != null && item.available) R.string.plugin_use else R.string.tools_catalog_details),
                                     variant = DsButtonVariant.Info,
-                                    onClick = { selectedRow = item },
+                                    size = DsButtonSize.Small,
+                                    onClick = {
+                                        if (onUseCapability != null && item.available) onUseCapability(usePrompt)
+                                        else selectedRow = item
+                                    },
                                 )
                             }
                         }
@@ -220,15 +256,21 @@ internal fun PluginInventoryBrowser(
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
+            if (item.id.startsWith("skill:") && !item.available) {
+                Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
+            }
+            val usePrompt = stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
             DsButton(
                 text = stringResource(
-                    if (item.remote) R.string.tools_external_services
+                    if (onUseCapability != null && item.available) R.string.plugin_use
+                    else if (item.remote) R.string.tools_external_services
                     else R.string.tools_catalog_return_chat,
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     selectedRow = null
-                    if (item.remote) onManageConnections() else onReturnToChat()
+                    if (onUseCapability != null && item.available) onUseCapability(usePrompt)
+                    else if (item.remote) onManageConnections() else onReturnToChat()
                 },
             )
         }

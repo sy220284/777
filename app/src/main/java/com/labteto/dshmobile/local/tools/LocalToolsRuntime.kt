@@ -15,6 +15,8 @@ class LocalToolsRuntime @Inject internal constructor(
     internal suspend fun configureGitHub(token: String) = githubCredentials.configure(token)
     internal suspend fun clearGitHub() = githubCredentials.clear()
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
+    internal suspend fun installedSkills(): List<LocalInstalledSkill> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installedSkills() }
     internal suspend fun connectHttp(serverId: String, endpoint: String): String =
         management.connectHttp(serverId, endpoint)
     internal suspend fun connectStdio(

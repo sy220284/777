@@ -53,8 +53,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import com.labteto.dshmobile.ui.theme.DsMetrics
 import androidx.compose.ui.graphics.Color
+import com.labteto.dshmobile.ui.theme.DsShapes
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -107,8 +112,6 @@ import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsMetrics
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -172,6 +175,9 @@ fun LocalHarnessScreen(
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
+    var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
+    var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
@@ -300,6 +306,11 @@ fun LocalHarnessScreen(
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
             onNewSession = { showNewSessionMode = true },
+            onOpenDrawer = { scope.launch { drawerState.open() } },
+            composerHandoff = composerHandoff,
+            onConsumeComposerHandoff = { composerHandoff = emptyList() },
+            onOpenPlugins = { toolsStartAtSkills = false; toolsStartAtPlugins = true; pushFeature(LocalFeaturePage.TOOLS) },
+            onOpenSkills = { toolsStartAtSkills = true; toolsStartAtPlugins = false; pushFeature(LocalFeaturePage.TOOLS) },
         ),
         localChatFeatureUiContribution(
             gallery = gallery,
@@ -327,6 +338,11 @@ fun LocalHarnessScreen(
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
+            onCreateViaChat = { prompt ->
+                composerHandoff = listOf(shell.sessionId, prompt)
+                taskMode = null
+                resetFeatureNavigation()
+            },
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
             onResetNavigation = ::resetFeatureNavigation,
@@ -335,10 +351,18 @@ fun LocalHarnessScreen(
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
         localToolsFeatureUiContribution(
+            startAtPlugins = toolsStartAtPlugins,
+            startAtSkills = toolsStartAtSkills,
+            onUseCapability = { prompt ->
+                composerHandoff = listOf(shell.sessionId, prompt)
+                toolsStartAtPlugins = false
+                toolsStartAtSkills = false
+                resetFeatureNavigation()
+            },
             onTaskModeChange = { taskMode = it },
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
-            onPopFeature = ::popFeature,
+            onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
@@ -469,8 +493,11 @@ fun LocalHarnessScreen(
         }
     }
 
+    val drawerWidth = LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
+    val drawerWidthPx = with(LocalDensity.current) { drawerWidth.toPx() }
     ModalNavigationDrawer(
         drawerState = drawerState,
+        scrimColor = Color.Transparent,
         drawerContent = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
@@ -527,7 +554,14 @@ fun LocalHarnessScreen(
         LocalFeatureAnimatedHost(
             stack = featureStack,
             predictiveBackProgress = predictiveBackProgress.value,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                val offset = drawerState.currentOffset
+                translationX = if (offset.isNaN()) 0f else (drawerWidthPx + offset).coerceIn(0f, drawerWidthPx)
+                if (translationX > 0f) {
+                    shape = DsShapes.dialog
+                    clip = true
+                }
+            },
         ) { renderedPage ->
             featureStateHolder.SaveableStateProvider(renderedPage.name) {
                 LocalFeaturePageContent(renderedPage, featureContributions)

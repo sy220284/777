@@ -11,6 +11,8 @@ data class LocalWebhookUiState(
     val tokenHint: String? = null,
 )
 
+data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean)
+
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
 class LocalToolsUiFacade @Inject constructor(
@@ -22,6 +24,9 @@ class LocalToolsUiFacade @Inject constructor(
     internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
     internal suspend fun clearGitHub() = tools.clearGitHub()
     internal fun installedPluginIds() = tools.installedPluginIds()
+    internal suspend fun installedSkills() = tools.installedSkills().map {
+        LocalSkillUiEntry(it.name, it.description, it.modelInvocable)
+    }
     internal suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
     internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)

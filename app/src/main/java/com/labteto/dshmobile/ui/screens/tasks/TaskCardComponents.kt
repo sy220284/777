@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
@@ -47,6 +45,10 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -116,6 +118,7 @@ internal fun TaskCard(
 ) {
     val colors = DsTheme.colors
     var confirmDelete by remember(task.id) { mutableStateOf(false) }
+    var actionsOpen by remember(task.id) { mutableStateOf(false) }
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.scheduleType) {
@@ -191,12 +194,27 @@ internal fun TaskCard(
                     color = colors.labelTertiary,
                 )
             }
-            DsButton(
-                text = stringResource(R.string.tasks_cancel),
-                onClick = { confirmDelete = true },
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
-            )
+            Box {
+                DsIconButton(
+                    icon = FeatherIcons.MoreVertical,
+                    contentDescription = stringResource(R.string.tasks_actions),
+                    onClick = { actionsOpen = true },
+                )
+                DsPopupMenu(
+                    expanded = actionsOpen,
+                    onDismiss = { actionsOpen = false },
+                    items = listOf(
+                        MenuItem(stringResource(R.string.tasks_edit), FeatherIcons.Edit3, onClick = onEdit),
+                        MenuItem(stringResource(R.string.tasks_try_now), FeatherIcons.Activity, onClick = onRunNow),
+                        MenuItem(
+                            stringResource(if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause),
+                            FeatherIcons.Clock,
+                            onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
+                        ),
+                        MenuItem(stringResource(R.string.tasks_delete_confirm), FeatherIcons.Trash2, danger = true, onClick = { confirmDelete = true }),
+                    ),
+                )
+            }
         }
 
         Row(
@@ -243,7 +261,7 @@ internal fun TaskCard(
                 color = colors.labelTertiary,
             )
             val timelineItems = mutableListOf<DsTimelineItem>()
-            for (receipt in task.runReceipts.takeLast(3).asReversed()) {
+            for (receipt in task.runReceipts.asReversed()) {
                 timelineItems += DsTimelineItem(
                     text = stringResource(
                         R.string.tasks_run_history_item,
@@ -382,4 +400,28 @@ private fun taskStatusLabel(status: AutomationStatus): String = when (status) {
     AutomationStatus.WAITING_USER -> stringResource(R.string.tasks_status_waiting_user)
     AutomationStatus.CANCELLED -> stringResource(R.string.local_execution_notification_cancelled)
     AutomationStatus.SKIPPED -> stringResource(R.string.tasks_run_skipped)
+}
+
+@Composable
+internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
+    val colors = DsTheme.colors
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+    ) {
+        Row(
+            modifier = Modifier.padding(DsSpacing.comfortable),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary, maxLines = 2)
+                Text(formatTime(task.nextRunAt), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
+                DsStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
+            }
+            androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.labelTertiary)
+        }
+    }
 }
