@@ -23,6 +23,16 @@ import androidx.compose.ui.unit.dp
  */
 internal object FeatherIcons {
 
+    /** A compact speedometer representing selectable reasoning effort. */
+    val Gauge: ImageVector by lazy {
+        feather("Gauge") {
+            moveTo(4f, 18f)
+            arcTo(9f, 9f, 0f, true, true, 20f, 18f)
+            moveTo(12f, 16f); lineTo(17f, 10f)
+            circle(12f, 16f, 1f)
+        }
+    }
+
     val CreditCard: ImageVector by lazy {
         feather("CreditCard") {
             rectangle(2f, 4f, 20f, 16f)
