@@ -67,12 +67,12 @@ class LocalToolExecutionCoordinatorTest {
             register(tool(
                 name = "web_search", access = ToolAccess.NETWORK,
                 approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络", keywords = setOf("网页读取"), keywords = setOf("联网"),
+                family = "网络", keywords = setOf("联网"),
             ) { ToolResult("ok") })
             register(tool(
                 name = "web_fetch", access = ToolAccess.NETWORK,
                 approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络",
+                family = "网络", keywords = setOf("网页读取"),
             ) { ToolResult("ok") })
             register(tool(
                 name = "write", access = ToolAccess.WORKSPACE_WRITE,
