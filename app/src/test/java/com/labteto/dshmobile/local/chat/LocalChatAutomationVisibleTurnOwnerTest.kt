@@ -265,7 +265,7 @@ class LocalChatAutomationVisibleTurnOwnerTest {
                 currentSessionId = {
                     assertTrue(Thread.holdsLock(handle.lock))
                     inspections++
-                    "another"
+                    "chat"
                 },
                 visibleState = {
                     assertTrue(Thread.holdsLock(handle.lock))
