@@ -30,6 +30,35 @@ class LocalWorkArtifactProjectionTest {
         assertEquals("reports/one.md", artifacts.single().reference)
     }
 
+    @Test fun unsafeWorkspaceReferencesCannotBePresentedAsRealArtifacts() {
+        val artifacts = projectLocalWorkArtifacts(listOf(
+            event(1, """C:\Users\private.txt"""),
+            event(2, """nested\..\escape.md"""),
+            event(3, "reports//empty.md"),
+            event(4, "./unverified.md"),
+            event(5, "reports/valid.md"),
+        ))
+        assertEquals(listOf("reports/valid.md"), artifacts.map { it.reference })
+    }
+
+    @Test fun malformedOrCredentialedLinksAreRejected() {
+        fun link(seq: Long, url: String) = LocalSessionEventLog.Event(
+            sequence = seq, type = "tool/result", createdAt = seq,
+            data = buildJsonObject {
+                put("id", "call-$seq")
+                put("url", url)
+                put("is_error", false)
+            },
+        )
+        val artifacts = projectLocalWorkArtifacts(listOf(
+            link(1, "https:///missing-host"),
+            link(2, "https://alice:password@example.com/private"),
+            link(3, "javascript:alert(1)"),
+            link(4, "https://example.org/report"),
+        ))
+        assertEquals(listOf("https://example.org/report"), artifacts.map { it.reference })
+    }
+
     @Test fun declarationsCannotPretendToBeResults() {
         val declaration = event(9, "unconfirmed.md").copy(type = "tool/call")
         assertTrue(projectLocalWorkArtifacts(listOf(declaration)).isEmpty())

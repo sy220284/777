@@ -25,8 +25,8 @@ internal fun projectLocalWorkArtifacts(
         val verified = verifiedLocalWorkspaceResultPath(data)?.let { listOf(it to "file") }.orEmpty()
         for ((raw, kind) in declared + verified) {
             if (raw.length !in 1..480) continue
-            if (kind == "file" && (raw.startsWith("/") || raw.split('/').any { it == ".." })) continue
-            if (kind == "link" && !(raw.startsWith("https://") || raw.startsWith("http://"))) continue
+            if (kind == "file" && !isSafeLocalArtifactPath(raw)) continue
+            if (kind == "link" && !isSafeArtifactUrl(raw)) continue
             if (kind == "revision" && !raw.matches(Regex("[a-fA-F0-9]{7,64}"))) continue
             results[raw] = LocalArtifactUiItem(
                 reference = raw,
@@ -55,3 +55,21 @@ private fun verifiedLocalWorkspaceResultPath(data: JsonObject): String? {
     }
     return path?.trim()?.takeIf(String::isNotBlank)
 }
+
+/** Tool result metadata is untrusted: never display absolute or parent paths as workspace files. */
+private fun isSafeLocalArtifactPath(path: String): Boolean =
+    path.isNotBlank() &&
+        !path.startsWith("/") &&
+        !path.contains('\\') &&
+        !path.contains(':') &&
+        path.none { it.code < 0x20 || it.code == 0x7f } &&
+        path.split('/').all { it.isNotEmpty() && it != "." && it != ".." }
+
+/** An artifact link needs a real HTTP(S) authority and must not expose embedded credentials. */
+private fun isSafeArtifactUrl(raw: String): Boolean = runCatching {
+    val uri = java.net.URI(raw)
+    uri.scheme?.lowercase() in setOf("http", "https") &&
+        !uri.host.isNullOrBlank() &&
+        uri.userInfo == null &&
+        raw.none { it.code < 0x20 || it.code == 0x7f }
+}.getOrDefault(false)
