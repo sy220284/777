@@ -96,6 +96,7 @@ internal data class LocalWorkFeatureUiActions(
     val backgroundJobOutput: (String) -> String,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val toolActivitiesForUi: (String) -> List<LocalToolActivityUiItem>,
+    val eventSequenceForUi: (String) -> Long,
     val stopBackgroundJob: (String) -> String,
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,

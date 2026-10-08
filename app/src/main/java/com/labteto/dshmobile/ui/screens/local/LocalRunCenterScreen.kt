@@ -40,6 +40,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -61,6 +62,7 @@ internal fun LocalRunCenterScreen(
     onJobOutput: (String) -> String,
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
     onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
+    onEventSequence: (String) -> Long = { 0L },
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
@@ -77,12 +79,24 @@ internal fun LocalRunCenterScreen(
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
     var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
+    // Bounded, visible-only refresh reads the single Session EventLog cursor, including tool
+    // state changes that leave WorkState unchanged. No duplicate persistent event stream.
     LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos) {
-        val (recentArtifacts, recentTools) = withContext(Dispatchers.IO) {
-            onArtifacts(state.sessionId) to onToolActivities(state.sessionId)
+        var lastSequence = Long.MIN_VALUE
+        while (true) {
+            val (sequence, recent) = withContext(Dispatchers.IO) {
+                val seq = onEventSequence(state.sessionId)
+                seq to if (seq != lastSequence) {
+                    onArtifacts(state.sessionId) to onToolActivities(state.sessionId)
+                } else null
+            }
+            if (recent != null) {
+                artifacts = recent.first
+                toolActivities = recent.second
+                lastSequence = sequence
+            }
+            delay(750)
         }
-        artifacts = recentArtifacts
-        toolActivities = recentTools
     }
 
     Surface(

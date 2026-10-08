@@ -39,6 +39,10 @@ class LocalWorkRuntime @Inject internal constructor(
         return projectLocalWorkArtifacts(eventLogs.get(sessionId).pageBeforeChronological(limit = 384))
     }
 
+    /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
+    internal fun eventSequenceForUi(sessionId: String): Long =
+        if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L
+
     internal fun toolActivitiesForUi(sessionId: String): List<LocalToolActivityUiItem> {
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
         return toolActivity.snapshot(eventLogs.get(sessionId)).state.activities.takeLast(32).map { activity ->
