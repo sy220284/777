@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -59,10 +60,23 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
 }
 
 @Composable
-internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
+internal fun LocalPersonaHeaderAvatar(
+    name: String,
+    portraitPath: String,
+    presetAssetPath: String? = null,
+) {
     val colors = DsTheme.colors
-    val portrait by produceState<ImageBitmap?>(null, portraitPath) {
-        value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(portraitPath, maxEdgePx = 256) }
+    val context = LocalContext.current
+    val portrait by produceState<ImageBitmap?>(null, portraitPath, presetAssetPath) {
+        value = withContext(Dispatchers.IO) {
+            if (portraitPath.isNotBlank()) {
+                decodePersonaPortraitBitmap(portraitPath, maxEdgePx = 256)
+            } else {
+                presetAssetPath?.let { path ->
+                    decodePersonaPresetArtworkBitmap(context.assets, path, maxEdgePx = 256)
+                }
+            }
+        }
     }
     Surface(
         modifier = Modifier.size(34.dp),
