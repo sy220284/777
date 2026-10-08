@@ -228,7 +228,13 @@ class LocalToolExecutionCoordinatorTest {
     @Test
     fun explicitSubagentAllowlistCanActivateOptionalReadOnlyTool() {
         val registry = ToolRegistry().apply {
-            register(webFetchTool { ToolResult("ok") })
+            register(tool(
+                name = "remote_lookup",
+                access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                family = "网络",
+            ) { ToolResult("ok") })
         }
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
         val disabled = projection.subagentSchemas(
@@ -236,14 +242,14 @@ class LocalToolExecutionCoordinatorTest {
             allowVirtualScreen = false,
             enabledOptional = emptySet(),
         )
-        assertFalse("web_fetch" in projection.names(disabled))
+        assertFalse("remote_lookup" in projection.names(disabled))
         val allowed = projection.subagentSchemas(
             allowMutation = false,
             allowVirtualScreen = false,
-            enabledOptional = setOf("web_fetch"),
+            enabledOptional = setOf("remote_lookup"),
         )
-        assertTrue("web_fetch" in projection.names(allowed))
-        assertTrue("web_fetch" !in projection.names(projection.subagentSchemas(
+        assertTrue("remote_lookup" in projection.names(allowed))
+        assertTrue("remote_lookup" !in projection.names(projection.subagentSchemas(
             allowMutation = false,
             allowVirtualScreen = false,
             enabledOptional = emptySet(),
