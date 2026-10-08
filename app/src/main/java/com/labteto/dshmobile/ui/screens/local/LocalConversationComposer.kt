@@ -84,6 +84,7 @@ internal fun LocalConversationComposer(
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
     networkSearchEnabled: Boolean = true,
     onNetworkSearchChange: (Boolean) -> Unit = {},
+    onRequestWorkWebSearch: () -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
     onDisableAutoApprove: () -> Unit,
@@ -99,9 +100,11 @@ internal fun LocalConversationComposer(
     var focused by remember { mutableStateOf(false) }
     var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+    LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
 
-    // Both capability icons remain visible in the composer bottom row, even before focus.
-    val expanded = true
+    // Opening the input reveals the two capabilities; idle chats retain their compact row.
+    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() ||
+        teamDispatchSelected || capabilityPanel != null
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
         groupChatReady &&
@@ -248,17 +251,6 @@ internal fun LocalConversationComposer(
         animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
-        capabilityPanel?.let { panel ->
-            LocalComposerCapabilityPanel(
-                panel = panel,
-                profile = activeModelProfile,
-                usageMode = state.usageMode,
-                reasoningMode = reasoningMode,
-                onReasoningModeChange = onReasoningModeChange,
-                networkSearchEnabled = networkSearchEnabled,
-                onNetworkSearchChange = onNetworkSearchChange,
-            )
-        }
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -365,13 +357,19 @@ internal fun LocalConversationComposer(
             state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
-            capabilityControls = {
+            capabilityControls = { showLabels ->
                 LocalComposerCapabilityActions(
                     profile = activeModelProfile,
                     usageMode = state.usageMode,
                     reasoningMode = reasoningMode,
                     networkSearchEnabled = networkSearchEnabled,
-                    onSelectPanel = { name -> capabilityPanel = if (capabilityPanel == name) null else name },
+                    running = state.running,
+                    showLabels = showLabels,
+                    openPanel = capabilityPanel,
+                    onSelectPanel = { capabilityPanel = it },
+                    onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
+                    onNetworkSearchChange = { if (!state.running) onNetworkSearchChange(it) },
+                    onWorkSearchRequested = onRequestWorkWebSearch,
                 )
             },
             stopControl = { StopControl() },
