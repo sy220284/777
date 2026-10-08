@@ -9,10 +9,10 @@
     <string name="local_persona_ai_working_hint">正在整理人物设定，请稍候…</string>
     <string name="local_persona_ai_synced">设定已生成，请检查内容，确认后保存。</string>
     <string name="local_persona_ai_new_hint">用一句话介绍人物，AI 会帮你补齐设定。检查满意后，再点保存。</string>
-    <string name="local_persona_ai_new_draft">人物草稿已生成，检查后保存到人设图集。</string>
+    <string name="local_persona_ai_new_draft">人物草稿已经生成。可以先改名字和简介，也可以展开详细设定，满意后再保存。</string>
     <string name="local_persona_ai_busy">当前还在回复消息，完成后就能生成人设。</string>
     <string name="local_persona_ai_unconfigured">还没有可用的 AI 模型，请先去设置里连接一个。</string>
     <string name="local_persona_ai_stale">刚才切换了对话或人物，为避免覆盖你的修改，请重新生成。</string>
-    <string name="local_persona_ai_failed">这次没能生成人设，请检查模型连接后再试一次。</string>
+    <string name="local_persona_ai_failed">这次没能生成人设。请再试一次，如果一直失败，可以检查 AI 模型是否能正常使用。</string>
     <string name="local_persona_ai_example">例如：神里绫人，保留原作气质，和我更亲近一点，说话自然，别有客服腔。</string>
 </resources>
