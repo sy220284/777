@@ -82,6 +82,7 @@ internal fun LocalModeDrawer(
     onRenameSession: (String, String) -> Boolean,
     onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
@@ -362,6 +363,7 @@ internal fun LocalModeDrawer(
                             onOpenDiary = onOpenDiary,
                             onTasks = onTasks,
                             onWorkspaceFiles = onWorkspaceFiles,
+                            onProjects = onProjects,
                             onOpenRunCenter = onOpenRunCenter,
                             onTools = onTools,
                         )
