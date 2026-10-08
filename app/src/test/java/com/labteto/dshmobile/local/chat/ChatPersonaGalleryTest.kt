@@ -208,6 +208,29 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun deletingMissingMessageDoesNotReportSuccessOrLeaveTombstone() {
+        val file = File(temporary.newFolder("missing-message"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val existing = LocalHarnessMessage("existing", "assistant", "需要保留的历史", createdAt = 1L)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(existing), chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val missingKey = galleryMessageArchiveKey(
+            LocalHarnessMessage("missing", "assistant", "从未存在", createdAt = 2L),
+        )
+
+        assertFalse(gallery.deleteHistoryMessage(saved.entry.id, storyId, missingKey))
+        val storyAfter = gallery.list().single().stories.single { it.id == storyId }
+        assertFalse(missingKey in storyAfter.excludedMessageKeys)
+        assertEquals(listOf("existing"), gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.map { it.id })
+
+        assertTrue(gallery.deleteHistoryMessage(saved.entry.id, storyId, galleryMessageArchiveKey(existing)))
+        assertTrue(gallery.loadStoryHistory(saved.entry.id, storyId, 20).messages.isEmpty())
+    }
+
+    @Test
     fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
         val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
         val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)
