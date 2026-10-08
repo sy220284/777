@@ -522,6 +522,8 @@ fun LocalHarnessScreen(
                     }
                 },
                 onDeleteSessions = viewModel::deleteSessions,
+                },
+                onDeleteSessions = viewModel::deleteSessions,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
                 onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
