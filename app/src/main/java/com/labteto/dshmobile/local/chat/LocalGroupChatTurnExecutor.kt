@@ -197,7 +197,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             )
             val groupRequestHistory = withChatTurnContext(
                 history = baseHistory,
-                stableContext = turnContext.stablePrompt,
+                stableContext = chatTurnCoordinator.projectStablePrompt(snapshot, turnContext.stablePrompt),
                 dynamicContext = turnContext.dynamicPrompt,
             )
             val groupImageMode = resolveLocalImageInputMode(
