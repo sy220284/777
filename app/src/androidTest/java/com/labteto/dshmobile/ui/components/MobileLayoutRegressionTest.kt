@@ -116,7 +116,8 @@ class MobileLayoutRegressionTest {
         }
         val title = compose.onNodeWithText("工作项目与文件", useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val value = compose.onNodeWithText("9999 个项目", useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue(title.right <= value.left)
+        // Large accessibility text may place the value below the title; either arrangement must not overlap.
+        assertTrue("分类标题与数量不得重叠", title.right <= value.left || title.bottom <= value.top)
         assertTextFits("工作项目与文件")
         assertTextFits("9999 个项目")
         compose.onNodeWithText("工作项目与文件").performClick()
