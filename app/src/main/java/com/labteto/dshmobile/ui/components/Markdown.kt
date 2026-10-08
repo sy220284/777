@@ -25,7 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -434,6 +439,26 @@ private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     }
 }
 
+private val CODE_SYNTAX_TOKENS = Regex(
+    "//[^\\n]*|#[^\\n]*|\\\"(?:\\\\.|[^\\\"\\\\])*\\\"|'(?:\\\\.|[^'\\\\])*'|\\b(?:fun|val|var|class|object|interface|data|sealed|return|if|else|when|for|while|try|catch|import|package|private|public|internal|override|suspend|const|let|def|from|async|await|function|true|false|null|None|True|False)\\b",
+)
+
+internal fun highlightedCode(code: String, language: String?, colors: DsColors): AnnotatedString {
+    val supported = setOf("kotlin", "kt", "java", "python", "py", "javascript", "js", "typescript", "ts")
+    if (language?.trim()?.lowercase() !in supported || code.length > 20_000) return AnnotatedString(code)
+    val builder = AnnotatedString.Builder(code)
+    CODE_SYNTAX_TOKENS.findAll(code).forEach { match ->
+        val token = match.value
+        val tint = when {
+            token.startsWith("//") || token.startsWith("#") -> colors.labelSecondary
+            token.startsWith("\\"") || token.startsWith("'") -> colors.warnLabel
+            else -> colors.accent
+        }
+        builder.addStyle(SpanStyle(color = tint), match.range.first, match.range.last + 1)
+    }
+    return builder.toAnnotatedString()
+}
+
 internal enum class MarkdownCalloutKind { QUOTE, NOTE, IMPORTANT, WARNING, TIP }
 
 internal fun markdownCalloutKind(lines: List<String>): MarkdownCalloutKind = when (
@@ -570,6 +595,14 @@ private fun CodeBlock(
 ) {
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
+    val styledCode = remember(code, lang, colors) { highlightedCode(code, lang, colors) }
+    var copied by remember(code) { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1500)
+            copied = false
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -595,12 +628,17 @@ private fun CodeBlock(
                     modifier = Modifier
                         .size(DsSpacing.touchTarget)
                         .clip(DsShapes.chip)
-                        .clickable { clipboard.setText(AnnotatedString(code)) },
+                        .clickable {
+                            clipboard.setText(AnnotatedString(code))
+                            copied = true
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        FeatherIcons.Copy,
-                        contentDescription = stringResource(R.string.markdown_copy_code),
+                        if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = stringResource(
+                            if (copied) R.string.chat_copy_success else R.string.markdown_copy_code
+                        ),
                         tint = colors.labelSecondary,
                         modifier = Modifier.size(18.dp),
                     )
@@ -612,7 +650,7 @@ private fun CodeBlock(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Text(
-                code,
+                styledCode,
                 style = DsType.mdCode.withReadingWeight(),
                 color = colors.labelPrimary,
                 softWrap = false,
