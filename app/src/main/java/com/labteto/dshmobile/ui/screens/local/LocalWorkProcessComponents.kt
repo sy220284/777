@@ -1,8 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import android.graphics.ImageDecoder
-import android.graphics.drawable.AnimatedImageDrawable
-import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -21,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,18 +25,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -50,7 +43,6 @@ import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -146,7 +138,7 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
  * narration, tool outcome. The Run Center retains raw results and diagnostic details.
  */
 internal fun conversationWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> =
-    nodes.map { it.copy(toolContent = null) }
+    semanticWorkProcessNodes(nodes)
 
 internal fun visibleWorkProcessNodes(
     nodes: List<LocalWorkProcessNode>,
@@ -236,6 +228,7 @@ internal fun WorkProcessRow(
         thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
         messages.any { it.role == "reasoning" } ->
             stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought)
+        running && latestNode.summary != null -> activeStage
         running -> stringResource(R.string.local_work_process) + " · " +
             stringResource(R.string.agent_operation_status_running)
         else -> stringResource(R.string.local_work_process)
@@ -285,13 +278,6 @@ internal fun WorkProcessRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                stringResource(R.string.local_work_process_stage_operations,
-                    semanticNodes.size, nodes.sumOf { it.count }),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
-                maxLines = 1,
-            )
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = stringResource(
@@ -313,22 +299,15 @@ internal fun WorkProcessRow(
                 modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                visibleNodes.forEach { node ->
-                    if (node.summary != null) {
-                        // Model-authored, user-facing status narrative, never provider reasoning.
-                        Text(
-                            text = node.summary,
-                            style = DsType.mdBody.withReadingWeight(),
-                            color = colors.labelPrimary,
-                            modifier = Modifier.fillMaxWidth().padding(
-                                horizontal = DsSpacing.small,
-                                vertical = DsSpacing.small,
-                            ),
-                        )
-                    } else {
-                        // A completed tool outcome keeps its own icon/status and never leaks arguments.
-                        WorkContentBlock(node, running = false)
-                    }
+                visibleNodes.forEachIndexed { index, node ->
+                    // One semantic stage per visible row. Tool results are attached to their
+                    // preceding narration, instead of showing a duplicate generic tool title.
+                    WorkContentBlock(
+                        node = node,
+                        running = running && !node.failed &&
+                            index == visibleNodes.lastIndex &&
+                            semanticNodes.last() == node,
+                    )
                 }
                 if (collapsedHiddenCount > 0) {
                     DsButton(
@@ -348,96 +327,31 @@ internal fun WorkProcessRow(
     }
 }
 
-@Composable
-private fun AnimatedToolIcon(
-    resId: Int,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val drawable = remember(resId) {
-        runCatching {
-            ImageDecoder.decodeDrawable(
-                ImageDecoder.createSource(context.resources, resId),
-            ) as? AnimatedImageDrawable
-        }.getOrNull()
-    }
-    DisposableEffect(drawable) {
-        drawable?.start()
-        onDispose { drawable?.stop() }
-    }
-    AndroidView(
-        factory = { viewContext ->
-            ImageView(viewContext).apply {
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setImageDrawable(drawable)
-            }
-        },
-        update = { imageView ->
-            if (imageView.drawable !== drawable) imageView.setImageDrawable(drawable)
-            if (drawable?.isRunning == false) drawable.start()
-        },
-        modifier = modifier,
-    )
-}
-
+/** Consistent Feather outline icon; only the active step receives accent colour. */
 @Composable
 internal fun WorkOperationIcon(
     kind: AgentOperationKind,
     running: Boolean,
 ) {
-    val animatedRes = when (kind) {
-        AgentOperationKind.Inspect -> R.drawable.work_anim_tool_file
-        AgentOperationKind.Search -> R.drawable.work_anim_tool_search
-        AgentOperationKind.Update, AgentOperationKind.Execute -> R.drawable.work_anim_tool_code
-        AgentOperationKind.Web -> R.drawable.work_anim_tool_web
-        AgentOperationKind.Generic -> R.drawable.work_anim_tool_think
-        AgentOperationKind.Delegate -> R.drawable.work_anim_tool_create_subagent
-        AgentOperationKind.Image -> R.drawable.work_anim_tool_image
-        AgentOperationKind.External -> R.drawable.work_anim_tool_mcp
-        AgentOperationKind.Background -> R.drawable.work_anim_tool_task
-        AgentOperationKind.Device -> R.drawable.work_anim_tool_browser
-        else -> null
+    val icon = when (kind) {
+        AgentOperationKind.Inspect -> FeatherIcons.FileText
+        AgentOperationKind.Search -> FeatherIcons.Search
+        AgentOperationKind.Update -> FeatherIcons.Edit3
+        AgentOperationKind.Execute -> FeatherIcons.Code
+        AgentOperationKind.Web -> FeatherIcons.Globe
+        AgentOperationKind.Device -> FeatherIcons.Device
+        AgentOperationKind.Image -> FeatherIcons.Image
+        AgentOperationKind.Background -> FeatherIcons.Clock
+        AgentOperationKind.Generic -> FeatherIcons.Sparkles
+        AgentOperationKind.Delegate -> FeatherIcons.Users
+        AgentOperationKind.External -> FeatherIcons.Gear
     }
-    if (running && animatedRes != null) {
-        AnimatedToolIcon(
-            resId = animatedRes,
-            modifier = Modifier.size(34.dp),
-        )
-        return
-    }
-    when (kind) {
-        AgentOperationKind.Delegate -> DsIconBox(
-            icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_create_subagent),
-            active = running,
-            modifier = Modifier.size(30.dp),
-        )
-        AgentOperationKind.External -> DsIconBox(
-            icon = null,
-            iconPainter = painterResource(R.drawable.ic_ui_plugin),
-            active = running,
-            modifier = Modifier.size(30.dp),
-        )
-        else -> {
-            val icon = when (kind) {
-                AgentOperationKind.Inspect -> FeatherIcons.FileText
-                AgentOperationKind.Search -> FeatherIcons.Search
-                AgentOperationKind.Update -> FeatherIcons.Edit3
-                AgentOperationKind.Execute -> FeatherIcons.Code
-                AgentOperationKind.Web -> FeatherIcons.Globe
-                AgentOperationKind.Device -> FeatherIcons.Device
-                AgentOperationKind.Image -> FeatherIcons.Image
-                AgentOperationKind.Background -> FeatherIcons.Clock
-                AgentOperationKind.Generic -> FeatherIcons.Tool
-                AgentOperationKind.Delegate, AgentOperationKind.External -> FeatherIcons.Tool
-            }
-            DsIconBox(
-                icon = icon,
-                active = running,
-                modifier = Modifier.size(30.dp),
-            )
-        }
-    }
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = if (running) DsTheme.colors.accent else DsTheme.colors.labelSecondary,
+        modifier = Modifier.size(18.dp),
+    )
 }
 
 private fun toolResultFailed(content: String): Boolean =
