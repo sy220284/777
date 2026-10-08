@@ -1156,7 +1156,7 @@
     <string name="persona_gallery_delete_story_hint">只删除这条故事线及其中的归档对白，人物主档案会保留。</string>
     <string name="persona_gallery_delete_story">删除这条故事</string>
     <string name="persona_gallery_continue_story">继续这条故事</string>
-    <string name="persona_gallery_start_fresh_story">只用人物设定开启新故事</string>
+    <string name="persona_gallery_start_fresh_story">用这个人物开启新故事</string>
     <string name="persona_gallery_untitled_story">未命名故事</string>
 
 
@@ -1218,7 +1218,7 @@
 
 
     <string name="persona_gallery_import_file">导入人物文件</string>
-    <string name="persona_gallery_export_file">导出人物</string>
+    <string name="persona_gallery_export_file">导出人物卡</string>
     <string name="persona_gallery_export_format_title">选择导出格式</string>
     <string name="persona_gallery_export_format_hint">三种格式都会包含人物设定、记忆摘要、人物日记和已归档对话；Markdown 与 Word 可直接阅读，也可重新导入。</string>
     <string name="persona_gallery_export_json">JSON 数据文件</string>
@@ -1765,5 +1765,17 @@
     <string name="persona_form_character">性格与变化</string>
     <string name="persona_form_expression">关系与表达</string>
     <string name="persona_form_boundaries">世界与边界</string>
+    <string name="persona_gallery_detail_title">人物详情</string>
+    <string name="persona_gallery_more_actions">更多操作</string>
+    <string name="persona_gallery_current_story_actions">当前故事「%1$s」</string>
+    <string name="persona_gallery_persona_actions">人物资料</string>
+    <string name="persona_gallery_view_profile">查看人物设定</string>
+    <string name="persona_gallery_save_progress">保存本次对话进展</string>
+    <string name="persona_gallery_pending_progress">有新进展待保存 · 前往更多操作</string>
+    <string name="persona_gallery_current_story_badge">当前故事</string>
+    <string name="persona_gallery_notes_add">添加</string>
+    <string name="persona_gallery_notes_edit">编辑</string>
+    <string name="persona_gallery_notes_done">收起</string>
+    <string name="persona_gallery_notes_empty">记下关键经历，下次继续更容易衔接。</string>
 </resources>
 

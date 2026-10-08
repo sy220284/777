@@ -46,6 +46,7 @@ REPO_METADATA_FILES = {
     ".github/PULL_REQUEST_TEMPLATE.md",
 }
 FULL_VALIDATION_SCRIPTS = {
+    ".github/scripts/run-android-instrumentation.sh",
     ".github/scripts/verify-android16-apk.sh",
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",

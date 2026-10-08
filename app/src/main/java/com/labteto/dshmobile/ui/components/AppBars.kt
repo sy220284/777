@@ -35,7 +35,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 /**
  * 统一 mobile page bar.
  *
- * The title stays optically centered while Back and the optional action keep fixed 48dp hit areas.
+ * The title occupies a flexible center slot between fixed 48dp hit areas, wrapping when text grows.
  * Root pages may request [largeTitle], but it only raises typographic weight/size instead of creating
  * a second stacked toolbar; this keeps every secondary page on the same vertical rhythm.
  */
@@ -57,24 +57,26 @@ fun DsTopBar(
 ) {
     val colors = DsTheme.colors
     Column(modifier = modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight)) {
+        // Reserve an equal 48dp slot at either end. Unlike a centered overlay, this
+        // gives the title a real width constraint and lets large text grow vertically.
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             DsIconButton(
                 icon = backIcon,
                 contentDescription = backContentDescription,
                 onClick = onBack,
-                modifier = Modifier.align(Alignment.CenterStart),
                 containerColor = if (plainBackButton) Color.Transparent else colors.bgLayer1,
                 iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )
             Text(
                 title,
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 58.dp),
+                modifier = Modifier.weight(1f),
                 style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 2,
                 textAlign = TextAlign.Center,
-                overflow = TextOverflow.Ellipsis,
             )
             if ((actionIcon != null || actionPainter != null) && onAction != null) {
                 DsIconButton(
@@ -83,13 +85,12 @@ fun DsTopBar(
                     contentDescription = actionContentDescription,
                     onClick = onAction,
                     enabled = actionEnabled,
-                    modifier = Modifier.align(Alignment.CenterEnd),
                     containerColor = colors.bgLayer1,
                     iconSize = 24.dp,
                     tint = colors.labelPrimary,
                 )
             } else {
-                Box(Modifier.align(Alignment.CenterEnd).size(DsSpacing.touchTarget))
+                Box(Modifier.size(DsSpacing.touchTarget))
             }
         }
         subtitle?.takeIf(String::isNotBlank)?.let {

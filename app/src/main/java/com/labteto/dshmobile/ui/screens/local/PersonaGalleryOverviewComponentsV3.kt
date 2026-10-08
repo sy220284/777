@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -101,10 +102,9 @@ internal fun PersonaGalleryDetailHeaderV3(
     relationSummary: String,
     busy: Boolean,
     onChoosePortrait: () -> Unit,
-    onRemovePortrait: () -> Unit,
+    onManagePortrait: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    var portraitActionsOpen by remember(entry.id) { mutableStateOf(false) }
     val portrait by produceState<ImageBitmap?>(
         initialValue = null,
         key1 = entry.portraitPath,
@@ -121,33 +121,6 @@ internal fun PersonaGalleryDetailHeaderV3(
     }
     val subtitle = entry.persona.portrait.ifBlank { relationSummary }
 
-    if (portraitActionsOpen && entry.portraitPath.isNotBlank()) {
-        DsBottomSheet(
-            title = stringResource(R.string.persona_gallery_portrait_actions_title),
-            onDismiss = { portraitActionsOpen = false },
-        ) {
-            DsButton(
-                text = stringResource(R.string.persona_gallery_portrait_replace),
-                onClick = {
-                    portraitActionsOpen = false
-                    onChoosePortrait()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-                variant = DsButtonVariant.Outline,
-            )
-            DsButton(
-                text = stringResource(R.string.persona_gallery_portrait_remove),
-                onClick = {
-                    portraitActionsOpen = false
-                    onRemovePortrait()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-                variant = DsButtonVariant.Danger,
-            )
-        }
-    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -160,16 +133,16 @@ internal fun PersonaGalleryDetailHeaderV3(
                 WallpaperSurfaceLevel.CARD,
                 base = colors.bgLayer1,
             ),
-            shadowElevation = 5.dp,
+            shadowElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth(frameLayout.widthFraction)
                 .combinedClickable(
                     enabled = !busy,
                     onClick = {
-                        if (entry.portraitPath.isBlank()) onChoosePortrait()
+                        if (entry.portraitPath.isBlank()) onChoosePortrait() else onManagePortrait()
                     },
                     onLongClick = {
-                        if (entry.portraitPath.isNotBlank()) portraitActionsOpen = true
+                        if (entry.portraitPath.isNotBlank()) onManagePortrait()
                     },
                 ),
         ) {
@@ -223,45 +196,36 @@ internal fun PersonaGalleryDetailHeaderV3(
                         }
                     }
                 }
-                Spacer(Modifier.size(DsSpacing.xsmall))
-                Text(
-                    entry.persona.name,
-                    style = DsType.base16Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    subtitle,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-                if (entry.persona.portrait.isNotBlank()) {
-                    Text(
-                        relationSummary,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelTertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
-                }
             }
         }
-
-        if (entry.portraitPath.isNotBlank()) {
+        Spacer(Modifier.size(DsSpacing.xsmall))
+        Text(
+            entry.persona.name,
+            style = DsType.title22.withReadingWeight(),
+            color = colors.labelPrimary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        if (entry.persona.portrait.isNotBlank()) {
             Text(
-                stringResource(R.string.persona_gallery_portrait_long_press_hint),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
+                subtitle,
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
         }
+        Text(
+            relationSummary,
+            style = DsType.small13.withReadingWeight(),
+            color = colors.labelSecondary,
+            textAlign = TextAlign.Center,
+        )
     }
 }
+
 
 
 @Composable
@@ -472,6 +436,7 @@ internal fun CompactPersonaRow(
         color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("personaGalleryEntry_${entry.id}")
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(

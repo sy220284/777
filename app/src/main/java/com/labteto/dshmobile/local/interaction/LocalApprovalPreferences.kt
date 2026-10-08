@@ -62,6 +62,7 @@ class LocalApprovalPreferences internal constructor(
     internal fun currentMode(legacySessionValue: Boolean = false): LocalApprovalMode {
         if (!preferences.contains(KEY_APPROVAL_MODE) || preferences.contains(KEY_SAFE_AUTO_APPROVAL)) {
             val migrated = when {
+                preferences.contains(KEY_APPROVAL_MODE) -> readStoredMode()
                 preferences.contains(KEY_SAFE_AUTO_APPROVAL) ->
                     if (preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, true)) {
                         LocalApprovalMode.AUTO

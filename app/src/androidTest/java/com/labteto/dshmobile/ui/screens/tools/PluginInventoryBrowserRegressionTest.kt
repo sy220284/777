@@ -2,9 +2,10 @@ package com.labteto.dshmobile.ui.screens.tools
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -59,7 +60,8 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("创意与图像").performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
+        compose.onNodeWithText("创意与图像").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
     }

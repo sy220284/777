@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -64,6 +65,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -272,6 +274,9 @@ internal fun StoryDetailSection(
                 style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
+            story.chatState.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
+                Text(focus, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            }
             story.chatState.dynamics.sharedMoments.takeLast(4).takeIf { it.isNotEmpty() }?.let { moments ->
                 Text(
                     stringResource(R.string.persona_gallery_shared_moments, moments.joinToString("；")),
@@ -289,16 +294,31 @@ internal fun StoryDetailSection(
         }
     }
 
-    DsButton(
-        text = if (showHistory) {
-            stringResource(R.string.persona_gallery_history_hide)
-        } else {
-            stringResource(R.string.persona_gallery_history_show)
-        },
-        onClick = onToggleHistory,
-        variant = DsButtonVariant.Ghost,
+    Row(
         modifier = Modifier.fillMaxWidth(),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
+            modifier = Modifier.weight(1f),
+            style = DsType.std14Strong.withReadingWeight(),
+            color = DsTheme.colors.labelPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        DsButton(
+            text = stringResource(
+                if (showHistory) R.string.persona_gallery_history_hide
+                else R.string.persona_gallery_history_show,
+            ),
+            onClick = onToggleHistory,
+            variant = DsButtonVariant.Ghost,
+            size = DsButtonSize.Small,
+            enabled = !busy,
+        )
+    }
+
     if (showHistory) {
         DsCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -379,16 +399,49 @@ internal fun StoryDetailSection(
         }
     }
 
-    DsTextField(
-        value = notes,
-        onValueChange = onNotesChange,
-        label = { Text(stringResource(R.string.persona_gallery_story_notes)) },
-        placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
-        modifier = Modifier.fillMaxWidth(),
-        minLines = 3,
-        maxLines = 8,
-        enabled = !busy,
-    )
+    var editingNotes by rememberSaveable(entry.id, story.id) { mutableStateOf(false) }
+    DsCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.persona_gallery_story_notes),
+                modifier = Modifier.weight(1f),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = DsTheme.colors.labelPrimary,
+            )
+            DsButton(
+                text = stringResource(
+                    if (editingNotes) R.string.persona_gallery_notes_done
+                    else if (notes.isBlank()) R.string.persona_gallery_notes_add
+                    else R.string.persona_gallery_notes_edit,
+                ),
+                onClick = { editingNotes = !editingNotes },
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Ghost,
+                enabled = !busy,
+            )
+        }
+        if (editingNotes) {
+            DsTextField(
+                value = notes,
+                onValueChange = onNotesChange,
+                placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 8,
+                enabled = !busy,
+            )
+        } else {
+            Text(
+                notes.ifBlank { stringResource(R.string.persona_gallery_notes_empty) },
+                style = DsType.small13.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary,
+            )
+        }
+    }
+
 }
 
 @Composable
@@ -566,10 +619,12 @@ internal fun GalleryStoryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val summary = story.notes.ifBlank { story.chatState.relationshipState }
-                if (summary.isNotBlank()) {
+                val summary = listOf(story.chatState.relationshipState, story.chatState.mood)
+                    .filter(String::isNotBlank).joinToString(" · ")
+                if (summary.isNotBlank() || selected) {
                     Text(
-                        summary,
+                        if (selected) listOf(stringResource(R.string.persona_gallery_current_story_badge), summary)
+                            .filter(String::isNotBlank).joinToString(" · ") else summary,
                         style = DsType.caption11.withReadingWeight(),
                         color = DsTheme.colors.labelSecondary,
                         maxLines = 1,

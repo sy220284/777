@@ -53,7 +53,7 @@ class CharacterBehaviorTuningDialogTest {
 
         val done = context.getString(R.string.local_character_tuning_done)
         val restore = context.getString(R.string.local_character_tuning_restore)
-        compose.onNodeWithText(done).performScrollTo().performClick()
+        compose.onNodeWithText(done).performClick()
         compose.waitUntil(timeoutMillis = 2_000) { saveStarted.isCompleted }
 
         compose.onNodeWithText(done).assertIsNotEnabled()
@@ -82,7 +82,7 @@ class CharacterBehaviorTuningDialogTest {
             }
         }
         val done = context.getString(R.string.local_character_tuning_done)
-        compose.onNodeWithText(done).performScrollTo().performClick()
+        compose.onNodeWithText(done).performClick()
         compose.waitForIdle()
         compose.onNodeWithText(done).assertIsNotEnabled()
         result.complete(Result.failure(IllegalStateException("保存失败测试")))
