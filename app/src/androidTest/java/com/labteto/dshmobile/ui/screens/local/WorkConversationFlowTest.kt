@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -39,6 +40,28 @@ class WorkConversationFlowTest {
         // answer is rendered independently by the existing transcript message component.
         compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Figma", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun manuallyExpandedStepsStayOpenWhenRunningStateChanges() {
+        val running = mutableStateOf(true)
+        val events = listOf(
+            LocalHarnessMessage("p1", "progress", "首轮检查完成", createdAt = 1L),
+            LocalHarnessMessage("p2", "progress", "准备给出结论", createdAt = 2L),
+        )
+        compose.setContent { DshTheme { WorkProcessRow(events, running.value) } }
+        compose.waitForIdle()
+        compose.runOnIdle { running.value = false }
+        compose.waitForIdle()
+        compose.onNodeWithText("首轮检查完成").assertDoesNotExist()
+
+        // The reader opened the folded timeline: finishing again must not override it.
+        compose.onNodeWithText("工作过程").performClick()
+        compose.onNodeWithText("首轮检查完成").assertExists()
+        compose.runOnIdle { running.value = true }
+        compose.waitForIdle()
+        compose.runOnIdle { running.value = false }
+        compose.waitForIdle()
+        compose.onNodeWithText("首轮检查完成").assertExists()
     }
 
     @Test fun liveAssistantTextAppearsAfterDurableStepsWithoutPrivateReasoning() {
