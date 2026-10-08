@@ -27,7 +27,7 @@ class DsSheetChoiceSwitchTest {
         val row = compose.onNodeWithTag("reasoning-row")
         row.assertIsOff().performClick().assertIsOn()
         compose.runOnIdle { assertEquals(1, clicks) }
-        row.performTouchInput { click(Offset(size.width - 45f, size.height / 2f)) }.assertIsOff()
+        row.performTouchInput { click(Offset(center.x * 1.8f, center.y)) }.assertIsOff()
         compose.runOnIdle { assertEquals(2, clicks) }
     }
 }
