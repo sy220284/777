@@ -398,6 +398,10 @@ fun LocalHarnessScreen(
             settingsDestination = settingsDestination,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
+            onOpenRemote = {
+                resetFeatureNavigation()
+                onOpenRemote()
+            },
             onSettingsDestinationChange = { settingsDestination = it },
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
@@ -562,11 +566,6 @@ fun LocalHarnessScreen(
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
-                },
-                onRemote = {
-                    scope.launch { drawerState.close() }
-                    resetFeatureNavigation()
-                    onOpenRemote()
                 },
                 onSwitchSession = { sessionId ->
                     if (viewModel.switchSession(sessionId)) {
