@@ -396,7 +396,7 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = FeatherIcons.Eye,
                                 title = stringResource(R.string.settings_page_appearance),
                                 onClick = { page = SettingsDestination.APPEARANCE },
                                 compact = true,
@@ -497,7 +497,7 @@ fun SettingsScreen(
 
                     SettingsDestination.APPEARANCE -> {
                         AppSettingsSection {
-                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.settings_appearance),
+                            AppSettingsRow(FeatherIcons.SunMoon, stringResource(R.string.settings_appearance),
                                 value = stringResource(when (settings.themePreference) {
                                     "light" -> R.string.settings_appearance_light
                                     "dark" -> R.string.settings_appearance_dark
@@ -505,7 +505,7 @@ fun SettingsScreen(
                                     else -> R.string.settings_appearance_system
                                 }), onClick = { page = SettingsDestination.APPEARANCE_THEME })
                             AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.Sliders, stringResource(R.string.settings_accent_theme),
+                            AppSettingsRow(FeatherIcons.Palette, stringResource(R.string.settings_accent_theme),
                                 onClick = { page = SettingsDestination.APPEARANCE_ACCENT })
                             AppSettingsDivider()
                             AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.settings_reading_preferences),
