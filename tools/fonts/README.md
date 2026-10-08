@@ -9,4 +9,4 @@
 
 固定菜单、按钮、页签、导航和设置用精简字体；聊天、Markdown、工作正文、人物日记、历史会话名称等动态文字用系统字体；代码保持原来的等宽字体。
 
-**构建前提**：本机有 Python 3 和 Bash；首先从 main 成功的 GitHub Actions 下载最新版 `777-toolchain-runtime-cache-latest` 并按工具链说明安装。常规 Gradle `--offline` 构建只使用已校验缓存；即使运行在 GitHub Actions 中，只要带 `--offline` 也禁止字体依赖下载。只有 GitHub Actions 在线预热任务允许首次下载 fontTools，之后随 Runtime Artifact 分发。不得把生成的中间资源提交到 Git。
+**构建前提**：本机有 Python 3 和 Bash；首先从 main 成功的 GitHub Actions 下载最新版 `777-toolchain-runtime-cache-latest` 并按工具链说明安装（旧 Artifact 会被 `plan` 自动识别为缺少字体依赖，并列出该组件）。常规 Gradle `--offline` 构建只使用已校验缓存；即使运行在 GitHub Actions 中，只要带 `--offline` 也禁止字体依赖下载。只有 GitHub Actions 在线预热任务允许首次下载 fontTools，之后随 Runtime Artifact 分发。不得把生成的中间资源提交到 Git。

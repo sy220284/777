@@ -34,6 +34,11 @@ class UiFontTests(unittest.TestCase):
         self.assertIn('GITHUB_ACTIONS:-false', shell)
         self.assertIn('.gradle/runtime-cache/ui-fonttools-python', shell)
         self.assertIn('fonttools_available ||', shell)
+        versions = (ROOT / "tools" / "dev" / "toolchain-versions.env").read_text(encoding="utf-8")
+        self.assertIn("FONTTOOLS_VERSION=4.59.2", versions)
+        planner = (ROOT / "tools" / "dev" / "lib" / "components.sh").read_text(encoding="utf-8")
+        self.assertIn('FONTTOOLS_VERSION', planner)
+        self.assertIn('ui-fonttools-python', planner)
         self.assertIn('runtime-cache Artifact', shell)
 
     def test_git_blob_hash_and_font_source(self):

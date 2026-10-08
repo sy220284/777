@@ -5,7 +5,9 @@ TARGET="${1:?Expected generated resource directory}"
 # fontTools is provisioned by GitHub Actions and shipped in the verified runtime-cache Artifact.
 # Local offline builds must never resolve a missing Python dependency on the network.
 PY_DIR="$REPO_ROOT/.gradle/runtime-cache/ui-fonttools-python"
-VERSION='4.59.2'
+# Shared version contract with the toolchain planner and GitHub Actions Artifact.
+source "$REPO_ROOT/tools/dev/toolchain-versions.env"
+VERSION="${FONTTOOLS_VERSION:?}"
 fonttools_available() {
   PYTHONPATH="$PY_DIR" python3 -c '
 import os, sys, fontTools
