@@ -184,6 +184,16 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun technicalProgressCannotExposeRawCommandsOrPaths() {
+        assertEquals(null, localWorkProcessSummary("git status --short"))
+        assertEquals(null, localWorkProcessSummary("/private/path/config.json"))
+        assertEquals("已经读取 … 并校验", localWorkProcessSummary(
+            "已经读取 /private/path/config.json 并校验",
+        ))
+        assertEquals("准备继续", localWorkProcessSummary("准备继续"))
+    }
+
+    @Test
     fun reasoningOnlyWorkProcessProducesNoUserFacingNode() {
         val nodes = buildWorkProcessNodes(
             listOf(message("r1", "reasoning", "这段自由推理不能出现在界面里")),
@@ -220,7 +230,7 @@ class LocalTranscriptPresentationTest {
         val recent = visibleWorkProcessNodes(nodes, showAll = false)
         val all = visibleWorkProcessNodes(nodes, showAll = true)
         assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
-        assertEquals(5, recent.first().count)
+        assertEquals(8, recent.first().count)
         assertEquals(12, recent.last().count)
         assertEquals(12, all.size)
     }

@@ -65,10 +65,15 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
-internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 180
+internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 5
+internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 140
 
 private val WORK_PROCESS_WHITESPACE = Regex("\\s+")
+private val WORK_PROCESS_TECHNICAL_LINE = Regex(
+    "^(?:[>$#]\\s*|(?:git|curl|grep|rg|adb|gradle|npm|python|bash|sh)\\s+|[\\\\/]|\\x60{3})",
+    RegexOption.IGNORE_CASE,
+)
+private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
@@ -84,8 +89,9 @@ internal data class LocalWorkProcessNode(
 
 internal fun localWorkProcessSummary(content: String): String? {
     val compact = WORK_PROCESS_WHITESPACE.replace(content.trim(), " ")
-    if (compact.isBlank()) return null
-    return truncateWithoutSplittingSurrogatePair(compact, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
+    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
+    val readable = WORK_PROCESS_PATH.replace(compact, "…")
+    return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
 
 internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<LocalWorkProcessNode> {
@@ -189,6 +195,18 @@ internal fun WorkProcessRow(
     val semanticNodes = remember(nodes) {
         nodes.filter { it.summary != null || it.failed }.ifEmpty { nodes.takeLast(1) }
     }
+    val firstReasoningTimestamp = messages.firstOrNull {
+        it.role == "reasoning" && it.createdAt > 0L
+    }?.createdAt
+    val firstProgressTimestamp = messages.firstOrNull {
+        (it.role == "progress" || it.role == "tool") && it.createdAt > 0L
+    }?.createdAt
+    // Persisted event timestamps must be present and ordered. Unknown durations stay hidden.
+    val thinkingSeconds = if (firstReasoningTimestamp != null && firstProgressTimestamp != null) {
+        (firstProgressTimestamp - firstReasoningTimestamp)
+            .takeIf { it in 1_000L..600_000L }
+            ?.div(1_000L)
+    } else null
     val latestNode = semanticNodes.last()
     val preview = semanticNodes.lastOrNull { !it.summary.isNullOrBlank() }?.summary
         ?: stringResource(agentOperationLabelRes(latestNode.kind))
@@ -260,6 +278,27 @@ internal fun WorkProcessRow(
             )
         }
 
+        if (messages.any { it.role == "reasoning" }) {
+            Row(
+                modifier = Modifier.padding(start = DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
+                Text(
+                    text = if (thinkingSeconds != null) {
+                        stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
+                    } else {
+                        stringResource(
+                            if (running && nodes.none { it.summary != null })
+                                R.string.local_work_thinking
+                            else R.string.local_work_thought,
+                        )
+                    },
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+        }
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),

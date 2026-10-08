@@ -1772,5 +1772,7 @@
     <string name="local_character_inner_thought">心声</string>
     <string name="local_reasoning_work_failed">这一步执行失败，详情请查看任务进度</string>
     <string name="local_work_thinking">正在思考…</string>
+    <string name="local_work_thought">已思考</string>
+    <string name="local_work_thought_seconds">思考了 %1$d 秒</string>
 </resources>
 

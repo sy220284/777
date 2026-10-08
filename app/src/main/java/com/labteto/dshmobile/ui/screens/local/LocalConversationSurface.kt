@@ -700,12 +700,22 @@ internal fun LocalConversationSurface(
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
                     }
                 }
-                if (state.usageMode == LocalUsageMode.CHAT && state.running) {
-                    item(key = "streaming:${state.sessionId}") {
-                        LocalStreamingChatTurn(
-                            sessionId = state.sessionId,
-                            streamingState = streamingState,
-                        )
+                if (state.running) {
+                    if (state.usageMode == LocalUsageMode.CHAT) {
+                        item(key = "streaming:${state.sessionId}") {
+                            LocalStreamingChatTurn(
+                                sessionId = state.sessionId,
+                                streamingState = streamingState,
+                            )
+                        }
+                    } else {
+                        item(key = "work-streaming:${state.sessionId}") {
+                            LocalStreamingWorkPreview(
+                                sessionId = state.sessionId,
+                                streamingState = streamingState,
+                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                            )
+                        }
                     }
                 }
             }
@@ -723,15 +733,6 @@ internal fun LocalConversationSurface(
                         )
                     }
                 },
-            )
-        }
-
-        if (state.usageMode == LocalUsageMode.WORK && state.running) {
-            LocalStreamingWorkPreview(
-                sessionId = state.sessionId,
-                streamingState = streamingState,
-                surfaceColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
             )
         }
 
