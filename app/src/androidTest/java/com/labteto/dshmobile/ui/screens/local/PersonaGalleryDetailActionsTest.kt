@@ -5,11 +5,13 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.pressBack
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
@@ -62,7 +64,7 @@ class PersonaGalleryDetailActionsTest {
                 )
             }
         }
-        compose.onNodeWithText(entry.persona.name).performClick()
+        compose.onNodeWithTag("personaGalleryEntry_${entry.id}").performClick()
         compose.onNodeWithText("继续这条故事").assertIsDisplayed()
     }
 
@@ -87,6 +89,7 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
+        closeSoftKeyboard()
         pressBack()
         compose.onNodeWithText("继续这条故事").assertIsEnabled()
         compose.onNodeWithContentDescription("更多操作").performClick()

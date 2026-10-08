@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -435,6 +436,7 @@ internal fun CompactPersonaRow(
         color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("personaGalleryEntry_${entry.id}")
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(
