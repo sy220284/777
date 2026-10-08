@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.io.readBoundedLine
+
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -56,8 +58,9 @@ internal class PersonaGalleryHistoryStore(
         val known = linkedSetOf<String>()
         var total = 0
         if (file.isFile) {
-            file.useLines { lines ->
-                lines.forEach { line ->
+            file.bufferedReader().use { reader ->
+                while (true) {
+                    val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
                     decode(line)?.let { message ->
                         known += galleryMessageArchiveKey(message)
                         total++
@@ -112,8 +115,11 @@ internal class PersonaGalleryHistoryStore(
         repairTornTail(file)
         if (!file.isFile) return emptyList()
         return buildList {
-            file.useLines { lines ->
-                lines.forEach { line -> decode(line)?.let(::add) }
+            file.bufferedReader().use { reader ->
+                while (true) {
+                    val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
+                    decode(line)?.let(::add)
+                }
             }
         }
     }
@@ -128,7 +134,7 @@ internal class PersonaGalleryHistoryStore(
         file.bufferedReader().use { input ->
             temporary.bufferedWriter().use { output ->
                 while (true) {
-                    val line = input.readLine() ?: break
+                    val line = readBoundedLine(input, MAX_ARCHIVE_LINE_BYTES) ?: break
                     val message = decode(line) ?: continue
                     if (!removed && galleryMessageArchiveKey(message) == messageKey) {
                         removed = true
@@ -164,7 +170,7 @@ internal class PersonaGalleryHistoryStore(
             file.bufferedReader().use { input ->
                 temporary.bufferedWriter().use { output ->
                     while (true) {
-                        val line = input.readLine() ?: break
+                        val line = readBoundedLine(input, MAX_ARCHIVE_LINE_BYTES) ?: break
                         val message = decode(line)
                             ?: error("人物历史归档含有无法解析的记录，拒绝覆盖原数据")
                         if (galleryMessageArchiveKey(message) in excluded) {
