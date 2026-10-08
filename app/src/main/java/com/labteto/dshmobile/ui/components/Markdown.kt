@@ -440,7 +440,7 @@ private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
 }
 
 private val CODE_SYNTAX_TOKENS = Regex(
-    "//[^\\n]*|#[^\\n]*|\\\"(?:\\\\.|[^\\\"\\\\])*\\\"|'(?:\\\\.|[^'\\\\])*'|\\b(?:fun|val|var|class|object|interface|data|sealed|return|if|else|when|for|while|try|catch|import|package|private|public|internal|override|suspend|const|let|def|from|async|await|function|true|false|null|None|True|False)\\b",
+    """//[^\n]*|#[^\n]*|"[^"\n]*"|'[^'\n]*'|\b(?:fun|val|var|class|object|interface|data|sealed|return|if|else|when|for|while|try|catch|import|package|private|public|internal|override|suspend|const|let|def|from|async|await|function|true|false|null|None|True|False)\b""",
 )
 
 internal fun highlightedCode(code: String, language: String?, colors: DsColors): AnnotatedString {
@@ -451,7 +451,7 @@ internal fun highlightedCode(code: String, language: String?, colors: DsColors):
         val token = match.value
         val tint = when {
             token.startsWith("//") || token.startsWith("#") -> colors.labelSecondary
-            token.startsWith("\\"") || token.startsWith("'") -> colors.warnLabel
+            token.firstOrNull() == '"' || token.startsWith("'") -> colors.warnLabel
             else -> colors.accent
         }
         builder.addStyle(SpanStyle(color = tint), match.range.first, match.range.last + 1)
