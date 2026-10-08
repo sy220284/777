@@ -39,18 +39,14 @@ internal fun composerReasoningLabel(
     mode: LocalReasoningUiMode,
     modes: List<LocalReasoningUiMode>,
     needsBasicReasoning: Boolean = false,
-): Int = when {
-    modes.isEmpty() || (mode != LocalReasoningUiMode.DEFAULT && mode !in modes) ->
-        R.string.local_composer_reasoning_default
-    mode == LocalReasoningUiMode.DEFAULT && LocalReasoningUiMode.DEFAULT !in modes ->
-        R.string.local_composer_reasoning_high
-    mode == LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
-    mode == LocalReasoningUiMode.FAST ->
+): Int = when (LocalReasoningControls.effectiveMode(mode, modes)) {
+    LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
+    LocalReasoningUiMode.FAST ->
         if (needsBasicReasoning) R.string.local_composer_reasoning_basic
         else R.string.local_composer_reasoning_short_off
-    mode == LocalReasoningUiMode.LOW -> R.string.local_composer_reasoning_low
-    mode == LocalReasoningUiMode.DEEP -> R.string.local_composer_reasoning_high
-    else -> R.string.local_composer_reasoning_max
+    LocalReasoningUiMode.LOW -> R.string.local_composer_reasoning_low
+    LocalReasoningUiMode.DEEP -> R.string.local_composer_reasoning_high
+    LocalReasoningUiMode.MAX -> R.string.local_composer_reasoning_max
 }
 
 private fun reasoningModeLabel(mode: LocalReasoningUiMode, needsBasicReasoning: Boolean): Int =
@@ -186,9 +182,7 @@ internal fun LocalComposerCapabilityPanel(
                 Text(stringResource(R.string.local_composer_reasoning_unsupported),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             } else {
-                val effectiveMode = if (reasoningMode == LocalReasoningUiMode.DEFAULT && reasoningMode !in modes) {
-                    LocalReasoningUiMode.DEEP.takeIf { it in modes } ?: modes.first()
-                } else reasoningMode.takeIf { it in modes } ?: modes.first()
+                val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes)
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
                 }
@@ -207,7 +201,7 @@ internal fun LocalComposerCapabilityPanel(
                             style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                     }
                 }
-                if (reasoningMode == LocalReasoningUiMode.DEFAULT) {
+                if (effectiveMode == LocalReasoningUiMode.DEFAULT) {
                     Text(stringResource(R.string.local_composer_reasoning_default_tip),
                         style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }

@@ -22,17 +22,18 @@ internal object LocalReasoningControls {
         val policy = LocalReasoningRequestPolicy.resolve(supported, mode == LocalUsageMode.WORK)
             ?: return emptyList()
         return buildList {
-            // Only DeepSeek's documented provider default is known to equal HIGH.
-            // Other providers keep an explicit "Default" position to avoid false claims.
-            if (supported.model.trim().lowercase() !in setOf("deepseek-flash", "deepseek-v4-pro")) {
-                add(LocalReasoningUiMode.DEFAULT)
-            }
+            // Default means no request override, independently of the provider's current default.
+            add(LocalReasoningUiMode.DEFAULT)
             add(LocalReasoningUiMode.FAST)
             if (policy.lowEffort != null && policy.lowEffort != policy.disabledEffort) add(LocalReasoningUiMode.LOW)
             add(LocalReasoningUiMode.DEEP)
             if (policy.maxEffort != null) add(LocalReasoningUiMode.MAX)
         }
     }
+
+    /** Project unsupported saved choices to the same default used by effortFor, without rewriting them. */
+    fun effectiveMode(mode: LocalReasoningUiMode, availableModes: List<LocalReasoningUiMode>): LocalReasoningUiMode =
+        mode.takeIf { it in availableModes } ?: LocalReasoningUiMode.DEFAULT
 
     fun setMode(sessionId: String, mode: LocalReasoningUiMode) =
         LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.valueOf(mode.name))
