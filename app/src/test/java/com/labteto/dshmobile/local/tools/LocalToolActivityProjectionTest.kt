@@ -60,6 +60,26 @@ class LocalToolActivityProjectionTest {
         assertEquals(LocalToolActivityKind.FILE, activity.kind)
     }
 
+    @Test
+    fun resultDetailsKeepBoundedEvidenceAndCancellationPhase() {
+        var state = reduceLocalToolActivity(LocalToolActivityState(), event(1, "tool/call") {
+            put("id", "details")
+            put("name", "read")
+            put("arguments", "a".repeat(3_000))
+        })
+        state = reduceLocalToolActivity(state, event(2, "tool/result") {
+            put("id", "details")
+            put("content", "x".repeat(5_000))
+            put("is_error", true)
+            put("error_code", "TOOL_CANCELLED")
+        })
+        val activity = state.activities.single()
+        assertEquals(LocalToolActivityPhase.CANCELLED, activity.phase)
+        assertEquals(2L, activity.finishedSequence)
+        assertEquals(2_000, activity.argumentsPreview!!.length)
+        assertEquals(4_000, activity.resultPreview!!.length)
+    }
+
     private fun event(
         sequence: Long,
         type: String,

@@ -1786,5 +1786,18 @@
     <string name="local_work_thinking">正在思考…</string>
     <string name="local_work_thought">已思考</string>
     <string name="local_work_thought_seconds">思考了 %1$d 秒</string>
+    <string name="local_reasoning_default_hint">当前使用模型默认档位；打开后下一轮使用深度思考</string>
+    <string name="local_reasoning_basic_hint">关闭深度思考后使用快速档，仍保留模型必需的基础推理</string>
+    <string name="local_reasoning_restore_default">恢复模型默认档位</string>
+    <string name="local_work_failed_stage">失败：%1$s</string>
+    <string name="local_work_process_stage_operations">%1$d 阶段 · %2$d 次操作</string>
+    <string name="local_tool_activity_details">查看执行详情</string>
+    <string name="local_tool_activity_evidence">声明 #%1$s → 开始 #%2$s → 结果 #%3$s</string>
+    <string name="local_tool_activity_result">执行结果预览（最多 4000 字）</string>
+    <string name="local_tool_activity_arguments">调用参数</string>
+    <string name="local_tool_activity_error">错误：%1$s</string>
+    <string name="local_tool_activity_pending_result">尚未收到执行结果</string>
+    <string name="local_tool_activity_full_result">持久化执行结果</string>
+    <string name="local_tool_activity_evidence_error">完整记录读取失败，当前显示结果预览</string>
 </resources>
 

@@ -133,6 +133,14 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun collapsedFocusKeepsLatestFailureEvenWhenLaterStageSucceeds() {
+        val failed = LocalWorkProcessNode(summary = "校验文件", failed = true)
+        val later = LocalWorkProcessNode(summary = "已读取其他文件")
+        assertEquals(failed, workProcessFocus(listOf(failed, later)))
+        assertEquals(later, workProcessFocus(listOf(later)))
+    }
+
+    @Test
     fun semanticMilestonesKeepToolOutcomesAndUnlabelledOperations() {
         val nodes = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
             message("p1", "progress", "读取文件"),

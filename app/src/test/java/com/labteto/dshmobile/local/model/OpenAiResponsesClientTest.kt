@@ -39,6 +39,25 @@ class OpenAiResponsesClientTest {
     )
 
     @Test
+    fun apiAndPlanReasoningSelectionPreserveDefaultAndUseNativeFields() {
+        listOf(false, true).forEach { plan ->
+            listOf<String?>(null, "low", "high").forEach { effort ->
+                val payload = client.buildPayload(
+                    model = "gpt-6.1-sol", messages = listOf(buildJsonObject {
+                        put("role", "user"); put("content", "test")
+                    }), tools = JsonArray(emptyList()), temperature = null,
+                    reasoningEffort = effort, planSharing = plan,
+                )
+                if (effort == null) assertFalse(payload.containsKey("reasoning"))
+                else assertEquals(effort, payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+                assertFalse(payload.containsKey("reasoning_effort"))
+                assertEquals("false", payload["store"]!!.jsonPrimitive.content)
+                assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
+            }
+        }
+    }
+
+    @Test
     fun exactReportedCancelWithoutSpaceIsRetryable() {
         val error = client.networkFailure(IOException("stream was reset:CANCEL"))
         assertEquals("MODEL_NETWORK", error.code)

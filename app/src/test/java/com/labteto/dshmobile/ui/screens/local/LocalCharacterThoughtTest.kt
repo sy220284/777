@@ -17,6 +17,14 @@ class LocalCharacterThoughtTest {
         assertEquals(null to "", extractLocalCharacterThought("【心声：我有点", streaming = true))
     }
 
+    @Test fun incrementalMarkerPrefixesStayHiddenOnlyDuringStreaming() {
+        listOf("【", "【心", "【心声", "【心声：", "【心声:").forEach { prefix ->
+            assertEquals(null to "", extractLocalCharacterThought(prefix, streaming = true))
+            assertEquals(null to prefix, extractLocalCharacterThought(prefix))
+        }
+        assertEquals(null to "【你好】", extractLocalCharacterThought("【你好】", streaming = true))
+    }
+
     @Test fun finalIncompleteHeaderDoesNotHideTheReply() {
         assertEquals(null to "【心声：我有点", extractLocalCharacterThought("【心声：我有点"))
     }
@@ -26,6 +34,15 @@ class LocalCharacterThoughtTest {
         val (thought, body) = extractLocalCharacterThought(reply)
         assertEquals(20, thought!!.codePointCount(0, thought.length))
         assertEquals("正文", body)
+    }
+
+    @Test fun groupSpeakerPrefixIsRemovedBeforeThoughtParsing() {
+        val message = com.labteto.dshmobile.local.session.LocalHarnessMessage(
+            id = "group-thought", role = "assistant", content = "小雨：【心声：有点期待】我来帮你。",
+            createdAt = 1L, speakerName = "小雨",
+        )
+        val visible = com.labteto.dshmobile.local.presentation.groupMessageVisibleContent(message)
+        assertEquals("有点期待" to "我来帮你。", extractLocalCharacterThought(visible))
     }
 
     @Test fun normalConversationIsNotModified() {

@@ -7,6 +7,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun absentPreferencePreservesProviderDefaultAndMandatoryModelsUseLow() {
+        val route = LocalModelProfile("astra", "gpt-6-astra", "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES)
+        val session = "astra-mode-test"
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+        assertNull(LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.FAST)
+        assertEquals("low", LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEEP)
+        assertEquals("high", LocalReasoningModeStore.effortFor(session, route))
+        assertFalse(LocalReasoningModeStore.isSupported(route.copy(protocol = LocalModelProtocol.CHAT_COMPLETIONS), true))
+    }
+
+    @Test fun knownAccountBoundPlanModelsUseResponsesReasoningContract() {
+        val route = LocalModelProfile("plan-astra", "gpt-6.1-sol", "https://api.openai.com/v1",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, protocol = LocalModelProtocol.RESPONSES,
+            credentialRef = "account-a")
+        assertTrue(LocalReasoningModeStore.isSupported(route, true))
+        LocalReasoningModeStore.setMode("plan-reasoning-test", LocalReasoningMode.FAST)
+        assertEquals("low", LocalReasoningModeStore.effortFor("plan-reasoning-test", route, true))
+        assertFalse(LocalReasoningModeStore.isSupported(route.copy(model = "unknown-model")))
+        assertFalse(LocalReasoningModeStore.isSupported(route.copy(credentialRef = null)))
+    }
+
     @Test fun deepSeekFlashHasNativeSwitch() {
         val route = LocalModelProfile("ds", "deepseek-flash", "https://api.deepseek.com")
         assertTrue(LocalReasoningModeStore.isSupported(route))
@@ -24,12 +48,12 @@ class LocalReasoningModeStoreTest {
         assertNull(LocalReasoningModeStore.effortFor("work-turn", sol, withTools = true))
         val responses = sol.copy(protocol = LocalModelProtocol.RESPONSES)
         assertTrue(LocalReasoningModeStore.isSupported(responses, withTools = true))
-        assertEquals("high", LocalReasoningModeStore.effortFor("work-turn", responses, withTools = true))
+        assertNull(LocalReasoningModeStore.effortFor("work-turn", responses, withTools = true))
     }
 
     @Test fun explicitReasoningCapabilityDoesNotClaimMandatoryReasoningModels() {
         val mandatory = LocalModelProfile("next", "gpt-6.1-sol", "https://api.openai.com/v1")
-        assertFalse(LocalReasoningModeStore.isSupported(mandatory))
+        assertTrue(LocalReasoningModeStore.isSupported(mandatory))
         assertNull(LocalReasoningModeStore.effortFor("mandatory", mandatory))
         val custom = LocalModelProfile("local", "gpt-6-sol", "https://localhost:1234/v1")
         assertFalse(LocalReasoningModeStore.isSupported(custom))

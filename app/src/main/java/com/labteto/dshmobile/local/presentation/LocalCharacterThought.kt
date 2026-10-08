@@ -12,7 +12,9 @@ internal fun extractLocalCharacterThought(text: String, streaming: Boolean = fal
     val match = CHARACTER_THOUGHT_HEADER.find(text)
     if (match == null) {
         val prefix = text.trimStart()
-        if (streaming && prefix.startsWith("【心声") && prefix.length <= 256 &&
+        if (streaming && prefix.isNotEmpty() &&
+            ("【心声：".startsWith(prefix) || "【心声:".startsWith(prefix) || prefix.startsWith("【心声")) &&
+            prefix.length <= 256 &&
             !prefix.contains('\n') && !prefix.contains('\r') &&
             !prefix.contains('】')) return null to ""
         return null to text

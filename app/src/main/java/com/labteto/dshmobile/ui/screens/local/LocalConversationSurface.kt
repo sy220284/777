@@ -73,6 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
@@ -181,9 +182,9 @@ internal fun LocalConversationSurface(
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
-    var reasoningEnabled by remember(state.sessionId) {
+    var reasoningMode by remember(state.sessionId) {
         LocalReasoningControls.attach(appContext)
-        mutableStateOf(LocalReasoningControls.enabled(state.sessionId))
+        mutableStateOf(LocalReasoningControls.mode(state.sessionId))
     }
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -1131,19 +1132,33 @@ internal fun LocalConversationSurface(
             DsSheetChoiceRow(
                 title = stringResource(R.string.local_reasoning_switch_title),
                 subtitle = stringResource(
-                    if (reasoningAvailable) R.string.local_reasoning_switch_hint
-                    else R.string.local_reasoning_switch_unsupported,
+                    when {
+                        !reasoningAvailable -> R.string.local_reasoning_switch_unsupported
+                        reasoningMode == LocalReasoningUiMode.DEFAULT -> R.string.local_reasoning_default_hint
+                        LocalReasoningControls.requiresBasicReasoning(activeModelProfile, state.usageMode) -> R.string.local_reasoning_basic_hint
+                        else -> R.string.local_reasoning_switch_hint
+                    },
                 ),
                 icon = FeatherIcons.Activity,
-                switchChecked = if (reasoningAvailable) reasoningEnabled else null,
+                switchChecked = if (reasoningAvailable) reasoningMode == LocalReasoningUiMode.DEEP else null,
                 trailingText = if (reasoningAvailable) null else stringResource(R.string.local_reasoning_auto),
                 enabled = reasoningAvailable && !state.running,
                 onClick = {
-                    val next = !reasoningEnabled
+                    val next = reasoningMode != LocalReasoningUiMode.DEEP
                     LocalReasoningControls.setEnabled(state.sessionId, next)
-                    reasoningEnabled = next
+                    reasoningMode = LocalReasoningControls.mode(state.sessionId)
                 },
             )
+            if (reasoningAvailable && reasoningMode != LocalReasoningUiMode.DEFAULT) {
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_reasoning_restore_default),
+                    enabled = !state.running,
+                    onClick = {
+                        LocalReasoningControls.restoreDefault(state.sessionId)
+                        reasoningMode = LocalReasoningUiMode.DEFAULT
+                    },
+                )
+            }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 DsSheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),

@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
@@ -59,7 +61,26 @@ class LocalWorkRuntime @Inject internal constructor(
                 name = activity.name,
                 phase = phase,
                 errorCode = activity.errorCode,
+                executionId = activity.executionId,
+                declaredSequence = activity.declaredSequence,
+                startedSequence = activity.startedSequence,
+                finishedSequence = activity.finishedSequence,
+                argumentsPreview = activity.argumentsPreview,
+                resultPreview = activity.resultPreview,
             )
+        }
+    }
+
+    /** Exact bounded lookup; the selected event must still belong to this session and call. */
+    internal fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long): String? {
+        if (sessionId != runtimeStateStore.currentSessionId || sequence <= 0L) return null
+        val event = eventLogs.get(sessionId).pageAfter(sequence - 1L, limit = 1).singleOrNull()
+            ?.takeIf { it.sequence == sequence && it.data["id"]?.jsonPrimitive?.contentOrNull == callId }
+            ?: return null
+        return when (event.type) {
+            "tool/call" -> event.data["arguments"]?.toString()
+            "tool/result" -> event.data["content"]?.jsonPrimitive?.contentOrNull
+            else -> null
         }
     }
 

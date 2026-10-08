@@ -72,6 +72,32 @@ class DeepSeekClientTest {
     }
 
     @Test
+    fun streamingDeepSeekModesUseTheSameNativeContract() = runBlocking {
+        val requests = mutableListOf<String>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            requests += Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body(
+                    ("data: {\"choices\":[{\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n" +
+                        "data: [DONE]\n").toResponseBody("text/event-stream".toMediaType()),
+                ).build()
+        }.build()
+        val testClient = DeepSeekClient(http, Json { ignoreUnknownKeys = true })
+        listOf("none", "high").forEach { effort ->
+            val reply = testClient.completeStreaming(apiKey = "test", baseUrl = "https://api.deepseek.com",
+                model = "deepseek-flash", messages = listOf(buildJsonObject {
+                    put("role", "user"); put("content", "test")
+                }), tools = JsonArray(emptyList()), reasoningEffort = effort)
+            assertEquals("OK", reply.content)
+            val payload = Json.parseToJsonElement(requests.last()).jsonObject
+            assertEquals(if (effort == "none") "disabled" else "enabled",
+                payload["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+            if (effort == "none") assertFalse(payload.containsKey("reasoning_effort"))
+            else assertEquals("high", payload["reasoning_effort"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
     fun parsesToolCallAndReasoning() {
         val reply = client.parse(
             """

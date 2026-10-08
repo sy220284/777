@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,9 +45,12 @@ fun DsSheetChoiceRow(
 ) {
     val colors = DsTheme.colors
     Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(
+            if (switchChecked != null) Modifier.toggleable(
+                value = switchChecked, enabled = enabled, role = Role.Switch,
+                onValueChange = { onClick() },
+            ) else Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        ),
         shape = DsShapes.row,
         color = if (selected) colors.bgModulePlatform else androidx.compose.ui.graphics.Color.Transparent,
         tonalElevation = 0.dp,
@@ -83,7 +90,8 @@ fun DsSheetChoiceRow(
             if (switchChecked != null) {
                 DsSwitch(
                     checked = switchChecked,
-                    onCheckedChange = { onClick() },
+                    onCheckedChange = null,
+                    modifier = Modifier.clearAndSetSemantics { },
                     enabled = enabled,
                 )
             } else {

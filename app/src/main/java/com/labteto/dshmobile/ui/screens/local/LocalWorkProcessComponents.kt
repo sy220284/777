@@ -158,6 +158,9 @@ internal fun visibleWorkProcessNodes(
     return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
 }
 
+internal fun workProcessFocus(nodes: List<LocalWorkProcessNode>): LocalWorkProcessNode =
+    nodes.lastOrNull { it.failed } ?: nodes.last()
+
 internal fun workProcessStatus(
     nodes: List<LocalWorkProcessNode>,
     running: Boolean,
@@ -231,9 +234,10 @@ internal fun WorkProcessRow(
             .takeIf { it in 1_000L..600_000L }
             ?.div(1_000L)
     } else null
-    val latestNode = semanticNodes.last()
-    val preview = semanticNodes.lastOrNull { !it.summary.isNullOrBlank() }?.summary
-        ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    val latestNode = workProcessFocus(semanticNodes)
+    val preview = if (latestNode.failed) {
+        stringResource(R.string.local_work_failed_stage, latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind)))
+    } else latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
     val collapsedHiddenCount = (semanticNodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
     val visibleStartIndex = semanticNodes.size - visibleNodes.size
@@ -268,7 +272,7 @@ internal fun WorkProcessRow(
         ) {
             WorkOperationIcon(
                 kind = latestNode.kind,
-                running = processStatus == DsStatus.Running,
+                running = processStatus == DsStatus.Running && !latestNode.failed,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -289,7 +293,7 @@ internal fun WorkProcessRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            DsPill(text = stringResource(R.string.local_work_process_steps, semanticNodes.size))
+            DsPill(text = stringResource(R.string.local_work_process_stage_operations, semanticNodes.size, nodes.sumOf { it.count }))
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = stringResource(

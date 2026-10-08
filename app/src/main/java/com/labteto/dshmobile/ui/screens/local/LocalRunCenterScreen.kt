@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.text.selection.SelectionContainer
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +65,7 @@ internal fun LocalRunCenterScreen(
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
     onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
     onEventSequence: (String) -> Long = { 0L },
+    onToolEvidence: (String, String, Long) -> String? = { _, _, _ -> null },
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
@@ -78,6 +81,7 @@ internal fun LocalRunCenterScreen(
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
+    var selectedToolCallId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
     // Bounded, visible-only refresh reads the single Session EventLog cursor, including tool
     // state changes that leave WorkState unchanged. No duplicate persistent event stream.
@@ -158,10 +162,10 @@ internal fun LocalRunCenterScreen(
                                 LocalToolUiPhase.OUTCOME_UNKNOWN -> R.string.local_tool_phase_unknown
                                 LocalToolUiPhase.CANCELLED -> R.string.local_tool_phase_cancelled
                             }
-                            Text(
-                                text = activity.name + " · " + stringResource(phase),
-                                style = DsType.small13.withReadingWeight(),
-                                color = colors.labelSecondary,
+                            DsSheetChoiceRow(
+                                title = activity.name,
+                                subtitle = stringResource(phase) + activity.errorCode?.let { " · " + it }.orEmpty(),
+                                onClick = { selectedToolCallId = activity.callId },
                             )
                         }
                     }
@@ -185,6 +189,61 @@ internal fun LocalRunCenterScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    val selectedActivity = toolActivities.firstOrNull { it.callId == selectedToolCallId }
+    var fullArguments by remember(state.sessionId, selectedToolCallId) { mutableStateOf<String?>(null) }
+    var fullResult by remember(state.sessionId, selectedToolCallId) { mutableStateOf<String?>(null) }
+    var evidenceError by remember(state.sessionId, selectedToolCallId) { mutableStateOf(false) }
+    LaunchedEffect(state.sessionId, selectedToolCallId, selectedActivity?.finishedSequence) {
+        if (selectedActivity != null) {
+            try {
+                val evidence = withContext(Dispatchers.IO) {
+                    val arguments = selectedActivity.declaredSequence?.let {
+                        onToolEvidence(state.sessionId, selectedActivity.callId, it)
+                    }
+                    val result = selectedActivity.finishedSequence?.let {
+                        onToolEvidence(state.sessionId, selectedActivity.callId, it)
+                    }
+                    arguments to result
+                }
+                fullArguments = evidence.first
+                fullResult = evidence.second
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: java.io.IOException) {
+                evidenceError = true
+            }
+        }
+    }
+    if (selectedActivity != null) {
+        DsBottomSheet(
+            title = selectedActivity.name,
+            subtitle = stringResource(R.string.local_tool_activity_details),
+            scrollable = true,
+            onDismiss = { selectedToolCallId = null },
+        ) {
+            Text(
+                stringResource(R.string.local_tool_activity_evidence,
+                    selectedActivity.declaredSequence?.toString() ?: "—",
+                    selectedActivity.startedSequence?.toString() ?: "—",
+                    selectedActivity.finishedSequence?.toString() ?: "—"),
+                style = DsType.caption11.withReadingWeight(),
+            )
+            selectedActivity.errorCode?.let { code ->
+                Text(stringResource(R.string.local_tool_activity_error, code), color = colors.error)
+            }
+            if (evidenceError) Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.error)
+            (fullArguments ?: selectedActivity.argumentsPreview)?.let { arguments ->
+                Text(stringResource(R.string.local_tool_activity_arguments), style = DsType.small13Strong)
+                SelectionContainer { Text(arguments, style = DsType.small13) }
+            }
+            Text(stringResource(if (fullResult != null) R.string.local_tool_activity_full_result else R.string.local_tool_activity_result), style = DsType.small13Strong)
+            SelectionContainer {
+                Text(fullResult ?: selectedActivity.resultPreview ?: stringResource(R.string.local_tool_activity_pending_result),
+                    style = DsType.small13)
             }
         }
     }
