@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,17 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.PopupProperties
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.components.DsComposerAction
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -133,20 +128,11 @@ internal fun LocalComposerCapabilityActions(
                 )
             }
         }
-        DropdownMenu(
+        DsPopupMenu(
             expanded = openPanel != null && !running,
-            onDismissRequest = { onSelectPanel(null) },
+            onDismiss = { onSelectPanel(null) },
             modifier = Modifier.widthIn(min = 260.dp, max = 320.dp),
-            shape = DsShapes.menu,
-            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
-            tonalElevation = 0.dp,
-            border = BorderStroke(1.dp, colors.borderL1),
-            properties = PopupProperties(
-                focusable = false,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true,
-                clippingEnabled = true,
-            ),
+            focusable = false,
         ) {
             openPanel?.let { panel ->
                 LocalComposerCapabilityPanel(
