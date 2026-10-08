@@ -49,7 +49,6 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
@@ -436,7 +435,6 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.FileText,
                     title = stringResource(R.string.chatlist_workspace_files),
-                    iconFamily = DsIconFamily.Cyan,
                     titleTextStyle = DsType.navigationItem,
                     onClick = if (currentSessionId != null && connection.host != null) {
                         {
@@ -456,7 +454,6 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
-                    iconFamily = DsIconFamily.Amber,
                     titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
@@ -466,7 +463,6 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Tool,
                     title = stringResource(R.string.tools_title),
-                    iconFamily = DsIconFamily.Neutral,
                     titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
@@ -476,7 +472,6 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Device,
                     title = stringResource(R.string.chatlist_exit_remote_control),
-                    iconFamily = DsIconFamily.Cyan,
                     titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()
@@ -486,7 +481,6 @@ fun ChatListDrawer(
                 DsCategoryRow(
                     icon = FeatherIcons.Gear,
                     title = stringResource(R.string.settings_title),
-                    iconFamily = DsIconFamily.Neutral,
                     titleTextStyle = DsType.navigationItem,
                     onClick = {
                         onClose()

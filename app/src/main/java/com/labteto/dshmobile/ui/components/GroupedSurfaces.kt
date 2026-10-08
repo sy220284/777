@@ -63,13 +63,7 @@ fun DsGroupCard(
     )
 }
 
-/**
- * Compact disclosure row used across settings, tools and feature indexes.
- *
- * [iconFamily] stays in the signature for source compatibility, but the 当前视觉规范 keeps
- * function icons monochrome. Selection and semantic state are expressed by row/background/status,
- * never by assigning a different color family to each function.
- */
+/** Compact disclosure row used across settings, tools and feature indexes. */
 @Composable
 fun DsCategoryRow(
     icon: ImageVector? = null,
@@ -77,7 +71,6 @@ fun DsCategoryRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     value: String? = null,
-    iconFamily: DsIconFamily = DsIconFamily.Neutral,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     iconPainter: Painter? = null,
@@ -119,7 +112,7 @@ fun DsCategoryRow(
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsIconBox(icon = icon, iconPainter = iconPainter, family = iconFamily)
+        DsIconBox(icon = icon, iconPainter = iconPainter)
         Spacer(Modifier.width(DsSpacing.medium))
         Column(
             modifier = Modifier.weight(1f),
