@@ -287,10 +287,23 @@ internal fun WorkProcessRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            WorkOperationIcon(
-                kind = latestNode.kind,
-                running = processStatus == DsStatus.Running && !latestNode.failed,
-            )
+            when {
+                processStatus == DsStatus.Warning || processStatus == DsStatus.Failed -> Icon(
+                    imageVector = FeatherIcons.AlertTriangle,
+                    contentDescription = null,
+                    tint = colors.error,
+                    modifier = Modifier.size(18.dp),
+                )
+                processStatus == DsStatus.Running -> WorkOperationIcon(
+                    kind = latestNode.kind, running = true,
+                )
+                else -> Icon(
+                    imageVector = FeatherIcons.CheckCircle,
+                    contentDescription = null,
+                    tint = colors.labelSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             Text(
                 headerLabel,
                 modifier = Modifier.weight(1f),
