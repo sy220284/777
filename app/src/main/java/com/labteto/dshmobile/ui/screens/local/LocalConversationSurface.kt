@@ -396,7 +396,7 @@ internal fun LocalConversationSurface(
         anchoredViewportExtent = composerTailViewportAnchor,
     )
 
-    LaunchedEffect(state.messages.size, transcriptItems.size) {
+    LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
         if (transcriptItems.isNotEmpty()) {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             if (lastVisible >= transcriptLastListIndex - 2) {

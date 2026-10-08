@@ -154,7 +154,7 @@ internal fun WorkProcessRow(
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
     if (nodes.isEmpty()) {
         // Do not render private reasoning; keep a visible thinking state until progress arrives.
-        if (running && messages.any { it.role == "reasoning" }) {
+        if (messages.any { it.role == "reasoning" }) {
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
@@ -163,7 +163,7 @@ internal fun WorkProcessRow(
             ) {
                 WorkOperationIcon(AgentOperationKind.Generic, running = true)
                 Text(
-                    stringResource(R.string.local_work_thinking),
+                    stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought),
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )

@@ -17,6 +17,13 @@ class LocalCharacterThoughtTest {
         assertEquals(null to "", extractLocalCharacterThought("【心声：我有点"))
     }
 
+    @Test fun thoughtIsLimitedByCodePointsWithoutSplittingEmoji() {
+        val reply = "【心声：" + "💭".repeat(28) + "】正文"
+        val (thought, body) = extractLocalCharacterThought(reply)
+        assertEquals(20, thought!!.codePointCount(0, thought.length))
+        assertEquals("正文", body)
+    }
+
     @Test fun normalConversationIsNotModified() {
         assertEquals(null to "你好", extractLocalCharacterThought("你好"))
     }

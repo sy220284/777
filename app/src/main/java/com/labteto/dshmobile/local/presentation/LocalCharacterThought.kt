@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 
 private val CHARACTER_THOUGHT_HEADER =
     Regex("^\\s*【心声[:：]([^】\\r\\n]{1,256})】\\s*")
@@ -18,7 +17,10 @@ internal fun extractLocalCharacterThought(text: String): Pair<String?, String> {
             !prefix.contains('】')) return null to ""
         return null to text
     }
-    val thought = truncateWithoutSplittingSurrogatePair(match.groupValues[1].trim(), 20)
-        .takeIf(String::isNotBlank)
+    val fullThought = match.groupValues[1].trim()
+    val characters = fullThought.codePointCount(0, fullThought.length)
+    val thought = fullThought.substring(
+        0, fullThought.offsetByCodePoints(0, minOf(characters, 20)),
+    ).takeIf(String::isNotBlank)
     return thought to text.substring(match.range.last + 1).trimStart()
 }
