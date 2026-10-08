@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -83,6 +85,8 @@ import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsColors
+import com.labteto.dshmobile.ui.theme.LocalDsColors
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -196,6 +200,18 @@ private val usageDetailSelectionStateSaver =
         save = { state -> encodeUsageDetailSelection(state.value) },
         restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
     )
+/** Settings-only pure-black ink on light surfaces; keep dark and matte-black contrast intact. */
+internal fun settingsInkColors(colors: DsColors): DsColors =
+    if (colors.bgBase.luminance() > 0.5f) {
+        colors.copy(
+            labelPrimary = Color.Black,
+            labelSecondary = Color.Black,
+            labelCaption = Color.Black,
+        )
+    } else {
+        colors
+    }
+
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
@@ -216,7 +232,7 @@ fun SettingsScreen(
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
-    val colors = DsTheme.colors
+    val colors = settingsInkColors(DsTheme.colors)
     val toast = rememberDsToast()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -342,6 +358,7 @@ fun SettingsScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
+        CompositionLocalProvider(LocalDsColors provides colors) {
         Box {
             Column(
                 modifier = Modifier
@@ -952,6 +969,7 @@ fun SettingsScreen(
                 }
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
+        }
         }
     }
 
