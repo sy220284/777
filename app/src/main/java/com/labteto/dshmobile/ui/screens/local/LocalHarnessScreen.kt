@@ -337,7 +337,7 @@ fun LocalHarnessScreen(
             networkSearchEnabled = networkSearchEnabled,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
-            modeIntro = modeIntro,
+            modeIntro = modeIntro?.let(::LocalModeIntro),
             pinnedSessionIds = pinnedSessionIds,
             sessionTitleOverrides = sessionTitleOverrides,
             actions = shellActions,

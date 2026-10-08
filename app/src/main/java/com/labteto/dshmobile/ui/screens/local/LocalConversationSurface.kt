@@ -122,6 +122,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Optional introduction is wrapped so Compose never tracks a nullable enum via ordinal(). */
+internal data class LocalModeIntro(val usageMode: LocalUsageMode)
+
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
@@ -130,7 +133,7 @@ internal fun LocalConversationSurface(
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
-    modeIntro: LocalUsageMode?,
+    modeIntro: LocalModeIntro?,
     onConfigure: () -> Unit,
     onSelectModel: (String) -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
@@ -488,7 +491,7 @@ internal fun LocalConversationSurface(
             }
         }
 
-        modeIntro?.let { mode ->
+        modeIntro?.usageMode?.let { mode ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
                 shape = DsShapes.block,

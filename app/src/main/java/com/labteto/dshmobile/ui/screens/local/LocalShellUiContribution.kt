@@ -28,7 +28,7 @@ internal fun localShellFeatureUiContribution(
     networkSearchEnabled: Boolean,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
-    modeIntro: LocalUsageMode?,
+    modeIntro: LocalModeIntro?,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
     actions: LocalShellFeatureUiActions,
