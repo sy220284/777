@@ -29,6 +29,7 @@ internal fun LocalConversationComposerExpandedRow(
     state: LocalConversationSurfaceState,
     menuControl: @Composable () -> Unit,
     replySuggestionsControl: @Composable () -> Unit,
+    capabilityControls: @Composable () -> Unit,
     stopControl: @Composable () -> Unit,
     sendControl: @Composable (queue: Boolean) -> Unit,
 ) {
@@ -49,6 +50,7 @@ internal fun LocalConversationComposerExpandedRow(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
             menuControl()
+            capabilityControls()
             replySuggestionsControl()
             Spacer(Modifier.weight(1f))
             if (state.running) {
