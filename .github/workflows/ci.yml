@@ -377,6 +377,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
+            # 412dp wide: all 360/393/412dp Compose test windows fit on screen.
+            adb shell wm size 1236x2640
+            adb shell wm density 480
+            adb shell wm size | grep -F 'Override size: 1236x2640'
+            adb shell wm density | grep -F 'Override density: 480'
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
@@ -431,6 +436,11 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+          # 432dp wide, alongside the three constrained Compose test window widths.
+          adb shell wm size 1296x2784
+          adb shell wm density 480
+          adb shell wm size | grep -F 'Override size: 1296x2784'
+          adb shell wm density | grep -F 'Override density: 480'
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
