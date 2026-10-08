@@ -1,5 +1,39 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.theme.DsAnimations
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -129,94 +163,168 @@ internal fun ChatPersonaPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsBottomSheet(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss, scrollable = true) {
-        Text(
-            stringResource(R.string.local_persona_picker_intro),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-        Surface(
-            shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                val currentName = if (currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID) {
-                    stringResource(R.string.local_chat_no_persona)
-                } else {
-                    currentPersona.name
-                }
-                Text(
-                    stringResource(R.string.local_persona_picker_current, currentName),
-                    style = DsType.base16Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                )
-                currentPersona.portrait.takeIf(String::isNotBlank)?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                }
-            }
-        }
-        DsButton(
-            text = stringResource(R.string.local_persona_picker_edit_current),
-            onClick = onEditCurrent,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
-        )
-
+    val isUnbound = currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID
+    DsBottomSheet(
+        title = stringResource(R.string.local_persona_picker_title),
+        subtitle = stringResource(R.string.local_persona_picker_intro),
+        onDismiss = onDismiss,
+        trailing = {
+            DsButton(
+                text = stringResource(
+                    if (isUnbound) R.string.local_persona_picker_new
+                    else R.string.local_persona_picker_edit_current,
+                ),
+                onClick = onEditCurrent,
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Ghost,
+            )
+        },
+    ) {
         if (!canSwitchPersona) {
             Text(
                 stringResource(R.string.local_persona_picker_switch_requires_new_chat),
                 style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
+        if (entries.isEmpty()) {
+            Text(
+                stringResource(R.string.local_persona_picker_empty),
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         } else {
-            if (entries.isEmpty()) {
-                Text(
-                    stringResource(R.string.local_persona_picker_empty),
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-            } else {
-                Text(
-                    stringResource(R.string.local_persona_picker_saved),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-                entries.forEach { entry ->
-                    val selected = currentGalleryId == entry.id
-                    Surface(
-                        onClick = {
-                            if (onSelect(entry.id)) onDismiss()
-                        },
-                        shape = DsShapes.block,
-                        color = colors.wallpaperSurface(
-                            WallpaperSurfaceLevel.CARD,
-                            base = if (selected) colors.bgLayer2 else colors.bgLayer1,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(DsSpacing.medium),
-                            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                        ) {
-                            Text(
-                                entry.persona.name,
-                                style = DsType.std14.withReadingWeight(),
-                                color = colors.labelPrimary,
-                            )
-                            val subtitle = entry.persona.portrait
-                                .ifBlank { entry.persona.worldSetting }
-                                .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
-                            Text(
-                                subtitle,
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelSecondary,
-                            )
-                        }
+            Text(
+                "${stringResource(R.string.local_persona_picker_saved)} · ${entries.size}",
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+            )
+            // Keep the sheet header visible; only the portrait grid scrolls.
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val gap = DsSpacing.small
+                val columns = (maxWidth / 108.dp).toInt().coerceIn(3, 6)
+                val tileEdge = (maxWidth - gap * (columns - 1)) / columns
+                val rows = (entries.size + columns - 1) / columns
+                val contentHeight = tileEdge * rows + gap * (rows - 1)
+                val maxGridHeight = minOf(432.dp, LocalConfiguration.current.screenHeightDp.dp * 0.53f)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(minOf(contentHeight, maxGridHeight))
+                        .testTag("personaPickerAvatarGrid"),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                ) {
+                    items(entries, key = PersonaGalleryEntry::id) { entry ->
+                        PersonaPickerAvatarTile(
+                            entry = entry,
+                            selected = currentGalleryId == entry.id,
+                            enabled = canSwitchPersona,
+                            onClick = {
+                                if (onSelect(entry.id)) onDismiss()
+                            },
+                        )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonaPickerAvatarTile(
+    entry: PersonaGalleryEntry,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val portrait by produceState<ImageBitmap?>(null, entry.portraitPath) {
+        value = withContext(Dispatchers.IO) {
+            decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 256)
+        }
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
+        animationSpec = DsAnimations.pressScale,
+        label = "personaAvatarPress",
+    )
+    val background by animateColorAsState(
+        targetValue = if (selected) colors.accentTertiary
+        else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        animationSpec = DsAnimations.interactionColor,
+        label = "personaAvatarBackground",
+    )
+    val outline by animateColorAsState(
+        targetValue = if (selected) colors.accent else colors.borderL2,
+        animationSpec = DsAnimations.interactionColor,
+        label = "personaAvatarOutline",
+    )
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interaction,
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .semantics(mergeDescendants = true) {
+                contentDescription = entry.persona.name
+                this.selected = selected
+            }
+            .testTag("personaPickerAvatar_${entry.id}"),
+        shape = DsShapes.block,
+        color = background,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, outline),
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = portrait,
+                animationSpec = tween(durationMillis = 180),
+                label = "personaAvatarReveal",
+                modifier = Modifier.fillMaxSize(),
+            ) { image ->
+                if (image != null) {
+                    Image(
+                        bitmap = image,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = FeatherIcons.User,
+                            contentDescription = null,
+                            tint = colors.characterAccent,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
+            }
+            if (selected) {
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
+                    shape = CircleShape,
+                    color = colors.accent,
+                    border = BorderStroke(2.dp, colors.bgLayer1),
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Check,
+                        contentDescription = null,
+                        tint = colors.onAccent,
+                        modifier = Modifier.padding(4.dp),
+                    )
                 }
             }
         }

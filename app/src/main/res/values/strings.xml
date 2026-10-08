@@ -1163,7 +1163,7 @@
 
 
     <string name="local_persona_picker_title">选择人物</string>
-    <string name="local_persona_picker_intro">新对话可以选择人设图集里已保存的人物，也可以直接新建人物。选中后会从一条全新的故事开始。</string>
+    <string name="local_persona_picker_intro">点选头像，开始一段新故事。</string>
     <string name="local_persona_picker_current">当前人物：%1$s</string>
     <string name="local_persona_picker_new">新建人物</string>
     <string name="local_persona_picker_edit_current">编辑当前人物</string>
