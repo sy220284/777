@@ -74,7 +74,6 @@ internal fun LocalConversationComposer(
     onOpenAttachmentPicker: () -> Unit,
     onShowReplySuggestions: () -> Unit,
     onGenerateReplySuggestions: suspend () -> Boolean,
-    onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
     onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult = onSend,
     teamDispatchSelected: Boolean = false,
