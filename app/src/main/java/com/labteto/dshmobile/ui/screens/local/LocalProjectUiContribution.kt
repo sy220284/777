@@ -73,6 +73,7 @@ internal fun LocalProjectScreen(
         mutableStateOf(active?.name.orEmpty())
     }
     var error by remember { mutableStateOf<String?>(null) }
+    val localProjectCannotSwitchMessage = stringResource(R.string.local_project_cannot_switch_session)
 
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
@@ -98,7 +99,7 @@ internal fun LocalProjectScreen(
             text = stringResource(R.string.local_project_start_work_session),
             onClick = {
                 runCatching { actions.createProjectWorkSession() }
-                    .onSuccess { if (it) actions.onProjectSessionAccepted() else error = "会话当前不可切换" }
+                    .onSuccess { if (it) actions.onProjectSessionAccepted() else error = localProjectCannotSwitchMessage }
                     .onFailure { error = it.message }
             },
             modifier = Modifier.fillMaxWidth(),
