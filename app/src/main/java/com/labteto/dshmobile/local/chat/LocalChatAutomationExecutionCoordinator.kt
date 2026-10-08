@@ -155,8 +155,9 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
 
         var initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
         val budget = LocalChatAutomationTimeoutBudget(timeoutMillis, 10 * 60_000L)
+        val automationJob = currentCoroutineContext()[Job]
         val ownership = acquireAutomationChatOwnership(
-            targetSessionId, currentCoroutineContext()[Job], budget, visibleTurnOwner::acquire, visibleTurnOwner::release,
+            targetSessionId, automationJob, budget, visibleTurnOwner::acquire, visibleTurnOwner::release,
         )
         try {
         initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
@@ -495,15 +496,16 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
                 })
 
-                if (ownership.visibleTurnOwned && state.value.sessionId == session.id) {
+                val committedVisibly = ownership.visibleTurnOwned &&
                     visibleTurnOwner.commit(
                         session,
                         reply,
                         content,
                         proactiveMessage,
                         assistantEvent.sequence,
+                        automationJob,
                     )
-                } else {
+                if (!committedVisibly) {
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
                     val latest = sessionCoordinator.read(session.id) ?: session
