@@ -273,6 +273,7 @@ fun LocalHarnessScreen(
         conversationFiles = viewModel::conversationFiles,
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         backgroundJobOutput = viewModel::backgroundJobOutput,
+        artifactsForUi = viewModel::artifactsForUi,
         stopBackgroundJob = viewModel::stopBackgroundJob,
         startBackgroundAgent = viewModel::startBackgroundAgent,
         sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
