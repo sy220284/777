@@ -111,25 +111,35 @@ internal class LocalChatAutomationVisibleTurnOwner @Inject constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val wake: LocalForegroundTurnWakeCoordinator,
 ) {
-    internal suspend fun acquire(targetSessionId: String, automationJob: Job?): Boolean =
-        withTimeout(60_000L) {
-            val handle = runtimeStateStore.foregroundRunHandle
-            awaitAutomationVisibleTurn(
-                tryClaim = {
-                    tryClaimAutomationVisibleTurn(
-                        handle = handle,
-                        targetSessionId = targetSessionId,
-                        currentSessionId = runtimeStateStore.currentSessionId,
-                        visibleState = runtimeStateStore.state.value,
-                        transitioning = runtimeStateStore.sessionTransitioning,
-                        automationJob = automationJob,
-                        onClaimed = {
-                            runtimeStateStore.projection.setForegroundRunning(targetSessionId, true)
-                        },
-                    )
-                },
-            )
+    internal suspend fun acquire(targetSessionId: String, automationJob: Job?): Boolean {
+        val handle = runtimeStateStore.foregroundRunHandle
+        var claimed = false
+        try {
+            return withTimeout(60_000L) {
+                awaitAutomationVisibleTurn(
+                    tryClaim = {
+                        tryClaimAutomationVisibleTurn(
+                            handle = handle,
+                            targetSessionId = targetSessionId,
+                            currentSessionId = runtimeStateStore.currentSessionId,
+                            visibleState = runtimeStateStore.state.value,
+                            transitioning = runtimeStateStore.sessionTransitioning,
+                            automationJob = automationJob,
+                            onClaimed = {
+                                runtimeStateStore.projection.setForegroundRunning(targetSessionId, true)
+                                claimed = true
+                            },
+                        )
+                    },
+                )
+            }
+        } catch (error: Throwable) {
+            // withTimeout may cancel concurrently with a successful last poll. If the caller
+            // never receives visibleTurnOwned=true, the outer Session lease has nothing to release.
+            if (claimed) release(targetSessionId, automationJob)
+            throw error
         }
+    }
 
     internal fun commit(
         session: LocalHarnessSession,
