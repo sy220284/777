@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -136,10 +137,9 @@ internal fun LocalStreamingWorkPreview(
             )
         }
         if (visiblePreview) {
-            MarkdownText(
-                text = text,
-                bodyStyle = DsType.mdBody,
-            )
+            SelectionContainer {
+                MarkdownText(text = text, bodyStyle = DsType.mdBody)
+            }
         }
     }
 }
