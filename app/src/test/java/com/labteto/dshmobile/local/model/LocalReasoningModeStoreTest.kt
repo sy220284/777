@@ -17,6 +17,16 @@ class LocalReasoningModeStoreTest {
         assertEquals("high", LocalReasoningModeStore.effortFor(session, route))
     }
 
+    @Test fun chatCompletionWithToolsIsNotExposedAsHighReasoning() {
+        val sol = LocalModelProfile("sol", "gpt-6-sol", "https://api.openai.com/v1")
+        assertTrue(LocalReasoningModeStore.isSupported(sol))
+        assertFalse(LocalReasoningModeStore.isSupported(sol, withTools = true))
+        assertNull(LocalReasoningModeStore.effortFor("work-turn", sol, withTools = true))
+        val responses = sol.copy(protocol = LocalModelProtocol.RESPONSES)
+        assertTrue(LocalReasoningModeStore.isSupported(responses, withTools = true))
+        assertEquals("high", LocalReasoningModeStore.effortFor("work-turn", responses, withTools = true))
+    }
+
     @Test fun unsupportedAndPlanRoutesAreNeverSentUnsafeControls() {
         val unknown = LocalModelProfile("unknown", "custom-model", "https://example.com")
         assertFalse(LocalReasoningModeStore.isSupported(unknown))

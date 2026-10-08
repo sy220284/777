@@ -1121,7 +1121,9 @@ internal fun LocalConversationSurface(
                     else drafts.putBoundedLocalDraft(state.sessionId, listOf(webPrompt, input).filter(String::isNotBlank).joinToString("\n\n"))
                 },
             )
-            val reasoningAvailable = LocalReasoningModeStore.isSupported(activeModelProfile)
+            val reasoningAvailable = LocalReasoningModeStore.isSupported(
+                activeModelProfile, withTools = state.usageMode == LocalUsageMode.WORK,
+            )
             DsSheetChoiceRow(
                 title = stringResource(R.string.local_reasoning_switch_title),
                 subtitle = stringResource(

@@ -284,7 +284,10 @@ internal fun prepareLocalModelAdapterRequest(
         canonicalMessages.map { it.copy(replay = null) }
     }
     val routedTemperature = temperature
-        ?.takeIf { route.capabilities.temperature }
+        ?.takeIf {
+            route.capabilities.temperature &&
+                (reasoningEffort == null || reasoningEffort == "none")
+        }
         .takeUnless {
             route.protocol == LocalModelProtocol.RESPONSES &&
                 LocalModelPresets.toolCallingModeFor(

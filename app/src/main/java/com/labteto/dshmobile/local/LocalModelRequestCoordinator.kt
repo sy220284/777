@@ -122,7 +122,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         )
         val runSurface = frozenProfile.toRunModelSurface()
         // Freeze per-turn model reasoning preference before admission and retries.
-        val reasoningEffort = LocalReasoningModeStore.effortFor(snapshot.sessionId, frozenProfile)
+        val reasoningEffort = LocalReasoningModeStore.effortFor(snapshot.sessionId, frozenProfile, tools.isNotEmpty())
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
