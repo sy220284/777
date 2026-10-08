@@ -769,6 +769,8 @@ internal fun LocalConversationSurface(
             ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
         LocalConversationErrorCard(
             sendRejectMessage = sendRejectMessage,
+            showConnectAction = sendFeedback.sessionId == state.sessionId &&
+                sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
             onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
@@ -849,7 +851,6 @@ internal fun LocalConversationSurface(
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
-            onConfigure = onConfigure,
             onSend = onSend,
             onSendTeam = { text, files ->
                 onSendTeam(text, files).also { result ->

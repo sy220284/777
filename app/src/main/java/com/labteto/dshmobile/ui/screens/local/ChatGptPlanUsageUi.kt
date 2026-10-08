@@ -76,6 +76,7 @@ internal fun LocalConversationErrorCard(
     restoreRequest: String?,
     onRestoreRequest: (String) -> Unit,
     onSwitchModelSource: () -> Unit,
+    showConnectAction: Boolean = false,
 ) {
     val message = sendRejectMessage ?: stateError ?: return
     val uriHandler = LocalUriHandler.current
@@ -102,6 +103,14 @@ internal fun LocalConversationErrorCard(
                 color = colors.error,
             )
             when {
+                showConnectAction -> {
+                    DsButton(
+                        text = stringResource(R.string.local_welcome_connect_action),
+                        onClick = onSwitchModelSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        size = DsButtonSize.Small,
+                    )
+                }
                 usageError -> {
                     DsButton(
                         text = stringResource(R.string.chatgpt_manage_usage),

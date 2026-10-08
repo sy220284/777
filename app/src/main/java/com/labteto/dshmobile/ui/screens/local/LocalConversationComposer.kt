@@ -74,7 +74,6 @@ internal fun LocalConversationComposer(
     onOpenAttachmentPicker: () -> Unit,
     onShowReplySuggestions: () -> Unit,
     onGenerateReplySuggestions: suspend () -> Boolean,
-    onConfigure: () -> Unit,
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
     onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult = onSend,
     teamDispatchSelected: Boolean = false,
@@ -125,10 +124,8 @@ internal fun LocalConversationComposer(
     }
 
     fun submit() {
-        if (!state.configured) {
-            onConfigure()
-            return
-        }
+        // Sending is a conversation action, even when the model is not configured.
+        // Let the send coordinator reject it with visible feedback and keep the draft.
         val result = if (
             state.usageMode == LocalUsageMode.WORK && teamDispatchSelected
         ) {
