@@ -42,6 +42,7 @@ internal fun localWorkFeatureUiContribution(
             LocalRunCenterScreen(
                 state = workState,
                 onJobOutput = actions.backgroundJobOutput,
+                onArtifacts = actions.artifactsForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
