@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,6 +18,7 @@ class AppearancePolicyTest {
     fun readingWeightAdjustmentPreservesSemanticHierarchy() {
         val regular = TextStyle(fontWeight = FontWeight.Normal)
         val medium = TextStyle(fontWeight = FontWeight.Medium)
+        val semibold = TextStyle(fontWeight = FontWeight.SemiBold)
         val bold = TextStyle(fontWeight = FontWeight.Bold)
 
         assertEquals(FontWeight.Normal, regular.adjustedReadingWeight(0).fontWeight)
@@ -24,7 +26,10 @@ class AppearancePolicyTest {
         assertEquals(FontWeight.SemiBold, regular.adjustedReadingWeight(2).fontWeight)
         assertEquals(FontWeight.SemiBold, medium.adjustedReadingWeight(1).fontWeight)
         assertEquals(FontWeight.Bold, medium.adjustedReadingWeight(2).fontWeight)
-        assertEquals(FontWeight.Bold, bold.adjustedReadingWeight(2).fontWeight)
+        assertEquals(FontWeight.Bold, semibold.adjustedReadingWeight(1).fontWeight)
+        assertEquals(FontWeight.ExtraBold, semibold.adjustedReadingWeight(2).fontWeight)
+        assertEquals(FontWeight.ExtraBold, bold.adjustedReadingWeight(1).fontWeight)
+        assertEquals(FontWeight.ExtraBold, bold.adjustedReadingWeight(2).fontWeight)
     }
 
     @Test
@@ -33,8 +38,13 @@ class AppearancePolicyTest {
         assertTrue(DsType.navigationSupporting.fontSize > DsType.small13.fontSize)
         assertTrue(DsType.navigationSection.fontSize > DsType.caption11.fontSize)
         assertTrue(DsType.navigationItem.fontWeight!! >= FontWeight.SemiBold)
-        assertTrue(DsType.mdBody.fontWeight!! >= FontWeight.Medium)
-        assertTrue(DsType.chatBody.fontWeight!! >= FontWeight.Medium)
+        assertEquals(FontWeight.Normal, DsType.mdBody.fontWeight)
+        assertEquals(FontWeight.Normal, DsType.chatBody.fontWeight)
+        assertEquals(FontFamily.SansSerif, DsType.uiFont)
+        assertTrue(DsType.drawerItem.fontSize > DsType.drawerSession.fontSize)
+        assertTrue(DsType.drawerSession.fontSize > DsType.drawerSection.fontSize)
+        assertTrue(DsType.drawerItem.fontWeight!! > DsType.drawerSession.fontWeight!!)
+        assertTrue(DsType.base16Strong.fontWeight!! > DsType.base16.fontWeight!!)
     }
 
     @Test

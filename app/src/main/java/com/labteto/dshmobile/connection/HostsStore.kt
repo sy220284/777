@@ -251,7 +251,7 @@ class HostsStore @Inject constructor(
             sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
             textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(0.9f, 1.3f),
-            textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 1).coerceIn(0, 2),
+            textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
         )
