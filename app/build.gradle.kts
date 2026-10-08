@@ -132,6 +132,7 @@ val generateUiFontSubset = tasks.register<Exec>("generateUiFontSubset") {
     inputs.dir(rootProject.file("app/src/main/java/com/labteto/dshmobile/ui"))
     outputs.dir(generatedUiFontRes)
     outputs.file(layout.buildDirectory.file("generated/ui-font-subset-manifest.json"))
+    environment("DSH_FONT_OFFLINE", gradle.startParameter.isOffline.toString())
     commandLine("bash", rootProject.file("tools/fonts/generate.sh").absolutePath, generatedUiFontRes.get().asFile.absolutePath)
 }
 

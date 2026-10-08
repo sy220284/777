@@ -28,6 +28,14 @@ class UiFontTests(unittest.TestCase):
             self.assertTrue(set(map(ord, "设置按钮工作人物日记")).issubset(needed))
             self.assertNotIn(ord("忽"), needed)
 
+    def test_offline_fonttools_bootstrap_rejects_network(self):
+        shell = (HERE / "generate.sh").read_text(encoding="utf-8")
+        self.assertIn('DSH_FONT_OFFLINE:-false', shell)
+        self.assertIn('GITHUB_ACTIONS:-false', shell)
+        self.assertIn('.gradle/runtime-cache/ui-fonttools-python', shell)
+        self.assertIn('fonttools_available ||', shell)
+        self.assertIn('runtime-cache Artifact', shell)
+
     def test_git_blob_hash_and_font_source(self):
         self.assertEqual(font.git_sha(b"test"), "30d74d258442c7c65512eafab474568dd706c430")
         data = (HERE / "source" / "NotoSansSC-wght.ttf").read_bytes()
