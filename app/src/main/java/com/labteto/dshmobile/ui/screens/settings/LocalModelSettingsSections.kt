@@ -33,7 +33,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -89,7 +88,6 @@ internal fun LocalModelSettingsCard(
     local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
-    onOpenAccount: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
@@ -107,7 +105,6 @@ internal fun LocalModelSettingsCard(
     var testing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
-    val chatGpt by viewModel.chatGptState.collectAsStateWithLifecycle()
     val matchingRoutes = local.modelProfiles.filter {
         it.authKind == LocalModelAuthKind.API_KEY &&
             it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
@@ -133,11 +130,11 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    AppSettingsSection {
-        AppSettingsRow(FeatherIcons.User, stringResource(R.string.settings_account),
-            value = stringResource(if (chatGpt.connected) R.string.chatgpt_connected else R.string.chatgpt_not_connected),
-            onClick = onOpenAccount)
-    }
+    DsButton(stringResource(R.string.local_model_add), onClick = {
+        editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
+        custom = false
+        showEditor = true
+    }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
     SettingsCard(stringResource(R.string.advanced_model_settings)) {
         Text(
             stringResource(R.string.local_model_image_mode_title),
@@ -238,11 +235,6 @@ internal fun LocalModelSettingsCard(
                 }
             }
         }
-        DsButton(stringResource(R.string.local_model_add), onClick = {
-            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
-            custom = false
-            showEditor = true
-        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
     }
 
     if (showEditor) {
