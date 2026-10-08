@@ -90,7 +90,7 @@ fun DsSheetChoiceRow(
                 trailingText?.let {
                     Text(it, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                 }
-                Icon(
+                if (enabled || trailingText == null) Icon(
                     FeatherIcons.ChevronRight,
                     contentDescription = null,
                     tint = when {

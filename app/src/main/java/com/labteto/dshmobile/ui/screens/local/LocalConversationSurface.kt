@@ -245,7 +245,8 @@ internal fun LocalConversationSurface(
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
     val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
-    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
+    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
+        (if (state.running) 1 else 0)
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
