@@ -399,6 +399,7 @@ internal fun ChatPersonaDialog(
     var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
     var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
+    var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(!creatingNew) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
     var saving by remember(profile.id) { mutableStateOf(false) }
     var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
@@ -519,6 +520,7 @@ internal fun ChatPersonaDialog(
                 DsButton(
                     text = stringResource(
                         if (aiGenerating) R.string.local_persona_ai_generating
+                        else if (creatingNew) R.string.local_persona_ai_generate_new
                         else R.string.local_persona_ai_generate
                     ),
                     onClick = {
@@ -575,6 +577,15 @@ internal fun ChatPersonaDialog(
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
             PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
         }
+        DsButton(
+            text = stringResource(
+                if (advancedOpen) R.string.local_persona_hide_more else R.string.local_persona_show_more
+            ),
+            onClick = { advancedOpen = !advancedOpen },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
+        if (advancedOpen) {
         PersonaFormSection(stringResource(R.string.persona_form_life)) {
             PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
             PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
@@ -598,8 +609,7 @@ internal fun ChatPersonaDialog(
             PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
             PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
         }
-
-
+        }
     }
 }
 

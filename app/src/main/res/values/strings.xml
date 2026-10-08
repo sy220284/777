@@ -513,7 +513,7 @@
     <string name="panel_involved_files">工作涉及文件</string>
     <string name="panel_conversation_files_empty">本次对话暂时没有最终产物。</string>
     <string name="chat_open_files">查看产物</string>
-    <string name="chatlist_workspace_files">项目</string>
+    <string name="chatlist_workspace_files">工作区文件</string>
     <string name="panel_files">文件</string>
     <string name="panel_preview">预览</string>
     <string name="panel_terminal">终端</string>
@@ -628,7 +628,7 @@
     <string name="local_files_workspace_empty">项目暂无资料</string>
     <string name="local_files_loading">正在读取文件…</string>
     <string name="chat_diary_loading">正在整理角色日记…</string>
-    <string name="local_files_binary_hint">该文件为二进制文件，当前显示文件信息；可在工作区列表中确认其路径和大小。</string>
+    <string name="local_files_binary_hint">这种文件目前无法直接显示内容，你仍可查看名称、位置和大小。</string>
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
 
     <string name="pair_fail_local">配对未能完成：本机保存凭据或准备连接时发生错误。请重试；若持续出现，请重启应用并检查 Android 存储与安全服务。</string>
@@ -643,21 +643,21 @@
     <string name="settings_group_experience">体验</string>
     <string name="settings_group_system">系统</string>
     <string name="settings_group_maintenance">维护</string>
-    <string name="settings_models_subtitle">模型配置、账户与连通性测试</string>
-    <string name="settings_model_usage_subtitle">API 价格、Token 消耗与费用估算</string>
-    <string name="settings_memory_subtitle">长期规则、自动记忆与召回</string>
-    <string name="settings_session_subtitle">会话排序与聊天流式过滤</string>
+    <string name="settings_models_subtitle">登录 AI 账户、添加模型、检查是否能使用</string>
+    <string name="settings_model_usage_subtitle">查看使用量、价格和预计费用</string>
+    <string name="settings_memory_subtitle">让 AI 记住你的偏好和重要信息</string>
+    <string name="settings_session_subtitle">管理聊天记录和消息显示方式</string>
     <string name="settings_permissions_subtitle">远程连接、后台连接与设备授权</string>
     <string name="settings_notifications_subtitle">完成、目标与需要处理的提醒</string>
-    <string name="settings_advanced_subtitle">智能体执行、项目配置与诊断</string>
+    <string name="settings_advanced_subtitle">工作方式、项目设置和问题排查</string>
     <string name="settings_runtime_diagnostics">运行与诊断</string>
     <string name="settings_local_session_storage">本地会话存储</string>
-    <string name="settings_local_session_storage_usage">已用 %1$s · 软预算 %2$s</string>
+    <string name="settings_local_session_storage_usage">已用 %1$s · 建议保留在 %2$s 以内</string>
     <string name="settings_local_session_storage_free">设备可用 %1$s · %2$d 个会话</string>
-    <string name="settings_local_session_storage_segments">旧原始分片 %1$d 个 · 已压缩分片 %2$d 个</string>
+    <string name="settings_local_session_storage_segments">历史记录 %1$d 份 · 已整理 %2$d 份</string>
     <string name="settings_local_session_storage_warning">会话存储已超过软预算，或设备剩余空间偏低。建议先导出，再删除不再需要的会话。</string>
     <string name="settings_local_session_storage_retention">原始会话事实会一直保留到你主动删除会话；压缩不会丢历史。</string>
-    <string name="settings_local_session_storage_compact">压缩旧分片</string>
+    <string name="settings_local_session_storage_compact">整理旧聊天记录</string>
     <string name="settings_local_session_storage_export">导出全部本地会话</string>
     <string name="settings_local_session_storage_cleanup">返回聊天页清理会话</string>
     <string name="settings_local_session_storage_compacted">旧会话分片已压缩。</string>
@@ -667,9 +667,9 @@
     <string name="settings_network_diagnostic">网络诊断</string>
     <string name="settings_environment_capabilities">环境能力</string>
     <string name="settings_export_diagnostics">导出诊断报告</string>
-    <string name="settings_export_diagnostics_hint">仅包含运行状态与日志元信息，不含对话及密钥。</string>
+    <string name="settings_export_diagnostics_hint">只导出应用运行信息，不包含聊天内容和登录凭据。</string>
     <string name="settings_export_diagnostics_failed">诊断报告保存失败。</string>
-    <string name="settings_diagnostic_events">已记录 %1$d 条事件（最多显示 40 条）</string>
+    <string name="settings_diagnostic_events">已记录 %1$d 条运行信息（最多显示 40 条）</string>
     <string name="settings_diagnostic_show_all">显示全部事件</string>
     <string name="settings_diagnostic_errors_only">只看错误</string>
     <string name="settings_diagnostic_empty">没有符合条件的事件。</string>
@@ -679,7 +679,7 @@
     <string name="common_refresh">刷新</string>
     <string name="common_maximum">最大</string>
     <string name="advanced_accessibility">无障碍控制</string>
-    <string name="advanced_agent_limits_hint">主循环 4–512；子代理 1–512；长按 ± 可连续调整，也可直接输入数字。</string>
+    <string name="advanced_agent_limits_hint">设置 AI 助手最多执行多少步；长按加减可以连续调整，也能直接输入数字。</string>
     <string name="advanced_agent_saved">智能体设置已保存</string>
     <string name="advanced_agent_settings">智能体设置</string>
     <string name="advanced_auto_memory">自动记忆明确长期规则</string>
@@ -767,7 +767,7 @@
     <string name="local_model_capability_video">视频</string>
     <string name="local_model_capability_audio">音频</string>
     <string name="local_model_capability_music">音乐</string>
-    <string name="advanced_model_unconfigured">尚未配置本机模型密钥。</string>
+    <string name="advanced_model_unconfigured">这里还没有填写模型密钥。如果已经通过账户登录使用模型，可以忽略这一项。</string>
     <string name="advanced_not_authorized">未授权</string>
     <string name="advanced_notification_access">通知读取</string>
     <string name="advanced_pin">置顶</string>
@@ -917,7 +917,7 @@
     <string name="local_group_chat_active_speaker">%1$s 正在回复…</string>
     <string name="local_group_chat_members_title">群聊角色</string>
     <string name="local_group_chat_search_members">搜索角色</string>
-    <string name="local_group_chat_members_hint">从已创建的人物中选择 %1$d～%2$d 个。每个角色由独立角色智能体读取自己的完整人设与关系状态。</string>
+    <string name="local_group_chat_members_hint">从已创建的人物中选择 %1$d～%2$d 位。每位人物都会保留自己的性格和与你的关系。</string>
     <string name="local_group_chat_no_characters">还没有可加入群聊的人物，请先在人设图集创建或保存角色。</string>
     <string name="local_group_chat_selected_count">已选择 %1$d/%2$d</string>
     <string name="local_group_chat_apply_members">保存群聊角色</string>
@@ -925,11 +925,11 @@
     <string name="local_group_chat_manage_members">管理群聊角色</string>
     <string name="local_chat_composer_hint">想说什么就说吧…</string>
     <string name="local_persona_title">角色人设</string>
-    <string name="local_persona_intro">固定人设会在每轮聊天重新注入，不跟普通聊天历史一起被压缩。</string>
-    <string name="local_persona_name">角色名称</string>
-    <string name="local_persona_intro_v3">人物资料描述这个人怎样生活、注意和变化；聊天时只会按当前情境投影真正相关的部分。</string>
+    <string name="local_persona_intro">人物设定会帮助 AI 在后续聊天中保持一致的性格和说话方式。</string>
+    <string name="local_persona_name">人物名字</string>
+    <string name="local_persona_intro_v3">先写下人物的名字和特点。想让人物更鲜活，还可以展开详细设定。</string>
     <string name="local_persona_ai_example_v3">例如：24 岁自由插画师，线下社恐、网上很能聊，对颜色特别敏感，工作时会忘记吃饭。</string>
-    <string name="local_persona_portrait">像朋友介绍这个人</string>
+    <string name="local_persona_portrait">人物简介（性格、身份和特点）</string>
     <string name="local_persona_life_context">他的生活</string>
     <string name="local_persona_attention">他天然会注意什么（每行一项）</string>
     <string name="local_persona_blind_spots">他容易漏掉或误读什么（每行一项）</string>
@@ -952,7 +952,7 @@
     <string name="local_persona_banned">角色专属禁用词（每行一条）</string>
     <string name="local_persona_signature">角色常用表达（每行一条）</string>
     <string name="local_persona_corrections">已学到的人设纠正（每行一条，可编辑或删除）</string>
-    <string name="local_persona_save">保存人设</string>
+    <string name="local_persona_save">保存人物设定</string>
     <string name="chat_scroll_start">回到开头</string>
     <string name="chat_scroll_latest">回到最新</string>
 
@@ -1071,7 +1071,7 @@
     <string name="persona_gallery_archive_deleted">归档对白已删除</string>
 
 
-    <string name="local_run_center">运行中心</string>
+    <string name="local_run_center">任务进度</string>
     <string name="local_workflow_stage">当前阶段：%1$s</string>
     <string name="local_workflow_executing">执行中</string>
     <string name="local_workflow_reassigning">重新指派</string>
@@ -1087,13 +1087,13 @@
     <string name="local_run_plan">计划</string>
     <string name="local_run_tasks_progress">任务 · %1$d/%2$d</string>
     <string name="local_run_background">后台任务</string>
-    <string name="local_run_agent_direct_title">直接调用后台子代理</string>
-    <string name="local_run_agent_direct_body">把一项独立任务交给后台子代理；它会保留自己的进度，完成后仍可继续追加指令。</string>
-    <string name="local_run_agent_task_hint">例如：审计当前实现并列出仍需修复的问题</string>
-    <string name="local_run_agent_start">启动子代理</string>
-    <string name="local_run_agent_message_hint">继续给这个子代理追加指令…</string>
-    <string name="local_run_agent_send">发送指令</string>
-    <string name="local_run_agent_dormant_hint">正在等待新消息；发送后会从上次状态继续。</string>
+    <string name="local_run_agent_direct_title">交给 AI 助手处理</string>
+    <string name="local_run_agent_direct_body">描述你想完成的事。助手会独立处理，你可以回来查看进度，也能随时补充要求。</string>
+    <string name="local_run_agent_task_hint">例如：检查当前项目，列出还需要改进的地方</string>
+    <string name="local_run_agent_start">交给助手处理</string>
+    <string name="local_run_agent_message_hint">给助手补充要求…</string>
+    <string name="local_run_agent_send">发送</string>
+    <string name="local_run_agent_dormant_hint">助手正在等你的新要求，发送后会接着处理。</string>
     <string name="local_run_agent_pending_messages">待处理消息 %1$d 条</string>
     <string name="local_run_resources">资源</string>
     <string name="local_run_job_view">查看</string>
@@ -1188,8 +1188,8 @@
     <string name="settings_chat_guard_hits_title">最近实际过滤</string>
     <string name="settings_chat_guard_hits_empty">最近没有过滤到内容。</string>
     <string name="settings_chat_guard_hits_clear">清空过滤记录</string>
-    <string name="local_mode_intro_chat">聊天模式：用于日常聊天、角色扮演和连续关系记忆；会启用人设与聊天风格门禁。</string>
-    <string name="local_mode_intro_work">工作模式：用于任务执行、文件、命令、工具和子代理；完整执行链只在这里展开。</string>
+    <string name="local_mode_intro_chat">和你创建的人物自然聊天，延续之前的故事和彼此的关系。</string>
+    <string name="local_mode_intro_work">在这里把任务交给 AI，查看进度、使用工具，并管理完成的文件。</string>
     <string name="local_persona_correction_recorded">已记入人设纠正</string>
     <string name="local_persona_correction_undo">撤销</string>
 
@@ -1292,7 +1292,7 @@
     <string name="tasks_chat_suggestions_title">顺手安排</string>
     <string name="tasks_chat_suggestions_subtitle">根据最近聊天，挑两三件适合以后自然发生的事。</string>
     <string name="tasks_chat_suggestions_loading">正在从最近聊天里找合适的后续…</string>
-    <string name="tasks_chat_suggestions_empty">最近聊天还不够形成合适建议，直接在下方告诉我也可以。</string>
+    <string name="tasks_chat_suggestions_empty">现在还没有合适的互动建议。你也可以直接写下希望人物做的事。</string>
     <string name="tasks_chat_suggestion_hint">点一下带入下方，还可以继续改</string>
     <string name="tasks_chat_plan_mention">@角色事件规划</string>
     <string name="tasks_chat_plan_placeholder">例如：明晚让她来问我今天过得怎么样</string>
@@ -1316,7 +1316,7 @@
     <string name="tasks_chat_schedule_once">一次 · %1$s</string>
     <string name="tasks_chat_schedule_interval_hours">每 %1$d 小时 · 下次 %2$s</string>
     <string name="tasks_chat_schedule_interval_minutes">每 %1$d 分钟 · 下次 %2$s</string>
-    <string name="tasks_chat_suggestions_failed">暂时没生成出合适的互动建议。</string>
+    <string name="tasks_chat_suggestions_failed">这次没有找到合适的互动建议，你也可以自己写下想安排的事。</string>
     <string name="tasks_chat_session_changed">聊天已经切换，请在当前聊天重新安排。</string>
     <string name="tasks_chat_save_failed">这个事件还不能保存，请换一种时间说法再试。</string>
     <string name="tasks_chat_plan_failed">定时事件生成失败，请重试。</string>
@@ -1377,7 +1377,7 @@
     <string name="local_harness_loading">正在准备本机执行环境…</string>
     <string name="local_harness_title">本机 Harness</string>
     <string name="local_on_device_execution_title">手机直接执行</string>
-    <string name="local_on_device_execution_hint">模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。</string>
+    <string name="local_on_device_execution_hint">聊天、处理文件、搜索资料和使用工具都可以在手机上完成。远程控制可从侧边栏进入。</string>
     <string name="local_model_section_title">模型与接口</string>
     <string name="local_model_flash_label">DeepSeek Flash｜V4.1 · 思考默认开启</string>
     <string name="local_model_pro_label">DeepSeek V4 Pro｜专家模型</string>
@@ -1385,7 +1385,7 @@
     <string name="local_model_save_enter">保存并进入本机 Harness</string>
     <string name="local_file_import_failed">文件导入失败</string>
     <string name="local_restore_request">恢复请求</string>
-    <string name="local_manage_model_config">管理模型配置</string>
+    <string name="local_manage_model_config">管理 AI 模型</string>
     <string name="local_attachment_image">图片</string>
     <string name="local_attachment_file">文件</string>
     <string name="local_run_agents">智能体 %1$d</string>
@@ -1504,7 +1504,10 @@
 <string name="usage_model_step">%1$s · 第 %2$d 步</string>
 <string name="local_send_rejected_empty">请输入消息或添加附件。</string>
 <string name="local_send_rejected_loading">会话仍在加载，请稍后重试；当前输入已保留。</string>
-<string name="local_send_rejected_unconfigured">当前模型尚未配置，请先完成模型设置。</string>
+<string name="local_welcome_connect_title">先连接 AI，就可以开始使用</string>
+    <string name="local_welcome_connect_body">登录账户或添加模型后，就能在这里聊天和处理任务。</string>
+    <string name="local_welcome_connect_action">去连接</string>
+    <string name="local_send_rejected_unconfigured">还没有可用的 AI 模型。请先在设置里连接一个，然后再发送。</string>
 <string name="local_send_rejected_session_transition">会话正在切换，请稍后重试；当前输入已保留。</string>
 <string name="local_send_rejected_queue_full">当前执行中的补充消息已达到 %1$d 条上限；当前输入已保留。</string>
 <string name="local_send_rejected_queue_unavailable">当前执行中的补充消息队列暂时不可用；当前输入已保留。</string>
@@ -1583,11 +1586,11 @@
     <string name="local_drawer_group_chat_hint">多人角色对话</string>
     <string name="local_drawer_chat_tasks_hint">计划、免打扰与互动节奏</string>
     <string name="local_drawer_workspace_hint">文件与任务产物</string>
-    <string name="local_drawer_run_center_hint">进度、智能体与后台任务</string>
+    <string name="local_drawer_run_center_hint">查看当前任务、进展和结果</string>
     <string name="local_drawer_work_tasks_hint">定时、计划与主动执行</string>
     <string name="local_drawer_tools_hint">能力、连接与扩展</string>
     <string name="local_run_needs_attention">需要你处理 · %1$d</string>
-    <string name="local_run_agent_inherits_context">默认沿用当前任务的模型与执行边界；启动后可在这里继续发消息。</string>
+    <string name="local_run_agent_inherits_context">助手会沿用当前任务的设置。开始后，你可以随时回来补充要求。</string>
 
     <string name="tools_capability_code_hint">定义、引用、诊断与工作区符号</string>
     <string name="tools_capability_vision_hint">图片与屏幕内容理解</string>
@@ -1669,7 +1672,7 @@
     <string name="app_model_available">可用于当前对话</string>
     <string name="app_model_context">上下文容量 %1$d Token</string>
     <string name="app_extended_capabilities">777 扩展能力</string>
-    <string name="app_project_title">项目</string>
+    <string name="app_project_title">工作区文件</string>
     <string name="app_project_materials">项目资料</string>
     <string name="app_project_context">会话资料</string>
     <string name="app_team_task_updated">更新任务安排</string>
@@ -1681,16 +1684,23 @@
     <string name="settings_approval_default_hint">低风险操作经安全策略确认后自动进行，其余操作逐次询问。</string>
     <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
     <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
-    <string name="local_project_management_title">项目管理</string>
+    <string name="local_project_select_hint">选择要使用的项目</string>
+    <string name="local_project_current_settings">当前项目的设置</string>
+    <string name="local_drawer_projects_plain_hint">按不同目标整理工作要求</string>
+    <string name="local_drawer_workspace_plain_hint">查看和管理工作文件</string>
+    <string name="local_model_picker_empty_title">还没有可用的 AI 模型</string>
+    <string name="local_model_picker_empty_body">先在模型设置中登录账户或添加模型，之后就能开始聊天和处理任务。</string>
+    <string name="local_model_picker_configure">去连接 AI 模型</string>
+    <string name="local_project_management_title">工作项目</string>
     <string name="local_project_back">返回</string>
-    <string name="local_project_new_session_hint">切换项目只影响之后新建的项目会话，已有会话保留原项目归属。</string>
+    <string name="local_project_new_session_hint">每个项目都能保存自己的工作要求。切换后，新建的对话会使用这个项目，之前的对话不变。</string>
     <string name="local_project_name_hint">新项目名称</string>
     <string name="local_project_create">创建项目</string>
     <string name="local_project_rename">保存项目名称</string>
     <string name="local_project_rename_hint">当前项目名称</string>
-    <string name="local_project_instruction_label">项目指令 · %1$s</string>
-    <string name="local_project_instruction_hint">本项目长期工作规则</string>
-    <string name="local_project_save_instruction">保存项目指令</string>
+    <string name="local_project_instruction_label">希望 AI 在「%1$s」中遵守什么？</string>
+    <string name="local_project_instruction_hint">例如：先检查问题，再修改；写清每次完成了什么</string>
+    <string name="local_project_save_instruction">保存工作要求</string>
     <string name="tasks_schedule_monthly">每月</string>
     <string name="advanced_memory_vault_view">按记忆空间分组</string>
     <string name="advanced_memory_flat_view">返回平铺列表</string>
@@ -1740,9 +1750,9 @@
     <string name="tasks_chat_optimize">优化任务</string>
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
-    <string name="local_project_start_work_session">在当前项目中新建工作会话</string>
+    <string name="local_project_start_work_session">用当前项目开始新工作</string>
     <string name="local_project_backup_and_reset">备份损坏目录并恢复默认项目</string>
-    <string name="local_project_cannot_switch_session">会话当前不可切换</string>
+    <string name="local_project_cannot_switch_session">现在暂时无法开始新的工作，请稍后再试。</string>
     <string name="settings_memory_status">记忆状态</string>
     <string name="persona_form_basics">基本信息</string>
     <string name="persona_form_life">生活与习惯</string>
