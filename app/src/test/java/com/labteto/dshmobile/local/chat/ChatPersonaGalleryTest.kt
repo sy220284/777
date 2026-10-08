@@ -174,6 +174,39 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun deleteJournalCleansOrphanOnlyAfterMetadataCommit() {
+        val root = temporary.newFolder("archive-delete-recovery")
+        val file = File(root, "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val saved = gallery.save(
+            persona = PersonaProfile(name = "阿青"), sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("m1", "assistant", "历史", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+        )
+        val storyId = checkNotNull(saved.storyId)
+        val archive = File(File(File(root, "persona-history-v5"), saved.entry.id), storyId + ".jsonl")
+        assertTrue(archive.isFile)
+        val pending = PersonaGalleryArchiveDeletionJournal(file, json)
+        pending.queue(saved.entry.id, storyId)
+        // A failed metadata commit must preserve referenced history.
+        val intact = ChatPersonaGalleryStore(file, json)
+        assertEquals(1, intact.loadStoryHistory(saved.entry.id, storyId, 10).totalCount)
+        assertTrue(archive.isFile)
+
+        pending.queue(saved.entry.id, storyId)
+        val document = json.decodeFromString(GalleryDocument.serializer(), file.readText())
+        file.writeText(json.encodeToString(GalleryDocument.serializer(),
+            document.copy(entries = document.entries.map { entry ->
+                if (entry.id != saved.entry.id) entry else entry.copy(stories = emptyList())
+            }),
+        ))
+        // Crash after the durable metadata commit; startup finishes the physical deletion.
+        val recovered = ChatPersonaGalleryStore(file, json)
+        assertTrue(recovered.list().single().stories.isEmpty())
+        assertTrue(!archive.exists())
+    }
+
+    @Test
     fun archivedDialogueDeletionCreatesTombstoneSoLaterSaveCannotRestoreIt() {
         val first = LocalHarnessMessage("m1", "user", "第一句", createdAt = 1L)
         val second = LocalHarnessMessage("m2", "assistant", "第二句", createdAt = 2L)

@@ -24,6 +24,7 @@ class ChatPersonaGalleryStore internal constructor(
         json,
     )
     private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
+    private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
 
     private var excludedHistoryReconciled = false
 
@@ -440,8 +441,10 @@ class ChatPersonaGalleryStore internal constructor(
     fun delete(id: String): Boolean {
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == id }))
-        history.deleteEntry(id)
+        val updated = doc.copy(version = 5, entries = doc.entries.filterNot { it.id == id })
+        archiveDeletionJournal.queue(id)
+        documentStore.write(updated)
+        archiveDeletionJournal.drain(updated, history)
         return true
     }
 
@@ -454,8 +457,10 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.filterNot { it.id == storyId },
             updatedAt = System.currentTimeMillis(),
         )
-        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
-        history.deleteStory(id, storyId)
+        val next = doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it })
+        archiveDeletionJournal.queue(id, storyId)
+        documentStore.write(next)
+        archiveDeletionJournal.drain(next, history)
         return true
     }
 
@@ -500,7 +505,9 @@ class ChatPersonaGalleryStore internal constructor(
         val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
-        return recoverDurableHistoryExclusions(normalized)
+        val recovered = recoverDurableHistoryExclusions(normalized)
+        archiveDeletionJournal.drain(recovered, history)
+        return recovered
     }
 
 
