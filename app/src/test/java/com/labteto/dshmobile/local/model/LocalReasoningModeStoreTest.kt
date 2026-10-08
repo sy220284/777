@@ -39,6 +39,13 @@ class LocalReasoningModeStoreTest {
         assertEquals("none", LocalReasoningModeStore.effortFor(session, route))
         LocalReasoningModeStore.setEnabled(session, true)
         assertEquals("high", LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.LOW)
+        assertEquals("low", LocalReasoningModeStore.effortFor(session, route))
+        LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+        assertEquals("max", LocalReasoningModeStore.effortFor(session, route))
+        assertEquals(listOf(com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.FAST, com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.LOW,
+            com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.DEEP, com.labteto.dshmobile.local.presentation.LocalReasoningUiMode.MAX),
+            com.labteto.dshmobile.local.presentation.LocalReasoningControls.availableModes(route, com.labteto.dshmobile.local.LocalUsageMode.CHAT))
     }
 
     @Test fun chatCompletionWithToolsIsNotExposedAsHighReasoning() {
