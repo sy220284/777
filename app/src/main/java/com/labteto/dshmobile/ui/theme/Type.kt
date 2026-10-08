@@ -3,19 +3,30 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.labteto.dshmobile.R
 
 /**
- * DeepSeek Harness type scale (gradient-shadow-text.css):
- * sizes 11..24, system UI stack + mono code stack.
+ * Mobile type roles: page titles, body, supporting text and code have independent metrics.
+ * Reading preferences adjust weight without replacing the reference glyph families.
  */
 object DsType {
-    val uiFont = FontFamily.SansSerif
+    // Latin glyphs use the reference resource family; Android supplies missing CJK glyphs.
+    val uiFont = FontFamily(
+        Font(R.font.ui_latin_regular, FontWeight.Normal),
+        Font(R.font.ui_latin_medium, FontWeight.Medium),
+        Font(R.font.ui_latin_semibold, FontWeight.SemiBold),
+    )
     /** Android's CJK-aware serif family; centralised so a packaged subset can replace it later. */
     val titleFont = FontFamily.Serif
-    val codeFont = FontFamily.Monospace
+    val codeFont = FontFamily(
+        Font(R.font.code_mono_regular, FontWeight.Normal),
+        Font(R.font.code_mono_italic, FontWeight.Normal, FontStyle.Italic),
+    )
 
     // Markdown roles
     val mdH1 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 34.sp)

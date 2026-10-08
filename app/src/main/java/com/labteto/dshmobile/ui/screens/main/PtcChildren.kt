@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
+import com.labteto.dshmobile.ui.theme.DsType
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -29,7 +31,7 @@ internal fun PtcChildren(parent: String, events: List<OtherNode>, ancestors: Set
             Column(Modifier.padding(start = 12.dp)) {
                 record["arguments"]?.let { args ->
                     val code = (args as? JsonObject)?.get("code") as? JsonPrimitive
-                    if (code != null) Text(code.content, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    if (code != null) Text(code.content, fontFamily = DsType.codeFont)
                     JsonDisclosure("JSON", args)
                 }
                 record["content"]?.let { JsonDisclosure("JSON", it) }
