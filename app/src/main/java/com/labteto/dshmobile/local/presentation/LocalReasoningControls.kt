@@ -18,12 +18,13 @@ internal object LocalReasoningControls {
         LocalReasoningUiMode.valueOf(LocalReasoningModeStore.mode(sessionId).name)
 
     fun availableModes(profile: LocalModelProfile?, mode: LocalUsageMode): List<LocalReasoningUiMode> {
-        val policy = LocalReasoningRequestPolicy.resolve(profile, mode == LocalUsageMode.WORK)
+        val supported = profile ?: return emptyList()
+        val policy = LocalReasoningRequestPolicy.resolve(supported, mode == LocalUsageMode.WORK)
             ?: return emptyList()
         return buildList {
             // Only DeepSeek's documented provider default is known to equal HIGH.
             // Other providers keep an explicit "Default" position to avoid false claims.
-            if (profile.model.trim().lowercase() !in setOf("deepseek-flash", "deepseek-v4-pro")) {
+            if (supported.model.trim().lowercase() !in setOf("deepseek-flash", "deepseek-v4-pro")) {
                 add(LocalReasoningUiMode.DEFAULT)
             }
             add(LocalReasoningUiMode.FAST)
