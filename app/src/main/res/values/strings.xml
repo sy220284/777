@@ -1504,7 +1504,10 @@
 <string name="usage_model_step">%1$s · 第 %2$d 步</string>
 <string name="local_send_rejected_empty">请输入消息或添加附件。</string>
 <string name="local_send_rejected_loading">会话仍在加载，请稍后重试；当前输入已保留。</string>
-<string name="local_send_rejected_unconfigured">还没有可用的 AI 模型。请先在设置里连接一个，然后再发送。</string>
+<string name="local_welcome_connect_title">先连接 AI，就可以开始使用</string>
+    <string name="local_welcome_connect_body">登录账户或添加模型后，就能在这里聊天和处理任务。</string>
+    <string name="local_welcome_connect_action">去连接</string>
+    <string name="local_send_rejected_unconfigured">还没有可用的 AI 模型。请先在设置里连接一个，然后再发送。</string>
 <string name="local_send_rejected_session_transition">会话正在切换，请稍后重试；当前输入已保留。</string>
 <string name="local_send_rejected_queue_full">当前执行中的补充消息已达到 %1$d 条上限；当前输入已保留。</string>
 <string name="local_send_rejected_queue_unavailable">当前执行中的补充消息队列暂时不可用；当前输入已保留。</string>
