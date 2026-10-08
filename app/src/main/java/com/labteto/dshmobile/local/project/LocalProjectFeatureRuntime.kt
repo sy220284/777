@@ -47,8 +47,13 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
     private val json: Json,
 ) : ProjectContextPort {
     private val preferences = LocalHarnessPreferences.from(context)
-    private val mutableCatalog = MutableStateFlow(read())
+    private val initialCatalog = runCatching { read() }
+    private val mutableCatalog = MutableStateFlow(initialCatalog.getOrDefault(LocalProjectCatalogState()))
+    private val mutableRecoveryNotice = MutableStateFlow<String?>(
+        initialCatalog.exceptionOrNull()?.let { "项目目录无法读取。修改操作已暂停，可备份原始数据后恢复默认目录。" },
+    )
     val catalog: StateFlow<LocalProjectCatalogState> = mutableCatalog.asStateFlow()
+    val recoveryNotice: StateFlow<String?> = mutableRecoveryNotice.asStateFlow()
 
     override fun activeProjectId(): String = mutableCatalog.value.activeId
 
@@ -93,21 +98,26 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
         }))
     }
 
-    private fun read(): LocalProjectCatalogState {
-        val raw = preferences.getString(KEY_PROJECT_CATALOG, null) ?: return LocalProjectCatalogState()
-        val current = json.decodeFromString<LocalProjectCatalogState>(raw)
-        require(current.projects.isNotEmpty() && current.projects.size <= MAX_PROJECTS &&
-            current.projects.map(LocalProject::id).distinct().size == current.projects.size &&
-            current.projects.any { it.id == current.activeId } &&
-            current.projects.all {
-                it.id.isNotBlank() && it.name.isNotBlank() &&
-                it.name.length <= MAX_PROJECT_NAME_CHARS &&
-                it.instructions.length <= MAX_PROJECT_INSTRUCTIONS_CHARS
-            }) { "本地项目目录数据无效" }
-        return current
+    private fun read(): LocalProjectCatalogState =
+        preferences.getString(KEY_PROJECT_CATALOG, null)?.let { decodeLocalProjectCatalog(it, json) }
+            ?: LocalProjectCatalogState()
+
+    /** Keep the invalid original untouched until explicitly backed up and reset. */
+    @Synchronized
+    fun backupAndResetCatalog() {
+        check(mutableRecoveryNotice.value != null) { "项目目录正常，无需恢复" }
+        val original = preferences.all[KEY_PROJECT_CATALOG]?.toString()
+            ?: error("原始目录不可读取，恢复已取消")
+        val backupKey = KEY_PROJECT_CATALOG + "_backup_" + UUID.randomUUID()
+        check(preferences.edit().putString(backupKey, original).remove(KEY_PROJECT_CATALOG).commit()) {
+            "备份失败，原始项目目录已保留"
+        }
+        mutableCatalog.value = LocalProjectCatalogState()
+        mutableRecoveryNotice.value = null
     }
 
     private fun save(next: LocalProjectCatalogState) {
+        check(mutableRecoveryNotice.value == null) { "项目目录需先备份恢复" }
         check(preferences.edit().putString(KEY_PROJECT_CATALOG, json.encodeToString(next)).commit()) {
             "项目保存失败"
         }
@@ -117,6 +127,20 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
     private fun validateName(name: String): String = name.trim().also {
         require(it.isNotEmpty() && it.length <= MAX_PROJECT_NAME_CHARS) { "项目名称长度无效" }
     }
+}
+
+/** Testable validation of every persisted project identity and instruction. */
+internal fun decodeLocalProjectCatalog(raw: String, json: Json): LocalProjectCatalogState {
+    val current = json.decodeFromString<LocalProjectCatalogState>(raw)
+    require(current.projects.isNotEmpty() && current.projects.size <= MAX_PROJECTS &&
+        current.projects.map(LocalProject::id).distinct().size == current.projects.size &&
+        current.projects.any { it.id == current.activeId } &&
+        current.projects.all {
+            it.id.isNotBlank() && it.name.isNotBlank() &&
+                it.name.length <= MAX_PROJECT_NAME_CHARS &&
+                it.instructions.length <= MAX_PROJECT_INSTRUCTIONS_CHARS
+        }) { "本地项目目录数据无效" }
+    return current
 }
 
 @Module

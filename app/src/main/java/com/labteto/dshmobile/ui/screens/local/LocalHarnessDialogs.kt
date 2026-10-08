@@ -73,6 +73,13 @@ internal fun NewSessionModeDialog(
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
+        if (!chatMode) {
+            DsSheetChoiceRow(
+                title = stringResource(R.string.local_project_start_work_session),
+                subtitle = stringResource(R.string.local_project_new_session_hint),
+                onClick = { onSelect(LocalConversationMode.PROJECT) },
+            )
+        }
         DsSheetChoiceRow(
             title = stringResource(R.string.local_new_session_independent),
             subtitle = stringResource(

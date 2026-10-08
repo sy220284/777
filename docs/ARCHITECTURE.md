@@ -208,6 +208,8 @@ LocalFeatureCatalog
 ├─ Work
 │  ├─ Workspace
 │  └─ RunCenter
+├─ Project
+│  └─ Project
 ├─ Automation
 │  └─ Tasks
 ├─ Tools

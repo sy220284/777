@@ -10,6 +10,8 @@ class LocalProjectUiFacade @Inject internal constructor(
     private val runtime: LocalProjectFeatureRuntime,
 ) {
     internal val catalog get() = runtime.catalog
+    internal val recoveryNotice get() = runtime.recoveryNotice
+    fun backupAndResetCatalog() = runtime.backupAndResetCatalog()
     fun create(name: String): String = runtime.create(name)
     fun select(id: String) = runtime.select(id)
     fun updateInstructions(id: String, instructions: String) = runtime.updateInstructions(id, instructions)

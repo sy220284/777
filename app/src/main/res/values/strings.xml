@@ -1734,5 +1734,7 @@
     <string name="tasks_chat_optimize">优化任务</string>
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
+    <string name="local_project_start_work_session">在当前项目中新建工作会话</string>
+    <string name="local_project_backup_and_reset">备份损坏目录并恢复默认项目</string>
 </resources>
 

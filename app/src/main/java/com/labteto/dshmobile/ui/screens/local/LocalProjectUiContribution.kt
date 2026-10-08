@@ -26,6 +26,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 internal data class LocalProjectUiActions(
     val catalog: StateFlow<LocalProjectCatalogState>,
+    val recoveryNotice: StateFlow<String?>,
+    val backupAndReset: () -> Unit,
+    val createProjectWorkSession: () -> Boolean,
+    val onProjectSessionAccepted: () -> Unit,
     val create: (String) -> String,
     val select: (String) -> Unit,
     val updateInstructions: (String, String) -> Unit,
@@ -57,6 +61,7 @@ private fun LocalProjectScreen(
     onBack: () -> Unit,
 ) {
     val state by actions.catalog.collectAsStateWithLifecycle()
+    val recovery by actions.recoveryNotice.collectAsStateWithLifecycle()
     val active = state.projects.firstOrNull { it.id == state.activeId }
     var newName by remember { mutableStateOf("") }
     var instructionDraft by remember(active?.id, active?.instructions) {
@@ -73,6 +78,23 @@ private fun LocalProjectScreen(
             Text(stringResource(R.string.local_project_management_title))
         }
         Text(stringResource(R.string.local_project_new_session_hint))
+        if (recovery != null) {
+            Text(requireNotNull(recovery))
+            Button(
+                onClick = { runCatching { actions.backupAndReset() }.onFailure { error = it.message } },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.local_project_backup_and_reset)) }
+            error?.let { Text(it) }
+            return@Column
+        }
+        Button(
+            onClick = {
+                runCatching { actions.createProjectWorkSession() }
+                    .onSuccess { if (it) actions.onProjectSessionAccepted() else error = "会话当前不可切换" }
+                    .onFailure { error = it.message }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.local_project_start_work_session)) }
         state.projects.forEach { project ->
             Button(
                 onClick = {

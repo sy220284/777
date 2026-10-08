@@ -309,6 +309,10 @@ fun LocalHarnessScreen(
     )
     val projectActions = LocalProjectUiActions(
         catalog = viewModel.projectCatalog,
+        recoveryNotice = viewModel.projectRecoveryNotice,
+        backupAndReset = viewModel::backupAndResetProjectCatalog,
+        createProjectWorkSession = viewModel::createProjectWorkSession,
+        onProjectSessionAccepted = ::resetFeatureNavigation,
         create = viewModel::createProject,
         select = viewModel::selectProject,
         updateInstructions = viewModel::updateProjectInstructions,

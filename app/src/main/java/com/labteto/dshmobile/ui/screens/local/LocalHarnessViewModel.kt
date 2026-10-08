@@ -49,6 +49,11 @@ class LocalHarnessViewModel @Inject constructor(
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
     internal val projectCatalog = projects.catalog
+    internal val projectRecoveryNotice = projects.recoveryNotice
+    internal fun backupAndResetProjectCatalog() = projects.backupAndResetCatalog()
+    internal fun createProjectWorkSession() = runtime.session.createSession(
+        LocalConversationMode.PROJECT, LocalUsageMode.WORK,
+    )
     internal fun createProject(name: String) = projects.create(name)
     internal fun selectProject(id: String) = projects.select(id)
     internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
