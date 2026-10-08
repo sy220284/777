@@ -127,9 +127,7 @@ fun DsCategoryRow(
         ) {
             Text(
                 text = title,
-                style = (titleTextStyle ?: DsType.std14)
-                    .let { if (compactWithValue) it.copy(fontSize = 9.sp) else it }
-                    .withReadingWeight(),
+                style = (titleTextStyle ?: DsType.std14).withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -143,17 +141,28 @@ fun DsCategoryRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (compactWithValue) {
+                Text(
+                    text = requireNotNull(value),
+                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        value?.let {
-            Spacer(Modifier.width(if (compactWithValue) DsSpacing.tiny else DsSpacing.small))
-            Text(
-                text = it,
-                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
-                color = colors.labelSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = if (compactWithValue) 56.dp else 96.dp),
-            )
+        if (!compactWithValue) {
+            value?.let {
+                Spacer(Modifier.width(DsSpacing.small))
+                Text(
+                    text = it,
+                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 96.dp),
+                )
+            }
         }
         if (trailing != null) {
             Spacer(Modifier.width(DsSpacing.small))
