@@ -179,7 +179,7 @@ internal fun WorkProcessRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                WorkOperationIcon(AgentOperationKind.Generic, running = true)
+                WorkOperationIcon(AgentOperationKind.Generic, running = running)
                 Text(
                     stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought),
                     style = DsType.small13.withReadingWeight(),
@@ -328,7 +328,7 @@ internal fun WorkProcessRow(
             ) {
                 visibleNodes.forEachIndexed { visibleIndex, node ->
                     val rowRunning = running && visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
-                        node.count == 0 && !node.failed
+                        !node.failed
                     WorkContentBlock(node, rowRunning)
                 }
                 if (collapsedHiddenCount > 0) {
