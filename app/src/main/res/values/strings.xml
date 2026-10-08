@@ -1743,5 +1743,11 @@
     <string name="local_project_start_work_session">在当前项目中新建工作会话</string>
     <string name="local_project_backup_and_reset">备份损坏目录并恢复默认项目</string>
     <string name="local_project_cannot_switch_session">会话当前不可切换</string>
+    <string name="settings_memory_status">记忆状态</string>
+    <string name="persona_form_basics">基本信息</string>
+    <string name="persona_form_life">生活与习惯</string>
+    <string name="persona_form_character">性格与变化</string>
+    <string name="persona_form_expression">关系与表达</string>
+    <string name="persona_form_boundaries">世界与边界</string>
 </resources>
 

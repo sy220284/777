@@ -10,6 +10,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -48,8 +51,10 @@ class MobileLayoutRegressionTest {
         val backBounds = compose.onNodeWithContentDescription("返回").fetchSemanticsNode().boundsInRoot
         val actionBounds = compose.onNodeWithContentDescription("刷新").fetchSemanticsNode().boundsInRoot
         assertTrue(title.left >= backBounds.right && title.right <= actionBounds.left)
-        assertTrue(subtitle.left >= backBounds.right && subtitle.right <= actionBounds.left)
+        assertTrue(subtitle.top >= backBounds.bottom && subtitle.top >= actionBounds.bottom)
         assertTrue(subtitle.top >= title.bottom)
+        assertTextFits("个性化与长期记忆")
+        assertTextFits("查看和管理聊天中记住的内容")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithContentDescription("刷新").performClick()
         compose.runOnIdle {
@@ -80,7 +85,20 @@ class MobileLayoutRegressionTest {
         val title = compose.onNodeWithText("工作项目与文件", useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val value = compose.onNodeWithText("9999 个项目", useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue(title.right <= value.left)
+        assertTextFits("工作项目与文件")
+        assertTextFits("9999 个项目")
         compose.onNodeWithText("工作项目与文件").performClick()
         compose.runOnIdle { assertEquals(1, opened) }
     }
+
+    private fun assertTextFits(text: String) {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(text, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { getLayouts ->
+                assertTrue(getLayouts(layouts))
+            }
+        assertTrue(layouts.isNotEmpty())
+        assertTrue(layouts.all { !it.hasVisualOverflow })
+    }
+
 }

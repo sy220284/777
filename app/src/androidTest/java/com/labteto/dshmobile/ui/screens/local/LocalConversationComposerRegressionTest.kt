@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -59,6 +61,97 @@ class LocalConversationComposerRegressionTest {
         compose.runOnIdle {
             assertEquals(1, attachmentPickerOpenCount)
         }
+    }
+
+
+    @Test
+    fun focusedPlusOpensFullPickerAndPreservesDraft() {
+        var openCount = 0
+        val draft = "未发送的草稿"
+        val focusChanges = mutableListOf<Boolean>()
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "attachment-focused",
+                        usageMode = LocalUsageMode.CHAT,
+                    ),
+                    activeModelProfile = null,
+                    input = draft,
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = { openCount++ },
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onConfigure = {},
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onPlanModeChange = {},
+                    onAutoApprove = {},
+                    onDisableAutoApprove = {},
+                    onFocusChanged = { focusChanges += it },
+                )
+            }
+        }
+
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_more_actions),
+        ).performClick()
+        compose.waitForIdle()
+
+        compose.runOnIdle {
+            assertEquals(1, openCount)
+            assertTrue(focusChanges.contains(true))
+            assertEquals(false, focusChanges.last())
+        }
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains(draft)
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertIsNotFocused()
+    }
+
+    @Test
+    fun workModeFocusedPlusOpensSamePicker() {
+        var openCount = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false,
+                        configured = true,
+                        sessionId = "work-attachment-focused",
+                        usageMode = LocalUsageMode.WORK,
+                    ),
+                    activeModelProfile = null,
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = { openCount++ },
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onConfigure = {},
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onPlanModeChange = {},
+                    onAutoApprove = {},
+                    onDisableAutoApprove = {},
+                )
+            }
+        }
+
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_more_actions),
+        ).performClick()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(1, openCount) }
     }
 
     @Test

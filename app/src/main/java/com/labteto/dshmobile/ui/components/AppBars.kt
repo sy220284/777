@@ -55,60 +55,49 @@ fun DsTopBar(
     backIcon: ImageVector = FeatherIcons.ChevronLeft,
 ) {
     val colors = DsTheme.colors
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = DsMetrics.topBarHeight),
-    ) {
-        DsIconButton(
-            icon = backIcon,
-            contentDescription = backContentDescription,
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterStart),
-            containerColor = colors.bgLayer1,
-            iconSize = 24.dp,
-            tint = colors.labelPrimary,
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 58.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight)) {
+            DsIconButton(
+                icon = backIcon,
+                contentDescription = backContentDescription,
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.CenterStart),
+                containerColor = colors.bgLayer1,
+                iconSize = 24.dp,
+                tint = colors.labelPrimary,
+            )
             Text(
                 title,
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 58.dp),
                 style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 2,
                 textAlign = TextAlign.Center,
                 overflow = TextOverflow.Ellipsis,
             )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    it,
-                    style = DsType.xsmall12.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 2,
-                    textAlign = TextAlign.Center,
-                    overflow = TextOverflow.Ellipsis,
+            if ((actionIcon != null || actionPainter != null) && onAction != null) {
+                DsIconButton(
+                    icon = actionIcon,
+                    iconPainter = actionPainter,
+                    contentDescription = actionContentDescription,
+                    onClick = onAction,
+                    enabled = actionEnabled,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    containerColor = colors.bgLayer1,
+                    iconSize = 24.dp,
+                    tint = colors.labelPrimary,
                 )
+            } else {
+                Box(Modifier.align(Alignment.CenterEnd).size(DsSpacing.touchTarget))
             }
         }
-        if ((actionIcon != null || actionPainter != null) && onAction != null) {
-            DsIconButton(
-                icon = actionIcon,
-                iconPainter = actionPainter,
-                contentDescription = actionContentDescription,
-                onClick = onAction,
-                enabled = actionEnabled,
-                modifier = Modifier.align(Alignment.CenterEnd),
-                containerColor = colors.bgLayer1,
-                iconSize = 24.dp,
-                tint = colors.labelPrimary,
+        subtitle?.takeIf(String::isNotBlank)?.let {
+            Text(
+                it,
+                modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.tiny, bottom = DsSpacing.small),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
             )
-        } else {
-            Box(Modifier.align(Alignment.CenterEnd).size(DsSpacing.touchTarget))
         }
     }
 }
