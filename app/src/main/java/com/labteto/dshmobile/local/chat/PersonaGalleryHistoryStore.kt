@@ -132,7 +132,7 @@ internal class PersonaGalleryHistoryStore(
         if (!file.isFile) return false
         return file.bufferedReader().use { reader ->
             while (true) {
-                val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: return@use false
+                val line = readBoundedLine(reader, MAX_ARCHIVE_LINE_BYTES) ?: break
                 val message = decode(line) ?: continue
                 if (galleryMessageArchiveKey(message) == messageKey) return@use true
             }
