@@ -1,7 +1,7 @@
 name: Release APK
 
 'on':
-  # 主线 CI 成功后直接发布；每 6 小时低频兜底检查漏触发。
+  # 主线 CI 成功后直接发布；每 30 分钟定时任务做漏触发补偿。
   workflow_run:
     workflows: ['CI']
     types: [completed]
@@ -10,7 +10,7 @@ name: Release APK
     tags:
       - 'v*'
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 permissions:

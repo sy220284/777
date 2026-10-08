@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,26 +21,25 @@ class LocalWelcomePersonaTest {
     fun savedPortraitsComeFirstAndDoNotDuplicateInstalledPreset() {
         val presets = PersonaPresetCatalog.presets.take(2)
         val saved = listOf(
-            PersonaGalleryEntry(
-                id = "chibi",
-                persona = PersonaProfile(name = "自定义Q版"),
-                portraitPath = "/private/chibi.webp",
-            ),
-            PersonaGalleryEntry(
-                id = "installed",
-                persona = presets.first().persona,
-                portraitPath = "/private/installed.webp",
-            ),
-            PersonaGalleryEntry(
-                id = "no-image",
-                persona = PersonaProfile(name = "无图人物"),
-            ),
+            PersonaGalleryEntry(id = "chibi", persona = PersonaProfile(name = "自定义Q版"), portraitPath = "/private/chibi.webp"),
+            PersonaGalleryEntry(id = "installed", persona = presets.first().persona, portraitPath = "/private/installed.webp"),
+            PersonaGalleryEntry(id = "no-image", persona = PersonaProfile(name = "无图人物")),
         )
         val result = welcomePersonaArtworks(saved, presets)
         assertEquals(3, result.size)
         assertEquals("saved:chibi", result[0].id)
         assertEquals("saved:installed", result[1].id)
         assertEquals("preset:${presets[1].id}", result[2].id)
+    }
+
+    @Test
+    fun fiveHolographicCharactersHaveDedicatedArtworkAndUniqueIds() {
+        val showcase = welcomeMotionPersonas
+        assertEquals(listOf(R.string.hologram_ayaka, R.string.hologram_march7, R.string.hologram_shenxinghui, R.string.hologram_xiayizhou, R.string.hologram_klee), showcase.map { it.nameRes })
+        assertEquals(5, showcase.map { it.id }.distinct().size)
+        assertEquals(5, showcase.map { it.assetPath }.distinct().size)
+        assertTrue(showcase.all { it.assetPath.startsWith("persona-motion/") && it.assetPath.endsWith(".webp") })
+        assertTrue(showcase.none { it.assetPath.startsWith("persona-presets/") })
     }
 
     @Test

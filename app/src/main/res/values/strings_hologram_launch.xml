@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hologram_ayaka">神里绫华</string>
+    <string name="hologram_march7">三月七</string>
+    <string name="hologram_shenxinghui">沈星回</string>
+    <string name="hologram_xiayizhou">夏以昼</string>
+    <string name="hologram_klee">可莉</string>
+    <string name="launch_artwork_description">%1$s启动画面，点击立即进入应用</string>
+    <string name="launch_brand_name">777</string>
+</resources>

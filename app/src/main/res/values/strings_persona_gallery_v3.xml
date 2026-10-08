@@ -49,4 +49,12 @@
     <string name="persona_gallery_portrait_actions_title">人物相片</string>
     <string name="persona_gallery_portrait_long_press_hint">长按相片可更换或移除</string>
     <string name="persona_gallery_portrait_photo_empty">轻点添加人物相片</string>
+    <string name="local_files_select">选择文件</string>
+    <string name="local_files_select_all">全选当前列表</string>
+    <string name="local_files_selected_count">已选 %1$d 个文件</string>
+    <string name="local_files_share_selected">分享选中的文件</string>
+    <string name="local_files_share_one">分享文件</string>
+    <string name="local_files_share_chooser">分享到</string>
+    <string name="local_files_share_failed">分享未能打开，请确认文件还在工作区，再试一次。</string>
+    <string name="local_files_share_limit">一次最多分享 %1$d 个文件</string>
 </resources>
