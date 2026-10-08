@@ -25,27 +25,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -65,7 +71,7 @@ fun MarkdownText(
 ) {
     val colors = DsTheme.colors
     val blocks = remember(text) { parseMarkdown(text) }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MdBlock.Heading -> {
@@ -101,7 +107,12 @@ internal enum class TableAlignment { START, CENTER, END }
 internal sealed interface MdBlock {
     data class Paragraph(val lines: List<String>) : MdBlock
     data class Heading(val level: Int, val text: String) : MdBlock
-    data class MdList(val items: List<String>, val ordered: Boolean) : MdBlock
+    data class MdList(
+        val items: List<String>,
+        val ordered: Boolean,
+        val levels: List<Int> = emptyList(),
+        val numbered: List<Boolean> = emptyList(),
+    ) : MdBlock
     data class Blockquote(val lines: List<String>) : MdBlock
     data class Code(val lang: String?, val code: String) : MdBlock
     data class Table(
@@ -131,29 +142,28 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
                 blocks += MdBlock.Code(lang, code.toString().trimEnd('\n'))
             }
             HEADING_REGEX.matches(trimmed) -> {
-                val match = checkNotNull(HEADING_REGEX.matchEntire(trimmed)) { "标题正则匹配状态不一致" }
+                val match = checkNotNull(HEADING_REGEX.matchEntire(trimmed))
                 val level = match.groupValues[1].length
                 val text = match.groupValues[2].trim().trimEnd('#').trim()
                 blocks += MdBlock.Heading(level, text)
                 i++
             }
-            trimmed.startsWith("- ") || trimmed.startsWith("* ") -> {
+            isMarkdownListItem(trimmed) -> {
                 val items = mutableListOf<String>()
+                val levels = mutableListOf<Int>()
+                val numbered = mutableListOf<Boolean>()
                 while (i < lines.size) {
-                    val t = lines[i].trimStart()
-                    if (!t.startsWith("- ") && !t.startsWith("* ")) break
-                    items += t.removePrefix("- ").removePrefix("* ").trim()
+                    val source = lines[i]
+                    val item = source.trimStart()
+                    if (!isMarkdownListItem(item)) break
+                    val isNumbered = ORDERED_REGEX.containsMatchIn(item)
+                    numbered += isNumbered
+                    levels += ((source.length - item.length) / 2).coerceIn(0, 6)
+                    items += if (isNumbered) ORDERED_REGEX.replace(item, "").trim()
+                        else item.drop(2).trim()
                     i++
                 }
-                blocks += MdBlock.MdList(items, ordered = false)
-            }
-            ORDERED_REGEX.containsMatchIn(trimmed) -> {
-                val items = mutableListOf<String>()
-                while (i < lines.size && ORDERED_REGEX.containsMatchIn(lines[i].trimStart())) {
-                    items += ORDERED_REGEX.replace(lines[i].trim(), "").trim()
-                    i++
-                }
-                blocks += MdBlock.MdList(items, ordered = true)
+                blocks += MdBlock.MdList(items, numbered.firstOrNull() == true, levels, numbered)
             }
             trimmed.startsWith(">") -> {
                 val quote = mutableListOf<String>()
@@ -190,13 +200,15 @@ internal fun parseMarkdown(markdown: String): List<MdBlock> {
     return blocks
 }
 
+private fun isMarkdownListItem(text: String): Boolean =
+    text.startsWith("- ") || text.startsWith("* ") || text.startsWith("+ ") ||
+        ORDERED_REGEX.containsMatchIn(text)
+
 private fun isSpecialLine(line: String): Boolean {
     val trimmed = line.trimStart()
     return trimmed.startsWith("```") ||
         HEADING_REGEX.matches(trimmed) ||
-        trimmed.startsWith("- ") ||
-        trimmed.startsWith("* ") ||
-        ORDERED_REGEX.containsMatchIn(trimmed) ||
+        isMarkdownListItem(trimmed) ||
         trimmed.startsWith(">") ||
         trimmed.startsWith("|")
 }
@@ -264,6 +276,7 @@ private sealed interface InlineSegment {
     data class Plain(val text: String) : InlineSegment
     data class Bold(val text: String) : InlineSegment
     data class Italic(val text: String) : InlineSegment
+    data class Strikethrough(val text: String) : InlineSegment
     data class Code(val text: String) : InlineSegment
     data class Link(val text: String, val url: String) : InlineSegment
 }
@@ -295,6 +308,16 @@ private fun parseInlineSegments(text: String): List<InlineSegment> {
                 if (end != -1) {
                     flush()
                     segments += InlineSegment.Bold(text.substring(i + 2, end))
+                    i = end + 2
+                } else {
+                    sb.append(text[i]); i++
+                }
+            }
+            text.startsWith("~~", i) -> {
+                val end = text.indexOf("~~", i + 2)
+                if (end != -1) {
+                    flush()
+                    segments += InlineSegment.Strikethrough(text.substring(i + 2, end))
                     i = end + 2
                 } else {
                     sb.append(text[i]); i++
@@ -370,8 +393,9 @@ private fun buildInlineContent(
             is InlineSegment.Plain -> builder.append(segment.text)
             is InlineSegment.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
             is InlineSegment.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
+            is InlineSegment.Strikethrough -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(segment.text) }
             is InlineSegment.Code -> builder.withStyle(
-                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color),
+                SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.inlineCode),
             ) { append(segment.text) }
             is InlineSegment.Link -> {
                 builder.pushStringAnnotation("url", segment.url)
@@ -388,14 +412,25 @@ private fun buildInlineContent(
 @Composable
 private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
-    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val counters = IntArray(7)
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         block.items.forEachIndexed { index, item ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            val level = block.levels.getOrElse(index) { 0 }.coerceIn(0, 6)
+            val ordered = block.numbered.getOrElse(index) { block.ordered }
+            val marker = if (ordered) {
+                counters[level]++
+                for (next in level + 1 until counters.size) counters[next] = 0
+                "${counters[level]}."
+            } else "•"
+            Row(
+                Modifier.fillMaxWidth().padding(start = (level * 15).dp),
+                verticalAlignment = Alignment.Top,
+            ) {
                 Text(
-                    if (block.ordered) "${index + 1}." else "•",
+                    marker,
                     style = bodyStyle.withReadingWeight().copy(color = colors.labelSecondary),
-                    textAlign = if (block.ordered) TextAlign.End else TextAlign.Start,
-                    modifier = Modifier.width(if (block.ordered) 28.dp else 18.dp),
+                    textAlign = if (ordered) TextAlign.End else TextAlign.Start,
+                    modifier = Modifier.width(if (ordered) 28.dp else 18.dp),
                 )
                 Spacer(Modifier.width(6.dp))
                 InlineMarkdown(item, bodyStyle.copy(color = colors.labelPrimary), Modifier.weight(1f))
@@ -404,21 +439,86 @@ private fun MdListBlock(block: MdBlock.MdList, bodyStyle: TextStyle) {
     }
 }
 
+private val CODE_SYNTAX_TOKENS = Regex(
+    """//[^\n]*|#[^\n]*|"[^"\n]*"|'[^'\n]*'|\b(?:fun|val|var|class|object|interface|data|sealed|return|if|else|when|for|while|try|catch|import|package|private|public|internal|override|suspend|const|let|def|from|async|await|function|true|false|null|None|True|False)\b""",
+)
+
+internal fun highlightedCode(code: String, language: String?, colors: DsColors): AnnotatedString {
+    val supported = setOf("kotlin", "kt", "java", "python", "py", "javascript", "js", "typescript", "ts")
+    val normalizedLanguage = language?.trim()?.lowercase().orEmpty()
+    if (normalizedLanguage !in supported || code.length > 20_000) return AnnotatedString(code)
+    val builder = AnnotatedString.Builder(code)
+    CODE_SYNTAX_TOKENS.findAll(code).forEach { match ->
+        val token = match.value
+        val tint = when {
+            token.startsWith("//") || token.startsWith("#") -> colors.labelSecondary
+            token.firstOrNull() == '"' || token.startsWith("'") -> colors.warnLabel
+            else -> colors.accent
+        }
+        builder.addStyle(SpanStyle(color = tint), match.range.first, match.range.last + 1)
+    }
+    return builder.toAnnotatedString()
+}
+
+internal enum class MarkdownCalloutKind { QUOTE, NOTE, IMPORTANT, WARNING, TIP }
+
+internal fun markdownCalloutKind(lines: List<String>): MarkdownCalloutKind = when (
+    lines.firstOrNull()?.trim()?.uppercase()
+) {
+    "[!NOTE]" -> MarkdownCalloutKind.NOTE
+    "[!IMPORTANT]" -> MarkdownCalloutKind.IMPORTANT
+    "[!WARNING]", "[!CAUTION]" -> MarkdownCalloutKind.WARNING
+    "[!TIP]" -> MarkdownCalloutKind.TIP
+    else -> MarkdownCalloutKind.QUOTE
+}
+
 @Composable
 private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
     val colors = DsTheme.colors
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 2.dp)) {
+    val kind = remember(block.lines) { markdownCalloutKind(block.lines) }
+    val title = when (kind) {
+        MarkdownCalloutKind.NOTE -> stringResource(R.string.markdown_callout_note)
+        MarkdownCalloutKind.IMPORTANT -> stringResource(R.string.markdown_callout_important)
+        MarkdownCalloutKind.WARNING -> stringResource(R.string.markdown_callout_warning)
+        MarkdownCalloutKind.TIP -> stringResource(R.string.markdown_callout_tip)
+        MarkdownCalloutKind.QUOTE -> null
+    }
+    val stripeColor = when (kind) {
+        MarkdownCalloutKind.WARNING -> colors.warn
+        MarkdownCalloutKind.IMPORTANT -> colors.accent
+        else -> colors.labelSecondary
+    }
+    val content = if (title != null) block.lines.drop(1) else block.lines
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(DsShapes.block)
+            .background(colors.tipSurface)
+            .height(IntrinsicSize.Min)
+            .padding(vertical = 10.dp, horizontal = 12.dp),
+    ) {
         Box(
             Modifier
-                .width(2.dp)
+                .width(3.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(1.dp))
-                .background(colors.citation),
+                .clip(RoundedCornerShape(2.dp))
+                .background(stripeColor),
         )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            block.lines.forEach { line ->
-                InlineMarkdown(line, bodyStyle.copy(color = colors.labelTertiary), Modifier.fillMaxWidth())
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (title != null) Text(
+                title,
+                style = DsType.mdSmall.withReadingWeight().copy(fontWeight = FontWeight.SemiBold),
+                color = if (kind == MarkdownCalloutKind.WARNING) colors.warnLabel
+                    else if (kind == MarkdownCalloutKind.IMPORTANT) colors.accent
+                    else colors.labelPrimary,
+            )
+            content.forEach { line ->
+                InlineMarkdown(
+                    line,
+                    bodyStyle.copy(color = colors.labelPrimary),
+                    Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -450,7 +550,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             TableAlignment.END -> TextAlign.End
         }
 
-        Row(Modifier.background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))) {
+        Row(Modifier.background(colors.tipSurface)) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
@@ -461,7 +561,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
                     ),
                     Modifier
                         .width(widths[column])
-                        .border(0.5.dp, colors.borderL1)
+                        .border(0.5.dp, colors.borderL2)
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 )
             }
@@ -477,7 +577,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
                         ),
                         Modifier
                             .width(widths[column])
-                            .border(0.5.dp, colors.borderL1)
+                            .border(0.5.dp, colors.borderL2)
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
@@ -496,6 +596,14 @@ private fun CodeBlock(
 ) {
     val colors = DsTheme.colors
     val clipboard = LocalClipboardManager.current
+    val styledCode = remember(code, lang, colors) { highlightedCode(code, lang, colors) }
+    var copied by remember(code) { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1500)
+            copied = false
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -511,14 +619,9 @@ private fun CodeBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                when {
-                    allowCopy && lang != null -> "$lang · copy"
-                    allowCopy -> "copy"
-                    lang != null -> lang
-                    else -> "code"
-                },
-                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
-                color = colors.labelCaption,
+                lang ?: stringResource(R.string.markdown_code_language),
+                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont),
+                color = colors.labelSecondary,
                 modifier = Modifier.weight(1f),
             )
             if (allowCopy) {
@@ -526,24 +629,34 @@ private fun CodeBlock(
                     modifier = Modifier
                         .size(DsSpacing.touchTarget)
                         .clip(DsShapes.chip)
-                        .clickable { clipboard.setText(AnnotatedString(code)) },
+                        .clickable {
+                            clipboard.setText(AnnotatedString(code))
+                            copied = true
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        FeatherIcons.Copy,
-                        contentDescription = "Copy code",
-                        tint = colors.labelTertiary,
-                        modifier = Modifier.size(16.dp),
+                        if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = stringResource(
+                            if (copied) R.string.chat_copy_success else R.string.markdown_copy_code
+                        ),
+                        tint = colors.labelSecondary,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
         }
-        Text(
-            code,
-            style = DsType.mdCode.withReadingWeight(),
-            color = colors.labelPrimary,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(
+                styledCode,
+                style = DsType.mdCode.withReadingWeight(),
+                color = colors.labelPrimary,
+                softWrap = false,
+            )
+        }
     }
 }
 

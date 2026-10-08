@@ -70,6 +70,15 @@ class LocalConversationScrollBehaviorTest {
             assertEquals(info.totalItemsCount - 1, tail.index)
             assertTrue(tail.offset + tail.size - info.viewportEndOffset <= 4)
         }
+        // A large Markdown chunk must not strand the viewport above the live tail.
+        compose.runOnIdle { tailHeight.value = 560.dp }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val info = listState.layoutInfo
+            val tail = info.visibleItemsInfo.last()
+            assertEquals(info.totalItemsCount - 1, tail.index)
+            assertTrue(tail.offset + tail.size - info.viewportEndOffset <= 4)
+        }
         compose.runOnIdle { runBlocking { listState.scrollToItem(0) } }
         compose.waitForIdle()
         compose.runOnIdle { tailHeight.value = 180.dp }

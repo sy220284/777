@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +35,8 @@ internal fun LocalStreamingChatTurn(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
 ) {
+    // Lifecycle-aware StateFlow collection supplies its own safe initial state.
+    // Avoid accessing StateFlow.value during composition (Compose lint violation).
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -89,15 +92,19 @@ internal fun LocalStreamingChatTurn(
  * authoritative: suppress text already committed as a progress/final row and do not repeat
  * empty loading cards when a work timeline exists.
  */
-internal fun shouldShowInlineWorkPreview(
-    draft: String,
-    lastDurableNarrative: String?,
-): Boolean {
-    val text = draft.trim()
-    if (text.isEmpty()) return false
+internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?): String {
     val committed = lastDurableNarrative?.trim().orEmpty()
-    return committed.isEmpty() || !committed.startsWith(text)
+    val candidate = draft.trim()
+    if (candidate.isEmpty()) return ""
+    if (committed.isEmpty()) return candidate
+    if (committed.startsWith(candidate)) return ""
+    // During an event-log commit, only render the genuinely new suffix.
+    if (candidate.startsWith(committed)) return candidate.removePrefix(committed).trimStart()
+    return candidate
 }
+
+internal fun shouldShowInlineWorkPreview(draft: String, lastDurableNarrative: String?): Boolean =
+    inlineWorkPreviewText(draft, lastDurableNarrative).isNotBlank()
 
 @Composable
 internal fun LocalStreamingWorkPreview(
@@ -106,10 +113,12 @@ internal fun LocalStreamingWorkPreview(
     hasDurableProgress: Boolean,
     lastDurableNarrative: String? = null,
 ) {
+    // Lifecycle-aware StateFlow collection supplies its own safe initial state.
+    // Avoid accessing StateFlow.value during composition (Compose lint violation).
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
-    val text = stream.assistant
-    val visiblePreview = shouldShowInlineWorkPreview(text, lastDurableNarrative)
+    val text = inlineWorkPreviewText(stream.assistant, lastDurableNarrative)
+    val visiblePreview = text.isNotBlank()
     if (!visiblePreview && hasDurableProgress) return
 
     Column(
@@ -132,10 +141,9 @@ internal fun LocalStreamingWorkPreview(
             )
         }
         if (visiblePreview) {
-            MarkdownText(
-                text = text,
-                bodyStyle = DsType.mdBody,
-            )
+            SelectionContainer {
+                MarkdownText(text = text, bodyStyle = DsType.mdBody)
+            }
         }
     }
 }

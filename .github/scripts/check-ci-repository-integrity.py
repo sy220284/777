@@ -171,6 +171,49 @@ for control_path in critical_architecture_controls:
     if control_path not in CI:
         violations.append(f"scope coverage verification lost architecture control path: {control_path}")
 
+# Keep independent CI lanes concurrent without allowing expensive jobs to run
+# before the cheap static smoke gates. The final merge gate remains authoritative.
+def ci_job_source(lane: str) -> str:
+    match = re.search(
+        rf"(?ms)^  {re.escape(lane)}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
+        CI,
+    )
+    if match is None:
+        violations.append(f"CI missing job body: {lane}")
+        return ""
+    return match.group(1)
+
+
+ci_dag = {
+    "static-gates": ("scope",),
+    "architecture-3-gates": ("scope",),
+    "fixture-provenance": ("scope",),
+    "unit-tests": ("scope", "static-gates"),
+    "relay-conformance": ("scope", "static-gates"),
+    "build-arm64": ("scope", "static-gates"),
+    "device-artifacts-x86": ("scope", "static-gates"),
+    "android-16-instrumented": ("scope", "device-artifacts-x86"),
+    "android-17-instrumented": ("scope", "device-artifacts-x86"),
+}
+for lane, dependencies in ci_dag.items():
+    source = ci_job_source(lane)
+    expected_needs = (
+        f"    needs: {dependencies[0]}" if len(dependencies) == 1
+        else f"    needs: [{', '.join(dependencies)}]"
+    )
+    if expected_needs not in source.splitlines():
+        violations.append(f"{lane}: CI critical-path dependencies must be {dependencies}")
+    for dependency in dependencies:
+        if dependency == "scope":
+            condition = "needs.scope.result == 'success'"
+        elif dependency == "static-gates":
+            condition = "needs.static-gates.result == 'success'"
+        else:
+            condition = "needs.device-artifacts-x86.result == 'success'"
+        if condition not in source:
+            violations.append(f"{lane}: missing successful dependency condition: {condition}")
+
+
 merge_gate = CI.split("\n  merge-gate:\n", 1)[1] if "\n  merge-gate:\n" in CI else ""
 for lane in required_ci_lanes[:-1]:
     if f"      - {lane}" not in merge_gate:

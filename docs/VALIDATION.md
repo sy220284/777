@@ -27,7 +27,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合；`architecture-3-gates` 独立验证所有权 / 依赖与执行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合。`static-gates` 与 `architecture-3-gates` 在 `scope` 后同时启动；单测、Relay、一组 APK 构建只需等待快速静态检查成功，无需等待独立架构检查。Android 16/17 共用 `device-artifacts-x86` 的 APK，构建成功后并行启动；`fixture-provenance` 可在 `scope` 后独立执行。最后统一由 `merge-gate` 等待并核验所有选中的 lane。混合改动取检查并集，未知产品路径保守回退到完整 CI。
 
 主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；分类前固定执行分类器语法 / 自测与仓库 CI 完整性检查，分类后再独立复核关键控制文件是否选中了最低必需 lane。纯文档完成控制面自举后可快速结束，CI / 门禁 / 架构权威文件本身不能通过修改分类器把自身验证跳过。
 
@@ -39,13 +39,13 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
 → scope（控制面自举 + 范围防降级）
-→ static-gates → architecture-3-gates → merge-gate
+→ static-gates + architecture-3-gates（并行）→ merge-gate
 
 普通 GitHub Actions / 自动化脚本
 → static-gates → merge-gate
 
 架构 3.0 范围内的 JVM / 单元测试
-→ static-gates → architecture-3-gates → unit-tests
+→ static-gates + architecture-3-gates（并行）；静态检查成功后启动 unit-tests
 → 涉及 Relay 契约时额外执行 relay-conformance
 → merge-gate
 
@@ -53,17 +53,17 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 → static-gates → unit-tests → merge-gate
 
 官方 fixture / 上游锁定来源变化
-→ static-gates + fixture-provenance + unit-tests → merge-gate
+→ scope 后 fixture-provenance 与 static-gates 并行；静态检查成功后启动 unit-tests → merge-gate
 
 架构 3.0 范围内的 androidTest
-→ static-gates → architecture-3-gates
-→ device-artifacts-x86
+→ static-gates + architecture-3-gates（并行）
+→ 静态检查成功后启动 device-artifacts-x86
 → Android 16 + Android 17（并行，共用同一组 APK）
 → merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ static-gates → architecture-3-gates
-→ unit-tests + relay-conformance + build-arm64 + device-artifacts-x86（并行）
+→ static-gates + architecture-3-gates（并行）
+→ 静态检查成功后启动 unit-tests + relay-conformance + build-arm64 + device-artifacts-x86（并行，无须等架构检查）
 → Android 16 + Android 17（并行，共用 device-artifacts-x86）
 → merge-gate
 ```
