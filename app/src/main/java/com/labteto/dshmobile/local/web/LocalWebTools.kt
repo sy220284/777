@@ -23,9 +23,7 @@ internal class LocalWebTools(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,
     ): String {
-        val key = searchKeyProvider()
-            ?: error("网页搜索需要单独配置 DeepSeek 官方 API Key")
-        return web.search(key, queries, usageContext)
+        return web.searchWithFallback(queries, usageContext, searchKeyProvider)
     }
 
     suspend fun fetch(
@@ -48,17 +46,12 @@ internal class LocalWebTools(
             )
         } catch (error: LocalWebException) {
             if (error.code !in FALLBACK_WEB_ERRORS) throw error
-            val key = searchKeyProvider()
-            if (key == null) {
-                "[web_fetch][${error.code}] ${error.message}\n搜索降级不可用：未配置 DeepSeek 官方搜索所需的 API Key。可把文件通过输入栏附件放入本机工作区。"
-            } else {
-                runCatching {
-                    val fallback = web.search(key, listOf(web.fallbackQuery(input)))
-                    "[web_fetch][${error.code}] 直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
-                }.getOrElse { fallbackError ->
-                    if (fallbackError is CancellationException) throw fallbackError
-                    "[web_fetch][${error.code}] ${error.message}\n搜索降级也失败：${fallbackError.message}\n建议：先运行 network_diagnose，或把目标文件通过附件放入本机工作区。"
-                }
+            runCatching {
+                val fallback = search(listOf(web.fallbackQuery(input)))
+                "[web_fetch][${error.code}] 直接抓取失败，已自动降级为网页搜索。\n原因：${error.message}\n\n$fallback"
+            }.getOrElse { fallbackError ->
+                if (fallbackError is CancellationException) throw fallbackError
+                "[web_fetch][${error.code}] ${error.message}\n搜索降级也失败：${fallbackError.message}\n建议：先运行 network_diagnose，或把目标文件通过附件放入本机工作区。"
             }
         }
     }
