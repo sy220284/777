@@ -229,7 +229,7 @@ internal fun PersonaGalleryScreen(
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
-    var showMoreActions by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showMoreActions by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPortraitActions by remember(selectedId) { mutableStateOf(false) }
     var showPersonaDetails by rememberSaveable(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
