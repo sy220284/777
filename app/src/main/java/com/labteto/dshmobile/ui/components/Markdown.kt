@@ -445,7 +445,8 @@ private val CODE_SYNTAX_TOKENS = Regex(
 
 internal fun highlightedCode(code: String, language: String?, colors: DsColors): AnnotatedString {
     val supported = setOf("kotlin", "kt", "java", "python", "py", "javascript", "js", "typescript", "ts")
-    if (language?.trim()?.lowercase() !in supported || code.length > 20_000) return AnnotatedString(code)
+    val normalizedLanguage = language?.trim()?.lowercase().orEmpty()
+    if (normalizedLanguage !in supported || code.length > 20_000) return AnnotatedString(code)
     val builder = AnnotatedString.Builder(code)
     CODE_SYNTAX_TOKENS.findAll(code).forEach { match ->
         val token = match.value
