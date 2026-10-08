@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -36,6 +38,8 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal fun LocalWorkUiState.hasRunCenterContent(): Boolean =
     running ||
@@ -53,6 +57,7 @@ internal fun LocalWorkUiState.hasRunCenterContent(): Boolean =
 internal fun LocalRunCenterScreen(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
+    onArtifacts: (String) -> List<LocalArtifactUiItem>,
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
@@ -65,6 +70,10 @@ internal fun LocalRunCenterScreen(
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
+    var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
+    LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos) {
+        artifacts = withContext(Dispatchers.IO) { onArtifacts(state.sessionId) }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -86,7 +95,7 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
-            if (!state.hasRunCenterContent()) {
+            if (!state.hasRunCenterContent() && artifacts.isEmpty()) {
                 DsPageEmptyState(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center_empty_title),
@@ -110,6 +119,25 @@ internal fun LocalRunCenterScreen(
                         onOpenResults = onOpenResults,
                         showHeader = false,
                     )
+                    if (artifacts.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.local_artifacts_title),
+                            style = DsType.base16Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        artifacts.forEach { artifact ->
+                            Text(
+                                artifact.reference,
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
+                        DsButton(
+                            text = stringResource(R.string.local_artifacts_open_files),
+                            onClick = onOpenResults,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
                 }
             }
         }
