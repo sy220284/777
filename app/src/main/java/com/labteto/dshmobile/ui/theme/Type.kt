@@ -15,10 +15,15 @@ import com.labteto.dshmobile.R
  * Reading preferences adjust weight without replacing the reference glyph families.
  */
 object DsType {
-    // Use one platform sans-serif family across Latin and CJK glyphs. The previous Latin-only
-    // resource family caused device-dependent CJK fallback and uneven apparent weights.
-    // Android resolves a script-appropriate glyph face at each requested weight.
-    val uiFont = FontFamily.SansSerif
+    // Fixed UI uses bundled Noto subsets; dynamic content keeps the Android system font.
+    val uiFont = FontFamily(
+        Font(R.font.ui_noto_sc_400, FontWeight.Normal),
+        Font(R.font.ui_noto_sc_500, FontWeight.Medium),
+        Font(R.font.ui_noto_sc_600, FontWeight.SemiBold),
+        Font(R.font.ui_noto_sc_700, FontWeight.Bold),
+        Font(R.font.ui_noto_sc_800, FontWeight.ExtraBold),
+    )
+    val contentFont = FontFamily.SansSerif
     /** Android's CJK-aware serif family; centralised so a packaged subset can replace it later. */
     val titleFont = FontFamily.Serif
     val codeFont = FontFamily(
@@ -27,12 +32,12 @@ object DsType {
     )
 
     // Markdown roles
-    val mdH1 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp)
-    val mdH2 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 21.sp, lineHeight = 30.sp)
-    val mdH3 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 28.sp)
-    val mdH4 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 26.sp)
-    val mdBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
-    val mdSmall = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
+    val mdH1 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp)
+    val mdH2 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 21.sp, lineHeight = 30.sp)
+    val mdH3 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 28.sp)
+    val mdH4 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 26.sp)
+    val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
+    val mdSmall = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 
     // UI roles
@@ -60,14 +65,14 @@ object DsType {
     val navigationSection = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp)
     // Kimi-inspired hierarchy: actionable rows read stronger; history reads like body copy.
     val drawerItem = navigationItem.copy(fontWeight = FontWeight.Medium)
-    val drawerSession = navigationItem.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
+    val drawerSession = navigationItem.copy(fontFamily = contentFont, fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
     val drawerSection = navigationSection.copy(fontWeight = FontWeight.Medium)
     val settingsItem = navigationItem.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium)
 
     // Composer / rows / chat
     // User and assistant body text deliberately share the exact same metrics. Role distinction comes
     // from container, alignment and colour rather than an accidental font-size mismatch.
-    val chatBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 26.sp)
+    val chatBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 26.sp)
     val bubbleText = chatBody
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 23.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
@@ -99,9 +104,9 @@ fun dsTypography(textWeightAdjustment: Int): Typography = Typography(
     titleLarge = DsType.large20.adjustedReadingWeight(textWeightAdjustment),
     titleMedium = DsType.headline17.adjustedReadingWeight(textWeightAdjustment),
     titleSmall = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
-    bodyLarge = DsType.base16.adjustedReadingWeight(textWeightAdjustment),
-    bodyMedium = DsType.std14.adjustedReadingWeight(textWeightAdjustment),
-    bodySmall = DsType.small13.adjustedReadingWeight(textWeightAdjustment),
+    bodyLarge = DsType.base16.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
+    bodyMedium = DsType.std14.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
+    bodySmall = DsType.small13.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
     labelLarge = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
     labelMedium = DsType.small13Strong.adjustedReadingWeight(textWeightAdjustment),
     labelSmall = DsType.caption11.adjustedReadingWeight(textWeightAdjustment),

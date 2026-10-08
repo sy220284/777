@@ -111,6 +111,20 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
     )
 }
 
+// Generated fixed UI fonts are never copied from the complete source into the APK.
+val generatedUiFontRes = layout.buildDirectory.dir("generated/uiFontRes")
+val generateUiFontSubset = tasks.register<Exec>("generateUiFontSubset") {
+    group = "build setup"
+    description = "Produce Noto Sans SC UI glyph subsets in real font weight files."
+    inputs.file(rootProject.file("tools/fonts/source/NotoSansSC-wght.ttf"))
+    inputs.file(rootProject.file("tools/fonts/build_ui_font.py"))
+    inputs.file(rootProject.file("tools/fonts/generate.sh"))
+    inputs.dir(rootProject.file("app/src/main/res"))
+    inputs.dir(rootProject.file("app/src/main/java/com/labteto/dshmobile/ui"))
+    outputs.dir(generatedUiFontRes)
+    commandLine("bash", rootProject.file("tools/fonts/generate.sh").absolutePath, generatedUiFontRes.get().asFile.absolutePath)
+}
+
 val generatedBundledRuntimeAssets = layout.buildDirectory.dir("generated/bundledRuntimeAssets")
 val compactBundledRuntimeAssets = tasks.register<Exec>("compactBundledRuntimeAssets") {
     group = "build setup"
@@ -234,6 +248,8 @@ android {
         rootProject.file("reference-validation/src/test/resources"),
     )
 
+    sourceSets.getByName("main").res.srcDir(generatedUiFontRes.get().asFile)
+
     sourceSets.getByName("main").apply {
         // AGP 9 rejects Provider-backed entries in the legacy SourceSet API. These providers only
         // describe deterministic build-directory paths; generating task edges remain explicit
@@ -282,6 +298,12 @@ tasks.matching {
         prepareUpdatePatcher,
     )
 }
+
+// Resource and lint model consumers need declared generation dependencies.
+tasks.matching {
+    (it.name.contains("Resources") || it.name.endsWith("SourceSetPaths") ||
+        it.name.startsWith("lint", ignoreCase = true)) && it.name != "generateUiFontSubset"
+}.configureEach { dependsOn(generateUiFontSubset) }
 
 // Lint model writers inspect the merged asset source set directly. Without this explicit edge
 // Gradle 8 correctly rejects the graph as an undeclared generated-source dependency.
