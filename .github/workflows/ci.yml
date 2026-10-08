@@ -378,6 +378,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
+            # 360dp x 800dp: representative compact Android phone window.
+            adb shell wm size 1080x2400
+            adb shell wm density 480
+            adb shell wm size | grep -F 'Override size: 1080x2400'
+            adb shell wm density | grep -F 'Override density: 480'
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
@@ -432,6 +437,11 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+          # 393dp x 852dp: common modern phone window, with 412dp also checked in Compose tests.
+          adb shell wm size 1179x2556
+          adb shell wm density 480
+          adb shell wm size | grep -F 'Override size: 1179x2556'
+          adb shell wm density | grep -F 'Override density: 480'
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
