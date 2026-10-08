@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,6 +51,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
+import com.labteto.dshmobile.ui.artwork.characterArtworkSampleSize
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.Dispatchers
@@ -171,6 +173,7 @@ internal fun WelcomePersonaCarousel(@Suppress("UNUSED_PARAMETER") gallery: List<
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
+                    filterQuality = FilterQuality.High,
                     modifier = Modifier.fillMaxSize().graphicsLayer {
                         if (motionEnabled) {
                             val magnitude = breathing.value - 0.5f
@@ -196,8 +199,8 @@ private fun decodeWelcomeMotionArtwork(assets: AssetManager, path: String): Imag
     return runCatching {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(assets, path)) { decoder, info, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            var sample = 1
-            while (maxOf(info.size.width, info.size.height) / sample > 1000) sample *= 2
+            // 1200×1560 previews supply genuine display pixels without resampling down.
+            val sample = characterArtworkSampleSize(maxOf(info.size.width, info.size.height), 2000)
             if (sample > 1) decoder.setTargetSampleSize(sample)
         }.asImageBitmap()
     }.getOrNull()

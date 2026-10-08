@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.artwork.HologramCharacterArtwork
 import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
+import com.labteto.dshmobile.ui.artwork.characterArtworkSampleSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -93,6 +95,7 @@ internal fun LaunchCharacterScreen(
                 bitmap = image,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                filterQuality = FilterQuality.High,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     alpha = opacity.value
                     scaleX = scale.value
@@ -108,8 +111,8 @@ private fun decodeLaunchArtwork(assets: AssetManager, path: String): ImageBitmap
     return runCatching {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(assets, path)) { decoder, info, _ ->
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            var sample = 1
-            while (maxOf(info.size.width, info.size.height) / sample > 2000) sample *= 2
+            // 1440×3200 launch assets must remain at native resolution on high-density screens.
+            val sample = characterArtworkSampleSize(maxOf(info.size.width, info.size.height), 3600)
             if (sample > 1) decoder.setTargetSampleSize(sample)
         }.asImageBitmap()
     }.getOrNull()

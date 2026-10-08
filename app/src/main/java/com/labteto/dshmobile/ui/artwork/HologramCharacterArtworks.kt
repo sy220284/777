@@ -21,3 +21,11 @@ internal val hologramCharacterArtworks = listOf(
     HologramCharacterArtwork("xiayizhou", R.string.hologram_xiayizhou, "persona-motion/xiayizhou.webp", "persona-launch/xiayizhou.webp", Color(0xFFBD8E84), Color(0xFFC1A38A)),
     HologramCharacterArtwork("klee", R.string.hologram_klee, "persona-motion/klee.webp", "persona-launch/klee.webp", Color(0xFFCAA17C), Color(0xFFD0BD9C)),
 )
+
+/** Avoid discarding high-resolution character details during bitmap decoding. */
+internal fun characterArtworkSampleSize(longestEdge: Int, maxDecodedEdge: Int): Int {
+    require(maxDecodedEdge > 0)
+    var sample = 1
+    while (longestEdge / sample > maxDecodedEdge) sample *= 2
+    return sample
+}
