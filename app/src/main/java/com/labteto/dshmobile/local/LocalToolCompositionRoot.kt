@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.tools.LocalPluginComposition
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
 import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
@@ -48,6 +49,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     builtinRuntime: Provider<LocalBuiltinToolRuntime>,
     private val approvalRuntime: LocalToolApprovalRuntime,
     private val activityProjection: LocalToolActivityProjectionRuntime,
+    private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -125,6 +127,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
             registry = registry,
             currentSessionId = runtimeStateStore::currentSessionId,
             planMode = { runtimeStateStore.state.value.work.planMode },
+            networkSearchEnabled = networkSearchSettings::isEnabled,
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },
