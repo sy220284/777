@@ -35,7 +35,7 @@ class BundledNodeRuntimeTest {
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
 
         assertEquals(0, process.exitValue())
-        assertTrue("unexpected Node version: $output", output.startsWith("v24.18.0|"))
+        assertTrue("unexpected Node version: $output", output.startsWith("v26.4.0|"))
         assertTrue("Node child_process shell failed: $output", output.endsWith("shell-ok"))
     }
 }

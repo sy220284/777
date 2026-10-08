@@ -352,9 +352,9 @@ Shared Runtime / Feature 初始化与恢复
 工具链：
 
 - AGP 9.4.0
-- Kotlin 2.2.10
+- Kotlin 2.4.20
 - Jetpack Compose BOM 2026.09.00
-- Hilt 2.59.2
+- Hilt 2.60.1
 - Kotlin 单一源码语言 / JVM 21（构建 JDK 21+）
 
 当前正式版本以 GitHub Releases 的最新标签为准。

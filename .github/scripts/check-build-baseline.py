@@ -7,9 +7,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-EXPECTED_JDK_MIN = 21
+EXPECTED_JDK_MIN = 27
 EXPECTED_JVM_TARGET = 21
-EXPECTED_NODE_MIN = 22
+EXPECTED_NODE_MIN = 24
 EXPECTED_ANDROID_BUILD_TOOLS = "37.0.0"
 
 
@@ -82,7 +82,7 @@ for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
     text = workflow.read_text(encoding="utf-8")
     if "java-version: 17" in text:
         fail(f"{workflow.relative_to(ROOT)} 仍使用 JDK 17")
-    if "node-version: 22.23.3" in text:
+    if "node-version: 24.21.0" in text:
         fail(f"{workflow.relative_to(ROOT)} 仍精确锁定 Node 22.23.3")
 
 print(

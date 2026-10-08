@@ -77,7 +77,7 @@ Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery �
 
 ## 3. Gradle 模块边界
 
-当前构建基线使用 Kotlin 2.2.10、JVM 21 与 JDK 21+；开发工具链版本与安装方式由 `docs/DEVELOPMENT.md` 维护。构建工具版本变化不改变本文的 Feature / Shared Capability / Kernel 所有权边界。
+当前构建基线使用 Kotlin 2.4.20、JVM 21 与 JDK 21+；开发工具链版本与安装方式由 `docs/DEVELOPMENT.md` 维护。构建工具版本变化不改变本文的 Feature / Shared Capability / Kernel 所有权边界。
 
 架构 3.0 不把每个产品 Feature 都拆成 Gradle module。
 
