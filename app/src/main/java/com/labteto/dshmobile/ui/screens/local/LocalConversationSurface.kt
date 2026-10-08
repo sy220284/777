@@ -769,6 +769,8 @@ internal fun LocalConversationSurface(
             ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
         LocalConversationErrorCard(
             sendRejectMessage = sendRejectMessage,
+            showConnectAction = sendFeedback.sessionId == state.sessionId &&
+                sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
             onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
