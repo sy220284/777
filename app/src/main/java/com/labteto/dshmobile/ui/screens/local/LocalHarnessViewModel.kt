@@ -216,6 +216,11 @@ class LocalHarnessViewModel @Inject constructor(
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
 
+    internal suspend fun startResearchAgent(task: String): LocalWorkUiActionResult {
+        val result = runtime.work.startResearchAgentForUi(task)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
     internal suspend fun sendBackgroundAgentMessage(
         agentId: String,
         message: String,

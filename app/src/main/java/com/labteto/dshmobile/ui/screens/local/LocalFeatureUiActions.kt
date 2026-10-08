@@ -96,6 +96,7 @@ internal data class LocalWorkFeatureUiActions(
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val stopBackgroundJob: (String) -> String,
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
+    val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,
     val sendBackgroundAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
 )
 

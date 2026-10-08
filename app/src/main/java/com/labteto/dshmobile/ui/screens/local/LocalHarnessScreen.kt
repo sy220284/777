@@ -276,6 +276,7 @@ fun LocalHarnessScreen(
         artifactsForUi = viewModel::artifactsForUi,
         stopBackgroundJob = viewModel::stopBackgroundJob,
         startBackgroundAgent = viewModel::startBackgroundAgent,
+        startResearchAgent = viewModel::startResearchAgent,
         sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
     )
     val projectActions = LocalProjectUiActions(

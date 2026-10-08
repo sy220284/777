@@ -60,6 +60,7 @@ internal fun LocalRunCenterScreen(
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
+    onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onOpenResults: () -> Unit,
     onDismiss: () -> Unit,
@@ -68,6 +69,7 @@ internal fun LocalRunCenterScreen(
     val scope = rememberCoroutineScope()
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
+    var researchPreset by remember(state.sessionId) { mutableStateOf(false) }
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
@@ -165,6 +167,32 @@ internal fun LocalRunCenterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !startingAgent,
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(R.string.local_research_agent_general),
+                    onClick = { researchPreset = false },
+                    enabled = !startingAgent,
+                    variant = if (researchPreset) DsButtonVariant.Ghost else DsButtonVariant.Outline,
+                    size = DsButtonSize.Small,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_research_agent_research),
+                    onClick = { researchPreset = true },
+                    enabled = !startingAgent,
+                    variant = if (researchPreset) DsButtonVariant.Outline else DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+            if (researchPreset) {
+                Text(
+                    stringResource(R.string.local_research_agent_readonly_hint),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
             Text(
                 stringResource(R.string.local_run_agent_inherits_context),
                 style = DsType.caption11.withReadingWeight(),
@@ -199,7 +227,7 @@ internal fun LocalRunCenterScreen(
                             scope.launch {
                                 startingAgent = true
                                 try {
-                                    val result = onStartBackgroundAgent(task)
+                                    val result = if (researchPreset) onStartResearchAgent(task) else onStartBackgroundAgent(task)
                                     agentFeedback = result.message
                                     if (result.accepted) {
                                         agentTask = ""

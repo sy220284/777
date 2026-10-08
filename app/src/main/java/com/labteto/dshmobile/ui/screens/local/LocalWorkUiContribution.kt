@@ -45,6 +45,7 @@ internal fun localWorkFeatureUiContribution(
                 onArtifacts = actions.artifactsForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
+                onStartResearchAgent = actions.startResearchAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onOpenResults = {
                     onFilesModeChange(LocalFilesMode.CONVERSATION)

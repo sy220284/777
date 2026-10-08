@@ -1690,5 +1690,8 @@
     <string name="advanced_memory_flat_view">返回平铺列表</string>
     <string name="local_artifacts_title">本次产物</string>
     <string name="local_artifacts_open_files">查看会话文件</string>
+    <string name="local_research_agent_general">通用助手</string>
+    <string name="local_research_agent_research">资料研究</string>
+    <string name="local_research_agent_readonly_hint">按来源核查事实并报告证据与不确定性；保持只读工具权限。</string>
 </resources>
 
