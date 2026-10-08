@@ -12,6 +12,7 @@ import org.junit.rules.TemporaryFolder
 
 class ChatPersonaGalleryTest {
     @get:Rule val temporary = TemporaryFolder()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test
     fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {

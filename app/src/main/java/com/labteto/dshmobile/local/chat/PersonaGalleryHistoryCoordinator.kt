@@ -114,6 +114,10 @@ internal class PersonaGalleryHistoryCoordinator(
         },
     )
 
+    /** Replay durable message tombstones before exposing cold history after a restart. */
+    fun pruneExcluded(entryId: String, storyId: String, excluded: Set<String>): Int =
+        store.pruneExcluded(entryId, storyId, excluded)
+
     fun deleteEntry(entryId: String) = store.deleteEntry(entryId)
 
     fun deleteStory(entryId: String, storyId: String) = store.deleteStory(entryId, storyId)
