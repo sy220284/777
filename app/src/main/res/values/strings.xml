@@ -1529,6 +1529,10 @@
     <string name="chatgpt_reauthorize">重新授权</string>
     <string name="chatgpt_disconnect">断开</string>
     <string name="chatgpt_add_account">添加 ChatGPT 账户</string>
+    <string name="chatgpt_action_view_usage">额度查看</string>
+    <string name="chatgpt_action_reconnect">重新连接</string>
+    <string name="chatgpt_action_disconnect">断开连接</string>
+    <string name="chatgpt_action_add_account">添加账户</string>
     <string name="chatgpt_waiting_browser">请在浏览器完成授权，然后返回这里。</string>
     <string name="chatgpt_exchanging">正在完成 ChatGPT 授权…</string>
     <string name="chatgpt_validating">正在验证账户身份…</string>
