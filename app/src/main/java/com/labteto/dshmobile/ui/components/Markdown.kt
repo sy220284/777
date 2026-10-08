@@ -36,6 +36,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
@@ -264,6 +265,7 @@ private sealed interface InlineSegment {
     data class Plain(val text: String) : InlineSegment
     data class Bold(val text: String) : InlineSegment
     data class Italic(val text: String) : InlineSegment
+    data class Strikethrough(val text: String) : InlineSegment
     data class Code(val text: String) : InlineSegment
     data class Link(val text: String, val url: String) : InlineSegment
 }
@@ -295,6 +297,16 @@ private fun parseInlineSegments(text: String): List<InlineSegment> {
                 if (end != -1) {
                     flush()
                     segments += InlineSegment.Bold(text.substring(i + 2, end))
+                    i = end + 2
+                } else {
+                    sb.append(text[i]); i++
+                }
+            }
+            text.startsWith("~~", i) -> {
+                val end = text.indexOf("~~", i + 2)
+                if (end != -1) {
+                    flush()
+                    segments += InlineSegment.Strikethrough(text.substring(i + 2, end))
                     i = end + 2
                 } else {
                     sb.append(text[i]); i++
@@ -370,6 +382,7 @@ private fun buildInlineContent(
             is InlineSegment.Plain -> builder.append(segment.text)
             is InlineSegment.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
             is InlineSegment.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(segment.text) }
+            is InlineSegment.Strikethrough -> builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(segment.text) }
             is InlineSegment.Code -> builder.withStyle(
                 SpanStyle(fontFamily = codeStyle.fontFamily, color = codeStyle.color, background = colors.inlineCode),
             ) { append(segment.text) }
