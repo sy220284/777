@@ -53,6 +53,7 @@ fun DsTopBar(
     largeTitle: Boolean = false,
     actionPainter: Painter? = null,
     backIcon: ImageVector = FeatherIcons.ChevronLeft,
+    plainBackButton: Boolean = false,
 ) {
     val colors = DsTheme.colors
     Column(modifier = modifier.fillMaxWidth()) {
@@ -62,7 +63,7 @@ fun DsTopBar(
                 contentDescription = backContentDescription,
                 onClick = onBack,
                 modifier = Modifier.align(Alignment.CenterStart),
-                containerColor = colors.bgLayer1,
+                containerColor = if (plainBackButton) Color.Transparent else colors.bgLayer1,
                 iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )

@@ -282,7 +282,7 @@ internal fun DrawerQuickAction(
         ) {
             Text(
                 title,
-                style = DsType.navigationItem.withReadingWeight(),
+                style = DsType.drawerItem.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -372,7 +372,7 @@ internal fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.navigationSection.withReadingWeight(),
+            style = DsType.drawerSection.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -466,7 +466,7 @@ internal fun LocalSessionDrawerRow(
                 ) {
                     Text(
                         displayTitle,
-                        style = DsType.navigationItem.withReadingWeight(),
+                        style = (if (current) DsType.navigationItem else DsType.drawerSession).withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

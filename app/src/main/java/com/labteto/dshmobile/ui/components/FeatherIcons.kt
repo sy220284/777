@@ -23,6 +23,99 @@ import androidx.compose.ui.unit.dp
  */
 internal object FeatherIcons {
 
+    val CreditCard: ImageVector by lazy {
+        feather("CreditCard") {
+            rectangle(2f, 4f, 20f, 16f)
+            moveTo(2f, 9f); horizontalLineTo(22f)
+            moveTo(6f, 15f); horizontalLineTo(10f)
+        }
+    }
+
+    /** Message actions share rounded outlines without visible button containers. */
+    val MessageCopy: ImageVector by lazy {
+        feather("MessageCopy") {
+            moveTo(10f, 8f); horizontalLineTo(18f)
+            arcToRelative(2f, 2f, 0f, false, true, 2f, 2f)
+            verticalLineTo(19f)
+            arcToRelative(2f, 2f, 0f, false, true, -2f, 2f)
+            horizontalLineTo(10f)
+            arcToRelative(2f, 2f, 0f, false, true, -2f, -2f)
+            verticalLineTo(10f)
+            arcToRelative(2f, 2f, 0f, false, true, 2f, -2f); close()
+            moveTo(16f, 8f); verticalLineTo(5f)
+            arcToRelative(2f, 2f, 0f, false, false, -2f, -2f)
+            horizontalLineTo(5f)
+            arcToRelative(2f, 2f, 0f, false, false, -2f, 2f)
+            verticalLineTo(14f)
+            arcToRelative(2f, 2f, 0f, false, false, 2f, 2f)
+            horizontalLineTo(8f)
+        }
+    }
+
+    val Retry: ImageVector by lazy {
+        feather("Retry") {
+            moveTo(20f, 4f); verticalLineTo(9f); horizontalLineTo(15f)
+            moveTo(20f, 9f)
+            arcTo(8f, 8f, 0f, true, false, 20f, 15f)
+        }
+    }
+
+    /** Remote control depicts a connected screen, distinct from a local phone. */
+    val RemoteControl: ImageVector by lazy {
+        feather("RemoteControl") {
+            moveTo(14f, 4f); horizontalLineTo(4f)
+            arcToRelative(2f, 2f, 0f, false, false, -2f, 2f)
+            verticalLineTo(16f)
+            arcToRelative(2f, 2f, 0f, false, false, 2f, 2f)
+            horizontalLineTo(20f)
+            arcToRelative(2f, 2f, 0f, false, false, 2f, -2f)
+            verticalLineTo(12f)
+            moveTo(12f, 18f); verticalLineTo(22f)
+            moveTo(8f, 22f); horizontalLineTo(16f)
+            moveTo(18f, 3f); curveTo(20.8f, 3f, 23f, 5.2f, 23f, 8f)
+            moveTo(18f, 7f); lineTo(19f, 8f)
+        }
+    }
+
+    val SettingsOutline: ImageVector by lazy {
+        feather("SettingsOutline") {
+            circle(12f, 12f, 3f)
+            moveTo(20.200f, 12.000f)
+            lineTo(21.808f, 13.951f)
+            lineTo(21.239f, 15.827f)
+            lineTo(18.818f, 16.556f)
+            lineTo(17.798f, 17.798f)
+            lineTo(17.556f, 20.315f)
+            lineTo(15.827f, 21.239f)
+            lineTo(13.600f, 20.042f)
+            lineTo(12.000f, 20.200f)
+            lineTo(10.049f, 21.808f)
+            lineTo(8.173f, 21.239f)
+            lineTo(7.444f, 18.818f)
+            lineTo(6.202f, 17.798f)
+            lineTo(3.685f, 17.556f)
+            lineTo(2.761f, 15.827f)
+            lineTo(3.958f, 13.600f)
+            lineTo(3.800f, 12.000f)
+            lineTo(2.192f, 10.049f)
+            lineTo(2.761f, 8.173f)
+            lineTo(5.182f, 7.444f)
+            lineTo(6.202f, 6.202f)
+            lineTo(6.444f, 3.685f)
+            lineTo(8.173f, 2.761f)
+            lineTo(10.400f, 3.958f)
+            lineTo(12.000f, 3.800f)
+            lineTo(13.951f, 2.192f)
+            lineTo(15.827f, 2.761f)
+            lineTo(16.556f, 5.182f)
+            lineTo(17.798f, 6.202f)
+            lineTo(20.315f, 6.444f)
+            lineTo(21.239f, 8.173f)
+            lineTo(20.042f, 10.400f)
+            close()
+        }
+    }
+
     /** `terminal` — the shell tools (bash, pwsh). */
     val Terminal: ImageVector by lazy {
         feather("Terminal") {

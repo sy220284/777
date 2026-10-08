@@ -24,6 +24,7 @@ object DsShapes {
     val toast = RoundedCornerShape(12.dp)
     val tooltip = RoundedCornerShape(8.dp)
     val block = RoundedCornerShape(24.dp)
+    val settingsGroup = RoundedCornerShape(18.dp)
     val pill = RoundedCornerShape(12.dp)
     val pillFull = RoundedCornerShape(999.dp)
     val chip = RoundedCornerShape(6.dp)

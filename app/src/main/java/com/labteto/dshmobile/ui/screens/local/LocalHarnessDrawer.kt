@@ -428,14 +428,14 @@ internal fun LocalModeDrawer(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         DsIconButton(
-                            icon = FeatherIcons.Device,
+                            icon = FeatherIcons.RemoteControl,
                             contentDescription = stringResource(R.string.local_remote_control),
                             onClick = onRemote,
                             containerColor = colors.bgLayer1,
                         )
                         Spacer(Modifier.width(DsSpacing.small))
                         DsIconButton(
-                            icon = FeatherIcons.Gear,
+                            icon = FeatherIcons.SettingsOutline,
                             contentDescription = stringResource(R.string.settings_title),
                             onClick = onSettings,
                             containerColor = colors.bgLayer1,
