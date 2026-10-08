@@ -71,7 +71,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                         style = DsType.small13.withReadingWeight().let {
                             if (node.kind == AgentOperationKind.Execute || node.kind == AgentOperationKind.Update) {
                                 it.copy(fontFamily = DsType.codeFont)
-                            } else it
+                            } else it.copy(fontFamily = DsType.contentFont)
                         },
                         color = colors.labelSecondary,
                         maxLines = if (node.kind == AgentOperationKind.Search) 12 else 18,
@@ -80,7 +80,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 }
             } else {
                 node.summary?.let {
-                    Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                    Text(it, style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont), color = colors.labelSecondary)
                 }
             }
         }

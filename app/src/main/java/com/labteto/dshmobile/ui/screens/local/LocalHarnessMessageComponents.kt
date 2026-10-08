@@ -275,7 +275,7 @@ internal fun LocalMessageRow(
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
                             speaker,
-                            style = DsType.small13Strong.withReadingWeight(),
+                            style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = colors.characterAccent,
                         )
                     }

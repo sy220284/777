@@ -466,7 +466,7 @@ internal fun LocalSessionDrawerRow(
                 ) {
                     Text(
                         displayTitle,
-                        style = (if (current) DsType.navigationItem else DsType.drawerSession).withReadingWeight(),
+                        style = DsType.drawerSession.copy(fontWeight = if (current) DsType.drawerItem.fontWeight else DsType.drawerSession.fontWeight).withReadingWeight(),
                         color = colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

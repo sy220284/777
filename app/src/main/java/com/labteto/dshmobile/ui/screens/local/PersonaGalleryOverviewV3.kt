@@ -284,7 +284,7 @@ internal fun PersonaGalleryOverviewV3(
                     Column(Modifier.weight(1f)) {
                         Text(
                             currentPersona.name,
-                            style = DsType.std14Strong.withReadingWeight(),
+                            style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
                             color = DsTheme.colors.labelPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
