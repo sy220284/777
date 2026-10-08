@@ -65,16 +65,24 @@ internal class LocalKeylessWebSearchClient(private val http: OkHttpClient) {
 
 /** Harden XML before reading remote snippets. An HTML/blocked response must fail, not look empty. */
 internal fun parseKeylessSearchRss(query: String, xml: String): String {
+    // Android's default DocumentBuilderFactory does not support FEATURE_SECURE_PROCESSING.
+    // Reject all DTD declarations before parsing, so unsupported optional parser features never
+    // become a reason to fail legitimate RSS or to allow external entity expansion.
+    if (Regex("""<!\\s*(DOCTYPE|ENTITY)\\b""", RegexOption.IGNORE_CASE).containsMatchIn(xml)) {
+        throw LocalWebException("INVALID_RESPONSE", "公共搜索 RSS 禁止 DTD/实体声明")
+    }
     val document = try {
         val factory = DocumentBuilderFactory.newInstance().apply {
-            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
             isExpandEntityReferences = false
-            isXIncludeAware = false
+            // Android parser implementations differ: apply these hardenings when supported.
+            runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
         }
-        factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
+        factory.newDocumentBuilder().apply {
+            setEntityResolver { _, _ -> InputSource(StringReader("")) }
+        }.parse(InputSource(StringReader(xml)))
     } catch (error: Exception) {
         throw LocalWebException("INVALID_RESPONSE", "公共搜索 RSS 响应格式无效", error)
     }
