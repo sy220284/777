@@ -7,7 +7,7 @@
     <string name="local_persona_ai_generate">AI 帮我完善人设</string>
     <string name="local_persona_ai_generating">正在生成人设…</string>
     <string name="local_persona_ai_working_hint">正在整理人物设定，请稍候…</string>
-    <string name="local_persona_ai_synced">设定已生成，请检查内容，确认后保存。</string>
+    <string name="local_persona_ai_synced">已更新当前人物设定。还想调整的话，修改下方内容后再点击「保存人物设定」。</string>
     <string name="local_persona_ai_new_hint">用一句话介绍人物，AI 会帮你补齐设定。检查满意后，再点保存。</string>
     <string name="local_persona_ai_new_draft">人物草稿已经生成。可以先改名字和简介，也可以展开详细设定，满意后再保存。</string>
     <string name="local_persona_ai_busy">当前还在回复消息，完成后就能生成人设。</string>
