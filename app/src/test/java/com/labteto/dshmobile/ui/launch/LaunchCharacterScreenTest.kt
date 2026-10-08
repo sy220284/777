@@ -1,12 +1,21 @@
 package com.labteto.dshmobile.ui.launch
 
 import com.labteto.dshmobile.ui.artwork.hologramCharacterArtworks
+import com.labteto.dshmobile.ui.artwork.characterArtworkSampleSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LaunchCharacterScreenTest {
+    @Test
+    fun fullResolutionArtworksAreNotDownsampled() {
+        assertEquals(1, characterArtworkSampleSize(3200, 3600))
+        assertEquals(1, characterArtworkSampleSize(1560, 2000))
+        assertEquals(2, characterArtworkSampleSize(5000, 3600))
+        assertEquals(2, characterArtworkSampleSize(3000, 2000))
+    }
+
     @Test
     fun onlyColdLauncherStartsArtwork() {
         assertTrue(shouldShowLaunchArtwork(false, "android.intent.action.MAIN", true, false))
