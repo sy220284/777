@@ -461,7 +461,7 @@ fun ToolsScreen(
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
                     modifier = Modifier.padding(
-                        horizontal = DsSpacing.large,
+                        horizontal = DsSpacing.comfortable,
                         vertical = DsSpacing.medium,
                     ),
                 )
@@ -481,7 +481,7 @@ fun ToolsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.large),
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.large),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
@@ -492,8 +492,8 @@ fun ToolsScreen(
                         )
                         Text(
                             stringResource(R.string.tools_capability_group_hint),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
+                            style = DsType.small13.withReadingWeight(),
+                            color = colors.labelSecondary,
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -1000,9 +1000,9 @@ private fun ToolCapabilityRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 70.dp)
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Surface(
                 modifier = Modifier.size(40.dp),
@@ -1035,36 +1035,37 @@ private fun ToolCapabilityRow(
                     title,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     subtitle,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
-                StateDot(state, size = 7.dp)
-                Text(
-                    status,
-                    style = DsType.caption11Strong.withReadingWeight(),
-                    color = if (state == StateDotState.Done) colors.labelSecondary else colors.labelTertiary,
-                    maxLines = 1,
-                )
-                if (onClick != null) {
-                    Icon(
-                        FeatherIcons.ChevronRight,
-                        contentDescription = null,
-                        tint = colors.labelCaption,
-                        modifier = Modifier.size(16.dp),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    StateDot(state, size = 7.dp)
+                    Text(
+                        status,
+                        style = DsType.xsmall12.withReadingWeight(),
+                        color = colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            if (onClick != null) {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.labelCaption,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }

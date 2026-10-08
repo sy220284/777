@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -73,22 +74,24 @@ fun DsTopBar(
                 .align(Alignment.Center)
                 .padding(horizontal = 58.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
             Text(
                 title,
                 style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 1,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
                 overflow = TextOverflow.Ellipsis,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                    style = DsType.xsmall12.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

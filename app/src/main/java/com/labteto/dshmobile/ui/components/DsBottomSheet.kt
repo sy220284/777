@@ -81,7 +81,7 @@ fun DsBottomSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             // A short grabber stands in for the platform drag handle so the sheet still reads as
             // draggable without the default's heavy vertical padding.
@@ -99,10 +99,10 @@ fun DsBottomSheet(
                     Modifier.fillMaxWidth().padding(top = DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(title, style = DsType.headline17.withReadingWeight(), color = colors.labelPrimary)
                         if (subtitle != null) {
-                            Text(subtitle, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                            Text(subtitle, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                         }
                     }
                     trailing?.invoke()
@@ -113,7 +113,7 @@ fun DsBottomSheet(
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = maxBodyHeight)
                         .verticalScroll(rememberScrollState())
                         .testTag("bottomSheetScrollBody"),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                     content = content,
                 )
             } else {

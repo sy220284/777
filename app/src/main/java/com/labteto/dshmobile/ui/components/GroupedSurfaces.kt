@@ -58,7 +58,7 @@ fun DsGroupCard(
             .fillMaxWidth()
             .clip(DsShapes.block)
             .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
         content = content,
     )
 }
@@ -100,7 +100,7 @@ fun DsCategoryRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 58.dp)
+            .heightIn(min = 64.dp)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .then(
@@ -116,27 +116,27 @@ fun DsCategoryRow(
                     Modifier
                 },
             )
-            .padding(horizontal = 4.dp, vertical = 7.dp),
+            .padding(horizontal = DsSpacing.small, vertical = DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DsIconBox(icon = icon, iconPainter = iconPainter, family = iconFamily)
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(DsSpacing.medium))
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
             Text(
                 text = title,
                 style = (titleTextStyle ?: DsType.std14).withReadingWeight(),
                 color = colors.labelPrimary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             subtitle?.let {
                 Text(
                     text = it,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -147,10 +147,10 @@ fun DsCategoryRow(
             Text(
                 text = it,
                 style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary,
-                maxLines = 1,
+                color = colors.labelSecondary,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 136.dp),
+                modifier = Modifier.widthIn(max = 96.dp),
             )
         }
         if (trailing != null) {
@@ -209,7 +209,7 @@ fun DsQuickActionTile(
                 text = label,
                 style = DsType.small13.withReadingWeight(),
                 color = if (enabled) colors.labelPrimary else colors.labelCaption,
-                maxLines = 1,
+                maxLines = 2,
             )
         }
     }
