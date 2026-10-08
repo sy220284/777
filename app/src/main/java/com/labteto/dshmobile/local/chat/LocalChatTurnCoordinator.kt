@@ -25,7 +25,7 @@ internal data class LocalPreparedChatTurn(
 )
 
 @Singleton
-class LocalChatTurnCoordinator @Inject constructor(
+internal class LocalChatTurnCoordinator @Inject constructor(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
     private val projects: ProjectContextPort,
