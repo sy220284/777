@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
     val pinnedSessionIds by viewModel.pinnedSessionIds.collectAsStateWithLifecycle()
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
+    val projectRecoveryNotice by viewModel.projectRecoveryNotice.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -652,6 +653,7 @@ fun LocalHarnessScreen(
         } else {
             NewSessionModeDialog(
                 usageMode = shell.usageMode,
+                projectAvailable = projectRecoveryNotice == null,
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {

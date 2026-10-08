@@ -7,8 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -78,71 +79,76 @@ internal fun LocalProjectScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onBack) { Text(stringResource(R.string.local_project_back)) }
+            DsButton(text = stringResource(R.string.local_project_back), onClick = onBack, variant = DsButtonVariant.Ghost)
             Text(stringResource(R.string.local_project_management_title))
         }
         Text(stringResource(R.string.local_project_new_session_hint))
         if (recovery != null) {
             Text(requireNotNull(recovery))
-            Button(
+            DsButton(
+                text = stringResource(R.string.local_project_backup_and_reset),
                 onClick = { runCatching { actions.backupAndReset() }.onFailure { error = it.message } },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.local_project_backup_and_reset)) }
+                variant = DsButtonVariant.Danger,
+            )
             error?.let { Text(it) }
             return@Column
         }
-        Button(
+        DsButton(
+            text = stringResource(R.string.local_project_start_work_session),
             onClick = {
                 runCatching { actions.createProjectWorkSession() }
                     .onSuccess { if (it) actions.onProjectSessionAccepted() else error = "会话当前不可切换" }
                     .onFailure { error = it.message }
             },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.local_project_start_work_session)) }
+        )
         state.projects.forEach { project ->
-            Button(
+            DsButton(
+                text = if (project.id == state.activeId) "✓ ${project.name}" else project.name,
                 onClick = {
                     runCatching { actions.select(project.id) }
                         .onFailure { error = it.message }
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (project.id == state.activeId) "✓ ${project.name}" else project.name)
-            }
+                variant = DsButtonVariant.Outline,
+            )
         }
-        OutlinedTextField(
+        DsTextField(
             value = newName,
             onValueChange = { newName = it.take(80) },
             label = { Text(stringResource(R.string.local_project_name_hint)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        Button(
+        DsButton(
+            text = stringResource(R.string.local_project_create),
             onClick = {
                 runCatching { actions.create(newName) }
                     .onSuccess { newName = ""; error = null }
                     .onFailure { error = it.message }
             },
             enabled = newName.isNotBlank(),
-        ) { Text(stringResource(R.string.local_project_create)) }
+        )
         active?.let { project ->
-            OutlinedTextField(
+            DsTextField(
                 value = nameDraft,
                 onValueChange = { nameDraft = it.take(80) },
                 label = { Text(stringResource(R.string.local_project_rename_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Button(
+            DsButton(
+                text = stringResource(R.string.local_project_rename),
                 onClick = {
                     runCatching { actions.rename(project.id, nameDraft) }
                         .onSuccess { error = null }
                         .onFailure { error = it.message }
                 },
                 enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
-            ) { Text(stringResource(R.string.local_project_rename)) }
+            )
             Text(stringResource(R.string.local_project_instruction_label, project.name))
-            OutlinedTextField(
+            DsTextField(
                 value = instructionDraft,
                 onValueChange = { instructionDraft = it.take(8_000) },
                 label = { Text(stringResource(R.string.local_project_instruction_hint)) },
@@ -150,14 +156,15 @@ internal fun LocalProjectScreen(
                 minLines = 4,
                 maxLines = 12,
             )
-            Button(
+            DsButton(
+                text = stringResource(R.string.local_project_save_instruction),
                 onClick = {
                     runCatching { actions.updateInstructions(project.id, instructionDraft) }
                         .onSuccess { error = null }
                         .onFailure { error = it.message }
                 },
                 enabled = instructionDraft != project.instructions,
-            ) { Text(stringResource(R.string.local_project_save_instruction)) }
+            )
         }
         error?.let { Text(it) }
     }
