@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -71,7 +70,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                         truncateWithoutSplittingSurrogatePair(node.toolContent, 2400),
                         style = DsType.small13.withReadingWeight().let {
                             if (node.kind == AgentOperationKind.Execute || node.kind == AgentOperationKind.Update) {
-                                it.copy(fontFamily = FontFamily.Monospace)
+                                it.copy(fontFamily = DsType.codeFont)
                             } else it
                         },
                         color = colors.labelSecondary,

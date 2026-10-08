@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -70,7 +69,7 @@ fun DsValueRow(
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
-                fontFamily = if (masked) FontFamily.Monospace else FontFamily.Default,
+                fontFamily = if (masked) DsType.codeFont else DsType.uiFont,
             )
             hint?.let {
                 Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption, maxLines = 2)
