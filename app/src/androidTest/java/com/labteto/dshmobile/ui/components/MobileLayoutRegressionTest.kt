@@ -25,8 +25,8 @@ import org.junit.Test
 class MobileLayoutRegressionTest {
     @get:Rule val compose = createComposeRule()
 
-    // Representative phone window widths in dp, independent of the emulator's pixel density.
-    // Keep all three in each test rather than depending on one emulator's default resolution.
+    // Representative phone window widths in dp. Emulator viewports must be >= 412dp:
+    // otherwise a 412dp test would silently be constrained to the physical screen width.
     private val phoneWidthsDp = listOf(360, 393, 412)
 
     @Test
@@ -156,6 +156,7 @@ class MobileLayoutRegressionTest {
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { getLayouts ->
                 assertTrue(getLayouts(layouts))
             }
+        assertTrue("No text layout returned for: $text", layouts.isNotEmpty())
         assertTrue(
             "Text overflow for: $text, layouts: ${layouts.map { "size=${it.size} lines=${it.lineCount} overflowWidth=${it.didOverflowWidth} overflowHeight=${it.didOverflowHeight}" }}",
             layouts.all { !it.hasVisualOverflow },
