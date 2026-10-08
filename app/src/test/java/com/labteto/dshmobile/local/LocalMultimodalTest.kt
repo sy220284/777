@@ -46,7 +46,7 @@ class LocalMultimodalTest {
 
     @Test
     fun nativeModeMaterializesPixelsWithoutPersistingThem() = runTest {
-        val root = createTempDir(prefix = "multimodal-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-").toFile()
         val file = File(root, ".dsh/attachments/abc.png").apply {
             parentFile?.mkdirs()
             writeBytes(PNG_SIGNATURE + byteArrayOf(1, 2, 3, 4))
@@ -106,7 +106,7 @@ class LocalMultimodalTest {
 
     @Test
     fun oldImagesStayAsReferencesAndOnlyNewestImageMessageReactivatesPixels() = runTest {
-        val root = createTempDir(prefix = "multimodal-history-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-history-").toFile()
         val first = imageMessage(root, "first.png", "first")
         val second = imageMessage(root, "second.png", "second")
 
@@ -133,7 +133,7 @@ class LocalMultimodalTest {
 
     @Test
     fun newTextOnlyUserTurnStopsOlderImagePixelReactivation() = runTest {
-        val root = createTempDir(prefix = "multimodal-new-turn-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-new-turn-").toFile()
         val image = imageMessage(root, "old.png", "old")
         val laterText = kotlinx.serialization.json.buildJsonObject {
             put("role", "user")
@@ -159,7 +159,7 @@ class LocalMultimodalTest {
 
     @Test
     fun queuedUserBurstCanActivateImagesBeforeTrailingText() = runTest {
-        val root = createTempDir(prefix = "multimodal-queued-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-queued-").toFile()
         val image = imageMessage(root, "queued.png", "queued")
         val trailingText = kotlinx.serialization.json.buildJsonObject {
             put("role", "user")
@@ -184,7 +184,7 @@ class LocalMultimodalTest {
 
     @Test
     fun nativeRequestBudgetRejectsOversizedActiveImageSetBeforeUnboundedGrowth() = runTest {
-        val root = createTempDir(prefix = "multimodal-budget-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-budget-").toFile()
         val message = imageMessage(root, "budget.png", "budget")
 
         val failure = runCatching {
@@ -248,7 +248,7 @@ class LocalMultimodalTest {
 
     @Test
     fun toolModeKeepsTextAndDropsNativePixelPart() = runTest {
-        val root = createTempDir(prefix = "multimodal-tool-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-tool-").toFile()
         val durable = buildLocalUserModelMessage(
             visibleText = "图片在 .dsh/attachments/a.png",
             attachments = listOf(
@@ -315,7 +315,7 @@ class LocalMultimodalTest {
 
     @Test
     fun boundedImageReadRejectsBytesBeyondFinalStreamLimit() {
-        val root = createTempDir(prefix = "multimodal-bounded-read-")
+        val root = kotlin.io.path.createTempDirectory("multimodal-bounded-read-").toFile()
         try {
             val file = File(root, "image.bin").apply {
                 writeBytes(ByteArray(33) { 1 })

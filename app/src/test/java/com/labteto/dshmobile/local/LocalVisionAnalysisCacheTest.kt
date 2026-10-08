@@ -11,7 +11,7 @@ import org.junit.Test
 class LocalVisionAnalysisCacheTest {
     @Test
     fun cacheKeyBindsImageRouteModelAndPrompt() {
-        val root = createTempDir(prefix = "vision-analysis-cache-")
+        val root = kotlin.io.path.createTempDirectory("vision-analysis-cache-").toFile()
         try {
             val cacheDir = File(root, "cache")
             val image = File(root, "image.png").apply { writeBytes(validPngBytes()) }
@@ -35,7 +35,7 @@ class LocalVisionAnalysisCacheTest {
 
     @Test
     fun expiredEntriesAreNotReused() {
-        val root = createTempDir(prefix = "vision-analysis-expiry-")
+        val root = kotlin.io.path.createTempDirectory("vision-analysis-expiry-").toFile()
         try {
             var now = 1_000L
             val image = File(root, "image.png").apply { writeBytes(validPngBytes()) }

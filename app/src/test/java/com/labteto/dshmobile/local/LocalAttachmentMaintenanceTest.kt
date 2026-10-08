@@ -20,7 +20,7 @@ class LocalAttachmentMaintenanceTest {
 
     @Test
     fun referenceCollectorFindsImageRefsInsideDurableUserMessages() {
-        val root = createTempDir(prefix = "attachment-ref-")
+        val root = kotlin.io.path.createTempDirectory("attachment-ref-").toFile()
         try {
             val log = LocalSessionEventLog(File(root, "s.events.jsonl"), json)
             log.append(
@@ -56,7 +56,7 @@ class LocalAttachmentMaintenanceTest {
 
     @Test
     fun cleanupDeletesOnlyStaleUnreferencedImagesAndLeavesOtherFilesAlone() {
-        val root = createTempDir(prefix = "attachment-gc-")
+        val root = kotlin.io.path.createTempDirectory("attachment-gc-").toFile()
         try {
             val dir = File(root, ".dsh/attachments").apply { mkdirs() }
             val referenced = png(File(dir, "keep.png"), 32)
@@ -92,7 +92,7 @@ class LocalAttachmentMaintenanceTest {
 
     @Test
     fun quotaPressureDeletesOldestUnreferencedImageWithoutTouchingReferencedImage() {
-        val root = createTempDir(prefix = "attachment-quota-")
+        val root = kotlin.io.path.createTempDirectory("attachment-quota-").toFile()
         try {
             val dir = File(root, ".dsh/attachments").apply { mkdirs() }
             val keep = png(File(dir, "keep.png"), 40)

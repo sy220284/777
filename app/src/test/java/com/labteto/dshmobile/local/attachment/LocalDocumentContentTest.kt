@@ -12,7 +12,7 @@ import org.junit.Test
 class LocalDocumentContentTest {
     @Test
     fun readsPlainTextAndUtf16Bom() {
-        val root = createTempDir(prefix = "doc-text-")
+        val root = kotlin.io.path.createTempDirectory("doc-text-").toFile()
         try {
             val text = File(root, "sample.txt")
             text.writeBytes(
@@ -162,7 +162,7 @@ class LocalDocumentContentTest {
 
     @Test
     fun bestEffortPdfExtractsLiteralTextWhenAvailable() {
-        val root = createTempDir(prefix = "doc-pdf-")
+        val root = kotlin.io.path.createTempDirectory("doc-pdf-").toFile()
         try {
             val file = File(root, "sample.pdf")
             file.writeBytes(
@@ -182,7 +182,7 @@ class LocalDocumentContentTest {
 
     @Test
     fun unknownBinaryStaysExplicitlyUnparsed() {
-        val root = createTempDir(prefix = "doc-unknown-")
+        val root = kotlin.io.path.createTempDirectory("doc-unknown-").toFile()
         try {
             val file = File(root, "sample.bin").apply { writeBytes(byteArrayOf(0, 1, 2, 3)) }
 
@@ -196,7 +196,7 @@ class LocalDocumentContentTest {
     }
 
     private fun zipFile(name: String, entries: Map<String, String>): File {
-        val root = createTempDir(prefix = "doc-zip-")
+        val root = kotlin.io.path.createTempDirectory("doc-zip-").toFile()
         val file = File(root, name)
         val bytes = ByteArrayOutputStream().use { output ->
             ZipOutputStream(output).use { zip ->
