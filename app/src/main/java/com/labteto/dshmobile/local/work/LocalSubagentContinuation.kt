@@ -12,7 +12,7 @@ import kotlinx.serialization.json.put
 
 internal const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT = "subagent/history-checkpoint"
 internal const val LOCAL_SUBAGENT_INBOX_CLAIM_EVENT = "subagent/inbox-claimed"
-private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 1
+private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 2
 private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
 private const val MAX_TERMINAL_OUTPUT_CHARS = 65_536
@@ -26,6 +26,7 @@ internal data class LocalSubagentHistoryCheckpoint(
     val step: Int,
     val softStepLimit: Int? = null,
     val terminalOutput: String? = null,
+    val enabledOptionalTools: Set<String> = emptySet(),
 )
 
 internal fun encodeLocalSubagentHistoryCheckpoint(
@@ -38,6 +39,7 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     terminalOutput: String? = null,
     resultId: String? = null,
     resultFirst: Boolean = true,
+    enabledOptionalTools: Set<String> = emptySet(),
 ): JsonObject = buildJsonObject {
     put("version", LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION)
     put("background_job_id", backgroundJobId)
@@ -45,6 +47,7 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     put("step", step.coerceAtLeast(0))
     softStepLimit?.takeIf { it > 0 }?.let { put("soft_step_limit", it) }
     put("history", JsonArray(history))
+    put("enabled_optional_tools", JsonArray(enabledOptionalTools.sorted().take(48).map(::JsonPrimitive)))
     terminalOutput?.takeIf(String::isNotBlank)?.let {
         put("terminal_output", it.takeLast(MAX_TERMINAL_OUTPUT_CHARS))
         resultId?.let { id -> put("result_id", id); put("result_first", resultFirst) }
@@ -147,7 +150,7 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
     data: JsonObject,
 ): LocalSubagentHistoryCheckpoint? {
     val version = data["version"]?.jsonPrimitive?.intOrNull ?: return null
-    if (version != LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION) return null
+    if (version !in 1..LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION) return null
     val rawHistory = data["history"] as? JsonArray ?: return null
     val history = rawHistory.mapNotNull { it as? JsonObject }
     if (history.size != rawHistory.size) return null
@@ -167,6 +170,11 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
         ?.takeLast(MAX_CLAIMED_MESSAGE_IDS)
         ?.toSet()
         .orEmpty()
+    val rawEnabledTools = if (version >= 2) data["enabled_optional_tools"] as? JsonArray ?: return null else null
+    val enabledTools = rawEnabledTools?.map { element ->
+        val name = (element as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+        name?.takeIf { it.isNotBlank() && it.length <= 128 } ?: return null
+    }?.takeIf { it.size <= 48 }?.toSet() ?: if (version == 1) emptySet() else return null
     return LocalSubagentHistoryCheckpoint(
         history = history,
         claimedMessageIds = claimed,
@@ -174,5 +182,6 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
         softStepLimit = data["soft_step_limit"]?.jsonPrimitive?.intOrNull
             ?.takeIf { it > 0 },
         terminalOutput = data["terminal_output"]?.jsonPrimitive?.contentOrNull,
+        enabledOptionalTools = enabledTools,
     )
 }

@@ -172,7 +172,7 @@ internal class LocalWorkTurnToolRuntime(
             content = "[${call.name}][PARALLEL_TASK_ERROR] 工具执行失败：$detail\n调用 id：${call.id}",
             isError = true,
             errorCode = "PARALLEL_TASK_ERROR",
-            retryable = true,
+            retryable = sideEffect == AgentToolSideEffect.NONE,
             sideEffect = sideEffect,
             recoveryHint = if (sideEffect == AgentToolSideEffect.POSSIBLE) {
                 "该调用可能已产生部分副作用；先检查当前状态，再决定是否重试。"
