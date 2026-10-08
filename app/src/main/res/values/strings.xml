@@ -1807,7 +1807,8 @@
     <string name="local_composer_plan_title">规划</string>
     <string name="local_composer_plan_off">关</string>
     <string name="local_composer_plan_start">开始规划</string>
-    <string name="local_composer_plan_tip">下一条任务进入规划，计划提交后自动关闭</string>
+    <string name="local_composer_plan_tip">下一条任务进入规划，提交审批后自动退出</string>
+    <string name="local_composer_plan_waiting_approval">计划已提交，等待确认。审批前保持只读保护</string>
     <string name="local_reasoning_auto">自动</string>
     <string name="local_reasoning_switch_title">深度思考与推理</string>
     <string name="local_reasoning_switch_hint">控制下一轮模型的真实思考模式；执行中的请求不受影响</string>
