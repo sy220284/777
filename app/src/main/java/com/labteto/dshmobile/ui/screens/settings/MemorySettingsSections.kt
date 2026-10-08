@@ -44,6 +44,7 @@ import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.memory.memoryVaultFolders
 import com.labteto.dshmobile.local.model.DeepSeekBillingSchedule
 import com.labteto.dshmobile.local.model.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
@@ -221,6 +222,7 @@ internal fun MemoryManagementCard(
     val colors = DsTheme.colors
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(MemoryFilter.ALL) }
+    var vaultMode by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var visibleLimit by remember(records, query, filter) { mutableStateOf(20) }
 
@@ -231,8 +233,12 @@ internal fun MemoryManagementCard(
                 (needle.isBlank() || record.content.contains(needle, ignoreCase = true))
         }
     }
-    val visibleRecords = remember(filteredRecords, visibleLimit) {
-        filteredRecords.take(visibleLimit)
+    val folders = remember(filteredRecords) { memoryVaultFolders(filteredRecords) }
+    val visibleRecords = remember(filteredRecords, folders, visibleLimit, vaultMode) {
+        (if (vaultMode) folders.flatMap { it.records } else filteredRecords).take(visibleLimit)
+    }
+    val firstFolderRecords = remember(folders) {
+        folders.mapNotNull { folder -> folder.records.firstOrNull()?.id?.let { it to folder } }.toMap()
     }
 
     SettingsCard(stringResource(R.string.advanced_manage_memory), FeatherIcons.BookOpen) {
@@ -256,6 +262,15 @@ internal fun MemoryManagementCard(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text(stringResource(R.string.advanced_memory_search)) },
+        )
+
+        DsButton(
+            text = stringResource(
+                if (vaultMode) R.string.advanced_memory_flat_view else R.string.advanced_memory_vault_view
+            ),
+            onClick = { vaultMode = !vaultMode },
+            variant = DsButtonVariant.Ghost,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         val filterOptions = listOf(
@@ -302,6 +317,19 @@ internal fun MemoryManagementCard(
         }
 
         visibleRecords.forEach { record ->
+            if (vaultMode) {
+                firstFolderRecords[record.id]?.let { folder ->
+                    Text(
+                        listOfNotNull(
+                            memoryScopeLabel(folder.scope),
+                            folder.ownerId?.take(18),
+                            memoryKindLabel(folder.kind),
+                        ).joinToString(" / "),
+                        style = DsType.small13Strong.withReadingWeight(),
+                        color = colors.labelSecondary,
+                    )
+                }
+            }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = DsShapes.block,
