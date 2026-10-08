@@ -177,15 +177,19 @@ internal fun ColumnScope.TaskEditorPane(
                     color = colors.error,
                 )
             }
+        }
+    }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 DsButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = onReset,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Info,
+                    modifier = Modifier.weight(1f),
+                    size = DsButtonSize.Large,
+
                 )
                 DsButton(
                     text = stringResource(
@@ -235,10 +239,21 @@ internal fun ColumnScope.TaskEditorPane(
                         )
                         if (ok) onReset() else createError = createInvalidMessage
                     },
-                    size = DsButtonSize.Small,
+                    modifier = Modifier.weight(1f),
+                    size = DsButtonSize.Large,
+
                 )
             }
-        }
+    if (showSchedulePicker) {
+        TaskSchedulePicker(
+            initialMillis = firstRunAt,
+            onPicked = { picked ->
+                firstRunAt = picked
+                createError = null
+                showSchedulePicker = false
+            },
+            onDismiss = { showSchedulePicker = false },
+        )
     }
     if (showSchedulePicker) {
         TaskSchedulePicker(
@@ -389,3 +404,28 @@ private fun TaskSchedulePicker(
 
 internal fun formatMinuteOfDay(minuteOfDay: Int): String =
     "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AutomationTimePickerSheet(
+    initialMinuteOfDay: Int,
+    onPicked: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val time = rememberTimePickerState(
+        initialHour = initialMinuteOfDay / 60,
+        initialMinute = initialMinuteOfDay % 60,
+        is24Hour = true,
+    )
+    com.labteto.dshmobile.ui.components.DsBottomSheet(
+        title = stringResource(R.string.tasks_schedule_label),
+        onDismiss = onDismiss,
+        footer = {
+            DsButton(
+                text = stringResource(R.string.common_ok),
+                onClick = { onPicked(time.hour * 60 + time.minute) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    ) { TimeInput(state = time) }
+}

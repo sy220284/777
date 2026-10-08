@@ -8,6 +8,8 @@ internal interface LocalToolsManagementPort {
 
     fun installedPluginIds(): List<String>
 
+    fun installedSkills(): List<LocalInstalledSkill>
+
     suspend fun connectHttp(serverId: String, endpoint: String): String
 
     suspend fun connectStdio(

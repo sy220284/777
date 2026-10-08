@@ -47,7 +47,7 @@ import kotlinx.coroutines.delay
 enum class DsButtonVariant { Primary, Info, Ghost, Outline, Danger }
 
 /** Button sizes: [Normal] is h36 r18, [Small] is h28 r14. */
-enum class DsButtonSize { Normal, Small }
+enum class DsButtonSize { Normal, Small, Large }
 
 /** Ink/ghost/outline button in the DeepSeek Harness style. */
 @Composable
@@ -86,7 +86,7 @@ fun DsButton(
     )
     
     val (fill, content) = when (variant) {
-        DsButtonVariant.Primary -> colors.buttonInfoFill to colors.onAccent
+        DsButtonVariant.Primary -> colors.brandPrimary to colors.onBrandPrimary
         DsButtonVariant.Info -> colors.bgModulePlatform to colors.labelPrimary
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
@@ -106,12 +106,12 @@ fun DsButton(
         else -> fill
     }
     val contentColor = if (enabled) content else content.copy(alpha = 0.5f)
-    val normal = size == DsButtonSize.Normal
+    val normal = size != DsButtonSize.Small
     Surface(
         onClick = onClick,
         modifier = modifier
             .minimumInteractiveComponentSize()
-            .height(if (normal) 36.dp else 28.dp)
+            .height(when (size) { DsButtonSize.Large -> 52.dp; DsButtonSize.Normal -> 36.dp; DsButtonSize.Small -> 28.dp })
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

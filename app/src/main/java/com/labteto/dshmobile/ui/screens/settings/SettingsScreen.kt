@@ -104,6 +104,7 @@ import kotlinx.coroutines.withContext
  */
 enum class SettingsDestination {
     ROOT,
+    ACCOUNT,
     SESSION,
     APPEARANCE,
     CHAT,
@@ -125,6 +126,7 @@ enum class SettingsDestination {
 
 private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
     SettingsDestination.ROOT -> null
+    SettingsDestination.ACCOUNT,
     SettingsDestination.SESSION,
     SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
@@ -295,6 +297,7 @@ fun SettingsScreen(
 
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
+        SettingsDestination.ACCOUNT -> stringResource(R.string.settings_account)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
@@ -353,10 +356,9 @@ fun SettingsScreen(
                         // The first card contains frequently used destinations; details belong to subpages.
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Device,
-                                title = stringResource(R.string.settings_page_permissions),
-                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
-                                onClick = { page = SettingsDestination.PERMISSIONS },
+                                icon = FeatherIcons.User,
+                                title = stringResource(R.string.settings_account),
+                                onClick = { page = SettingsDestination.ACCOUNT },
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
@@ -402,6 +404,13 @@ fun SettingsScreen(
                             )
                         }
 
+                        SettingsGroupTitle(stringResource(R.string.settings_group_system))
+                        AppSettingsSection {
+                            AppSettingsRow(icon = FeatherIcons.Shield,
+                                title = stringResource(R.string.settings_page_permissions),
+                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
+                                onClick = { page = SettingsDestination.PERMISSIONS })
+                        }
                         SettingsGroupTitle(stringResource(R.string.settings_group_maintenance))
                         AppSettingsSection {
                             AppSettingsRow(
@@ -616,6 +625,10 @@ fun SettingsScreen(
                         }
                     }
 
+                    SettingsDestination.ACCOUNT -> {
+                        val account by viewModel.chatGptState.collectAsStateWithLifecycle()
+                        ChatGptAccountPanel(account, viewModel, toast.second)
+                    }
                     SettingsDestination.MODELS -> {
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)

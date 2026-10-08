@@ -54,6 +54,8 @@ fun DsBottomSheet(
     trailing: (@Composable () -> Unit)? = null,
     scrollable: Boolean = false,
     dismissEnabled: Boolean = true,
+    showDragHandle: Boolean = true,
+    floating: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -67,8 +69,8 @@ fun DsBottomSheet(
     ModalBottomSheet(
         onDismissRequest = { if (dismissal.value) onDismiss() },
         sheetState = state,
-        modifier = modifier,
-        shape = DsShapes.sheet,
+        modifier = if (floating) modifier.padding(horizontal = 6.dp, vertical = 6.dp) else modifier,
+        shape = if (floating) DsShapes.floatingSheet else DsShapes.sheet,
         containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.SHEET, BackgroundRegion.BOTTOM),
         scrimColor = colors.overlayMask,
         dragHandle = null,
@@ -83,7 +85,7 @@ fun DsBottomSheet(
         ) {
             // A short grabber stands in for the platform drag handle so the sheet still reads as
             // draggable without the default's heavy vertical padding.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            if (showDragHandle) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Spacer(
                     Modifier
                         .fillMaxWidth(0.12f)

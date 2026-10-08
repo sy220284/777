@@ -15,3 +15,9 @@ data class LocalWorkspaceFilePreview(
     val text: String? = null,
     val truncated: Boolean = false,
 )
+
+internal data class LocalInstalledSkill(
+    val name: String,
+    val description: String,
+    val modelInvocable: Boolean,
+)

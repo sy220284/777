@@ -31,6 +31,7 @@ fun DsSheetChoiceRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    trailingText: String? = null,
     icon: ImageVector? = null,
     selected: Boolean = false,
     danger: Boolean = false,
@@ -43,19 +44,19 @@ fun DsSheetChoiceRow(
         enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = DsShapes.row,
-        color = if (selected) colors.bgModulePlatform else colors.bgBase,
+        color = if (selected) colors.bgModulePlatform else androidx.compose.ui.graphics.Color.Transparent,
         tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
+                .heightIn(min = if (subtitle == null) 56.dp else 72.dp)
                 .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             icon?.let {
-                Icon(it, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(20.dp))
+                Icon(it, contentDescription = null, tint = colors.labelSecondary, modifier = Modifier.size(24.dp))
             }
             Column(
                 modifier = Modifier.weight(1f),
@@ -71,12 +72,15 @@ fun DsSheetChoiceRow(
                 subtitle?.takeIf(String::isNotBlank)?.let {
                     Text(
                         it,
-                        style = DsType.caption11.withReadingWeight(),
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelTertiary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            trailingText?.let {
+                Text(it, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
             }
             Icon(
                 FeatherIcons.ChevronRight,

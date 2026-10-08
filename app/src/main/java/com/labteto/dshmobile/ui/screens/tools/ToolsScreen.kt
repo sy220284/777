@@ -87,6 +87,7 @@ data class ToolsUiState(
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
+    val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val remotePlugins: PluginInventorySnapshot? = null,
     val webhook: LocalWebhookUiState = LocalWebhookUiState(),
     val notice: ToolsNotice? = null,
@@ -140,6 +141,7 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
+                    skills = localTools.installedSkills(),
                     remotePlugins = sessionStore.plugins.value,
                     webhook = localTools.webhookStatus(),
                 )
@@ -356,6 +358,9 @@ class ToolsViewModel @Inject constructor(
 @Composable
 fun ToolsScreen(
     onClose: () -> Unit,
+    startAtPlugins: Boolean = false,
+    startAtSkills: Boolean = false,
+    onUseCapability: ((String) -> Unit)? = null,
     onOpenTasks: () -> Unit = {},
     onOpenSettings: (SettingsDestination) -> Unit = {},
     handleRootSystemBack: Boolean = true,
@@ -375,7 +380,8 @@ fun ToolsScreen(
     var capabilityDetail by remember { mutableStateOf<String?>(null) }
     var webhookPort by remember { mutableStateOf("8765") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
-    var showPluginBrowser by remember { mutableStateOf(false) }
+    var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
+    var skillsOnly by remember(startAtSkills) { mutableStateOf(startAtSkills) }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -426,6 +432,11 @@ fun ToolsScreen(
     if (showPluginBrowser) {
         PluginInventoryBrowser(
             localIds = state.localPlugins,
+            skills = state.skills,
+            skillsOnly = skillsOnly,
+            loading = state.loading,
+            error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
+            onRetry = viewModel::refresh,
             remote = state.remotePlugins,
             onBack = { showPluginBrowser = false },
             onManageConnections = {
@@ -433,6 +444,7 @@ fun ToolsScreen(
                 showExternalConfig = true
             },
             onReturnToChat = onClose,
+            onUseCapability = onUseCapability,
         )
     } else {
     Box(Modifier.fillMaxSize()) {
@@ -492,7 +504,7 @@ fun ToolsScreen(
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             status = capabilityStateLabel(builtinAvailable),
                             state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
-                            onClick = { showPluginBrowser = true },
+                            onClick = { skillsOnly = true; showPluginBrowser = true },
                         )
 
                         val terminalAvailable = "android-runtime" in state.localPlugins

@@ -53,8 +53,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import com.labteto.dshmobile.ui.theme.DsMetrics
 import androidx.compose.ui.graphics.Color
+import com.labteto.dshmobile.ui.theme.DsShapes
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -107,8 +112,6 @@ import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsMetrics
-import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -172,6 +175,12 @@ fun LocalHarnessScreen(
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
+    var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
+    var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
+    var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
+    var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
+    var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
@@ -207,6 +216,24 @@ fun LocalHarnessScreen(
             .filterNot { it == LocalFeaturePage.HOME }
             .forEach { featureStateHolder.removeState(it.name) }
         featureStack = localFeatureHome()
+    }
+
+    fun handoffWorkCapability(prompt: String) {
+        composerHandoff = listOf(shell.sessionId, prompt)
+        taskMode = null
+        toolsStartAtPlugins = false
+        toolsStartAtSkills = false
+        resetFeatureNavigation()
+    }
+
+    fun useWorkCapability(prompt: String) {
+        if (shell.usageMode == LocalUsageMode.WORK && !shell.loading) {
+            handoffWorkCapability(prompt)
+        } else {
+            pendingWorkCapability = prompt
+            workCapabilityConfirmed = false
+            workCapabilityFailed = false
+        }
     }
 
     val shellActions = LocalShellFeatureUiActions(
@@ -309,6 +336,12 @@ fun LocalHarnessScreen(
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
             onNewSession = { showNewSessionMode = true },
+            onOpenDrawer = { scope.launch { drawerState.open() } },
+            onUseWorkCapability = ::useWorkCapability,
+            composerHandoff = composerHandoff,
+            onConsumeComposerHandoff = { composerHandoff = emptyList() },
+            onOpenPlugins = { toolsStartAtSkills = false; toolsStartAtPlugins = true; pushFeature(LocalFeaturePage.TOOLS) },
+            onOpenSkills = { toolsStartAtSkills = true; toolsStartAtPlugins = false; pushFeature(LocalFeaturePage.TOOLS) },
         ),
         localChatFeatureUiContribution(
             gallery = gallery,
@@ -342,6 +375,7 @@ fun LocalHarnessScreen(
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
+            onCreateViaChat = ::useWorkCapability,
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
             onResetNavigation = ::resetFeatureNavigation,
@@ -350,10 +384,13 @@ fun LocalHarnessScreen(
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
         localToolsFeatureUiContribution(
+            startAtPlugins = toolsStartAtPlugins,
+            startAtSkills = toolsStartAtSkills,
+            onUseCapability = ::useWorkCapability,
             onTaskModeChange = { taskMode = it },
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
-            onPopFeature = ::popFeature,
+            onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
@@ -399,6 +436,19 @@ fun LocalHarnessScreen(
                 delay(250)
                 if (!shell.loading && shell.usageMode != pending) pendingUsageMode = null
             }
+        }
+    }
+
+    LaunchedEffect(workCapabilityConfirmed, pendingUsageMode, shell.loading, shell.usageMode, shell.sessionId) {
+        val prompt = pendingWorkCapability ?: return@LaunchedEffect
+        if (!workCapabilityConfirmed) return@LaunchedEffect
+        if (shell.usageMode == LocalUsageMode.WORK && !shell.loading) {
+            handoffWorkCapability(prompt)
+            pendingWorkCapability = null
+            workCapabilityConfirmed = false
+        } else if (pendingUsageMode == null && !shell.loading) {
+            workCapabilityConfirmed = false
+            workCapabilityFailed = true
         }
     }
 
@@ -484,8 +534,11 @@ fun LocalHarnessScreen(
         }
     }
 
+    val drawerWidth = LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
+    val drawerWidthPx = with(LocalDensity.current) { drawerWidth.toPx() }
     ModalNavigationDrawer(
         drawerState = drawerState,
+        scrimColor = Color.Transparent,
         drawerContent = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
@@ -543,12 +596,36 @@ fun LocalHarnessScreen(
         LocalFeatureAnimatedHost(
             stack = featureStack,
             predictiveBackProgress = predictiveBackProgress.value,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                val offset = drawerState.currentOffset
+                translationX = if (offset.isNaN()) 0f else (drawerWidthPx + offset).coerceIn(0f, drawerWidthPx)
+                if (translationX > 0f) {
+                    shape = DsShapes.dialog
+                    clip = true
+                }
+            },
         ) { renderedPage ->
             featureStateHolder.SaveableStateProvider(renderedPage.name) {
                 LocalFeaturePageContent(renderedPage, featureContributions)
             }
         }
+    }
+
+    if (pendingWorkCapability != null) {
+        LocalWorkCapabilitySheet(
+            switching = workCapabilityConfirmed,
+            failed = workCapabilityFailed,
+            enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+            onContinue = {
+                workCapabilityConfirmed = true
+                workCapabilityFailed = false
+                switchUsageMode(LocalUsageMode.WORK)
+            },
+            onDismiss = {
+                pendingWorkCapability = null
+                workCapabilityConfirmed = false
+            },
+        )
     }
 
     if (showNewSessionMode) {

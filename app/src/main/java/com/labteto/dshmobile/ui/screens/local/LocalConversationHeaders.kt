@@ -56,6 +56,7 @@ internal fun ChatSurfaceHeader(
     onTogglePin: () -> Unit,
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
+    tuningEnabled: Boolean = true,
 ) {
     val colors = DsTheme.colors
     Row(
@@ -127,7 +128,7 @@ internal fun ChatSurfaceHeader(
                     modifier = Modifier.size(16.dp),
                 )
             }
-            if (!groupEnabled) {
+            if (!groupEnabled && tuningEnabled) {
                 DsIconButton(
                     icon = FeatherIcons.User,
                     contentDescription = stringResource(R.string.local_character_tuning_open),

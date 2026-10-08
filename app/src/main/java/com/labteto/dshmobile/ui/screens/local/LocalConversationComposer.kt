@@ -45,6 +45,8 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsComposerAction
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
@@ -72,6 +74,7 @@ internal fun LocalConversationComposer(
     onRemoveAttachment: (Int) -> Unit,
     onClearAttachments: () -> Unit,
     onOpenAttachmentPicker: () -> Unit,
+    attachmentMenuItems: List<MenuItem> = emptyList(),
     onShowReplySuggestions: () -> Unit,
     onGenerateReplySuggestions: suspend () -> Boolean,
     onConfigure: () -> Unit,
@@ -93,6 +96,7 @@ internal fun LocalConversationComposer(
     // Keep real TextField focus across session projection changes. Otherwise the IME can remain
     // visible while the composer is incorrectly reset to its idle one-row state.
     var focused by remember { mutableStateOf(false) }
+    var attachmentMenuOpen by remember(state.sessionId) { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
     val expanded = focused || input.contains('\n') || attachments.isNotEmpty() || teamDispatchSelected
@@ -147,14 +151,22 @@ internal fun LocalConversationComposer(
     @Composable
     fun AttachmentControl() {
         if (state.running) return
+        Box {
         DsComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
-            onClick = onOpenAttachmentPicker,
+            onClick = { if (focused && attachmentMenuItems.isNotEmpty()) attachmentMenuOpen = true else onOpenAttachmentPicker() },
             tint = colors.labelPrimary,
             containerColor = colors.hoverSolid,
         )
+        DsPopupMenu(
+            expanded = attachmentMenuOpen,
+            onDismiss = { attachmentMenuOpen = false },
+            items = attachmentMenuItems,
+            focusable = false,
+        )
+        }
     }
 
     @Composable

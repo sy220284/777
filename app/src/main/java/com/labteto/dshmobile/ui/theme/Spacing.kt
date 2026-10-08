@@ -43,6 +43,7 @@ object DsSpacing {
 
 /** Semantic layout metrics shared by chat and work surfaces. */
 object DsMetrics {
+    const val drawerWidthFraction = 0.85f
     val screenHorizontal = 16.dp
     val drawerHorizontal = 16.dp
     val topBarHeight = 56.dp
