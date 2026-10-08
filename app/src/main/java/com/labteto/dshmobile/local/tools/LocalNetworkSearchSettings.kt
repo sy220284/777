@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** Device-local preference for built-in web search and page retrieval. */
 @Singleton
-internal class LocalNetworkSearchSettings @Inject constructor(
+class LocalNetworkSearchSettings @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
