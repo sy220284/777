@@ -524,7 +524,7 @@ internal fun PersonaGalleryScreen(
                                 busy = false
                             }
                         },
-                        icon = FeatherIcons.FilePlus,
+                        icon = FeatherIcons.Archive,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !busy,
                     )
