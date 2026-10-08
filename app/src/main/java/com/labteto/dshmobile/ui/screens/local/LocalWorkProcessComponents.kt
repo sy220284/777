@@ -66,7 +66,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 5
-internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 140
+internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 260
 
 private val WORK_PROCESS_WHITESPACE = Regex("\\s+")
 private val WORK_PROCESS_TECHNICAL_LINE = Regex(
@@ -142,6 +142,13 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
     return result
 }
 
+/**
+ * Compose projection keeps the exact persisted event order: narration, tool outcome,
+ * narration, tool outcome. The Run Center retains raw results and diagnostic details.
+ */
+internal fun conversationWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> =
+    nodes.map { it.copy(toolContent = null) }
+
 internal fun visibleWorkProcessNodes(
     nodes: List<LocalWorkProcessNode>,
     showAll: Boolean,
@@ -210,9 +217,8 @@ internal fun WorkProcessRow(
     LaunchedEffect(messages.first().id, running) {
         expanded = running
     }
-    val semanticNodes = remember(nodes) {
-        semanticWorkProcessNodes(nodes)
-    }
+    // Do not merge prose into tool rows: the dialogue must read in event order.
+    val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
     val firstReasoningTimestamp = messages.firstOrNull {
         it.role == "reasoning" && it.createdAt > 0L
     }?.createdAt
@@ -327,9 +333,24 @@ internal fun WorkProcessRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 visibleNodes.forEachIndexed { visibleIndex, node ->
-                    val rowRunning = running && visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
-                        !node.failed
-                    WorkContentBlock(node, rowRunning)
+                    val rowRunning = running &&
+                        visibleStartIndex + visibleIndex == semanticNodes.lastIndex &&
+                        node.summary != null && !node.failed
+                    if (node.summary != null) {
+                        // Model-authored, user-facing status narrative, never provider reasoning.
+                        Text(
+                            text = node.summary,
+                            style = DsType.mdBody.withReadingWeight(),
+                            color = colors.labelPrimary,
+                            modifier = Modifier.fillMaxWidth().padding(
+                                horizontal = DsSpacing.small,
+                                vertical = DsSpacing.small,
+                            ),
+                        )
+                    } else {
+                        // A completed tool outcome keeps its own icon/status and never leaks arguments.
+                        WorkContentBlock(node, running = false)
+                    }
                 }
                 if (collapsedHiddenCount > 0) {
                     DsButton(

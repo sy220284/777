@@ -109,6 +109,30 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun inlineConversationPreservesNarrationToolNarrationSequence() {
+        val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
+            message("p1", "progress", "先检查相关文件"),
+            message("t1", "tool", "/private/path/raw.txt", toolName = "read"),
+            message("p2", "progress", "发现问题，开始修复"),
+            message("t2", "tool", "ok", toolName = "edit_file"),
+        )))
+        assertEquals(4, projected.size)
+        assertEquals(listOf("先检查相关文件", null, "发现问题，开始修复", null),
+            projected.map { it.summary })
+        assertEquals(AgentOperationKind.Inspect, projected[1].kind)
+        assertEquals(AgentOperationKind.Update, projected[3].kind)
+        assertTrue(projected.all { it.toolContent == null })
+    }
+
+    @Test
+    fun inlineWorkStreamingDoesNotDuplicateCommittedNarration() {
+        assertFalse(shouldShowInlineWorkPreview("正在检查", "正在检查项目的最新代码"))
+        assertTrue(shouldShowInlineWorkPreview("开始修复新问题", "正在检查项目的最新代码"))
+        assertFalse(shouldShowInlineWorkPreview("  ", null))
+        assertTrue(shouldShowInlineWorkPreview("现在重新运行测试", null))
+    }
+
+    @Test
     fun semanticMilestonesKeepToolOutcomesAndUnlabelledOperations() {
         val nodes = semanticWorkProcessNodes(buildWorkProcessNodes(listOf(
             message("p1", "progress", "读取文件"),

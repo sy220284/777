@@ -715,6 +715,10 @@ internal fun LocalConversationSurface(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
                                 hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                                lastDurableNarrative = (transcriptItems.lastOrNull() as?
+                                    LocalTranscriptItem.WorkProcess)?.messages?.lastOrNull {
+                                    it.role == "progress" || it.role == "assistant"
+                                }?.content,
                             )
                         }
                     }

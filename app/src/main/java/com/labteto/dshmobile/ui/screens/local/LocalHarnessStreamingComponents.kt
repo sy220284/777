@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.forSurface
@@ -84,32 +85,57 @@ internal fun LocalStreamingChatTurn(
 }
 
 /**
- * Only the transient status before the first durable event. Rendering this inside the
- * transcript, rather than below the scroll area, preserves one continuous message flow.
- * Once a durable work step exists the projection owns the status and suppresses duplicates.
+ * Inline response preview for the current model step. The durable Session EventLog remains
+ * authoritative: suppress text already committed as a progress/final row and do not repeat
+ * empty loading cards when a work timeline exists.
  */
+internal fun shouldShowInlineWorkPreview(
+    draft: String,
+    lastDurableNarrative: String?,
+): Boolean {
+    val text = draft.trim()
+    if (text.isEmpty()) return false
+    val committed = lastDurableNarrative?.trim().orEmpty()
+    return committed.isEmpty() || !committed.startsWith(text)
+}
+
 @Composable
 internal fun LocalStreamingWorkPreview(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     hasDurableProgress: Boolean,
+    lastDurableNarrative: String? = null,
 ) {
-    if (hasDurableProgress) return
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
-    Row(
+    val text = stream.assistant
+    val visiblePreview = shouldShowInlineWorkPreview(text, lastDurableNarrative)
+    if (!visiblePreview && hasDurableProgress) return
+
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-        Text(
-            stringResource(
-                if (stream.reasoning.isNotBlank()) R.string.local_work_thinking
-                else R.string.local_work_process_preparing,
-            ),
-            style = DsType.small13.withReadingWeight(),
-            color = DsTheme.colors.labelTertiary,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Text(
+                stringResource(
+                    if (visiblePreview) R.string.local_streaming_status
+                    else if (stream.reasoning.isNotBlank()) R.string.local_work_thinking
+                    else R.string.local_work_process_preparing,
+                ),
+                style = DsType.small13.withReadingWeight(),
+                color = DsTheme.colors.labelTertiary,
+            )
+        }
+        if (visiblePreview) {
+            MarkdownText(
+                text = text,
+                bodyStyle = DsType.mdBody,
+            )
+        }
     }
 }
