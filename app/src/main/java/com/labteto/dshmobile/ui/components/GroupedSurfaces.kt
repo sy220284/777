@@ -128,7 +128,7 @@ fun DsCategoryRow(
             Text(
                 text = title,
                 style = (titleTextStyle ?: DsType.std14)
-                    .let { if (compactWithValue) it.copy(fontSize = 14.sp) else it }
+                    .let { if (compactWithValue) it.copy(fontSize = 13.sp) else it }
                     .withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 2,
