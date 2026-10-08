@@ -135,7 +135,7 @@ jobs:
 
   static-gates:
     needs: scope
-    if: ${{ needs.scope.outputs.run_static == 'true' }}
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_static == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -177,9 +177,10 @@ jobs:
           value="$(tr -d '\r\n' < .github/release-version)"
           [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
 
+  # Architecture validation is independent of the static lane; both start after scope.
   architecture-3-gates:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_architecture == 'true' && needs.static-gates.result == 'success' }}
+    needs: scope
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_architecture == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -189,9 +190,10 @@ jobs:
       - name: Validate Architecture 3.0 execution invariants
         run: python3 .github/scripts/check-local-performance-invariants.py
 
+  # Fixture provenance is an independent validation lane, not a static-gate subtask.
   fixture-provenance:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_fixture == 'true' && needs.static-gates.result == 'success' }}
+    needs: scope
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_fixture == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -210,8 +212,8 @@ jobs:
           git diff --exit-code -- reference-validation/src/test/resources/official reference-validation/src/test/resources/official-semantic
 
   unit-tests:
-    needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
+    needs: [scope, static-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -232,8 +234,8 @@ jobs:
 
 
   relay-conformance:
-    needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_relay == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
+    needs: [scope, static-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_relay == 'true' && needs.static-gates.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -270,8 +272,8 @@ jobs:
             --stacktrace
 
   build-arm64:
-    needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
+    needs: [scope, static-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -307,8 +309,8 @@ jobs:
           retention-days: 3
 
   device-artifacts-x86:
-    needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
+    needs: [scope, static-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -347,8 +349,8 @@ jobs:
           if-no-files-found: error
 
   android-16-instrumented:
-    needs: [scope, static-gates, device-artifacts-x86]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.static-gates.result == 'success' && needs.device-artifacts-x86.result == 'success' }}
+    needs: [scope, device-artifacts-x86]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.device-artifacts-x86.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -387,8 +389,8 @@ jobs:
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
   android-17-instrumented:
-    needs: [scope, static-gates, device-artifacts-x86]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.static-gates.result == 'success' && needs.device-artifacts-x86.result == 'success' }}
+    needs: [scope, device-artifacts-x86]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.device-artifacts-x86.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
