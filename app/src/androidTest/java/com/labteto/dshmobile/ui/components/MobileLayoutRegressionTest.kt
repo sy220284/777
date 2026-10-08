@@ -64,6 +64,38 @@ class MobileLayoutRegressionTest {
     }
 
     @Test
+    fun extraLargeTypeHeaderWrapsWithoutClippingOnVeryNarrowScreens() {
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+                DshTheme {
+                    Box(Modifier.width(220.dp)) {
+                        DsTopBar(
+                            title = "个性化与长期记忆",
+                            subtitle = "查看和管理聊天中记住的内容",
+                            onBack = {},
+                            backContentDescription = "返回",
+                            actionIcon = FeatherIcons.RefreshCw,
+                            actionContentDescription = "刷新",
+                            onAction = {},
+                        )
+                    }
+                }
+            }
+        }
+        val title = compose.onNodeWithText("个性化与长期记忆").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithText("查看和管理聊天中记住的内容").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val back = compose.onNodeWithContentDescription("返回").fetchSemanticsNode().boundsInRoot
+        val action = compose.onNodeWithContentDescription("刷新").fetchSemanticsNode().boundsInRoot
+        assertTrue(title.left >= back.right && title.right <= action.left)
+        assertTrue(subtitle.top >= title.bottom && subtitle.top >= back.bottom && subtitle.top >= action.bottom)
+        assertTextFits("个性化与长期记忆")
+        assertTextFits("查看和管理聊天中记住的内容")
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithContentDescription("刷新").performClick()
+    }
+
+    @Test
     fun narrowLargeTypeCategoryKeepsValueAndNavigationUsable() {
         var opened = 0
         compose.setContent {
@@ -98,7 +130,7 @@ class MobileLayoutRegressionTest {
                 assertTrue(getLayouts(layouts))
             }
         assertTrue(layouts.isNotEmpty())
-        assertTrue(layouts.all { !it.hasVisualOverflow })
+        assertTrue("Text overflow for: $text, layouts: ${layouts.map { "size=${it.size} lines=${it.lineCount} overflowWidth=${it.didOverflowWidth} overflowHeight=${it.didOverflowHeight}" }}", layouts.all { !it.hasVisualOverflow })
     }
 
 }
