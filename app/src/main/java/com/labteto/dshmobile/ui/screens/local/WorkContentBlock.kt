@@ -4,16 +4,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -44,19 +48,37 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        WorkOperationIcon(node.kind, running)
+        when {
+            node.failed -> Icon(
+                FeatherIcons.AlertTriangle,
+                contentDescription = null,
+                tint = colors.error,
+                modifier = Modifier.size(18.dp),
+            )
+            running -> WorkOperationIcon(node.kind, running = true)
+            else -> Icon(
+                FeatherIcons.CheckCircle,
+                contentDescription = null,
+                tint = colors.labelSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Text(
             summary,
             modifier = Modifier.weight(1f),
-            style = DsType.small13.withReadingWeight(),
-            color = if (node.failed) colors.error else if (running) colors.labelPrimary else colors.labelSecondary,
-            maxLines = 2,
+            style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
+                .withReadingWeight().copy(fontFamily = FontFamily.Default),
+            color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
+                else colors.labelSecondary,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            stringResource(agentOperationStatusRes(running, node.failed)),
-            style = DsType.caption11.withReadingWeight(),
-            color = if (node.failed) colors.error else colors.labelTertiary,
-        )
+        if (node.failed) {
+            Text(
+                stringResource(agentOperationStatusRes(running = false, failed = true)),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.error,
+            )
+        }
     }
 }

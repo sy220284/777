@@ -113,11 +113,11 @@ object DsLight {
     val sidebarNavAccent = Ds.AccentBlue100
     val sidebarNavHover = Color(0xFFF1F1F1)
     val tipSurface = Color(0xFFF5F5F5)
-    val codeBlockBg = Ds.Bluish50
-    val codeBlockBanner = Ds.Bluish50
-    val inlineCode = Ds.Bluish100
-    val citation = Ds.Bluish100
-    val markdownTag = Ds.Bluish75
+    val codeBlockBg = Color(0xFFF5F5F5)
+    val codeBlockBanner = Color(0xFFEDEDED)
+    val inlineCode = Color(0xFFEDEDED)
+    val citation = Color(0xFFB9B9B9)
+    val markdownTag = Color(0xFFF5F5F5)
     val overlayMask = Color(0x3D000000) // rgba(0,0,0,.24)
 }
 
@@ -171,10 +171,10 @@ object DsDark {
     val sidebarNavAccent = Ds.Bluish800
     val sidebarNavHover = Color(0xFF222220)
     val tipSurface = Ds.Bluish800
-    val codeBlockBg = Ds.Bluish900
-    val codeBlockBanner = Ds.Bluish875
-    val inlineCode = Ds.Bluish850
-    val citation = Ds.Bluish800
-    val markdownTag = Ds.Bluish850
+    val codeBlockBg = Color(0xFF202020)
+    val codeBlockBanner = Color(0xFF2B2B2B)
+    val inlineCode = Color(0xFF303030)
+    val citation = Color(0xFF636363)
+    val markdownTag = Color(0xFF282828)
     val overlayMask = Color(0x80000000) // rgba(0,0,0,.5)
 }
