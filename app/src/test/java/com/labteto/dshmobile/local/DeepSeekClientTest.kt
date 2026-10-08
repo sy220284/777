@@ -62,6 +62,16 @@ class DeepSeekClientTest {
             ?.get("type")?.jsonPrimitive?.content)
         assertEquals("high", enabledDeepSeekPayload["reasoning_effort"]?.jsonPrimitive?.content)
 
+        for (effort in listOf("low", "max")) {
+            testClient.complete(
+                apiKey = "test", baseUrl = "https://api.deepseek.com", model = "deepseek-flash",
+                messages = history, tools = JsonArray(emptyList()), reasoningEffort = effort,
+            )
+            val request = Json.parseToJsonElement(requests.last()).jsonObject
+            assertEquals("enabled", request["thinking"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+            assertEquals(effort, request["reasoning_effort"]?.jsonPrimitive?.content)
+        }
+
         testClient.complete(
             apiKey = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-5.6-sol",
             messages = history, tools = JsonArray(emptyList()), reasoningEffort = "high",
