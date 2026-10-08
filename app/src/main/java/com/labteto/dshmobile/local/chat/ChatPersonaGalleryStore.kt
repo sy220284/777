@@ -469,6 +469,7 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         val story = current.stories.firstOrNull { it.id == storyId } ?: return false
+        if (!history.containsMessage(id, storyId, messageKey)) return false
         val now = System.currentTimeMillis()
         val protectedStory = story.copy(
             excludedMessageKeys = mergePersonaLines(
