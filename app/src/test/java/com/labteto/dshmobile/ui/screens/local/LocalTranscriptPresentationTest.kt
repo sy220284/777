@@ -151,6 +151,17 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun semanticStageRetainsItsOwnOperationKindsAfterMergingEarlierTools() {
+        val merged = semanticWorkProcessNodes(listOf(
+            LocalWorkProcessNode(operationKinds = listOf(AgentOperationKind.Inspect), count = 1),
+            LocalWorkProcessNode(summary = "检查完成，进入执行", operationKinds = listOf(AgentOperationKind.Execute), count = 1),
+        ))
+        assertEquals(1, merged.size)
+        assertEquals(listOf(AgentOperationKind.Inspect, AgentOperationKind.Execute), merged.single().operationKinds)
+        assertEquals(2, merged.single().count)
+    }
+
+    @Test
     fun workStepAlsoSupportsToolBeforeNarrationWithoutRepeatingGenericLabel() {
         val projected = conversationWorkProcessNodes(buildWorkProcessNodes(listOf(
             message("t1", "tool", "ok", toolName = "bash"),
