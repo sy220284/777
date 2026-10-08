@@ -136,7 +136,7 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
                 val tools = result.subList(start, result.size).toList()
                 result.subList(start, result.size).clear()
                 result += node.copy(
-                    operationKinds = tools.flatMap { it.operationKinds }.distinct(),
+                    operationKinds = (tools.flatMap { it.operationKinds } + node.operationKinds).distinct(),
                     failed = tools.any { it.failed } || node.failed,
                     count = tools.sumOf { it.count } + node.count,
                 )
