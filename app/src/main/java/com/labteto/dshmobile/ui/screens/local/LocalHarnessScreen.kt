@@ -53,12 +53,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
-import com.labteto.dshmobile.ui.theme.DsMetrics
-import androidx.compose.ui.graphics.Color
-import com.labteto.dshmobile.ui.theme.DsShapes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -539,11 +533,8 @@ fun LocalHarnessScreen(
         }
     }
 
-    val drawerWidth = LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
-    val drawerWidthPx = with(LocalDensity.current) { drawerWidth.toPx() }
     ModalNavigationDrawer(
         drawerState = drawerState,
-        scrimColor = Color.Transparent,
         drawerContent = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
@@ -601,14 +592,7 @@ fun LocalHarnessScreen(
         LocalFeatureAnimatedHost(
             stack = featureStack,
             predictiveBackProgress = predictiveBackProgress.value,
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                val offset = drawerState.currentOffset
-                translationX = if (offset.isNaN()) 0f else (drawerWidthPx + offset).coerceIn(0f, drawerWidthPx)
-                if (translationX > 0f) {
-                    shape = DsShapes.dialog
-                    clip = true
-                }
-            },
+            modifier = Modifier.fillMaxSize(),
         ) { renderedPage ->
             featureStateHolder.SaveableStateProvider(renderedPage.name) {
                 LocalFeaturePageContent(renderedPage, featureContributions)
