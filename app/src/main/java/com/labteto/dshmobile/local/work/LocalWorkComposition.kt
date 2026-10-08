@@ -367,6 +367,12 @@ internal class LocalWorkComposition @Inject constructor(
     }
 
     override suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult =
+        launchBackgroundAgent(task, instructions = "")
+
+    override suspend fun startResearchAgent(task: String): LocalWorkAgentUiResult =
+        launchBackgroundAgent(task, instructions = LocalResearchAgentPreset.instructions)
+
+    private suspend fun launchBackgroundAgent(task: String, instructions: String): LocalWorkAgentUiResult =
         withContext(Dispatchers.IO) {
             val clean = task.trim()
             if (clean.isEmpty()) {
@@ -380,6 +386,7 @@ internal class LocalWorkComposition @Inject constructor(
             try {
                 val result = persistentJobs.startReadonlySubagentResult(
                     task = clean,
+                    instructions = instructions,
                     model = LocalWorkerModelRouter.resolve(null, snapshot),
                     maxSteps = snapshot.subagentMaxSteps,
                     virtualScreen = false,

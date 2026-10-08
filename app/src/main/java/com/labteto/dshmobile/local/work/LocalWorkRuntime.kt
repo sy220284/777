@@ -40,6 +40,8 @@ class LocalWorkRuntime @Inject internal constructor(
         runtimeStateStore.jobManager.kill(jobId, runtimeStateStore.currentSessionId)
     internal suspend fun startBackgroundAgentForUi(task: String): LocalWorkAgentUiResult =
         agentUi.startBackgroundAgent(task)
+    internal suspend fun startResearchAgentForUi(task: String): LocalWorkAgentUiResult =
+        agentUi.startResearchAgent(task)
     internal suspend fun sendBackgroundAgentMessageForUi(agentId: String, message: String): LocalWorkAgentUiResult =
         agentUi.sendMessage(agentId, message)
     internal suspend fun sendTeamMemberMessageForUi(memberId: String, message: String): LocalWorkAgentUiResult =
