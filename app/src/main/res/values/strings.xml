@@ -1802,5 +1802,12 @@
     <string name="tools_network_search">网络搜索</string>
     <string name="tools_network_search_hint">关闭后智能体无法搜索和抓取网页；GitHub 等其他联网能力不受影响</string>
     <string name="tools_agent_settings_hint">主循环、子循环步数、重试次数与子智能体模型</string>
+    <!-- Markdown reply semantic emphasis -->
+    <string name="markdown_callout_note">说明</string>
+    <string name="markdown_callout_important">重点</string>
+    <string name="markdown_callout_warning">注意</string>
+    <string name="markdown_callout_tip">提示</string>
+    <string name="markdown_code_language">代码</string>
+    <string name="markdown_copy_code">复制代码</string>
 </resources>
 
