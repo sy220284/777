@@ -44,6 +44,30 @@ done
 
 python3 .github/scripts/check-apk-runtime-layout.py "$apk" "$expected_abi"
 
+# 检查最终 APK，避免 Termux 上游包升级时重新带入闲置资源。
+python3 - "$apk" <<'PY'
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    stale = [
+        name for name in archive.namelist()
+        if (name.startswith("assets/runtime/python/")
+            and "/lib-dynload/_test" in name and name.endswith(".so"))
+        or (name.startswith("assets/runtime/git/")
+            and "/share/git-core/templates/hooks/" in name and name.endswith(".sample"))
+        or name in {
+            "assets/runtime/python/README.txt",
+            "assets/runtime/git/README.txt",
+            "assets/runtime/node/README.txt",
+            "assets/persona-presets/README.md",
+        }
+    ]
+if stale:
+    raise SystemExit("APK 遗留无用测试/示例/说明文件：\n" + "\n".join(stale))
+print("APK 闲置资源校验通过")
+PY
+
 # Python 3.14 contains real standard-library packages whose directory names begin
 # with an underscore. AAPT normally strips <dir>_* from assets silently, which
 # leaves bz2/gzip/lzma present while their shared compression._common package is

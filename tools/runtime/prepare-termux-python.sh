@@ -417,6 +417,8 @@ prepare_arch() {
       )
 
       patch_python_runtime "$stdlib_dir"
+      # 解释器内部自测扩展与正常 Python 脚本执行无关，禁止装入 APK。
+      find "$stdlib_dir/lib-dynload" -maxdepth 1 -type f -name '_test*.so' -delete
       # Patched stdlib source must be authoritative. Precompiled bytecode from the
       # Termux package can otherwise keep compiled-in Termux paths even after the
       # .py source has been rewritten for this app.
@@ -487,15 +489,4 @@ for android_abi in "${requested_abis[@]}"; do
 done
 
 printf '%s\n' "$PYTHON_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/python/python-version.txt"
-cat > "$OUT_ROOT/assets/runtime/python/README.txt" <<EOF
-Bundled Python runtime
-Python: $PYTHON_RUNTIME_VERSION
-ABIs: $RUNTIME_ABIS
-Source packages: Termux termux-main, signature verified with $TERMUX_KEY_FINGERPRINT
-Executable: APK native library libdsh_python.so
-Standard library: assets/runtime/python/<abi>/home/lib/python$PYTHON_MAJOR_MINOR
-Runtime shared libraries: assets/runtime/python/<abi>/lib
-Default subprocess shell patched to /system/bin/sh for Android app execution
-EOF
-
 echo "Python runtime prepared: $PYTHON_RUNTIME_VERSION"

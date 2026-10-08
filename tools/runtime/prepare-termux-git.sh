@@ -378,6 +378,8 @@ prepare_arch() {
       if [ -d "$prefix/share/git-core/templates" ]; then
         mkdir -p "$home_dir/share/git-core"
         cp -aL "$prefix/share/git-core/templates" "$home_dir/share/git-core/"
+        # 应用禁止执行 Git hooks，保留模板目录，但删除无用途的示例钩子。
+        find "$home_dir/share/git-core/templates/hooks" -maxdepth 1 -type f -name '*.sample' -delete
       fi
     fi
 
@@ -445,14 +447,4 @@ for android_abi in "${requested_abis[@]}"; do
 done
 
 printf '%s\n' "$GIT_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/git/git-version.txt"
-cat > "$OUT_ROOT/assets/runtime/git/README.txt" <<EOF
-Bundled Git runtime
-Git: $GIT_RUNTIME_VERSION
-ABIs: $RUNTIME_ABIS
-Source packages: Termux termux-main, signature verified with $TERMUX_KEY_FINGERPRINT
-Executable: APK native library libdsh_git.so
-Native helpers: APK native libraries linked through GIT_EXEC_PATH
-Writable Git hooks are disabled because Android 16 does not permit executing app-written binaries.
-EOF
-
 echo "Git runtime prepared: $GIT_RUNTIME_VERSION"
