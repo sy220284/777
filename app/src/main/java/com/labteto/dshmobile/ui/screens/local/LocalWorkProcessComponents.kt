@@ -241,16 +241,14 @@ internal fun WorkProcessRow(
             ?.div(1_000L)
     } else null
     val latestNode = if (running) semanticNodes.last() else workProcessFocus(semanticNodes)
-    val activeStage = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
+    // The heading represents overall state; the detailed narration belongs exclusively
+    // to the step below. Repeating the active summary breaks reading and accessibility.
     val headerLabel = when {
         processStatus == DsStatus.Warning || processStatus == DsStatus.Failed ->
-            stringResource(R.string.local_work_failed_stage, activeStage)
-        running && latestNode.summary != null -> activeStage
+            stringResource(R.string.local_work_process_warning)
+        running -> stringResource(R.string.local_work_process_running)
         thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
-        messages.any { it.role == "reasoning" } ->
-            stringResource(if (running) R.string.local_work_thinking else R.string.local_work_thought)
-        running -> stringResource(R.string.local_work_process) + " · " +
-            stringResource(R.string.agent_operation_status_running)
+        messages.any { it.role == "reasoning" } -> stringResource(R.string.local_work_thought)
         else -> stringResource(R.string.local_work_process)
     }
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
