@@ -243,8 +243,7 @@ class LocalExecutionService : Service() {
         }
 
         fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId"): Boolean {
-            dispatchedActive = true
-            return dispatch(
+            val submitted = dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_TURN)
@@ -253,6 +252,8 @@ class LocalExecutionService : Service() {
                     .putExtra(EXTRA_LABEL, context.getString(R.string.local_execution_notification_body))
                     .putExtra(EXTRA_STEP, step),
             )
+            if (submitted) dispatchedActive = true
+            return submitted
         }
 
         fun releaseTurn(context: Context, sessionId: String, outcome: String, key: String = "turn:$sessionId") {
@@ -270,8 +271,7 @@ class LocalExecutionService : Service() {
         fun syncJobs(context: Context, activeJobs: List<LocalJobInfo>): Boolean {
             val owned = activeJobs.filter { !it.ownerSessionId.isNullOrBlank() }
             if (owned.isEmpty() && !dispatchedActive) return true
-            if (owned.isNotEmpty()) dispatchedActive = true
-            return dispatch(
+            val submitted = dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_SYNC_JOBS)
@@ -282,6 +282,8 @@ class LocalExecutionService : Service() {
                         ArrayList(owned.map { it.ownerSessionId.orEmpty() }),
                     ),
             )
+            if (submitted && owned.isNotEmpty()) dispatchedActive = true
+            return submitted
         }
 
         private fun dispatch(context: Context, intent: Intent): Boolean =
