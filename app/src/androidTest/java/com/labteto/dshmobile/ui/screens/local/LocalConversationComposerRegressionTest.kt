@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -264,6 +265,86 @@ class LocalConversationComposerRegressionTest {
 
         compose.onNodeWithText(context.getString(R.string.local_welcome_connect_action)).performClick()
         compose.runOnIdle { assertEquals(1, connectCount) }
+    }
+
+
+    @Test
+    fun focusRevealsReasoningActionAndPopupDoesNotReplaceDraft() {
+        val draft = "待发送内容"
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false, configured = true,
+                        sessionId = "reasoning-focus",
+                        usageMode = LocalUsageMode.CHAT,
+                    ),
+                    activeModelProfile = null,
+                    input = draft,
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onPlanModeChange = {},
+                    onAutoApprove = {},
+                    onDisableAutoApprove = {},
+                )
+            }
+        }
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.onNodeWithContentDescription(
+            context.getString(
+                R.string.local_composer_reasoning_action,
+                context.getString(R.string.local_composer_reasoning_default),
+            ),
+        ).performClick()
+        compose.onNodeWithText(
+            context.getString(R.string.local_composer_reasoning_unsupported),
+        ).assertIsDisplayed()
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains(draft)
+    }
+
+    @Test
+    fun chatWebActionExplainsToolBoundaryAndOffersWorkHandoff() {
+        var workRequests = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false, configured = true,
+                        sessionId = "web-work-handoff",
+                        usageMode = LocalUsageMode.CHAT,
+                    ),
+                    activeModelProfile = null,
+                    input = "",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {},
+                    onRequestWorkWebSearch = { workRequests++ },
+                    onPlanModeChange = {},
+                    onAutoApprove = {},
+                    onDisableAutoApprove = {},
+                )
+            }
+        }
+        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_web_work_only),
+        ).performClick()
+        compose.onNodeWithText(context.getString(R.string.local_composer_web_to_work))
+            .performClick()
+        compose.runOnIdle { assertEquals(1, workRequests) }
     }
 
 }
