@@ -33,8 +33,8 @@ object DsType {
     val mdH2 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 32.sp)
     val mdH3 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 30.sp)
     val mdH4 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 28.sp)
-    val mdBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 28.sp)
-    val mdSmall = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 24.sp)
+    val mdBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 28.sp)
+    val mdSmall = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 24.sp)
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 
     // UI roles
@@ -46,26 +46,31 @@ object DsType {
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
-    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
     val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
-    val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+    val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
     val std14Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
-    val small13 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 21.sp)
+    val small13 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp)
     val small13Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp)
-    val xsmall12 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp)
-    val caption11 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp)
+    val xsmall12 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 19.sp)
+    val caption11 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)
     val caption11Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)
+
+    // Navigation and settings use larger, stronger roles for comfortable viewing distance.
+    val navigationItem = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 26.sp)
+    val navigationSupporting = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 22.sp)
+    val navigationSection = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 22.sp)
 
     // Composer / rows / chat
     // User and assistant body text deliberately share the exact same metrics. Role distinction comes
     // from container, alignment and colour rather than an accidental font-size mismatch.
-    val chatBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 26.sp)
+    val chatBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 26.sp)
     val bubbleText = chatBody
-    val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp)
+    val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 21.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp)
     val dockTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 24.sp)
-    val sectionTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp)
-    val statsText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 20.sp)
+    val sectionTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 19.sp)
+    val statsText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 20.sp)
 }
 
 fun TextStyle.adjustedReadingWeight(adjustment: Int): TextStyle {
