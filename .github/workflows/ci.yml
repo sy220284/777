@@ -375,8 +375,11 @@ jobs:
         with:
           api-level: 36
           arch: x86_64
+          profile: pixel_6
           disable-animations: true
           script: |
+            # Pixel 6 hardware profile plus 400dpi yields at least 412dp width.
+            bash .github/scripts/verify-android-test-viewport.sh 412 400
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
@@ -413,24 +416,33 @@ jobs:
       - name: Android 17 instrumentation and startup tests
         run: |
           set -euo pipefail
-          echo no | avdmanager create avd --force -n android17             --package 'system-images;android-37.0;google_apis_ps16k;x86_64'
-          "$ANDROID_SDK_ROOT/emulator/emulator" -avd android17             -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim &
-          adb wait-for-device
+          echo no | avdmanager create avd --force -n android17 -d pixel_6 \
+            --package 'system-images;android-37.0;google_apis_ps16k;x86_64'
+          "$ANDROID_SDK_ROOT/emulator/emulator" -avd android17 \
+            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim &
           booted=false
-          for _ in $(seq 1 150); do
-            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+          for attempt in $(seq 1 150); do
+            state="$(adb get-state 2>/dev/null || true)"
+            boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [ "$state" = "device" ] && [ "$boot_state" = "1" ]; then
               booted=true
+              echo "Android 17 boot completed on probe ${attempt}."
               break
+            fi
+            if (( attempt % 15 == 0 )); then
+              echo "Android 17 boot probe ${attempt}/150: adb=${state:-offline}, boot=${boot_state:-pending}"
             fi
             sleep 2
           done
           if [ "$booted" != "true" ]; then
-            echo "::error::Android 17 emulator did not finish booting within 300 seconds"
+            echo "::error::Android 17 emulator not ready after 300 seconds"
+            adb devices -l || true
             exit 1
           fi
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+          bash .github/scripts/verify-android-test-viewport.sh 412 400
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
