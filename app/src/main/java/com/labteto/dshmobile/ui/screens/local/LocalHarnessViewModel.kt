@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
+import com.labteto.dshmobile.local.presentation.LocalProjectUiFacade
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
 import com.labteto.dshmobile.local.presentation.projectWorkState
@@ -37,6 +38,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
+    private val projects: LocalProjectUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val state = runtime.state
@@ -46,6 +48,10 @@ class LocalHarnessViewModel @Inject constructor(
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
+    internal val projectCatalog = projects.catalog
+    internal fun createProject(name: String) = projects.create(name)
+    internal fun selectProject(id: String) = projects.select(id)
+    internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
         chatUi = chatUi,
