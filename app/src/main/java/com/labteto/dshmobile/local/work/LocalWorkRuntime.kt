@@ -105,6 +105,8 @@ class LocalWorkRuntime @Inject internal constructor(
         if (binding?.interactions?.answerApproval(callId, approved) == true) return
         runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
     }
+    internal fun useDefaultApproval() =
+        runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.useDefaultApproval() }
     internal fun enableAutoApproval() =
         runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.enableAutoApproval() }
     internal fun enableAutoApprovalForPending(callId: String) =
