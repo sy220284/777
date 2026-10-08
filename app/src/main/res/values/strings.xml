@@ -1688,5 +1688,7 @@
     <string name="local_project_save_instruction">保存项目指令</string>
     <string name="advanced_memory_vault_view">按记忆空间分组</string>
     <string name="advanced_memory_flat_view">返回平铺列表</string>
+    <string name="local_artifacts_title">本次产物</string>
+    <string name="local_artifacts_open_files">查看会话文件</string>
 </resources>
 
