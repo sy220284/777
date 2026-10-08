@@ -3,15 +3,35 @@ package com.labteto.dshmobile.ui.screens.local
 import android.graphics.Bitmap
 import android.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PersonaPortraitImageDecoderTest {
+
+    @Test
+    fun bundledPresetsHaveVisiblePortraitsBeforeInstallation() {
+        val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
+        PersonaPresetCatalog.presets.forEach { preset ->
+            val assetPath = requireNotNull(preset.artwork).assetPath
+            val bitmap = decodePersonaPresetArtworkBitmap(assets, assetPath, maxEdgePx = 256)
+            assertNotNull("预置人物头像无法加载：${preset.persona.name} ($assetPath)", bitmap)
+        }
+    }
+
+    @Test
+    fun bundledPortraitDecoderRejectsUnsafePaths() {
+        val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
+        assertNull(decodePersonaPresetArtworkBitmap(assets, "../secrets.webp", maxEdgePx = 256))
+        assertNull(decodePersonaPresetArtworkBitmap(assets, "persona-presets/../secrets.webp", maxEdgePx = 256))
+        assertNull(decodePersonaPresetArtworkBitmap(assets, "persona-presets/genshin-klee.webp", maxEdgePx = 0))
+    }
     @Test
     fun firstDecodeAppliesExifOrientationWithoutManualCorrection() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
