@@ -29,6 +29,11 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
+    internal fun artifactsForUi(sessionId: String): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
+        if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
+        return projectLocalWorkArtifacts(eventLogs.get(sessionId).pageBeforeChronological(limit = 384))
+    }
+
     internal fun backgroundJobOutputForUi(jobId: String): String =
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
     internal fun stopBackgroundJobForUi(jobId: String): String =
