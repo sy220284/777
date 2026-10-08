@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsTheme
 import kotlinx.coroutines.Dispatchers
