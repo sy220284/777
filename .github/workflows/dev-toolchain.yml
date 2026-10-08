@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'tools/dev/**'
+      - 'tools/runtime/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
       - 'gradle/wrapper/gradle-wrapper.properties'
@@ -22,6 +23,7 @@ on:
   pull_request:
     paths:
       - 'tools/dev/**'
+      - 'tools/runtime/**'
       - '.github/workflows/dev-toolchain.yml'
       - '.github/workflows/ci.yml'
       - 'gradle/wrapper/gradle-wrapper.properties'
@@ -59,6 +61,8 @@ jobs:
           bash -n tools/dev/lib/components.sh
           bash tools/dev/install.sh --help >/dev/null
           bash tools/dev/setup-toolchain.sh --self-test
+          python3 tools/dev/test-install.py
+          python3 tools/runtime/test-verification.py
           if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)' tools/dev --include='*.sh' ||              grep -RIn 'download_verified' tools/dev --include='*.sh'; then
             echo "本地工具链脚本出现外部下载/包管理入口；组件只能来自 GitHub Actions Artifact。" >&2
             exit 1

@@ -193,7 +193,7 @@ verify_artifact_dir() {
   (
     cd "$dir"
     sha256sum -c SHA256SUMS
-  )
+  ) || return 3
 
   # SHA-256 通过后只读取白名单元数据，避免旧 Artifact 覆盖当前工具链版本变量。
   artifact_value() {
@@ -261,8 +261,8 @@ materialize_component_archive() {
   local parts artifact dir part=1
   parts="$(component_part_count "$component")"
 
-  rm -f "$target"
-  : > "$target"
+  rm -f "$target" || return 3
+  : > "$target" || return 3
 
   while IFS= read -r artifact; do
     [ -n "$artifact" ] || continue
@@ -274,9 +274,9 @@ materialize_component_archive() {
     verify_artifact_dir "$component" "$dir" "$part" "$parts" || return $?
 
     if [ "$parts" -eq 1 ]; then
-      cat "$dir/payload.tar.gz" > "$target"
+      cat "$dir/payload.tar.gz" > "$target" || return 3
     else
-      cat "$dir/payload.part" >> "$target"
+      cat "$dir/payload.part" >> "$target" || return 3
     fi
     part=$((part + 1))
   done < <(artifact_names_for_component "$component")
@@ -288,24 +288,26 @@ materialize_component_archive() {
   gzip -t "$target"
 }
 
-install_component() {
+install_component() (
+  set -e
   local component="$1" tmp archive
   tmp="$(mktemp -d)"
   archive="$tmp/payload.tar.gz"
+  trap 'rm -rf "$tmp"' EXIT
 
   if ! materialize_component_archive "$component" "$archive"; then
     rm -rf "$tmp"
     return 3
   fi
 
-  tar -xzf "$archive" -C "$tmp"
+  tar --no-same-owner -xzf "$archive" -C "$tmp"
 
   case "$component" in
     jdk)
       test -d "$tmp/jdk"
       rm -rf "$TOOLS_ROOT/jdk"
       mkdir -p "$TOOLS_ROOT"
-      cp -a "$tmp/jdk" "$TOOLS_ROOT/jdk"
+      cp -a --no-preserve=ownership "$tmp/jdk" "$TOOLS_ROOT/jdk"
       ;;
     android-core)
       test -d "$tmp/android-sdk"
@@ -313,7 +315,7 @@ install_component() {
       for part in cmdline-tools platform-tools build-tools platforms licenses; do
         if [ -e "$tmp/android-sdk/$part" ]; then
           rm -rf "$SDK_ROOT/$part"
-          cp -a "$tmp/android-sdk/$part" "$SDK_ROOT/$part"
+          cp -a --no-preserve=ownership "$tmp/android-sdk/$part" "$SDK_ROOT/$part"
         fi
       done
       ;;
@@ -321,13 +323,13 @@ install_component() {
       test -d "$tmp/gradle"
       rm -rf "$GRADLE_HOME"
       mkdir -p "$(dirname "$GRADLE_HOME")"
-      cp -a "$tmp/gradle" "$GRADLE_HOME"
+      cp -a --no-preserve=ownership "$tmp/gradle" "$GRADLE_HOME"
       ;;
     gradle-deps)
       test -d "$tmp/gradle-user-home"
       rm -rf "$GRADLE_USER_HOME"
       mkdir -p "$(dirname "$GRADLE_USER_HOME")"
-      cp -a "$tmp/gradle-user-home" "$GRADLE_USER_HOME"
+      cp -a --no-preserve=ownership "$tmp/gradle-user-home" "$GRADLE_USER_HOME"
       ;;
     runtime-cache)
       test -d "$tmp/runtime-cache"
@@ -338,37 +340,37 @@ install_component() {
       fi
       mkdir -p "$REPO_ROOT/.gradle"
       rm -rf "$REPO_ROOT/.gradle/runtime-cache"
-      cp -a "$tmp/runtime-cache" "$REPO_ROOT/.gradle/runtime-cache"
+      cp -a --no-preserve=ownership "$tmp/runtime-cache" "$REPO_ROOT/.gradle/runtime-cache"
       ;;
     node)
       test -d "$tmp/node-current"
       rm -rf "$TOOLS_ROOT/node-current"
       mkdir -p "$TOOLS_ROOT"
-      cp -a "$tmp/node-current" "$TOOLS_ROOT/node-current"
+      cp -a --no-preserve=ownership "$tmp/node-current" "$TOOLS_ROOT/node-current"
       ;;
     actionlint)
       test -x "$tmp/bin/actionlint"
       mkdir -p "$TOOLS_ROOT/bin"
-      cp -a "$tmp/bin/actionlint" "$TOOLS_ROOT/bin/actionlint"
+      cp -a --no-preserve=ownership "$tmp/bin/actionlint" "$TOOLS_ROOT/bin/actionlint"
       chmod +x "$TOOLS_ROOT/bin/actionlint"
       ;;
     emulator)
       test -d "$tmp/android-sdk/emulator"
       rm -rf "$SDK_ROOT/emulator"
       mkdir -p "$SDK_ROOT"
-      cp -a "$tmp/android-sdk/emulator" "$SDK_ROOT/emulator"
+      cp -a --no-preserve=ownership "$tmp/android-sdk/emulator" "$SDK_ROOT/emulator"
       ;;
     android-image-16)
       test -d "$tmp/android-sdk/system-images/android-36"
       mkdir -p "$SDK_ROOT/system-images"
       rm -rf "$SDK_ROOT/system-images/android-36"
-      cp -a "$tmp/android-sdk/system-images/android-36" "$SDK_ROOT/system-images/android-36"
+      cp -a --no-preserve=ownership "$tmp/android-sdk/system-images/android-36" "$SDK_ROOT/system-images/android-36"
       ;;
     android-image-17)
       test -d "$tmp/android-sdk/system-images/android-37.0"
       mkdir -p "$SDK_ROOT/system-images"
       rm -rf "$SDK_ROOT/system-images/android-37.0"
-      cp -a "$tmp/android-sdk/system-images/android-37.0" "$SDK_ROOT/system-images/android-37.0"
+      cp -a --no-preserve=ownership "$tmp/android-sdk/system-images/android-37.0" "$SDK_ROOT/system-images/android-37.0"
       ;;
     *)
       echo "[777-install] 未知组件：$component" >&2
@@ -379,27 +381,29 @@ install_component() {
 
   rm -rf "$tmp"
   ok "已安装组件：$component"
-}
+)
 
 missing_before="$(missing_components "$PROFILE")"
 if [ -z "$missing_before" ]; then
   ok "当前 $PROFILE 环境已经满足，无需下载或安装组件"
 else
-  failed=0
   while IFS= read -r component; do
     [ -n "$component" ] || continue
     if component_ready "$component"; then
       ok "复用现有组件：$component"
       continue
     fi
-    install_component "$component" || failed=1
+    # 不在 if/|| 条件中调用，避免 Bash 隐式禁用函数内的 errexit。
+    set +e
+    install_component "$component"
+    install_status=$?
+    set -e
+    if [ "$install_status" -ne 0 ]; then
+      echo "[777-install] 组件安装失败：$component（退出码 $install_status）；停止安装。" >&2
+      exit "$install_status"
+    fi
   done <<< "$missing_before"
 
-  if [ "$failed" -ne 0 ]; then
-    echo "[777-install] 仍缺少以下 Artifact：" >&2
-    missing_artifacts "$PROFILE" >&2
-    exit 3
-  fi
 fi
 
 java_home="$(find_compatible_java_home || true)"

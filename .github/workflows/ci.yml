@@ -154,10 +154,12 @@ jobs:
           "$RUNNER_TEMP/actionlint/actionlint"
       - name: Validate Python and shell automation syntax
         run: |
-          python3 -m compileall -q .github/scripts tools/runtime
+          python3 -m compileall -q .github/scripts tools/runtime tools/dev
+          python3 tools/dev/test-install.py
+          python3 tools/runtime/test-verification.py
           while IFS= read -r -d '' file; do
             bash -n "$file"
-          done < <(find .github/scripts tools/runtime tools/reference-validation -type f -name '*.sh' -print0)
+          done < <(find .github/scripts tools/runtime tools/dev tools/reference-validation -type f -name '*.sh' -print0)
       - name: Validate Android security boundaries
         run: python3 .github/scripts/check-android-security-boundaries.py
       - name: Validate static product guards

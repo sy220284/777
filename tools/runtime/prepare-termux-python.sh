@@ -22,7 +22,9 @@ SYSTEM_LIBS=(
   libc.so libdl.so libm.so liblog.so libandroid.so libpthread.so librt.so
 )
 
-for tool in curl gpg python3 dpkg-deb readelf sha256sum; do
+source "$ROOT_DIR/tools/runtime/runtime-download.sh"
+
+for tool in curl gpgv python3 dpkg-deb readelf sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "缺少构建工具：$tool" >&2
     exit 1
@@ -38,18 +40,12 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 KEY_FILE="$CACHE_DIR/termux-autobuilds.gpg"
 if [ ! -s "$KEY_FILE" ]; then
-  curl -fL --retry 3 --connect-timeout 15 \
+  runtime_download -fL --retry 3 --connect-timeout 15 \
     "https://raw.githubusercontent.com/termux/termux-packages/$TERMUX_KEY_COMMIT/packages/termux-keyring/termux-autobuilds.gpg" \
     -o "$KEY_FILE"
 fi
 
-gpg --batch --homedir "$GNUPGHOME" --import "$KEY_FILE" >/dev/null 2>&1
-if ! gpg --batch --homedir "$GNUPGHOME" --with-colons --fingerprint \
-  | awk -F: '$1 == "fpr" { print $10 }' \
-  | grep -Fxq "$TERMUX_KEY_FINGERPRINT"; then
-  echo "Termux 仓库公钥指纹不匹配" >&2
-  exit 1
-fi
+source "$ROOT_DIR/tools/runtime/verify-termux-signature.sh"
 
 fetch_repo_path() {
   local relative="$1"
@@ -67,7 +63,7 @@ fetch_repo_path() {
   local repo
   for repo in "${TERMUX_REPOS[@]}"; do
     rm -f "$tmp"
-    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/$relative" -o "$tmp" &&
+    if runtime_download -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/$relative" -o "$tmp" &&
       printf '%s  %s\n' "$expected_sha256" "$tmp" | sha256sum -c - >/dev/null 2>&1; then
       mv "$tmp" "$dest"
       return 0
@@ -113,7 +109,7 @@ verify_packages_index() {
   local packages="$2"
   local apt_arch="$3"
 
-  gpg --batch --homedir "$GNUPGHOME" --verify "$inrelease" >/dev/null 2>&1 || {
+  verify_termux_signature "$inrelease" "$KEY_FILE" "$TERMUX_KEY_FINGERPRINT" "$GNUPGHOME" || {
     echo "Termux InRelease 签名验证失败：$apt_arch" >&2
     exit 1
   }
@@ -162,8 +158,8 @@ fetch_verified_repo_index() {
   local repo
   for repo in "${TERMUX_REPOS[@]}"; do
     rm -f "$packages_tmp" "$inrelease_tmp"
-    if curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/main/binary-$apt_arch/Packages" -o "$packages_tmp" &&
-      curl -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/InRelease" -o "$inrelease_tmp" &&
+    if runtime_download -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/main/binary-$apt_arch/Packages" -o "$packages_tmp" &&
+      runtime_download -fL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 20         "$repo/dists/stable/InRelease" -o "$inrelease_tmp" &&
       (verify_packages_index "$inrelease_tmp" "$packages_tmp" "$apt_arch"); then
       mv "$packages_tmp" "$packages_file"
       mv "$inrelease_tmp" "$inrelease_file"
@@ -339,7 +335,9 @@ prepare_arch() {
   local packages_file="$index_dir/Packages"
   local inrelease_file="$index_dir/InRelease"
 
-  rm -rf "$index_dir"
+  if [ "${DSH_RUNTIME_OFFLINE:-false}" != true ]; then
+    rm -rf "$index_dir"
+  fi
   mkdir -p "$index_dir"
   fetch_verified_repo_index "$packages_file" "$inrelease_file" "$apt_arch"
 
