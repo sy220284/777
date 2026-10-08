@@ -851,7 +851,6 @@ internal fun LocalConversationSurface(
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onShowReplySuggestions = { showReplySuggestions = true },
             onGenerateReplySuggestions = onGenerateReplySuggestions,
-            onConfigure = onConfigure,
             onSend = onSend,
             onSendTeam = { text, files ->
                 onSendTeam(text, files).also { result ->
