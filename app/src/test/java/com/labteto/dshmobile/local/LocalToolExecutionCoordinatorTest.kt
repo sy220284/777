@@ -234,6 +234,7 @@ class LocalToolExecutionCoordinatorTest {
                 approval = ToolApprovalPolicy.NEVER,
                 exposure = ToolExposure.OPTIONAL,
                 family = "网络",
+                keywords = setOf("remote", "lookup"),
             ) { ToolResult("ok") })
         }
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
