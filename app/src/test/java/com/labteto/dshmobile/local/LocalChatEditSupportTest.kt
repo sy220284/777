@@ -336,7 +336,7 @@ class LocalChatEditSupportTest {
     )
 
     private fun withLog(block: (LocalSessionEventLog) -> Unit) {
-        val root = createTempDir(prefix = "chat-edit-support-")
+        val root = kotlin.io.path.createTempDirectory("chat-edit-support-").toFile()
         try {
             block(
                 LocalSessionEventLog(

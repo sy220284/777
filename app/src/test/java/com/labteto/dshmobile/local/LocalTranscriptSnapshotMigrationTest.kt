@@ -139,7 +139,7 @@ class LocalTranscriptSnapshotMigrationTest {
     )
 
     private fun withLog(block: (LocalSessionEventLog) -> Unit) {
-        val root = createTempDir(prefix = "transcript-migration-")
+        val root = kotlin.io.path.createTempDirectory("transcript-migration-").toFile()
         try {
             val log = LocalSessionEventLog(
                 file = File(root, "session.events.jsonl"),

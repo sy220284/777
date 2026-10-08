@@ -19,7 +19,7 @@ import org.junit.Test
 class ExecutionKernelPhaseBcIntegrationTest {
     @Test
     fun interruptedPersistentJobResumesUnderResourceBudgetAndPersistsCompletion() = runTest {
-        val root = createTempDir(prefix = "phase-bc-")
+        val root = kotlin.io.path.createTempDirectory("phase-bc-").toFile()
         try {
             val store = LocalPersistentJobStore(
                 file = File(root, "jobs.json"),

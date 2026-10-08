@@ -8,7 +8,7 @@
 
 这里的“只允许”约束的是依赖来源。本地不会通过 `apt`、Google Android 仓库、Gradle/Maven 在线解析、Node 官网等渠道补齐开发依赖。
 
-项目源码统一使用 Kotlin；构建环境接受 JDK 27+，CI 与兜底 Artifact 固定使用 JDK 27 LTS；项目编译目标固定为 JVM 21。Node 接受 24+，不锁 minor / patch。
+项目源码统一使用 Kotlin；构建环境接受 JDK 27+，CI 与兜底 Artifact 固定使用 JDK 27（非 LTS）；项目编译目标固定为 JVM 21。Node 接受 24+，不锁 minor / patch。
 
 ## 按需下载模型
 
@@ -64,7 +64,7 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-jdk-latest` | JDK 27 LTS 兜底包，包含 `java` / `javac`；本机 JDK 27+ 可直接复用 |
+| `777-toolchain-jdk-latest` | JDK 27（非 LTS） 兜底包，包含 `java` / `javac`；本机 JDK 27+ 可直接复用 |
 | `777-toolchain-android-core-latest` | Android command-line tools、platform-tools、API 37 platform、build-tools 37.0.0、licenses |
 | `777-toolchain-gradle-runtime-latest` | Gradle 9.8.1 完整分发 |
 | `777-toolchain-gradle-deps-part-01..04-latest` | Gradle Wrapper 分发缓存、Kotlin 2.4.20、AGP 9.4.0 与项目依赖离线缓存；4 个固定分片 |
@@ -74,7 +74,7 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-node-latest` | Node.js 22+ |
+| `777-toolchain-node-latest` | Node.js 24+ |
 | `777-toolchain-actionlint-latest` | actionlint 1.7.12 |
 | `777-toolchain-emulator-latest` | Android Emulator |
 | `777-toolchain-android-image-16-part-01..06-latest` | Android 16 x86_64 system image；6 个固定分片 |
@@ -216,7 +216,7 @@ Gradle 离线缓存  ~/.local/share/777-dev/gradle-user-home
 
 `full` 额外要求：
 
-- Node.js 22+。
+- Node.js 24+。
 - actionlint 1.7.12。
 - Android Emulator。
 - Android 16 x86_64 system image。

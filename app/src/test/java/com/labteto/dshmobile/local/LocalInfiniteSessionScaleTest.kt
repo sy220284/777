@@ -122,7 +122,7 @@ class LocalInfiniteSessionScaleTest {
     )
 
     private fun withLog(name: String, block: (LocalSessionEventLog) -> Unit) {
-        val root = createTempDir(prefix = "infinite-session-$name-")
+        val root = kotlin.io.path.createTempDirectory("infinite-session-$name-").toFile()
         try {
             val log = LocalSessionEventLog(
                 file = File(root, "session.events.jsonl"),

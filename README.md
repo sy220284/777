@@ -355,7 +355,7 @@ Shared Runtime / Feature 初始化与恢复
 - Kotlin 2.4.20
 - Jetpack Compose BOM 2026.09.00
 - Hilt 2.60.1
-- Kotlin 单一源码语言 / JVM 21（构建 JDK 21+）
+- Kotlin 单一源码语言 / JVM 21（构建 JDK 27+）
 
 当前正式版本以 GitHub Releases 的最新标签为准。
 

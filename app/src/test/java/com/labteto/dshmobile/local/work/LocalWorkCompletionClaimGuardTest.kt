@@ -139,7 +139,7 @@ class LocalWorkCompletionClaimGuardTest {
 
     @Test
     fun deliveryGuardReplacesFalseCompletionAcrossVisibleAndCanonicalReply() {
-        val root = createTempDir(prefix = "work-completion-guard-")
+        val root = kotlin.io.path.createTempDirectory("work-completion-guard-").toFile()
         try {
             val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
             val state = LocalHarnessState(

@@ -222,7 +222,7 @@ class LocalTimelineRewriteTransactionTest {
     private fun withStores(
         block: (LocalSessionEventLog, MemoryStore, ChatPersonaGalleryStore, ChatDiaryStore, Json) -> Unit,
     ) {
-        val root = createTempDir(prefix = "timeline-rewrite-")
+        val root = kotlin.io.path.createTempDirectory("timeline-rewrite-").toFile()
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
         try {
             block(
