@@ -28,19 +28,16 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.sample
 
-@OptIn(FlowPreview::class)
 @Composable
 internal fun LocalStreamingChatTurn(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
 ) {
-    // Coalesce token bursts to keep Markdown parsing and recomposition below 25 fps.
-    val sampledStream = androidx.compose.runtime.remember(streamingState) { streamingState.sample(40L) }
-    val rawStream by sampledStream.collectAsStateWithLifecycle(initialValue = streamingState.value)
+    // Lifecycle-aware StateFlow collection supplies its own safe initial state.
+    // Avoid accessing StateFlow.value during composition (Compose lint violation).
+    val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         if (stream.reasoning.isNotBlank()) {
@@ -109,7 +106,6 @@ internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?)
 internal fun shouldShowInlineWorkPreview(draft: String, lastDurableNarrative: String?): Boolean =
     inlineWorkPreviewText(draft, lastDurableNarrative).isNotBlank()
 
-@OptIn(FlowPreview::class)
 @Composable
 internal fun LocalStreamingWorkPreview(
     sessionId: String,
@@ -117,9 +113,9 @@ internal fun LocalStreamingWorkPreview(
     hasDurableProgress: Boolean,
     lastDurableNarrative: String? = null,
 ) {
-    // Coalesce token bursts to keep Markdown parsing and recomposition below 25 fps.
-    val sampledStream = androidx.compose.runtime.remember(streamingState) { streamingState.sample(40L) }
-    val rawStream by sampledStream.collectAsStateWithLifecycle(initialValue = streamingState.value)
+    // Lifecycle-aware StateFlow collection supplies its own safe initial state.
+    // Avoid accessing StateFlow.value during composition (Compose lint violation).
+    val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
     val text = inlineWorkPreviewText(stream.assistant, lastDurableNarrative)
     val visiblePreview = text.isNotBlank()
