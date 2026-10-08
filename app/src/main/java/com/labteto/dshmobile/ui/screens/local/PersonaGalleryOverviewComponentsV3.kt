@@ -201,7 +201,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         Spacer(Modifier.size(DsSpacing.xsmall))
         Text(
             entry.persona.name,
-            style = DsType.title22.withReadingWeight(),
+            style = DsType.title22.withReadingWeight().copy(fontFamily = DsType.contentFont),
             color = colors.labelPrimary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -210,7 +210,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         if (entry.persona.portrait.isNotBlank()) {
             Text(
                 subtitle,
-                style = DsType.small13.withReadingWeight(),
+                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                 color = colors.labelSecondary,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -219,7 +219,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         }
         Text(
             relationSummary,
-            style = DsType.small13.withReadingWeight(),
+            style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
             color = colors.labelSecondary,
             textAlign = TextAlign.Center,
         )
@@ -312,14 +312,14 @@ internal fun PersonaGalleryAddPanel(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     preset.persona.name,
-                                    style = DsType.std14Strong.withReadingWeight(),
+                                    style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
                                     color = DsTheme.colors.labelPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
                                     preset.franchise + " · " + preset.summary,
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
                                     color = DsTheme.colors.labelTertiary,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
@@ -458,7 +458,7 @@ internal fun CompactPersonaRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         entry.persona.name,
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
                         color = DsTheme.colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

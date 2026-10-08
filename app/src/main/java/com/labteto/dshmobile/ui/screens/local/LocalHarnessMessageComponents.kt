@@ -500,7 +500,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
             )
             Text(
                 file.name,
-                style = DsType.small13.withReadingWeight(),
+                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
                 color = colors.labelPrimary,
             )
         }

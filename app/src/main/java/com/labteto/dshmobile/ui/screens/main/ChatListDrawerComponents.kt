@@ -266,7 +266,7 @@ internal fun SessionRowItem(
                         ?.let { folder ->
                             Text(
                                 folder,
-                                style = DsType.navigationSupporting.withReadingWeight(),
+                                style = DsType.navigationSupporting.withReadingWeight().copy(fontFamily = DsType.contentFont),
                                 color = colors.labelCaption,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
