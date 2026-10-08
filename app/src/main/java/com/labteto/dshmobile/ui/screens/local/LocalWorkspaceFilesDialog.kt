@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -608,6 +609,7 @@ private fun LocalDirectoryRow(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     val colors = DsTheme.colors
     val controls = LocalFileSelectionUi.current
