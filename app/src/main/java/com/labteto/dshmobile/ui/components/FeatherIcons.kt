@@ -433,6 +433,62 @@ internal object FeatherIcons {
         }
     }
 
+
+    /** Appearance and reading — preview what the user sees. */
+    val Eye: ImageVector by lazy {
+        feather("Eye") {
+            moveTo(1f, 12f)
+            curveTo(1f, 12f, 5f, 4f, 12f, 4f)
+            curveTo(19f, 4f, 23f, 12f, 23f, 12f)
+            curveTo(23f, 12f, 19f, 20f, 12f, 20f)
+            curveTo(5f, 20f, 1f, 12f, 1f, 12f)
+            close()
+            circle(12f, 12f, 3f)
+        }
+    }
+
+    /** Appearance mode — light, dark and follow-system. */
+    val SunMoon: ImageVector by lazy {
+        feather("SunMoon") {
+            circle(8f, 8f, 3f)
+            moveTo(8f, 1.5f); verticalLineTo(2.5f)
+            moveTo(8f, 13.5f); verticalLineTo(14.5f)
+            moveTo(1.5f, 8f); horizontalLineTo(2.5f)
+            moveTo(13.5f, 8f); horizontalLineTo(14.5f)
+            moveTo(3.4f, 3.4f); lineTo(4.1f, 4.1f)
+            moveTo(11.9f, 11.9f); lineTo(12.6f, 12.6f)
+            moveTo(12.6f, 3.4f); lineTo(11.9f, 4.1f)
+            moveTo(4.1f, 11.9f); lineTo(3.4f, 12.6f)
+            moveTo(20.5f, 12f)
+            curveTo(17.5f, 13f, 16.4f, 16.2f, 17.8f, 18.6f)
+            curveTo(18.5f, 20f, 19.8f, 20.7f, 21.5f, 20.7f)
+            curveTo(20f, 22.1f, 17.3f, 22.4f, 15.3f, 21.2f)
+            curveTo(12.8f, 19.7f, 12f, 16.9f, 13f, 14.3f)
+            curveTo(14f, 11.9f, 17f, 10.5f, 20.5f, 12f)
+            close()
+        }
+    }
+
+    /** Accent colours — palette with a thumb notch and colour wells. */
+    val Palette: ImageVector by lazy {
+        feather("Palette") {
+            moveTo(12f, 2f)
+            curveTo(6.5f, 2f, 2f, 6.5f, 2f, 12f)
+            curveTo(2f, 17.5f, 6.5f, 22f, 12f, 22f)
+            horizontalLineTo(13.5f)
+            curveTo(15.2f, 22f, 16f, 20.1f, 15f, 18.8f)
+            curveTo(13.8f, 17.2f, 14.8f, 15f, 16.8f, 15f)
+            horizontalLineTo(18.5f)
+            curveTo(20.5f, 15f, 22f, 13.6f, 22f, 11.6f)
+            curveTo(22f, 6.2f, 17.5f, 2f, 12f, 2f)
+            close()
+            circle(7f, 11f, 0.75f)
+            circle(9f, 6.5f, 0.75f)
+            circle(15f, 6.5f, 0.75f)
+            circle(18.5f, 10.5f, 0.75f)
+        }
+    }
+
     /** settings — compact settings entry. */
     val Gear: ImageVector by lazy {
         feather("Gear") {

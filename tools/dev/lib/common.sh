@@ -89,5 +89,5 @@ node_major() {
 }
 
 required_host_commands() {
-  printf '%s\n' bash python3 dpkg-deb readelf sha256sum tar gzip git find awk sed grep head tr cat cp rm mkdir
+  printf '%s\n' bash curl gpgv python3 dpkg-deb readelf sha256sum tar gzip git find awk sed grep head tr cat cp rm mkdir
 }

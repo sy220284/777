@@ -58,6 +58,8 @@ val generatedNodeRuntime = layout.buildDirectory.dir("generated/nodeRuntime")
 val prepareBundledNodeRuntime = tasks.register<Exec>("prepareBundledNodeRuntime") {
     group = "build setup"
     description = "Fetches and verifies the bundled Android Node.js runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/runtime-download.sh"))
+    inputs.file(rootProject.file("tools/runtime/verify-termux-signature.sh"))
     inputs.file(rootProject.file("tools/runtime/prepare-termux-node.sh"))
     inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedNodeRuntime)
@@ -66,6 +68,7 @@ val prepareBundledNodeRuntime = tasks.register<Exec>("prepareBundledNodeRuntime"
         rootProject.file(".gradle/runtime-cache/termux-node").absolutePath,
     )
     environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    environment("DSH_RUNTIME_OFFLINE", gradle.startParameter.isOffline.toString())
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-termux-node.sh").absolutePath,
@@ -77,6 +80,8 @@ val generatedPythonRuntime = layout.buildDirectory.dir("generated/pythonRuntime"
 val prepareBundledPythonRuntime = tasks.register<Exec>("prepareBundledPythonRuntime") {
     group = "build setup"
     description = "Fetches and verifies the bundled Android Python runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/runtime-download.sh"))
+    inputs.file(rootProject.file("tools/runtime/verify-termux-signature.sh"))
     inputs.file(rootProject.file("tools/runtime/prepare-termux-python.sh"))
     inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedPythonRuntime)
@@ -85,6 +90,7 @@ val prepareBundledPythonRuntime = tasks.register<Exec>("prepareBundledPythonRunt
         rootProject.file(".gradle/runtime-cache/termux-python").absolutePath,
     )
     environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    environment("DSH_RUNTIME_OFFLINE", gradle.startParameter.isOffline.toString())
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-termux-python.sh").absolutePath,
@@ -96,6 +102,8 @@ val generatedGitRuntime = layout.buildDirectory.dir("generated/gitRuntime")
 val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") {
     group = "build setup"
     description = "Fetches and verifies the bundled Android Git runtime from Termux."
+    inputs.file(rootProject.file("tools/runtime/runtime-download.sh"))
+    inputs.file(rootProject.file("tools/runtime/verify-termux-signature.sh"))
     inputs.file(rootProject.file("tools/runtime/prepare-termux-git.sh"))
     inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedGitRuntime)
@@ -104,6 +112,7 @@ val prepareBundledGitRuntime = tasks.register<Exec>("prepareBundledGitRuntime") 
         rootProject.file(".gradle/runtime-cache/termux-git").absolutePath,
     )
     environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    environment("DSH_RUNTIME_OFFLINE", gradle.startParameter.isOffline.toString())
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-termux-git.sh").absolutePath,
@@ -154,6 +163,7 @@ val generatedUpdatePatcher = layout.buildDirectory.dir("generated/updatePatcher"
 val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
     group = "build setup"
     description = "Fetches and verifies the pinned HDiffPatch Android patch runtime."
+    inputs.file(rootProject.file("tools/runtime/runtime-download.sh"))
     inputs.file(rootProject.file("tools/runtime/prepare-hdiffpatch.sh"))
     inputs.property("runtimeAbis", bundledRuntimeAbiArgument)
     outputs.dir(generatedUpdatePatcher)
@@ -162,6 +172,7 @@ val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
         rootProject.file(".gradle/runtime-cache/hdiffpatch").absolutePath,
     )
     environment("DSH_RUNTIME_ABIS", bundledRuntimeAbiArgument)
+    environment("DSH_RUNTIME_OFFLINE", gradle.startParameter.isOffline.toString())
     commandLine(
         "bash",
         rootProject.file("tools/runtime/prepare-hdiffpatch.sh").absolutePath,

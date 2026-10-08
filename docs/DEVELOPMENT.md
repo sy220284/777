@@ -231,6 +231,8 @@ Artifact 负责项目开发工具和编译依赖。Linux 宿主仍需要脚本�
 ```text
 bash >= 4
 python3
+curl
+gpgv
 dpkg-deb
 readelf
 sha256sum
@@ -248,7 +250,9 @@ rm
 mkdir
 ```
 
-缺失时直接报错，不会调用系统包管理器安装。
+缺失时直接报错，不会调用系统包管理器安装。Termux 索引使用固定公钥环与 `gpgv` 验证签名，并核对实际签名者的公钥指纹，无需启动 GPG Agent 或创建本地套接字。
+
+安装解压不恢复产物生成机器的文件所有者；校验、解压或复制失败立即停止，不输出组件安装成功。
 
 ## 离线构建
 
@@ -259,7 +263,7 @@ bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
 bash tools/dev/ai-toolchain.sh gradle :app:assembleOptimized
 ```
 
-该入口固定使用安装自 Artifact 的 Gradle，并附加 `--offline`。
+该入口固定使用安装自 Artifact 的 Gradle，并附加 `--offline`。离线设置同时传给 Runtime 准备脚本；保留并验证缓存索引，任何缓存缺失或校验失败都直接报错，禁止尝试外部下载。
 
 ## CI 如何证明“真的有产物”
 
