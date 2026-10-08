@@ -122,7 +122,6 @@ private const val SORT_UPDATED = "updated"
 fun ChatListDrawer(
     onClose: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenLocalHarness: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenTools: () -> Unit,
 ) {
@@ -469,15 +468,8 @@ fun ChatListDrawer(
                         onOpenTools()
                     },
                 )
-                DsCategoryRow(
-                    icon = FeatherIcons.Device,
-                    title = stringResource(R.string.chatlist_exit_remote_control),
-                    titleTextStyle = DsType.navigationItem,
-                    onClick = {
-                        onClose()
-                        onOpenLocalHarness()
-                    },
-                )
+            }
+            DsGroupCard {
                 DsCategoryRow(
                     icon = FeatherIcons.Gear,
                     title = stringResource(R.string.settings_title),

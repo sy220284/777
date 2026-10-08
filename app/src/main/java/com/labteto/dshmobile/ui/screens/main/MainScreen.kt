@@ -71,7 +71,6 @@ fun MainScreen(
             ChatListDrawer(
                 onClose = { scope.launch { drawerState.close() } },
                 onOpenSettings = onOpenSettings,
-                onOpenLocalHarness = onOpenLocalHarness,
                 onOpenTasks = onOpenTasks,
                 onOpenTools = onOpenTools,
             )

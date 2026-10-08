@@ -46,6 +46,8 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.main.ConfirmDialog
@@ -78,7 +80,6 @@ internal fun LocalModeDrawer(
     running: Boolean,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
-    onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSessions: suspend (Set<String>) -> Int,
     onRenameSession: (String, String) -> Boolean,
@@ -422,23 +423,12 @@ internal fun LocalModeDrawer(
                         }
                     }
                 } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        DsIconButton(
-                            icon = FeatherIcons.RemoteControl,
-                            contentDescription = stringResource(R.string.local_remote_control),
-                            onClick = onRemote,
-                            containerColor = colors.bgLayer1,
-                        )
-                        Spacer(Modifier.width(DsSpacing.small))
-                        DsIconButton(
+                    DsGroupCard {
+                        DsCategoryRow(
                             icon = FeatherIcons.SettingsOutline,
-                            contentDescription = stringResource(R.string.settings_title),
+                            title = stringResource(R.string.settings_title),
+                            titleTextStyle = DsType.navigationItem,
                             onClick = onSettings,
-                            containerColor = colors.bgLayer1,
                         )
                     }
                 }
