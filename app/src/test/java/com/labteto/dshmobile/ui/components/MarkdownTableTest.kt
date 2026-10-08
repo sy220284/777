@@ -49,7 +49,15 @@ class MarkdownTableTest {
 
     @Test
     fun unfinishedStreamingQuoteAndCodeFenceRemainReadable() {
-        val blocks = parseMarkdown("> [!IMPORTANT]\\n> 应注意这一点\\n\\n\x60\x60\x60kotlin\\nval x = 1")
+        val blocks = parseMarkdown(
+            """
+            > [!IMPORTANT]
+            > 应注意这一点
+
+            ```kotlin
+            val x = 1
+            """.trimIndent(),
+        )
         assertEquals(2, blocks.size)
         val quote = blocks[0] as MdBlock.Blockquote
         assertEquals(MarkdownCalloutKind.IMPORTANT, markdownCalloutKind(quote.lines))
