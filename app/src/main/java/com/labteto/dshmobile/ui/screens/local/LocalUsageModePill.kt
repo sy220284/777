@@ -45,7 +45,7 @@ internal fun LocalUsageModePill(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 216.dp)
-            .height(44.dp),
+            .height(48.dp),
         shape = DsShapes.row,
         color = colors.bgModulePlatform,
         tonalElevation = 0.dp,
@@ -87,12 +87,11 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = (if (selected == mode) DsType.small13Strong else DsType.small13)
-                                .withReadingWeight(),
+                            style = DsType.navigationSupporting.withReadingWeight(),
                             color = when {
                                 !enabled -> colors.labelCaption
                                 selected == mode -> colors.labelPrimary
-                                else -> colors.labelTertiary
+                                else -> colors.labelSecondary
                             },
                         )
                     }
