@@ -28,7 +28,7 @@ internal object LocalReasoningControls {
                 add(LocalReasoningUiMode.DEFAULT)
             }
             add(LocalReasoningUiMode.FAST)
-            if (policy.lowEffort != null) add(LocalReasoningUiMode.LOW)
+            if (policy.lowEffort != null && policy.lowEffort != policy.disabledEffort) add(LocalReasoningUiMode.LOW)
             add(LocalReasoningUiMode.DEEP)
             if (policy.maxEffort != null) add(LocalReasoningUiMode.MAX)
         }
