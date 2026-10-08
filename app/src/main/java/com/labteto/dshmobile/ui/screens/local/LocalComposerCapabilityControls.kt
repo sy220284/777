@@ -39,7 +39,7 @@ internal fun composerReasoningLabel(
     modes: List<LocalReasoningUiMode>,
     needsBasicReasoning: Boolean = false,
 ): Int = when {
-    modes.isEmpty() -> R.string.local_composer_reasoning_default
+    modes.isEmpty() || (mode != LocalReasoningUiMode.DEFAULT && mode !in modes) -> R.string.local_composer_reasoning_default
     mode == LocalReasoningUiMode.DEFAULT &&
         LocalReasoningUiMode.DEFAULT !in modes -> R.string.local_composer_reasoning_high
     mode == LocalReasoningUiMode.DEFAULT -> R.string.local_composer_reasoning_default
