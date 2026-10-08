@@ -162,6 +162,64 @@ class LocalChatAutomationVisibleTurnOwnerTest {
     }
 
     @Test
+    fun outerTimeoutAfterClaimReleasesTheExactVisibleOwner() = runBlocking {
+        val handle = handle()
+        val owner = Job()
+        var cleanups = 0
+        val timedOut = CancellationException("outer budget cancelled")
+        val result = runCatching {
+            acquireAutomationVisibleTurnWithinBudget(
+                targetSessionId = "chat",
+                automationJob = owner,
+                budget = LocalChatAutomationTimeoutBudget(5_000L, 5_000L),
+                acquireVisibleTurn = { _, claimedJob ->
+                    handle.job = claimedJob
+                    throw timedOut
+                },
+                releaseVisibleTurn = { sessionId, releasedJob ->
+                    releaseAutomationVisibleTurn(
+                        handle, sessionId, "chat", state(), releasedJob,
+                        onReleased = { cleanups++ },
+                    )
+                },
+            )
+        }
+        assertSame(timedOut, result.exceptionOrNull())
+        assertNull(handle.job)
+        assertEquals(1, cleanups)
+        owner.cancel()
+    }
+
+    @Test
+    fun failedOuterAcquireNeverReleasesAnUnrelatedForegroundOwner() = runBlocking {
+        val handle = handle()
+        val current = Job()
+        val attempted = Job()
+        handle.job = current
+        var cleanups = 0
+        val failure = IllegalStateException("failed preflight")
+        val result = runCatching {
+            acquireAutomationVisibleTurnWithinBudget(
+                targetSessionId = "chat",
+                automationJob = attempted,
+                budget = LocalChatAutomationTimeoutBudget(5_000L, 5_000L),
+                acquireVisibleTurn = { _, _ -> throw failure },
+                releaseVisibleTurn = { id, job ->
+                    releaseAutomationVisibleTurn(
+                        handle, id, "chat", state(), job,
+                        onReleased = { cleanups++ },
+                    )
+                },
+            )
+        }
+        assertSame(failure, result.exceptionOrNull())
+        assertSame(current, handle.job)
+        assertEquals(0, cleanups)
+        current.cancel()
+        attempted.cancel()
+    }
+
+    @Test
     fun cancelledWaitDoesNotClaimOrReleaseAnotherOwner() = runBlocking {
         val handle = handle()
         val existing = Job()
