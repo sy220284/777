@@ -190,6 +190,11 @@ internal fun ChatAutomationScreen(
                             task.prompt,
                             scheduleDescription,
                         )
+                        val optimizeSeed = stringResource(
+                            R.string.tasks_chat_optimization_seed,
+                            task.prompt,
+                            scheduleDescription,
+                        )
                         ChatAutomationEventRow(
                             task = task,
                             scheduleDescription = scheduleDescription,
@@ -197,6 +202,10 @@ internal fun ChatAutomationScreen(
                             onEdit = {
                                 editingTaskId = task.id
                                 draft = "$planMention $editSeed"
+                            },
+                            onOptimize = {
+                                editingTaskId = task.id
+                                draft = "$planMention $optimizeSeed"
                             },
                             onPolicy = { policyTaskId = task.id },
                             onOpenSession = onOpenSession,
@@ -430,6 +439,7 @@ private fun ChatAutomationEventRow(
     scheduleDescription: String,
     currentSessionId: String,
     onEdit: () -> Unit,
+    onOptimize: () -> Unit,
     onPolicy: () -> Unit,
     onOpenSession: (String) -> Unit,
     onPause: () -> Unit,
@@ -521,6 +531,15 @@ private fun ChatAutomationEventRow(
                 onClick = { confirmDelete = true },
                 variant = DsButtonVariant.Ghost,
                 size = DsButtonSize.Small,
+            )
+        }
+        if (task.targetSessionId == currentSessionId) {
+            DsButton(
+                text = stringResource(R.string.tasks_chat_optimize),
+                onClick = onOptimize,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

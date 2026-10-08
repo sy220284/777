@@ -1678,5 +1678,7 @@
     <string name="settings_approval_manual_hint">需要授权的操作逐次询问，已有待处理请求仍需单独处理。</string>
     <string name="settings_approval_auto_hint">自动批准可用工具的授权请求。操作仍受实际系统权限、沙箱和工具能力限制。</string>
     <string name="tasks_schedule_monthly">每月</string>
+    <string name="tasks_chat_optimize">优化任务</string>
+    <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
 </resources>
 
