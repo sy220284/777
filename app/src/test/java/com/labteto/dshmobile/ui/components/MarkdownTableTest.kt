@@ -36,6 +36,15 @@ class MarkdownTableTest {
         assertTrue(isTableSeparator("| --- | :---: | ---: |"))
     }
     @Test
+    fun nestedMixedListsKeepIndentationAndListKinds() {
+        val blocks = parseMarkdown("- 第一项\n  - 子项\n  1. 子序号\n- 第二项")
+        val list = blocks.single() as MdBlock.MdList
+        assertEquals(listOf("第一项", "子项", "子序号", "第二项"), list.items)
+        assertEquals(listOf(0, 1, 1, 0), list.levels)
+        assertEquals(listOf(false, false, true, false), list.numbered)
+    }
+
+    @Test
     fun semanticCalloutsIdentifyImportantAndWarningWithoutChangingOrdinaryQuotes() {
         assertEquals(MarkdownCalloutKind.QUOTE,
             markdownCalloutKind(listOf("这里是一段需要清晰阅读的引用")))
