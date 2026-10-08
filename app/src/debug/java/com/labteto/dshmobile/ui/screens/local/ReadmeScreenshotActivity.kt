@@ -166,7 +166,7 @@ private fun ChatScreenshot() {
         ChatSurfaceHeader(
             personaName = "神里绫华",
             portraitPath = "",
-            secondary = "亲密 · 稻妻日常",
+            secondary = "延续对话",
             groupEnabled = false,
             groupMembers = emptyList(),
             activeSpeakerName = null,
@@ -259,7 +259,6 @@ private fun WorkScreenshot() {
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         WorkSurfaceHeader(
-            sessionTitle = "检查项目并修复问题",
             modelLabel = "GPT-5.6 Sol",
             configured = true,
             running = true,

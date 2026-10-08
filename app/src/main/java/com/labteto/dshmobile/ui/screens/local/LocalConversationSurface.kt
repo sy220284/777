@@ -421,18 +421,14 @@ internal fun LocalConversationSurface(
                         } else {
                             stringResource(R.string.local_chat_no_persona)
                         }
-                        val relationship = state.chatState.relationshipState.takeIf {
-                            hasSelectedPersona && it.isNotBlank()
-                        }
-                        val storyTitle = currentGalleryStory?.title?.takeIf { it.isNotBlank() }
-                        val contextSource = when (state.conversationMode) {
-                            LocalConversationMode.INDEPENDENT -> null
-                            else -> localConversationModeLabel(state.conversationMode)
-                        }
                         ChatSurfaceHeader(
                             personaName = personaDisplayName,
                             portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                            secondary = listOfNotNull(storyTitle, relationship, contextSource).joinToString(" · "),
+                            secondary = if (state.conversationMode == LocalConversationMode.INDEPENDENT) {
+                                stringResource(R.string.local_new_session_chat_new)
+                            } else {
+                                localConversationModeLabel(state.conversationMode)
+                            },
                             groupEnabled = state.groupChat.enabled,
                             groupMembers = state.groupChat.members,
                             activeSpeakerName = state.groupActiveSpeakerName,
@@ -453,8 +449,6 @@ internal fun LocalConversationSurface(
                         )
                     } else {
                         WorkSurfaceHeader(
-                            sessionTitle = sessionTitle.takeIf(String::isNotBlank)
-                                ?: stringResource(R.string.local_usage_work),
                             modelLabel = state.model,
                             configured = state.configured,
                             running = state.running,

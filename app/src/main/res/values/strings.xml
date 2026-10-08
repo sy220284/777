@@ -137,8 +137,8 @@
     <string name="local_context_source">上下文来源：%1$s</string>
     <string name="local_context_source_independent">独立会话</string>
     <string name="local_context_source_project">当前项目</string>
-    <string name="local_context_source_continuation">上一会话交接</string>
-    <string name="local_context_handoff">交接摘要</string>
+    <string name="local_context_source_continuation">延续对话</string>
+    <string name="local_context_handoff">对话摘要</string>
     <string name="local_streaming_status">正在处理…</string>
     <string name="local_chat_replying">正在回复…</string>
     <string name="local_device_approval_on">本轮设备操作已授权</string>
@@ -854,12 +854,12 @@
     <string name="local_new_session_dialog_intro">选择新对话可以使用哪些已有上下文。长期规则始终保留，其他内容按作用域隔离。</string>
     <string name="local_new_session_continue">继续当前任务</string>
     <string name="local_new_session_continue_hint">继承当前项目、对话链记忆和精简交接摘要，不复制整段旧聊天。</string>
-    <string name="local_new_session_chat_intro">继续当前人物对话，或开始一段未选择角色的空白对话。</string>
-    <string name="local_new_session_chat_continue">继续当前对话</string>
-    <string name="local_new_session_chat_continue_hint">继承当前人物对话和记忆，并保留人物状态；不复制整段旧聊天。</string>
+    <string name="local_new_session_chat_new">新对话</string>
+    <string name="local_new_session_chat_continue">延续对话</string>
+    <string name="local_new_session_chat_continue_hint">保留当前角色和记忆</string>
     <string name="local_new_session_independent">独立新对话</string>
     <string name="local_new_session_independent_hint">只使用全局规则和全局长期记忆。</string>
-    <string name="local_new_session_chat_independent_hint">进入未选择角色的空白对话，不继承当前人物对话和状态；之后可选择角色，也可不选择任何角色。</string>
+    <string name="local_new_session_chat_independent_hint">从空白对话开始</string>
     <string name="settings_runtime_network_diagnostic_title">网络诊断</string>
     <string name="settings_runtime_network_diagnostic_intro">检查实际解析地址、系统代理、VPN/TUN、安全策略，并发起受限 HTTP/TLS 探测验证真实连通性。</string>
     <string name="settings_runtime_network_target_label">网址或域名</string>

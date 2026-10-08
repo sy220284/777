@@ -52,17 +52,13 @@ internal fun NewSessionModeDialog(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
     ) {
-        Text(
-            stringResource(
-                if (chatMode) {
-                    R.string.local_new_session_chat_intro
-                } else {
-                    R.string.local_new_session_dialog_intro
-                },
-            ),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
+        if (!chatMode) {
+            Text(
+                stringResource(R.string.local_new_session_dialog_intro),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
         DsSheetChoiceRow(
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_continue
@@ -82,7 +78,10 @@ internal fun NewSessionModeDialog(
             )
         }
         DsSheetChoiceRow(
-            title = stringResource(R.string.local_new_session_independent),
+            title = stringResource(
+                if (chatMode) R.string.local_new_session_chat_new
+                else R.string.local_new_session_independent,
+            ),
             subtitle = stringResource(
                 if (chatMode) R.string.local_new_session_chat_independent_hint
                 else R.string.local_new_session_independent_hint,
