@@ -125,7 +125,7 @@ class MobileLayoutRegressionTest {
                     Box(Modifier.width(widthDp.intValue.dp)) {
                         DsCategoryRow(
                             icon = FeatherIcons.Folder,
-                            title = "工作项目与文件",
+                            title = "工作项目",
                             subtitle = "查看项目中保存的文件",
                             value = "9999 个项目",
                             onClick = { opened++ },
@@ -137,15 +137,15 @@ class MobileLayoutRegressionTest {
         phoneWidthsDp.forEachIndexed { index, viewport ->
             compose.runOnIdle { widthDp.intValue = viewport }
             compose.waitForIdle()
-            val title = compose.onNodeWithText("工作项目与文件", useUnmergedTree = true)
+            val title = compose.onNodeWithText("工作项目", useUnmergedTree = true)
                 .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val value = compose.onNodeWithText("9999 个项目", useUnmergedTree = true)
                 .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue("宽度 ${viewport}dp：分类标题与数量不得重叠",
                 title.right <= value.left || title.bottom <= value.top)
-            assertTextFits("工作项目与文件")
+            assertTextFits("工作项目")
             assertTextFits("9999 个项目")
-            compose.onNodeWithText("工作项目与文件").performClick()
+            compose.onNodeWithText("工作项目").performClick()
             compose.runOnIdle { assertEquals(index + 1, opened) }
         }
     }
