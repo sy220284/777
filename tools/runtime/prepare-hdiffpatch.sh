@@ -5,6 +5,8 @@ OUT_ROOT="${1:?usage: prepare-hdiffpatch.sh <generated-output-dir>}"
 RUNTIME_ABIS="${DSH_RUNTIME_ABIS:-arm64-v8a}"
 CACHE_DIR="${HDIFFPATCH_CACHE:-.gradle/runtime-cache/hdiffpatch}"
 
+source "$(dirname "${BASH_SOURCE[0]}")/runtime-download.sh"
+
 VERSION="5.1.3"
 ARCHIVE="hdiffpatch_v${VERSION}_sdk_android_hpatchz.zip"
 URL="https://github.com/sisong/HDiffPatch/releases/download/v${VERSION}/${ARCHIVE}"
@@ -20,7 +22,7 @@ verify_archive() {
 
 if ! verify_archive; then
   rm -f "$ZIP_PATH"
-  curl --fail --location --retry 3 --retry-delay 2 "$URL" --output "$ZIP_PATH"
+  runtime_download --fail --location --retry 3 --retry-delay 2 "$URL" --output "$ZIP_PATH"
   printf '%s  %s\n' "$SHA256" "$ZIP_PATH" | sha256sum -c -
 fi
 
