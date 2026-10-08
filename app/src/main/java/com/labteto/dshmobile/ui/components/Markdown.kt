@@ -65,7 +65,7 @@ fun MarkdownText(
 ) {
     val colors = DsTheme.colors
     val blocks = remember(text) { parseMarkdown(text) }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MdBlock.Heading -> {
@@ -577,12 +577,17 @@ private fun CodeBlock(
                 }
             }
         }
-        Text(
-            code,
-            style = DsType.mdCode.withReadingWeight(),
-            color = colors.labelPrimary,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(
+                code,
+                style = DsType.mdCode.withReadingWeight(),
+                color = colors.labelPrimary,
+                softWrap = false,
+            )
+        }
     }
 }
 
