@@ -226,6 +226,31 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitSubagentAllowlistCanActivateOptionalReadOnlyTool() {
+        val registry = ToolRegistry().apply {
+            register(webFetchTool { ToolResult("ok") })
+        }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+        val disabled = projection.subagentSchemas(
+            allowMutation = false,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        )
+        assertFalse("web_fetch" in projection.names(disabled))
+        val allowed = projection.subagentSchemas(
+            allowMutation = false,
+            allowVirtualScreen = false,
+            enabledOptional = setOf("web_fetch"),
+        )
+        assertTrue("web_fetch" in projection.names(allowed))
+        assertTrue("web_fetch" !in projection.names(projection.subagentSchemas(
+            allowMutation = false,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        )))
+    }
+
+    @Test
     fun readonlyAndPlanScopesRejectBackgroundWebFetchBeforeExecution() = runBlocking {
         var executed = 0
         val registry = ToolRegistry().apply {

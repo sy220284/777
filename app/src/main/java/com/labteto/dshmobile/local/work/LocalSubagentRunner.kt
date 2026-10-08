@@ -282,6 +282,10 @@ internal class LocalSubagentRunner(
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>().apply {
             addAll(recoveredEnabledOptionalTools)
+            // Explicit allowed_tools may name optional tools that are not yet active.
+            // Offer only these requested candidates; the effective schemas still enforce
+            // subagent access, network switch, prompt budget and the strict allowlist.
+            addAll(capabilities.toolAllowlist.orEmpty())
         }
         val initialToolSchemas = schemas(
             allowMutation,
