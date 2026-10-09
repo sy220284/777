@@ -198,7 +198,10 @@ class LocalHarnessViewModel @Inject constructor(
         chatModelAssistController.generateGroupAnnouncement(direction)
     suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
         val result = withContext(Dispatchers.IO) {
-            runtime.chat.editAndResendUserMessage(messageId, text)
+            when (state.value.usageMode) {
+                LocalUsageMode.WORK -> runtime.work.editAndResendUserMessage(messageId, text)
+                LocalUsageMode.CHAT -> runtime.chat.editAndResendUserMessage(messageId, text)
+            }
         }
         if (result == LocalChatUserEditResult.SENT) {
             refreshTranscriptHistoryAfterTimelineRewrite()

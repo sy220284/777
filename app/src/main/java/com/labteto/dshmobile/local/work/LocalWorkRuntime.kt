@@ -37,6 +37,12 @@ class LocalWorkRuntime @Inject internal constructor(
         attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList(),
     ): com.labteto.dshmobile.local.send.LocalSendResult = execution.sendWithTeam(text, attachments)
 
+    internal fun editAndResendUserMessage(
+        messageId: String,
+        replacement: String,
+    ): com.labteto.dshmobile.local.session.LocalUserMessageEditResult =
+        execution.editAndResendUserMessage(messageId, replacement)
+
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
     internal fun artifactsForUi(

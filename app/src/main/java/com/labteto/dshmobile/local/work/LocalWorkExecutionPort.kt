@@ -37,6 +37,11 @@ internal interface LocalWorkExecutionPort {
         attachments: List<LocalImportedAttachment> = emptyList(),
     ): LocalSendResult = send(text, attachments)
 
+    fun editAndResendUserMessage(
+        messageId: String,
+        replacement: String,
+    ): com.labteto.dshmobile.local.session.LocalUserMessageEditResult
+
     fun regenerateReply(messageId: String): Boolean
 
     suspend fun prepareSession(
