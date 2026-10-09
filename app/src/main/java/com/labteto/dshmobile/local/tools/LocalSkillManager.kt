@@ -15,9 +15,20 @@ internal data class LocalPresetSkill(
     val description: String,
     val instructions: String,
     val installed: Boolean = false,
+    val whenToUse: String = "",
 )
 
 internal object LocalPresetSkillCatalog {
+    private val triggers = mapOf(
+        "writing-polish" to "润色、改写和精修段落",
+        "longform-outline" to "小说大纲、人物弧线、伏笔和章节规划",
+        "document-summary" to "文档总结、会议纪要和待办提取",
+        "research-check" to "资料查询、来源核实和事实查证",
+        "code-review" to "代码审查、PR 和回归风险",
+        "bug-investigation" to "故障排查、日志分析和崩溃定位",
+        "data-insights" to "数据统计、报表和趋势分析",
+        "translation-localization" to "翻译、术语统一和本地化",
+    )
     val entries = listOf(
         LocalPresetSkill("writing-polish", "写作润色", "改善文笔、逻辑和节奏，保留原意与风格。",
             """
@@ -82,12 +93,12 @@ internal object LocalPresetSkillCatalog {
             4. 对双关、文化背景和歧义提供简短说明或选项。
             5. 不添写原文没有的事实或立场。
             """.trimIndent()),
-    )
+    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) }
 }
 
 internal val LOCAL_SKILL_ID_PATTERN = Regex("[a-z][a-z0-9-]{1,47}")
 
-internal fun buildLocalSkillDocument(id: String, description: String, instructions: String): String {
+internal fun buildLocalSkillDocument(id: String, description: String, instructions: String, whenToUse: String = ""): String {
     require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能标识需由 2—48 位小写字母、数字或连字符组成，并以字母开头" }
     val summary = description.trim()
     val body = instructions.trim()
@@ -96,8 +107,10 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
     }
     require(body.isNotEmpty() && body.length <= 12_000) { "技能说明需要 1—12000 个字符" }
     val scalar = summary.replace('"', '\'').replace(" #", " ＃")
-    return listOf("---", "name: " + id, "description: \"" + scalar + "\"", "---",
-        "# " + id, "", body, "").joinToString("\n")
+    require(whenToUse.length <= 240 && '\n' !in whenToUse && '\r' !in whenToUse) { "使用条件不能超过 240 字或换行" }
+    val trigger = if (whenToUse.isBlank()) emptyList() else listOf("when-to-use: \"" + whenToUse.replace('"', '\'') + "\"")
+    return (listOf("---", "name: " + id, "description: \"" + scalar + "\"") +
+        trigger + listOf("---", "# " + id, "", body, "")).joinToString("\n")
 }
 
 /** Single writer for workspace SKILL.md files; both the UI and the model read these same files. */
@@ -128,7 +141,7 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     fun install(id: String) {
         val preset = LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }
             ?: throw IllegalArgumentException("未知预置技能")
-        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions))
+        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse))
     }
 
     fun create(id: String, description: String, instructions: String) {
@@ -143,6 +156,58 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
         val target = File(dir, "SKILL.md")
         require(!target.exists() && !Files.isSymbolicLink(target.toPath())) { "技能已经安装" }
         workspace.write(".dsh/skills/" + id + "/SKILL.md", document)
+    }
+
+
+    private fun requireInstalled(id: String) {
+        require(id.isNotBlank() && id != "." && id != ".." && '/' !in id && '\\' !in id && '\u0000' !in id) {
+            "无效的技能标识"
+        }
+        val dir = File(skillsDir, id)
+        val target = File(dir, "SKILL.md")
+        require(dir.canonicalFile.parentFile == skillsDir.canonicalFile &&
+            !Files.isSymbolicLink(dir.toPath()) && !Files.isSymbolicLink(target.toPath()) &&
+            target.isFile && target.canonicalFile.parentFile == dir.canonicalFile) {
+            "技能未安装或路径不安全"
+        }
+    }
+
+    fun readDocument(id: String): String {
+        requireInstalled(id)
+        return workspace.readRaw(".dsh/skills/$id/SKILL.md").also {
+            require(it.toByteArray(Charsets.UTF_8).size <= 24_000) {
+                "技能说明超过 24 KB，请通过工作区文件工具编辑"
+            }
+        }
+    }
+
+    fun updateDocument(id: String, document: String) {
+        requireInstalled(id)
+        require(document.isNotBlank() && document.toByteArray(Charsets.UTF_8).size <= 24_000) {
+            "技能文件不能为空，且不能超过 24 KB"
+        }
+        require(document.lineSequence().firstOrNull()?.trim() != "---" ||
+            document.lineSequence().drop(1).take(95).any { it.trim() == "---" }) {
+            "技能元数据缺少结束分隔符"
+        }
+        workspace.write(".dsh/skills/$id/SKILL.md", document.trimEnd() + "\n")
+    }
+
+    fun setModelInvocable(id: String, enabled: Boolean) {
+        val original = readDocument(id)
+        val lines = original.lines().toMutableList()
+        if (lines.firstOrNull()?.trim() == "---") {
+            val end = lines.drop(1).indexOfFirst { it.trim() == "---" } + 1
+            require(end > 0) { "技能元数据格式无效" }
+            val flag = lines.subList(1, end).indexOfFirst {
+                it.trim().startsWith("disable-model-invocation:")
+            }
+            if (flag >= 0) lines[flag + 1] = "disable-model-invocation: \${!enabled}"
+            else lines.add(end, "disable-model-invocation: \${!enabled}")
+            updateDocument(id, lines.joinToString("\n"))
+        } else if (!enabled) {
+            updateDocument(id, "---\ndisable-model-invocation: true\n---\n" + original)
+        }
     }
 
     /** Remove only SKILL.md; never destroy extra files supplied by the user. */
@@ -170,4 +235,7 @@ internal class LocalSkillManager @Inject constructor(storage: LocalSessionStorag
     fun install(id: String) = store.install(id)
     fun create(id: String, description: String, instructions: String) = store.create(id, description, instructions)
     fun remove(id: String) = store.remove(id)
+    fun readDocument(id: String) = store.readDocument(id)
+    fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
+    fun setModelInvocable(id: String, enabled: Boolean) = store.setModelInvocable(id, enabled)
 }
