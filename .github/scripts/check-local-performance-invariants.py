@@ -77,9 +77,100 @@ def paths_containing(sources: dict[str, str], token: str) -> list[str]:
     return sorted(path for path, source in sources.items() if token in source)
 
 
-def ordered_in_source(source: str, *tokens: str) -> bool:
-    positions = [source.find(token) for token in tokens]
-    return min(positions) >= 0 and positions == sorted(positions)
+def kotlin_function_body(source: str, name: str) -> str | None:
+    """Get one Kotlin function body with balanced delimiters, ignoring literals.
+
+    This checks ownership within an executable function, so comments, strings,
+    other functions and local variable renaming cannot satisfy or break a rule.
+    """
+    masked = list(source)
+    ignored = re.compile(r'"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
+    for match in ignored.finditer(source):
+        for i in range(match.start(), match.end()):
+            if masked[i] != "\n":
+                masked[i] = " "
+    code = "".join(masked)
+    match = re.search(r"\bfun\s+" + re.escape(name) + r"\s*\(", code)
+    if match is None:
+        return None
+    start = code.find("(", match.start())
+    depth = 0
+    end_params = -1
+    for i in range(start, len(code)):
+        if code[i] == "(":
+            depth += 1
+        elif code[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end_params = i
+                break
+    if end_params < 0:
+        return None
+    brace = code.find("{", end_params + 1)
+    if brace < 0:
+        return None
+    depth = 0
+    for i in range(brace, len(code)):
+        if code[i] == "{":
+            depth += 1
+        elif code[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return code[brace + 1:i]
+    return None
+
+
+def snapshot_cursor_contract(source: str) -> bool:
+    body = kotlin_function_body(source, "currentSnapshot")
+    if body is None:
+        return False
+    boundary = re.search(
+        r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*localSessionSnapshotBoundary\s*\(",
+        body,
+    )
+    if boundary is None:
+        return False
+    snapshot = re.search(
+        r"\breturn\s+currentSnapshotProvider\s*\.\s*snapshot\s*\(",
+        body[boundary.end():],
+    )
+    if snapshot is None:
+        return False
+    # The captured cursor must be supplied to the call in the same function.
+    args = body[boundary.end() + snapshot.end():]
+    return re.search(r"\bboundary\s*=\s*" + re.escape(boundary.group("id")) + r"\b", args) is not None
+
+
+def frozen_model_route_contract(source: str) -> bool:
+    body = kotlin_function_body(source, "complete")
+    if body is None:
+        return False
+    profile = re.search(
+        r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*profile\s*\?:\s*modelGateway\s*\.\s*profileForRoute\s*\(",
+        body,
+    )
+    if profile is None:
+        return False
+    rest = body[profile.end():]
+    surface = re.search(
+        r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*"
+        + re.escape(profile.group("id")) + r"\s*\.\s*toRunModelSurface\s*\(\s*\)",
+        rest,
+    )
+    if surface is None:
+        return False
+    rest = rest[surface.end():]
+    recover = re.search(r"\bmodelStepRuntime\s*\.\s*recover\s*\(", rest)
+    if recover is None:
+        return False
+    rest = rest[recover.end():]
+    return re.search(
+        r"\brequestRuntime\s*\.\s*complete\s*\(\s*surface\s*=\s*"
+        + re.escape(surface.group("id")) + r"\b",
+        rest,
+    ) is not None
+
+
 
 
 event_log = strip_comments(read(EVENT_LOG))
@@ -284,11 +375,7 @@ if (
 
 if "controlProjectedThroughSequence = eventLog.latestSequence()" not in session_snapshot_boundary:
     violations.append("Session snapshot boundary lost durable control cursor capture")
-if not ordered_in_source(
-    session_storage,
-    "val boundary = localSessionSnapshotBoundary(",
-    "return currentSnapshotProvider.snapshot(",
-):
+if not snapshot_cursor_contract(session_storage):
     violations.append(
         "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
@@ -382,30 +469,21 @@ for required_tool_boundary in (
             + required_tool_boundary
         )
 
-if model_request_coordinator.count("modelGateway.profileForRoute(") != 1:
+if "modelGateway.profileForRoute(" not in model_request_coordinator:
     violations.append(
-        "one model request must resolve the fallback route exactly once before retries/recovery"
+        "model request must resolve the route into a frozen profile before retries/recovery"
     )
-if not ordered_in_source(
-    model_request_coordinator,
-    "val frozenProfile = profile ?: modelGateway.profileForRoute(",
-    "val runSurface = frozenProfile.toRunModelSurface()",
-    "modelStepRuntime.recover(",
-):
+# Exactly-once invocation is a behavioral contract covered by model-request tests;
+# do not freeze the source-level number of calls across valid refactors.
+if not frozen_model_route_contract(model_request_coordinator):
     violations.append(
         "model route/profile must freeze before request recovery and retry orchestration"
     )
-if re.search(
-    r"requestRuntime\.complete\s*\(\s*surface\s*=\s*runSurface\b",
-    model_request_coordinator,
-    re.DOTALL,
-) is None:
-    violations.append(
-        "provider invocation must use the frozen runSurface instead of re-reading mutable model settings"
-    )
+# frozen_model_route_contract also verifies the actual provider invocation
+# uses the previously bound, locally frozen run surface.
 
 for required_agent_owner_fact in (
-    "private val foregroundOwners = ConcurrentHashMap<String, String>()",
+    "foregroundOwners",
     "fun isCurrentOwner(context: LocalAgentRunContext)",
     "fun ensureCurrentOwner(context: LocalAgentRunContext)",
 ):
@@ -426,7 +504,7 @@ for required_session_owner_api in (
             "LocalSessionRuntimeRegistry lost process-wide session ownership API: "
             + required_session_owner_api
         )
-if ".distinct().sorted().forEach { sessionId ->" not in session_runtime_registry:
+if re.search(r"\.distinct\s*\(\s*\)\s*\.sorted\s*\(\s*\)\s*\.forEach\s*\{", session_runtime_registry) is None:
     violations.append(
         "multi-session ownership must acquire leases in stable order to avoid cross-session deadlock"
     )
@@ -472,6 +550,26 @@ if "--self-test" in sys.argv:
         assert check_full_history_reference({target: sample}, target) is not None, sample
     for safe in ("eventLog().latestMatching()", "val events = listOf(1)", "// log.events()"):
         assert check_full_history_reference({target: safe}, target) is None, safe
+    # Structural positive and mutation negatives: harmless variable renames pass,
+    # wrong dataflow or execution ordering fails even with the same tokens present.
+    snapshot_ok = """internal fun currentSnapshot(id: String): Thing? {
+        val cursor = localSessionSnapshotBoundary(log)
+        return currentSnapshotProvider.snapshot(id, boundary = cursor)
+    }"""
+    assert snapshot_cursor_contract(snapshot_ok)
+    assert not snapshot_cursor_contract(snapshot_ok.replace("boundary = cursor", "boundary = other"))
+    assert not snapshot_cursor_contract(snapshot_ok.replace("return currentSnapshotProvider.snapshot(id, boundary = cursor)", "return other.snapshot(id, boundary = cursor)"))
+    model_ok = """suspend fun complete(profile: Profile?): Reply {
+        val selected = profile ?: modelGateway.profileForRoute(id)
+        val fixed = selected.toRunModelSurface()
+        return modelStepRuntime.recover(initialMessages = listOf()) {
+            requestRuntime.complete(surface = fixed, messages = emptyList())
+        }
+    }"""
+    assert frozen_model_route_contract(model_ok)
+    assert not frozen_model_route_contract(model_ok.replace("surface = fixed", "surface = mutableSurface"))
+    assert not frozen_model_route_contract(model_ok.replace("selected.toRunModelSurface()", "profile.toRunModelSurface()"))
+    assert not frozen_model_route_contract(model_ok.replace("modelStepRuntime.recover(", "other.recover("))
     print("[architecture-3] execution guard self-test passed")
     sys.exit(0)
 

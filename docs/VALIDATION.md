@@ -25,50 +25,26 @@ Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 ```
 
+## 仓库验收边界（与产品功能清单分离）
+
+仓库可执行验收索引只收录 **126 个已有 Kotlin @Test 直接证据的功能叶节点**，其他 301 个叶节点继续保留在 427 项权威功能树中，不进入本仓库 CI 验收目标、不可计作验收失败或通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、真实远程主机、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
+
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合。`static-gates` 与 `architecture-3-gates` 在 `scope` 后同时启动；单测、Relay、一组 APK 构建只需等待快速静态检查成功，无需等待独立架构检查。Android 16/17 预启动模拟器并与 `device-artifacts-x86` 构建并行，从当前 GitHub Actions Run 取得经过验证的共享 APK 后才运行测试；`fixture-provenance` 可在 `scope` 后独立执行。最后统一由 `merge-gate` 等待并核验所有选中的 lane。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**。分类由 `.github/scripts/classify-ci-scope.py` 决定，混合变更取检查并集；未知或关键底层改动回退完整矩阵。
 
-主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；分类前固定执行分类器语法 / 自测与仓库 CI 完整性检查，分类后再独立复核关键控制文件是否选中了最低必需 lane。纯文档完成控制面自举后可快速结束，CI / 门禁 / 架构权威文件本身不能通过修改分类器把自身验证跳过。
+- L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
+- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64。普通 UI 和模型无关业务不重复执行 Relay 与双模拟器。
+- L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、Relay、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
+- L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器、真实 Relay），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 
-当前任务类型：
+普通 PR 的产品源码在确保真实 Kotlin 编译、相关单测及专项检查的基础上执行精准集合；`main` 的所有影响发布产物的 push 强制执行完整矩阵，`workflow_dispatch` 同样强制完整（含 fixture-provenance）。发布判断与一般 CI 成功解绑，轻量 CI 无法授权 APK 发布。CI 和发布工作流自身变更必须经过真实完整矩阵，不能依赖静态关键字扫描冒充验证。
 
-```text
-普通纯文档 / 仓库说明
-→ scope（控制面自举）→ merge-gate
+**执行顺序**：scope 自举和范围防降级 → static-gates + architecture-3-gates 并行 → 成功后 unit-tests / relay-conformance / ARM64 / x86 构建并行；选中的 Android 16/17 模拟器同步从当前 Run 的 x86 产物执行，最后由 merge-gate 汇总。本次必需检查必须 success，未选中可 skipped。只有 PR 的旧 CI 因更新自动取消，main 的发布候选验证不被后续文档提交取消。
 
-架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
-→ scope（控制面自举 + 范围防降级）
-→ static-gates + architecture-3-gates（并行）→ merge-gate
+`fixture-provenance` 仅官方 fixture 来源变更或手动全量验证时运行。`dev-toolchain` 只在工具版本、构建依赖、缓存 Action、安装与打包脚本变更或定时/手动要求时打包；更新开发说明文档不得重新生成工具链。
 
-普通 GitHub Actions / 自动化脚本
-→ static-gates → merge-gate
-
-架构 3.0 范围内的 JVM / 单元测试
-→ static-gates + architecture-3-gates（并行）；静态检查成功后启动 unit-tests
-→ 涉及 Relay 契约时额外执行 relay-conformance
-→ merge-gate
-
-普通 JVM / Reference Validation / Mock Harness
-→ static-gates → unit-tests → merge-gate
-
-官方 fixture / 上游锁定来源变化
-→ scope 后 fixture-provenance 与 static-gates 并行；静态检查成功后启动 unit-tests → merge-gate
-
-架构 3.0 范围内的 androidTest
-→ static-gates + architecture-3-gates（并行）
-→ 静态检查成功后启动 device-artifacts-x86
-→ Android 16 + Android 17 模拟器并行预热（与 APK 构建重叠），取得同 Run APK 后执行
-→ merge-gate
-
-产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ static-gates + architecture-3-gates（并行）
-→ 静态检查成功后启动 unit-tests + relay-conformance + build-arm64 + device-artifacts-x86（并行，无须等架构检查）
-→ Android 16 + Android 17 模拟器从 scope 后并行准备，共用当前 Run 的 device-artifacts-x86 APK
-→ merge-gate
-```
-
-`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
+**验收重点**：分类器正反例（文档、资源、UI、模型、Relay、会话恢复、底层、Android 16/17、CI/Release 控制面、混合与未知路径）、编译与架构违规注入、同 SHA 发布资格、完整 Android 矩阵，以及优化前后 PR 中位/P95 时长与总 Runner 分钟。不能以单个成功 PR 推断性能收益。
 
 ### scope
 
@@ -438,7 +414,7 @@ current main + current PR head
 - 工具结果：结构化成功正文可以讨论错误代码；错误事实经 transcript 编码/恢复不丢失。
 - 人物与导入：生活事件不无条件续期、显式故事晚间优先、无 schema/旧 schema 混合新旧字段保留新版已编辑值、非法版本不回退。
 - 体验：群聊部分失败/全部失败及单成员重试、任务 Worker 更新实时显示、运行中心全部清单、TalkBack 状态、130% 字号与系统大字、长时间线、明/夜/墨及高对比壁纸均须设备复验。
-- 产品源码改动必须跑完整 CI；静态守卫通过不代表单测、APK、设备测试或实际视觉体验通过。
+- 产品源码 PR 必须运行与影响范围匹配的编译、单测、架构及专项检查；main 中影响 APK 的变更、关键高风险改动、正式发布必须运行完整矩阵。静态守卫通过不能代替设备和用户实际操作验收。
 
 
 ### 架构 3.0 审计修复链路回归
@@ -452,7 +428,7 @@ current main + current PR head
 
 ### CI 模拟器预热与 APK 编译并行（2026-10-09）
 
-`android-16-instrumented` 和 `android-17-instrumented` 在 `scope` 后即开始 SDK 初始化/模拟器启动，消除在 `device-artifacts-x86` 构建后才开始模拟器冷启动的串行等待。
+选中的 `android-16-instrumented` 和 `android-17-instrumented` 在 `scope`、快速静态及架构验证通过后开始 SDK 初始化/模拟器启动，消除在 `device-artifacts-x86` 构建后才开始模拟器冷启动的串行等待。
 设备实际安装前调用 `wait-android-device-artifacts.sh`：通过 GitHub Actions 只读授权按 **当前 `GITHUB_REPOSITORY` + `GITHUB_RUN_ID`** 定位构建产物，仅从此 Run 的 `android-x86_64-test-apks` 下载三个非空 APK。源 Job 失败、取消或等待超时时直接失败。无跨 Run APK 复用，完整 Android 16/17 仪器化、Debug/Optimized 启动冒烟及最终合并门禁均保留。
 
 该优化主要缩短墙钟等待时间，但模拟器 Runner 可能在 APK 编译时占用更长时间；应同时衡量总 Runner 分钟成本。Gradle 已启用并行构建、Configuration Cache 和 Build Cache，不重复分拆同一构建任务。

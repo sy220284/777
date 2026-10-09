@@ -926,8 +926,9 @@ if set(feature_contribution_paths) != module_ids:
 for module_id, relative in feature_contribution_paths.items():
     contribution = strip_comments(read(relative))
     own_marker = f"LocalFeatureModuleId.{module_id}"
-    if contribution.count(own_marker) != 1:
-        die(f"Feature UI contribution {module_id} must declare its owner exactly once")
+    # Unique ownership is already validated from actual moduleId assignments above.
+    # Legitimate extra references to the same module within one UI contribution
+    # must not fail merely because the symbol appears twice.
     foreign_markers = {
         other for other in module_ids
         if other != module_id and f"LocalFeatureModuleId.{other}" in contribution

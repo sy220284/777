@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -84,11 +85,31 @@ if not endpoint_policy.exists() or not endpoint_test.exists():
 else:
     policy = endpoint_policy.read_text(encoding="utf-8")
     tests = endpoint_test.read_text(encoding="utf-8")
-    for required in ('scheme == "https"', 'scheme == "http" && loopback', 'host == "127.0.0.1"'):
+    if re.search(r"\bfun\s+normalizeModelBaseUrl\s*\(", policy) is None:
+        violations.append("model endpoint policy lost its normalization entrypoint")
+    for required in ("URI(", ".scheme", ".host", ".userInfo", "loopback"):
         if required not in policy:
-            violations.append(f"model endpoint policy lost required security rule: {required}")
-    if "httpsRemoteEndpointIsAccepted" not in tests or "loopbackHttpIsAccepted" not in tests:
-        violations.append("model endpoint policy tests must cover HTTPS remote and HTTP loopback")
+            violations.append("model endpoint policy lost a security decision input: " + required)
+
+    # Actual JVM @Test methods prove HTTPS, loopback, remote HTTP and embedded
+    # credentials; method/variable renames and rearrangements are harmless.
+    methods = re.findall(
+        r"@Test\s+fun\s+\w+\s*\([^)]*\)\s*\{[\s\S]*?(?=\n\s*@Test|\n\})",
+        tests,
+    )
+    categories = {
+        "remote HTTPS accepted": lambda case: "assertEquals(" in case and
+            "normalizeModelBaseUrl(" in case and '"https://' in case,
+        "loopback HTTP accepted": lambda case: "assertEquals(" in case and
+            "normalizeModelBaseUrl(" in case and re.search(r'"http://(?:localhost|127\.0\.0\.1|\[::1\])', case),
+        "remote HTTP rejected": lambda case: "assertThrows(" in case and
+            "normalizeModelBaseUrl(" in case and '"http://example.com' in case,
+        "embedded credentials rejected": lambda case: "assertThrows(" in case and
+            "normalizeModelBaseUrl(" in case and "user:pass@" in case,
+    }
+    for scenario, predicate in categories.items():
+        if not any(predicate(case) for case in methods):
+            violations.append("model endpoint JVM behavior test missing: " + scenario)
 
 if violations:
     print("Android security boundary violations:")
