@@ -369,7 +369,7 @@ def self_test() -> None:
            required=("architecture", "unit", "build"),
            excluded=("android16", "android17"), release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt"],
-           required=("android16", "device"), excluded=("android17"), release=True)
+           required=("android16", "device"), excluded=("android17",), release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"],
            full=True, release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],
