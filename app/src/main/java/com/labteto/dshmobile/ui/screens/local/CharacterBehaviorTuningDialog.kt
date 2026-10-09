@@ -436,8 +436,13 @@ internal fun CharacterBehaviorTuningDialog(
                         high = stringResource(R.string.local_character_tuning_expression_variation_high),
                         value = draft.expressionVariation,
                         displayValue = temperatureRange?.let { range ->
+                            val label = if (range.omitAtChatDefault && draft.expressionVariation == 50) {
+                                R.string.local_character_tuning_temperature_provider_default
+                            } else {
+                                R.string.local_character_tuning_temperature_value
+                            }
                             stringResource(
-                                R.string.local_character_tuning_temperature_value,
+                                label,
                                 range.at(draft.expressionVariation),
                                 draft.expressionVariation,
                             )
