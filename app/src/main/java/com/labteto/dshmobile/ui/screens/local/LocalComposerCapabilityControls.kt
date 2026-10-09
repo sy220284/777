@@ -217,15 +217,16 @@ internal fun LocalComposerCapabilityPanel(
                 val temperatureTick = rememberHapticTickFeedback(selectedLevel)
                 val temperatureText = stringResource(R.string.local_composer_temperature_title)
                 val temperatureSample = range.at(temperatureSelection.roundToInt().coerceIn(0, 4) * 25)
+                val temperatureState = stringResource(
+                    R.string.local_composer_temperature_value, temperatureSample,
+                )
                 val allowTemperature = temperatureEnabled && !thinkingBlocksSampling
                 Slider(
                     modifier = Modifier
                         .testTag("local-composer-temperature-slider")
                         .semantics {
                             contentDescription = temperatureText
-                            stateDescription = stringResource(
-                                R.string.local_composer_temperature_value, temperatureSample,
-                            )
+                            stateDescription = temperatureState
                         },
                     value = temperatureSelection,
                     enabled = allowTemperature,
