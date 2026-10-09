@@ -319,6 +319,7 @@ internal fun LocalConversationComposer(
             DsComposerField(
                 value = input,
                 onValueChange = onInputChange,
+                visualTransformation = remember(colors.accent) { LocalSkillCallVisualTransformation(colors.accent) },
                 placeholder = when {
                     state.usageMode == LocalUsageMode.WORK && teamDispatchSelected ->
                         stringResource(R.string.local_team_input_hint)

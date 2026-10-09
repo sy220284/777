@@ -345,7 +345,7 @@ private fun LocalUserMessageContent(
         message.visibleBlocks().forEach { block ->
             when (block) {
                 is LocalMessageBlock.Text -> if (block.text.isNotBlank()) {
-                    UserBubble(block.text)
+                    UserBubble(localSkillCallDisplayText(block.text))
                 }
                 is LocalMessageBlock.Image -> LocalTranscriptImage(
                     image = block,

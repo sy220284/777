@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.presentation
 
+import com.labteto.dshmobile.local.tools.LocalPresetSkillCatalog
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -7,6 +8,10 @@ import javax.inject.Singleton
 data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean)
 data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
 data class LocalSkillEditorUiEntry(val id: String, val document: String)
+
+/** Only defined preset titles are projected; user-defined skill IDs keep their original text. */
+internal fun localPresetSkillTitle(id: String): String? =
+    LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }?.title
 
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
