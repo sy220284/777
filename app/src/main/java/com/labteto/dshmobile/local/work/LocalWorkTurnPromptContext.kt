@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.model.withWorkRuntimeContext
 internal data class LocalWorkTurnPromptContext(
     val stable: String = "",
     val dynamic: String = "",
+    val skill: String = "",
 )
 
 internal fun ContextComposer.composeWorkTurnContext(
@@ -35,6 +36,7 @@ internal fun ContextComposer.composeWorkTurnContext(
             snapshot.modelState.baseUrl,
             snapshot.modelState.modelSelection.activeProfile,
         ),
-        dynamic = listOf(skillGuidance, composed.dynamic).filter(String::isNotBlank).joinToString("\n\n"),
+        dynamic = composed.dynamic,
+        skill = skillGuidance,
     )
 }
