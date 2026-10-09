@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,9 +31,13 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        // BackHandler registration and shell input delivery cross separate UI queues.
-        // Wait for the actual system Back callback, then enforce exactly-once delivery.
+        // Shell input targets the focused Android window, which can change
+        // between emulator instrumentation cases. Confirm our Compose host owns
+        // focus before sending exactly one real system Back key.
         compose.waitForIdle()
+        compose.waitUntil(timeoutMillis = 10_000L) {
+            compose.activity.window.decorView.hasWindowFocus()
+        }
         pressDeviceBack()
         compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
@@ -54,9 +59,13 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        // BackHandler registration and shell input delivery cross separate UI queues.
-        // Wait for the actual system Back callback, then enforce exactly-once delivery.
+        // Shell input targets the focused Android window, which can change
+        // between emulator instrumentation cases. Confirm our Compose host owns
+        // focus before sending exactly one real system Back key.
         compose.waitForIdle()
+        compose.waitUntil(timeoutMillis = 10_000L) {
+            compose.activity.window.decorView.hasWindowFocus()
+        }
         pressDeviceBack()
         compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
