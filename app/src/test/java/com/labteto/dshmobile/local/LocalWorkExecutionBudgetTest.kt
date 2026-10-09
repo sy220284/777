@@ -27,6 +27,20 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun perSliceRequestLimitAllowsBoundedCheckpointContinuation() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        budget.reserve(1).commit()
+        val error = runCatching { budget.reserve(1) }.exceptionOrNull()
+        assertTrue(error is LocalModelException)
+        val modelError = error as LocalModelException
+        assertEquals("WORK_BUDGET_EXHAUSTED", modelError.code)
+        assertTrue(modelError.continuationEligible)
+        assertTrue(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 0, 0))
+        assertFalse(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 2, 0))
+        assertFalse(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 0, 1))
+    }
+
+    @Test
     fun largeRequestRunsAndConcurrentPendingExposureWaits() = runTest {
         val budget = LocalWorkExecutionBudget(
             pendingLimitTokens = 200_000,

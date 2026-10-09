@@ -23,5 +23,5 @@ internal fun localToolFailure(
 }
 
 internal fun String.isRetryableToolTransportFailure(): Boolean =
-    this in setOf("TIMEOUT", "NETWORK_ERROR", "DNS_FAILED", "TOOL_TIMEOUT", "TOOL_LIFECYCLE_UNAVAILABLE", "PARALLEL_TASK_ERROR") ||
+    this in setOf("TIMEOUT", "NETWORK_ERROR", "DNS_FAILED", "TOOL_TIMEOUT", "TOOL_LIFECYCLE_UNAVAILABLE", "PARALLEL_TASK_ERROR", "TOOL_IO_ERROR") ||
         startsWith("MODEL_HTTP_5") || contains("TIMEOUT") || contains("NETWORK")

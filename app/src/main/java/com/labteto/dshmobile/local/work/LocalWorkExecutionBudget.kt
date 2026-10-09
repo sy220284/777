@@ -148,6 +148,8 @@ internal class LocalWorkExecutionBudget(
         code = "WORK_BUDGET_EXHAUSTED",
         message = "$detail；已有进度会保留，请缩小任务范围或开始新的工作回合",
         retryable = false,
+        // This guard is per execution slice; resume from the durable checkpoint, never replay the request.
+        continuationEligible = true,
     )
 
     class Lease internal constructor(

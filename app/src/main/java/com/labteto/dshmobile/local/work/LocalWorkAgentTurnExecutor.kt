@@ -558,11 +558,17 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                             if (continuationEligible) {
                                 runEventLog.append("turn/end", buildJsonObject {
-                                    put("reason", "stream_interrupted_continuation")
+                                    put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
+                                        "budget_exhausted_continuation"
+                                    } else {
+                                        "stream_interrupted_continuation"
+                                    })
                                     put("detail", detail)
                                     put("messages", runState.value.transcriptIndex.totalMessageCount)
                                 })
-                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/stream-interrupted")
+                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
+                                    if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
+                                    else "turn/stream-interrupted")
                             } else {
                                 val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                                 val turnEnd = runEventLog.append("turn/end", buildJsonObject {
