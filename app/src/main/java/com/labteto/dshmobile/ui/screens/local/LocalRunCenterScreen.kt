@@ -143,14 +143,24 @@ internal fun LocalRunCenterScreen(
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
-                DsPageEmptyState(
-                    icon = FeatherIcons.Activity,
-                    title = stringResource(R.string.local_run_center_empty_title),
-                    body = stringResource(R.string.local_run_center_empty_body),
-                    modifier = Modifier.fillMaxSize(),
-                    actionText = stringResource(R.string.local_run_agent_start),
-                    onAction = { showAgentLauncher = true },
-                )
+                Column(Modifier.fillMaxSize()) {
+                    DsPageEmptyState(
+                        icon = FeatherIcons.Activity,
+                        title = stringResource(R.string.local_run_center_empty_title),
+                        body = stringResource(R.string.local_run_center_empty_body),
+                        modifier = Modifier.weight(1f),
+                        actionText = stringResource(R.string.local_run_agent_start),
+                        onAction = { showAgentLauncher = true },
+                    )
+                    if (artifactScanLimit < 4_096) {
+                        DsButton(
+                            text = stringResource(R.string.local_artifact_more_history),
+                            onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
+                            variant = DsButtonVariant.Ghost,
+                            modifier = Modifier.padding(DsSpacing.medium),
+                        )
+                    }
+                }
             } else {
                 Column(
                     modifier = Modifier
@@ -253,16 +263,16 @@ internal fun LocalRunCenterScreen(
                         if (artifactActionFailed) {
                             Text(stringResource(R.string.local_artifact_open_failed), color = colors.error)
                         }
-                        if (artifactScanLimit < 4_096) {
-                            DsButton(
-                                text = stringResource(R.string.local_artifact_more_history),
-                                onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
-                                variant = DsButtonVariant.Ghost,
-                            )
-                        }
                         DsButton(
                             text = stringResource(R.string.local_artifacts_open_files),
                             onClick = onOpenResults,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                    if (artifactScanLimit < 4_096) {
+                        DsButton(
+                            text = stringResource(R.string.local_artifact_more_history),
+                            onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
                             variant = DsButtonVariant.Ghost,
                         )
                     }
