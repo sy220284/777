@@ -429,12 +429,12 @@ internal class ChatInteractionStateReducer {
         val conversation = listOf(userMessage, assistantMessage)
         val stageWords = when (proposedStage) {
             "AMBIGUOUS" -> Regex("暧昧|心动|喜欢你|喜欢我|对你有好感")
-            "DATING" -> Regex("开始约会|正式交往|在谈恋爱|正在约会")
+            "DATING" -> Regex("开始约会|正式交往|在谈恋爱|正在约会|约会中")
             "COMMITTED" -> Regex("确认关系|确定关系|在一起(?:了)?|正式在一起|订婚|结婚|同居")
             "CONFLICT" -> Regex("冷战|吵架|争吵|闹矛盾|发生争执")
             "COOLING" -> Regex("暂时冷静|冷淡下来|暂停关系")
             "SEPARATED" -> Regex("分手|分开了|离婚|结束关系")
-            "REPAIRING" -> Regex("和好了|复合|重新和好|修复关系")
+            "REPAIRING" -> Regex("和好(?:了)?|复合|重新和好|修复关系")
             "FAMILIAR" -> Regex("互相认识|开始熟悉|成为朋友")
             else -> return false
         }
@@ -653,7 +653,7 @@ private companion object {
             "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
         )
         val TOPIC_RESET_REQUEST = Regex(
-            """^(?:嗯|好|那|行|唉|算了[，,])?[，,。\\s]*(?:换个话题|先不聊这个|不聊这个|别提这个|别再提(?:这个)?|到此为止)""",
+            """^(?:嗯|好|那|行|唉|算了[，,])?[，,。\\s]*(?:我们|咱们|要不|不如|先)?[\\s]*(?:换个话题|先不聊这个|不聊这个|别提这个|别再提(?:这个)?|到此为止)""",
         )
         const val THREAD_TTL = 6
     }

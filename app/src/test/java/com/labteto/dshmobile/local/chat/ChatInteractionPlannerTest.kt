@@ -113,6 +113,22 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun explicitNaturalTopicChangeStillClearsOldTopic() {
+        val previous = ChatCharacterState(
+            currentFocus = "旧话题",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "我们换个话题吧，聊点新的",
+            assistantMessage = "好",
+        )!!.state
+        assertEquals("", state.currentFocus)
+        assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
+    @Test
     fun topicResetImmediatelyDropsCurrentTopicAndOpenThreads() {
         val previous = ChatCharacterState(
             currentFocus = "旧话题",
