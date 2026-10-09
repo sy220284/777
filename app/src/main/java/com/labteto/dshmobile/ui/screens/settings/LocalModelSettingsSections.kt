@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,8 @@ internal fun LocalModelSettingsCard(
     local: LocalHarnessSettingsState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
+    requestAddModel: Boolean,
+    onAddModelRequestHandled: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
@@ -131,12 +134,16 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    SettingsCard(stringResource(R.string.local_api_models_title)) {
-        DsButton(stringResource(R.string.local_api_model_add), onClick = {
+    LaunchedEffect(requestAddModel) {
+        if (requestAddModel) {
             editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
             custom = false
             showEditor = true
-        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
+            onAddModelRequestHandled()
+        }
+    }
+
+    SettingsCard(stringResource(R.string.local_api_models_title)) {
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (apiProfiles.isEmpty()) {

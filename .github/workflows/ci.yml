@@ -290,13 +290,16 @@ jobs:
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .gradle/runtime-cache
-          key: runtime-${{ runner.os }}-arm64-v8a-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - uses: ./.github/actions/setup-runtime-cached
+        with:
+          abi: arm64-v8a
       - name: Lint and assemble optimized APK
-        run: ./gradlew :app:lintDebug :app:assembleOptimized --stacktrace
+        run: |
+          set -euo pipefail
+          start=$SECONDS
+          ./gradlew :app:lintDebug :app:assembleOptimized --stacktrace --console=plain
+          printf "| ARM64 Lint + 优化包构建 | %s 秒 |\n" "$((SECONDS - start))" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify arm64 APK
         run: .github/scripts/verify-android16-apk.sh app/build/outputs/apk/optimized/app-optimized.apk arm64-v8a
       - name: Enforce APK size budget
@@ -327,14 +330,16 @@ jobs:
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .gradle/runtime-cache
-          key: runtime-${{ runner.os }}-x86_64-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - uses: ./.github/actions/setup-runtime-cached
+        with:
+          abi: x86_64
       - name: Build shared Android test artifacts
         run: |
-          DSH_RUNTIME_ABIS=x86_64 ./gradlew             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          set -euo pipefail
+          start=$SECONDS
+          DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleOptimized --stacktrace --console=plain
+          printf "| x86_64 调试/测试/优化包构建 | %s 秒 |\n" "$((SECONDS - start))" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify and stage x86_64 APKs
         run: |
           set -euo pipefail

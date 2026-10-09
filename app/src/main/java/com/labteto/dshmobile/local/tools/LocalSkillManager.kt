@@ -144,17 +144,22 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     private val seedMarker = ".dsh/skills/.preset-seed-v1"
 
     fun installed(): List<LocalInstalledSkill> = workspace.skills().map { name ->
-        val doc = workspace.readRaw(".dsh/skills/" + name + "/SKILL.md")
-        val metadata = parseLocalSkillMetadata(name, doc)
-        val display = metadata.displayName
-            ?: LocalPresetSkillCatalog.entries.firstOrNull { it.id == name }?.title
-            ?: doc.lineSequence().firstOrNull { it.trimStart().startsWith("# ") }
-                ?.trim()?.removePrefix("# ")?.trim()
-                ?.takeIf { it.length in 1..40 && it.any { c -> c in '\u4e00'..'\u9fff' } }
-            ?: metadata.description.substringBefore('，').substringBefore('。').trim()
-                .takeIf { it.length in 2..30 && it.any { c -> c in '\u4e00'..'\u9fff' } }
-            ?: "自定义技能（$name）"
-        LocalInstalledSkill(name, metadata.description, metadata.modelInvocable, display)
+        try {
+            val doc = workspace.readRaw(".dsh/skills/" + name + "/SKILL.md")
+            val metadata = parseLocalSkillMetadata(name, doc)
+            val display = metadata.displayName
+                ?: LocalPresetSkillCatalog.entries.firstOrNull { it.id == name }?.title
+                ?: doc.lineSequence().firstOrNull { it.trimStart().startsWith("# ") }
+                    ?.trim()?.removePrefix("# ")?.trim()
+                    ?.takeIf { it.length in 1..40 && it.any { c -> c in '\u4e00'..'\u9fff' } }
+                ?: metadata.description.substringBefore('，').substringBefore('。').trim()
+                    .takeIf { it.length in 2..30 && it.any { c -> c in '\u4e00'..'\u9fff' } }
+                ?: "自定义技能（$name）"
+            LocalInstalledSkill(name, metadata.description, metadata.modelInvocable, display)
+        } catch (error: Exception) {
+            com.labteto.dshmobile.observability.AppLog.warn("LocalSkills", "技能条目无法读取：$name", error)
+            LocalInstalledSkill(name, "无法读取，请修复或删除此技能", false, "自定义技能（$name）")
+        }
     }
 
     fun presets(): List<LocalPresetSkill> {
@@ -227,8 +232,12 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
             if (!workspace.skills().contains(preset.id)) continue
             val before = buildLocalSkillDocument(preset.id, preset.description, previousInstructions)
             val path = ".dsh/skills/" + preset.id + "/SKILL.md"
-            if (workspace.readRaw(path) == before) {
-                workspace.write(path, buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse))
+            try {
+                if (workspace.readSkill(preset.id) == before) {
+                    workspace.write(path, buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse))
+                }
+            } catch (error: Exception) {
+                com.labteto.dshmobile.observability.AppLog.warn("LocalSkills", "保留无法升级的预置技能：${preset.id}", error)
             }
         }
     }

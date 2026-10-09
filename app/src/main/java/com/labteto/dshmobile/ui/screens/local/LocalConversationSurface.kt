@@ -1155,6 +1155,7 @@ internal fun LocalConversationSurface(
         }
     }
 
+    val teamPanelResources = androidx.compose.ui.platform.LocalResources.current
     if (showTeamPanel && state.usageMode == LocalUsageMode.WORK && state.team.visible) {
         LocalAgentTeamSheet(
             team = state.team,
@@ -1162,6 +1163,16 @@ internal fun LocalConversationSurface(
             onSendMemberMessage = onSendTeamMemberMessage,
             onStopMember = onStopTeamMember,
             onStopAll = onStopTeam,
+            onLeadFollowup = { memberName ->
+                val request = teamPanelResources.getString(
+                    if (memberName.isBlank()) R.string.local_team_lead_followup_request else R.string.local_team_lead_recover_request,
+                    memberName,
+                )
+                val previous = drafts[state.sessionId].orEmpty()
+                drafts.putBoundedLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
+                teamDispatchSelected = true
+                showTeamPanel = false
+            },
             onDismiss = { showTeamPanel = false },
         )
     }

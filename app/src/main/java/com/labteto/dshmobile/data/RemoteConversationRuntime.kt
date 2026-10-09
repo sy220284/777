@@ -42,7 +42,9 @@ internal class RemoteConversationRuntime(
     private val onDurableEvent: (sessionId: String, event: SessionEventEnvelope) -> Unit,
     private val onConnectionRecovered: () -> Unit,
     private val logger: (String) -> Unit,
+    private val connectionIdentity: () -> Any? = { apiProvider() },
 ) {
+    private var openEpoch = 0L
     private val state = OpenSessionFoldState()
     private val rebuildTicks = Channel<Unit>(Channel.CONFLATED)
 
@@ -52,10 +54,12 @@ internal class RemoteConversationRuntime(
 
     fun reset(blank: Boolean, clearPublished: Boolean) {
         synchronized(lock) {
+            openEpoch += 1L
             state.reset(blank)
             if (clearPublished) conversation.value = null
+            loadingOlder.value = false
+            loadOlderFailed.value = false
         }
-        loadOlderFailed.value = false
     }
 
     fun projection(key: String): JsonElement? = synchronized(lock) { state.projection(key) }
@@ -112,49 +116,72 @@ internal class RemoteConversationRuntime(
         }
     }
 
+    private data class PageOwner(
+        val sessionId: String,
+        val epoch: Long,
+        val connection: Any,
+        val api: DshApiClient,
+        val request: SessionPageRequest,
+    )
+
+    private fun ownsPage(owner: PageOwner): Boolean =
+        owner.epoch == openEpoch && owner.sessionId == currentSessionId() &&
+            owner.connection === connectionIdentity()
+
     suspend fun loadOlder() = withContext(Dispatchers.Default) {
-        val sessionId = currentSessionId() ?: return@withContext
-        val api = apiProvider() ?: return@withContext
-        if (!loadingOlder.compareAndSet(expect = false, update = true)) return@withContext
-        try {
-            val (oldestSeq, cursor) = synchronized(lock) { state.pageAnchor() }
+        val owner = synchronized(lock) {
+            val sessionId = currentSessionId() ?: return@withContext
+            val connection = connectionIdentity() ?: return@withContext
+            val api = apiProvider() ?: return@withContext
+            if (connection !== connectionIdentity() || loadingOlder.value) return@withContext
+            val (oldestSeq, cursor) = state.pageAnchor()
             if (cursor == null) {
                 logger("cannot page $sessionId: no follow cursor yet")
                 return@withContext
             }
-            val request = SessionPageRequest(
+            loadingOlder.value = true
+            PageOwner(sessionId, openEpoch, connection, api, SessionPageRequest(
                 address = SessionAddress.Session(sessionId = sessionId),
                 throughSeq = cursor,
                 beforeSeq = oldestSeq?.toInt(),
                 maxMessages = HISTORY_PAGE_SIZE,
-            )
-            when (val result = api.sessionPage(request)) {
+            ))
+        }
+        try {
+            when (val result = owner.api.sessionPage(owner.request)) {
                 is RpcResult.Ok -> {
-                    onConnectionRecovered()
-                    loadOlderFailed.value = false
                     val envelopes = expandRecords(result.value.records)
                     val page = historyTail(envelopes)
                     val overDelivered = envelopes.size > page.size
                     synchronized(lock) {
-                        if (currentSessionId() != sessionId) return@synchronized
+                        if (!ownsPage(owner)) return@synchronized
+                        onConnectionRecovered()
+                        loadOlderFailed.value = false
                         state.prependPage(page, result.value.hasMore, overDelivered)
                         rebuildLocked()
                     }
                 }
-                is RpcResult.Err -> loadOlderFailed.value = true
+                is RpcResult.Err -> synchronized(lock) {
+                    if (ownsPage(owner)) loadOlderFailed.value = true
+                }
             }
         } finally {
-            loadingOlder.value = false
+            synchronized(lock) {
+                if (ownsPage(owner)) loadingOlder.value = false
+            }
         }
     }
 
     private fun applyFollowSnapshot(sessionId: String, frame: SessionFollowFrame.Snapshot) {
-        onConnectionRecovered()
         val envelopes = expandRecords(frame.records)
         val page = historyTail(envelopes)
         val overDelivered = envelopes.size > page.size
         synchronized(lock) {
             if (currentSessionId() != sessionId) return@synchronized
+            openEpoch += 1L
+            loadingOlder.value = false
+            loadOlderFailed.value = false
+            onConnectionRecovered()
             state.installSnapshot(frame, page, overDelivered)
             rebuildLocked()
         }

@@ -159,18 +159,9 @@ class HarnessJobManager(
                     startedAt = snapshot.startedAt,
                     deadlineAt = snapshot.deadlineAt,
                     updatedAt = snapshot.updatedAt,
-                    inbox = snapshot.inbox
-                        .takeLast(MAX_INBOX_MESSAGES)
-                        .map { message ->
-                            QueuedAgentInput(
-                                id = message.id.take(MAX_INBOX_ID),
-                                content = message.content.take(MAX_INBOX_MESSAGE),
-                                memoryInput = message.memoryInput.take(MAX_INBOX_MESSAGE),
-                                modelMessage = message.modelMessage,
-                            )
-                        }
-                        .filter { it.id.isNotBlank() && it.content.isNotBlank() }
-                        .toMutableList(),
+                    inbox = snapshot.inbox.also { inbox ->
+                        require(inbox.size <= MAX_INBOX_MESSAGES) { "恢复的后台代理消息队列超过容量" }
+                    }.map(JobInboxContract::normalize).toMutableList(),
                 )
             }
         }
@@ -829,8 +820,8 @@ class HarnessJobManager(
             id = id,
             input = QueuedAgentInput(
                 id = "msg-" + UUID.randomUUID().toString().replace("-", "").take(16),
-                content = clean.take(MAX_INBOX_MESSAGE),
-                memoryInput = clean.take(MAX_INBOX_MESSAGE),
+                content = clean,
+                memoryInput = clean,
             ),
             ownerId = ownerId,
         ).message
@@ -841,18 +832,8 @@ class HarnessJobManager(
         input: QueuedAgentInput,
         ownerId: String? = null,
     ): JobMessageAdmission = synchronized(publicationLock) {
-        val messageId = input.id.trim()
-        require(messageId.isNotEmpty()) { "消息编号不能为空" }
-        require(messageId.length <= MAX_INBOX_ID) {
-            "消息编号过长：最多允许 $MAX_INBOX_ID 个字符"
-        }
-        val content = input.content.trim()
-        require(content.isNotEmpty()) { "消息不能为空" }
-        val normalized = input.copy(
-            id = messageId,
-            content = content.take(MAX_INBOX_MESSAGE),
-            memoryInput = input.memoryInput.take(MAX_INBOX_MESSAGE),
-        )
+        val normalized = JobInboxContract.normalize(input)
+        val messageId = normalized.id
         var infos: List<JobInfo>? = null
         val admission = synchronized(lock) {
             val found = records[id]
@@ -1214,8 +1195,8 @@ class HarnessJobManager(
         const val MAX_JOB_ID = 96
         const val MAX_LABEL = 160
         const val MAX_OUTPUT = 65_536
-        const val MAX_INBOX_ID = 64
-        const val MAX_INBOX_MESSAGE = 4_000
+        const val MAX_INBOX_ID = JobInboxContract.MAX_ID_CHARS
+        const val MAX_INBOX_MESSAGE = JobInboxContract.MAX_MESSAGE_CHARS
         const val MAX_INBOX_MESSAGES = AgentInputQueue.DEFAULT_CAPACITY
         const val MAX_RESUME_KIND = 64
         const val MAX_RESUME_PAYLOAD = 64_000

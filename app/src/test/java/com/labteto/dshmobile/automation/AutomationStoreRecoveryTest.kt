@@ -131,4 +131,61 @@ class AutomationStoreRecoveryTest {
         }
     }
 
+
+    @Test fun replacementAndDeleteRecreateRejectOldGenerationAcrossWalRecovery() {
+        val root = Files.createTempDirectory("automation-reincarnation").toFile()
+        val file = root.resolve("automations.json")
+        try {
+            val store = AutomationStore(file, json)
+            store.upsert(task("same", 1_000L))
+            val first = store.get("same")!!.scheduleGeneration
+            store.upsert(task("same", 2_000L).copy(prompt = "replacement"))
+            val second = store.get("same")!!.scheduleGeneration
+            assertTrue(second > first)
+            assertEquals(null, store.updateIf("same", { it.scheduleGeneration == first }) { it.copy(lastResult = "old") })
+            store.remove("same")
+            val recovered = AutomationStore(file, json)
+            recovered.upsert(task("same", 3_000L).copy(prompt = "recreated"))
+            val third = recovered.get("same")!!.scheduleGeneration
+            assertTrue(third > second)
+            assertEquals(false, recovered.withCurrentGeneration("same", second) { error("stale notification") })
+            assertEquals("recreated", recovered.get("same")!!.prompt)
+            assertEquals(null, recovered.get("same")!!.lastResult)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun legacyDeletionRetainsWatermarkAfterSnapshotAndWalCompaction() {
+        val root = Files.createTempDirectory("automation-legacy-generation").toFile()
+        val file = root.resolve("automations.json")
+        try {
+            file.writeText(json.encodeToString(AutomationDocument.serializer(), AutomationDocument(tasks = listOf(
+                task("same", 1_000L).copy(scheduleGeneration = 19L),
+            ))))
+            val store = AutomationStore(file, json)
+            store.remove("same")
+            repeat(140) { index ->
+                store.upsert(task("temporary", index.toLong()))
+                store.remove("temporary")
+            }
+            val recovered = AutomationStore(file, json)
+            recovered.upsert(task("same", 3_000L))
+            assertTrue(recovered.get("same")!!.scheduleGeneration > 19L)
+            assertEquals(false, recovered.withCurrentGeneration("same", 19L) { error("old owner") })
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun replacementReturnsCapturedIdentityEvenWhenSameTimeTaskReplacesItAgain() {
+        val root = Files.createTempDirectory("automation-admission-owner").toFile()
+        try {
+            val store = AutomationStore(root.resolve("automations.json"), json)
+            val first = store.upsert(task("same", 1_000L))
+            val second = store.upsert(task("same", 1_000L).copy(prompt = "new request"))
+            assertEquals(first.admitted, second.replaced)
+            assertTrue(second.admitted.scheduleGeneration > first.admitted.scheduleGeneration)
+            assertEquals(false, store.withCurrentGeneration("same", first.admitted.scheduleGeneration) { error("stale enqueue") })
+            assertEquals(false, store.removeIfGeneration("same", first.admitted.scheduleGeneration))
+            assertEquals(second.admitted, store.get("same"))
+        } finally { root.deleteRecursively() }
+    }
+
 }

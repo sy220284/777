@@ -4,6 +4,8 @@ import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import java.io.File
+import com.labteto.dshmobile.local.io.readBoundedLine
+import com.labteto.dshmobile.observability.AppLog
 import java.io.FileOutputStream
 import java.io.Reader
 import java.nio.file.AtomicMoveNotSupportedException
@@ -45,6 +47,7 @@ internal class LocalFileObservationCache(
 }
 
 private const val MAX_MODEL_SKILL_LIST = 128
+private const val MAX_SKILL_BYTES = 128 * 1024
 
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
@@ -353,28 +356,58 @@ class LocalWorkspace(
             .sorted()
     }
 
-    /** Read one installed skill instruction file. */
+    /** Full rules, with a byte budget independent of the generic file-preview line limit. */
     fun readSkill(name: String): String {
+        val file = skillFile(name)
+        require(file.length() <= MAX_SKILL_BYTES) { "技能规则超过 128 KB，请精简后重新加载" }
+        val before = fingerprint(file)
+        val bytes = file.inputStream().use { it.readNBytes(MAX_SKILL_BYTES + 1) }
+        require(bytes.size <= MAX_SKILL_BYTES) { "技能规则超过 128 KB，请精简后重新加载" }
+        val content = bytes.toString(Charsets.UTF_8)
+        val after = fingerprint(file)
+        require(before == after) { "技能在读取过程中发生变化，请重新加载" }
+        observations.put(file.path, after)
+        return content
+    }
+
+    /** Catalogs only need front matter; one unreadable skill cannot disable all other skills. */
+    internal fun skillMetadata(name: String): LocalSkillMetadata {
+        val file = skillFile(name)
+        require(file.length() <= MAX_SKILL_BYTES) { "技能规则超过 128 KB" }
+        val header = file.bufferedReader().use { reader ->
+            buildList {
+                repeat(96) {
+                    val line = readBoundedLine(reader, 1_024) ?: return@buildList
+                    add(line)
+                    if (size == 1 && line.trim() != "---") return@buildList
+                    if (size > 1 && line.trim() == "---") return@buildList
+                }
+            }.joinToString("\n")
+        }
+        return parseLocalSkillMetadata(name, header)
+    }
+
+    private fun skillFile(name: String): File {
         val normalized = name.trim()
-        require(
-            normalized.isNotEmpty() &&
-                normalized != "." &&
-                normalized != ".." &&
-                File.separatorChar !in normalized &&
-                '/' !in normalized &&
-                '\\' !in normalized,
-        ) { "技能名称只能是 .dsh/skills 下的直接子目录名" }
-        return read(".dsh/skills/$normalized/SKILL.md", 1, 800)
+        require(normalized.isNotEmpty() && normalized != "." && normalized != ".." &&
+            File.separatorChar !in normalized && '/' !in normalized && '\\' !in normalized) {
+            "技能名称只能是 .dsh/skills 下的直接子目录名"
+        }
+        return resolve(".dsh/skills/$normalized/SKILL.md").also {
+            require(it.isFile) { "技能文件不存在：$normalized" }
+        }
     }
 
     /** Model-facing skill catalog. User-only skills stay installed but are hidden from tools. */
     fun modelSkillCatalog(): String {
         val visible = skills().take(MAX_MODEL_SKILL_LIST)
-            .map { name ->
-                val raw = readSkill(name).lineSequence()
-                    .map { it.substringAfter(": ", it) }
-                    .joinToString("\n")
-                parseLocalSkillMetadata(name, raw)
+            .mapNotNull { name ->
+                try {
+                    skillMetadata(name)
+                } catch (error: Exception) {
+                    AppLog.warn("LocalSkills", "技能目录条目无法读取：$name", error)
+                    null
+                }
             }
             .filter(LocalSkillMetadata::modelInvocable)
         if (visible.isEmpty()) return "未安装可由模型调用的技能"
@@ -388,10 +421,7 @@ class LocalWorkspace(
     /** Model tool access must respect user-only metadata; direct user access remains unchanged. */
     fun readModelSkill(name: String): String {
         val content = readSkill(name)
-        val raw = content.lineSequence()
-            .map { it.substringAfter(": ", it) }
-            .joinToString("\n")
-        require(parseLocalSkillMetadata(name.trim(), raw).modelInvocable) {
+        require(parseLocalSkillMetadata(name.trim(), content).modelInvocable) {
             "SKILL_USER_ONLY：此技能仅支持用户主动调用"
         }
         return content
