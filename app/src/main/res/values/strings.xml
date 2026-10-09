@@ -1534,6 +1534,11 @@
     <string name="chatgpt_account_fallback">ChatGPT 账户</string>
     <string name="chatgpt_plan_usage">ChatGPT 套餐</string>
     <string name="chatgpt_model_count">%1$d 个模型</string>
+    <string name="chatgpt_account_models_title">套餐可用模型（%1$d）</string>
+    <string name="chatgpt_account_models_cached">暂时无法验证模型目录，以下是上次同步的模型；连接恢复后可切换。</string>
+    <string name="chatgpt_account_models_empty">当前账户没有可用的套餐模型。</string>
+    <string name="chatgpt_account_models_pending">模型列表将在连接完成后显示。</string>
+    <string name="chatgpt_account_use_model">使用</string>
     <string name="chatgpt_saved_accounts">其他授权记录</string>
     <string name="chatgpt_current_account">当前</string>
     <string name="chatgpt_use_account">使用</string>

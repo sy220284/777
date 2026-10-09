@@ -702,7 +702,7 @@ fun SettingsScreen(
 
                     SettingsDestination.ACCOUNT -> {
                         val account by viewModel.chatGptState.collectAsStateWithLifecycle()
-                        ChatGptAccountPanel(account, viewModel, toast.second)
+                        ChatGptAccountPanel(account, localHarness, viewModel, toast.second)
                     }
                     SettingsDestination.MODELS -> {
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)

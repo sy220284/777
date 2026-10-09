@@ -92,6 +92,7 @@ internal fun LocalModelSettingsCard(
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
     val scope = rememberCoroutineScope()
+    val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
     var showEditor by remember { mutableStateOf(false) }
     var model by remember { mutableStateOf(LocalModelPresets.entries.first().model) }
     var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
@@ -169,12 +170,12 @@ internal fun LocalModelSettingsCard(
         )
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
-        if (local.modelProfiles.isEmpty()) {
+        if (apiProfiles.isEmpty()) {
             Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary)
         }
         local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
-        local.modelProfiles.forEach { profile ->
+        apiProfiles.forEach { profile ->
             Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
                 modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
@@ -190,15 +191,11 @@ internal fun LocalModelSettingsCard(
                                 DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
-                        val duplicateApiRoute = profile.authKind == LocalModelAuthKind.API_KEY &&
-                            local.modelProfiles.count {
-                                it.authKind == LocalModelAuthKind.API_KEY &&
-                                    it.model == profile.model && it.baseUrl == profile.baseUrl
-                            } > 1
+                        val duplicateApiRoute = apiProfiles.count {
+                            it.model == profile.model && it.baseUrl == profile.baseUrl
+                        } > 1
                         Text(
-                            if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                stringResource(R.string.chatgpt_model_source, profile.model)
-                            } else if (duplicateApiRoute) {
+                            if (duplicateApiRoute) {
                                 "${profile.baseUrl} · ${profile.id.takeLast(6)}"
                             } else {
                                 profile.baseUrl
@@ -398,7 +395,7 @@ internal fun LocalModelSettingsCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
+internal fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
     if (capabilities.isEmpty()) return
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
