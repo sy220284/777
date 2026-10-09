@@ -57,6 +57,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -421,9 +422,10 @@ internal fun CompactPersonaRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onTogglePin: () -> Unit,
-    onMove: (Int) -> Unit,
+    onMove: (Int) -> Boolean,
 ) {
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
+    val tick = rememberHapticPulse(minIntervalMillis = 65L)
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
     val rowColor = when {
@@ -518,7 +520,7 @@ internal fun CompactPersonaRow(
                                 val threshold = 44.dp.toPx()
                                 while (abs(dragDistance) >= threshold) {
                                     val direction = if (dragDistance > 0f) 1 else -1
-                                    onMove(direction)
+                                    if (onMove(direction)) tick()
                                     dragDistance -= direction * threshold
                                 }
                             }

@@ -529,6 +529,7 @@ private fun BehaviorSlider(
             enabled = enabled,
             valueRange = 0f..100f,
             steps = 99,
+            hapticSegments = 10,
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = title },

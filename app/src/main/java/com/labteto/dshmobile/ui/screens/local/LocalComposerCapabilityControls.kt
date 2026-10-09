@@ -31,6 +31,7 @@ import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -189,6 +190,7 @@ internal fun LocalComposerCapabilityPanel(
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
                 }
+                val tick = rememberHapticTickFeedback(modes.indexOf(effectiveMode))
                 val sliderTitle = stringResource(R.string.local_composer_reasoning_title)
                 val sliderState = stringResource(reasoningModeLabel(
                     modes[chosen.roundToInt().coerceIn(0, modes.lastIndex)], basicReasoning,
@@ -199,7 +201,10 @@ internal fun LocalComposerCapabilityPanel(
                         stateDescription = sliderState
                     },
                     value = chosen,
-                    onValueChange = { chosen = it },
+                    onValueChange = { next ->
+                        chosen = next
+                        tick(next.roundToInt().coerceIn(0, modes.lastIndex))
+                    },
                     onValueChangeFinished = {
                         onReasoningModeChange(modes[chosen.roundToInt().coerceIn(0, modes.lastIndex)])
                     },
@@ -232,6 +237,7 @@ internal fun LocalComposerCapabilityPanel(
                 var selected by remember(networkSearchEnabled) {
                     mutableFloatStateOf(if (networkSearchEnabled) 1f else 0f)
                 }
+                val tick = rememberHapticTickFeedback(if (networkSearchEnabled) 1 else 0)
                 val sliderTitle = stringResource(R.string.local_composer_web_title)
                 val sliderState = stringResource(
                     if (selected >= 0.5f) R.string.local_composer_web_on else R.string.local_composer_web_off,
@@ -242,7 +248,10 @@ internal fun LocalComposerCapabilityPanel(
                         stateDescription = sliderState
                     },
                     value = selected,
-                    onValueChange = { selected = it },
+                    onValueChange = { next ->
+                        selected = next
+                        tick(if (next >= 0.5f) 1 else 0)
+                    },
                     onValueChangeFinished = { onNetworkSearchChange(selected >= 0.5f) },
                     valueRange = 0f..1f,
                 )

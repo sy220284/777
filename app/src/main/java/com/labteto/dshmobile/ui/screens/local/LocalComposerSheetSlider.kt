@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -34,6 +35,7 @@ internal fun LocalComposerSheetSlider(
     require(labels.size >= 2)
     val colors = DsTheme.colors
     var draft by remember(selectedIndex, labels) { mutableFloatStateOf(selectedIndex.toFloat()) }
+    val tick = rememberHapticTickFeedback(selectedIndex.coerceIn(labels.indices))
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(title, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
@@ -47,7 +49,10 @@ internal fun LocalComposerSheetSlider(
             },
             value = draft,
             enabled = enabled,
-            onValueChange = { draft = it },
+            onValueChange = { next ->
+                draft = next
+                tick(next.roundToInt().coerceIn(labels.indices))
+            },
             onValueChangeFinished = {
                 onSelect(draft.roundToInt().coerceIn(labels.indices))
             },

@@ -106,6 +106,7 @@ internal fun ReadingPreferencesRow(
             onValueChange = onTextScaleChange,
             valueRange = 0.9f..1.3f,
             steps = 7,
+            hapticSegments = 8,
             modifier = Modifier.weight(1f),
         )
         Text(
@@ -127,6 +128,7 @@ internal fun ReadingPreferencesRow(
             DsSegment("2", stringResource(R.string.settings_text_weight_bold)),
         ),
         selectedKey = settings.textWeightAdjustment.toString(),
+        hapticOnChange = true,
         onSelect = { onTextWeightChange(it.toIntOrNull() ?: 0) },
         stretch = true,
         modifier = Modifier.fillMaxWidth(),
@@ -148,6 +150,7 @@ internal fun ReadingPreferencesRow(
             onValueChange = onTransparencyChange,
             valueRange = 0f..1f,
             steps = 9,
+            hapticSegments = 10,
             modifier = Modifier.weight(1f),
         )
         Text(stringResource(R.string.settings_surface_airier), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)

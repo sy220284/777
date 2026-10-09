@@ -54,6 +54,7 @@ import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.relativeTime
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -408,6 +409,7 @@ internal fun LocalSessionDrawerRow(
     val density = LocalDensity.current
     val reveal = with(density) { 76.dp.toPx() }
     var swipe by remember { mutableStateOf(0f) }
+    val thresholdPulse = rememberHapticPulse()
 
     Box(Modifier.fillMaxWidth()) {
         DsIconButton(
@@ -429,7 +431,9 @@ internal fun LocalSessionDrawerRow(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, amount ->
                             change.consume()
+                            val wasPastThreshold = swipe <= -reveal / 2f
                             swipe = (swipe + amount).coerceIn(-reveal, 0f)
+                            if ((swipe <= -reveal / 2f) != wasPastThreshold) thresholdPulse()
                         },
                         onDragEnd = { swipe = if (swipe < -reveal / 2) -reveal else 0f },
                     )
