@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui
 
+import android.os.ParcelFileDescriptor
 import androidx.activity.OnBackPressedDispatcher
 import androidx.test.platform.app.InstrumentationRegistry
 
@@ -17,5 +18,17 @@ import androidx.test.platform.app.InstrumentationRegistry
 internal fun dispatchHostBack(dispatcher: OnBackPressedDispatcher) {
     val instrumentation = InstrumentationRegistry.getInstrumentation()
     instrumentation.runOnMainSync { dispatcher.onBackPressed() }
+    instrumentation.waitForIdleSync()
+}
+
+/**
+ * Real system key injection for dialog, window and IME interaction tests.
+ * It intentionally remains separate from deterministic BackHandler tests.
+ */
+internal fun pressDeviceBack() {
+    val instrumentation = InstrumentationRegistry.getInstrumentation()
+    ParcelFileDescriptor.AutoCloseInputStream(
+        instrumentation.uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK"),
+    ).use { it.readBytes() }
     instrumentation.waitForIdleSync()
 }
