@@ -98,8 +98,21 @@ for paths in (
     if release_equivalent(paths):
         fail("binary-impacting change incorrectly skipped: " + ", ".join(paths))
 
-if "'.event == \"push\"'" in RELEASE:
-    pass  # Not a stable spelling requirement; the jq job evidence is authoritative.
+# CI and release must observe old as well as new paths on file moves. GitHub
+# Compare uses previous_filename; local git diff disables rename coalescing.
+CI = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+if CI.count("git diff --no-renames --name-only --diff-filter=ACMRD") < 2:
+    fail("CI rename detection can conceal a removed product source")
+if "git diff --no-renames --name-only --diff-filter=ACMRD" not in RELEASE:
+    fail("release version comparison can conceal a removed product source")
+if ".previous_filename?" not in RELEASE:
+    fail("GitHub compare ignores source paths of renamed files")
+if release_equivalent([
+    "app/src/main/java/com/labteto/dshmobile/local/LegacyEngine.kt",
+    "docs/LegacyEngine.md",
+]):
+    fail("binary source moved to docs incorrectly considered release equivalent")
+
 if '.event == "push"' not in RELEASE or '.conclusion == "success"' not in RELEASE:
     fail("full validation must come from a successful main push workflow")
 print("Release-eligibility evidence and scope regression passed")

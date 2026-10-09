@@ -56,14 +56,14 @@ jobs:
             git ls-files > changed-files.txt
             echo "手动执行：强制完整 CI"
           elif [ "$EVENT_NAME" = "pull_request" ]; then
-            git diff --name-only --diff-filter=ACMRD "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+            git diff --no-renames --name-only --diff-filter=ACMRD "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
             git diff --check "$BASE_SHA" "$HEAD_SHA"
           else
             base="$BEFORE_SHA"
             if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
               base="$(git rev-parse "$CURRENT_SHA^")"
             fi
-            git diff --name-only --diff-filter=ACMRD "$base" "$CURRENT_SHA" > changed-files.txt
+            git diff --no-renames --name-only --diff-filter=ACMRD "$base" "$CURRENT_SHA" > changed-files.txt
             git diff --check "$base" "$CURRENT_SHA"
           fi
           echo "本次变更文件："

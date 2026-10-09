@@ -84,7 +84,7 @@ jobs:
             fi
 
             changes="$RUNNER_TEMP/release-change-files.txt"
-            printf '%s' "$comparison" | jq -r '.files[]?.filename' > "$changes"
+            printf '%s' "$comparison" | jq -r '.files[]? | (.filename, .previous_filename?) | select(. != null and . != "")' | sort -u > "$changes"
             python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe
           }
 
@@ -179,7 +179,7 @@ jobs:
             git fetch --no-tags --depth=1 origin "refs/tags/$MAX_RELEASE_TAG" >/dev/null 2>&1
             published_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
             changes="$RUNNER_TEMP/release-since-published.txt"
-            git diff --name-only --diff-filter=ACMRD "$published_sha" "$RELEASE_SHA" > "$changes"
+            git diff --no-renames --name-only --diff-filter=ACMRD "$published_sha" "$RELEASE_SHA" > "$changes"
             if python3 "$classifier" --paths-file "$changes" --release-safe; then
               echo "相对上一正式 APK 没有影响产物的变化，不发布新版本。"
               skip_release
