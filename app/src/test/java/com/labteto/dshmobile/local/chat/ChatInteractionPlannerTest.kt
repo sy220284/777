@@ -1045,6 +1045,17 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun standaloneSuggestionsPreserveValidEntriesWhenOtherEntriesDrift() {
+        val suggestions = planner.parseSuggestions(
+            """{"suggestions":["invalid",{"label":"自然","text":"继续聊","bold":"yes"},
+            {"label":"俏皮","text":"再来一点","bold":true}]}""",
+        )!!
+        assertEquals(2, suggestions.size)
+        assertEquals("继续聊", suggestions[0].text)
+        assertTrue(suggestions[1].bold)
+    }
+
+    @Test
     fun malformedArraysCannotClearEarlierThreadsOrContinuity() {
         val previous = ChatCharacterState(
             unresolvedThreads = listOf("等待回答"),
