@@ -84,6 +84,7 @@ internal fun LocalProjectScreen(
     var deleting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val localProjectCannotSwitchMessage = stringResource(R.string.local_project_cannot_switch_session)
+    val deleteFailedMessage = stringResource(R.string.local_project_delete_failed)
 
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
@@ -238,7 +239,7 @@ internal fun LocalProjectScreen(
                                 throw cancelled
                             } catch (failure: Exception) {
                                 pendingDeleteId = null
-                                error = failure.message ?: "删除项目失败"
+                                error = failure.message ?: deleteFailedMessage
                             } finally {
                                 deleting = false
                             }
