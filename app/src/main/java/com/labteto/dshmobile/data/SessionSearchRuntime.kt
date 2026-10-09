@@ -47,7 +47,11 @@ internal class SessionSearchRuntime(
                 _results.value = result.value.items.map { it.sessionId to it.snippet }
             }
             is RpcResult.Err -> {
-                _available.value = false
+                // Only a confirmed missing RPC capability is latched off for the host.
+                // Transient transport/auth/server failures must remain retryable on the next query.
+                if (shouldDisableRemoteSessionSearch(result.error.code)) {
+                    _available.value = false
+                }
                 _results.value = emptyList()
             }
         }
@@ -57,3 +61,7 @@ internal class SessionSearchRuntime(
         const val SESSION_SEARCH_QUERY_MAX_CHARS = 500
     }
 }
+
+/** A temporary RPC failure does not prove that the connected host lacks search. */
+internal fun shouldDisableRemoteSessionSearch(code: String): Boolean =
+    code == "capability-unavailable"
