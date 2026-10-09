@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.model
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.chatgpt.chatGptPlanProfiles
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import java.io.IOException
 import java.net.SocketException
@@ -41,7 +43,7 @@ class OpenAiResponsesClientTest {
     @Test
     fun apiAndPlanReasoningSelectionPreserveDefaultAndUseNativeFields() {
         listOf(false, true).forEach { plan ->
-            listOf<String?>(null, "low", "high").forEach { effort ->
+            listOf<String?>(null, "low", "high", "max").forEach { effort ->
                 val payload = client.buildPayload(
                     model = "gpt-6.1-sol", messages = listOf(buildJsonObject {
                         put("role", "user"); put("content", "test")
@@ -54,6 +56,36 @@ class OpenAiResponsesClientTest {
                 assertEquals("false", payload["store"]!!.jsonPrimitive.content)
                 assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
             }
+        }
+    }
+
+    @Test
+    fun accountBoundPlanMaxEffortProducesResponsesPayloadWithoutSampling() {
+        val profile = chatGptPlanProfiles("account-a", listOf(
+            ChatGptModelOption("gpt-6.1-sol", "GPT-6.1 Sol"),
+        )).single()
+        val session = "plan-payload-max-effort-test"
+        try {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+            val effort = LocalReasoningModeStore.effortFor(session, profile, withTools = true)
+            val payload = client.buildPayload(
+                model = profile.model,
+                messages = listOf(buildJsonObject {
+                    put("role", "user"); put("content", "检查账户思考强度")
+                }),
+                tools = JsonArray(emptyList()),
+                temperature = 0.85,
+                reasoningEffort = effort,
+                planSharing = profile.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+            )
+            assertEquals("max", payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("false", payload["store"]!!.jsonPrimitive.content)
+            assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
+            assertFalse(payload.containsKey("temperature"))
+            assertFalse(payload.containsKey("reasoning_effort"))
+            assertTrue(payload.containsKey("include"))
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
         }
     }
 

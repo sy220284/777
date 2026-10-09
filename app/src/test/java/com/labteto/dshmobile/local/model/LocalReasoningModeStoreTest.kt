@@ -10,6 +10,54 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun modernGptModelsExposeNativeMaxEffortForApiKeyAndChatGptPlan() {
+        val models = listOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-sol", "gpt-6-luna",
+            "gpt-6-astra", "gpt-6.1-sol")
+        val mandatory = setOf("gpt-6-astra", "gpt-6.1-sol")
+        val session = "modern-gpt-reasoning-policy-test"
+        try {
+            for (model in models) {
+                for (auth in LocalModelAuthKind.entries) {
+                    val profile = LocalModelProfile(
+                        id = "$model-$auth", model = model, baseUrl = "https://api.openai.com/v1",
+                        authKind = auth, protocol = LocalModelProtocol.RESPONSES,
+                        credentialRef = if (auth == LocalModelAuthKind.CHATGPT_PLAN) "account-a" else null,
+                    )
+                    val modes = LocalReasoningControls.availableModes(profile, LocalUsageMode.WORK)
+                    assertEquals(LocalReasoningUiMode.DEFAULT, modes.first())
+                    assertEquals(LocalReasoningUiMode.MAX, modes.last())
+                    assertEquals(model !in mandatory, LocalReasoningUiMode.LOW in modes)
+                    LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+                    assertEquals("max", LocalReasoningModeStore.effortFor(session, profile, withTools = true))
+                    LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEEP)
+                    assertEquals("high", LocalReasoningModeStore.effortFor(session, profile, withTools = true))
+                    LocalReasoningModeStore.setMode(session, LocalReasoningMode.FAST)
+                    assertEquals(if (model in mandatory) "low" else "none",
+                        LocalReasoningModeStore.effortFor(session, profile, withTools = true))
+                    LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+                    assertNull(LocalReasoningModeStore.effortFor(session, profile, withTools = true))
+                }
+            }
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+        }
+    }
+
+    @Test fun modernGptChatCompletionsToolsOnlyExposeSupportedReasoningRoutes() {
+        for (model in listOf("gpt-5.6", "gpt-5.6-sol")) {
+            val profile = LocalModelProfile("chat-$model", model, "https://api.openai.com/v1")
+            assertTrue(LocalReasoningModeStore.isSupported(profile, withTools = true))
+            LocalReasoningModeStore.setMode("modern-chat-tools", LocalReasoningMode.MAX)
+            assertEquals("max", LocalReasoningModeStore.effortFor("modern-chat-tools", profile, true))
+        }
+        for (model in listOf("gpt-6-sol", "gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol")) {
+            val profile = LocalModelProfile("chat-$model", model, "https://api.openai.com/v1")
+            assertFalse(LocalReasoningModeStore.isSupported(profile, withTools = true))
+            assertNull(LocalReasoningModeStore.effortFor("modern-chat-tools", profile, true))
+        }
+        LocalReasoningModeStore.setMode("modern-chat-tools", LocalReasoningMode.DEFAULT)
+    }
+
     @Test fun allUiModesPreserveTheirDeepSeekRequestEffort() {
         val session = "reasoning-explicit-ui-mapping-test"
         val route = LocalModelProfile("mapping-ds", "deepseek-flash", "https://api.deepseek.com")
