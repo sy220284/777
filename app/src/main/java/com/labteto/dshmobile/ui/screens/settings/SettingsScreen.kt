@@ -534,6 +534,12 @@ fun SettingsScreen(
                                     viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) }
                                 },
                             )
+                            Text(
+                                stringResource(R.string.settings_appearance_preview),
+                                style = DsType.std14Strong.withReadingWeight(),
+                                color = colors.labelPrimary,
+                            )
+                            AppearanceReadingPreview()
                         }
                         SettingsCard(stringResource(R.string.settings_background_image)) {
                             BackgroundRow(
@@ -545,9 +551,6 @@ fun SettingsScreen(
                                 onPick = viewModel::setBackgroundImage,
                                 onClear = viewModel::clearBackgroundImage,
                             )
-                        }
-                        SettingsCard(stringResource(R.string.settings_appearance_preview)) {
-                            AppearanceReadingPreview()
                         }
                     }
                     SettingsDestination.CHAT -> {
