@@ -27,7 +27,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合。`static-gates` 与 `architecture-3-gates` 在 `scope` 后同时启动；单测、Relay、一组 APK 构建只需等待快速静态检查成功，无需等待独立架构检查。Android 16/17 共用 `device-artifacts-x86` 的 APK，构建成功后并行启动；`fixture-provenance` 可在 `scope` 后独立执行。最后统一由 `merge-gate` 等待并核验所有选中的 lane。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合。`static-gates` 与 `architecture-3-gates` 在 `scope` 后同时启动；单测、Relay、一组 APK 构建只需等待快速静态检查成功，无需等待独立架构检查。Android 16/17 预启动模拟器并与 `device-artifacts-x86` 构建并行，从当前 GitHub Actions Run 取得经过验证的共享 APK 后才运行测试；`fixture-provenance` 可在 `scope` 后独立执行。最后统一由 `merge-gate` 等待并核验所有选中的 lane。混合改动取检查并集，未知产品路径保守回退到完整 CI。
 
 主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；分类前固定执行分类器语法 / 自测与仓库 CI 完整性检查，分类后再独立复核关键控制文件是否选中了最低必需 lane。纯文档完成控制面自举后可快速结束，CI / 门禁 / 架构权威文件本身不能通过修改分类器把自身验证跳过。
 
@@ -58,13 +58,13 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 架构 3.0 范围内的 androidTest
 → static-gates + architecture-3-gates（并行）
 → 静态检查成功后启动 device-artifacts-x86
-→ Android 16 + Android 17（并行，共用同一组 APK）
+→ Android 16 + Android 17 模拟器并行预热（与 APK 构建重叠），取得同 Run APK 后执行
 → merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
 → static-gates + architecture-3-gates（并行）
 → 静态检查成功后启动 unit-tests + relay-conformance + build-arm64 + device-artifacts-x86（并行，无须等架构检查）
-→ Android 16 + Android 17（并行，共用 device-artifacts-x86）
+→ Android 16 + Android 17 模拟器从 scope 后并行准备，共用当前 Run 的 device-artifacts-x86 APK
 → merge-gate
 ```
 
@@ -187,7 +187,7 @@ Runtime 下载复用 `setup-runtime-cached` 组合 Action：在完整 APK 构建
 
 ### Android 16 / Android 17
 
-两条 lane 在 `device-artifacts-x86` 成功后并行：
+两条 lane 在 `scope` 后开始模拟器准备工作，与 `device-artifacts-x86` 构建重叠；两套设备均需在共享 APK 当前 Run 下载成功后才开始安装和仪器化测试：
 
 - 下载同一 `android-x86_64-test-apks`。
 - 安装 debug + androidTest APK。
@@ -449,3 +449,10 @@ current main + current PR head
 - Automation：同 ID 覆盖、删除重建、旧版代次、WAL 恢复和压缩后仍不复用身份；旧 Worker 不能结算、删除或提交新任务副作用。
 - Skill：合法 900 行规则保留最后一行约束；目录枚举只读取元数据；超预算或损坏单项不阻塞其他技能及预置恢复。
 - Team 投影：首批扫描有界，后台追赶不占全局命令锁，检查点续读及缓存命中不重扫；跨会话、清空和删除后不复用或重建旧检查点；UI 区分恢复中与空团队。
+
+### CI 模拟器预热与 APK 编译并行（2026-10-09）
+
+`android-16-instrumented` 和 `android-17-instrumented` 在 `scope` 后即开始 SDK 初始化/模拟器启动，消除在 `device-artifacts-x86` 构建后才开始模拟器冷启动的串行等待。
+设备实际安装前调用 `wait-android-device-artifacts.sh`：通过 GitHub Actions 只读授权按 **当前 `GITHUB_REPOSITORY` + `GITHUB_RUN_ID`** 定位构建产物，仅从此 Run 的 `android-x86_64-test-apks` 下载三个非空 APK。源 Job 失败、取消或等待超时时直接失败。无跨 Run APK 复用，完整 Android 16/17 仪器化、Debug/Optimized 启动冒烟及最终合并门禁均保留。
+
+该优化主要缩短墙钟等待时间，但模拟器 Runner 可能在 APK 编译时占用更长时间；应同时衡量总 Runner 分钟成本。Gradle 已启用并行构建、Configuration Cache 和 Build Cache，不重复分拆同一构建任务。

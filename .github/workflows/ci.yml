@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -108,7 +109,7 @@ jobs:
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 ;;
-              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py)
+              .github/scripts/verify-android16-apk.sh|.github/scripts/run-android-instrumentation.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py|.github/scripts/wait-android-device-artifacts.sh)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
@@ -173,6 +174,7 @@ jobs:
           python3 .github/scripts/check-test-quality.py
           python3 .github/scripts/check-acceptance-matrix.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
+          bash .github/scripts/wait-android-device-artifacts.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
         run: |
@@ -360,16 +362,13 @@ jobs:
           if-no-files-found: error
 
   android-16-instrumented:
-    needs: [scope, device-artifacts-x86]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.device-artifacts-x86.result == 'success' }}
+    # Prewarm emulator and SDK in parallel with shared APK compilation.
+    needs: scope
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: android-x86_64-test-apks
-          path: .ci/device-apks
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools'
@@ -383,6 +382,8 @@ jobs:
           fi
       - name: Android 16 instrumentation and startup tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           api-level: 36
           arch: x86_64
@@ -391,6 +392,7 @@ jobs:
           script: |
             # Pixel 6 hardware profile plus 400dpi yields at least 412dp width.
             bash .github/scripts/verify-android-test-viewport.sh 412 400
+            bash .github/scripts/wait-android-device-artifacts.sh
             adb install -r .ci/device-apks/app-debug.apk
             adb install -r .ci/device-apks/app-debug-androidTest.apk
             bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
@@ -401,16 +403,13 @@ jobs:
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
   android-17-instrumented:
-    needs: [scope, device-artifacts-x86]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.device-artifacts-x86.result == 'success' }}
+    # Prewarm emulator and SDK in parallel with shared APK compilation.
+    needs: scope
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: android-x86_64-test-apks
-          path: .ci/device-apks
       - uses: ./.github/actions/setup-android-cached
         with:
           packages: 'platform-tools emulator platforms;android-37.0 build-tools;37.0.0 system-images;android-37.0;google_apis_ps16k;x86_64'
@@ -423,6 +422,8 @@ jobs:
             exit 1
           fi
       - name: Android 17 instrumentation and startup tests
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           echo no | avdmanager create avd --force -n android17 -d pixel_6 \
@@ -452,6 +453,7 @@ jobs:
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           bash .github/scripts/verify-android-test-viewport.sh 412 400
+          bash .github/scripts/wait-android-device-artifacts.sh
           adb install -r .ci/device-apks/app-debug.apk
           adb install -r .ci/device-apks/app-debug-androidTest.apk
           bash .github/scripts/run-android-instrumentation.sh com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner
