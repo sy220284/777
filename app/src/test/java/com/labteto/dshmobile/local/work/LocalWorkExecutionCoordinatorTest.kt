@@ -134,6 +134,11 @@ class LocalWorkExecutionCoordinatorTest {
             enqueueSnapshot = { error("首轮启动不得写排队快照") },
             startPreparedTurn = turn::startPrepared,
             startRegeneration = turn::startRegeneration,
+            prepareEditedTurn = { _, _ ->
+                LocalWorkMessageEditPreparation.Rejected(
+                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.HISTORY_UNAVAILABLE,
+                )
+            },
             prepareDetachedSession = prepareDetachedSession,
             runDetached = runDetached,
         )
