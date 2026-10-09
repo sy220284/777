@@ -298,7 +298,11 @@ for forbidden in (
 
 # App shell lifecycle hooks must enter local product behavior through presentation boundaries.
 main_activity_imports = local_references(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
-if "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator" in main_activity_imports:
+if any(
+    item == "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator"
+    or item.startswith("com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator.")
+    for item in main_activity_imports
+):
     die(
         "MainActivity bypasses presentation ownership for ChatGPT refresh; "
         "use the presentation account workflow so remote catalog refresh and local profile reconciliation stay atomic"
@@ -837,12 +841,14 @@ for required in ("drawerActions", "backAction", "restorePage"):
     if required not in feature_page_host:
         die("Feature UI contribution lost navigation ownership contract: " + required)
 
-# Discover every real UI contribution from its declared owner; new Features cannot pass
-# by reusing or omitting an old hard-coded filename.
+# Discover real UI contribution registrations irrespective of file naming/location.
+# New Features cannot pass by reusing or omitting an old owner.
 feature_contribution_paths: dict[str, str] = {}
-for contribution_path in sorted((UI_SOURCE_ROOT / "screens/local").glob("Local*UiContribution.kt")):
+for contribution_path in sorted(UI_SOURCE_ROOT.rglob("*.kt")):
     relative = contribution_path.relative_to(ROOT).as_posix()
     contribution = strip_comments(contribution_path.read_text(encoding="utf-8"))
+    if "LocalFeatureUiContribution(" not in contribution:
+        continue
     declared_owners = re.findall(
         r"\bmoduleId\s*=\s*LocalFeatureModuleId\.([A-Z][A-Z0-9_]*)\b",
         contribution,
