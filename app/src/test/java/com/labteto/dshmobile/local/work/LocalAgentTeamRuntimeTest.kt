@@ -1492,6 +1492,10 @@ class LocalAgentTeamRuntimeTest {
         val session = "team-scope-lock"
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
+        fixture.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "writer2", "provisioning"))
+        fixture.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "writer2", "active"))
         startLiveChild(fixture, session)
         fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(session, "task-1", 1, emptyList(), writeScopes = listOf("app/src")))
@@ -1508,7 +1512,7 @@ class LocalAgentTeamRuntimeTest {
                 put("task_id", id)
                 put("expected_revision", 1)
                 put("action", "claim")
-                put("owner", "worker")
+                put("owner", "writer2")
             }, "{}"), binding,
         )
         val conflict = runCatching { claim("task-2") }.exceptionOrNull()
