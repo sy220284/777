@@ -39,6 +39,75 @@ class McpToolBridgePluginTest {
     }
 
     @Test
+    fun failedRemoteRequestRequiresExplicitReconnectAndNeverReplaysTheRequest() = runTest {
+        var connections = 0
+        var remoteCalls = 0
+        var oldClosed = false
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                val generation = ++connections
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject =
+                        when (method) {
+                            "tools/list" -> buildJsonObject {
+                                put("result", buildJsonObject {
+                                    put("tools", buildJsonArray {
+                                        add(buildJsonObject {
+                                            put("name", "write")
+                                            put("inputSchema", buildJsonObject { put("type", "object") })
+                                        })
+                                    })
+                                })
+                            }
+                            "tools/call" -> {
+                                remoteCalls++
+                                if (generation == 1) throw java.io.IOException("remote disconnected")
+                                buildJsonObject {
+                                    put("result", buildJsonObject { put("isError", false) })
+                                }
+                            }
+                            else -> error("unexpected request")
+                        }
+                    override fun close() {
+                        if (generation == 1) oldClosed = true
+                    }
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "broken", "https://example.com/mcp")
+        val failed = registry.context.tools.execute(
+            "mcp_broken_write", buildJsonObject { },
+            context = ToolContext(approval = { true }),
+        )
+        assertTrue(failed.isError)
+        assertEquals("MCP_TRANSPORT_FAILED", failed.errorCode)
+        assertFalse(failed.retryable)
+        assertEquals(1, remoteCalls)
+        assertEquals(1, connections)
+
+        val reconnected = registry.context.tools.execute(
+            "mcp_reconnect",
+            buildJsonObject { put("server_id", "broken") },
+            context = ToolContext(approval = { true }),
+        )
+        assertFalse(reconnected.isError)
+        assertTrue(oldClosed)
+        assertEquals(2, connections)
+        assertEquals(1, remoteCalls)
+        val recovered = registry.context.tools.execute(
+            "mcp_broken_write", buildJsonObject { },
+            context = ToolContext(approval = { true }),
+        )
+        assertFalse(recovered.isError)
+        assertEquals(2, remoteCalls)
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
     fun connectDiscoversRegistersCallsAndDisconnectsRemoteTools() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         var closed = false
@@ -305,19 +374,17 @@ class McpToolBridgePluginTest {
             ),
         )
 
-        val result = runCatching {
-            registry.context.tools.execute(
-                "mcp_http_connect",
-                buildJsonObject {
-                    put("server_id", "demo")
-                    put("endpoint", "https://user:pass@example.com/mcp")
-                },
-                context = ToolContext(approval = { true }),
-            )
-        }
-
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("禁止内嵌用户名或密码"))
+        val result = registry.context.tools.execute(
+            "mcp_http_connect",
+            buildJsonObject {
+                put("server_id", "demo")
+                put("endpoint", "https://user:pass@example.com/mcp")
+            },
+            context = ToolContext(approval = { true }),
+        )
+        assertTrue(result.isError)
+        assertEquals("MCP_CONNECT_FAILED", result.errorCode)
+        assertFalse(result.content.contains("user:pass"))
     }
 
     @Test
@@ -401,19 +468,17 @@ class McpToolBridgePluginTest {
             assertTrue(listing.content.contains("stdio:node"))
             assertFalse(listing.content.contains("server.js"))
 
-            val outsideAttempt = runCatching {
-                registry.context.tools.execute(
-                    "mcp_stdio_connect",
-                    buildJsonObject {
-                        put("server_id", "outside")
-                        put("command", buildJsonArray { add(JsonPrimitive("node")) })
-                        put("working_directory", outside.absolutePath)
-                    },
-                    context = ToolContext(approval = { true }),
-                )
-            }
-            assertTrue(outsideAttempt.isFailure)
-            assertTrue(outsideAttempt.exceptionOrNull()?.message.orEmpty().contains("工作区"))
+            val outsideAttempt = registry.context.tools.execute(
+                "mcp_stdio_connect",
+                buildJsonObject {
+                    put("server_id", "outside")
+                    put("command", buildJsonArray { add(JsonPrimitive("node")) })
+                    put("working_directory", outside.absolutePath)
+                },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue(outsideAttempt.isError)
+            assertEquals("MCP_CONNECT_FAILED", outsideAttempt.errorCode)
 
             val disconnected = registry.context.tools.execute(
                 "mcp_disconnect",
