@@ -53,7 +53,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "team_interrupt", "team_disable_member", "team_dismiss_member", "team_stop_all", "team_wait",
     "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
     "webhook_start", "webhook_stop", "webhook_copy_token", "webhook_rotate_token",
-    "mcp_http_connect", "mcp_stdio_connect", "mcp_disconnect",
+    "mcp_http_connect", "mcp_stdio_connect", "mcp_reconnect", "mcp_disconnect",
 )
 
 internal val PARALLEL_SUBAGENT_TOOLS = setOf("subagent", "spawn_subagent")
