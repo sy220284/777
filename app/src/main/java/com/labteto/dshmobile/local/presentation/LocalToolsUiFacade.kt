@@ -4,6 +4,8 @@ import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean)
+
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
 class LocalToolsUiFacade @Inject constructor(
