@@ -162,13 +162,13 @@ class LocalComposerReasoningRegressionTest {
                 )
             }
         }
-        // 60 is between 50 (1.30) and 75 (1.65): actual sampled value is 1.44.
+        // 60 maps directly into the capped 0..1.3 window, giving 0.78.
         val slider = compose.onNodeWithContentDescription(
             context.getString(R.string.local_composer_temperature_title),
         )
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 1.44),
+            context.getString(R.string.local_composer_temperature_value, 0.78),
         ))
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.ProgressBarRangeInfo,
@@ -177,7 +177,7 @@ class LocalComposerReasoningRegressionTest {
         compose.runOnIdle { position.value = 75 }
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 1.65),
+            context.getString(R.string.local_composer_temperature_value, 0.975),
         ))
     }
 
