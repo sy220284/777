@@ -91,10 +91,13 @@ class LocalModelProfilesTest {
                 LocalModelPresets.protocolFor(model, baseUrl),
             )
         }
-        assertEquals(
-            LocalModelProtocol.RESPONSES,
-            LocalModelPresets.protocolFor("gpt-6-astra", "https://api.openai.com/v1"),
-        )
+        for (model in listOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-astra",
+            "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna")) {
+            assertEquals(
+                LocalModelProtocol.RESPONSES,
+                LocalModelPresets.protocolFor(model, "https://api.openai.com/v1"),
+            )
+        }
         assertEquals(
             LocalModelProtocol.ANTHROPIC_MESSAGES,
             LocalModelPresets.protocolFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"),
@@ -264,7 +267,8 @@ class LocalModelProfilesTest {
             models("智谱 GLM"),
         )
         assertEquals(
-            setOf("gpt-5.6", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"),
+            setOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-astra", "gpt-6.1-sol",
+                "gpt-6-sol", "gpt-6-luna"),
             models("OpenAI"),
         )
         assertEquals(

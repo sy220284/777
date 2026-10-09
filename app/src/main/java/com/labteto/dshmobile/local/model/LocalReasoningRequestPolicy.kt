@@ -40,13 +40,14 @@ internal object LocalReasoningRequestPolicy {
         // Mandatory-reasoning models select low for FAST; UI must disclose this floor.
         val minimumEffort = if (model in setOf("gpt-6-astra", "gpt-6.1-sol")) "low" else "none"
         if (model !in setOf(
-            "gpt-5.5", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+            "gpt-5.6", "gpt-5.6-sol",
             "gpt-6-sol", "gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol",
         )) return null
-        // High-effort tool calls on these Chat Completions routes are not portable.
+        // GPT-6 Sol/Luna Chat Completions permits tools only with reasoning disabled.
+        // GPT-6 Astra/6.1 Sol require Responses for tools. GPT-5.6 Sol supports both.
         if (withTools && profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
-            model != "gpt-5.5"
+            model !in setOf("gpt-5.6", "gpt-5.6-sol")
         ) return null
-        return LocalReasoningSelection("high", minimumEffort, "low")
+        return LocalReasoningSelection("high", minimumEffort, "low", "max")
     }
 }

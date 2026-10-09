@@ -86,7 +86,11 @@ class LocalModelGatewayRoutingTest {
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
                 LocalModelProtocol.CHAT_COMPLETIONS,
             ),
+            Triple("gpt-5.6-sol", "https://api.openai.com/v1", LocalModelProtocol.RESPONSES),
+            Triple("gpt-6-sol", "https://api.openai.com/v1", LocalModelProtocol.RESPONSES),
+            Triple("gpt-6-luna", "https://api.openai.com/v1", LocalModelProtocol.RESPONSES),
             Triple("gpt-6-astra", "https://api.openai.com/v1", LocalModelProtocol.RESPONSES),
+            Triple("gpt-6.1-sol", "https://api.openai.com/v1", LocalModelProtocol.RESPONSES),
             Triple("claude-sonnet-5-5", "https://api.anthropic.com/v1", LocalModelProtocol.ANTHROPIC_MESSAGES),
         )
 
