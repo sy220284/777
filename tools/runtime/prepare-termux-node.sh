@@ -318,13 +318,4 @@ for android_abi in "${requested_abis[@]}"; do
 done
 
 printf '%s\n' "$NODE_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/node/node-version.txt"
-cat > "$OUT_ROOT/assets/runtime/node/README.txt" <<EOF
-Bundled Node.js runtime
-Node.js: $NODE_RUNTIME_VERSION
-ABIs: $RUNTIME_ABIS
-Source packages: Termux termux-main, signature verified with $TERMUX_KEY_FINGERPRINT
-Executable: APK native library libdsh_node.so
-Runtime shared libraries: extracted as data and loaded through LD_LIBRARY_PATH
-EOF
-
 echo "Node runtime prepared: $NODE_RUNTIME_VERSION"

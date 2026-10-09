@@ -18,9 +18,9 @@
 777: 版本以 `.github/release-version` 为准（运行时以 `.github/release-version` 及实际构建产物为准）
 Android: min 36 / target 36 / compile 37
 Source language: Kotlin
-Build JDK: >= 21（CI / Artifact 基线为 JDK 21 LTS）
+Build JDK: >= 27（CI / Artifact 基线为 JDK 27）
 JVM target: 21（class major 65）
-Node: >= 22
+Node: >= 24
 Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 ```
