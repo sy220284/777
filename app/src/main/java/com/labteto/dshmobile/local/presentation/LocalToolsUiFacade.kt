@@ -13,6 +13,7 @@ data class LocalWebhookUiState(
 
 data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean)
 data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
+data class LocalSkillEditorUiEntry(val id: String, val document: String)
 
 /** Tools page boundary; plugin/runtime implementations stay outside UI. */
 @Singleton
@@ -35,6 +36,9 @@ class LocalToolsUiFacade @Inject constructor(
     internal suspend fun createSkill(id: String, description: String, instructions: String) =
         tools.createSkill(id, description, instructions)
     internal suspend fun removeSkill(id: String) = tools.removeSkill(id)
+    internal suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
+    internal suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
+    internal suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     internal suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
     internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
         tools.connectStdio(serverId, command, workingDirectory)
