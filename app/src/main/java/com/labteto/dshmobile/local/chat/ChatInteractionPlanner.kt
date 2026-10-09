@@ -23,6 +23,8 @@ class ChatInteractionPlanner @Inject constructor(json: Json) {
     ): String = promptBuilder.suggestionsPrompt(persona, state, userMessage, assistantMessage, recentDialogue)
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? = parser.parseSuggestions(text)
+
+    fun postTurnParseFailureKind(text: String): String = parser.parseFailureKind(text)
     fun parse(
         text: String,
         previous: ChatCharacterState,

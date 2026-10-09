@@ -447,7 +447,10 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         if (plan == null) {
             boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "parse-failed")
+                put("error_kind", chatTurnCoordinator.postTurnParseFailureKind(plannerReply.content.orEmpty()))
+                put("raw_content_chars", plannerReply.content.orEmpty().length)
                 put("content", plannerReply.content.orEmpty().take(2_000))
+                put("content_log_truncated", plannerReply.content.orEmpty().length > 2_000)
                 put("pending_count", pending.size)
             })
             scheduleRetry(

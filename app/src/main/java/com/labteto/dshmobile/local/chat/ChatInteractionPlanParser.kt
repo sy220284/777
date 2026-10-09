@@ -20,17 +20,24 @@ internal class ChatInteractionPlanParser(
         return sanitizeSuggestions(decoded.suggestions)
     }
 
-    fun parsePlan(text: String): ParsedChatPostTurnPlan? {
-        val body = extractJsonObject(text) ?: return null
-        val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return null
+    fun parsePlan(text: String): ParsedChatPostTurnPlan? = parsePlanWithFailure(text).first
+
+    /** Content-free error label suitable for exported diagnostics. */
+    fun parseFailureKind(text: String): String = parsePlanWithFailure(text).second
+
+    private fun parsePlanWithFailure(text: String): Pair<ParsedChatPostTurnPlan?, String> {
+        val body = extractJsonObject(text) ?: return null to "missing_json_object"
+        val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            ?: return null to "invalid_json"
+        val normalized = normalizeChatPostTurnPatch(root)
         val decoded = runCatching {
-            json.decodeFromString(ChatPostTurnPlan.serializer(), body)
-        }.getOrNull() ?: return null
-        val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
+            json.decodeFromString(ChatPostTurnPlan.serializer(), normalized.toString())
+        }.getOrNull() ?: return null to "schema_mismatch"
+        val rawState = normalized["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
         return ParsedChatPostTurnPlan(
             plan = decoded.copy(suggestions = sanitizeSuggestions(decoded.suggestions)),
             rawState = rawState,
-        )
+        ) to "none"
     }
 
     private fun sanitizeSuggestions(

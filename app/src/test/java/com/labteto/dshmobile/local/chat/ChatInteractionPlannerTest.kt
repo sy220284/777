@@ -1045,6 +1045,47 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun malformedOptionalPatchFieldsPreserveValidStateAndExistingEvidence() {
+        val previous = ChatCharacterState(
+            initiative = 55,
+            dynamics = RelationshipDynamics(
+                unresolvedConflict = "尚未解释清楚",
+                facts = listOf(RelationshipEvidence("已有证据", confidence = 95, source = "dialogue")),
+            ),
+        )
+        val result = planner.parse(
+            """{"state":{"mood":"开心","initiative":"略升","dynamics":{"unresolvedConflict":false,"facts":["无来源文字"],"warmth":65}},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "今天很好",
+            assistantMessage = "是呀",
+        )!!
+        assertEquals("开心", result.state.mood)
+        assertEquals(55, result.state.initiative)
+        assertEquals("尚未解释清楚", result.state.dynamics.unresolvedConflict)
+        assertEquals(previous.dynamics.facts, result.state.dynamics.facts)
+    }
+
+    @Test
+    fun numericStringsCanBeNormalizedWithoutGuessingQualitativeConflict() {
+        val result = planner.parse(
+            """{"state":{"initiative":"62","dynamics":{"unresolvedConflict":[]}},"turnSignificance":"MINOR"}""",
+            previous = ChatCharacterState(initiative = 50, dynamics = RelationshipDynamics(unresolvedConflict = "保留")),
+            userMessage = "好的",
+            assistantMessage = "收到",
+        )!!
+        assertEquals(62, result.state.initiative)
+        assertEquals("保留", result.state.dynamics.unresolvedConflict)
+    }
+
+    @Test
+    fun brokenJsonNeverAppliesAPartialPatch() {
+        val previous = ChatCharacterState(mood = "平静")
+        assertEquals(null, planner.parse("""{"state":{"mood":"开心","initiative":""", previous))
+        assertEquals("invalid_json", ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+            .parseFailureKind("""{"state":{"mood":"开心","initiative":"""))
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))

@@ -131,6 +131,9 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         assistantMessage = assistantMessage,
     )
 
+    internal fun postTurnParseFailureKind(text: String): String =
+        interactionPlanner.postTurnParseFailureKind(text)
+
     internal fun parsePostTurn(
         text: String,
         previous: ChatCharacterState,
