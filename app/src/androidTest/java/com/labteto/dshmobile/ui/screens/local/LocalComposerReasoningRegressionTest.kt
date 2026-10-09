@@ -146,6 +146,36 @@ class LocalComposerReasoningRegressionTest {
             ))
     }
 
+    @Test fun finePersonaValueDisplaysActualTemperatureBetweenFiveDetents() {
+        val position = mutableStateOf(60)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    temperatureLevel = 2,
+                    temperaturePosition = position.value,
+                    onReasoningModeChange = {},
+                    onTemperatureLevelChange = {},
+                )
+            }
+        }
+        // 60 is between 50 (1.30) and 75 (1.65): actual sampled value is 1.44.
+        val slider = compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        )
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 1.44),
+        ))
+        compose.runOnIdle { position.value = 75 }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 1.65),
+        ))
+    }
+
     @Test fun planIconTogglesAndAnnouncesStateWithoutSlider() {
         val selected = mutableStateOf(false)
         compose.setContent {
