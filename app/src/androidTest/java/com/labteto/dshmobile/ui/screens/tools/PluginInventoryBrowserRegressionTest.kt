@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -32,6 +33,30 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("返回对话").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, returned) }
     }
+    @Test
+    fun serviceConnectionsCategoryUsesLocalMcpInventory() {
+        var openedConnections = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    connectedServices = listOf(McpServerSnapshot(
+                        id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
+                        tools = listOf("search"),
+                    )),
+                    onBack = {},
+                    onManageConnections = { openedConnections++ },
+                    onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
+        compose.onNodeWithText("服务扩展").performClick()
+        compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
+        compose.onNodeWithText("外部服务").performClick()
+        compose.runOnIdle { assertEquals(1, openedConnections) }
+    }
+
     @Test
     fun useHandsTheSelectedCapabilityToTheComposer() {
         var prompt: String? = null

@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -53,7 +54,7 @@ private data class InventoryRow(
     val id: String,
     val name: String,
     val detail: String,
-    val remote: Boolean,
+    val connectedService: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
@@ -65,6 +66,7 @@ private data class InventoryRow(
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
+    connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     createdSkillId: String? = null,
@@ -136,21 +138,31 @@ internal fun PluginInventoryBrowser(
             "android-automation", "android-webhook" -> R.string.plugin_automation_hint to FeatherIcons.Clock
             else -> R.string.plugin_external_hint to FeatherIcons.Tool
         }
-        InventoryRow("local:$id", label, stringResource(hint), remote = false, icon = icon)
+        InventoryRow("local:$id", label, stringResource(hint), connectedService = false, icon = icon)
+    }
+    val connected = connectedServices.sortedBy { it.id }.map { server ->
+        InventoryRow(
+            id = "service:${server.id}",
+            name = server.id,
+            detail = stringResource(R.string.tools_server_summary, server.transport, server.tools.size),
+            connectedService = true,
+            available = false,
+            icon = FeatherIcons.Globe,
+        )
     }
     val installedSkills = skills.map { skill ->
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
-            remote = false, icon = FeatherIcons.BookOpen,
+            connectedService = false, icon = FeatherIcons.BookOpen,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         InventoryRow("skill:" + preset.id, preset.title, preset.description,
-            remote = false, icon = FeatherIcons.BookOpen,
+            connectedService = false, icon = FeatherIcons.BookOpen,
             available = false, installablePreset = true)
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
-        1 -> emptyList()
+        1 -> connected
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
@@ -329,7 +341,7 @@ internal fun PluginInventoryBrowser(
                     text = stringResource(
                         if (item.installablePreset) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
-                        else if (item.remote) R.string.tools_external_services
+                        else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
                     ),
                     modifier = Modifier.fillMaxWidth(),
@@ -338,13 +350,13 @@ internal fun PluginInventoryBrowser(
                         selectedRow = null
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                        else if (item.remote) onManageConnections() else onReturnToChat()
+                        else if (item.connectedService) onManageConnections() else onReturnToChat()
                     },
                 )
             },
         ) {
             Text(
-                item.id.removePrefix("local:").removePrefix("remote:"),
+                item.id.removePrefix("local:").removePrefix("service:"),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )

@@ -537,6 +537,7 @@ fun ToolsScreen(
     } else if (showPluginBrowser) {
         PluginInventoryBrowser(
             localIds = state.localPlugins,
+            connectedServices = state.servers,
             skills = state.skills,
             presets = state.presets,
             createdSkillId = state.createdSkillId,
