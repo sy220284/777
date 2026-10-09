@@ -83,7 +83,16 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
             })
             // String facts are not converted to evidence: provenance must be verified.
         }
-        state[name] = JsonObject(fields)
+        // These sub-objects also contain system-maintained counters and provenance.
+        // Model output may update only fields accepted by the state reducer.
+        val permitted = when (name) {
+            "dynamics" -> numeric + textual + stringArrays + evidenceArrays
+            "userPattern" -> setOf("replyLength", "directness", "playfulness",
+                "initiative", "emojiStyle", "preferredTone")
+            "continuity" -> setOf("recentEvents", "recurringEvents", "decisions", "unfinished")
+            else -> emptySet()
+        }
+        state[name] = JsonObject(fields.filterKeys { it in permitted })
     }
 
     nested("dynamics",
