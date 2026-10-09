@@ -35,6 +35,14 @@ class LocalReasoningModeStoreTest {
         }
     }
 
+    @Test fun existingDeepSeekWorkSelectionsMigrateBySamplingValue() {
+        // Old 5 stops: 0, 0.65, 1.3, 1.65, 2.0. Values over the new cap are clamped.
+        val expected = listOf(0, 2, 4, 4, 4)
+        assertEquals(expected, (0..4).map(LocalWorkTemperatureStore::migrateLegacyDeepSeekLevel))
+        assertEquals(0, LocalWorkTemperatureStore.migrateLegacyDeepSeekLevel(-1))
+        assertEquals(4, LocalWorkTemperatureStore.migrateLegacyDeepSeekLevel(9))
+    }
+
     @Test fun deepSeekWorkUnsetPreferenceKeepsPreviousOnePointThreeDefault() {
         val session = "deepseek-work-untouched-capped-default-20261009"
         val range = LocalModelPresets.chatTemperatureRangeFor(
