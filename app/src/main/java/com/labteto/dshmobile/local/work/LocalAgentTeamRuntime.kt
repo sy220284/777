@@ -503,6 +503,10 @@ internal class LocalAgentTeamRuntime(
             }
             val resumingExisting = member.phase == LocalTeamMemberPhase.DISABLED &&
                 jobs.snapshotInfos().any { it.id == member.jobId }
+            require(!resumingExisting || grantedExtensions.isEmpty() ||
+                grantedExtensions == member.grantedExtensions) {
+                "TEAM_GRANTS_IMMUTABLE：历史成员的持久执行权限不能直接变更；请让 Lead 重新招募成员"
+            }
             val provisioning = member.copy(
                 phase = LocalTeamMemberPhase.PROVISIONING,
                 error = null,
