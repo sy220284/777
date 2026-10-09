@@ -616,10 +616,18 @@ object LocalModelPresets {
         // Both official DeepSeek entrypoints are equivalent; proxies cannot inherit the range.
         if (normalized in setOf("https://api.deepseek.com", "https://api.deepseek.com/v1") &&
             model.lowercase() in setOf("deepseek-flash", "deepseek-v4-pro")) {
-            // Product-level cap: use the entire slider for 0..1.3, with Chat starting at 1.3.
-            return LocalModelTemperatureRange(
-                0.0, 1.3, 1.3, requiresDisabledThinking = true, defaultPosition = 100,
-            )
+            // Preserve the established 1.3 default. The owner's configurable ceiling may
+            // extend the slider to 2.0 without another release or overriding user sessions.
+            val selectedMaximum = LocalModelPerformanceStore.current().temperatureCeiling
+            return if (selectedMaximum <= 1.3) {
+                LocalModelTemperatureRange(
+                    0.0, 1.3, 1.3, requiresDisabledThinking = true, defaultPosition = 100,
+                )
+            } else {
+                LocalModelTemperatureRange(
+                    0.0, selectedMaximum, 1.3, requiresDisabledThinking = true, defaultPosition = 50,
+                )
+            }
         }
         val preset = find(model, baseUrl) ?: return null
         if (!preset.temperatureSupported) return null

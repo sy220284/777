@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalReasoningMode
 import com.labteto.dshmobile.local.model.LocalReasoningRequestPolicy
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
+import com.labteto.dshmobile.local.model.LocalModelPerformanceStore
+import com.labteto.dshmobile.local.model.ModelReasoningCeiling
 
 /**
  * Narrow presentation façade for the conversation's native reasoning-mode switch.
@@ -37,7 +39,11 @@ internal object LocalReasoningControls {
             LocalReasoningMode.MAX -> LocalReasoningUiMode.MAX
         }
 
-    fun availableModes(profile: LocalModelProfile?, mode: LocalUsageMode): List<LocalReasoningUiMode> {
+    fun availableModes(
+        profile: LocalModelProfile?,
+        mode: LocalUsageMode,
+        ceiling: ModelReasoningCeiling = LocalModelPerformanceStore.current().reasoningCeiling,
+    ): List<LocalReasoningUiMode> {
         val supported = profile ?: return emptyList()
         val policy = LocalReasoningRequestPolicy.resolve(supported, mode == LocalUsageMode.WORK)
             ?: return emptyList()
@@ -48,6 +54,16 @@ internal object LocalReasoningControls {
             if (policy.lowEffort != null && policy.lowEffort != policy.disabledEffort) add(LocalReasoningUiMode.LOW)
             add(LocalReasoningUiMode.DEEP)
             if (policy.maxEffort != null) add(LocalReasoningUiMode.MAX)
+        }.filter { selection ->
+            when (ceiling) {
+                ModelReasoningCeiling.CUSTOM, ModelReasoningCeiling.MAX -> true
+                ModelReasoningCeiling.DEEP -> selection != LocalReasoningUiMode.MAX
+                ModelReasoningCeiling.LOW -> selection in setOf(
+                    LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST, LocalReasoningUiMode.LOW,
+                )
+                ModelReasoningCeiling.DEFAULT, ModelReasoningCeiling.FAST ->
+                    selection in setOf(LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST)
+            }
         }
     }
 
@@ -61,7 +77,10 @@ internal object LocalReasoningControls {
         // Mandatory-reasoning routes expose LOW through their FAST/basic position.
         mode == LocalReasoningUiMode.LOW && needsBasicReasoning && LocalReasoningUiMode.FAST in availableModes ->
             LocalReasoningUiMode.FAST
-        else -> LocalReasoningUiMode.DEFAULT
+        mode == LocalReasoningUiMode.DEFAULT ||
+            LocalModelPerformanceStore.current().reasoningCeiling == ModelReasoningCeiling.DEFAULT ->
+            LocalReasoningUiMode.DEFAULT
+        else -> availableModes.lastOrNull() ?: LocalReasoningUiMode.DEFAULT
     }
 
     fun setMode(sessionId: String, mode: LocalReasoningUiMode) =

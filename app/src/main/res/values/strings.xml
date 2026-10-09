@@ -1829,6 +1829,15 @@
     <string name="persona_gallery_notes_edit">编辑</string>
     <string name="persona_gallery_notes_done">收起</string>
     <string name="persona_gallery_notes_empty">记下关键经历，下次继续更容易衔接。</string>
+    <string name="settings_model_performance_title">模型表现</string>
+    <string name="settings_model_performance_subtitle">统一管理聊天与工作的推理和温度上限</string>
+    <string name="settings_model_performance_reasoning">推理强度上限</string>
+    <string name="settings_model_performance_reasoning_hint">限制聊天和工作中可选的最高思考档位；不支持的模型沿用原有能力。</string>
+    <string name="settings_model_performance_custom">自定义 · 聊天和工作自由调节</string>
+    <string name="settings_model_performance_restoration">原有会话的选择会保留。提高上限后自动恢复，实际请求始终遵守当前上限。</string>
+    <string name="settings_model_performance_temperature">温度上限</string>
+    <string name="settings_model_performance_temperature_hint">设置可用温度的最大值（1.00～2.00）；模型原生支持范围仍然有效。</string>
+    <string name="settings_model_performance_temperature_value">最高 %1$.2f</string>
     <string name="local_composer_reasoning_title">思考强度</string>
     <string name="local_composer_temperature_title">温度调节</string>
     <string name="local_composer_temperature_work_low">严谨</string>
