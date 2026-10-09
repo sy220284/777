@@ -14,7 +14,6 @@ import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -171,7 +170,12 @@ internal class LocalWorkBackgroundToolExecutor(
                     },
                 )
         return if (allowMutation && canonical.name in fileMutationTools) {
-            persistentMutationMutex.withLock { dispatch() }
+            persistentMutationMutex.lock()
+            try {
+                dispatch()
+            } finally {
+                persistentMutationMutex.unlock()
+            }
         } else {
             dispatch()
         }
