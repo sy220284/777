@@ -957,15 +957,14 @@ internal fun LocalConversationSurface(
         portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
         state = state.chatState,
         temperatureTuningAvailable = activeModelProfile?.let { profile ->
+            val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)
             LocalModelPresets.runtimeCapabilitiesFor(
                 model = profile.model,
                 baseUrl = profile.baseUrl,
                 protocol = profile.protocol,
                 authKind = profile.authKind,
-            ).temperature && LocalModelPresets.chatTemperatureRangeFor(
-                profile.model, profile.baseUrl,
-            ) != null && (reasoningMode == LocalReasoningUiMode.FAST ||
-                profile.baseUrl.trimEnd('/') != "https://api.deepseek.com")
+            ).temperature && range != null &&
+                (!range.requiresDisabledThinking || reasoningMode == LocalReasoningUiMode.FAST)
         } ?: false,
         temperatureRange = activeModelProfile?.let {
             LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
