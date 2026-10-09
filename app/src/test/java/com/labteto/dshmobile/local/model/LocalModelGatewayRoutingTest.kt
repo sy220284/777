@@ -42,6 +42,12 @@ class LocalModelGatewayRoutingTest {
                 temperature = range.at(slider), reasoningEffort = "high", streaming = true,
             )
             assertNull(thinking.request.temperature)
+            // Provider-default DeepSeek mode enables thinking; its temperature must not be sent.
+            val providerDefault = prepareLocalModelAdapterRequest(
+                route = modelRoute, messages = messages, tools = JsonArray(emptyList()),
+                temperature = range.at(slider), reasoningEffort = null, streaming = true,
+            )
+            assertNull(providerDefault.request.temperature)
         }
     }
 
