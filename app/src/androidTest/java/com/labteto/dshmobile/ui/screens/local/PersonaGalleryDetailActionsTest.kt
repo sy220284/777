@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -88,8 +89,10 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
-        pressDeviceBack() // Dismiss the IME without Espresso's root-focus selection.
-        pressDeviceBack() // Dismiss the rename dialog.
+        // Renaming is inline in the actions sheet: cancel the edit, then close the sheet.
+        // Device Back may first dismiss the IME without cancelling the inline edit.
+        compose.onAllNodesWithText("取消").onFirst().performClick()
+        compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("继续这条故事").assertIsEnabled()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("删除这条故事").performScrollTo().performClick()
