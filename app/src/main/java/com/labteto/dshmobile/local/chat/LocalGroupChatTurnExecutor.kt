@@ -347,6 +347,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                             .joinToString(" ")
                     },
                     generation = snapshot.chat.groupChat.context.generation,
+                    // Stable across pending-batch retries: the diary store deduplicates revisions
+                    // by projectionId before applying any new write.
+                    projectionId = buildString {
+                        append(snapshot.sessionId)
+                        append(":group:")
+                        append(member.galleryId)
+                        append(':')
+                        append(snapshot.chat.groupChat.context.generation)
+                        append(':')
+                        append(sharedPending.maxOfOrNull(ChatPendingTurn::sequence) ?: 0L)
+                    },
                 ),
             )
         }.onSuccess { diary ->
