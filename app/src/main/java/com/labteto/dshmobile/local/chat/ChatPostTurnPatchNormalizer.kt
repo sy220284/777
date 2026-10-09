@@ -146,7 +146,9 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
                     }
                 }
                 fields["bold"]?.let { field ->
-                    if ((field as? JsonPrimitive)?.booleanOrNull == null) fields.remove("bold")
+                    val parsed = (field as? JsonPrimitive)?.booleanOrNull
+                    if (parsed == null) fields.remove("bold")
+                    else fields["bold"] = JsonPrimitive(parsed)
                 }
                 JsonObject(fields)
             })
