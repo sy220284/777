@@ -1822,6 +1822,8 @@
     <string name="local_composer_temperature_unavailable">当前模型未核实可调温度范围，使用模型默认设置</string>
     <string name="local_composer_temperature_thinking">当前思考档位下温度不会生效，请先切换到关闭思考</string>
     <string name="local_composer_temperature_group_hint">群聊人物分别保存表达变化度，请在各人物设置中调整</string>
+    <string name="local_composer_temperature_saving">正在保存人物温度设置</string>
+    <string name="local_composer_temperature_busy">会话忙碌，请在回复结束后调整温度</string>
     <string name="local_composer_temperature_value">温度 %1$.2f</string>
     <string name="local_composer_temperature_provider_default">模型默认（%1$.2f）</string>
     <string name="local_composer_temperature_save_failed">人物温度保存失败，请重试</string>
