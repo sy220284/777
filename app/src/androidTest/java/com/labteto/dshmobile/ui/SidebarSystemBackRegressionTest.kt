@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,18 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private fun pressBackWhenWindowFocused() {
+        // A device-level key event targets the focused window; cold Android 16
+        // emulator runs sometimes finish Compose idle before Activity focus.
+        // Keep the OS Back injection (and the exact-once assertion) intact.
+        compose.waitForIdle()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.activity.window.decorView.hasWindowFocus()
+        }
+        pressDeviceBack()
+    }
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,7 +42,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        pressBackWhenWindowFocused()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -50,7 +62,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        pressBackWhenWindowFocused()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
