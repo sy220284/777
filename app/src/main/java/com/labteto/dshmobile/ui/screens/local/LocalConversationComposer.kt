@@ -101,6 +101,11 @@ internal fun LocalConversationComposer(
     var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
+    LaunchedEffect(state.usageMode) {
+        if (state.usageMode != LocalUsageMode.WORK && capabilityPanel == "web") {
+            capabilityPanel = null
+        }
+    }
 
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
     val expanded = focused || input.contains('\n') || attachments.isNotEmpty() ||

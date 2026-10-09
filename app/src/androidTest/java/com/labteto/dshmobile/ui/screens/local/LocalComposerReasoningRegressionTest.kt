@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -28,6 +29,46 @@ class LocalComposerReasoningRegressionTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val deepSeek = LocalModelProfile("composer-ds", "deepseek-flash", "https://api.deepseek.com")
+
+    @Test fun webButtonOnlyAppearsInWorkModeAndStalePanelIsHiddenInChat() {
+        val mode = mutableStateOf(LocalUsageMode.CHAT)
+        val panel = mutableStateOf<String?>(null)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityActions(
+                    profile = deepSeek, usageMode = mode.value,
+                    reasoningMode = LocalReasoningUiMode.DEFAULT,
+                    networkSearchEnabled = true,
+                    running = false, showLabels = true,
+                    openPanel = panel.value,
+                    onSelectPanel = { panel.value = it },
+                    onReasoningModeChange = {},
+                    onNetworkSearchChange = {},
+                    onWorkSearchRequested = {},
+                )
+            }
+        }
+        val onlineAction = context.getString(R.string.local_composer_web_on_action)
+        val onlineLabel = context.getString(R.string.local_composer_web_online)
+        val webTitle = context.getString(R.string.local_composer_web_title)
+        compose.onNodeWithContentDescription(onlineAction).assertDoesNotExist()
+        compose.onNodeWithText(onlineLabel).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(
+            R.string.local_composer_reasoning_action,
+            context.getString(R.string.local_composer_reasoning_default),
+        )).assertIsDisplayed()
+
+        compose.runOnIdle { mode.value = LocalUsageMode.WORK }
+        compose.onNodeWithContentDescription(onlineAction).assertIsDisplayed()
+        compose.onNodeWithText(onlineLabel).assertIsDisplayed()
+        compose.runOnIdle { panel.value = "web" }
+        compose.onNodeWithText(webTitle).assertIsDisplayed()
+
+        compose.runOnIdle { mode.value = LocalUsageMode.CHAT }
+        compose.onNodeWithContentDescription(onlineAction).assertDoesNotExist()
+        compose.onNodeWithText(onlineLabel).assertDoesNotExist()
+        compose.onNodeWithText(webTitle).assertDoesNotExist()
+    }
 
     @Test fun webSliderAnnouncesSelectionAndCommitsAccessibleAction() {
         val enabled = mutableStateOf(false)

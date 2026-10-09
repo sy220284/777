@@ -84,6 +84,8 @@ internal fun LocalComposerCapabilityActions(
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     val webAvailable = usageMode == LocalUsageMode.WORK
+    // When switching from Work to Chat, never keep a stale web popup visible.
+    val visiblePanel = openPanel?.takeIf { it != "web" || webAvailable }
     Box {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DsComposerAction(
@@ -104,37 +106,37 @@ internal fun LocalComposerCapabilityActions(
                     color = colors.labelSecondary,
                 )
             }
-            DsComposerAction(
-                icon = FeatherIcons.Globe,
-                contentDescription = stringResource(when {
-                    !webAvailable -> R.string.local_composer_web_work_only
-                    networkSearchEnabled -> R.string.local_composer_web_on_action
-                    else -> R.string.local_composer_web_off_action
-                }),
-                onClick = { onSelectPanel(if (openPanel == "web") null else "web") },
-                enabled = !running,
-                tint = if (webAvailable && networkSearchEnabled) colors.labelPrimary else colors.labelTertiary,
-                containerColor = Color.Transparent,
-            )
-            if (showLabels) {
-                Text(
-                    text = stringResource(when {
-                        !webAvailable -> R.string.local_composer_web_work_label
-                        networkSearchEnabled -> R.string.local_composer_web_online
-                        else -> R.string.local_composer_web_offline
-                    }),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
+            if (webAvailable) {
+                DsComposerAction(
+                    icon = FeatherIcons.Globe,
+                    contentDescription = stringResource(
+                        if (networkSearchEnabled) R.string.local_composer_web_on_action
+                        else R.string.local_composer_web_off_action,
+                    ),
+                    onClick = { onSelectPanel(if (openPanel == "web") null else "web") },
+                    enabled = !running,
+                    tint = if (networkSearchEnabled) colors.labelPrimary else colors.labelTertiary,
+                    containerColor = Color.Transparent,
                 )
+                if (showLabels) {
+                    Text(
+                        text = stringResource(
+                            if (networkSearchEnabled) R.string.local_composer_web_online
+                            else R.string.local_composer_web_offline,
+                        ),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelSecondary,
+                    )
+                }
             }
         }
         DsPopupMenu(
-            expanded = openPanel != null && !running,
+            expanded = visiblePanel != null && !running,
             onDismiss = { onSelectPanel(null) },
             modifier = Modifier.widthIn(min = 260.dp, max = 320.dp),
             focusable = false,
         ) {
-            openPanel?.let { panel ->
+            visiblePanel?.let { panel ->
                 LocalComposerCapabilityPanel(
                     panel = panel,
                     profile = profile,
