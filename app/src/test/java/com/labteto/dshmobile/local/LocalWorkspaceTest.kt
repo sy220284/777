@@ -245,6 +245,37 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun modelSkillCatalogFiltersBeforePagingAndCanReachSkillsAfter128Entries() {
+        val skills = root.resolve(".dsh/skills")
+        repeat(132) { i ->
+            val dir = skills.resolve("private-" + i.toString().padStart(3, '0'))
+            dir.mkdirs()
+            dir.resolve("SKILL.md").writeText("---\ndescription: private\ndisable-model-invocation: true\n---\n")
+        }
+        val public = skills.resolve("zz-public")
+        public.mkdirs()
+        public.resolve("SKILL.md").writeText("---\ndescription: Public review\nwhen-to-use: code review\n---\n")
+        val catalog = workspace.modelSkillCatalog()
+        assertTrue(catalog.contains("zz-public：Public review"))
+        assertFalse(catalog.contains("private-"))
+    }
+
+    @Test
+    fun modelSkillCatalogOffersExplicitContinuationForLongDirectory() {
+        val skills = root.resolve(".dsh/skills")
+        repeat(132) { i ->
+            val dir = skills.resolve("public-" + i.toString().padStart(3, '0'))
+            dir.mkdirs()
+            dir.resolve("SKILL.md").writeText("---\ndescription: review code\n---\n")
+        }
+        val first = workspace.modelSkillCatalog()
+        assertTrue(first.contains("skill(offset=128"))
+        assertTrue(workspace.modelSkillCatalog(offset = 128).contains("public-131"))
+        val compact = workspace.modelSkillCatalog(maxChars = 180)
+        assertTrue(compact.contains("目录未完"))
+    }
+
+    @Test
     fun fileObservationCacheRejectsInvalidCapacity() {
         assertThrows(IllegalArgumentException::class.java) {
             LocalFileObservationCache(maxEntries = 0)
