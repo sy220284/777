@@ -393,7 +393,6 @@ fun LocalHarnessScreen(
             startAtPlugins = toolsStartAtPlugins,
             startAtSkills = toolsStartAtSkills,
             onUseCapability = ::useWorkCapability,
-            onTaskModeChange = { taskMode = it },
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
             onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },

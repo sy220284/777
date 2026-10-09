@@ -133,11 +133,6 @@ fun AppRoot(
 
             RootOverlay.TOOLS -> ToolsScreen(
                 onClose = { overlay = null },
-                onOpenTasks = {
-                    overlayReturn = RootOverlay.TOOLS
-                    taskMode = AutomationMode.WORK
-                    overlay = RootOverlay.TASKS
-                },
                 onOpenSettings = { destination ->
                     overlayReturn = RootOverlay.TOOLS
                     settingsDestination = destination
