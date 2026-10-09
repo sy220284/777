@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
 import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
+import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
@@ -168,26 +169,8 @@ internal fun parallelToolFailure(
     access: ToolAccess?,
     detail: String,
 ): AgentToolResult {
-    val sideEffect = if (
-        access in setOf(
-            ToolAccess.WORKSPACE_WRITE,
-            ToolAccess.SESSION_WRITE,
-            ToolAccess.PROCESS,
-            ToolAccess.AGENT_CONTROL,
-            ToolAccess.DEVICE,
-            ToolAccess.PRIVILEGED,
-        )
-    ) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE
-    return AgentToolResult(
-        content = "[${call.name}][PARALLEL_TASK_ERROR] 工具执行失败：$detail\n调用 id：${call.id}",
-        isError = true,
-        errorCode = "PARALLEL_TASK_ERROR",
-        retryable = sideEffect == AgentToolSideEffect.NONE,
-        sideEffect = sideEffect,
-        recoveryHint = if (sideEffect == AgentToolSideEffect.POSSIBLE) {
-            "该调用可能已产生部分副作用；先检查当前状态，再决定是否重试。"
-        } else {
-            "该错误允许重试；先检查前置状态后再重试。"
-        },
-    )
+    return localToolFailure("PARALLEL_TASK_ERROR",
+        "[${call.name}][PARALLEL_TASK_ERROR] 工具执行失败：$detail\n调用 id：${call.id}",
+        readOnly = access != null && LocalToolPolicy.isReadOnlyInvocation(call.name, access, call.arguments),
+        executionStarted = null)
 }

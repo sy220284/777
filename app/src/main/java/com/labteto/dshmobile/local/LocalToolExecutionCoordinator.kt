@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.observability.AppLog
@@ -326,23 +327,11 @@ internal class LocalToolExecutionCoordinator(
         message: String,
         executionStarted: Boolean,
     ): AgentToolResult {
-        val readLike = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments)
-        val possibleSideEffect = executionStarted && !readLike
-        val retryable = !possibleSideEffect && code.isRetryableTransportFailure()
-        val recoveryHint = when {
-            possibleSideEffect -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-            retryable -> "当前调用没有不可确认的副作用，可在检查前置条件后重试一次。"
-            else -> "根据失败原因检查前置条件后再决定下一步。"
-        }
-        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=$retryable")
-        return AgentToolResult(
-            content = message,
-            isError = true,
-            errorCode = code,
-            retryable = retryable,
-            sideEffect = if (possibleSideEffect) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
-            recoveryHint = recoveryHint,
-        )
+        val result = localToolFailure(code, message,
+            readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
+            executionStarted = executionStarted)
+        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=${result.retryable}")
+        return result
     }
 
     private fun approvalSummary(call: LocalToolCall, tool: HarnessTool): String = when (tool.name) {
@@ -379,8 +368,3 @@ internal data class LocalToolExecutionIdentity(
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-private fun String.isRetryableTransportFailure(): Boolean =
-    this in setOf("TIMEOUT", "NETWORK_ERROR", "DNS_FAILED", "TOOL_TIMEOUT", "TOOL_LIFECYCLE_UNAVAILABLE") ||
-        startsWith("MODEL_HTTP_5") ||
-        contains("TIMEOUT") ||
-        contains("NETWORK")
