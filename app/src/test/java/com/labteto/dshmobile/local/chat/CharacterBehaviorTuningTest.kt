@@ -14,6 +14,17 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
+    fun composerAndPersonaShareOneStoredTemperaturePosition() {
+        val fine = CharacterBehaviorTuning(expressionVariation = 60)
+        assertEquals(2, fine.composerTemperatureLevel())
+        val high = fine.withComposerTemperatureLevel(4)
+        assertEquals(100, high.expressionVariation)
+        assertEquals(4, high.composerTemperatureLevel())
+        assertEquals(0, high.withComposerTemperatureLevel(-1).expressionVariation)
+        assertEquals(100, high.withComposerTemperatureLevel(9).expressionVariation)
+    }
+
+    @Test
     fun expressionVariationUsesOfficialBoundsAndConversationDefault() {
         val model = "deepseek-flash"
         val endpoint = "https://api.deepseek.com"
