@@ -149,6 +149,7 @@ data class LocalModelTemperatureRange(
     val minimum: Double,
     val maximum: Double,
     val chatDefault: Double,
+    val requiresDisabledThinking: Boolean = false,
 ) {
     init {
         require(minimum.isFinite() && maximum.isFinite() && chatDefault.isFinite())
@@ -598,10 +599,16 @@ object LocalModelPresets {
      * Gemini 3 recommends temperature=1.0; its center anchor follows that guidance.
      */
     fun chatTemperatureRangeFor(model: String, baseUrl: String): LocalModelTemperatureRange? {
+        val normalized = runCatching { normalizeModelBaseUrl(baseUrl).lowercase() }.getOrNull()
+            ?: return null
+        // Both official DeepSeek entrypoints are equivalent; proxies cannot inherit the range.
+        if (normalized in setOf("https://api.deepseek.com", "https://api.deepseek.com/v1") &&
+            model.lowercase() in setOf("deepseek-flash", "deepseek-v4-pro")) {
+            return LocalModelTemperatureRange(0.0, 2.0, 1.3, requiresDisabledThinking = true)
+        }
         val preset = find(model, baseUrl) ?: return null
         if (!preset.temperatureSupported) return null
         return when (preset.provider) {
-            "DeepSeek" -> LocalModelTemperatureRange(0.0, 2.0, 1.3)
             "Google Gemini" -> LocalModelTemperatureRange(0.0, 2.0, 1.0)
             // Others require a model-specific confirmed range or a fixed-value/unsupported rule.
             else -> null
