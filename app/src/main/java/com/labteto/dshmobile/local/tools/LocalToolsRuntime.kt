@@ -25,6 +25,8 @@ class LocalToolsRuntime @Inject internal constructor(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             management.createSkill(id, displayName, description, instructions)
         }
+    internal suspend fun importSkill(filename: String, bytes: ByteArray): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.importSkill(filename, bytes) }
     internal suspend fun removeSkill(id: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.removeSkill(id) }
     internal suspend fun readSkillDocument(id: String): String =
