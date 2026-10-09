@@ -115,7 +115,7 @@ internal class LocalSubagentRunner(
     private val acquireVirtualScreen: suspend (String) -> String? = { null },
     private val releaseVirtualScreen: (String) -> Unit = { },
     private val historyBudget: ((LocalModelProfile) -> LocalHistoryBudget)? = null,
-    private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
+    private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(summaries = LocalWorkHistorySummaryStrategy, ),
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,

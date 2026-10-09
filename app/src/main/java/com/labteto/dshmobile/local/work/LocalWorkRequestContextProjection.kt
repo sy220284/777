@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
 import com.labteto.dshmobile.local.model.compactHistoryWithStaleToolProjection
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.model.projectStaleToolResults

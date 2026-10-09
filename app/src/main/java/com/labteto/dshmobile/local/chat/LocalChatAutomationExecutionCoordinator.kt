@@ -592,15 +592,17 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
         snapshot = snapshot,
         messages = messages,
         step = CHAT_POST_TURN_MODEL_STEP + 200,
-        toolsOverride = JsonArray(emptyList()),
-        publishPreviewEnabled = false,
-        maxAttemptsOverride = snapshot.modelState.modelAttempts.coerceIn(1, 3),
-        allowContextOverflowRecovery = allowContextOverflowRecovery,
-        persistOverflowHistory = false,
-        requestLog = eventLogFor(snapshot.sessionId),
-        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
-            profile.model, profile.baseUrl,
+        options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+            toolsOverride = JsonArray(emptyList()),
+            publishPreviewEnabled = false,
+            maxAttemptsOverride = snapshot.modelState.modelAttempts.coerceIn(1, 3),
+            allowContextOverflowRecovery = allowContextOverflowRecovery,
+            persistOverflowHistory = false,
+            requestLog = eventLogFor(snapshot.sessionId),
+            temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
+                profile.model, profile.baseUrl,
+            ),
+            profile = profile,
         ),
-        profile = profile,
     )
 }

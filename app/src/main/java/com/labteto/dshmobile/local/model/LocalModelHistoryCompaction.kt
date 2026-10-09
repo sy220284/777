@@ -17,7 +17,7 @@ internal fun LocalModelHistoryBuffer.compact(
     budget: LocalHistoryBudget,
     extraTokens: Int = 0,
     summaryMode: LocalHistorySummaryMode,
-    structuredWorkState: LocalStructuredWorkState? = null,
+    structuredWorkState: LocalHistorySummaryInput? = null,
 ): LocalHistoryCompaction? {
     val compacted = compactHistoryWithStaleToolProjection(
         history = snapshot(),

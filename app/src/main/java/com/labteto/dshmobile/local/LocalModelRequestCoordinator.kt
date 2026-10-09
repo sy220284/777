@@ -64,6 +64,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalModelRequestCoordinator @Inject constructor(
+    summaries: com.labteto.dshmobile.local.model.LocalHistorySummaryProvider,
     private val modelGateway: LocalModelGateway,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -81,7 +82,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         get() = runtimeStateStore.streamingPreviewStore
     private val pressureStore
         get() = runtimeStateStore.requestPressureStore
-    private val historyCompactor = LocalHistoryCompactor()
+    private val historyCompactor = LocalHistoryCompactor(summaries = summaries)
     private val promptCacheBaselines = LocalPromptCacheBaselineStore()
     private val promptCacheContinuity = LocalPromptCacheContinuityStore()
     private val maxStreamPreviewChars: Int = 4_096
@@ -106,21 +107,22 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
-        toolsOverride: JsonArray? = null,
-        publishPreviewEnabled: Boolean = true,
-        maxAttemptsOverride: Int? = null,
-        allowContextOverflowRecovery: Boolean = true,
-        persistOverflowHistory: Boolean = false,
-        streamFilterPhrases: List<String> = emptyList(),
-        requestLog: LocalSessionEventLog? = null,
-        temperature: Double? = null,
-        profile: LocalModelProfile? = null,
-        previewGuard: () -> Boolean = { true },
-        overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
-        contextPolicy: LocalRequestContextPolicy? = null,
-        allowImageGeneration: Boolean = false,
-        admission: LocalModelAdmissionPort? = null,
+        options: LocalModelRequestOptions = LocalModelRequestOptions(),
     ): LocalModelReply {
+        val toolsOverride = options.toolsOverride
+        val publishPreviewEnabled = options.publishPreviewEnabled
+        val maxAttemptsOverride = options.maxAttemptsOverride
+        val allowContextOverflowRecovery = options.allowContextOverflowRecovery
+        val persistOverflowHistory = options.persistOverflowHistory
+        val streamFilterPhrases = options.streamFilterPhrases
+        val requestLog = options.requestLog
+        val temperature = options.temperature
+        val profile = options.profile
+        val previewGuard = options.previewGuard
+        val overflowPersister = options.overflowPersister
+        val contextPolicy = options.contextPolicy
+        val allowImageGeneration = options.allowImageGeneration
+        val admission = options.admission
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
         val frozenProfile = profile ?: modelGateway.profileForRoute(

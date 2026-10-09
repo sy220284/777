@@ -5,8 +5,8 @@ import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.LocalStructuredWorkState
+import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.work.structuredWorkState
 import com.labteto.dshmobile.local.work.LocalWorkRequestProjection
@@ -172,7 +172,7 @@ class LocalWorkTokenSimulationTest {
                     )
                 }
                 history += message("user", "继续第${generation}代第${batch}批最新任务")
-                compacted = LocalHistoryCompactor().compact(
+                compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(
                     history = history,
                     budget = LocalHistoryBudget(
                         maxHistoryChars = 200_000,
@@ -225,7 +225,7 @@ class LocalWorkTokenSimulationTest {
             val projected = projectWorkRequestContext(
                 messages = history,
                 tools = JsonArray(emptyList()),
-                compactor = LocalHistoryCompactor(),
+                compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
                 operationalLimitTokens = 678_464,
                 measuredPressure = sourcePressure,
                 previousPressure = previousPressure,
@@ -261,7 +261,7 @@ class LocalWorkTokenSimulationTest {
         projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
         )
 

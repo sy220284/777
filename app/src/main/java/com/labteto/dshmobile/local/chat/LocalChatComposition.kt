@@ -21,10 +21,12 @@ internal class LocalChatComposition @Inject constructor(
     sessionStorage: LocalSessionStorageRuntime,
     private val chatState: LocalChatStatePort,
     private val styleGuardSettings: LocalChatStyleGuardSettingsPort,
+    summaries: com.labteto.dshmobile.local.model.LocalHistorySummaryProvider,
 ) {
     private val modelHistory = LocalForegroundModelHistoryRuntime(
         runtimeStateStore = runtimeStateStore,
         sessionStorage = sessionStorage,
+        summaries = summaries,
     )
     internal val branchCoordinator = LocalChatBranchCoordinator(
         runtimeStateStore = runtimeStateStore,

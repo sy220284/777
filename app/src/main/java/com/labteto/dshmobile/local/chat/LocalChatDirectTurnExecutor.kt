@@ -232,10 +232,11 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     snapshot = snapshot,
                     messages = requestMessages,
                     step = 1,
-                    toolsOverride = JsonArray(emptyList()),
-                    allowImageGeneration = true,
-                    publishPreviewEnabled = false,
-                    streamFilterPhrases = ChatStyleGuard.activePhrases(
+                    options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+                        toolsOverride = JsonArray(emptyList()),
+                        allowImageGeneration = true,
+                        publishPreviewEnabled = false,
+                        streamFilterPhrases = ChatStyleGuard.activePhrases(
                         customPhrases = snapshot.chat.chatStyleGuardCustomPhrases,
                         personaPhrases = turnContext.persona.bannedPhrases,
                         enabled = snapshot.chat.chatStyleGuardEnabled,
@@ -249,6 +250,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         runtimeStateStore.currentSessionId == sessionId &&
                             runtimeStateStore.state.value.sessionId == sessionId
                     },
+                    ),
                 ).also {
                     if (nativeImagesSent) {
                         imageCapabilities.markSupported(
@@ -297,6 +299,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                             runtimeStateStore.currentSessionId == sessionId &&
                                 runtimeStateStore.state.value.sessionId == sessionId
                         },
+                        ),
                     )
                 },
                 appendEvent = { type, data -> eventLog.append(type, data) },
