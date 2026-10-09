@@ -1056,6 +1056,34 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun wrongRootStateTypePreservesValidSuggestionsAndDiary() {
+        val previous = ChatCharacterState(mood = "旧情绪")
+        val plan = planner.parse(
+            """{"state":false,"suggestions":[{"label":"回应","text":"我们接着聊"}],
+            "diaryDelta":{"event":"彼此道别","importance":"无效"},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "回头见",
+            assistantMessage = "再见",
+        )!!
+        assertEquals("旧情绪", plan.state.mood)
+        assertEquals(1, plan.suggestions.size)
+        assertEquals("我们接着聊", plan.suggestions.single().text)
+        assertEquals("彼此道别", plan.diaryDelta?.event)
+    }
+
+    @Test
+    fun malformedObserverIdsNeverBreakOtherGroupEntries() {
+        fun id(value: String): String? = validGroupGalleryId(
+            Json.parseToJsonElement("""{"galleryId":$value}""").jsonObject,
+        )
+        assertEquals("role-a", id(""""role-a""""))
+        assertEquals(null, id("""{"id":"role-a"}"""))
+        assertEquals(null, id("""["role-a"]"""))
+        assertEquals(null, id("42"))
+        assertEquals(null, id("null"))
+    }
+
+    @Test
     fun malformedArraysCannotClearEarlierThreadsOrContinuity() {
         val previous = ChatCharacterState(
             unresolvedThreads = listOf("等待回答"),

@@ -45,6 +45,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** Only string IDs are valid; a drifting model field must not abort the other members. */
+internal fun validGroupGalleryId(item: JsonObject): String? =
+    (item["galleryId"] as? JsonPrimitive)
+        ?.takeIf { it.isString }
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
+
 /**
  * Owns multi-character group-chat turn execution.
  *
@@ -546,7 +553,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val result = linkedMapOf<String, ChatCharacterState>()
             plans.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
-                val galleryId = (item["galleryId"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
+                val galleryId = validGroupGalleryId(item) ?: return@forEach
                 val source = replies.firstOrNull { it.member.galleryId == galleryId } ?: return@forEach
                 val plan = item["plan"] ?: return@forEach
                 val parsed = chatTurnCoordinator.parsePostTurn(
@@ -564,7 +571,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val observerDiaries = (root["observerDiaries"] as? JsonArray).orEmpty()
             observerDiaries.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
-                val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val galleryId = validGroupGalleryId(item) ?: return@forEach
                 val observer = observers.firstOrNull { (member, _) -> member.galleryId == galleryId }
                     ?: return@forEach
                 val significance = (item["turnSignificance"] as? JsonPrimitive)?.contentOrNull ?: "NONE"

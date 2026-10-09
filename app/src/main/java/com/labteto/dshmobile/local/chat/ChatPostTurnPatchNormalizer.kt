@@ -11,7 +11,8 @@ import kotlinx.serialization.json.booleanOrNull
  * An invalid optional field is omitted so the reducer retains the previous authoritative value.
  */
 internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
-    val rawState = root["state"] as? JsonObject ?: return root
+    // An invalid optional state block must not discard valid suggestions or diary data.
+    val rawState = root["state"] as? JsonObject ?: JsonObject(emptyMap())
     val state = rawState.toMutableMap()
 
     fun string(name: String) {
