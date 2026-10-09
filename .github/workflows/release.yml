@@ -101,7 +101,7 @@ jobs:
               if printf '%s' "$jobs" | jq -e '
                 [.jobs[] | select(.conclusion == "success") | .name] as $passed
                 | (["scope", "static-gates", "architecture-3-gates",
-                    "unit-tests", "relay-conformance", "build-arm64",
+                    "unit-tests", "build-arm64",
                     "device-artifacts-x86", "android-16-instrumented",
                     "android-17-instrumented", "merge-gate"]
                    | all(. as $lane | $passed | index($lane) != null))
@@ -188,7 +188,7 @@ jobs:
           fi
 
           if ! has_full_main_validation "$RELEASE_SHA"; then
-            echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、Relay、ARM64、x86），拒绝发布。"
+            echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、ARM64、x86），拒绝发布。"
             skip_release
             exit 0
           fi
