@@ -430,7 +430,7 @@ internal class ChatInteractionStateReducer {
         val stageWords = when (proposedStage) {
             "AMBIGUOUS" -> Regex("暧昧|心动|喜欢你|喜欢我|对你有好感")
             "DATING" -> Regex("开始约会|正式交往|在谈恋爱|正在约会")
-            "COMMITTED" -> Regex("确认关系|确定关系|在一起了|正式在一起|订婚|结婚|同居")
+            "COMMITTED" -> Regex("确认关系|确定关系|在一起(?:了)?|正式在一起|订婚|结婚|同居")
             "CONFLICT" -> Regex("冷战|吵架|争吵|闹矛盾|发生争执")
             "COOLING" -> Regex("暂时冷静|冷淡下来|暂停关系")
             "SEPARATED" -> Regex("分手|分开了|离婚|结束关系")

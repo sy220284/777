@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -50,6 +52,18 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun relationshipCommitmentSupportsNaturalConfirmedLanguage() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "DATING"))
+        val plan = planner.parse(
+            """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}""",
+            previous,
+            userMessage = "我们决定在一起",
+            assistantMessage = "嗯，这次我们是认真的",
+        )!!
+        assertEquals("COMMITTED", plan.state.dynamics.stage)
+    }
+
+    @Test
     fun stageEventMustMatchRequestedRelationshipDirection() {
         val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
         val payload = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
@@ -65,6 +79,25 @@ class ChatInteractionPlannerTest {
             payload, previous, userMessage = "我们确认关系，在一起了", assistantMessage = "好",
         )!!
         assertEquals("COMMITTED", confirmed.state.dynamics.stage)
+    }
+
+    @Test
+    fun backgroundConsolidationRegeneratesOnlyRecoverableAdmittedStreamFailures() {
+        val interrupted = modelPostAdmissionFailure(
+            code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+            detail = "模型流中断",
+        )
+        assertTrue(shouldRetryChatPostTurnRequest(interrupted))
+        assertTrue(shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_NETWORK", message = "连接前失败", retryable = true,
+        )))
+        assertEquals(false, shouldRetryChatPostTurnRequest(modelPostAdmissionFailure(
+            code = "MODEL_STREAM_PROTOCOL",
+            detail = "协议错误",
+        )))
+        assertEquals(false, shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_HTTP_401", message = "身份验证失败", retryable = false,
+        )))
     }
 
     @Test
