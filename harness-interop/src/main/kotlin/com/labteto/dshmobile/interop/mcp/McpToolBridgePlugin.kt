@@ -11,7 +11,9 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
+import java.io.IOException
 import java.net.URI
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -40,6 +42,36 @@ internal fun boundedMcpToolResult(
     val head = retained * 2 / 3
     val tail = retained - head
     return text.take(head) + notice + text.takeLast(tail)
+}
+
+/** Explicit MCP failures; never expose remote response bodies or credential-bearing endpoint URLs. */
+internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting: Boolean): ToolResult {
+    val code = when (error) {
+        is McpHttpException -> when (error.statusCode) {
+            401, 403 -> "MCP_AUTH_REQUIRED"
+            404, 410 -> "MCP_ENDPOINT_UNAVAILABLE"
+            429 -> "MCP_RATE_LIMITED"
+            else -> "MCP_HTTP_FAILED"
+        }
+        is IOException -> "MCP_TRANSPORT_FAILED"
+        else -> if (connecting) "MCP_CONNECT_FAILED" else "MCP_REMOTE_CALL_FAILED"
+    }
+    val hint = when (code) {
+        "MCP_AUTH_REQUIRED" -> "核实 MCP 服务认证信息和访问权限，并重新建立连接。"
+        "MCP_ENDPOINT_UNAVAILABLE" -> "核实 MCP 端点和协议；先断开再使用正确地址连接。"
+        "MCP_RATE_LIMITED" -> "MCP 服务正在限流，请稍后检查服务状态。"
+        "MCP_TRANSPORT_FAILED" -> "检查网络或本地 MCP 进程是否运行；必要时断开后重新连接。"
+        else -> if (connecting) "检查服务进程、工作目录、网络和启动命令。"
+            else "请求可能已到达远端；先核对实际执行结果，禁止盲目重放写入请求。"
+    }
+    return ToolResult(
+        content = "MCP 服务 $serverId ${if (connecting) "连接" else "执行"}失败" +
+            (if (error is McpHttpException) "（HTTP ${error.statusCode}）" else "") + "：$hint",
+        isError = true,
+        errorCode = code,
+        retryable = false,
+        recoveryHint = hint,
+    )
 }
 
 internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
@@ -175,7 +207,14 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 MCP HTTP/HTTPS 服务必须可访问"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(connectHttp(context, input.required("server_id"), input.required("endpoint")))
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(connectHttp(context, serverId, input.required("endpoint")))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
                 },
             ),
         )
@@ -207,14 +246,15 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 stdio 命令必须已安装且工作目录位于 Harness 工作区内"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(
-                        connectStdio(
-                            context = context,
-                            rawId = input.required("server_id"),
-                            command = input.requiredStringArray("command"),
-                            workingDirectory = input.optional("working_directory"),
-                        ),
-                    )
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(connectStdio(context, serverId, input.requiredStringArray("command"),
+                            input.optional("working_directory")))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
                 },
             ),
         )
@@ -453,10 +493,19 @@ class McpToolBridgePlugin(
                                 } else {
                                     try {
                                         val result = client.callTool(definition.name, input)
+                                        val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
                                         ToolResult(
                                             content = boundedMcpToolResult(result),
-                                            isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
+                                            isError = remoteError,
+                                            errorCode = if (remoteError) "MCP_REMOTE_REJECTED" else null,
+                                            recoveryHint = if (remoteError)
+                                                "远端工具报告失败；先检查副作用和参数，不要直接重放。"
+                                                else null,
                                         )
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (error: Exception) {
+                                        mcpExtensionFailure(serverId, error, connecting = false)
                                     } finally {
                                         binding.endCall()
                                     }
