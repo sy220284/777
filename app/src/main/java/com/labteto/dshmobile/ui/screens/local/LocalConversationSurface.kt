@@ -903,13 +903,16 @@ internal fun LocalConversationSurface(
                 state.chatState.behaviorTuning.expressionVariation
             } else null,
             temperatureSaveFailed = temperatureSaveFailed,
+            temperatureSaving = temperatureSaving,
+            temperatureGroupChat = state.groupChat.enabled,
             temperatureEnabled = state.usageMode == LocalUsageMode.WORK ||
-                (!state.groupChat.enabled && !temperatureSaving),
+                (!state.groupChat.enabled && !temperatureSaving && !state.loading && !state.running),
             onTemperatureLevelChange = { level ->
                 if (state.usageMode == LocalUsageMode.WORK) {
                     LocalWorkTemperatureControls.setLevel(state.sessionId, level)
                     workTemperatureLevel = LocalWorkTemperatureControls.level(state.sessionId)
-                } else if (!state.groupChat.enabled && !temperatureSaving) {
+                } else if (!state.groupChat.enabled && !temperatureSaving &&
+                    !state.loading && !state.running) {
                     temperatureSaving = true
                     temperatureSaveFailed = false
                     scope.launch {
