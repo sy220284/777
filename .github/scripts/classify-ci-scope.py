@@ -20,7 +20,6 @@ class CiPlan:
     run_android: bool
     run_fixture: bool
     affects_release: bool
-    run_relay: bool = False
     run_android17: bool = False
 
     def as_outputs(self) -> dict[str, str]:
@@ -34,7 +33,6 @@ class CiPlan:
             "run_android16": str(self.run_android).lower(),
             "run_android17": str(self.run_android17).lower(),
             "run_fixture": str(self.run_fixture).lower(),
-            "run_relay": str(self.run_relay).lower(),
             "affects_release": str(self.affects_release).lower(),
         }
 
@@ -53,12 +51,6 @@ FULL_VALIDATION_SCRIPTS = {
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",
 }
-RELAY_CONFORMANCE_PATHS = {
-    ".github/workflows/ci.yml",
-    ".github/scripts/classify-ci-scope.py",
-    "app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt",
-}
-
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
     "tools/reference-validation/official-runner.ts",
@@ -160,7 +152,7 @@ def is_architecture_3_path(path: str) -> bool:
     return path in ARCHITECTURE_3_CONTROL_FILES or path.startswith(ARCHITECTURE_3_PREFIXES)
 
 
-# Device, relay and architecture decisions are based on affected runtime contracts,
+# Device and architecture decisions are based on affected runtime contracts,
 # not on the mere presence of a Kotlin source file.
 PLATFORM_PREFIXES = (
     "app/src/main/java/com/labteto/dshmobile/update/",
@@ -176,15 +168,6 @@ PLATFORM_FILES = {
     "app/src/main/AndroidManifest.xml",
     "app/src/main/java/com/labteto/dshmobile/MainActivity.kt",
     "app/src/main/java/com/labteto/dshmobile/DshApplication.kt",
-}
-RELAY_PREFIXES = (
-    "app/src/main/java/com/labteto/dshmobile/connection/",
-    "app/src/main/java/com/labteto/dshmobile/local/model/",
-    "harness-interop/src/main/",
-)
-RELAY_FILES = {
-    "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
 }
 HIGH_RISK_PREFIXES = (
     "harness-core/src/main/",
@@ -224,7 +207,6 @@ def classify(
     android16 = False
     android17 = False
     fixture = force_full
-    relay = force_full
     full = force_full
     affects_release = False
     audit_index = False
@@ -235,7 +217,6 @@ def classify(
             continue
 
         architecture = architecture or is_architecture_3_path(path)
-        relay = relay or path in RELAY_CONFORMANCE_PATHS
 
         if path in {"docs/FEATURE-TREE.zh-CN.md", "docs/FEATURE-TREE.zh-CN.html",
                     "docs/ACCEPTANCE-MATRIX.json", "docs/FUNCTION-AUDIT.zh-CN.md"}:
@@ -304,8 +285,6 @@ def classify(
             if path in ANDROID_UI_ENTRYPOINTS:
                 device = True
                 android16 = True
-            if path in RELAY_FILES or path.startswith(RELAY_PREFIXES):
-                relay = True
             continue
 
         # Unknown inputs and build/runtime paths fail closed.
@@ -324,7 +303,6 @@ def classify(
     run_device = device or full
     run_android16 = android16 or full
     run_android17 = android17 or full
-    run_relay = relay or full
 
     if full:
         scope = "full"
@@ -356,7 +334,6 @@ def classify(
         run_android17=run_android17,
         run_fixture=fixture,
         affects_release=affects_release,
-        run_relay=run_relay,
     )
 
 def self_test() -> None:
@@ -373,26 +350,26 @@ def self_test() -> None:
             assert values["run_" + item] == "false", (paths, item, result)
 
     verify(["README.md"], excluded=("static", "architecture", "unit", "build",
-                                   "device", "android16", "android17", "relay"))
+                                   "device", "android16", "android17"))
     verify(["docs/ARCHITECTURE.md"], required=("static", "architecture"),
-           excluded=("unit", "device", "relay"))
+           excluded=("unit", "device"))
     verify([".github/workflows/ci.yml"], full=True,
            required=("architecture", "unit", "build", "android16", "android17"), release=False)
     verify([".github/workflows/release.yml"], full=True, release=False)
     verify([".github/scripts/check-local-architecture-boundaries.py"],
            required=("static", "architecture"), release=False)
     verify(["tools/dev/install.sh"], required=("static",),
-           excluded=("unit", "build", "android16", "android17", "relay"), release=False)
+           excluded=("unit", "build", "android16", "android17"), release=False)
     verify(["tools/dev/toolchain-versions.env"], full=True, release=True)
     verify([".github/release-version"], full=True, release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],
            required=("static", "architecture", "unit", "build"),
-           excluded=("device", "android16", "android17", "relay"), release=True)
+           excluded=("device", "android16", "android17"), release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/local/model/LocalGateway.kt"],
-           required=("architecture", "unit", "build", "relay"),
+           required=("architecture", "unit", "build"),
            excluded=("android16", "android17"), release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt"],
-           required=("android16", "device"), excluded=("android17", "relay"), release=True)
+           required=("android16", "device"), excluded=("android17"), release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"],
            full=True, release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],

@@ -124,7 +124,6 @@ required_ci_lanes = (
     "architecture-3-gates",
     "fixture-provenance",
     "unit-tests",
-    "relay-conformance",
     "build-arm64",
     "device-artifacts-x86",
     "android-16-instrumented",
@@ -144,7 +143,6 @@ for lane in (
     "static-gates",
     "architecture-3-gates",
     "unit-tests",
-    "relay-conformance",
     "build-arm64",
     "device-artifacts-x86",
     "android-16-instrumented",
@@ -203,7 +201,6 @@ ci_dag = {
     "architecture-3-gates": ("scope",),
     "fixture-provenance": ("scope",),
     "unit-tests": ("scope", "static-gates", "architecture-3-gates"),
-    "relay-conformance": ("scope", "static-gates", "architecture-3-gates"),
     "build-arm64": ("scope", "static-gates", "architecture-3-gates"),
     "device-artifacts-x86": ("scope", "static-gates", "architecture-3-gates"),
     "android-16-instrumented": ("scope", "static-gates", "architecture-3-gates"),
@@ -240,7 +237,6 @@ merge_gate_contracts = {
     "architecture-3-gates": ("REQUIRE_ARCHITECTURE:", "ARCHITECTURE_RESULT:"),
     "fixture-provenance": ("REQUIRE_FIXTURE:", "FIXTURE_RESULT:"),
     "unit-tests": ("REQUIRE_UNIT:", "UNIT_RESULT:"),
-    "relay-conformance": ("REQUIRE_RELAY:", "RELAY_RESULT:"),
     "build-arm64": ("REQUIRE_BUILD:", "BUILD_RESULT:"),
     "device-artifacts-x86": ("REQUIRE_DEVICE:", "DEVICE_RESULT:"),
     "android-16-instrumented": ("REQUIRE_ANDROID16:", "ANDROID16_RESULT:"),
@@ -251,15 +247,6 @@ for lane, tokens in merge_gate_contracts.items():
         if token not in merge_gate:
             violations.append(f"merge-gate lost {lane} selection/result contract: {token}")
 
-relay_contract_tokens = (
-    "repository: sorsama/deepseek-harness-relay",
-    "ref: 10c2758e77192413d9450a4d641daafb2a675286",
-    "DSH_RELAY_CONFORMANCE_REQUIRED: true",
-    "RelayConformanceTest",
-)
-for token in relay_contract_tokens:
-    if token not in CI:
-        violations.append(f"real relay conformance lane lost pinned contract: {token}")
 
 # Every check-*.py file is a gate by convention. Reachability uses real run steps and
 # interpreter invocations, not arbitrary mentions in comments, filenames or YAML conditions.

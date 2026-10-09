@@ -86,7 +86,7 @@ Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery �
 | 模块 | 职责 |
 |---|---|
 | `app/` | Android 组合根、产品 Feature、UI、运行内核装配 |
-| `core/` | 尚未从构建清退的历史远程协议及其测试；不装配当前本机产品运行链 |
+| `core/` | 本机组件仍在复用的 DTO、JSON 编解码与可取消 HTTP 工具；不装配远程会话或中继连接 |
 | `harness-core/` | 平台无关 Agent、工具、资源与会话核心契约 |
 | `harness-runtime-android/` | Android 进程运行时与持久终端 |
 | `harness-interop/` | MCP / LSP / GitHub 等互通能力 |

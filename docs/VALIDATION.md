@@ -22,7 +22,6 @@ Build JDK: >= 27（CI / Artifact 基线为 JDK 27）
 JVM target: 21（class major 65）
 Node: >= 24
 Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
-Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 ```
 
 ## 仓库验收边界（与产品功能清单分离）
@@ -34,17 +33,17 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**。分类由 `.github/scripts/classify-ci-scope.py` 决定，混合变更取检查并集；未知或关键底层改动回退完整矩阵。
 
 - L0 文档：scope 控制面与 merge-gate；修改功能树 / 验收索引时增跑 static-gates，检查树与验收凭据的一致性。
-- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64。普通 UI 和模型无关业务不重复执行 Relay 与双模拟器。
-- L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、Relay、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
-- L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器、真实 Relay），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
+- L1 普通源码：static-gates、受影响的 architecture-3-gates、unit-tests、build-arm64。普通 UI 和模型无关业务不重复执行双模拟器。
+- L2 跨功能底层、Android 平台/ABI、安全边界、CI/发布控制面：完整单测、架构、ARM64/x86 与 Android 16/17。androidTest 变更验证双设备，导航入口变更补 Android 16。
+- L3 正式 APK 发布：必须在**同一发布 SHA** 找到 `main` push 对应成功的完整 CI 矩阵（含 merge-gate、两套 APK、双模拟器），并与最近已发布的正式版本比较，确认实际存在影响 APK 的变更。文档/自动化独立改动不会制造正式 Release。
 
 普通 PR 的产品源码在确保真实 Kotlin 编译、相关单测及专项检查的基础上执行精准集合；`main` 的所有影响发布产物的 push 强制执行完整矩阵，`workflow_dispatch` 同样强制完整（含 fixture-provenance）。发布判断与一般 CI 成功解绑，轻量 CI 无法授权 APK 发布。CI 和发布工作流自身变更必须经过真实完整矩阵，不能依赖静态关键字扫描冒充验证。
 
-**执行顺序**：scope 自举和范围防降级 → static-gates + architecture-3-gates 并行 → 成功后 unit-tests / relay-conformance / ARM64 / x86 构建并行；选中的 Android 16/17 模拟器同步从当前 Run 的 x86 产物执行，最后由 merge-gate 汇总。本次必需检查必须 success，未选中可 skipped。只有 PR 的旧 CI 因更新自动取消，main 的发布候选验证不被后续文档提交取消。
+**执行顺序**：scope 自举和范围防降级 → static-gates + architecture-3-gates 并行 → 成功后 unit-tests / ARM64 / x86 构建并行；选中的 Android 16/17 模拟器同步从当前 Run 的 x86 产物执行，最后由 merge-gate 汇总。本次必需检查必须 success，未选中可 skipped。只有 PR 的旧 CI 因更新自动取消，main 的发布候选验证不被后续文档提交取消。
 
 `fixture-provenance` 仅官方 fixture 来源变更或手动全量验证时运行。`dev-toolchain` 只在工具版本、构建依赖、缓存 Action、安装与打包脚本变更或定时/手动要求时打包；更新开发说明文档不得重新生成工具链。
 
-**验收重点**：分类器正反例（文档、资源、UI、模型、Relay、会话恢复、底层、Android 16/17、CI/Release 控制面、混合与未知路径）、编译与架构违规注入、同 SHA 发布资格、完整 Android 矩阵，以及优化前后 PR 中位/P95 时长与总 Runner 分钟。不能以单个成功 PR 推断性能收益。
+**验收重点**：分类器正反例（文档、资源、UI、模型、会话恢复、底层、Android 16/17、CI/Release 控制面、混合与未知路径）、编译与架构违规注入、同 SHA 发布资格、完整 Android 矩阵，以及优化前后 PR 中位/P95 时长与总 Runner 分钟。不能以单个成功 PR 推断性能收益。
 
 ### scope
 
@@ -66,7 +65,7 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 - Python / Shell 自动化语法校验。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
 - UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
-- 测试质量门禁：禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待；真实 Relay 一致性测试不得携带工作站本地默认路径。
+- 测试质量门禁：禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待。
 - Runtime 压缩器自测。
 - 发布版本格式。
 
@@ -121,14 +120,6 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 
 其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、V2 requestUid 自动重建 / digest 校验 / 多模态脱敏 / V1 evidence-only 兼容、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity、统一 Agent Inbox 落盘/回滚/满载拒绝、Child History Checkpoint 与完成态再激活/Cold Resume、终态原子结算、Session Projection 同版本共享 / 引用计数 / 异版本拒绝 / stateVersion / asOfSequence、SubagentCapabilities 启动前拒绝、toolAllowlist 实际工具面过滤、稳定 instructions 与 task 分离及持久恢复 V1/V2→V3 兼容、三级审批 DEFAULT/MANUAL/AUTO 迁移与安全决策、Tool Activity 由原 EventLog 有界派生且未知副作用状态不丢失、Structured Result 纯 JSON / Schema mismatch / 未支持关键字拒绝 / 校验后终态提交、持久 resume payload 超限显式失败、Agent Teams roster/mailbox/task DAG/revision/blockedBy、`fresh|fork` 创建语义、Child step=0 fork seed 恢复与官方 V2 whole-value event 兼容。基础 AgentLoop 和存在稳定官方可执行 seam 的高级 Projection 使用锁定官方源码生成的 golden；Android 进程恢复等平台特化语义继续由本机契约测试证明，不把自测包装成官方输出。
 
-### relay-conformance
-
-该 lane 驱动真实 `dsh-relay`，用于证明 Android 客户端与真实中继实现的一致性，避免客户端与 Mock 同时理解错误却仍然全绿。
-
-- 上游固定为 `sorsama/deepseek-harness-relay` 的 `0.2.1` 对应提交 `10c2758e77192413d9450a4d641daafb2a675286`；
-- CI 显式设置 `DSH_RELAY_CONFORMANCE_REQUIRED=true`，缺少源码、Node 或可用网络地址时直接失败，不允许通过 JUnit assumption 静默跳过；
-- 覆盖真实配对、Bearer 认证、未认证拒绝、WebSocket 升级与 TLS 公钥固定；
-- Relay 测试本身、CI Relay 控制面和完整产品改动必须执行该 lane。
 
 ### build-arm64
 
@@ -181,7 +172,6 @@ Runtime 下载复用 `setup-runtime-cached` 组合 Action：在完整 APK 构建
 static-gates
 architecture-3-gates
 unit-tests
-relay-conformance
 build-arm64
 device-artifacts-x86
 android-16-instrumented

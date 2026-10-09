@@ -25,7 +25,6 @@ TEST_ROOTS = (
 )
 
 ASSUMPTION_ALLOW = {
-    "app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt",
     "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt",
     "harness-interop/src/test/kotlin/com/labteto/dshmobile/interop/lsp/LspPluginTest.kt",
 }
@@ -69,24 +68,6 @@ for path in sorted(test_files):
             f"{rel}: real blocking sleep is not allowlisted; prefer deterministic synchronization"
         )
 
-relay_test = ROOT / "app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt"
-relay_source = relay_test.read_text(encoding="utf-8")
-if "DSH_RELAY_CONFORMANCE_REQUIRED" not in relay_source:
-    violations.append("RelayConformanceTest lost strict CI mode")
-if "DEFAULT_SRC" in relay_source or "D:/LabTeto/deepseek-harness-mobile-plugin" in relay_source:
-    violations.append("RelayConformanceTest must not contain a workstation-specific default checkout")
-
-ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-relay_sha = "10c2758e77192413d9450a4d641daafb2a675286"
-for required in (
-    "relay-conformance:",
-    "sorsama/deepseek-harness-relay",
-    relay_sha,
-    "DSH_RELAY_CONFORMANCE_REQUIRED: true",
-    "RelayConformanceTest",
-):
-    if required not in ci:
-        violations.append(f"CI lost required real-relay conformance contract: {required}")
 
 if violations:
     print("Test quality guard failed:")

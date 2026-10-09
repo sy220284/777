@@ -129,7 +129,7 @@ data class SessionWireEvent(
  * The packed class is still read, because a 0.1.2 host is still out there and misreading its rows
  * is worse than not talking to it at all. `seq` and `time` on a run identify its *first* member,
  * so a run read as one event silently swallows the rest of the run's sequence numbers and leaves
- * the journal looking gapped. See [com.labteto.dshmobile.core.session.ChunkRows].
+ * the journal looking gapped. See 旧版流式事件分块整理器.
  */
 @Serializable(with = SessionHistoryRecordSerializer::class)
 sealed class SessionHistoryRecord {
@@ -151,7 +151,7 @@ sealed class SessionHistoryRecord {
      *
      * The inner `event.type` is `chunkrow/text-chunks`, `chunkrow/reasoning-chunks`, or
      * `chunkrow/tool-call-chunks`; `seq` and `time` identify the run's *first* member, and the
-     * rest are reconstructed by [com.labteto.dshmobile.core.session.ChunkRows].
+     * rest are reconstructed by 旧版流式事件分块整理器.
      */
     @Serializable
     data class Chunks(
@@ -239,7 +239,7 @@ data class SessionFollowRequest(
  * [stream] is the compact record list the attempt had accumulated at the opening revision —
  * the same encoding an `assistant/message` settlement embeds — and [nextIndex] is the dense
  * position the next live [SessionAssistantStreamFrame.Chunk] will carry. A follower expands the
- * stream (`core/session/AssistantStream.kt`) to rebuild the partial reply it missed.
+ * stream (历史流式事件聚合器) to rebuild the partial reply it missed.
  */
 @Serializable
 data class SessionAssistantStreamAttempt(

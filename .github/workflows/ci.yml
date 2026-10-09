@@ -29,7 +29,6 @@ jobs:
       run_android16: ${{ steps.classify.outputs.run_android16 }}
       run_android17: ${{ steps.classify.outputs.run_android17 }}
       run_fixture: ${{ steps.classify.outputs.run_fixture }}
-      run_relay: ${{ steps.classify.outputs.run_relay }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -88,7 +87,6 @@ jobs:
           RUN_ANDROID16: ${{ steps.classify.outputs.run_android16 }}
           RUN_ANDROID17: ${{ steps.classify.outputs.run_android17 }}
           RUN_FIXTURE: ${{ steps.classify.outputs.run_fixture }}
-          RUN_RELAY: ${{ steps.classify.outputs.run_relay }}
         run: |
           set -euo pipefail
 
@@ -112,7 +110,6 @@ jobs:
                 require_true "$RUN_DEVICE" "device-artifacts-x86" "$path"
                 require_true "$RUN_ANDROID16" "android-16-instrumented" "$path"
                 require_true "$RUN_ANDROID17" "android-17-instrumented" "$path"
-                require_true "$RUN_RELAY" "relay-conformance" "$path"
                 ;;
               AGENTS.md|docs/ARCHITECTURE.md|docs/SYSTEM-AUDIT-GUIDE.zh-CN.md|docs/VALIDATION.md|.github/scripts/check-ci-repository-integrity.py|.github/scripts/check-local-architecture-boundaries.py|.github/scripts/check-local-performance-invariants.py)
                 require_true "$RUN_STATIC" "static-gates" "$path"
@@ -131,11 +128,6 @@ jobs:
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_UNIT" "unit-tests" "$path"
                 require_true "$RUN_FIXTURE" "fixture-provenance" "$path"
-                ;;
-              app/src/test/java/com/labteto/dshmobile/connection/RelayConformanceTest.kt)
-                require_true "$RUN_STATIC" "static-gates" "$path"
-                require_true "$RUN_UNIT" "unit-tests" "$path"
-                require_true "$RUN_RELAY" "relay-conformance" "$path"
                 ;;
               .github/scripts/check-*.py)
                 require_true "$RUN_STATIC" "static-gates" "$path"
@@ -250,43 +242,6 @@ jobs:
         run: python3 .github/scripts/check-jvm21-bytecode.py
 
 
-  relay-conformance:
-    needs: [scope, static-gates, architecture-3-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_relay == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: sorsama/deepseek-harness-relay
-          ref: 10c2758e77192413d9450a4d641daafb2a675286
-          path: .ci/dsh-relay
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
-        with:
-          distribution: temurin
-          java-version: 27
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - uses: ./.github/actions/setup-android-cached
-        with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-      - name: Install pinned dsh-relay dependencies
-        run: |
-          set -euo pipefail
-          corepack enable
-          cd .ci/dsh-relay
-          pnpm install --frozen-lockfile --ignore-scripts
-      - name: Verify Android client against real dsh-relay
-        env:
-          DSH_RELAY_SRC: ${{ github.workspace }}/.ci/dsh-relay
-          DSH_RELAY_CONFORMANCE_REQUIRED: true
-        run: |
-          ./gradlew :app:testDebugUnitTest \
-            --tests com.labteto.dshmobile.connection.RelayConformanceTest \
-            --stacktrace
 
   build-arm64:
     needs: [scope, static-gates, architecture-3-gates]
@@ -480,7 +435,6 @@ jobs:
       - architecture-3-gates
       - fixture-provenance
       - unit-tests
-      - relay-conformance
       - build-arm64
       - device-artifacts-x86
       - android-16-instrumented
@@ -496,7 +450,6 @@ jobs:
           REQUIRE_ARCHITECTURE: ${{ needs.scope.outputs.run_architecture }}
           REQUIRE_FIXTURE: ${{ needs.scope.outputs.run_fixture }}
           REQUIRE_UNIT: ${{ needs.scope.outputs.run_unit }}
-          REQUIRE_RELAY: ${{ needs.scope.outputs.run_relay }}
           REQUIRE_BUILD: ${{ needs.scope.outputs.run_build }}
           REQUIRE_DEVICE: ${{ needs.scope.outputs.run_device }}
           REQUIRE_ANDROID16: ${{ needs.scope.outputs.run_android16 }}
@@ -505,7 +458,6 @@ jobs:
           ARCHITECTURE_RESULT: ${{ needs.architecture-3-gates.result }}
           FIXTURE_RESULT: ${{ needs.fixture-provenance.result }}
           UNIT_RESULT: ${{ needs.unit-tests.result }}
-          RELAY_RESULT: ${{ needs.relay-conformance.result }}
           BUILD_RESULT: ${{ needs.build-arm64.result }}
           DEVICE_RESULT: ${{ needs.device-artifacts-x86.result }}
           ANDROID16_RESULT: ${{ needs.android-16-instrumented.result }}
@@ -536,7 +488,6 @@ jobs:
           check_lane "$REQUIRE_ARCHITECTURE" "$ARCHITECTURE_RESULT" "architecture-3-gates"
           check_lane "$REQUIRE_FIXTURE" "$FIXTURE_RESULT" "fixture-provenance"
           check_lane "$REQUIRE_UNIT" "$UNIT_RESULT" "unit-tests"
-          check_lane "$REQUIRE_RELAY" "$RELAY_RESULT" "relay-conformance"
           check_lane "$REQUIRE_BUILD" "$BUILD_RESULT" "build-arm64"
           check_lane "$REQUIRE_DEVICE" "$DEVICE_RESULT" "device-artifacts-x86"
           check_lane "$REQUIRE_ANDROID16" "$ANDROID16_RESULT" "android-16-instrumented"
