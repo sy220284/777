@@ -6,4 +6,5 @@ data class LocalArtifactUiItem(
     val category: String,
     val sourceCallId: String?,
     val asOfSequence: Long,
+    val currentlyAvailable: Boolean? = null,
 )
