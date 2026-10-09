@@ -14,8 +14,8 @@ import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 internal enum class LocalReasoningUiMode { DEFAULT, FAST, LOW, DEEP, MAX }
 
 internal object LocalReasoningControls {
-    fun mode(sessionId: String): LocalReasoningUiMode =
-        when (LocalReasoningModeStore.mode(sessionId)) {
+    fun mode(sessionId: String, usageMode: LocalUsageMode? = null): LocalReasoningUiMode =
+        when (LocalReasoningModeStore.mode(sessionId, defaultChatFast = usageMode == LocalUsageMode.CHAT)) {
             LocalReasoningMode.DEFAULT -> LocalReasoningUiMode.DEFAULT
             LocalReasoningMode.FAST -> LocalReasoningUiMode.FAST
             LocalReasoningMode.LOW -> LocalReasoningUiMode.LOW
