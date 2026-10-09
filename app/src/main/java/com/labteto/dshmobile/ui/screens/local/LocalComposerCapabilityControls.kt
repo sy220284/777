@@ -74,6 +74,7 @@ internal fun LocalComposerCapabilityActions(
     usageMode: LocalUsageMode,
     reasoningMode: LocalReasoningUiMode,
     temperatureLevel: Int = 2,
+    temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
@@ -121,6 +122,7 @@ internal fun LocalComposerCapabilityActions(
                     usageMode = usageMode,
                     reasoningMode = reasoningMode,
                     temperatureLevel = temperatureLevel,
+                    temperaturePosition = temperaturePosition,
                     temperatureEnabled = temperatureEnabled,
                     temperatureSaveFailed = temperatureSaveFailed,
                     onTemperatureLevelChange = onTemperatureLevelChange,
@@ -139,6 +141,7 @@ internal fun LocalComposerCapabilityPanel(
     reasoningMode: LocalReasoningUiMode,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
     temperatureLevel: Int = 2,
+    temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
@@ -214,16 +217,34 @@ internal fun LocalComposerCapabilityPanel(
                 )
             } else {
                 val selectedLevel = temperatureLevel.coerceIn(0, 4)
-                var temperatureSelection by remember(profile?.id, usageMode, selectedLevel, temperatureEnabled) {
+                var temperatureSelection by remember(
+                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureEnabled,
+                ) {
                     mutableFloatStateOf(selectedLevel.toFloat())
                 }
+                var temperatureInteracted by remember(
+                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureEnabled,
+                ) { androidx.compose.runtime.mutableStateOf(false) }
                 val temperatureTick = rememberHapticTickFeedback(selectedLevel)
                 val temperatureText = stringResource(R.string.local_composer_temperature_title)
-                val temperatureSample = range.at(temperatureSelection.roundToInt().coerceIn(0, 4) * 25)
-                val temperatureState = stringResource(
-                    R.string.local_composer_temperature_value, temperatureSample,
-                )
+                // A persona may have a fine 0..100 value between composer detents.
+                // Show that actual value until the user touches this five-stop slider.
+                val visiblePosition = if (
+                    usageMode == LocalUsageMode.CHAT && !temperatureInteracted && temperaturePosition != null
+                ) temperaturePosition.coerceIn(0, 100)
+                else temperatureSelection.roundToInt().coerceIn(0, 4) * 25
+                val temperatureSample = range.at(visiblePosition)
+                val temperatureState = if (range.omitAtChatDefault && visiblePosition == 50) {
+                    stringResource(R.string.local_composer_temperature_provider_default, temperatureSample)
+                } else {
+                    stringResource(R.string.local_composer_temperature_value, temperatureSample)
+                }
                 val allowTemperature = temperatureEnabled && !thinkingBlocksSampling
+                Text(
+                    temperatureState,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
                 Slider(
                     modifier = Modifier
                         .testTag("local-composer-temperature-slider")
@@ -235,6 +256,7 @@ internal fun LocalComposerCapabilityPanel(
                     enabled = allowTemperature,
                     onValueChange = { next ->
                         temperatureSelection = next
+                        temperatureInteracted = true
                         temperatureTick(next.roundToInt().coerceIn(0, 4))
                     },
                     onValueChangeFinished = {
