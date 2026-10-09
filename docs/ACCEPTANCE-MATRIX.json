@@ -37,10 +37,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#coalescesSnapshotsWithoutDroppingOtherSessions"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 历史消息加载与分页",
@@ -66,10 +64,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#concurrentPendingExposureWaitsUntilReservationSettles"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
@@ -517,10 +513,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 工具结果回填与继续推理",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#durableFinalAssistantReplyIsNotGeneratedTwiceAfterRestart"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
@@ -591,17 +585,13 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 并行执行和流水线工作流",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt#requiredEvidenceTriggersOneReassignmentAndReportsRealCheck"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理模型选路与调用消耗",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#calibrationIsIsolatedByModelRoute"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 资料研究代理预设",
@@ -770,10 +760,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt#exposesLatestTypedEventForRecovery"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
@@ -907,10 +895,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务启用、停用与暂停",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/automation/AutomationExecutionSafetyTest.kt#interactionPolicyUpdatePreservesScheduleAndWaitingState"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 手动执行和执行记录",
@@ -1018,10 +1004,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / Webhook 接收和校验",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/automation/WebhookExecutionTest.kt#unknownPersistedWebhookStatusDegradesToFailedOnDowngrade"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 请求大小及执行边界",
@@ -1282,10 +1266,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#repeatedTransientFailuresOpenCooldownBeforeBudgetOrProviderCall"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
@@ -1729,10 +1711,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 运行中配置变化隔离",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelConfigurationTransactionTest.kt#processDeathBeforeDecisionRollsBackOnNextOwner"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 连接健康诊断和重试约束",
@@ -1944,10 +1924,8 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt#streamedEventsMatchSnapshotAcrossRotatedSegmentsAndSequenceAdvances"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
