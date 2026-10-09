@@ -44,6 +44,7 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -279,6 +280,14 @@ fun ToolsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
+    val autoApprovalEnabled = approvalMode == LocalApprovalMode.AUTO
+    var confirmAutoApproval by remember { mutableStateOf(false) }
+    val toggleAutoApproval: (Boolean) -> Unit = { enabled ->
+        if (enabled) confirmAutoApproval = true
+        else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
+    }
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var serverId by remember { mutableStateOf("") }
@@ -288,6 +297,7 @@ fun ToolsScreen(
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
@@ -336,8 +346,7 @@ fun ToolsScreen(
     }
 
     if (showAgentSettings) {
-        val agentSettingsViewModel: SettingsViewModel = hiltViewModel()
-        val agentSettings by agentSettingsViewModel.localHarnessState.collectAsStateWithLifecycle()
+        val agentSettings by settingsViewModel.localHarnessState.collectAsStateWithLifecycle()
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 DsTopBar(
@@ -349,7 +358,7 @@ fun ToolsScreen(
                     modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
                         .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
                 ) {
-                    LocalAgentSettingsCard(agentSettings, agentSettingsViewModel, toast.second)
+                    LocalAgentSettingsCard(agentSettings, settingsViewModel, toast.second)
                 }
                 DsToastHost(toast)
             }
@@ -439,6 +448,26 @@ fun ToolsScreen(
                             },
                         )
                         ToolCapabilityRow(
+                            icon = FeatherIcons.Shield,
+                            title = stringResource(R.string.cap_center_auto_approval),
+                            subtitle = stringResource(R.string.cap_center_auto_approval_hint),
+                            status = stringResource(
+                                when (approvalMode) {
+                                    LocalApprovalMode.AUTO -> R.string.common_enabled
+                                    LocalApprovalMode.MANUAL -> R.string.settings_approval_mode_manual
+                                    LocalApprovalMode.DEFAULT -> R.string.common_disabled
+                                },
+                            ),
+                            state = if (autoApprovalEnabled) StateDotState.Done else StateDotState.Idle,
+                            onClick = { toggleAutoApproval(!autoApprovalEnabled) },
+                            trailing = {
+                                DsSwitch(
+                                    checked = autoApprovalEnabled,
+                                    onCheckedChange = toggleAutoApproval,
+                                )
+                            },
+                        )
+                        ToolCapabilityRow(
                             icon = FeatherIcons.Sliders,
                             title = stringResource(R.string.advanced_agent_settings),
                             subtitle = stringResource(R.string.tools_agent_settings_hint),
@@ -446,6 +475,15 @@ fun ToolsScreen(
                             state = StateDotState.Done,
                             onClick = { showAgentSettings = true },
                         )
+
+                    }
+
+                    Text(
+                        stringResource(R.string.cap_center_extensions_group),
+                        style = DsType.std14.withReadingWeight(),
+                        color = colors.labelTertiary,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         val builtinAvailable = "local-builtin" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
@@ -455,15 +493,6 @@ fun ToolsScreen(
                             state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { skillsOnly = true; showPluginBrowser = true },
                         )
-
-                    }
-
-                    Text(
-                        stringResource(R.string.tools_connection_group),
-                        style = DsType.std14.withReadingWeight(),
-                        color = colors.labelTertiary,
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         ToolCapabilityRow(
                             icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
@@ -582,11 +611,26 @@ fun ToolsScreen(
                             )
                         }
                         DsButton(
+                            text = stringResource(R.string.cap_center_view_tools),
+                            onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
+                            enabled = server.tools.isNotEmpty(),
+                            size = DsButtonSize.Small,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                        DsButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
                             enabled = !state.loading,
                             size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                    if (expandedMcpServer == server.id) {
+                        Text(
+                            server.tools.joinToString(" · "),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelSecondary,
+                            modifier = Modifier.padding(bottom = DsSpacing.small),
                         )
                     }
                 }
@@ -669,6 +713,34 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = FeatherIcons.Terminal,
             )
+        }
+    }
+
+    if (confirmAutoApproval) {
+        DsDialog(
+            title = stringResource(R.string.cap_center_auto_approval_confirm_title),
+            onDismiss = { confirmAutoApproval = false },
+        ) {
+            Text(
+                stringResource(R.string.cap_center_auto_approval_confirm_body),
+                style = DsType.std14.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmAutoApproval = false },
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.cap_center_auto_approval_confirm_action),
+                    onClick = {
+                        confirmAutoApproval = false
+                        settingsViewModel.configureApprovalMode(LocalApprovalMode.AUTO)
+                    },
+                    variant = DsButtonVariant.Danger,
+                )
+            }
         }
     }
 

@@ -9,15 +9,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,19 +71,15 @@ internal fun LocalComposerCapabilityActions(
     profile: LocalModelProfile?,
     usageMode: LocalUsageMode,
     reasoningMode: LocalReasoningUiMode,
-    networkSearchEnabled: Boolean,
     running: Boolean,
     showLabels: Boolean,
     openPanel: String?,
     onSelectPanel: (String?) -> Unit,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
-    onNetworkSearchChange: (Boolean) -> Unit,
-    onWorkSearchRequested: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
-    val webAvailable = usageMode == LocalUsageMode.WORK
     Box {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DsComposerAction(
@@ -104,32 +100,10 @@ internal fun LocalComposerCapabilityActions(
                     color = colors.labelSecondary,
                 )
             }
-            DsComposerAction(
-                icon = FeatherIcons.Globe,
-                contentDescription = stringResource(when {
-                    !webAvailable -> R.string.local_composer_web_work_only
-                    networkSearchEnabled -> R.string.local_composer_web_on_action
-                    else -> R.string.local_composer_web_off_action
-                }),
-                onClick = { onSelectPanel(if (openPanel == "web") null else "web") },
-                enabled = !running,
-                tint = if (webAvailable && networkSearchEnabled) colors.labelPrimary else colors.labelTertiary,
-                containerColor = Color.Transparent,
-            )
-            if (showLabels) {
-                Text(
-                    text = stringResource(when {
-                        !webAvailable -> R.string.local_composer_web_work_label
-                        networkSearchEnabled -> R.string.local_composer_web_online
-                        else -> R.string.local_composer_web_offline
-                    }),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
-                )
-            }
+
         }
         DsPopupMenu(
-            expanded = openPanel != null && !running,
+            expanded = openPanel == "reasoning" && !running,
             onDismiss = { onSelectPanel(null) },
             modifier = Modifier.widthIn(min = 260.dp, max = 320.dp),
             focusable = false,
@@ -144,15 +118,6 @@ internal fun LocalComposerCapabilityActions(
                         onReasoningModeChange(it)
                         onSelectPanel(null)
                     },
-                    networkSearchEnabled = networkSearchEnabled,
-                    onNetworkSearchChange = {
-                        onNetworkSearchChange(it)
-                        onSelectPanel(null)
-                    },
-                    onWorkSearchRequested = {
-                        onSelectPanel(null)
-                        onWorkSearchRequested()
-                    },
                 )
             }
         }
@@ -166,9 +131,6 @@ internal fun LocalComposerCapabilityPanel(
     usageMode: LocalUsageMode,
     reasoningMode: LocalReasoningUiMode,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
-    networkSearchEnabled: Boolean,
-    onNetworkSearchChange: (Boolean) -> Unit,
-    onWorkSearchRequested: () -> Unit,
 ) {
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
@@ -222,48 +184,35 @@ internal fun LocalComposerCapabilityPanel(
                         style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
-        } else {
-            Text(
-                stringResource(R.string.local_composer_web_title),
-                style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
-            )
-            if (usageMode != LocalUsageMode.WORK) {
-                Text(stringResource(R.string.local_composer_web_work_only),
-                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-                TextButton(onClick = onWorkSearchRequested) {
-                    Text(stringResource(R.string.local_composer_web_to_work))
-                }
-            } else {
-                var selected by remember(networkSearchEnabled) {
-                    mutableFloatStateOf(if (networkSearchEnabled) 1f else 0f)
-                }
-                val tick = rememberHapticTickFeedback(if (networkSearchEnabled) 1 else 0)
-                val sliderTitle = stringResource(R.string.local_composer_web_title)
-                val sliderState = stringResource(
-                    if (selected >= 0.5f) R.string.local_composer_web_on else R.string.local_composer_web_off,
-                )
-                Slider(
-                    modifier = Modifier.semantics {
-                        contentDescription = sliderTitle
-                        stateDescription = sliderState
-                    },
-                    value = selected,
-                    onValueChange = { next ->
-                        selected = next
-                        tick(if (next >= 0.5f) 1 else 0)
-                    },
-                    onValueChangeFinished = { onNetworkSearchChange(selected >= 0.5f) },
-                    valueRange = 0f..1f,
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.local_composer_web_off),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                    Text(stringResource(R.string.local_composer_web_on),
-                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-                }
-                Text(stringResource(R.string.local_composer_web_tip),
-                    style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
-            }
         }
     }
+}
+
+/** Work-only plan action; the running session owns the state. */
+@Composable
+internal fun LocalComposerPlanAction(
+    selected: Boolean,
+    enabled: Boolean,
+    waitingForApproval: Boolean,
+    onToggle: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val label = stringResource(
+        when {
+            waitingForApproval -> R.string.local_composer_plan_waiting_approval
+            selected -> R.string.local_composer_plan_start
+            else -> R.string.local_composer_plan_off
+        },
+    )
+    DsComposerAction(
+        icon = FeatherIcons.List,
+        modifier = Modifier
+            .testTag("local-composer-plan-toggle")
+            .semantics { stateDescription = label },
+        contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
+        onClick = onToggle,
+        enabled = enabled && !waitingForApproval,
+        tint = if (selected) colors.accent else colors.labelSecondary,
+        containerColor = if (selected) colors.accent.copy(alpha = 0.12f) else Color.Transparent,
+    )
 }

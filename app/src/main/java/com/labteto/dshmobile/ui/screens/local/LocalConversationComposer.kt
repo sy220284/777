@@ -82,12 +82,7 @@ internal fun LocalConversationComposer(
     onStop: () -> Unit,
     reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
-    networkSearchEnabled: Boolean = true,
-    onNetworkSearchChange: (Boolean) -> Unit = {},
-    onRequestWorkWebSearch: () -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
-    onAutoApprove: () -> Unit,
-    onDisableAutoApprove: () -> Unit,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val colors = DsTheme.colors
@@ -103,7 +98,7 @@ internal fun LocalConversationComposer(
     LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
 
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
-    val expanded = focused || input.contains('\n') || attachments.isNotEmpty() ||
+    val expanded = state.usageMode == LocalUsageMode.WORK || focused || input.contains('\n') || attachments.isNotEmpty() ||
         teamDispatchSelected || capabilityPanel != null
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     val canSend = !state.loading &&
@@ -357,19 +352,26 @@ internal fun LocalConversationComposer(
             state = state,
             menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
+            planControl = {
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    LocalComposerPlanAction(
+                        selected = state.planMode,
+                        enabled = !state.running,
+                        waitingForApproval = state.pendingQuestion?.let(::localPlanReviewOf) != null,
+                        onToggle = { onPlanModeChange(!state.planMode) },
+                    )
+                }
+            },
             capabilityControls = { showLabels ->
                 LocalComposerCapabilityActions(
                     profile = activeModelProfile,
                     usageMode = state.usageMode,
                     reasoningMode = reasoningMode,
-                    networkSearchEnabled = networkSearchEnabled,
                     running = state.running,
                     showLabels = showLabels,
                     openPanel = capabilityPanel,
                     onSelectPanel = { capabilityPanel = it },
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
-                    onNetworkSearchChange = { if (!state.running) onNetworkSearchChange(it) },
-                    onWorkSearchRequested = onRequestWorkWebSearch,
                 )
             },
             stopControl = { StopControl() },

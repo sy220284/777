@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -29,57 +31,15 @@ class LocalComposerReasoningRegressionTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val deepSeek = LocalModelProfile("composer-ds", "deepseek-flash", "https://api.deepseek.com")
 
-    @Test fun webSliderAnnouncesSelectionAndCommitsAccessibleAction() {
-        val enabled = mutableStateOf(false)
-        compose.setContent {
-            DshTheme {
-                LocalComposerCapabilityPanel(
-                    panel = "web", profile = deepSeek, usageMode = LocalUsageMode.WORK,
-                    reasoningMode = LocalReasoningUiMode.DEFAULT, onReasoningModeChange = {},
-                    networkSearchEnabled = enabled.value,
-                    onNetworkSearchChange = { enabled.value = it }, onWorkSearchRequested = {},
-                )
-            }
-        }
-        val slider = compose.onNodeWithContentDescription(context.getString(R.string.local_composer_web_title))
-        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_web_off)))
-        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(1f) }
-        compose.runOnIdle { assertEquals(true, enabled.value) }
-        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_web_on)))
-    }
-
-    @Test fun approvalSliderAnnouncesNamedModesAndCommitsAccessibleAction() {
-        val selected = mutableStateOf(0)
-        val labels = listOf(R.string.local_composer_approval_default,
-            R.string.local_composer_approval_manual, R.string.local_composer_approval_auto)
-            .map { context.getString(it) }
-        val title = context.getString(R.string.local_composer_approval_title)
-        compose.setContent {
-            DshTheme {
-                LocalComposerSheetSlider(title = title, labels = labels,
-                    selectedIndex = selected.value, onSelect = { selected.value = it })
-            }
-        }
-        val slider = compose.onNodeWithContentDescription(title)
-        for (index in labels.indices) {
-            if (index > 0) slider.performSemanticsAction(SemanticsActions.SetProgress) { it(index.toFloat()) }
-            compose.runOnIdle { assertEquals(index, selected.value) }
-            slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, labels[index]))
-        }
-    }
-
     @Test fun modelSwitchUpdatesButtonSliderAndDefaultHintTogether() {
         val profile = mutableStateOf(deepSeek)
         compose.setContent {
             DshTheme {
                 LocalComposerCapabilityActions(
                     profile = profile.value, usageMode = LocalUsageMode.CHAT,
-                    reasoningMode = LocalReasoningUiMode.MAX, networkSearchEnabled = true,
+                    reasoningMode = LocalReasoningUiMode.MAX,
                     running = false, showLabels = true, openPanel = "reasoning",
                     onSelectPanel = {}, onReasoningModeChange = {},
-                    onNetworkSearchChange = {}, onWorkSearchRequested = {},
                 )
             }
         }
@@ -103,6 +63,32 @@ class LocalComposerReasoningRegressionTest {
                 context.getString(R.string.local_composer_reasoning_default)))
     }
 
+
+    @Test fun planIconTogglesAndAnnouncesStateWithoutSlider() {
+        val selected = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                LocalComposerPlanAction(
+                    selected = selected.value,
+                    enabled = true,
+                    waitingForApproval = false,
+                    onToggle = { selected.value = !selected.value },
+                )
+            }
+        }
+        val control = compose.onNodeWithTag("local-composer-plan-toggle")
+        control.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_plan_off),
+        ))
+        control.performClick()
+        compose.runOnIdle { assertEquals(true, selected.value) }
+        control.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_plan_start),
+        ))
+    }
+
     @Test fun deepSeekSliderCanRestoreProviderDefault() {
         val session = "composer-restore-default-regression"
         LocalReasoningControls.setMode(session, LocalReasoningUiMode.DEEP)
@@ -117,7 +103,6 @@ class LocalComposerReasoningRegressionTest {
                             LocalReasoningControls.setMode(session, it)
                             mode.value = LocalReasoningControls.mode(session)
                         },
-                        networkSearchEnabled = true, onNetworkSearchChange = {}, onWorkSearchRequested = {},
                     )
                 }
             }
