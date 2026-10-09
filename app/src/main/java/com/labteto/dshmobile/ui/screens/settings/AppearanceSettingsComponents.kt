@@ -169,12 +169,6 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
         "system" to stringResource(R.string.settings_appearance_system),
     )
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
-        Text(
-            stringResource(R.string.settings_appearance),
-            style = DsType.std14.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-        Spacer(Modifier.height(DsSpacing.small))
         // 预览先行：每块内画出主题本身的底色与卡片条，选中块描 accent 边
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             options.take(2).forEach { (key, label) ->
@@ -206,12 +200,6 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = DsTheme.colors
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
-        Text(
-            stringResource(R.string.settings_accent_theme),
-            style = DsType.std14.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-        Spacer(Modifier.height(DsSpacing.small))
         Row(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -310,12 +298,6 @@ internal fun BackgroundRow(
         if (uri != null) onPick(uri)
     }
     Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
-        Text(
-            stringResource(R.string.settings_background_image),
-            style = DsType.std14.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-        Spacer(Modifier.height(DsSpacing.small))
         if (path != null) {
             val imagePath = path
             val thumbnail by produceState<ImageBitmap?>(initialValue = null, key1 = imagePath) {
