@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -27,6 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.local.project.LocalProjectCatalogState
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 internal data class LocalProjectUiActions(
     val catalog: StateFlow<LocalProjectCatalogState>,
@@ -37,6 +40,7 @@ internal data class LocalProjectUiActions(
     val create: (String) -> String,
     val select: (String) -> Unit,
     val rename: (String, String) -> Unit,
+    val delete: suspend (String) -> Unit = {},
     val updateInstructions: (String, String) -> Unit,
 )
 
@@ -76,6 +80,9 @@ internal fun LocalProjectScreen(
         mutableStateOf(active?.name.orEmpty())
     }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val localProjectCannotSwitchMessage = stringResource(R.string.local_project_cannot_switch_session)
 
     Column(
@@ -187,9 +194,58 @@ internal fun LocalProjectScreen(
                 },
                 enabled = instructionDraft != project.instructions,
             )
+            if (project.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID) {
+                DsButton(
+                    text = stringResource(R.string.local_project_delete),
+                    onClick = { pendingDeleteId = project.id },
+                    variant = DsButtonVariant.Danger,
+                    enabled = !deleting,
+                )
+            }
         }
         error?.let {
             Text(it, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
+        }
+    }
+    val target = state.projects.firstOrNull { it.id == pendingDeleteId }
+    if (target != null) {
+        DsDialog(
+            title = stringResource(R.string.local_project_delete),
+            onDismiss = { if (!deleting) pendingDeleteId = null },
+        ) {
+            Text(stringResource(R.string.local_project_delete_confirm, target.name))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { pendingDeleteId = null },
+                    variant = DsButtonVariant.Ghost,
+                    enabled = !deleting,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_project_delete),
+                    variant = DsButtonVariant.Danger,
+                    loading = deleting,
+                    enabled = !deleting,
+                    onClick = {
+                        if (deleting) return@DsButton
+                        deleting = true
+                        scope.launch {
+                            try {
+                                actions.delete(target.id)
+                                pendingDeleteId = null
+                                error = null
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                pendingDeleteId = null
+                                error = failure.message ?: "删除项目失败"
+                            } finally {
+                                deleting = false
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
 }
