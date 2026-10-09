@@ -127,4 +127,25 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle { assertEquals("my-skill", removed) }
     }
 
+    @Test
+    fun userOnlySkillCanStillBeInvokedExplicitly() {
+        var prompt: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), remote = null, skillsOnly = true,
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "manual-review", "Only on user request", false,
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = { prompt = it },
+                )
+            }
+        }
+        compose.onNodeWithText("使用").performClick()
+        compose.runOnIdle {
+            org.junit.Assert.assertEquals("@skill:manual-review\n", prompt)
+        }
+    }
+
 }
