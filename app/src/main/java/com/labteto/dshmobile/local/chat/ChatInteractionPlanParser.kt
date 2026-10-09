@@ -20,6 +20,11 @@ internal class ChatInteractionPlanParser(
         return sanitizeSuggestions(decoded.suggestions)
     }
 
+    fun parseJsonObjectEnvelope(text: String): JsonObject? =
+        extractJsonObject(text)?.let { body ->
+            runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+        }
+
     fun parsePlan(text: String): ParsedChatPostTurnPlan? = parsePlanWithFailure(text).first
 
     /** Content-free error label suitable for exported diagnostics. */

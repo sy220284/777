@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -133,6 +134,9 @@ internal class LocalChatTurnCoordinator @Inject constructor(
 
     internal fun postTurnParseFailureKind(text: String): String =
         interactionPlanner.postTurnParseFailureKind(text)
+
+    internal fun parsePostTurnEnvelope(text: String): JsonObject? =
+        interactionPlanner.parseJsonObjectEnvelope(text)
 
     internal fun parsePostTurn(
         text: String,

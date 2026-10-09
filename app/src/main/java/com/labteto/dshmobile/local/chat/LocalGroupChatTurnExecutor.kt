@@ -528,7 +528,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 taskLabel = userMessage,
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
             )
-            val root = json.parseToJsonElement(plannerReply.content.orEmpty()).jsonObject
+            val root = chatTurnCoordinator.parsePostTurnEnvelope(plannerReply.content.orEmpty())
+                ?: error("群聊状态整理未返回完整 JSON 对象")
             val plans = root["plans"]?.jsonArray.orEmpty()
             val result = linkedMapOf<String, ChatCharacterState>()
             plans.forEach { element ->

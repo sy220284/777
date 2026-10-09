@@ -1078,6 +1078,16 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun groupPostTurnEnvelopeCanRecoverFencedBatchJson() {
+        val envelope = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+            .parseJsonObjectEnvelope(
+                """结果如下：{"plans":[{"galleryId":"a","plan":{"state":{"mood":"开心"}}}],"observerDiaries":[]} 后续说明""",
+            )
+        assertNotNull(envelope)
+        assertTrue(envelope!!.containsKey("plans"))
+    }
+
+    @Test
     fun firstCompleteJsonObjectCanBeRecoveredFromAdditionalModelProse() {
         val result = planner.parse(
             """以下为更新：{"state":{"mood":"开心","currentFocus":"他提到{旧事}"},"turnSignificance":"MINOR"} 完毕 {"other":"ignored"}""",
