@@ -187,6 +187,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 args.string("query"),
                 args.optionalString("path") ?: ".",
                 args.boolean("regex", false),
+                args.optionalString("cursor"),
             )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
