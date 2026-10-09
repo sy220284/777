@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import java.io.File
+import com.labteto.dshmobile.local.persistence.DocumentFileStamp
 import kotlinx.serialization.json.Json
 
 /**
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.Json
 internal class PersonaGallerySchemaMigrationCoordinator(
     private val currentFile: File,
     private val json: Json,
+    private val onCurrentDecode: () -> Unit = {},
 ) {
     private val root = requireNotNull(currentFile.parentFile)
     private val legacyFile = File(root, "persona-gallery.json")
@@ -17,24 +19,35 @@ internal class PersonaGallerySchemaMigrationCoordinator(
     private val currentHistoryRoot = File(root, "persona-history-v5")
     private val marker = File(root, "persona-gallery-v1-v4-to-v5.done")
 
+    private var verifiedStamp: DocumentFileStamp? = null
+
+    private fun stamp() = DocumentFileStamp.of(currentFile, File(root, "${currentFile.name}.bak"),
+        File(root, "${currentFile.name}.recovery-required"), marker, legacyFile, File(root, "${legacyFile.name}.bak"))
+
     fun migrateIfNeeded() {
         if (currentFile.name != "persona-gallery-v5.json") return
+        val before = stamp()
+        if (before == verifiedStamp) return
         val currentBackup = File(root, "${currentFile.name}.bak")
         val currentReadable = listOf(currentFile, currentBackup)
             .asSequence()
             .filter(File::isFile)
             .any { candidate ->
                 runCatching {
+                    onCurrentDecode()
                     json.decodeFromString(GalleryDocument.serializer(), candidate.readText())
                 }.getOrNull()?.version == 5
             }
-        if (marker.isFile && currentReadable) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacyFile)) return
+        if (marker.isFile && currentReadable || !PersonaSchemaMigration.hasDurableSource(legacyFile)) {
+            verifiedStamp = before
+            return
+        }
 
         val documentStore = PersonaGalleryDocumentStore(currentFile, json)
         val history = PersonaGalleryHistoryCoordinator(currentHistoryRoot, json)
+        var needsRecovery = false
         val current = runCatching { documentStore.read() }
-            .getOrElse { GalleryDocument() }
+            .getOrElse { needsRecovery = true; GalleryDocument() }
         require(current.version == 5) { "人物图集版本不受支持" }
 
         val legacyDocument = PersonaSchemaMigration.readLegacyGalleryDocument(legacyFile, json)
@@ -82,8 +95,11 @@ internal class PersonaGallerySchemaMigrationCoordinator(
             }
         }
 
-        documentStore.write(current.copy(version = 5, entries = mergedEntries))
+        val migrated = current.copy(version = 5, entries = mergedEntries)
+        if (needsRecovery) documentStore.restoreFromRecoverySource(migrated)
+        else documentStore.write(migrated)
         markDone()
+        verifiedStamp = stamp()
     }
 
     private fun mergeStories(

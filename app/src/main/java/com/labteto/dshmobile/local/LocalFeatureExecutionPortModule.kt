@@ -41,6 +41,10 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
     @Provides
+    fun provideHistorySummaryProvider(): com.labteto.dshmobile.local.model.LocalHistorySummaryProvider =
+        LocalFeatureHistorySummaries
+
+    @Provides
     @Singleton
     fun provideLocalRuntimeBootstrapPort(
         composition: LocalRuntimeBootstrapComposition,
@@ -73,7 +77,7 @@ internal object LocalFeatureExecutionPortModule {
     @Provides
     @Singleton
     fun provideLocalWorkAgentUiPort(composition: LocalWorkComposition): LocalWorkAgentUiPort =
-        composition
+        composition.agentUi
 
     @Provides
     @Singleton

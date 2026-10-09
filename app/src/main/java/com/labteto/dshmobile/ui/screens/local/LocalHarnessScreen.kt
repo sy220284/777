@@ -305,6 +305,7 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         backgroundJobOutput = viewModel::backgroundJobOutput,
         artifactsForUi = viewModel::artifactsForUi,
+        historyPageForUi = viewModel::historyPageForUi,
         artifactHistoryForUi = viewModel::artifactHistoryForUi,
         toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,

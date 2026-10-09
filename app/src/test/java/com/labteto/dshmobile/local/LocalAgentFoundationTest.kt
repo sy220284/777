@@ -10,7 +10,7 @@ import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestPressureStore
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.work.structuredWorkState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -54,7 +54,7 @@ class LocalAgentFoundationTest {
             add(message("assistant", "当前回复" + "新".repeat(300)))
         }
 
-        val compacted = LocalHistoryCompactor(
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 800,
             tailChars = 500,
             maxSummaryChars = 1_200,

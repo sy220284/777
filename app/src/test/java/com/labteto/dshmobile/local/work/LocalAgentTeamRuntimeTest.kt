@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract
+
 import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
@@ -60,7 +62,7 @@ class LocalAgentTeamRuntimeTest {
         }
         val fixture = fixture("777-agent-team")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(
                 "777-agent-team",
                 "member-worker",
@@ -70,7 +72,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(
                 "777-agent-team",
                 "member-worker",
@@ -80,7 +82,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 teamId = "777-agent-team",
                 id = "task-1",
@@ -91,7 +93,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 teamId = "777-agent-team",
                 id = "task-2",
@@ -102,17 +104,17 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage("777-agent-team", "team-msg-1", "member-worker", "continue"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
             teamDelivered("777-agent-team", "team-msg-1", "member-worker"),
         )
 
         val projection = fixture.runtime.project("777-agent-team")
         val native = buildJsonObject {
-            put("stateVersion", LocalAgentTeamRuntime.OFFICIAL_TEAM_PROJECTION_STATE_VERSION)
+            put("stateVersion", LocalAgentTeamContract.OFFICIAL_TEAM_PROJECTION_STATE_VERSION)
             put("asOfSequence", projection.asOfSequence)
             put(
                 "members",
@@ -163,7 +165,7 @@ class LocalAgentTeamRuntimeTest {
     fun rosterRequiresProvisioningBeforeActive() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-a", "member-1", "worker", "active"),
         )
 
@@ -179,7 +181,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         appendActiveMember(fixture.log, "team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(
                 teamId = "team-a",
                 id = "team-msg-1",
@@ -194,7 +196,7 @@ class LocalAgentTeamRuntimeTest {
         )
 
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
             teamDelivered("team-a", "team-msg-1", "member-1"),
         )
 
@@ -205,15 +207,15 @@ class LocalAgentTeamRuntimeTest {
     fun inheritedTeamIdDoesNotLeakIntoForkProjection() {
         val fixture = fixture("fork-b")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("ancestor-a", "member-old", "old", "provisioning"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("fork-b", "member-new", "new", "provisioning"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("fork-b", "member-new", "new", "active"),
         )
 
@@ -228,11 +230,11 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         appendActiveMember(fixture.log, "team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-1", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-a",
                 "task-1",
@@ -243,7 +245,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-a",
                 "task-1",
@@ -254,7 +256,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-a",
                 "task-1",
@@ -264,7 +266,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-a",
                 "task-1",
@@ -288,15 +290,15 @@ class LocalAgentTeamRuntimeTest {
     fun failedTeammateNameCannotBeReused() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-a", "member-1", "reviewer", "provisioning"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-a", "member-1", "reviewer", "failed"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-a", "member-2", "reviewer", "provisioning"),
         )
 
@@ -311,11 +313,11 @@ class LocalAgentTeamRuntimeTest {
     fun persistedTaskWithDuplicateBlockerFailsClosed() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-1", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-2", 1, blockedBy = listOf("task-1", "task-1")),
         )
 
@@ -336,8 +338,8 @@ class LocalAgentTeamRuntimeTest {
             targetId = "member-1",
             text = "检查结果",
         )
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED, queued)
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED, queued)
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED, queued)
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED, queued)
 
         val projection = fixture.runtime.project("team-a")
 
@@ -351,7 +353,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         appendActiveMember(fixture.log, "team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
             teamDelivered("team-a", "team-msg-missing", "member-1"),
         )
 
@@ -366,7 +368,7 @@ class LocalAgentTeamRuntimeTest {
     fun provisioningWithoutPersistedChildRecoversAsFailed() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-a", "member-missing", "reviewer", "provisioning"),
         )
 
@@ -383,15 +385,15 @@ class LocalAgentTeamRuntimeTest {
     fun taskDagRejectsCycleAndFreezesAtLastValidState() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-1", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-2", 1, blockedBy = listOf("task-1")),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-a", "task-1", 2, blockedBy = listOf("task-2")),
         )
 
@@ -409,7 +411,7 @@ class LocalAgentTeamRuntimeTest {
     fun unsupportedTeamEventVersionFailsProjectionWithoutApplyingPayload() {
         val fixture = fixture("team-a")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             buildJsonObject {
                 put("version", 99)
                 put("teamId", "team-a")
@@ -435,11 +437,11 @@ class LocalAgentTeamRuntimeTest {
     fun taskRevisionGapIsRejectedAndLastValidRevisionSurvives() {
         val fixture = fixture("team-revision")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-revision", "task-1", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-revision", "task-1", 3, blockedBy = emptyList()),
         )
 
@@ -455,9 +457,9 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-restart")
         appendActiveMember(fixture.log, "team-restart")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             buildJsonObject {
-                put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+                put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
                 put("teamId", "team-restart")
                 put("message", buildJsonObject {
                     put("id", "team-msg-restart")
@@ -512,7 +514,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-ui")
         appendActiveMember(fixture.log, "team-ui")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-ui",
                 "task-1",
@@ -522,7 +524,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-ui",
                 "task-1",
@@ -534,7 +536,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-ui",
                 "task-2",
@@ -544,7 +546,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(
                 teamId = "team-ui",
                 id = "team-msg-ui",
@@ -578,11 +580,11 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-member-busy")
         appendActiveMember(fixture.log, "team-member-busy")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-member-busy", "task-1", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-member-busy",
                 "task-1",
@@ -593,11 +595,11 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-member-busy", "task-2", 1, blockedBy = emptyList()),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-member-busy",
                 "task-2",
@@ -620,23 +622,23 @@ class LocalAgentTeamRuntimeTest {
     fun memberLifecycleSupportsCreateDisableRestartAndDismiss() {
         val fixture = fixture("team-lifecycle")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-lifecycle", "member-1", "worker", "created"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-lifecycle", "member-1", "worker", "disabled"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-lifecycle", "member-1", "worker", "provisioning"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-lifecycle", "member-1", "worker", "active"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-lifecycle", "member-1", "worker", "dismissed"),
         )
 
@@ -685,11 +687,11 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-auto-complete")
         appendActiveMember(fixture.log, "team-auto-complete")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-auto-complete", "task-1", 1, blockedBy = emptyList(), subject = "审查"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-auto-complete",
                 "task-1",
@@ -736,11 +738,11 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-missing-child")
         appendActiveMember(fixture.log, "team-missing-child")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-missing-child", "task-1", 1, blockedBy = emptyList(), subject = "检查"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-missing-child",
                 "task-1",
@@ -766,11 +768,11 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-auto-release")
         appendActiveMember(fixture.log, "team-auto-release")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task("team-auto-release", "task-1", 1, blockedBy = emptyList(), subject = "检查"),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(
                 "team-auto-release",
                 "task-1",
@@ -937,7 +939,7 @@ class LocalAgentTeamRuntimeTest {
         appendActiveMember(fixture.log, session)
         startLiveChild(fixture, session)
         repeat(2_000) { fixture.log.append("test/noise", buildJsonObject { put("i", it) }) }
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(session, "legacy-cold", "member-1", "文".repeat(4_001)))
         assertTrue(fixture.runtime.uiState(session).rebuilding)
         assertTrue("冷投影完成后必须主动恢复邮箱", recovered.await(5, TimeUnit.SECONDS))
@@ -952,7 +954,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
         startLiveChild(fixture, session)
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+        fixture.log.append(LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(session, "legacy-long", "member-1", "文".repeat(4_001)))
         fixture.runtime.recoverMailbox(session)
         val state = fixture.runtime.project(session)
@@ -967,7 +969,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-message-discard")
         appendActiveMember(fixture.log, "team-message-discard")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(
                 teamId = "team-message-discard",
                 id = "team-msg-discard",
@@ -976,7 +978,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DISCARDED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED,
             teamDiscarded(
                 teamId = "team-message-discard",
                 messageId = "team-msg-discard",
@@ -989,7 +991,7 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(listOf("team-msg-discard"), settled.discardedMessageIds)
 
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED,
             teamDelivered("team-message-discard", "team-msg-discard", "member-1"),
         )
 
@@ -1100,7 +1102,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-discard-message")
         appendActiveMember(fixture.log, "team-discard-message")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(
                 teamId = "team-discard-message",
                 id = "team-msg-discard",
@@ -1109,7 +1111,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_DISCARDED,
+            LocalAgentTeamContract.TEAM_MESSAGE_DISCARDED,
             teamDiscarded(
                 teamId = "team-discard-message",
                 messageId = "team-msg-discard",
@@ -1367,7 +1369,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-failed-mailbox")
         appendActiveMember(fixture.log, "team-failed-mailbox")
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            LocalAgentTeamContract.TEAM_MESSAGE_QUEUED,
             teamMessage(
                 teamId = "team-failed-mailbox",
                 id = "team-msg-failed",
@@ -1376,7 +1378,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
         fixture.log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member("team-failed-mailbox", "member-1", "worker", "failed"),
         )
 
@@ -1414,7 +1416,7 @@ class LocalAgentTeamRuntimeTest {
             assertEquals(1, attempts.get())
             assertEquals(1, projection.deliveredMessageIds.size)
             assertTrue(projection.pendingMessages.isEmpty())
-            assertEquals(1, fixture.log.snapshot().count { it.type == LocalAgentTeamRuntime.TEAM_MESSAGE_DELIVERED })
+            assertEquals(1, fixture.log.snapshot().count { it.type == LocalAgentTeamContract.TEAM_MESSAGE_DELIVERED })
         } finally {
             release.countDown()
             executor.shutdownNow()
@@ -1471,7 +1473,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
         startLiveChild(fixture, session)
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(session, "task-1", 1, emptyList(), subject = "审查"))
         val binding = teamBinding(fixture, session)
         val ready = CountDownLatch(2)
@@ -1503,10 +1505,10 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture(session)
         appendActiveMember(fixture.log, session)
         startLiveChild(fixture, session)
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
             status = "in_progress", ownerId = "member-1"))
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-2", 1, listOf("task-1")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-2", 1, listOf("task-1")))
         val binding = teamBinding(fixture, session)
         suspend fun complete(result: String?) = fixture.runtime.execute(LocalToolCall("complete", "team_task_update", buildJsonObject {
             put("task_id", "task-1"); put("expected_revision", 2); put("action", "complete")
@@ -1554,7 +1556,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-activity-limit")
         repeat(70) { index ->
             fixture.log.append(
-                LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+                LocalAgentTeamContract.TEAM_TASK_EVENT,
                 task("team-activity-limit", "task-${index + 1}", 1, blockedBy = emptyList()),
             )
         }
@@ -1579,8 +1581,8 @@ class LocalAgentTeamRuntimeTest {
             encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 1, emptyList(), emptySet(),
                 terminalOutput = "旧任务结果"))
         legacyCheckpoint()
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
-        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
             status = "in_progress", ownerId = "member-1"))
         legacyCheckpoint()
         assertEquals(1, fixture.runtime.uiState(session).members.single().resultMessageCount)
@@ -1658,11 +1660,11 @@ class LocalAgentTeamRuntimeTest {
 
     private fun appendActiveMember(log: LocalSessionEventLog, teamId: String) {
         log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(teamId, "member-1", "worker", "provisioning"),
         )
         log.append(
-            LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
+            LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(teamId, "member-1", "worker", "active"),
         )
     }
@@ -1674,7 +1676,7 @@ class LocalAgentTeamRuntimeTest {
         phase: String,
         description: String = "",
     ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("member", buildJsonObject {
             put("id", id)
@@ -1692,7 +1694,7 @@ class LocalAgentTeamRuntimeTest {
         targetId: String,
         text: String,
     ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("message", buildJsonObject {
             put("id", id)
@@ -1718,7 +1720,7 @@ class LocalAgentTeamRuntimeTest {
         messageId: String,
         targetId: String,
     ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("messageId", messageId)
         put("targetId", targetId)
@@ -1729,7 +1731,7 @@ class LocalAgentTeamRuntimeTest {
         messageId: String,
         targetId: String,
     ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("messageId", messageId)
         put("targetId", targetId)
@@ -1746,7 +1748,7 @@ class LocalAgentTeamRuntimeTest {
         subject: String = id,
         writeScopes: List<String> = emptyList(),
     ) = buildJsonObject {
-        put("version", LocalAgentTeamRuntime.TEAM_EVENT_VERSION)
+        put("version", LocalAgentTeamContract.TEAM_EVENT_VERSION)
         put("teamId", teamId)
         put("task", buildJsonObject {
             put("id", id)

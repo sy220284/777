@@ -37,3 +37,10 @@
 ## 面向用户的界面收敛
 
 保留统一聊天主界面，按聊天/工作切换。项目与文件、运行中心、定时任务、工具与扩展、设置可在侧栏进入。群聊、人物、日记归聊天领域，Agent 团队从工作模式 + 面板启动；工具活动和成果随真实运行状态展示，界面读取同一份运行记录。
+
+## 共享机制与 Feature 策略（PR #594）
+
+- `JournalDocumentFile` 只拥有持久化、WAL、修复及缓存机制；Memory/Automation 保留业务变更编码与幂等归约，Automation 独占调度代次水位。
+- `TurnContextPlacement` 只负责消息放置；Work 保留完整技能规则和拒绝超限策略。`LocalHistoryCompactor` 不解释工作目标和计划，摘要内容由 Chat/Work 各自策略提供。
+- `LocalAgentTeamRuntime` 仍为唯一团队命令与副作用所有者；事件 codec 和纯 reducer 分离。工作后台工具、智能体 UI 操作及邮箱恢复由 Work 服务持有，组合根只连接它们。
+- 运行中心完整历史使用已有 EventLog 游标和成果提取器；文件归 Files，工具证据归 Tool/Session，不增加平行数据库或新的执行所有者。

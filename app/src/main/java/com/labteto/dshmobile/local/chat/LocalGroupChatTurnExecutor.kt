@@ -155,16 +155,18 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         snapshot = snapshot,
         messages = messages,
         step = step,
-        toolsOverride = toolsOverride,
-        publishPreviewEnabled = publishPreview,
-        maxAttemptsOverride = maxAttemptsOverride,
-        allowContextOverflowRecovery = allowContextOverflowRecovery,
-        requestLog = eventLog,
-        temperature = temperature,
-        previewGuard = {
+        options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+            toolsOverride = toolsOverride,
+            publishPreviewEnabled = publishPreview,
+            maxAttemptsOverride = maxAttemptsOverride,
+            allowContextOverflowRecovery = allowContextOverflowRecovery,
+            requestLog = eventLog,
+            temperature = temperature,
+            previewGuard = {
             runtimeStateStore.currentSessionId == snapshot.sessionId &&
                 runtimeStateStore.state.value.sessionId == snapshot.sessionId
         },
+        ),
     )
 
     private suspend fun generateGroupReply(

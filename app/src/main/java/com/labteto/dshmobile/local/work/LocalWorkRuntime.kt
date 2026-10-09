@@ -56,6 +56,20 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     }
 
+    internal fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
+        if (sessionId != runtimeStateStore.currentSessionId) return com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
+        val log = eventLogs.get(sessionId)
+        val generation = log.resetGeneration
+        val root = File(sessionFiles.workspace.path)
+        val page = projectLocalWorkHistoryPage(log, cursor)
+        val projected = page.copy(records = page.records.map { record ->
+            record.copy(artifacts = record.artifacts.map { item -> if (item.category == "file") item.copy(
+                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference)) else item })
+        })
+        return if (sessionId == runtimeStateStore.currentSessionId && !log.isClosed && generation == log.resetGeneration) projected
+        else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
+    }
+
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
     internal fun eventSequenceForUi(sessionId: String): Long =
         if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L
@@ -94,7 +108,8 @@ class LocalWorkRuntime @Inject internal constructor(
             ?: return null
         return when (event.type) {
             "tool/call" -> event.data["arguments"]?.toString()
-            "tool/result" -> event.data["content"]?.jsonPrimitive?.contentOrNull
+            "tool/result", "subagent/tool-result" -> event.data["content"]?.jsonPrimitive?.contentOrNull
+            "tool/execution-started" -> event.data.toString()
             else -> null
         }
     }

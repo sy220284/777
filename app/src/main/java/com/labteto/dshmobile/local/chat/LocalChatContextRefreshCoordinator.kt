@@ -179,10 +179,12 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 snapshot = snapshot,
                 messages = chatPostTurnModelMessages(prompt),
                 step = CHAT_POST_TURN_MODEL_STEP,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreviewEnabled = false,
-                requestLog = eventLog,
-                profile = profile,
+                options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreviewEnabled = false,
+                    requestLog = eventLog,
+                    profile = profile,
+                ),
             )
         },
         recordUsage = { snapshot, reply ->

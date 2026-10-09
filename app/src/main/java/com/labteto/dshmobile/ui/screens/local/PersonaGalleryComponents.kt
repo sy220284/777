@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsCheckbox
-
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
 import java.io.File
@@ -82,39 +81,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@Composable
-internal fun PersonaGalleryTopBar(
-    title: String,
-    onBack: () -> Unit,
-) {
-    val colors = DsTheme.colors
-    Surface(
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CHROME, BackgroundRegion.TOP, colors.bgBase),
-        shadowElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DsIconButton(
-                icon = FeatherIcons.ArrowLeft,
-                contentDescription = stringResource(R.string.common_back),
-                onClick = onBack,
-            )
-            Text(
-                text = title,
-                style = DsType.large20.withReadingWeight(),
-                color = colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
 
 internal fun personaExportFileName(
     name: String,
@@ -445,153 +411,6 @@ internal fun StoryDetailSection(
 }
 
 @Composable
-internal fun GalleryOverviewHeader(
-    characterCount: Int,
-    storyCount: Int,
-    dialogueCount: Int,
-) {
-    DsCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = CircleShape,
-                color = DsTheme.colors.characterAccentTertiary,
-                modifier = Modifier.size(46.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        FeatherIcons.Sparkles,
-                        contentDescription = null,
-                        tint = DsTheme.colors.characterAccent,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(DsSpacing.medium))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
-                Text(
-                    stringResource(R.string.persona_gallery_master),
-                    style = DsType.large20.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
-                )
-                Text(
-                    stringResource(
-                        R.string.persona_gallery_overview_stats,
-                        characterCount,
-                        storyCount,
-                        dialogueCount,
-                    ),
-                    style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PersonaPresetArtworkPreview(
-    preset: PersonaPreset,
-) {
-    val context = LocalContext.current
-    val assetPath = preset.artwork?.assetPath.orEmpty()
-    val artwork by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = assetPath,
-    ) {
-        value = if (assetPath.isBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    context.assets.open(assetPath).use { input ->
-                        BitmapFactory.decodeStream(input, null, bounds)
-                    }
-                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
-                    var sample = 1
-                    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-                    while (longest / sample > 720) sample *= 2
-                    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-                    context.assets.open(assetPath).use { input ->
-                        BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
-                    }
-                }.getOrNull()
-            }
-        }
-    }
-
-    val resolvedArtwork = artwork
-    if (resolvedArtwork == null) {
-        PersonaAvatar(preset.persona.name)
-    } else {
-        Image(
-            bitmap = resolvedArtwork,
-            contentDescription = preset.persona.name,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
-            modifier = Modifier
-                .size(72.dp)
-                .clip(RoundedCornerShape(18.dp)),
-        )
-    }
-}
-
-@Composable
-internal fun PersonaPresetCard(
-    preset: PersonaPreset,
-    busy: Boolean,
-    modifier: Modifier = Modifier,
-    onInstall: () -> Unit,
-    onLongClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
-        shadowElevation = 2.dp,
-        modifier = modifier
-            .heightIn(min = 196.dp)
-            .combinedClickable(
-                enabled = !busy,
-                onClick = onInstall,
-                onLongClick = onLongClick,
-            ),
-    ) {
-        Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            PersonaPresetArtworkPreview(preset)
-            Text(
-                preset.persona.name,
-                style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            GalleryPill(preset.franchise)
-            Text(
-                preset.summary,
-                style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            DsButton(
-                text = stringResource(R.string.persona_gallery_preset_add),
-                onClick = onInstall,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-                variant = DsButtonVariant.Outline,
-            )
-        }
-    }
-}
-
-@Composable
 internal fun GalleryStoryCard(
     story: PersonaGalleryStory,
     selected: Boolean,
@@ -667,54 +486,6 @@ private fun ArchivedDialogueRow(
             color = DsTheme.colors.labelSecondary,
             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
         )
-    }
-}
-
-@Composable
-internal fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
-    val colors = DsTheme.colors
-    val state = story.chatState
-    DsCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    stringResource(R.string.persona_gallery_story_relation),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-            }
-            GalleryPill(state.relationshipState)
-            state.mood.takeIf(String::isNotBlank)?.let { GalleryPill(it) }
-        }
-        state.currentFocus.takeIf(String::isNotBlank)?.let { focus ->
-            Text(
-                focus,
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        state.dynamics.sharedMoments.lastOrNull()?.takeIf(String::isNotBlank)?.let { moment ->
-            Text(
-                moment,
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }
 

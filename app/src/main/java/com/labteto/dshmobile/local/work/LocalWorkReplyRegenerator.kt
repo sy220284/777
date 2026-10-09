@@ -92,14 +92,16 @@ internal class LocalWorkReplyRegenerator @Inject constructor(
                 snapshot = snapshot,
                 messages = messages,
                 step = 1,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreviewEnabled = false,
-                persistOverflowHistory = true,
-                requestLog = log,
-                previewGuard = {
+                options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreviewEnabled = false,
+                    persistOverflowHistory = true,
+                    requestLog = log,
+                    previewGuard = {
                     runtimeStateStore.currentSessionId == sessionId &&
                         runtimeStateStore.state.value.sessionId == sessionId
                 },
+                ),
             )
             commitReply(
                 sessionId = sessionId,

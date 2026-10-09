@@ -87,7 +87,7 @@ internal fun compactHistoryWithStaleToolProjection(
     summaryMode: LocalHistorySummaryMode,
     currentChars: Int,
     currentTokens: Int,
-    structuredWorkState: LocalStructuredWorkState? = null,
+    structuredWorkState: LocalHistorySummaryInput? = null,
 ): LocalHistoryCompaction? {
     val projection = projectStaleToolResults(history, budget)
     val source = projection?.messages ?: history
@@ -103,20 +103,4 @@ internal fun compactHistoryWithStaleToolProjection(
     return compaction.copy(
         estimatedTokensBefore = projection?.estimatedTokensBefore ?: compaction.estimatedTokensBefore,
     )
-}
-
-internal fun projectStaleSubagentToolResults(
-    history: MutableList<JsonObject>,
-    budget: LocalHistoryBudget?,
-    subagentId: String,
-    eventLog: LocalSessionEventLog,
-) {
-    val projection = budget?.let { projectStaleToolResults(history, it) } ?: return
-    history.clear()
-    history += projection.messages
-    eventLog.append("subagent/tool-history-projection", buildJsonObject {
-        put("agent_id", subagentId)
-        put("estimated_tokens_before", projection.estimatedTokensBefore)
-        put("estimated_tokens_after", projection.estimatedTokensAfter)
-    })
 }

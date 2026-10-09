@@ -29,7 +29,7 @@ class MemoryStoreTest {
         val record = memoryStore.remember("remember apples", MemoryScope.GLOBAL)
         File(temporary.root, "memories.json").writeText("broken")
         assertEquals(record, all(memoryStore).single())
-        assertTrue(temporary.root.listFiles()!!.any { it.name.startsWith("memories.corrupt-") })
+        assertTrue(temporary.root.listFiles()!!.any { it.name.contains(".corrupt-") && it.readText().startsWith("broken") })
         assertEquals(record, all(memoryStore).single())
     }
 
@@ -48,8 +48,9 @@ class MemoryStoreTest {
 
         val failure = runCatching { all(store()) }.exceptionOrNull()
         assertTrue(failure is IllegalStateException)
-        assertTrue(failure?.message.orEmpty().contains("主文件与备份均无法读取"))
-        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.startsWith("memories.corrupt-") })
+        assertTrue(File(temporary.root, "memories.json.recovery-required").isFile)
+        assertTrue(runCatching { all(store()) }.exceptionOrNull() is IllegalStateException)
+        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().startsWith("broken") })
     }
 
     @Test fun tornJournalTailIsQuarantinedAndValidMutationsSurviveRestart() {
@@ -64,7 +65,7 @@ class MemoryStoreTest {
         assertEquals(setOf(first.id, second.id), all(restarted).map { it.id }.toSet())
         assertTrue(
             temporary.root.listFiles().orEmpty().any {
-                it.name.startsWith("memories.wal.corrupt-")
+                it.name.contains(".corrupt-") && it.readText().endsWith("{broken-tail")
             },
         )
     }

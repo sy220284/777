@@ -9,9 +9,9 @@ import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 
 /** WorkFeature implementation of the Shared request-context policy contract. */
 internal class LocalWorkRequestContextPolicy(
-    private val structuredState: com.labteto.dshmobile.local.model.LocalStructuredWorkState,
+    private val structuredState: com.labteto.dshmobile.local.work.LocalStructuredWorkState,
 ) : LocalRequestContextPolicy {
-    private val compactor = LocalHistoryCompactor()
+    private val compactor = LocalHistoryCompactor(summaries = LocalWorkHistorySummaryStrategy, )
 
     override fun project(input: LocalRequestContextPolicyInput): LocalRequestContextProjection {
         val projected = projectWorkRequestContext(

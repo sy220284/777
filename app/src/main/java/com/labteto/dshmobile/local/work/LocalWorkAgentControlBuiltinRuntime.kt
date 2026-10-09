@@ -163,6 +163,6 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             "send_message",
             "interrupt_agent",
             "workflow",
-        ) + LocalAgentTeamRuntime.TOOL_NAMES
+        ) + LocalAgentTeamContract.TOOL_NAMES
     }
 }

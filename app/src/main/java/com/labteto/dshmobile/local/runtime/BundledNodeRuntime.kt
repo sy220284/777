@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.nio.file.Files
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -41,32 +40,16 @@ class BundledNodeRuntime @Inject constructor(
 
         val versionRoot = File(runtimeHome, "$version/$abi")
         val libraryDir = File(versionRoot, "lib")
-        val marker = File(versionRoot, ".ready")
-        val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
-        if (
-            marker.readTextOrNull() != markerValue ||
-            !BundledRuntimeLibraryStore.isMaterializedValid(context, "node", abi, libraryDir)
-        ) {
-            versionRoot.deleteRecursively()
-            BundledRuntimeLibraryStore.materialize(context, "node", abi, libraryDir)
-            marker.parentFile?.mkdirs()
-            marker.writeText(markerValue)
-        }
+        BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, version, abi)
 
         val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
         require(nativeNode.isFile && nativeNode.canExecute()) {
             "内置 Node 可执行文件未从 APK 提取：${nativeNode.path}"
         }
 
-        binDir.mkdirs()
-        val nodeLink = File(binDir, "node").toPath()
-        Files.deleteIfExists(nodeLink)
-        Files.createSymbolicLink(nodeLink, nativeNode.toPath())
+        BundledRuntimeInstallation.linkExecutable(nativeNode, File(binDir, "node"))
 
-        runtimeHome.listFiles()
-            ?.filter { it.isDirectory && it.name != version }
-            ?.forEach { it.deleteRecursively() }
-
+        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
         activeLibraryDir = libraryDir
         runtimeVersion = version
@@ -91,9 +74,6 @@ class BundledNodeRuntime @Inject constructor(
             "当前 ABI 不支持内置 Node：${Build.SUPPORTED_ABIS.joinToString()}"
         else -> "Node 尚未完成初始化"
     }
-
-    private fun File.readTextOrNull(): String? =
-        runCatching { takeIf(File::isFile)?.readText()?.trim() }.getOrNull()
 
     private companion object {
         const val ASSET_ROOT = "runtime/node"

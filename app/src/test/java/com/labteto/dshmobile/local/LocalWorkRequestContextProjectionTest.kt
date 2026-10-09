@@ -6,8 +6,8 @@ import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.LocalStructuredWorkState
+import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.work.structuredWorkState
 import com.labteto.dshmobile.local.work.LocalWorkStepContextStatus
@@ -39,7 +39,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
             structuredWorkState = LocalStructuredWorkState(
                 goals = listOf("完成 Token 优化并保持任务效果"),
@@ -79,7 +79,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
             allowSemanticProjection = false,
         )
@@ -106,7 +106,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
         )
 
@@ -128,7 +128,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
         )
 
@@ -220,7 +220,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
         )
 
@@ -254,7 +254,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
             structuredWorkState = structured,
         )
@@ -292,7 +292,7 @@ class LocalWorkRequestContextProjectionTest {
             val projected = projectWorkRequestContext(
                 messages = history,
                 tools = JsonArray(emptyList()),
-                compactor = LocalHistoryCompactor(),
+                compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
                 operationalLimitTokens = 678_464,
                 measuredPressure = sourcePressure,
                 previousPressure = previousPressure,
@@ -337,7 +337,7 @@ class LocalWorkRequestContextProjectionTest {
         val projected = projectWorkRequestContext(
             messages = history,
             tools = JsonArray(emptyList()),
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             operationalLimitTokens = 678_464,
             measuredPressure = currentPressure,
             previousPressure = previous,

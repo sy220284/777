@@ -17,10 +17,11 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalForegroundHistoryCompactionRuntime @Inject constructor(
+    summaries: com.labteto.dshmobile.local.model.LocalHistorySummaryProvider,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
 ) {
-    private val compactor = LocalHistoryCompactor()
+    private val compactor = LocalHistoryCompactor(summaries = summaries)
     private val checkpointCodec = ModelHistoryCheckpointCodec()
 
     internal fun persistOverflowCompaction(

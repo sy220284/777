@@ -56,6 +56,15 @@ class ChatDiaryStoreTest {
             dir.listFiles().orEmpty().count { it.name.contains(".corrupt-") } >= 2,
         )
         assertTrue(!File(dir, "diary.json").isFile)
+        repeat(2) {
+            assertThrows(IllegalStateException::class.java) { fresh.listActive("gallery:a") }
+        }
+        assertThrows(IllegalStateException::class.java) { store().listActive("gallery:a") }
+        assertThrows(IllegalStateException::class.java) {
+            fresh.record(request(delta = ChatDiaryDelta(event = "用户答应周末和我去海边", feeling = "我很期待", importance = 4),
+                evidence = "用户答应周末和我去海边"))
+        }
+        assertTrue(!File(dir, "diary.json").isFile)
     }
 
     @Test

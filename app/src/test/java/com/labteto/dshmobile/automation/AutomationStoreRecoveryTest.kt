@@ -24,7 +24,7 @@ class AutomationStoreRecoveryTest {
 
             assertEquals(listOf("first", "second"), recovered.map(AutomationTask::id))
             assertTrue(file.readText().contains("\"first\""))
-            assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("automations.corrupt-") })
+            assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().contains("broken") })
         } finally {
             directory.deleteRecursively()
         }
@@ -64,7 +64,7 @@ class AutomationStoreRecoveryTest {
             assertEquals(listOf("first", "second"), recovered.map(AutomationTask::id))
             assertTrue(
                 directory.listFiles().orEmpty()
-                    .any { it.name.startsWith("automations.wal.corrupt-") },
+                    .any { it.name.contains(".corrupt-") && it.readText().endsWith("{broken-tail") },
             )
         } finally {
             directory.deleteRecursively()
@@ -92,8 +92,9 @@ class AutomationStoreRecoveryTest {
                 store.upsert(task("must-not-overwrite", 3_000L))
             }
 
-            assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("automations.corrupt-") })
-            assertTrue(backup.isFile)
+            assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().contains("broken") })
+            assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText() == "{broken-backup" })
+            assertThrows(IllegalStateException::class.java) { AutomationStore(file, json).list() }
         } finally {
             directory.deleteRecursively()
         }

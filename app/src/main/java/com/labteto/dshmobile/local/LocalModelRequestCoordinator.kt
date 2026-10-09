@@ -64,6 +64,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalModelRequestCoordinator @Inject constructor(
+    summaries: com.labteto.dshmobile.local.model.LocalHistorySummaryProvider,
     private val modelGateway: LocalModelGateway,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -81,7 +82,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         get() = runtimeStateStore.streamingPreviewStore
     private val pressureStore
         get() = runtimeStateStore.requestPressureStore
-    private val historyCompactor = LocalHistoryCompactor()
+    private val historyCompactor = LocalHistoryCompactor(summaries = summaries)
     private val promptCacheBaselines = LocalPromptCacheBaselineStore()
     private val promptCacheContinuity = LocalPromptCacheContinuityStore()
     private val maxStreamPreviewChars: Int = 4_096
@@ -106,43 +107,30 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
-        toolsOverride: JsonArray? = null,
-        publishPreviewEnabled: Boolean = true,
-        maxAttemptsOverride: Int? = null,
-        allowContextOverflowRecovery: Boolean = true,
-        persistOverflowHistory: Boolean = false,
-        streamFilterPhrases: List<String> = emptyList(),
-        requestLog: LocalSessionEventLog? = null,
-        temperature: Double? = null,
-        profile: LocalModelProfile? = null,
-        previewGuard: () -> Boolean = { true },
-        overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
-        contextPolicy: LocalRequestContextPolicy? = null,
-        allowImageGeneration: Boolean = false,
-        admission: LocalModelAdmissionPort? = null,
+        options: LocalModelRequestOptions = LocalModelRequestOptions(),
     ): LocalModelReply {
+        val toolsOverride = options.toolsOverride
+        val publishPreviewEnabled = options.publishPreviewEnabled
+        val maxAttemptsOverride = options.maxAttemptsOverride
+        val allowContextOverflowRecovery = options.allowContextOverflowRecovery
+        val persistOverflowHistory = options.persistOverflowHistory
+        val streamFilterPhrases = options.streamFilterPhrases
+        val requestLog = options.requestLog
+        val temperature = options.temperature
+        val profile = options.profile
+        val previewGuard = options.previewGuard
+        val overflowPersister = options.overflowPersister
+        val contextPolicy = options.contextPolicy
+        val allowImageGeneration = options.allowImageGeneration
+        val admission = options.admission
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
-        val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelState.modelSelection.activeProfileId,
-            snapshot.modelState.model,
-            snapshot.modelState.baseUrl,
-        )
-        val runSurface = frozenProfile.toRunModelSurface()
-        // Freeze per-turn model reasoning preference before admission and retries.
-        val reasoningEffort = LocalReasoningModeStore.effortFor(
-            sessionId = snapshot.sessionId,
-            profile = frozenProfile,
-            withTools = tools.isNotEmpty(),
-            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
-        )
-        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
-        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
-            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
-                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
-            )
-        } else null
-        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val frozen = freezeRequestConfiguration(snapshot, profile, tools, temperature)
+        val frozenProfile = frozen.profile
+        val runSurface = frozen.surface
+        val reasoningEffort = frozen.reasoningEffort
+        val effectiveTemperature = frozen.temperature
+        val credentialDiagnostic = frozen.credentialDiagnostic
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
         val cachePolicy = runSurface.promptCachePolicy
@@ -900,6 +888,40 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
         }
     }
+
+    /** Freeze route and session choices once; retries never re-read changing UI settings. */
+    private suspend fun freezeRequestConfiguration(snapshot: LocalHarnessState, profile: LocalModelProfile?,
+        tools: JsonArray, temperature: Double?): FrozenRequestConfiguration {
+        val frozenProfile = profile ?: modelGateway.profileForRoute(
+            snapshot.modelState.modelSelection.activeProfileId,
+            snapshot.modelState.model,
+            snapshot.modelState.baseUrl,
+        )
+        val runSurface = frozenProfile.toRunModelSurface()
+        // Freeze per-turn model reasoning preference before admission and retries.
+        val reasoningEffort = LocalReasoningModeStore.effortFor(
+            sessionId = snapshot.sessionId,
+            profile = frozenProfile,
+            withTools = tools.isNotEmpty(),
+            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
+        )
+        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
+        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
+            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
+                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+            )
+        } else null
+        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        return FrozenRequestConfiguration(frozenProfile, runSurface, reasoningEffort, effectiveTemperature, credentialDiagnostic)
+    }
+
+    private data class FrozenRequestConfiguration(
+        val profile: LocalModelProfile,
+        val surface: com.labteto.dshmobile.local.model.LocalRunModelSurface,
+        val reasoningEffort: String?,
+        val temperature: Double?,
+        val credentialDiagnostic: com.labteto.dshmobile.local.model.LocalCredentialDiagnostic,
+    )
 
     private fun ensureRequestEvidenceSurface(
         cache: MutableMap<String, RequestEvidenceRef>,

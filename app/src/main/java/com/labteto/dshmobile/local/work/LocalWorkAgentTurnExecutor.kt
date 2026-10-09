@@ -316,23 +316,25 @@ internal class LocalWorkAgentTurnExecutor(
                             snapshot = snapshot,
                             messages = requestMessages,
                             step = modelStep + 1,
-                            toolsOverride = tools,
-                            publishPreviewEnabled = true,
-                            persistOverflowHistory = true,
-                            requestLog = runEventLog,
-                            previewGuard = {
+                            options = com.labteto.dshmobile.local.LocalModelRequestOptions(
+                                toolsOverride = tools,
+                                publishPreviewEnabled = true,
+                                persistOverflowHistory = true,
+                                requestLog = runEventLog,
+                                previewGuard = {
                                 runtimeStateStore.currentSessionId == binding.sessionId &&
                                     runtimeStateStore.state.value.sessionId == binding.sessionId
                             },
-                            overflowPersister = { overflowSnapshot, mode ->
+                                overflowPersister = { overflowSnapshot, mode ->
                                 workModelHistoryRuntime.persistOverflowCompaction(
                                     overflowSnapshot,
                                     mode,
                                     binding,
                                 )
                             },
-                            contextPolicy = LocalWorkRequestContextPolicy(structuredWorkState(snapshot, runEventLog, workSessionProjection)),
-                            admission = binding.executionControl.asModelAdmissionPort(),
+                                contextPolicy = LocalWorkRequestContextPolicy(structuredWorkState(snapshot, runEventLog, workSessionProjection)),
+                                admission = binding.executionControl.asModelAdmissionPort(),
+                            ),
                         ).also {
                             if (nativeImagesSent) {
                                 imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)

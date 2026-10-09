@@ -186,6 +186,16 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工作成果清单、逐项操作及历史范围",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#olderPageReplacesRecentRecordsAndShowsExactToolEvidence",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果当前可用性和安全路径核对",
       "state": "automated_partial",
       "evidence": [
@@ -774,7 +784,9 @@
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 原子写入、损坏恢复和版本迁移",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#corruptPrimaryRecoversLastKnownGoodBackup"
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#corruptPrimaryRecoversLastKnownGoodBackup",
+        "app/src/test/java/com/labteto/dshmobile/local/persistence/JournalDocumentCommitTest.kt#memoryReplaySurvivesEachCompactionInterruptionAndLostPrimary",
+        "app/src/test/java/com/labteto/dshmobile/local/persistence/JournalDocumentCommitTest.kt#automationReplayPreservesDeletedGenerationAtEachCommitInterruption"
       ]
     },
     {

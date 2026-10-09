@@ -3,8 +3,8 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.LocalStructuredWorkState
+import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.applyOverflowCompaction
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.model.retainTextForModel
@@ -21,7 +21,7 @@ import org.junit.Test
 class LocalHistoryCompactorTest {
     @Test
     fun leavesSmallHistoryUntouched() {
-        val compactor = LocalHistoryCompactor(maxHistoryChars = 10_000, tailChars = 1_000)
+        val compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, maxHistoryChars = 10_000, tailChars = 1_000)
         assertNull(compactor.compact(listOf(message("system", "系统"), message("user", "你好"))))
     }
 
@@ -47,10 +47,10 @@ class LocalHistoryCompactorTest {
         )
 
         assertTrue(
-            LocalHistoryCompactor().compact(history, budget = common) != null,
+            LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(history, budget = common) != null,
         )
         assertNull(
-            LocalHistoryCompactor().compact(
+            LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(
                 history,
                 budget = common.copy(adaptiveCompactionTrigger = false),
             ),
@@ -69,7 +69,7 @@ class LocalHistoryCompactorTest {
             message("user", "最新请求：继续完成剩余问题。" + pad),
             message("assistant", "正在继续处理。" + pad),
         )
-        val compaction = LocalHistoryCompactor(maxHistoryChars = 300, tailChars = 260)
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, maxHistoryChars = 300, tailChars = 260)
             .compact(history) ?: error("expected compaction")
 
         assertTrue(compaction.omittedMessages > 0)
@@ -98,7 +98,7 @@ class LocalHistoryCompactorTest {
             }
         }
 
-        val compacted = LocalHistoryCompactor(
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 1_000,
             tailChars = 500,
             maxSummaryChars = 1_000,
@@ -126,7 +126,7 @@ class LocalHistoryCompactorTest {
             message("assistant", "正在继续" + "新".repeat(120)),
         )
 
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 300,
             maxSummaryChars = 3_000,
@@ -163,14 +163,14 @@ class LocalHistoryCompactorTest {
             message("assistant", "最近答复" + "新".repeat(500)),
         )
 
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 260,
             maxSummaryChars = 4_000,
         ).compact(history, summaryMode = LocalHistorySummaryMode.WORK)
             ?: error("expected typed work compaction")
 
-        val checkpoint = requireNotNull(compaction.workCheckpoint)
+        val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(compaction.messages))
         assertTrue(checkpoint.goals.any { it.contains("恢复链") })
         assertTrue(checkpoint.constraints.any { it.contains("保持旧会话兼容") })
         assertTrue(checkpoint.decisions.any { it.contains("Session Event") })
@@ -206,7 +206,7 @@ class LocalHistoryCompactorTest {
             tools = listOf("github_api_request"),
         )
 
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 260,
             maxSummaryChars = 4_000,
@@ -216,7 +216,7 @@ class LocalHistoryCompactorTest {
             structuredWorkState = structured,
         ) ?: error("expected structured compaction")
 
-        val checkpoint = requireNotNull(compaction.workCheckpoint)
+        val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(compaction.messages))
         assertTrue(checkpoint.goals.contains("发布统一治理 PR"))
         assertEquals(listOf("读取权威文档", "执行组合回归"), checkpoint.plan)
         assertTrue(checkpoint.unfinished.any { it.contains("组合回归") })
@@ -252,14 +252,14 @@ class LocalHistoryCompactorTest {
             add(message("user", "继续最后的验证"))
         }
 
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 800,
             tailChars = 320,
             maxSummaryChars = 4_000,
         ).compact(history, summaryMode = LocalHistorySummaryMode.WORK)
             ?: error("expected repeated work compaction")
 
-        val next = requireNotNull(compaction.workCheckpoint)
+        val next = requireNotNull(LocalWorkCheckpoint.latestFrom(compaction.messages))
         assertTrue(next.constraints.contains("必须保留完整功能"))
         assertTrue(next.constraints.contains("PR 标题使用中文"))
         assertTrue(next.decisions.contains("旧历史按需召回"))
@@ -299,7 +299,7 @@ class LocalHistoryCompactorTest {
             message("user", "最近请求" + "新".repeat(400)),
             message("assistant", "最近答复" + "新".repeat(400)),
         )
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 1_000,
             tailChars = 700,
             maxSummaryChars = 2_000,
@@ -326,7 +326,7 @@ class LocalHistoryCompactorTest {
             tailTokens = 300,
             maxToolResultTokens = 2_000,
         )
-        val compaction = LocalHistoryCompactor().compact(history, budget = budget)
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(history, budget = budget)
             ?: error("expected token-pressure compaction")
 
         assertTrue(compaction.estimatedTokensBefore > budget.maxHistoryTokens!!)
@@ -353,7 +353,7 @@ class LocalHistoryCompactorTest {
             maxToolResultTokens = 2_000,
         )
 
-        assertNull(LocalHistoryCompactor().compact(history, budget = budget))
+        assertNull(LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(history, budget = budget))
     }
 
     @Test
@@ -365,7 +365,7 @@ class LocalHistoryCompactorTest {
             message("user", "继续刚才的话题。" + "新".repeat(120)),
             message("assistant", "好。" + "新".repeat(120)),
         )
-        val compaction = LocalHistoryCompactor(maxHistoryChars = 400, tailChars = 260)
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, maxHistoryChars = 400, tailChars = 260)
             .compact(history, summaryMode = LocalHistorySummaryMode.CHAT)
             ?: error("expected chat compaction")
 
@@ -389,7 +389,7 @@ class LocalHistoryCompactorTest {
             message("assistant", "继续" + "新".repeat(500)),
         )
 
-        val compaction = LocalHistoryCompactor()
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, )
             .compactForOverflow(history, LocalHistorySummaryMode.CHAT)
             ?: error("expected overflow compaction")
 
@@ -425,7 +425,7 @@ class LocalHistoryCompactorTest {
 
         val compaction = applyOverflowCompaction(
             history = history,
-            compactor = LocalHistoryCompactor(),
+            compactor = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ),
             summaryMode = LocalHistorySummaryMode.WORK,
         ) ?: error("expected durable overflow compaction")
 
@@ -452,7 +452,7 @@ class LocalHistoryCompactorTest {
         val beforeChars = history.sumOf { it.toString().length }
         assertTrue(beforeChars < 10_000)
 
-        val compaction = LocalHistoryCompactor(
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 10_000,
             tailChars = 1_500,
             maxSummaryChars = 1_000,
@@ -507,7 +507,7 @@ class LocalHistoryCompactorTest {
             calls,
         ) + results
 
-        val compacted = LocalHistoryCompactor()
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, )
             .compactForOverflow(history, LocalHistorySummaryMode.WORK)
             ?: error("expected overflow recovery")
 
@@ -531,7 +531,7 @@ class LocalHistoryCompactorTest {
         } }
         val history = listOf(message("system", "rules"), message("user", "old".repeat(8_000)),
             message("assistant", "done"), calls) + results
-        val compacted = LocalHistoryCompactor().compactForOverflow(history)
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compactForOverflow(history)
             ?: error("expected overflow compaction")
         assertEquals(listOf(calls) + results, compacted.messages.takeLast(3))
         com.labteto.dshmobile.local.model.validateCanonicalModelHistory(
@@ -565,7 +565,7 @@ class LocalHistoryCompactorTest {
             }
             add(message("user", "继续当前任务"))
         }
-        val compacted = LocalHistoryCompactor().compact(
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, ).compact(
             history = history,
             budget = LocalHistoryBudget(
                 maxHistoryChars = 1_000_000,

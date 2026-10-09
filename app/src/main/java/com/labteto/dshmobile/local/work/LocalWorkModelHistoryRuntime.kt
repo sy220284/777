@@ -36,7 +36,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
     private val workMemory: LocalWorkMemoryRuntime,
     private val workSessionProjection: LocalWorkSessionProjectionRuntime,
 ) {
-    private val compactor = LocalHistoryCompactor()
+    private val compactor = LocalHistoryCompactor(summaries = LocalWorkHistorySummaryStrategy, )
     private val checkpointCodec = ModelHistoryCheckpointCodec()
 
     internal fun ensureSystemMessage(binding: LocalWorkRunBinding) {

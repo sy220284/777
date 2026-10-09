@@ -67,6 +67,7 @@ internal fun LocalRunCenterScreen(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
+    onHistoryPage: ((String, com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi)? = null,
     onArtifactHistory: (String, Int) -> List<LocalArtifactUiItem> = { _, _ -> emptyList() },
     onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
     onEventSequence: (String) -> Long = { 0L },
@@ -82,6 +83,7 @@ internal fun LocalRunCenterScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
+    var showFullHistory by remember(state.sessionId) { mutableStateOf(false) }
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
     var researchPreset by remember(state.sessionId) { mutableStateOf(false) }
@@ -142,6 +144,11 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
+            if (onHistoryPage != null) {
+                DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
+                    variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium))
+            }
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 Column(Modifier.fillMaxSize()) {
                     DsPageEmptyState(
@@ -335,6 +342,10 @@ internal fun LocalRunCenterScreen(
                     style = DsType.small13)
             }
         }
+    }
+
+    if (showFullHistory && onHistoryPage != null) {
+        LocalWorkHistorySheet(state.sessionId, onHistoryPage, onToolEvidence, onOpenResults) { showFullHistory = false }
     }
 
     if (showAgentLauncher) {

@@ -1901,5 +1901,15 @@
     <string name="markdown_callout_tip">提示</string>
     <string name="markdown_code_language">代码</string>
     <string name="markdown_copy_code">复制代码</string>
+    <string name="local_run_full_history">查看完整历史</string>
+    <string name="local_run_history_latest">回到最新</string>
+    <string name="local_run_history_older">更早一页</string>
+    <string name="local_run_history_failed">历史读取失败，请重试。</string>
+    <string name="local_run_history_changed">会话历史已变更，请回到最新重新读取。</string>
+    <string name="local_run_history_page_empty">这一页没有成果或工具记录，可继续查看更早一页。</string>
+    <string name="local_run_history_record">#%1$d · %2$s · %3$s</string>
+    <string name="local_run_history_call">调用</string>
+    <string name="local_run_history_started">开始执行</string>
+    <string name="local_run_history_result">结果</string>
 </resources>
 
