@@ -583,7 +583,7 @@
     <string name="local_run_open_results">本次文件与成果</string>
     <string name="tools_title">能力中心</string>
     <string name="tools_loading">正在读取工具与连接状态…</string>
-    <string name="tools_subtitle">查看工作模式可用能力，并按需管理外部连接</string>
+    <string name="tools_subtitle">管理网络搜索、技能与外部连接</string>
     <string name="tools_refresh">刷新能力状态</string>
     <string name="tools_external_services">外部工具服务</string>
     <string name="tools_no_services">暂无已连接服务</string>
@@ -600,8 +600,6 @@
     <string name="tools_stdio_connect">连接 stdio 服务</string>
     <string name="tools_processing">处理中…</string>
     <string name="tools_connect">连接服务</string>
-    <string name="tools_remote_extensions">远程 Harness 扩展</string>
-    <string name="tools_remote_inventory">%1$d 个扩展 · 仅显示当前加载状态</string>
     <string name="tools_load_failed">读取工具状态失败</string>
     <string name="tools_connecting">正在连接外部工具服务…</string>
     <string name="tools_connected">外部工具服务已连接</string>
@@ -1250,9 +1248,8 @@
 <string name="tasks_custom_hours">重复间隔（小时）</string>
 <string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
 <string name="tasks_every_hours">每 %1$d 小时</string>
-<string name="tools_capability_group_hint">这里展示当前已加载能力；带箭头的项目可直接管理，其余由智能体按任务需要调用。</string>
+<string name="tools_capability_group_hint">在此管理网络搜索、技能与智能体设置。</string>
 <string name="tools_capability_agent_available">由智能体按需调用</string>
-<string name="tools_capability_automation_hint">查看、创建和取消定时任务</string>
 <string name="chat_composer_add_attachment">添加附件</string>
 <string name="local_composer_more_actions">更多</string>
 
@@ -1600,33 +1597,8 @@
     <string name="local_run_needs_attention">需要你处理 · %1$d</string>
     <string name="local_run_agent_inherits_context">助手会沿用当前任务的设置。开始后，你可以随时回来补充要求。</string>
 
-    <string name="tools_capability_code_hint">定义、引用、诊断与工作区符号</string>
-    <string name="tools_capability_vision_hint">图片与屏幕内容理解</string>
-    <string name="tools_capability_code_detail">代码任务中按需自动启用，不需要手动选择 LSP 命令。</string>
-    <string name="tools_capability_code_features">可用能力：跳转定义、查找引用、查找实现、类型说明、代码诊断与工作区符号。</string>
-    <string name="tools_capability_vision_detail">图片和屏幕理解继续走现有模型与视觉能力链，避免建立第二套执行路径。</string>
-    <string name="tools_capability_vision_features">可用能力：读取图片附件；任务需要时分析屏幕；存在虚拟屏幕任务时按上下文调用视觉能力。</string>
-    <string name="tools_capability_open_settings">打开相关设置</string>
     <string name="tools_github_capabilities">连接后，Agent 可处理 PR、Issue、Actions、仓库代码读取与受控修改。</string>
     <string name="tools_github_write_approval">涉及写入的操作继续遵守现有确认与权限边界。</string>
-    <string name="tools_webhook_title">Webhook</string>
-    <string name="tools_webhook_hint">允许本机其他应用触发 777 自动任务</string>
-    <string name="tools_webhook_enabled">已开启</string>
-    <string name="tools_webhook_disabled">已关闭</string>
-    <string name="tools_webhook_local_only_hint">仅监听本机 127.0.0.1，不开放局域网入口。</string>
-    <string name="tools_webhook_address">地址：127.0.0.1:%1$d/run</string>
-    <string name="tools_webhook_token_hint">访问令牌：%1$s</string>
-    <string name="tools_webhook_port">端口</string>
-    <string name="tools_webhook_port_hint">可用范围 1024–65535；运行中请先停止再修改。</string>
-    <string name="tools_webhook_start">启动</string>
-    <string name="tools_webhook_stop">停止</string>
-    <string name="tools_webhook_copy_token">复制令牌</string>
-    <string name="tools_webhook_rotate_token">轮换访问令牌</string>
-    <string name="tools_webhook_start_failed">Webhook 启动失败</string>
-    <string name="tools_webhook_stopped">Webhook 已停止</string>
-    <string name="tools_webhook_stop_failed">Webhook 停止失败</string>
-    <string name="tools_webhook_copy_token_failed">复制访问令牌失败</string>
-    <string name="tools_webhook_rotate_token_failed">轮换访问令牌失败</string>
 
     <string name="local_model_image_mode_title">图片处理方式</string>
     <string name="local_model_image_mode_auto">自动</string>
