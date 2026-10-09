@@ -69,6 +69,13 @@ data class CharacterBehaviorTuning(
      * Center (50) uses its conversation-friendly temperature without changing saved sliders.
      * Missing/unsupported model bounds leave its default sampling behavior intact.
      */
+    /** Five composer stops share the persona editor's 0..100 persisted value. */
+    internal fun composerTemperatureLevel(): Int =
+        ((expressionVariation.coerceIn(0, 100) + 12) / 25).coerceIn(0, 4)
+
+    internal fun withComposerTemperatureLevel(level: Int): CharacterBehaviorTuning =
+        copy(expressionVariation = level.coerceIn(0, 4) * 25)
+
     internal fun roleplayTemperature(model: String, baseUrl: String): Double? {
         val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
         // Gemini 3.x official guidance recommends omitting sampling fields at the default.
