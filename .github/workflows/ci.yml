@@ -171,6 +171,7 @@ jobs:
           python3 .github/scripts/check-kotlin-risk-patterns.py
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
+          python3 .github/scripts/check-acceptance-matrix.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
