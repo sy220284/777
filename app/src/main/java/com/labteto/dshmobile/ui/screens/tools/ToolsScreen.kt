@@ -423,12 +423,12 @@ fun ToolsScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(
-                            stringResource(R.string.tools_capability_group),
+                            stringResource(R.string.cap_center_settings_group),
                             style = DsType.std14.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         Text(
-                            stringResource(R.string.tools_capability_group_hint),
+                            stringResource(R.string.cap_center_settings_group_hint),
                             style = DsType.small13.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
