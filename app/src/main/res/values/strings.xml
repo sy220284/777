@@ -47,6 +47,8 @@
     <string name="local_artifact_more_history">查看更多历史成果</string>
     <string name="local_artifact_history_scope">当前扫描最近 %1$d 条事件；更多历史可继续展开。</string>
     <string name="local_tool_history_scope">工具活动仅展示最近 32 项，完整证据仍保存在会话事件日志中。</string>
+    <string name="local_artifact_file_unavailable">工作区文件 · 当前不可访问</string>
+    <string name="local_run_center_refresh_failed">运行记录读取失败，已保留上次显示的内容，正在尝试恢复。</string>
 
     <string name="local_project_delete_confirm">确定删除“%1$s”吗？关联会话及长期记忆会阻止删除，相关数据不会自动清理。</string>
     <string name="common_search">搜索</string>
