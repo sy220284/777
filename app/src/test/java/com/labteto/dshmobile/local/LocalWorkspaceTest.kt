@@ -221,11 +221,11 @@ class LocalWorkspaceTest {
         repeat(3) {
             val result = workspace.list("paged", cursor = cursor)
             pages += result
-            val next = Regex("""cursor=(\\d+)""").find(result)
+            val next = Regex("""cursor=(\d+)""").find(result)
             if (next != null) cursor = next.groupValues[1].toInt()
         }
         val observed = pages.flatMap { page ->
-            Regex("""paged/item-\\d{4}\\.txt""").findAll(page).map { it.value }.toList()
+            Regex("""paged/item-\d{4}\.txt""").findAll(page).map { it.value }.toList()
         }
         assertEquals(1_005, observed.size)
         assertEquals(1_005, observed.toSet().size)
