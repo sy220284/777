@@ -210,6 +210,34 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun resumedDirectoryTraversalPreservesAllRowsAcrossThreePagesAndColdFallback() {
+        val directory = root.resolve("paged")
+        directory.mkdirs()
+        repeat(1_005) { i ->
+            directory.resolve("item-" + i.toString().padStart(4, '0') + ".txt").writeText("record")
+        }
+        val pages = mutableListOf<String>()
+        var cursor = 0
+        repeat(3) {
+            val result = workspace.list("paged", cursor = cursor)
+            pages += result
+            val next = Regex("""cursor=(\\d+)""").find(result)
+            if (next != null) cursor = next.groupValues[1].toInt()
+        }
+        val observed = pages.flatMap { page ->
+            Regex("""paged/item-\\d{4}\\.txt""").findAll(page).map { it.value }.toList()
+        }
+        assertEquals(1_005, observed.size)
+        assertEquals(1_005, observed.toSet().size)
+        assertTrue(observed.last().contains("item-1004.txt"))
+        assertFalse(pages.last().contains("目录扫描未完"))
+
+        // Cursors remain valid after the process-local traversal cache disappears.
+        val coldWorkspace = LocalWorkspace(root)
+        assertTrue(coldWorkspace.list("paged", cursor = 801).contains("item-1004.txt"))
+    }
+
+    @Test
     fun searchResultPageCarriesLineCursorInsteadOfSilentlyLosingMatches() {
         val text = (1..250).joinToString("\n") { "needle row $it" }
         root.resolve("rows.txt").writeText(text)
