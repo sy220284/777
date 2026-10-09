@@ -668,9 +668,22 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODELS -> {
+                        var addModelRequested by remember { mutableStateOf(false) }
                         val account by viewModel.chatGptState.collectAsStateWithLifecycle()
+                        DsButton(
+                            text = stringResource(R.string.local_api_model_add),
+                            onClick = { addModelRequested = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            icon = FeatherIcons.Plus,
+                        )
                         ChatGptAccountPanel(account, localHarness, viewModel, toast.second)
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        LocalModelSettingsCard(
+                            local = localHarness,
+                            viewModel = viewModel,
+                            report = toast.second,
+                            requestAddModel = addModelRequested,
+                            onAddModelRequestHandled = { addModelRequested = false },
+                        )
                         ModelServicesCard(modelServices, viewModel)
                     }
 
