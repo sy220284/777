@@ -345,11 +345,25 @@ class MemoryStore internal constructor(
         var used = 0
         val selected = mutableListOf<MemoryRecord>()
         for (record in reranked) {
-            val cost = record.content.length + 32
-            if (selected.isNotEmpty() && used + cost > boundedChars) break
-            selected += record
-            used += cost
             if (selected.size >= boundedItems) break
+            val remaining = boundedChars - used - 32
+            if (remaining <= 0) break
+            // A long memory must not crowd out later relevant facts. The original record stays
+            // durable and unchanged; only this search result's prompt-facing copy is excerpted.
+            val projected = if (record.content.length <= remaining) record else {
+                val excerptLimit = minOf(remaining, maxOf(96, boundedChars / minOf(boundedItems, 3)))
+                if (excerptLimit < 48) continue
+                val phrase = queryTerms.asSequence().map { record.content.indexOf(it, ignoreCase = true) }
+                    .firstOrNull { it >= 0 } ?: 0
+                val length = excerptLimit - 2
+                val start = (phrase - length / 3).coerceIn(0, record.content.length - length)
+                val end = start + length
+                record.copy(content = (if (start > 0) "…" else "") +
+                    record.content.substring(start, end) +
+                    (if (end < record.content.length) "…" else ""))
+            }
+            selected += projected
+            used += projected.content.length + 32
         }
         return selected
     }
