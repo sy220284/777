@@ -405,7 +405,8 @@ def self_test() -> None:
     verify([".github/scripts/check-new-guard.py"],
            required=("static",), release=False)
     for path in sorted(ARCHITECTURE_AUTHORITY_FILES | ARCHITECTURE_3_CONTROL_FILES):
-        verify([path], required=("static", "architecture"))
+        verify([path], required=("static", "architecture"),
+               full=(path in CORE_CI_CONTROLS))
     for path in sorted(FULL_VALIDATION_SCRIPTS):
         verify([path], full=True, required=("android16", "android17", "device"),
                release=False)
