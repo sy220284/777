@@ -114,6 +114,7 @@ class McpToolBridgePlugin(
         val id: String,
         val transport: String,
         val displayTarget: String,
+        val clientFactory: () -> McpClient,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
@@ -281,6 +282,36 @@ class McpToolBridgePlugin(
         )
         context.tools.register(
             HarnessTool(
+                name = "mcp_reconnect",
+                schema = functionToolSchema(
+                    name = "mcp_reconnect",
+                    description = "显式重建失效 MCP 服务的进程或网络连接；不会重放之前的远端工具请求",
+                    properties = buildJsonObject { put("server_id", stringSchema("已连接的 MCP 服务标识")) },
+                    required = setOf("server_id"),
+                ),
+                access = ToolAccess.PRIVILEGED,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                timeoutMillis = CONNECT_TIMEOUT_MILLIS + REMOTE_TOOL_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = listOf("已有连接记录；必须人工批准重新连接"),
+                ),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(reconnect(context, serverId))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
                 name = "mcp_disconnect",
                 schema = functionToolSchema(
                     name = "mcp_disconnect",
@@ -429,6 +460,7 @@ class McpToolBridgePlugin(
                 id = serverId,
                 transport = transport,
                 displayTarget = displayTarget,
+                clientFactory = clientFactory,
                 client = client,
                 toolNames = names,
                 definitionBytes = definitionBytes,
@@ -527,6 +559,16 @@ class McpToolBridgePlugin(
             }
             throw error
         }
+    }
+
+    private suspend fun reconnect(context: HarnessContext, rawId: String): String {
+        val serverId = validateServerId(rawId)
+        val existing = mutex.withLock { servers[serverId] }
+            ?: error("MCP 服务未连接：$serverId。请先用 mcp_http_connect 或 mcp_stdio_connect 建立连接")
+        // Explicit operator action only: drain in-flight calls, close old transport, then discover
+        // and register a fresh one. Never replay a failed remote tools/call.
+        disconnect(context, serverId)
+        return connect(context, serverId, existing.transport, existing.displayTarget, existing.clientFactory)
     }
 
     private suspend fun disconnect(context: HarnessContext, rawId: String): String {
@@ -704,6 +746,7 @@ class McpToolBridgePlugin(
             "mcp_http_connect",
             "mcp_stdio_connect",
             "mcp_server_list",
+            "mcp_reconnect",
             "mcp_disconnect",
         )
     }
