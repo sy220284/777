@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.nio.file.Files
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -46,31 +45,19 @@ class BundledGitRuntime @Inject constructor(
         val libraryDir = File(versionRoot, "lib")
         val homeDir = File(versionRoot, "home")
         val helperDir = File(versionRoot, "libexec/git-core")
-        val marker = File(versionRoot, ".ready")
-        val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
-        if (
-            marker.readTextOrNull() != markerValue ||
-            !BundledRuntimeLibraryStore.isMaterializedValid(context, "git", abi, libraryDir)
-        ) {
-            versionRoot.deleteRecursively()
+        BundledRuntimeInstallation.prepareVersion(context, "git", versionRoot, version, abi) {
             homeDir.mkdirs()
             helperDir.mkdirs()
-            BundledRuntimeLibraryStore.materialize(context, "git", abi, libraryDir)
-            copyAssetDirectory("$ASSET_ROOT/$abi/home", homeDir)
-            marker.writeText(markerValue)
-        } else {
-            helperDir.mkdirs()
+            BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
         }
+        helperDir.mkdirs()
 
         val nativeGit = File(context.applicationInfo.nativeLibraryDir, NATIVE_GIT_NAME)
         require(nativeGit.isFile && nativeGit.canExecute()) {
             "内置 Git 可执行文件未从 APK 提取：${nativeGit.path}"
         }
 
-        binDir.mkdirs()
-        val gitLink = File(binDir, "git").toPath()
-        Files.deleteIfExists(gitLink)
-        Files.createSymbolicLink(gitLink, nativeGit.toPath())
+        BundledRuntimeInstallation.linkExecutable(nativeGit, File(binDir, "git"))
 
         helperDir.listFiles()?.forEach { it.delete() }
         val helpers = context.assets.open("$ASSET_ROOT/$abi/helpers.tsv")
@@ -92,9 +79,7 @@ class BundledGitRuntime @Inject constructor(
             require(nativeHelper.isFile && nativeHelper.canExecute()) {
                 "内置 Git helper 未从 APK 提取：$nativeName"
             }
-            val link = File(helperDir, command).toPath()
-            Files.deleteIfExists(link)
-            Files.createSymbolicLink(link, nativeHelper.toPath())
+            BundledRuntimeInstallation.linkExecutable(nativeHelper, File(helperDir, command))
         }
 
         val templateDir = File(homeDir, "share/git-core/templates")
@@ -102,10 +87,7 @@ class BundledGitRuntime @Inject constructor(
         val certFile = File(homeDir, "etc/tls/cert.pem")
         require(certFile.isFile) { "内置 Git CA 证书未打包" }
 
-        runtimeHome.listFiles()
-            ?.filter { it.isDirectory && it.name != version }
-            ?.forEach { it.deleteRecursively() }
-
+        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
         activeLibraryDir = libraryDir
         activeHelperDir = helperDir
@@ -151,31 +133,6 @@ class BundledGitRuntime @Inject constructor(
             "当前 ABI 不支持内置 Git：${Build.SUPPORTED_ABIS.joinToString()}"
         else -> "Git 尚未完成初始化"
     }
-
-    private fun copyAssetDirectory(assetPath: String, target: File) {
-        val children = context.assets.list(assetPath).orEmpty()
-        require(children.isNotEmpty()) { "内置 Git 运行时目录为空：$assetPath" }
-        children.forEach { name ->
-            val childAsset = "$assetPath/$name"
-            val nested = context.assets.list(childAsset).orEmpty()
-            val destination = File(target, name)
-            if (nested.isNotEmpty()) {
-                destination.mkdirs()
-                copyAssetDirectory(childAsset, destination)
-            } else {
-                destination.parentFile?.mkdirs()
-                context.assets.open(childAsset).use { input ->
-                    destination.outputStream().use(input::copyTo)
-                }
-                destination.setReadable(true, true)
-                destination.setWritable(true, true)
-                destination.setExecutable(false, false)
-            }
-        }
-    }
-
-    private fun File.readTextOrNull(): String? =
-        runCatching { takeIf(File::isFile)?.readText()?.trim() }.getOrNull()
 
     private companion object {
         const val ASSET_ROOT = "runtime/git"

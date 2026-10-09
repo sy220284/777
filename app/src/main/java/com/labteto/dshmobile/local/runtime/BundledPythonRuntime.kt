@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.nio.file.Files
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -39,17 +38,9 @@ class BundledPythonRuntime @Inject constructor(
         val versionRoot = File(runtimeHome, "$version/$abi")
         val libraryDir = File(versionRoot, "lib")
         val homeDir = File(versionRoot, "home")
-        val marker = File(versionRoot, ".ready")
-        val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
-        if (
-            marker.readTextOrNull() != markerValue ||
-            !BundledRuntimeLibraryStore.isMaterializedValid(context, "python", abi, libraryDir)
-        ) {
-            versionRoot.deleteRecursively()
+        BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, version, abi) {
             homeDir.mkdirs()
-            BundledRuntimeLibraryStore.materialize(context, "python", abi, libraryDir)
-            copyAssetDirectory("$ASSET_ROOT/$abi/home", homeDir)
-            marker.writeText(markerValue)
+            BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
         }
 
         require(File(homeDir, "etc/tls/cert.pem").isFile) {
@@ -64,17 +55,10 @@ class BundledPythonRuntime @Inject constructor(
             "内置 Python 可执行文件未从 APK 提取：${nativePython.path}"
         }
 
-        binDir.mkdirs()
         PYTHON_COMMANDS.forEach { name ->
-            val link = File(binDir, name).toPath()
-            Files.deleteIfExists(link)
-            Files.createSymbolicLink(link, nativePython.toPath())
+            BundledRuntimeInstallation.linkExecutable(nativePython, File(binDir, name))
         }
-
-        runtimeHome.listFiles()
-            ?.filter { it.isDirectory && it.name != version }
-            ?.forEach { it.deleteRecursively() }
-
+        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
         activeHomeDir = homeDir
         activeLibraryDir = libraryDir
@@ -111,31 +95,6 @@ class BundledPythonRuntime @Inject constructor(
             "当前 ABI 不支持内置 Python：${Build.SUPPORTED_ABIS.joinToString()}"
         else -> "Python 尚未完成初始化"
     }
-
-    private fun copyAssetDirectory(assetPath: String, target: File) {
-        val children = context.assets.list(assetPath).orEmpty()
-        require(children.isNotEmpty()) { "内置 Python 运行时目录为空：$assetPath" }
-        children.forEach { name ->
-            val childAsset = "$assetPath/$name"
-            val nested = context.assets.list(childAsset).orEmpty()
-            val destination = File(target, name)
-            if (nested.isNotEmpty()) {
-                destination.mkdirs()
-                copyAssetDirectory(childAsset, destination)
-            } else {
-                destination.parentFile?.mkdirs()
-                context.assets.open(childAsset).use { input ->
-                    destination.outputStream().use(input::copyTo)
-                }
-                destination.setReadable(true, true)
-                destination.setWritable(true, true)
-                destination.setExecutable(false, false)
-            }
-        }
-    }
-
-    private fun File.readTextOrNull(): String? =
-        runCatching { takeIf(File::isFile)?.readText()?.trim() }.getOrNull()
 
     private companion object {
         const val ASSET_ROOT = "runtime/python"
