@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">神言神语</string>
+    <string name="skills_display_name_label">技能中文名称</string>
+    <string name="skills_display_name_hint">用于技能列表与调用展示，不影响英文调用标识</string>
     <string name="sidebar_avatar_open">设置侧边栏头像</string>
     <string name="sidebar_avatar_title">选择头像</string>
     <string name="sidebar_avatar_subtitle">使用人物预置或本地图片；本地图可拖动缩放裁剪，动图保留播放效果</string>

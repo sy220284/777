@@ -196,8 +196,8 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
-    fun createSkill(id: String, description: String, instructions: String) =
-        changeSkills(createdId = id) { localTools.createSkill(id, description, instructions) }
+    fun createSkill(id: String, displayName: String, description: String, instructions: String) =
+        changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
     fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
 
     fun openSkillEditor(id: String) {

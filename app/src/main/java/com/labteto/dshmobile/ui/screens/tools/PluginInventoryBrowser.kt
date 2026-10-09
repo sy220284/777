@@ -82,7 +82,7 @@ internal fun PluginInventoryBrowser(
     onReturnToChat: () -> Unit,
     onUseCapability: ((String) -> Unit)? = null,
     onInstallPreset: ((String) -> Unit)? = null,
-    onCreateSkill: ((String, String, String) -> Unit)? = null,
+    onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onOpenSkillEditor: ((String) -> Unit)? = null,
     onCloseSkillEditor: (() -> Unit)? = null,
@@ -96,6 +96,7 @@ internal fun PluginInventoryBrowser(
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
+    var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
     var editedSkillBody by remember { mutableStateOf("") }
@@ -103,6 +104,7 @@ internal fun PluginInventoryBrowser(
         if (showCreateSkill && createdSkillId != null && createdSkillId == newSkillId) {
             showCreateSkill = false
             newSkillId = ""
+            newSkillDisplayName = ""
             newSkillDescription = ""
             newSkillBody = ""
         }
@@ -149,7 +151,7 @@ internal fun PluginInventoryBrowser(
         )
     }
     val installedSkills = skills.map { skill ->
-        val display = presets.firstOrNull { it.id == skill.name }?.title ?: skill.name
+        val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
             remote = false, icon = FeatherIcons.BookOpen,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true)
@@ -381,7 +383,9 @@ internal fun PluginInventoryBrowser(
     }
     if (showCreateSkill && onCreateSkill != null) {
         val validId = newSkillId.matches(Regex("[a-z][a-z0-9-]{1,47}"))
-        val canCreate = validId && newSkillDescription.isNotBlank() &&
+        val validName = newSkillDisplayName.trim().length in 1..40 &&
+            newSkillDisplayName.any { it in '\u4e00'..'\u9fff' }
+        val canCreate = validId && validName && newSkillDescription.isNotBlank() &&
             newSkillDescription.length <= 240 &&
             newSkillBody.isNotBlank() && newSkillBody.length <= 12_000
         DsBottomSheet(
@@ -392,7 +396,7 @@ internal fun PluginInventoryBrowser(
                 DsButton(
                     text = stringResource(R.string.skills_install),
                     onClick = {
-                        onCreateSkill(newSkillId, newSkillDescription, newSkillBody)
+                        onCreateSkill(newSkillId, newSkillDisplayName.trim(), newSkillDescription, newSkillBody)
                     },
                     enabled = canCreate && !loading,
                     modifier = Modifier.fillMaxWidth(),
@@ -404,6 +408,14 @@ internal fun PluginInventoryBrowser(
                 onValueChange = { newSkillId = it },
                 label = { Text(stringResource(R.string.skills_id_label)) },
                 supportingText = { Text(stringResource(R.string.skills_id_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DsTextField(
+                value = newSkillDisplayName,
+                onValueChange = { newSkillDisplayName = it },
+                label = { Text(stringResource(R.string.skills_display_name_label)) },
+                supportingText = { Text(stringResource(R.string.skills_display_name_hint)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
