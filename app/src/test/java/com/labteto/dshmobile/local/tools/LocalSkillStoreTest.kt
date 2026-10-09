@@ -49,8 +49,9 @@ class LocalSkillStoreTest {
 
     @Test
     fun customSkillIsVisibleUntilRemovedAndItsSupportingFilesSurvive() = inWorkspace { store, workspace, root ->
-        store.create("my-review", "检查文稿", "先核对内容，再给出修订稿。")
+        store.create("my-review", "文稿审查", "检查文稿", "先核对内容，再给出修订稿。")
         assertTrue(workspace.modelSkillCatalog().contains("my-review：检查文稿"))
+        assertEquals("文稿审查", store.installed().first { it.name == "my-review" }.displayName)
         val extra = root.resolve(".dsh/skills/my-review/notes.txt")
         extra.writeText("保留")
         store.remove("my-review")
@@ -63,17 +64,17 @@ class LocalSkillStoreTest {
     @Test
     fun invalidAndUnsafeInputsCannotOverwriteExistingSkills() = inWorkspace { store, workspace, root ->
         assertThrows(IllegalArgumentException::class.java) {
-            store.create("../outside", "路径穿越", "恶意文本")
+            store.create("../outside", "测试技能", "路径穿越", "恶意文本")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            store.create("unsafe", "多行\nother: true", "说明")
+            store.create("unsafe", "测试技能", "多行\nother: true", "说明")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            store.create("bad", "", "说明")
+            store.create("bad", "测试技能", "", "说明")
         }
-        store.create("safe", "安全技能", "工作规则")
+        store.create("safe", "测试技能", "安全技能", "工作规则")
         assertThrows(IllegalArgumentException::class.java) {
-            store.create("safe", "第二个", "不应覆盖")
+            store.create("safe", "测试技能", "第二个", "不应覆盖")
         }
         assertTrue(workspace.readRaw(".dsh/skills/safe/SKILL.md").contains("安全技能"))
         assertFalse(root.resolve("outside/SKILL.md").exists())
@@ -94,7 +95,7 @@ class LocalSkillStoreTest {
     }
     @Test
     fun editingAndModelInvocationToggleUseTheSameSkillFile() = inWorkspace { store, workspace, _ ->
-        store.create("edited-one", "编辑前", "Original instructions.")
+        store.create("edited-one", "测试技能", "编辑前", "Original instructions.")
         val original = store.readDocument("edited-one")
         store.updateDocument("edited-one", original.replace("Original instructions.", "Revised instructions."))
         assertTrue(workspace.readModelSkill("edited-one").contains("Revised instructions."))

@@ -100,6 +100,7 @@ internal fun PluginInventoryBrowser(
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
     var editedSkillBody by remember { mutableStateOf("") }
+    var editedSkillDisplayName by remember { mutableStateOf("") }
     LaunchedEffect(createdSkillId) {
         if (showCreateSkill && createdSkillId != null && createdSkillId == newSkillId) {
             showCreateSkill = false
@@ -110,7 +111,10 @@ internal fun PluginInventoryBrowser(
         }
     }
     LaunchedEffect(skillEditor?.id, skillEditor?.document) {
-        if (skillEditor != null) editedSkillBody = skillEditor.document
+        if (skillEditor != null) {
+            editedSkillBody = skillEditor.document
+            editedSkillDisplayName = skills.firstOrNull { it.name == skillEditor.id }?.displayName.orEmpty()
+        }
     }
     val installedStatus = stringResource(R.string.tools_catalog_installed)
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
@@ -463,8 +467,12 @@ internal fun PluginInventoryBrowser(
             footer = {
                 DsButton(
                     text = stringResource(R.string.common_save),
-                    onClick = { onSaveSkillDocument(skillEditor.id, editedSkillBody) },
-                    enabled = !loading && editedSkillBody.isNotBlank() && editedSkillBody.length <= 20_000,
+                    onClick = {
+                        onSaveSkillDocument(skillEditor.id, withLocalSkillDisplayName(editedSkillBody, editedSkillDisplayName))
+                    },
+                    enabled = !loading && editedSkillBody.isNotBlank() && editedSkillBody.length <= 20_000 &&
+                        editedSkillDisplayName.trim().length in 1..40 &&
+                        editedSkillDisplayName.any { it in '\u4e00'..'\u9fff' },
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -473,6 +481,13 @@ internal fun PluginInventoryBrowser(
                 stringResource(R.string.skills_edit_hint),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
+            )
+            DsTextField(
+                value = editedSkillDisplayName,
+                onValueChange = { editedSkillDisplayName = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.skills_display_name_label)) },
             )
             DsTextField(
                 value = editedSkillBody,
@@ -484,4 +499,21 @@ internal fun PluginInventoryBrowser(
         }
     }
 
+}
+
+/** Edit the existing SKILL.md rather than keeping a second copy of the display name. */
+internal fun withLocalSkillDisplayName(document: String, displayName: String): String {
+    val name = displayName.trim()
+    require(name.length in 1..40 && name.any { it in '\u4e00'..'\u9fff' } && '\n' !in name && '\r' !in name)
+    val field = "display-name: \"" + name.replace('"', '\'') + "\""
+    val lines = document.lines().toMutableList()
+    if (lines.firstOrNull()?.trim() == "---") {
+        val end = lines.drop(1).indexOfFirst { it.trim() == "---" } + 1
+        if (end > 0) {
+            val index = (1 until end).firstOrNull { lines[it].trimStart().startsWith("display-name:") }
+            if (index != null) lines[index] = field else lines.add(end, field)
+            return lines.joinToString("\n")
+        }
+    }
+    return "---\n$field\n---\n$document"
 }
