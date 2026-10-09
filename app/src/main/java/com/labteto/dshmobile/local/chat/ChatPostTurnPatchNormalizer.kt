@@ -27,10 +27,15 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     fun strings(name: String) {
         val value = state[name] ?: return
         val list = value as? JsonArray
-        if (list == null || list.any { it !is JsonPrimitive || !it.isString }) {
-            // Invalid array elements are not an intentional request to clear old state.
+        if (list == null) {
             state.remove(name)
-        } else state[name] = list
+        } else {
+            val valid = list.filterIsInstance<JsonPrimitive>().filter { it.isString }
+            // Preserve valid entries even when another entry drifts in type.
+            // A nonempty but wholly invalid array must not erase stored history.
+            if (list.isNotEmpty() && valid.isEmpty()) state.remove(name)
+            else state[name] = JsonArray(valid)
+        }
     }
 
     listOf("physicalState", "mood", "relationshipState", "currentFocus",
@@ -59,15 +64,21 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         stringArrays.forEach { key ->
             val value = fields[key] ?: return@forEach
             val list = value as? JsonArray
-            if (list == null || list.any { it !is JsonPrimitive || !it.isString }) {
+            if (list == null) {
                 fields.remove(key)
-            } else fields[key] = list
+            } else {
+                val valid = list.filterIsInstance<JsonPrimitive>().filter { it.isString }
+                if (list.isNotEmpty() && valid.isEmpty()) fields.remove(key)
+                else fields[key] = JsonArray(valid)
+            }
         }
         evidenceArrays.forEach { key ->
             val value = fields[key] ?: return@forEach
             val list = value as? JsonArray
-            if (list == null) fields.remove(key)
-            else fields[key] = JsonArray(list.filterIsInstance<JsonObject>().map { candidate ->
+            if (list == null || (list.isNotEmpty() && list.none { it is JsonObject })) {
+                // A malformed evidence array must not clear previously validated facts.
+                fields.remove(key)
+            } else fields[key] = JsonArray(list.filterIsInstance<JsonObject>().map { candidate ->
                 val normalizedEvidence = candidate.toMutableMap()
                 listOf("text", "source").forEach { field ->
                     val value = normalizedEvidence[field]
