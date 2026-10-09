@@ -92,10 +92,11 @@ class LocalComposerReasoningRegressionTest {
 
     @Test fun workTemperatureHasFiveStopsWithThreeLabels() {
         val current = mutableStateOf(2)
+        val activeProfile = mutableStateOf(deepSeek)
         compose.setContent {
             DshTheme {
                 LocalComposerCapabilityPanel(
-                    panel = "reasoning", profile = deepSeek,
+                    panel = "reasoning", profile = activeProfile.value,
                     usageMode = LocalUsageMode.WORK,
                     reasoningMode = LocalReasoningUiMode.FAST,
                     temperatureLevel = current.value,
@@ -117,8 +118,27 @@ class LocalComposerReasoningRegressionTest {
             .assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_high))
             .assertIsDisplayed()
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 0.65),
+        ))
         slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(4f) }
         compose.runOnIdle { assertEquals(4, current.value) }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 1.3),
+        ))
+        // The DeepSeek-specific product cap must not carry over to another provider.
+        compose.runOnIdle {
+            activeProfile.value = LocalModelProfile(
+                "composer-gemini", "gemini-3.8-flash",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+            )
+        }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 2.0),
+        ))
     }
 
     @Test fun chatTemperatureReflectsPersonaSliderWhenChangedOutsidePanel() {
@@ -162,18 +182,84 @@ class LocalComposerReasoningRegressionTest {
                 )
             }
         }
-        // 60 is between 50 (1.30) and 75 (1.65): actual sampled value is 1.44.
+        // 60 maps directly into the capped 0..1.3 window, giving 0.78.
         val slider = compose.onNodeWithContentDescription(
             context.getString(R.string.local_composer_temperature_title),
         )
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 1.44),
+            context.getString(R.string.local_composer_temperature_value, 0.78),
+        ))
+        // The control has five detents: 60% is displayed at the nearest (50%) stop,
+        // while StateDescription above retains the exact persona temperature (0.78).
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(2f, 0f..4f, 3),
         ))
         compose.runOnIdle { position.value = 75 }
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 1.65),
+            context.getString(R.string.local_composer_temperature_value, 0.975),
+        ))
+    }
+
+    @Test fun chatTemperatureDoesNotReboundWhileSavingOrAfterReplyRefresh() {
+        val level = mutableStateOf(4)
+        val position = mutableStateOf(100)
+        val saving = mutableStateOf(false)
+        val enabled = mutableStateOf(true)
+        var proposedLevel: Int? = null
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    temperatureLevel = level.value,
+                    temperaturePosition = position.value,
+                    temperatureEnabled = enabled.value,
+                    temperatureSaving = saving.value,
+                    onReasoningModeChange = {},
+                    onTemperatureLevelChange = { chosen ->
+                        proposedLevel = chosen
+                        saving.value = true
+                        enabled.value = false
+                    },
+                )
+            }
+        }
+        val slider = compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        )
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(4f, 0f..4f, 3),
+        ))
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(1f) }
+        compose.runOnIdle { assertEquals(1, proposedLevel) }
+        slider.assertIsNotEnabled()
+        // Backend still reports the old maximum until the asynchronous save commits.
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
+        ))
+        compose.runOnIdle {
+            position.value = 25
+            level.value = 1
+            saving.value = false
+            enabled.value = true
+        }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
+        ))
+        // Sending a message, receiving its reply, and re-enabling the control must not
+        // reset the slider to the former maximum.
+        compose.runOnIdle { enabled.value = false }
+        compose.runOnIdle { enabled.value = true }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
         ))
     }
 

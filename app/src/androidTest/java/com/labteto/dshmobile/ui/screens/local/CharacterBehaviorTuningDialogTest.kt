@@ -131,7 +131,7 @@ class CharacterBehaviorTuningDialogTest {
                     evolution = CharacterEvolutionState(),
                     initial = CharacterBehaviorTuning(),
                     temperatureTuningAvailable = true,
-                    temperatureRange = LocalModelTemperatureRange(0.0, 2.0, 1.3),
+                    temperatureRange = LocalModelTemperatureRange(0.0, 1.3, 1.3, defaultPosition = 100),
                     onSave = { Result.success(Unit) },
                     onDismiss = {},
                 )
@@ -139,7 +139,7 @@ class CharacterBehaviorTuningDialogTest {
         }
         compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
             .performScrollTo().performClick()
-        compose.onNodeWithText("温度 1.30 · 50").assertExists()
+        compose.onNodeWithText("温度 1.30 · 100").assertExists()
     }
 
     @Test

@@ -189,9 +189,14 @@ internal fun LocalConversationSurface(
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
-    var workTemperatureLevel by remember(state.sessionId) {
+    val workTemperatureRange = activeModelProfile?.let {
+        LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+    }
+    var workTemperatureLevel by remember(state.sessionId, activeModelProfile?.id, workTemperatureRange) {
         LocalWorkTemperatureControls.attach(appContext)
-        androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureControls.level(state.sessionId))
+        androidx.compose.runtime.mutableIntStateOf(
+            LocalWorkTemperatureControls.level(state.sessionId, workTemperatureRange),
+        )
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
@@ -913,10 +918,14 @@ internal fun LocalConversationSurface(
             temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
                 workTemperatureLevel
             } else {
-                state.chatState.behaviorTuning.composerTemperatureLevel()
+                state.chatState.behaviorTuning.composerTemperatureLevel(
+                    activeModelProfile?.let { LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl) },
+                )
             },
             temperaturePosition = if (state.usageMode == LocalUsageMode.CHAT) {
-                state.chatState.behaviorTuning.expressionVariation
+                activeModelProfile?.let {
+                    LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+                }?.let { state.chatState.behaviorTuning.temperaturePosition(it) }
             } else null,
             temperatureSaveFailed = temperatureSaveFailed,
             temperatureSaving = temperatureSaving,
@@ -926,7 +935,7 @@ internal fun LocalConversationSurface(
             onTemperatureLevelChange = { level ->
                 if (state.usageMode == LocalUsageMode.WORK) {
                     LocalWorkTemperatureControls.setLevel(state.sessionId, level)
-                    workTemperatureLevel = LocalWorkTemperatureControls.level(state.sessionId)
+                    workTemperatureLevel = LocalWorkTemperatureControls.level(state.sessionId, workTemperatureRange)
                 } else if (!state.groupChat.enabled && !temperatureSaving &&
                     !state.loading && !state.running) {
                     temperatureSaving = true

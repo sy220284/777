@@ -434,20 +434,22 @@ internal fun CharacterBehaviorTuningDialog(
                         title = stringResource(R.string.local_character_tuning_expression_variation),
                         low = stringResource(R.string.local_character_tuning_expression_variation_low),
                         high = stringResource(R.string.local_character_tuning_expression_variation_high),
-                        value = draft.expressionVariation,
+                        value = temperatureRange?.let(draft::temperaturePosition)
+                            ?: draft.samplingTemperaturePosition ?: draft.expressionVariation,
                         displayValue = temperatureRange?.let { range ->
-                            val label = if (range.omitAtChatDefault && draft.expressionVariation == 50) {
+                            val position = draft.temperaturePosition(range)
+                            val label = if (range.omitAtChatDefault && position == range.defaultPosition) {
                                 R.string.local_character_tuning_temperature_provider_default
                             } else {
                                 R.string.local_character_tuning_temperature_value
                             }
                             stringResource(
                                 label,
-                                range.at(draft.expressionVariation),
-                                draft.expressionVariation,
+                                range.at(position),
+                                position,
                             )
                         },
-                        onValueChange = { draft = draft.copy(expressionVariation = it) },
+                        onValueChange = { draft = draft.copy(samplingTemperaturePosition = it) },
                         enabled = !saving,
                     )
                 }

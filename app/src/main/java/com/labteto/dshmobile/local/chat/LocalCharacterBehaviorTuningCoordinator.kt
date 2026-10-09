@@ -65,6 +65,23 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
             val previousGallery = withContext(Dispatchers.IO) {
                 snapshot.chat.galleryId?.let(galleryStore::findEntry)
             }
+            // Explicit edits must outrank older gallery/session copies even when the caller
+            // reused the tuning's previous updatedAt (as the composer slider does).
+            // This also lets an explicit return to the natural midpoint replace an old custom value.
+            val latestTuningTimestamp = maxOf(
+                System.currentTimeMillis(),
+                snapshot.chat.chatState.behaviorTuning.updatedAt,
+                snapshot.chat.chatPersona.behaviorTuning.updatedAt,
+                previousGallery?.persona?.behaviorTuning?.updatedAt ?: 0L,
+                profile.behaviorTuning.updatedAt,
+            )
+            val editedProfile = profile.copy(
+                behaviorTuning = profile.behaviorTuning.normalized().copy(
+                    updatedAt = if (latestTuningTimestamp == Long.MAX_VALUE) {
+                        Long.MAX_VALUE
+                    } else latestTuningTimestamp + 1L,
+                ),
+            )
             var committed = false
             try {
                 val persisted = withContext(Dispatchers.IO) {
@@ -74,7 +91,7 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
                         snapshot.chat.chatPersona,
                         personaId,
                         snapshot.chat.galleryId,
-                        profile,
+                        editedProfile,
                     )
                 }
                 val current = state.value
