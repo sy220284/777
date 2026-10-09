@@ -40,20 +40,30 @@ def validate(root=ROOT):
     if not leaves or not items:
         raise ValueError("feature tree and acceptance index must not be empty")
     # The feature tree is authoritative: additions/removals cannot be hidden by a frozen count.
-    if [item["path"] for item in items] != leaves or len(set(leaves)) != len(leaves):
-        raise ValueError("feature tree differs from acceptance index; regenerate and review the index")
+    if len(set(leaves)) != len(leaves):
+        raise ValueError("feature tree contains duplicate leaf paths")
+    if matrix.get("version") != 2 or matrix.get("repository_scope") != "executable_evidence_only":
+        raise ValueError("repository evidence index schema and scope must be v2")
+    if not isinstance(matrix.get("external_validation_exclusions"), list) or not matrix["external_validation_exclusions"]:
+        raise ValueError("external-only validation dimensions must be excluded from repository CI")
+    leaf_order = {leaf: i for i, leaf in enumerate(leaves)}
+    paths = [item["path"] for item in items]
+    if len(set(paths)) != len(paths) or any(path not in leaf_order for path in paths):
+        raise ValueError("evidence index has duplicate or unknown feature-tree leaf")
+    if paths != sorted(paths, key=leaf_order.__getitem__):
+        raise ValueError("evidence index order differs from authoritative feature tree")
     partial = 0
     for item in items:
         if set(item) != {"path", "state", "evidence"}:
             raise ValueError(f"unexpected or missing acceptance fields: {item['path']}")
-        if item["state"] not in ("unverified", "automated_partial"):
-            raise ValueError(f"unsupported claimed acceptance status: {item['path']}")
+        if item["state"] != "automated_partial":
+            raise ValueError(f"repository acceptance records must carry executable evidence: {item['path']}")
         if not isinstance(item["evidence"], list):
             raise ValueError(f"non-list evidence: {item['path']}")
-        if item["state"] == "automated_partial" and not item["evidence"]:
-            raise ValueError(f"automated_partial lacks an executable test: {item['path']}")
-        if item["state"] == "unverified" and item["evidence"]:
-            raise ValueError(f"evidence must use automated_partial: {item['path']}")
+        if not item["evidence"]:
+            raise ValueError(f"repository acceptance item lacks an executable test: {item['path']}")
+        if len(item["evidence"]) != len(set(item["evidence"])):
+            raise ValueError(f"duplicate executable evidence reference: {item['path']}")
         for ref in item["evidence"]:
             if not isinstance(ref, str) or "#" not in ref:
                 raise ValueError(f"invalid evidence reference: {ref}")
@@ -65,8 +75,8 @@ def validate(root=ROOT):
             if method not in methods:
                 raise ValueError(f"missing @Test method: {ref}")
         partial += item["state"] == "automated_partial"
-    print(f"Acceptance inventory checked: {len(items)} leaves; "
-          f"{partial} with partial executable evidence, {len(items)-partial} unverified; "
+    print(f"Repository executable evidence index checked: {len(items)} mapped leaves "
+          f"of {len(leaves)} functional leaves; external-only validation excluded; "
           "ZERO fully signed-off leaves.")
     return partial
 
@@ -74,6 +84,9 @@ def self_test():
     sample = "```text\n ROOT\n├─ A\n│  ├─ leaf1\n│  └─ leaf2\n└─ B\n   └─ leaf3\n```"
     assert len(leaves_from_tree(sample)) == 3
     assert leaves_from_tree(sample)[-1] == "B / leaf3"
+    # Subset validation: only evidence-backed leaves belong in the repo index;
+    # duplicate/out-of-tree records must be rejected by validate().
+    assert [leaf for leaf in leaves_from_tree(sample) if leaf.endswith("leaf2")] == ["A / leaf2"]
 
 if __name__ == "__main__":
     try:

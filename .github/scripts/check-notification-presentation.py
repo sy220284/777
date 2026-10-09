@@ -1,49 +1,102 @@
 #!/usr/bin/env python3
-"""Guard notification identity against duplicated or stale icon presentation."""
+"""Validate active notification resources and launcher structure, independent of filenames."""
+from __future__ import annotations
 
-from pathlib import Path
+import re
 import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "app/src/main"
 KOTLIN = APP / "java"
-MANIFEST = APP / "AndroidManifest.xml"
-SMALL_ICON = "R.drawable.ic_notification_butterfly"
-
+ANDROID = "{http://schemas.android.com/apk/res/android}"
 violations: list[str] = []
 
-builder_files = []
+def kotlin_code(text: str) -> str:
+    # Block and line comments do not create actual Notification builders.
+    text = re.sub(r"/\*[\s\S]*?\*/", "", text)
+    return re.sub(r"//[^\n]*", "", text)
+
+def resource(name: str, *, kind: str = "drawable") -> Path | None:
+    for folder in sorted((APP / "res").glob(kind + "*")):
+        candidate = folder / (name + ".xml")
+        if candidate.is_file():
+            return candidate
+    return None
+
+def notification_configuration(text: str) -> tuple[str | None, bool]:
+    code = kotlin_code(text)
+    if not re.search(r"\bNotificationCompat\s*\.\s*Builder\s*\(", code):
+        return None, False
+    has_large_icon = bool(re.search(r"\.\s*setLargeIcon\s*\(", code))
+    found = re.findall(r"\.\s*setSmallIcon\s*\(\s*R\.drawable\.([A-Za-z_]\w*)", code)
+    return (found[0] if len(set(found)) == 1 else None), has_large_icon
+
+def self_test() -> None:
+    assert notification_configuration(
+        "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon)"
+    ) == ("icon", False)
+    assert notification_configuration(
+        "// .setLargeIcon(old)\nNotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon)"
+    ) == ("icon", False)
+    assert notification_configuration(
+        "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.icon).setLargeIcon(bitmap)"
+    ) == ("icon", True)
+    assert notification_configuration(
+        "NotificationCompat.Builder(ctx, channel).setSmallIcon(R.drawable.one).setSmallIcon(R.drawable.two)"
+    )[0] is None
+
+if "--self-test" in sys.argv:
+    self_test()
+    print("Notification resource-structure self-test passed")
+    sys.exit(0)
+
+small_icons: set[str] = set()
+builder_files: list[Path] = []
 for path in KOTLIN.rglob("*.kt"):
-    text = path.read_text(encoding="utf-8")
-    if "NotificationCompat.Builder" not in text:
+    code = kotlin_code(path.read_text(encoding="utf-8"))
+    if not re.search(r"\bNotificationCompat\s*\.\s*Builder\s*\(", code):
         continue
     builder_files.append(path)
-    if ".setLargeIcon(" in text:
-        violations.append(f"{path.relative_to(ROOT)}: 通知不得再设置 LargeIcon，避免系统模板右侧重复应用头像")
-    if SMALL_ICON not in text:
-        violations.append(f"{path.relative_to(ROOT)}: 通知必须使用统一的单色 small icon")
+    icon, has_large = notification_configuration(code)
+    if has_large:
+        violations.append(f"{path.relative_to(ROOT)}: notification template must not setLargeIcon")
+    if not icon:
+        violations.append(f"{path.relative_to(ROOT)}: notification must set one static drawable small icon")
+    else:
+        small_icons.add(icon)
+if len(small_icons) != 1:
+    violations.append(f"all notification builders must share one monochrome small icon, got {sorted(small_icons)}")
+for icon in small_icons:
+    path = resource(icon)
+    if path is None:
+        violations.append(f"notification small icon drawable is missing: {icon}")
+    else:
+        xml = ET.parse(path).getroot()
+        if xml.tag != "vector" or not xml.findall("path"):
+            violations.append(f"notification small icon must be a vector silhouette: {path.relative_to(ROOT)}")
 
-manifest = MANIFEST.read_text(encoding="utf-8")
-if 'android:icon="@mipmap/ic_launcher_777_v2"' not in manifest:
-    violations.append("AndroidManifest.xml: 必须使用新版 launcher 资源 ID")
-if 'android:roundIcon="@mipmap/ic_launcher_777_v2_round"' not in manifest:
-    violations.append("AndroidManifest.xml: 必须同时声明新版 roundIcon")
-
-for stale in (
-    APP / "res/mipmap-anydpi-v26/ic_launcher.xml",
-    APP / "res/mipmap-anydpi-v26/ic_launcher_round.xml",
-    APP / "res/drawable-nodpi/notification_portrait.webp",
-    KOTLIN / "com/labteto/dshmobile/notify/NotificationArtwork.kt",
-):
-    if stale.exists():
-        violations.append(f"{stale.relative_to(ROOT)}: 旧通知/启动器图标实现必须移除")
+manifest = ET.parse(APP / "AndroidManifest.xml").getroot()
+application = manifest.find("application")
+if application is None:
+    violations.append("AndroidManifest.xml: no application element")
+else:
+    for attr in ("icon", "roundIcon"):
+        value = application.get(ANDROID + attr, "")
+        match = re.fullmatch(r"@mipmap/([A-Za-z_]\w*)", value)
+        if match is None:
+            violations.append(f"AndroidManifest.xml: missing valid application {attr}")
+            continue
+        path = resource(match.group(1), kind="mipmap")
+        if path is None or ET.parse(path).getroot().tag != "adaptive-icon":
+            violations.append(f"AndroidManifest.xml: application {attr} must resolve to an adaptive icon")
 
 if not builder_files:
-    violations.append("未找到 NotificationCompat.Builder，通知图标门禁失去覆盖对象")
-
+    violations.append("no NotificationCompat.Builder: notification validation has no owner")
 if violations:
-    print("Notification presentation guard violations:")
-    print("\n".join(f"  - {item}" for item in violations))
+    print("Notification resource-structure guard failed:")
+    for error in violations:
+        print(" - " + error)
     sys.exit(1)
-
-print(f"Notification presentation guard passed ({len(builder_files)} builder files)")
+print(f"Notification resource-structure guard passed ({len(builder_files)} builders)")

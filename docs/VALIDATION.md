@@ -25,6 +25,10 @@ Local Harness semantic reference: 0.2.1-alpha.1 / 5badb150...
 Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 ```
 
+## 仓库验收边界（与产品功能清单分离）
+
+仓库可执行验收索引只收录 **126 个已有 Kotlin @Test 直接证据的功能叶节点**，其他 301 个叶节点继续保留在 427 项权威功能树中，不进入本仓库 CI 验收目标、不可计作验收失败或通过。真实第三方账户/套餐、付费联机、物理设备辅助技术、真实远程主机、长期电量/跨天行为由环境专项验证，不能作为仓库 CI 必过项。见 `docs/ACCEPTANCE-PLAYBOOK.zh-CN.md`。
+
 ## CI
 
 CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**。分类由 `.github/scripts/classify-ci-scope.py` 决定，混合变更取检查并集；未知或关键底层改动回退完整矩阵。
