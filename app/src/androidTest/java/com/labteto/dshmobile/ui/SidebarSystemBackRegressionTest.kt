@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,7 +31,14 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // These isolated Compose screens have a BackHandler but no app navigation host.
+        // Dispatch through the Activity's real OnBackPressedDispatcher, as the system
+        // does after key/gesture routing. This preserves the handler assertion without
+        // depending on an emulator's unrelated focused window (Android 16).
+        compose.runOnUiThread {
+            compose.activity.onBackPressedDispatcher.onBackPressed()
+        }
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() == 1 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -50,7 +58,14 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // These isolated Compose screens have a BackHandler but no app navigation host.
+        // Dispatch through the Activity's real OnBackPressedDispatcher, as the system
+        // does after key/gesture routing. This preserves the handler assertion without
+        // depending on an emulator's unrelated focused window (Android 16).
+        compose.runOnUiThread {
+            compose.activity.onBackPressedDispatcher.onBackPressed()
+        }
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() == 1 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
