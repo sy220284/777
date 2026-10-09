@@ -82,6 +82,9 @@ internal fun LocalConversationComposer(
     onStop: () -> Unit,
     reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
+    temperatureLevel: Int = 2,
+    temperatureEnabled: Boolean = true,
+    onTemperatureLevelChange: (Int) -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
@@ -367,6 +370,11 @@ internal fun LocalConversationComposer(
                     profile = activeModelProfile,
                     usageMode = state.usageMode,
                     reasoningMode = reasoningMode,
+                    temperatureLevel = temperatureLevel,
+                    temperatureEnabled = temperatureEnabled,
+                    onTemperatureLevelChange = {
+                        if (!state.running) onTemperatureLevelChange(it)
+                    },
                     running = state.running,
                     showLabels = showLabels,
                     openPanel = capabilityPanel,
