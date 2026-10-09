@@ -137,10 +137,11 @@ internal fun LocalAgentTeamStatusBar(
     launchPending: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    dismissed: Boolean = false,
 ) {
     val colors = DsTheme.colors
     AnimatedVisibility(
-        visible = launchPending || team.visible,
+        visible = !dismissed && (launchPending || team.visible),
         enter = fadeIn(DsAnimations.composerFade) +
             expandVertically(animationSpec = DsAnimations.composerReveal),
         exit = fadeOut(DsAnimations.composerFade) +
@@ -227,7 +228,7 @@ internal fun LocalAgentTeamStatusBar(
                                 ) {
                                     StateDot(memberDotState(member), size = 6.dp)
                                     Text(
-                                        member.name,
+                                        member.friendlyName,
                                         style = DsType.caption11Strong.withReadingWeight(),
                                         color = colors.labelPrimary,
                                         maxLines = 1,
@@ -266,6 +267,7 @@ internal fun LocalAgentTeamSheet(
     onStopAll: suspend () -> LocalWorkUiActionResult,
     onLeadFollowup: (String) -> Unit,
     onDismiss: () -> Unit,
+    onCollapse: () -> Unit = onDismiss,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -310,6 +312,12 @@ internal fun LocalAgentTeamSheet(
                 return@Column
             }
             TeamProgressBlock(team)
+            DsButton(
+                text = stringResource(R.string.local_team_collapse_after_view),
+                onClick = onCollapse,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
             Text(
                 stringResource(R.string.local_team_readonly_hint),
                 style = DsType.caption11, color = colors.labelSecondary,
@@ -484,6 +492,13 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
                 trackColor = colors.borderL3,
             )
         }
+        if (team.returnedMemberCount > team.completedTaskCount && team.tasks.isNotEmpty()) {
+            Text(
+                stringResource(R.string.local_team_results_pending, team.returnedMemberCount),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
         if (team.blockedTaskCount > 0) {
             Text(
                 stringResource(R.string.local_team_blocked_count, team.blockedTaskCount),
@@ -529,7 +544,7 @@ private fun TeamMemberRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
                 Text(
-                    member.name,
+                    member.friendlyName,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
@@ -880,6 +895,7 @@ private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = str
         member.activity == "completed" -> R.string.local_team_state_task_done
         member.activity == "killed" -> R.string.local_team_state_dismissed
         member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
+        member.activity == "dormant" && member.resultMessageCount > 0 -> R.string.local_team_state_awaiting_review
         member.activity == "dormant" -> R.string.local_team_state_offwork
         else -> R.string.local_team_state_waiting
     },
