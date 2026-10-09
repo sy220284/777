@@ -111,6 +111,42 @@ class LocalDocumentContentTest {
     }
 
     @Test
+    fun xlsxScansSheetsBeyondLegacyTwoHundredLimitWithoutClaimingCompletenessEarly() {
+        val entries = (1..205).associate { index ->
+            "xl/worksheets/sheet$index.xml" to
+                """<worksheet><sheetData><row><c r="A1"><v>§{index}</v></c></row></sheetData></worksheet>""".replace("§{index}", index.toString())
+        }
+        val file = zipFile("many-sheets.xlsx", entries)
+        try {
+            val result = LocalDocumentContent.extract(file, file.name,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            assertTrue(result.text.contains("[工作表 205]"))
+            assertTrue(result.text.contains("A1: 205"))
+            assertFalse(result.truncated)
+        } finally {
+            file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun pptxScansSlidesBeyondLegacyThreeHundredLimitWithoutClaimingCompletenessEarly() {
+        val entries = (1..305).associate { index ->
+            "ppt/slides/slide$index.xml" to
+                "<p:sld><a:p><a:r><a:t>第§{index}页</a:t></a:r></a:p></p:sld>".replace("§{index}", index.toString())
+        }
+        val file = zipFile("many-slides.pptx", entries)
+        try {
+            val result = LocalDocumentContent.extract(file, file.name,
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            assertTrue(result.text.contains("[幻灯片 305]"))
+            assertTrue(result.text.contains("第305页"))
+            assertFalse(result.truncated)
+        } finally {
+            file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
     fun readsOpenDocumentAndEpubText() {
         val odt = zipFile(
             "sample.odt",
