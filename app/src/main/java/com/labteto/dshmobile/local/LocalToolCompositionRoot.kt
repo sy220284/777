@@ -165,6 +165,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override fun installPreset(id: String) = skillManager.install(id)
     override fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         skillManager.create(id, displayName, description, instructions)
+    override fun importSkill(filename: String, bytes: ByteArray): String = skillManager.importSkill(filename, bytes)
     override fun removeSkill(id: String) = skillManager.remove(id)
     override fun readSkillDocument(id: String) = skillManager.readDocument(id)
     override fun updateSkillDocument(id: String, document: String) = skillManager.updateDocument(id, document)
