@@ -749,8 +749,11 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(LocalTeamTaskStatus.IN_PROGRESS, task.status)
         assertEquals(2, task.revision)
         assertEquals("member-1", task.ownerId)
-        assertTrue(fixture.runtime.uiState("team-auto-complete").members.single().awaitingReview)
-        assertEquals(0, fixture.runtime.uiState("team-auto-complete").completedTaskCount)
+        val displayed = fixture.runtime.uiState("team-auto-complete")
+        assertTrue(displayed.members.single().awaitingReview)
+        assertEquals(95, displayed.members.single().progressPercent)
+        assertEquals(1, displayed.returnedMemberCount)
+        assertEquals(0, displayed.completedTaskCount)
     }
 
     @Test
