@@ -66,11 +66,29 @@ class LocalWorkspace(
     // Retain only the small traversal frontier between consecutive tool pages. On a
     // cache miss (process restart, different query or competing caller), numeric cursors
     // still work by replaying the deterministic walk.
-    private data class ScanResume(
-        val cursor: Int,
-        val pending: IndexedValue<File>,
-        val remaining: Iterator<IndexedValue<File>>,
-    )
+    private class ScanIterator(
+        private val backing: Iterator<IndexedValue<File>>,
+    ) : Iterator<IndexedValue<File>> {
+        private var pending: IndexedValue<File>? = null
+
+        override fun hasNext(): Boolean = pending != null || backing.hasNext()
+
+        override fun next(): IndexedValue<File> {
+            val first = pending
+            if (first != null) {
+                pending = null
+                return first
+            }
+            return backing.next()
+        }
+
+        fun defer(value: IndexedValue<File>) {
+            check(pending == null)
+            pending = value
+        }
+    }
+
+    private data class ScanResume(val cursor: Int, val iterator: ScanIterator)
     private val scanResumes = object : LinkedHashMap<String, ScanResume>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ScanResume>?): Boolean =
             size > 8
@@ -81,26 +99,24 @@ class LocalWorkspace(
         maxDepth: Int,
         key: String,
         cursor: Int,
-    ): Iterator<IndexedValue<File>> {
+    ): ScanIterator {
         val previous = synchronized(scanResumes) {
             scanResumes.remove(key)?.takeIf { it.cursor == cursor }
         }
-        return if (previous != null) sequence {
-            yield(previous.pending)
-            yieldAll(previous.remaining.asSequence())
-        }.iterator() else safeWalk(
+        return previous?.iterator ?: ScanIterator(safeWalk(
             directory, maxDepth = maxDepth, maxVisited = Int.MAX_VALUE, maxMillis = Long.MAX_VALUE,
-        ).withIndex().iterator()
+        ).withIndex().iterator())
     }
 
     private fun saveScanResume(
         key: String,
         entry: Int,
         file: File,
-        iterator: Iterator<IndexedValue<File>>,
+        iterator: ScanIterator,
     ) {
+        iterator.defer(IndexedValue(entry, file))
         synchronized(scanResumes) {
-            scanResumes[key] = ScanResume(entry, IndexedValue(entry, file), iterator)
+            scanResumes[key] = ScanResume(entry, iterator)
         }
     }
 
