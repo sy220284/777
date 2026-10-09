@@ -1195,6 +1195,16 @@ internal fun LocalConversationSurface(
                     },
                 )
             }
+            if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_team_reopen),
+                    icon = FeatherIcons.ChevronRight,
+                    onClick = {
+                        showAttachmentPicker = false
+                        showTeamPanel = true
+                    },
+                )
+            }
             if (state.usageMode == LocalUsageMode.WORK) {
                 LocalAgentSwarmLaunchEntry(
                     selected = teamDispatchSelected,
