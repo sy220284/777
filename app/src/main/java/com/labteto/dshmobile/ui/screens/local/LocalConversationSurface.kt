@@ -899,6 +899,9 @@ internal fun LocalConversationSurface(
             } else {
                 state.chatState.behaviorTuning.composerTemperatureLevel()
             },
+            temperaturePosition = if (state.usageMode == LocalUsageMode.CHAT) {
+                state.chatState.behaviorTuning.expressionVariation
+            } else null,
             temperatureSaveFailed = temperatureSaveFailed,
             temperatureEnabled = state.usageMode == LocalUsageMode.WORK ||
                 (!state.groupChat.enabled && !temperatureSaving),
