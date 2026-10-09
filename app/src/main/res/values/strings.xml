@@ -272,6 +272,8 @@
     <string name="local_team_progress_count">已完成 %1$d / %2$d</string>
     <string name="local_team_progress_compact">%1$d / %2$d</string>
     <string name="local_team_sheet_summary">%1$d 个助手 · %2$d / %3$d 项任务完成</string>
+    <string name="local_team_collapse_after_view">看完收起 · 返回聊天</string>
+    <string name="local_team_results_pending">已回收 %1$d 位助手的结果，待主代理核验结算</string>
     <string name="local_team_assistants">助手</string>
     <string name="local_team_recruit_title">助手招募</string>
     <string name="local_team_more_assistants">还有 %1$d 个助手，点开查看</string>
