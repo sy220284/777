@@ -224,7 +224,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
                 maxAttemptsOverride = interactiveAttempts,
-                temperature = persona.behaviorTuning.roleplayTemperature(),
+                temperature = persona.behaviorTuning.roleplayTemperature(
+                    snapshot.modelState.model, snapshot.modelState.baseUrl,
+                ),
             )
             val finalContent = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
@@ -253,7 +255,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         publishPreview = false,
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
-                        temperature = persona.behaviorTuning.roleplayTemperature(),
+                        temperature = persona.behaviorTuning.roleplayTemperature(
+                    snapshot.modelState.model, snapshot.modelState.baseUrl,
+                ),
                     )
                 },
                 appendEvent = { type, data ->
