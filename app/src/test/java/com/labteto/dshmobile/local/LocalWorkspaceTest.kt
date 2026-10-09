@@ -192,6 +192,23 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun globAndListCanPagePastLegacyFourHundredResultLimit() {
+        val directory = root.resolve("many")
+        directory.mkdirs()
+        repeat(415) { i ->
+            directory.resolve("item-" + i.toString().padStart(4, '0') + ".txt").writeText("record")
+        }
+        val firstList = workspace.list("many")
+        assertTrue(firstList.contains("目录扫描未完"))
+        val listCursor = Regex("""cursor=(\d+)""").find(firstList)!!.groupValues[1].toInt()
+        assertTrue(workspace.list("many", cursor = listCursor).contains("item-0414.txt"))
+        val firstGlob = workspace.glob("*.txt", "many")
+        assertTrue(firstGlob.contains("目录扫描未完"))
+        val globCursor = Regex("""cursor=(\d+)""").find(firstGlob)!!.groupValues[1].toInt()
+        assertTrue(workspace.glob("*.txt", "many", cursor = globCursor).contains("item-0414.txt"))
+    }
+
+    @Test
     fun searchResultPageCarriesLineCursorInsteadOfSilentlyLosingMatches() {
         val text = (1..250).joinToString("\n") { "needle row $it" }
         root.resolve("rows.txt").writeText(text)
