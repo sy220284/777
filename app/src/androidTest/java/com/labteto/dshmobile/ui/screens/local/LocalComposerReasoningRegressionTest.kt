@@ -8,6 +8,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -174,6 +175,56 @@ class LocalComposerReasoningRegressionTest {
             SemanticsProperties.StateDescription,
             context.getString(R.string.local_composer_temperature_value, 1.65),
         ))
+    }
+
+    @Test fun disabledTemperatureShowsCorrectSavingAndGroupHint() {
+        val saving = mutableStateOf(true)
+        val group = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    onReasoningModeChange = {},
+                    temperatureEnabled = false,
+                    temperatureSaving = saving.value,
+                    temperatureGroupChat = group.value,
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        ).assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_saving))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_group_hint))
+            .assertDoesNotExist()
+        compose.runOnIdle { saving.value = false; group.value = true }
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_group_hint))
+            .assertIsDisplayed()
+    }
+
+    @Test fun deepSeekThinkingDisablesTemperatureUntilFastSelected() {
+        val selected = mutableStateOf(LocalReasoningUiMode.DEEP)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = selected.value,
+                    onReasoningModeChange = { selected.value = it },
+                )
+            }
+        }
+        val temperature = compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        )
+        temperature.assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_thinking))
+            .assertIsDisplayed()
+        compose.runOnIdle { selected.value = LocalReasoningUiMode.FAST }
+        temperature.assertIsEnabled()
     }
 
     @Test fun planIconTogglesAndAnnouncesStateWithoutSlider() {
