@@ -98,10 +98,35 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$ARCHIVE" -C "$RUNNER_TEMP/actionlint-bin"
           "$RUNNER_TEMP/actionlint-bin/actionlint" -version
 
-      - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
+      # Keep app JVM tests isolated from R8/lint resource contention. The existing
+      # 2-minute :app:testDebugUnitTest task timeout remains in place and fails closed.
+      - name: 预热应用 JVM 测试（独立 Gradle 执行）
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
+
+      - name: 预热其余 JVM 模块测试
+        run: |
+          set -euo pipefail
+          ./gradlew --max-workers=2 \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :reference-validation:test \
+            --stacktrace --console=plain
+
+      - name: 预热 Android Lint、安装包与 Runtime 构建依赖
+        run: |
+          set -euo pipefail
+          ./gradlew --max-workers=2 \
+            :app:lintDebug \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:assembleOptimized \
+            --stacktrace --console=plain
 
       - name: 拆分并校验组件包
         run: |

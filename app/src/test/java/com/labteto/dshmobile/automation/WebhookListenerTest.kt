@@ -125,10 +125,14 @@ class WebhookListenerTest {
             },
         )
         val firstPort = ServerSocket(0).use { it.localPort }
-        val secondPort = ServerSocket(0).use { it.localPort }
         var firstClient: Socket? = null
         try {
             listener.restart(InetSocketAddress("127.0.0.1", firstPort))
+            // Keep the first listener bound while reserving the next ephemeral port.
+            // Two consecutive closed ServerSocket(0) probes may select the same port,
+            // turning restart() into its documented same-address no-op.
+            val secondPort = ServerSocket(0).use { it.localPort }
+            assertTrue("generation restart requires distinct bound addresses", secondPort != firstPort)
             firstClient = Socket("127.0.0.1", firstPort)
             assertTrue(firstEntered.await(3, TimeUnit.SECONDS))
 
