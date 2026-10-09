@@ -29,9 +29,9 @@ internal object LocalToolRouter {
         taskContext: String,
         limit: Int = MAX_TASK_PREACTIVATED_TOOLS,
     ): List<String> {
-        val normalized = taskContext
-            .takeLast(MAX_TASK_CONTEXT_CHARS)
-            .lowercase()
+        val normalized = (if (taskContext.length <= MAX_TASK_CONTEXT_CHARS) taskContext
+            else taskContext.take(MAX_TASK_CONTEXT_CHARS / 2) + "\n" +
+                taskContext.takeLast(MAX_TASK_CONTEXT_CHARS / 2)).lowercase()
         if (normalized.isBlank()) return emptyList()
 
         return tools.asSequence()
