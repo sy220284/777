@@ -30,11 +30,11 @@ class LocalWorkHistorySheetTest {
                 }, { session, id, sequence -> if (session == "session" && id == "early" && sequence == 1L) "full early result" else null }, {}, {})
             }
         }
-        compose.waitUntil(5_000) { reads.isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("recent preview").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("recent preview").assertExists()
         val older = context.getString(R.string.local_run_history_older)
         compose.onNodeWithText(older).performClick()
-        compose.waitUntil(5_000) { reads.contains(200L) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("early preview").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("early preview").assertExists()
         compose.onNodeWithText("recent preview").assertDoesNotExist()
         compose.onNodeWithText(older).assertIsNotEnabled()
@@ -59,7 +59,7 @@ class LocalWorkHistorySheetTest {
         compose.onNodeWithText(context.getString(R.string.local_run_history_older)).performClick()
         compose.waitUntil(5_000) { reads.contains("one" to 200L) }
         compose.runOnIdle { session.value = "two" }
-        compose.waitUntil(5_000) { reads.contains("two" to null) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("two").fetchSemanticsNodes().isNotEmpty() }
         assertTrue(reads.none { it.first == "two" && it.second != null })
         compose.onNodeWithText("two").assertExists()
         compose.onNodeWithText("one").assertDoesNotExist()

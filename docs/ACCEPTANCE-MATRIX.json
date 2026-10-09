@@ -190,7 +190,9 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#olderPageReplacesRecentRecordsAndShowsExactToolEvidence",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage"
       ]
     },
     {

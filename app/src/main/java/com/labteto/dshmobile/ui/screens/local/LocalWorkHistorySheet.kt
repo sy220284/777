@@ -71,14 +71,14 @@ internal fun LocalWorkHistorySheet(
         if (detail != null) {
             DsButton(stringResource(R.string.common_back), { selected = null }, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
             if (evidenceFailed) Text(stringResource(R.string.local_tool_activity_evidence_error))
-            SelectionContainer { Text(evidence ?: detail.content, Modifier.heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()), style = DsType.small13) }
+            SelectionContainer { Text(evidence ?: detail.content, Modifier.weight(1f, fill = false).heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()), style = DsType.small13) }
         } else when {
             failed -> Text(stringResource(R.string.local_run_history_failed), color = DsTheme.colors.labelSecondary)
             current == null -> Text(stringResource(R.string.common_loading))
             current.invalidated -> Text(stringResource(R.string.local_run_history_changed))
             current.records.isEmpty() -> Text(stringResource(R.string.local_run_history_page_empty))
             else -> key(cursor, retry) {
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
                     items(current.records, key = { it.sequence }) { record ->
                         Column {
