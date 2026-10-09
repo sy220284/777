@@ -125,26 +125,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val admission = options.admission
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
-        val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelState.modelSelection.activeProfileId,
-            snapshot.modelState.model,
-            snapshot.modelState.baseUrl,
-        )
-        val runSurface = frozenProfile.toRunModelSurface()
-        // Freeze per-turn model reasoning preference before admission and retries.
-        val reasoningEffort = LocalReasoningModeStore.effortFor(
-            sessionId = snapshot.sessionId,
-            profile = frozenProfile,
-            withTools = tools.isNotEmpty(),
-            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
-        )
-        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
-        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
-            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
-                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
-            )
-        } else null
-        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val frozen = freezeRequestConfiguration(snapshot, profile, tools, temperature)
+        val frozenProfile = frozen.profile
+        val runSurface = frozen.surface
+        val reasoningEffort = frozen.reasoningEffort
+        val effectiveTemperature = frozen.temperature
+        val credentialDiagnostic = frozen.credentialDiagnostic
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
         val cachePolicy = runSurface.promptCachePolicy
@@ -902,6 +888,40 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
         }
     }
+
+    /** Freeze route and session choices once; retries never re-read changing UI settings. */
+    private suspend fun freezeRequestConfiguration(snapshot: LocalHarnessState, profile: LocalModelProfile?,
+        tools: JsonArray, temperature: Double?): FrozenRequestConfiguration {
+        val frozenProfile = profile ?: modelGateway.profileForRoute(
+            snapshot.modelState.modelSelection.activeProfileId,
+            snapshot.modelState.model,
+            snapshot.modelState.baseUrl,
+        )
+        val runSurface = frozenProfile.toRunModelSurface()
+        // Freeze per-turn model reasoning preference before admission and retries.
+        val reasoningEffort = LocalReasoningModeStore.effortFor(
+            sessionId = snapshot.sessionId,
+            profile = frozenProfile,
+            withTools = tools.isNotEmpty(),
+            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
+        )
+        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
+        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
+            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
+                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+            )
+        } else null
+        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        return FrozenRequestConfiguration(frozenProfile, runSurface, reasoningEffort, effectiveTemperature, credentialDiagnostic)
+    }
+
+    private data class FrozenRequestConfiguration(
+        val profile: LocalModelProfile,
+        val surface: com.labteto.dshmobile.local.model.LocalRunModelSurface,
+        val reasoningEffort: String?,
+        val temperature: Double?,
+        val credentialDiagnostic: com.labteto.dshmobile.local.model.LocalCredentialDiagnostic,
+    )
 
     private fun ensureRequestEvidenceSurface(
         cache: MutableMap<String, RequestEvidenceRef>,

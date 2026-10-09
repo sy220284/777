@@ -1,38 +1,5 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.harness.agent.QueuedAgentInput
-import com.labteto.dshmobile.harness.jobs.JobInboxContract
-import com.labteto.dshmobile.harness.session.SessionEvent
-import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
-import com.labteto.dshmobile.harness.session.SessionReducer
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
-import com.labteto.dshmobile.local.jobs.LocalJobInfo
-import com.labteto.dshmobile.local.jobs.LocalJobManager
-import com.labteto.dshmobile.local.model.LocalToolCall
-import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import java.util.UUID
-import kotlinx.serialization.Serializable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
-import kotlinx.serialization.json.put
 
 
 internal object LocalAgentTeamContract {

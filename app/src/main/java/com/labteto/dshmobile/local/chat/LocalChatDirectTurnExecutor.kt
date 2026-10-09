@@ -286,6 +286,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         snapshot = snapshot,
                         messages = withEphemeralContext(requestMessages, repairHint),
                         step = 1,
+                        options = com.labteto.dshmobile.local.LocalModelRequestOptions(
                         toolsOverride = JsonArray(emptyList()),
                         allowImageGeneration = false,
                         publishPreviewEnabled = false,

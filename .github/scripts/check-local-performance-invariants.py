@@ -150,7 +150,24 @@ def frozen_model_route_contract(source: str) -> bool:
         body,
     )
     if profile is None:
-        return False
+        frozen = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*freezeRequestConfiguration\s*\(", body)
+        helper = kotlin_function_body(source, "freezeRequestConfiguration")
+        if frozen is None or helper is None:
+            return False
+        helper_profile = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*profile\s*\?:\s*modelGateway\s*\.\s*profileForRoute\s*\(", helper)
+        if helper_profile is None:
+            return False
+        helper_surface = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*" + re.escape(helper_profile.group("id")) + r"\s*\.\s*toRunModelSurface\s*\(\s*\)", helper[helper_profile.end():])
+        if helper_surface is None or not re.search(r"return\s+FrozenRequestConfiguration\s*\(\s*" + re.escape(helper_profile.group("id")) + r"\s*,\s*" + re.escape(helper_surface.group("id")) + r"\b", helper):
+            return False
+        surface = re.search(r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*" + re.escape(frozen.group("id")) + r"\s*\.\s*surface\b", body[frozen.end():])
+        if surface is None:
+            return False
+        rest = body[frozen.end() + surface.end():]
+        recover = re.search(r"\bmodelStepRuntime\s*\.\s*recover\s*\(", rest)
+        if recover is None:
+            return False
+        return re.search(r"\brequestRuntime\s*\.\s*complete\s*\(\s*surface\s*=\s*" + re.escape(surface.group("id")) + r"\b", rest[recover.end():]) is not None
     rest = body[profile.end():]
     surface = re.search(
         r"\bval\s+(?P<id>[A-Za-z_]\w*)\s*=\s*"
@@ -570,6 +587,23 @@ if "--self-test" in sys.argv:
     assert not frozen_model_route_contract(model_ok.replace("surface = fixed", "surface = mutableSurface"))
     assert not frozen_model_route_contract(model_ok.replace("selected.toRunModelSurface()", "profile.toRunModelSurface()"))
     assert not frozen_model_route_contract(model_ok.replace("modelStepRuntime.recover(", "other.recover("))
+    model_stage_ok = """suspend fun complete(profile: Profile?): Reply {
+        val frozen = freezeRequestConfiguration(snapshot, profile, tools, temperature)
+        val fixed = frozen.surface
+        return modelStepRuntime.recover(initialMessages = listOf()) {
+            requestRuntime.complete(surface = fixed, messages = emptyList())
+        }
+    }
+    private fun freezeRequestConfiguration(): FrozenRequestConfiguration {
+        val selected = profile ?: modelGateway.profileForRoute(id)
+        val surface = selected.toRunModelSurface()
+        return FrozenRequestConfiguration(selected, surface, null)
+    }"""
+    assert frozen_model_route_contract(model_stage_ok)
+    assert not frozen_model_route_contract(model_stage_ok.replace("val frozen = freezeRequestConfiguration", "val frozen = other"))
+    assert not frozen_model_route_contract(model_stage_ok.replace("selected, surface, null", "selected, mutableSurface, null"))
+    assert not frozen_model_route_contract(model_stage_ok.replace("val fixed = frozen.surface", "val fixed = other.surface"))
+    assert not frozen_model_route_contract(model_stage_ok.replace("surface = fixed", "surface = mutableSurface"))
     print("[architecture-3] execution guard self-test passed")
     sys.exit(0)
 
