@@ -1823,6 +1823,7 @@
     <string name="local_composer_temperature_thinking">当前思考档位下温度不会生效，请先切换到关闭思考</string>
     <string name="local_composer_temperature_group_hint">群聊人物分别保存表达变化度，请在各人物设置中调整</string>
     <string name="local_composer_temperature_value">温度 %1$.2f</string>
+    <string name="local_composer_temperature_save_failed">人物温度保存失败，请重试</string>
     <string name="local_composer_reasoning_default">默认</string>
     <string name="local_composer_reasoning_off">关闭</string>
     <string name="local_composer_reasoning_short_off">关</string>
