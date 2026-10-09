@@ -170,10 +170,74 @@ class LocalComposerReasoningRegressionTest {
             SemanticsProperties.StateDescription,
             context.getString(R.string.local_composer_temperature_value, 1.44),
         ))
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(2.4f, 0f..4f, 3),
+        ))
         compose.runOnIdle { position.value = 75 }
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
             context.getString(R.string.local_composer_temperature_value, 1.65),
+        ))
+    }
+
+    @Test fun chatTemperatureDoesNotReboundWhileSavingOrAfterReplyRefresh() {
+        val level = mutableStateOf(4)
+        val position = mutableStateOf(100)
+        val saving = mutableStateOf(false)
+        val enabled = mutableStateOf(true)
+        var proposedLevel: Int? = null
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    temperatureLevel = level.value,
+                    temperaturePosition = position.value,
+                    temperatureEnabled = enabled.value,
+                    temperatureSaving = saving.value,
+                    onReasoningModeChange = {},
+                    onTemperatureLevelChange = { chosen ->
+                        proposedLevel = chosen
+                        saving.value = true
+                        enabled.value = false
+                    },
+                )
+            }
+        }
+        val slider = compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        )
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(4f, 0f..4f, 3),
+        ))
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(1f) }
+        compose.runOnIdle { assertEquals(1, proposedLevel) }
+        slider.assertIsNotEnabled()
+        // Backend still reports the old maximum until the asynchronous save commits.
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
+        ))
+        compose.runOnIdle {
+            position.value = 25
+            level.value = 1
+            saving.value = false
+            enabled.value = true
+        }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
+        ))
+        // Sending a message, receiving its reply, and re-enabling the control must not
+        // reset the slider to the former maximum.
+        compose.runOnIdle { enabled.value = false }
+        compose.runOnIdle { enabled.value = true }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(1f, 0f..4f, 3),
         ))
     }
 
