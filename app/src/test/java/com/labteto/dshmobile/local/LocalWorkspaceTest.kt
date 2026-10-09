@@ -175,6 +175,46 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun recursiveSearchCanResumeBeyondFiveThousandEntriesWithoutFalseNoMatch() {
+        val docs = root.resolve("docs")
+        docs.mkdirs()
+        repeat(5_050) { index ->
+            docs.resolve("entry-" + index.toString().padStart(5, '0') + ".txt").writeText(
+                if (index == 5_040) "needle-beyond-first-page" else "ordinary record",
+            )
+        }
+        val first = workspace.search("needle-beyond-first-page")
+        assertTrue(first.contains("搜索未完成"))
+        val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
+        val second = workspace.search("needle-beyond-first-page", cursor = cursor)
+        assertTrue(second.contains("entry-05040.txt:1: needle-beyond-first-page"))
+        assertFalse(second.contains("搜索未完成"))
+    }
+
+    @Test
+    fun searchResultPageCarriesLineCursorInsteadOfSilentlyLosingMatches() {
+        val text = (1..250).joinToString("\n") { "needle row $it" }
+        root.resolve("rows.txt").writeText(text)
+        val first = workspace.search("needle")
+        assertTrue(first.contains("搜索未完成"))
+        val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
+        val second = workspace.search("needle", cursor = cursor)
+        assertTrue(second.contains("rows.txt:250: needle row 250"))
+        assertFalse(second.contains("rows.txt:1:"))
+    }
+
+    @Test
+    fun largeFileReadStreamsRequestedLinesWithoutSizeRejection() {
+        val big = root.resolve("large.txt")
+        big.bufferedWriter().use { writer ->
+            repeat(6_000) { writer.append("record " + it + " " + "x".repeat(1_000) + "\n") }
+        }
+        val excerpt = workspace.read("large.txt", 5_998, 6_000)
+        assertTrue(excerpt.contains("5999: record 5998"))
+        assertTrue(excerpt.contains("6000: record 5999"))
+    }
+
+    @Test
     fun shellInheritsRuntimePathAndEnvironment() = runBlocking {
         val runtimeBin = root.resolve("runtime-bin").apply { mkdirs() }
         runtimeBin.resolve("fake-runtime").apply {
