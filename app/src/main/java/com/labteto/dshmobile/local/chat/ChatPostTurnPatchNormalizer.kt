@@ -161,3 +161,9 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     }
     return JsonObject(result)
 }
+
+/** The standalone suggestion generator shares the same lenient optional-field contract. */
+internal fun normalizeChatReplySuggestionPayload(root: JsonObject): JsonObject {
+    val withState = JsonObject(root + ("state" to JsonObject(emptyMap())))
+    return JsonObject(normalizeChatPostTurnPatch(withState).filterKeys { it != "state" })
+}
