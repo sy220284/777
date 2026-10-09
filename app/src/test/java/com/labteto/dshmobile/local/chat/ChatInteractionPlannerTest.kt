@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -88,6 +89,11 @@ class ChatInteractionPlannerTest {
             detail = "模型流中断",
         )
         assertTrue(shouldRetryChatPostTurnRequest(interrupted))
+        assertTrue(shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_NETWORK", message = "请求体已发送，等待响应时断开",
+            retryable = false, admissionState = LocalModelAdmissionState.MAYBE_ADMITTED,
+            continuationEligible = true,
+        )))
         assertTrue(shouldRetryChatPostTurnRequest(LocalModelException(
             code = "MODEL_NETWORK", message = "连接前失败", retryable = true,
         )))
