@@ -327,7 +327,9 @@ internal class ChatInteractionStateReducer {
         previous: ChatCharacterState,
         userMessage: String,
     ): ChatCharacterState {
-        val topicReset = TOPIC_RESET_HINTS.any { userMessage.contains(it) }
+        // Treat only an explicit topic-ending instruction as a reset. Common conversational
+        // phrases such as "算了" or "说正事" can be quoted or refer to something else.
+        val topicReset = TOPIC_RESET_REQUEST.containsMatchIn(userMessage.trim())
         val nextAges = previous.transientAges.toMutableMap()
 
         fun age(key: String, value: String, ttl: Int, clearOnTopicReset: Boolean = false): String {
@@ -419,6 +421,32 @@ internal class ChatInteractionStateReducer {
         )
     }
 
+    private fun relationshipStageEventSupports(
+        proposedStage: String,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val conversation = listOf(userMessage, assistantMessage)
+        val stageWords = when (proposedStage) {
+            "AMBIGUOUS" -> Regex("暧昧|心动|喜欢你|喜欢我|对你有好感")
+            "DATING" -> Regex("开始约会|正式交往|在谈恋爱|正在约会")
+            "COMMITTED" -> Regex("确认关系|确定关系|在一起了|正式在一起|订婚|结婚|同居")
+            "CONFLICT" -> Regex("冷战|吵架|争吵|闹矛盾|发生争执")
+            "COOLING" -> Regex("暂时冷静|冷淡下来|暂停关系")
+            "SEPARATED" -> Regex("分手|分开了|离婚|结束关系")
+            "REPAIRING" -> Regex("和好了|复合|重新和好|修复关系")
+            "FAMILIAR" -> Regex("互相认识|开始熟悉|成为朋友")
+            else -> return false
+        }
+        return conversation.any { message ->
+            message.split(Regex("[。！？!?；;\\n]")).any { clause ->
+                val current = clause.trim()
+                stageWords.containsMatchIn(current) &&
+                    (Regex("我们|咱们|你和我|我和你|我喜欢你|你喜欢我").containsMatchIn(current))
+            }
+        }
+    }
+
     private fun sanitizeDynamics(
         value: RelationshipDynamics,
         previous: RelationshipDynamics,
@@ -428,7 +456,11 @@ internal class ChatInteractionStateReducer {
         tuning: CharacterBehaviorTuning,
     ): RelationshipDynamics {
         val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
-        val explicitStageEvidence = EXPLICIT_STAGE_SIGNAL.containsMatchIn(userMessage)
+        // Check that an explicit relationship event supports the requested target stage.
+        // Unrelated words (e.g. "我的前任结婚了") cannot advance our relationship.
+        val explicitStageEvidence = relationshipStageEventSupports(
+            candidateStage, userMessage, assistantMessage,
+        )
         val stage = when {
             tuning.lockRelationshipStage -> previous.stage
             candidateStage == previous.stage -> previous.stage
@@ -620,13 +652,10 @@ private companion object {
             "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",
             "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
         )
-        val TOPIC_RESET_HINTS = listOf(
-            "换个话题", "先不聊这个", "不聊这个", "别提这个", "别再提", "说正事", "算了", "到此为止",
+        val TOPIC_RESET_REQUEST = Regex(
+            """^(?:嗯|好|那|行|唉|算了[，,])?[，,。\\s]*(?:换个话题|先不聊这个|不聊这个|别提这个|别再提(?:这个)?|到此为止)""",
         )
         const val THREAD_TTL = 6
-        val EXPLICIT_STAGE_SIGNAL = Regex(
-            """在一起|确定关系|确认关系|正式交往|暧昧|约会中|分手|分开了|复合|冷战|闹矛盾|订婚|结婚|离婚|同居|前任""",
-        )
     }
 }
 

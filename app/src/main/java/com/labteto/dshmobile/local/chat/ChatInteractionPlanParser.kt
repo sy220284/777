@@ -39,6 +39,30 @@ internal class ChatInteractionPlanParser(
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             ?: return null to "invalid_json"
         val normalized = normalizeChatPostTurnPatch(root)
+        val originalState = root["state"] as? JsonObject
+        val normalizedState = normalized["state"] as? JsonObject
+        // A malformed model patch must not silently become a successful empty update:
+        // the caller would otherwise advance its durable pending-turn cursor.
+        // Genuine no-change state {} and independently valid diary/suggestions remain usable.
+        val hasStateUpdate = normalizedState?.any { (key, field) ->
+            key !in setOf("dynamics", "userPattern", "continuity") ||
+                (field as? JsonObject)?.isNotEmpty() == true
+        } == true
+        val diary = normalized["diaryDelta"] as? JsonObject
+        val hasDiary = (diary?.get("event") as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeIf { it.isString }?.content?.isNotBlank() == true
+        val suggestions = normalized["suggestions"] as? kotlinx.serialization.json.JsonArray
+        val hasSuggestions = suggestions?.any { element ->
+            val suggestion = element as? JsonObject
+            (suggestion?.get("text") as? kotlinx.serialization.json.JsonPrimitive)
+                ?.takeIf { it.isString }?.content?.isNotBlank() == true
+        } == true
+        val discardedRequestedState =
+            (originalState != null && originalState.isNotEmpty() && !hasStateUpdate) ||
+                (root.containsKey("state") && originalState == null)
+        if (discardedRequestedState && !hasDiary && !hasSuggestions) {
+            return null to "state_patch_unusable"
+        }
         val decoded = runCatching {
             json.decodeFromString(ChatPostTurnPlan.serializer(), normalized.toString())
         }.getOrNull() ?: return null to "schema_mismatch"

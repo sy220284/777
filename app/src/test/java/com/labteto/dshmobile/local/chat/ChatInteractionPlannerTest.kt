@@ -31,6 +31,55 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun casualTopicWordsDoNotEraseOpenThreads() {
+        val previous = ChatCharacterState(
+            currentFocus = "关于工作的争执",
+            currentAgenda = "等待解释",
+            unresolvedThreads = listOf("周末约定"),
+        )
+        listOf("算了，先去吃饭", "我们说正事吧", "昨天他说换个话题，我不认可").forEach { user ->
+            val result = planner.parse(
+                """{"state":{},"turnSignificance":"NONE"}""",
+                previous = previous,
+                userMessage = user,
+                assistantMessage = "好",
+            )!!
+            assertEquals("关于工作的争执", result.state.currentFocus)
+            assertEquals(listOf("周末约定"), result.state.unresolvedThreads)
+        }
+    }
+
+    @Test
+    fun stageEventMustMatchRequestedRelationshipDirection() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val payload = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        val wrongContext = planner.parse(
+            payload, previous, userMessage = "我的前任结婚了", assistantMessage = "哦",
+        )!!
+        assertEquals("FAMILIAR", wrongContext.state.dynamics.stage)
+        val wrongDirection = planner.parse(
+            payload, previous, userMessage = "我们分手了", assistantMessage = "好",
+        )!!
+        assertEquals("FAMILIAR", wrongDirection.state.dynamics.stage)
+        val confirmed = planner.parse(
+            payload, previous, userMessage = "我们确认关系，在一起了", assistantMessage = "好",
+        )!!
+        assertEquals("COMMITTED", confirmed.state.dynamics.stage)
+    }
+
+    @Test
+    fun invalidStateCannotSilentlyAdvancePendingTurnCursor() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        val bad = """{"state":{"initiative":"略升","dynamics":{"facts":["无来源文字"]}},"turnSignificance":"MINOR"}"""
+        assertEquals(null, parser.parsePlan(bad))
+        assertEquals("state_patch_unusable", parser.parseFailureKind(bad))
+        assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
+        assertNotNull(parser.parsePlan(
+            """{"state":{"initiative":"略升"},"diaryDelta":{"event":"真正发生的事情","importance":4},"turnSignificance":"MINOR"}""",
+        ))
+    }
+
+    @Test
     fun topicResetImmediatelyDropsCurrentTopicAndOpenThreads() {
         val previous = ChatCharacterState(
             currentFocus = "旧话题",
