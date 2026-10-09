@@ -92,10 +92,11 @@ class LocalComposerReasoningRegressionTest {
 
     @Test fun workTemperatureHasFiveStopsWithThreeLabels() {
         val current = mutableStateOf(2)
+        val activeProfile = mutableStateOf(deepSeek)
         compose.setContent {
             DshTheme {
                 LocalComposerCapabilityPanel(
-                    panel = "reasoning", profile = deepSeek,
+                    panel = "reasoning", profile = activeProfile.value,
                     usageMode = LocalUsageMode.WORK,
                     reasoningMode = LocalReasoningUiMode.FAST,
                     temperatureLevel = current.value,
@@ -117,8 +118,27 @@ class LocalComposerReasoningRegressionTest {
             .assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_high))
             .assertIsDisplayed()
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 0.65),
+        ))
         slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(4f) }
         compose.runOnIdle { assertEquals(4, current.value) }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 1.3),
+        ))
+        // The DeepSeek-specific product cap must not carry over to another provider.
+        compose.runOnIdle {
+            activeProfile.value = LocalModelProfile(
+                "composer-gemini", "gemini-3.8-flash",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+            )
+        }
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            context.getString(R.string.local_composer_temperature_value, 2.0),
+        ))
     }
 
     @Test fun chatTemperatureReflectsPersonaSliderWhenChangedOutsidePanel() {
