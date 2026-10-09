@@ -63,6 +63,46 @@ class LocalWorkspace(
 ) {
     private val canonicalRoot = root.canonicalFile
     private val observations = LocalFileObservationCache()
+    // Retain only the small traversal frontier between consecutive tool pages. On a
+    // cache miss (process restart, different query or competing caller), numeric cursors
+    // still work by replaying the deterministic walk.
+    private data class ScanResume(
+        val cursor: Int,
+        val pending: IndexedValue<File>,
+        val remaining: Iterator<IndexedValue<File>>,
+    )
+    private val scanResumes = object : LinkedHashMap<String, ScanResume>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ScanResume>?): Boolean =
+            size > 8
+    }
+
+    private fun scanPageIterator(
+        directory: File,
+        maxDepth: Int,
+        key: String,
+        cursor: Int,
+    ): Iterator<IndexedValue<File>> {
+        val previous = synchronized(scanResumes) {
+            scanResumes.remove(key)?.takeIf { it.cursor == cursor }
+        }
+        return if (previous != null) sequence {
+            yield(previous.pending)
+            yieldAll(previous.remaining.asSequence())
+        }.iterator() else safeWalk(
+            directory, maxDepth = maxDepth, maxVisited = Int.MAX_VALUE, maxMillis = Long.MAX_VALUE,
+        ).withIndex().iterator()
+    }
+
+    private fun saveScanResume(
+        key: String,
+        entry: Int,
+        file: File,
+        iterator: Iterator<IndexedValue<File>>,
+    ) {
+        synchronized(scanResumes) {
+            scanResumes[key] = ScanResume(entry, IndexedValue(entry, file), iterator)
+        }
+    }
 
     init {
         canonicalRoot.mkdirs()
@@ -177,7 +217,7 @@ class LocalWorkspace(
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val matcher = globRegex(pattern.replace('\\', '/'))
-        return discoverPage(directory, MAX_SCAN_DEPTH, cursor, "glob", "未找到匹配文件") { file ->
+        return discoverPage(directory, MAX_SCAN_DEPTH, cursor, "glob", "未找到匹配文件", pattern) { file ->
             file.takeIf { it.isFile && isInsideWorkspace(it) }
                 ?.relativeTo(directory)?.invariantSeparatorsPath
                 ?.takeIf(matcher::matches)
@@ -188,7 +228,7 @@ class LocalWorkspace(
     fun list(relativePath: String = ".", depth: Int = 3, cursor: Int = 0): String {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
-        return discoverPage(directory, depth.coerceIn(1, 8), cursor, "list_files", "目录为空") { file ->
+        return discoverPage(directory, depth.coerceIn(1, 8), cursor, "list_files", "目录为空", "") { file ->
             file.takeIf { it != directory && isInsideWorkspace(it) }?.let {
                 val suffix = if (it.isDirectory) "/" else " (${it.length()} B)"
                 displayPath(it) + suffix
@@ -202,6 +242,7 @@ class LocalWorkspace(
         cursor: Int,
         toolName: String,
         emptyMessage: String,
+        pattern: String,
         project: (File) -> String?,
     ): String {
         require(cursor >= 0) { "目录扫描游标不能为负数" }
@@ -210,8 +251,10 @@ class LocalWorkspace(
         var cursorFound = cursor == 0
         var nextCursor: Int? = null
         var started = 0L
-        for ((entry, file) in safeWalk(directory, maxDepth = depth, maxVisited = Int.MAX_VALUE,
-            maxMillis = Long.MAX_VALUE).withIndex()) {
+        val scanKey = listOf(toolName, directory.path, depth.toString(), pattern).joinToString("\u0000")
+        val iterator = scanPageIterator(directory, depth, scanKey, cursor)
+        while (iterator.hasNext()) {
+            val (entry, file) = iterator.next()
             if (entry < cursor) continue
             cursorFound = true
             // Page time begins when the continuation point is reached. Otherwise every
@@ -220,6 +263,7 @@ class LocalWorkspace(
             if (pageEntries >= MAX_SCAN_ENTRIES || rows.size >= MAX_LIST_ROWS ||
                 (System.nanoTime() - started) / 1_000_000L >= MAX_SCAN_MILLIS) {
                 nextCursor = entry
+                saveScanResume(scanKey, entry, file, iterator)
                 break
             }
             pageEntries++
@@ -257,9 +301,10 @@ class LocalWorkspace(
             (parts == null || parts.all { it.toIntOrNull() != null })) {
             "搜索游标无效，请从头搜索"
         }
-        val files = if (directory.isFile) sequenceOf(directory) else safeWalk(
-            directory, maxDepth = MAX_SCAN_DEPTH, maxVisited = Int.MAX_VALUE, maxMillis = Long.MAX_VALUE,
-        )
+        val scanKey = listOf("search", directory.path, regex.toString(), query).joinToString("\u0000")
+        val iterator = if (directory.isFile) {
+            scanPageIterator(directory, 0, scanKey, resumeEntry)
+        } else scanPageIterator(directory, MAX_SCAN_DEPTH, scanKey, resumeEntry)
         val matches = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         var outputChars = 0
@@ -267,7 +312,8 @@ class LocalWorkspace(
         var resumeFound = cursor == null
         var nextCursor: String? = null
         var startedAt = 0L
-        for ((entry, file) in files.withIndex()) {
+        while (iterator.hasNext()) {
+            val (entry, file) = iterator.next()
             if (entry < resumeEntry) continue
             resumeFound = true
             // Reaching an existing cursor can require replaying the directory prefix.
@@ -276,6 +322,7 @@ class LocalWorkspace(
             if (pageEntries >= MAX_SCAN_ENTRIES ||
                 (System.nanoTime() - startedAt) / 1_000_000L >= MAX_SCAN_MILLIS) {
                 nextCursor = "$entry:${if (entry == resumeEntry) resumeLine else 0}"
+                saveScanResume(scanKey, entry, file, iterator)
                 break
             }
             pageEntries++
@@ -317,7 +364,10 @@ class LocalWorkspace(
             } catch (error: Exception) {
                 warnings += "文件 ${displayPath(file)} 无法完整检索：${error.message.orEmpty().take(180)}"
             }
-            if (nextCursor != null) break
+            if (nextCursor != null) {
+                saveScanResume(scanKey, entry, file, iterator)
+                break
+            }
         }
         require(resumeFound) { "搜索游标已经失效，工作区可能发生变化；请从头搜索" }
         return buildString {
