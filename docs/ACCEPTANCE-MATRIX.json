@@ -1429,8 +1429,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 本机累计 Token",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
