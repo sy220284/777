@@ -286,6 +286,7 @@ internal class LocalSubagentRunner(
             // Offer only these requested candidates; the effective schemas still enforce
             // subagent access, network switch, prompt budget and the strict allowlist.
             addAll(capabilities.toolAllowlist.orEmpty())
+            addAll(capabilities.initialOptionalTools)
         }
         val initialToolSchemas = schemas(
             allowMutation,
@@ -583,7 +584,12 @@ internal class LocalSubagentRunner(
                 },
                 tools = AgentToolExecutor { call ->
                     currentCoroutineContext().ensureActive()
-                    toolCallPolicy.rejection(call) ?: withContext(LocalModelRunContext(runProfile)) {
+                    toolCallPolicy.rejection(call)
+                        ?: if (capabilities.teamManaged && call.name == "capability_search") {
+                            AgentToolResult(
+                                content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
+                            )
+                        } else withContext(LocalModelRunContext(runProfile)) {
                         currentCoroutineContext().ensureActive()
                         execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                             .also { currentCoroutineContext().ensureActive() }
