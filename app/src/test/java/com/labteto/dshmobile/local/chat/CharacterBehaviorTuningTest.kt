@@ -18,29 +18,58 @@ class CharacterBehaviorTuningTest {
         val fine = CharacterBehaviorTuning(expressionVariation = 60)
         assertEquals(2, fine.composerTemperatureLevel())
         val high = fine.withComposerTemperatureLevel(4)
-        assertEquals(100, high.expressionVariation)
+        assertEquals(60, high.expressionVariation) // The character expression axis is independent.
+        assertEquals(100, high.samplingTemperaturePosition)
         assertEquals(4, high.composerTemperatureLevel())
-        assertEquals(0, high.withComposerTemperatureLevel(-1).expressionVariation)
-        assertEquals(100, high.withComposerTemperatureLevel(9).expressionVariation)
+        assertEquals(0, high.withComposerTemperatureLevel(-1).samplingTemperaturePosition)
+        assertEquals(100, high.withComposerTemperatureLevel(9).samplingTemperaturePosition)
     }
 
     @Test
-    fun expressionVariationUsesOfficialBoundsAndConversationDefault() {
+    fun deepSeekTemperatureCapsAtOnePointThreeAndLegacyChoicesStayMeaningful() {
         val model = "deepseek-flash"
         val endpoint = "https://api.deepseek.com"
         assertEquals(1.3, CharacterBehaviorTuning().roleplayTemperature(model, endpoint)!!, 0.000001)
         assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = 0)
             .roleplayTemperature(model, endpoint)!!, 0.0)
-        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100)
+        assertEquals(1.3, CharacterBehaviorTuning(expressionVariation = 100)
             .roleplayTemperature(model, endpoint)!!, 0.0)
         assertEquals(0.65, CharacterBehaviorTuning(expressionVariation = 25)
             .roleplayTemperature(model, endpoint)!!, 0.000001)
-        assertEquals(1.65, CharacterBehaviorTuning(expressionVariation = 75)
+        assertEquals(1.3, CharacterBehaviorTuning(expressionVariation = 75)
             .roleplayTemperature(model, endpoint)!!, 0.000001)
         assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = -500)
             .roleplayTemperature(model, endpoint)!!, 0.0)
-        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 500)
+        assertEquals(1.3, CharacterBehaviorTuning(expressionVariation = 500)
             .roleplayTemperature(model, endpoint)!!, 0.0)
+    }
+
+    @Test
+    fun deepSeekChatDefaultsToMaximumAndUsesAllFiveTemperatureStops() {
+        for (model in listOf("deepseek-flash", "deepseek-v4-pro")) {
+            val url = "https://api.deepseek.com"
+            val range = com.labteto.dshmobile.local.model.LocalModelPresets
+                .chatTemperatureRangeFor(model, url)!!
+            assertEquals(1.3, range.maximum, 0.0)
+            assertEquals(100, range.defaultPosition)
+            val clean = CharacterBehaviorTuning()
+            assertEquals(100, clean.temperaturePosition(range))
+            assertEquals(4, clean.composerTemperatureLevel(range))
+            assertEquals(1.3, clean.roleplayTemperature(model, url)!!, 0.0)
+            listOf(0.0, 0.325, 0.65, 0.975, 1.3).forEachIndexed { level, expected ->
+                val selected = clean.withComposerTemperatureLevel(level)
+                assertEquals(level * 25, selected.temperaturePosition(range))
+                assertEquals(expected, selected.roleplayTemperature(model, url)!!, 0.000001)
+                assertEquals(50, selected.expressionVariation)
+            }
+            // Older 25/50/75 values retain their former output up to the new cap.
+            assertEquals(0.65,
+                CharacterBehaviorTuning(expressionVariation = 25).roleplayTemperature(model, url)!!,
+                0.000001)
+            assertEquals(1.3,
+                CharacterBehaviorTuning(expressionVariation = 75).roleplayTemperature(model, url)!!,
+                0.000001)
+        }
     }
 
     @Test
@@ -53,7 +82,7 @@ class CharacterBehaviorTuningTest {
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
         assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
-        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
+        assertEquals(1.3, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
             "deepseek-flash", "https://api.deepseek.com/v1")!!, 0.0)
         assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
             "deepseek-flash", "https://proxy.example.com/v1"))
