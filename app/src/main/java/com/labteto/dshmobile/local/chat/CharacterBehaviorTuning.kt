@@ -24,6 +24,8 @@ data class CharacterBehaviorTuning(
     val lockRelationshipStage: Boolean = false,
     val updatedAt: Long = 0L,
     val expressionVariation: Int = 50,
+    /** Sampling override shared by Chat composer and persona editor; null migrates legacy values. */
+    val samplingTemperaturePosition: Int? = null,
 ) {
     fun normalized(): CharacterBehaviorTuning = copy(
         intimacy = intimacy.coerceIn(0, 100),
@@ -37,6 +39,7 @@ data class CharacterBehaviorTuning(
         relationshipPace = relationshipPace.coerceIn(0, 100),
         updatedAt = updatedAt.coerceAtLeast(0L),
         expressionVariation = expressionVariation.coerceIn(0, 100),
+        samplingTemperaturePosition = samplingTemperaturePosition?.coerceIn(0, 100),
     )
 
     fun isNatural(): Boolean =
@@ -65,22 +68,32 @@ data class CharacterBehaviorTuning(
     }
 
     /**
-     * The 0..100 character axis spans the selected model's verified official limits.
-     * Center (50) uses its conversation-friendly temperature without changing saved sliders.
-     * Missing/unsupported model bounds leave its default sampling behavior intact.
+     * The temperature is separate from the character's expressive personality axis.
+     * Legacy values migrate through the route's old mapping only when no new choice exists.
+     * DeepSeek's old midpoint (1.3) becomes the new maximum without a dead slider region.
      */
-    /** Five composer stops share the persona editor's 0..100 persisted value. */
-    internal fun composerTemperatureLevel(): Int =
-        ((expressionVariation.coerceIn(0, 100) + 12) / 25).coerceIn(0, 4)
+    internal fun temperaturePosition(range: com.labteto.dshmobile.local.model.LocalModelTemperatureRange): Int =
+        samplingTemperaturePosition?.coerceIn(0, 100)
+            ?: range.legacyPosition(expressionVariation)
+
+    /** The five-stop composer and the persona editor use exactly one stored temperature. */
+    internal fun composerTemperatureLevel(
+        range: com.labteto.dshmobile.local.model.LocalModelTemperatureRange? = null,
+    ): Int {
+        val position = if (range == null) {
+            samplingTemperaturePosition ?: expressionVariation
+        } else temperaturePosition(range)
+        return ((position.coerceIn(0, 100) + 12) / 25).coerceIn(0, 4)
+    }
 
     internal fun withComposerTemperatureLevel(level: Int): CharacterBehaviorTuning =
-        copy(expressionVariation = level.coerceIn(0, 4) * 25)
+        copy(samplingTemperaturePosition = level.coerceIn(0, 4) * 25)
 
     internal fun roleplayTemperature(model: String, baseUrl: String): Double? {
         val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
-        // Gemini 3.x official guidance recommends omitting sampling fields at the default.
-        if (range.omitAtChatDefault && expressionVariation == 50) return null
-        return range.at(expressionVariation)
+        val position = temperaturePosition(range)
+        if (range.omitAtChatDefault && position == range.defaultPosition) return null
+        return range.at(position)
     }
 
     internal fun evolutionStepBonus(): Int = when {
@@ -94,6 +107,7 @@ data class CharacterBehaviorTuning(
         intimacy, persistence, initiative, openness, evolution,
         emotionalAfterglow, novelty, loreAdherence, relationshipPace,
         if (lockRelationshipStage) 1 else 0, expressionVariation,
+        samplingTemperaturePosition?.toString() ?: "auto",
     ).joinToString(",")
 }
 
