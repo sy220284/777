@@ -135,12 +135,13 @@ internal fun LocalAgentSwarmLaunchEntry(
 internal fun LocalAgentTeamStatusBar(
     team: LocalAgentTeamUiState,
     launchPending: Boolean,
+    dismissed: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
     AnimatedVisibility(
-        visible = launchPending || team.visible,
+        visible = launchPending || (team.visible && !dismissed),
         enter = fadeIn(DsAnimations.composerFade) +
             expandVertically(animationSpec = DsAnimations.composerReveal),
         exit = fadeOut(DsAnimations.composerFade) +
@@ -266,6 +267,7 @@ internal fun LocalAgentTeamSheet(
     onStopAll: suspend () -> LocalWorkUiActionResult,
     onLeadFollowup: (String) -> Unit,
     onDismiss: () -> Unit,
+    onCollapse: () -> Unit = onDismiss,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -309,6 +311,12 @@ internal fun LocalAgentTeamSheet(
                 Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.labelSecondary)
                 return@Column
             }
+            DsButton(
+                text = stringResource(R.string.local_team_collapse_after_view),
+                onClick = onCollapse,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
             TeamProgressBlock(team)
             Text(
                 stringResource(R.string.local_team_readonly_hint),
