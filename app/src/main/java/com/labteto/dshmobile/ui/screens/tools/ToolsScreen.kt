@@ -146,6 +146,9 @@ class ToolsViewModel @Inject constructor(
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
+                val skills = localTools.installedSkills()
+                val presets = localTools.presetSkills()
+                _state.value = _state.value.copy(skills = skills, presets = presets)
                 sessionStore.refreshPlugins()
                 val (servers, plugins) = localTools.servers() to localTools.installedPluginIds()
                 _state.value = ToolsUiState(
@@ -153,8 +156,8 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
-                    skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(),
+                    skills = skills,
+                    presets = presets,
                     remotePlugins = sessionStore.plugins.value,
                     webhook = localTools.webhookStatus(),
                 )
