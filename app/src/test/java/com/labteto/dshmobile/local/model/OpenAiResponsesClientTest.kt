@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.model
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.chatgpt.chatGptPlanProfiles
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import java.io.IOException
 import java.net.SocketException
@@ -41,7 +43,7 @@ class OpenAiResponsesClientTest {
     @Test
     fun apiAndPlanReasoningSelectionPreserveDefaultAndUseNativeFields() {
         listOf(false, true).forEach { plan ->
-            listOf<String?>(null, "low", "high").forEach { effort ->
+            listOf<String?>(null, "low", "high", "max").forEach { effort ->
                 val payload = client.buildPayload(
                     model = "gpt-6.1-sol", messages = listOf(buildJsonObject {
                         put("role", "user"); put("content", "test")
@@ -54,6 +56,80 @@ class OpenAiResponsesClientTest {
                 assertEquals("false", payload["store"]!!.jsonPrimitive.content)
                 assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
             }
+        }
+    }
+
+    @Test
+    fun accountBoundPlanMaxEffortProducesResponsesPayloadWithoutSampling() {
+        val profile = chatGptPlanProfiles("account-a", listOf(
+            ChatGptModelOption("gpt-6.1-sol", "GPT-6.1 Sol"),
+        )).single()
+        val session = "plan-payload-max-effort-test"
+        try {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+            val effort = LocalReasoningModeStore.effortFor(session, profile, withTools = true)
+            val payload = client.buildPayload(
+                model = profile.model,
+                messages = listOf(buildJsonObject {
+                    put("role", "user"); put("content", "检查账户思考强度")
+                }),
+                tools = JsonArray(emptyList()),
+                temperature = 0.85,
+                reasoningEffort = effort,
+                planSharing = profile.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+            )
+            assertEquals("max", payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("false", payload["store"]!!.jsonPrimitive.content)
+            assertEquals("true", payload["stream"]!!.jsonPrimitive.content)
+            assertFalse(payload.containsKey("temperature"))
+            assertFalse(payload.containsKey("reasoning_effort"))
+            assertTrue(payload.containsKey("include"))
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+        }
+    }
+
+    @Test
+    fun accountLoginReasoningMaxReachesTheActualResponsesRequest() = runBlocking {
+        val accountProfile = chatGptPlanProfiles("account-wire", listOf(
+            ChatGptModelOption("gpt-6-sol", "GPT-6 Sol"),
+        )).single()
+        val session = "plan-wire-reasoning-max-test"
+        var postedBody = ""
+        var postedAuthorization = ""
+        var postedUrl = ""
+        val completed = """data: {"type":"response.completed","response":{"id":"response-test","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"通过"}]}],"usage":{"input_tokens":8,"output_tokens":5}}}""" + "\n\n"
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            postedUrl = chain.request().url.toString()
+            postedAuthorization = chain.request().header("Authorization").orEmpty()
+            postedBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(completed.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        try {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+            val result = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-plan-access-token",
+                baseUrl = accountProfile.baseUrl,
+                model = accountProfile.model,
+                messages = chatPostTurnModelMessages("验证"),
+                tools = JsonArray(emptyList()),
+                planSharing = accountProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+                reasoningEffort = LocalReasoningModeStore.effortFor(session, accountProfile, withTools = true),
+            )
+            assertEquals("通过", result.content)
+            assertEquals("https://api.openai.com/v1/responses", postedUrl)
+            assertEquals("Bearer mock-plan-access-token", postedAuthorization)
+            val wire = Json.parseToJsonElement(postedBody).jsonObject
+            assertEquals("gpt-6-sol", wire["model"]!!.jsonPrimitive.content)
+            assertEquals("max", wire["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("false", wire["store"]!!.jsonPrimitive.content)
+            assertEquals("true", wire["stream"]!!.jsonPrimitive.content)
+            assertFalse(wire.containsKey("temperature"))
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
         }
     }
 

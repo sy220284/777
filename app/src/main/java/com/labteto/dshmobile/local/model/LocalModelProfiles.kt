@@ -337,9 +337,20 @@ object LocalModelPresets {
                 LocalModelCapability.IMAGE,
             ),
             imageInputSupported = true,
-            // Default reasoning is medium; sampling controls require an explicit none effort.
+            // The gpt-5.6 alias resolves to GPT-5.6 Sol.
+            protocol = LocalModelProtocol.RESPONSES,
             temperatureSupported = false,
             modelsEndpoint = "https://api.openai.com/v1/models",
+        ),
+        LocalModelPreset(
+            provider = "OpenAI",
+            model = "gpt-5.6-sol",
+            baseUrl = "https://api.openai.com/v1",
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+            protocol = LocalModelProtocol.RESPONSES,
+            temperatureSupported = false,
         ),
         LocalModelPreset(
             provider = "OpenAI",
@@ -356,6 +367,16 @@ object LocalModelPresets {
         ),
         LocalModelPreset(
             provider = "OpenAI",
+            model = "gpt-6.1-sol",
+            baseUrl = "https://api.openai.com/v1",
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            imageInputSupported = true,
+            modelsEndpoint = "https://api.openai.com/v1/models",
+            toolCallingMode = LocalModelToolCallingMode.RESPONSES_ONLY,
+            temperatureSupported = false,
+        ),
+        LocalModelPreset(
+            provider = "OpenAI",
             model = "gpt-6-sol",
             baseUrl = "https://api.openai.com/v1",
             capabilities = setOf(
@@ -365,6 +386,9 @@ object LocalModelPresets {
             imageInputSupported = true,
             modelsEndpoint = "https://api.openai.com/v1/models",
             toolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING,
+            // Use Responses by default so native reasoning and tool calls can coexist.
+            // Saved explicit Chat Completions routes remain unchanged.
+            protocol = LocalModelProtocol.RESPONSES,
         ),
         LocalModelPreset(
             provider = "OpenAI",
@@ -377,6 +401,7 @@ object LocalModelPresets {
             imageInputSupported = true,
             modelsEndpoint = "https://api.openai.com/v1/models",
             toolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING,
+            protocol = LocalModelProtocol.RESPONSES,
         ),
         LocalModelPreset(
             provider = "Google Gemini",
