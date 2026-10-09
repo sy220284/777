@@ -215,6 +215,7 @@ internal fun LocalConversationSurface(
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showTeamPanel by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamCardDismissed by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
@@ -863,6 +864,7 @@ internal fun LocalConversationSurface(
         LocalAgentTeamStatusBar(
             team = state.team,
             launchPending = teamLaunchPending,
+            dismissed = teamCardDismissed,
             onClick = {
                 if (state.team.visible) showTeamPanel = true
             },
@@ -889,6 +891,7 @@ internal fun LocalConversationSurface(
                 onSendTeam(text, files).also { result ->
                     if (result.accepted) {
                         teamLaunchPending = true
+                        teamCardDismissed = false
                         teamLaunchSawRunning = false
                     }
                 }
@@ -1223,6 +1226,10 @@ internal fun LocalConversationSurface(
                 showTeamPanel = false
             },
             onDismiss = { showTeamPanel = false },
+            onCollapse = {
+                teamCardDismissed = true
+                showTeamPanel = false
+            },
         )
     }
 }
