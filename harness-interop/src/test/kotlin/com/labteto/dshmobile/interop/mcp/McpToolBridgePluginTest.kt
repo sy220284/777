@@ -39,6 +39,63 @@ class McpToolBridgePluginTest {
     }
 
     @Test
+    fun concurrentReconnectCannotStealOrDisconnectAnInProgressReconnect() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var connections = 0
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = {
+                val generation = ++connections
+                object : McpTransport {
+                    override suspend fun request(method: String, params: JsonObject): JsonObject {
+                        require(method == "tools/list")
+                        if (generation == 2) {
+                            entered.complete(Unit)
+                            release.await()
+                        }
+                        return buildJsonObject {
+                            put("result", buildJsonObject {
+                                put("tools", buildJsonArray { })
+                            })
+                        }
+                    }
+                    override fun close() = Unit
+                }
+            },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        plugin.connectHttpFromUi(registry.context, "guarded", "https://example.com/mcp")
+        val running = async {
+            registry.context.tools.execute(
+                "mcp_reconnect",
+                buildJsonObject { put("server_id", "guarded") },
+                context = ToolContext(approval = { true }),
+            )
+        }
+        entered.await()
+        val duplicate = registry.context.tools.execute(
+            "mcp_reconnect",
+            buildJsonObject { put("server_id", "guarded") },
+            context = ToolContext(approval = { true }),
+        )
+        val disconnect = registry.context.tools.execute(
+            "mcp_disconnect",
+            buildJsonObject { put("server_id", "guarded") },
+            context = ToolContext(approval = { true }),
+        )
+        assertEquals("MCP_CONNECTION_BUSY", duplicate.errorCode)
+        assertEquals("MCP_CONNECTION_BUSY", disconnect.errorCode)
+        assertEquals(2, connections)
+        release.complete(Unit)
+        assertFalse(running.await().isError)
+        assertEquals(listOf("guarded"), plugin.serverSnapshots().map { it.id })
+        plugin.uninstall(registry.context)
+    }
+
+    @Test
     fun failedRemoteRequestRequiresExplicitReconnectAndNeverReplaysTheRequest() = runTest {
         var connections = 0
         var remoteCalls = 0
