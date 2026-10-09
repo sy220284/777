@@ -45,6 +45,8 @@ class LocalSessionEventLog(
         onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
     )
 
+    internal val historyInstanceIdentity: String = java.util.UUID.randomUUID().toString()
+
     private val checkpoints = LocalSessionProjectionCheckpoints(file, json)
     private var checkpointIdentity: String? = null
 

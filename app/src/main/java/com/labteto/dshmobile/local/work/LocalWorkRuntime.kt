@@ -56,6 +56,13 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     }
 
+    internal fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
+        if (sessionId != runtimeStateStore.currentSessionId) return com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
+        val page = projectLocalWorkHistoryPage(eventLogs.get(sessionId), cursor)
+        return if (sessionId == runtimeStateStore.currentSessionId) page
+        else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
+    }
+
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
     internal fun eventSequenceForUi(sessionId: String): Long =
         if (sessionId == runtimeStateStore.currentSessionId) eventLogs.get(sessionId).latestSequence() else -1L
