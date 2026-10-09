@@ -69,10 +69,54 @@ internal class ChatInteractionPlanParser(
             .removeSuffix("```")
             .trim()
         val start = trimmed.indexOf('{')
-        val end = trimmed.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        return trimmed.substring(start, end + 1)
+        if (start < 0) return null
+        var depth = 0
+        var quoted = false
+        var escaped = false
+        for (index in start until trimmed.length) {
+            val char = trimmed[index]
+            when {
+                escaped -> escaped = false
+                quoted && char == '\\' -> escaped = true
+                char == '"' -> quoted = !quoted
+                !quoted && char == '{' -> depth++
+                !quoted && char == '}' -> {
+                    depth--
+                    if (depth == 0) {
+                        return escapeUnquotedJsonControls(trimmed.substring(start, index + 1))
+                    }
+                }
+            }
+        }
+        return null
     }
 
+    // A literal newline in a model-generated JSON string is still unambiguous text.
+    // Escape it rather than paying for another entire model inference.
+    private fun escapeUnquotedJsonControls(body: String): String = buildString {
+        var quoted = false
+        var escaped = false
+        body.forEach { char ->
+            when {
+                escaped -> {
+                    append(char)
+                    escaped = false
+                }
+                quoted && char == '\\' -> {
+                    append(char)
+                    escaped = true
+                }
+                char == '"' -> {
+                    append(char)
+                    quoted = !quoted
+                }
+                quoted && char.code < 32 -> {
+                    append("\\u")
+                    append(char.code.toString(16).padStart(4, '0'))
+                }
+                else -> append(char)
+            }
+        }
+    }
 
 }

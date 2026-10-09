@@ -1078,6 +1078,30 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun firstCompleteJsonObjectCanBeRecoveredFromAdditionalModelProse() {
+        val result = planner.parse(
+            """以下为更新：{"state":{"mood":"开心","currentFocus":"他提到{旧事}"},"turnSignificance":"MINOR"} 完毕 {"other":"ignored"}""",
+            previous = ChatCharacterState(),
+            userMessage = "聊聊",
+            assistantMessage = "好",
+        )!!
+        assertEquals("开心", result.state.mood)
+        assertEquals("他提到{旧事}", result.state.currentFocus)
+    }
+
+    @Test
+    fun literalControlCharactersInGeneratedJsonStringsAreEscapedWithoutRetry() {
+        val body = "{\\"state\\":{\\"currentFocus\\":\\"第一行\\n第二行\\"},\\"turnSignificance\\":\\"MINOR\\"}"
+        val result = planner.parse(
+            body,
+            previous = ChatCharacterState(),
+            userMessage = "看一下",
+            assistantMessage = "好",
+        )!!
+        assertEquals("第一行\n第二行", result.state.currentFocus)
+    }
+
+    @Test
     fun brokenJsonNeverAppliesAPartialPatch() {
         val previous = ChatCharacterState(mood = "平静")
         assertEquals(null, planner.parse("""{"state":{"mood":"开心","initiative":""", previous))
