@@ -367,7 +367,12 @@ internal class LocalAgentTeamRuntime(
                 currentTask = currentTask?.subject,
                 hasCurrentTaskResult = currentTask != null && activity in setOf("dormant", "completed") &&
                     hasFreshTaskResult(sessionId, currentTask, member.jobId),
-                progressPercent = memberProgressPercent(sessionId, member, activity),
+                progressPercent = if (currentTask != null && activity in setOf("dormant", "completed")) {
+                    // 成员已交回结果，但任务仍待 Lead 核验；展示不得提前满格。
+                    95
+                } else {
+                    memberProgressPercent(sessionId, member, activity)
+                },
                 resultMessageCount = messageCounts[member.id] ?: 0,
                 pendingMessageCount =
                     state.pendingMessages.count { it.targetId == member.id } +
