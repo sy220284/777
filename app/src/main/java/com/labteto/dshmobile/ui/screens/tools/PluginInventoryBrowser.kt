@@ -51,8 +51,6 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-private const val LOCAL_SKILL_CREATION_PROMPT = """请帮我创建一个可在本应用重复使用的自定义技能。先问清楚用途、触发时机、输入输出格式和关键限制，给出规则草案让我确认。得到我的确认后，在当前本地工作区使用文件工具写入 .dsh/skills/英文技能标识/SKILL.md。文件必须有以 --- 分隔的元数据，其中 name 为2至48位小写英文、数字或连字符（以字母开头），description 为技能用途，display-name 为中文名称；后面填写完整执行规则。先检查是否有同名技能，禁止覆盖已有文件。写入成功后重新读取文件进行校验，并提醒我回到「工具→技能」列表刷新查看。未实际写入成功时请直接说明，不得宣称已安装。现在请先询问我想创建什么技能。"""
-
 private data class InventoryRow(
     val id: String,
     val name: String,
@@ -93,6 +91,7 @@ internal fun PluginInventoryBrowser(
     onSetSkillModelInvocable: ((String, Boolean) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
+    val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
@@ -209,7 +208,7 @@ internal fun PluginInventoryBrowser(
                     if (onUseCapability != null) {
                         DsButton(
                             text = stringResource(R.string.skills_create_in_chat),
-                            onClick = { onUseCapability(LOCAL_SKILL_CREATION_PROMPT) },
+                            onClick = { onUseCapability(skillCreationPrompt) },
                             enabled = !loading,
                             variant = DsButtonVariant.Info,
                             modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
