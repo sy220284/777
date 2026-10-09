@@ -282,7 +282,7 @@ def workflow_run_commands(source: str) -> str:
 
 
 script_invocation = re.compile(
-    r"(?<![A-Za-z0-9_])(?:python3?|bash|sh)\s+"
+    r"(?m)^\s*(?:(?:&&|\|\||;)\s*)?(?:python3?|bash|sh)\s+"
     r"(\.github/scripts/[A-Za-z0-9_.-]+\.(?:py|sh))\b"
 )
 
@@ -299,6 +299,7 @@ assert invoked_script_paths('python3 .github/scripts/check-example.py') == {
     '.github/scripts/check-example.py'
 }
 assert invoked_script_paths('echo .github/scripts/check-example.py') == set()
+assert invoked_script_paths('echo python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('# python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('python3 -m py_compile .github/scripts/check-example.py') == set()
 assert invoked_script_paths(workflow_run_commands('run: |\n  python3 .github/scripts/check-example.py\n')) == {
