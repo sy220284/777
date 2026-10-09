@@ -376,7 +376,7 @@ private fun InlineMarkdown(text: String, style: TextStyle, modifier: Modifier = 
         onClick = { offset ->
             result.getStringAnnotations("url", offset, offset).firstOrNull()?.item?.let { url ->
                 if (url.startsWith("https://") || url.startsWith("http://")) runCatching { uriHandler.openUri(url) }
-                else com.labteto.dshmobile.ui.screens.main.previewPath(url)?.let(openFile)
+                else localPreviewPath(url)?.let(openFile)
             }
         },
     )
@@ -689,4 +689,13 @@ private fun MarkdownTextPreview() {
             modifier = Modifier.padding(16.dp),
         )
     }
+}
+
+private fun localPreviewPath(value: String): String? {
+    val raw = value.trim().removeSurrounding("<", ">")
+    if (raw.isEmpty() || raw.startsWith('#')) return null
+    if (raw.startsWith("file://")) return runCatching { java.net.URI(raw).path }.getOrNull()
+    if (Regex("^[A-Za-z]:[/\\\\]").containsMatchIn(raw)) return raw
+    if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(raw)) return null
+    return raw.substringBefore('#')
 }

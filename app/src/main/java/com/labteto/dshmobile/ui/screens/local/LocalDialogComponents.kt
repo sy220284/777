@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.ui.screens.main
+package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
