@@ -1091,7 +1091,8 @@ class ChatInteractionPlannerTest {
 
     @Test
     fun literalControlCharactersInGeneratedJsonStringsAreEscapedWithoutRetry() {
-        val body = "{\\"state\\":{\\"currentFocus\\":\\"第一行\\n第二行\\"},\\"turnSignificance\\":\\"MINOR\\"}"
+        val body = """{"state":{"currentFocus":"第一行__NL__第二行"},"turnSignificance":"MINOR"}"""
+            .replace("__NL__", "\n")
         val result = planner.parse(
             body,
             previous = ChatCharacterState(),
