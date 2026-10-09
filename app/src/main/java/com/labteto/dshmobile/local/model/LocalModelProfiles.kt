@@ -141,9 +141,9 @@ data class LocalPromptCachePolicy(
 )
 
 /**
- * Provider-verified chat sampling window, separate from the 0..100 user control.
- * Keeping a documented middle anchor means neutral (50) is useful for conversation while
- * 0 and 100 reach the *exact inclusive* provider bounds.
+ * Client-exposed sampling window, constrained to verified provider bounds.
+ * Most providers keep a conversational midpoint; DeepSeek caps its product slider at 1.3
+ * and uses the full 0..100 scale with the default at the maximum.
  */
 data class LocalModelTemperatureRange(
     val minimum: Double,
@@ -600,9 +600,10 @@ object LocalModelPresets {
         find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
 
     /**
-     * Only expose a Chat slider where the exact official model/host has verified inclusive
-     * sampling bounds. Unknown proxies, fixed-temperature models and models without a
-     * verified range keep provider defaults rather than making up endpoints.
+     * Only expose a slider where the exact official model/host has verified sampling
+     * bounds. Client limits can be narrower than the official API limits (DeepSeek 0..2).
+     * Unknown proxies, fixed-temperature models and models without verified bounds keep
+     * provider defaults rather than making up endpoints.
      *
      * DeepSeek: https://api-docs.deepseek.com/zh-cn/api/create-chat-completion
      *            https://api-docs.deepseek.com/zh-cn/quick_start/parameter_settings/
