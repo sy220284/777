@@ -78,12 +78,69 @@ for token in ("object HPatch", "@JvmStatic", "external fun patch", 'System.loadL
     if token not in hpatch_text:
         fail(f"HPatch JNI ABI 声明缺少：{token}")
 
+def workflow_toolchain_violations(source: str) -> list[str]:
+    """Check versions within each setup Action step, including quoted YAML values."""
+    findings: list[str] = []
+    lines = source.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(-\s*)?uses:\s*actions/setup-(node|java)@", line)
+        if not match:
+            continue
+        indent, dash, kind = match.groups()
+        step_indent = len(indent) if dash else len(indent) - 2
+        if step_indent < 0:
+            findings.append(f"setup-{kind} has invalid YAML step indentation")
+            continue
+        field = "node-version" if kind == "node" else "java-version"
+        step_lines: list[str] = []
+        for following in lines[index + 1:]:
+            if re.match(r"^" + " " * step_indent + r"-\s+", following):
+                break
+            step_lines.append(following)
+        version_match = re.search(
+            rf"(?m)^\s*{re.escape(field)}:\s*([^\n#]+)",
+            "\n".join(step_lines),
+        )
+        if version_match is None:
+            findings.append(f"setup-{kind} missing {field}")
+            continue
+        value = version_match.group(1).strip().strip("'\"").strip()
+        if re.fullmatch(r"\d+(?:\.\d+){0,2}", value) is None:
+            findings.append(f"setup-{kind} has non-verifiable {field}={value!r}")
+            continue
+        major = int(value.split(".")[0])
+        minimum = EXPECTED_NODE_MIN if kind == "node" else EXPECTED_JDK_MIN
+        if major < minimum:
+            findings.append(f"setup-{kind} uses {major}, below minimum {minimum}")
+        if kind == "node" and len(value.split(".")) == 3:
+            findings.append(f"setup-node pins a patch version: {value}")
+    return findings
+
+
+def toolchain_self_test() -> None:
+    def sample(kind: str, version: str) -> str:
+        field = "node-version" if kind == "node" else "java-version"
+        return f"steps:\n  - uses: actions/setup-{kind}@0123456789abcdef\n    with:\n      {field}: {version}\n"
+    assert workflow_toolchain_violations(sample("node", "24")) == []
+    named_step = ("steps:\n  - name: Install Node\n    uses: actions/setup-node@0123456789abcdef\n"
+                  "    with:\n      node-version: '24.21.0'\n")
+    assert workflow_toolchain_violations(named_step)
+    named_java = ("steps:\n  - name: Install Java\n    uses: actions/setup-java@0123456789abcdef\n"
+                  "    with:\n      java-version: '26'\n")
+    assert workflow_toolchain_violations(named_java)
+
+    assert workflow_toolchain_violations(sample("java", "'27'")) == []
+    for value in ("24.21.0", "'24.21.0'", '"24.21.0"', "23", '"23"', "unknown"):
+        assert workflow_toolchain_violations(sample("node", value)), value
+    for value in ("26", "'17'", '"21"'):
+        assert workflow_toolchain_violations(sample("java", value)), value
+    assert workflow_toolchain_violations("  - uses: actions/setup-node@0123456789abcdef\n")
+
+
+toolchain_self_test()
 for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
-    text = workflow.read_text(encoding="utf-8")
-    if "java-version: 17" in text:
-        fail(f"{workflow.relative_to(ROOT)} 仍使用 JDK 17")
-    if re.search(r"node-version:\s*[0-9]+\.[0-9]+\.[0-9]+", text):
-        fail(f"{workflow.relative_to(ROOT)} 仍将 Node 锁定到精确补丁版本；应使用满足当前最低版本的主版本范围")
+    for violation in workflow_toolchain_violations(workflow.read_text(encoding="utf-8")):
+        fail(f"{workflow.relative_to(ROOT)}: {violation}")
 
 print(
     f"[build-baseline] OK: Kotlin-only, JDK >= {EXPECTED_JDK_MIN}, "
