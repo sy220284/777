@@ -962,8 +962,14 @@ internal fun LocalConversationSurface(
                 baseUrl = profile.baseUrl,
                 protocol = profile.protocol,
                 authKind = profile.authKind,
-            ).temperature
-        } ?: true,
+            ).temperature && LocalModelPresets.chatTemperatureRangeFor(
+                profile.model, profile.baseUrl,
+            ) != null && (reasoningMode == LocalReasoningUiMode.FAST ||
+                profile.baseUrl.trimEnd('/') != "https://api.deepseek.com")
+        } ?: false,
+        temperatureRange = activeModelProfile?.let {
+            LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+        },
         onConfigurePersona = onConfigureChatPersona,
         onDismiss = { showCharacterTuning = false },
     )
