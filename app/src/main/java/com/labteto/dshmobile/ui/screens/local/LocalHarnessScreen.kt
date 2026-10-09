@@ -171,6 +171,7 @@ fun LocalHarnessScreen(
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
@@ -182,6 +183,12 @@ fun LocalHarnessScreen(
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
+    LaunchedEffect(featurePage, shell.sessionId) {
+        if (featurePage == LocalFeaturePage.HOME) {
+            installedSkillDisplayNames = runCatching { viewModel.installedSkillDisplayNames() }
+                .getOrDefault(emptyMap())
+        }
+    }
     val featureStateHolder = rememberSaveableStateHolder()
     val predictiveBackProgress = remember { Animatable(0f) }
 
@@ -343,6 +350,7 @@ fun LocalHarnessScreen(
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onUseWorkCapability = ::useWorkCapability,
             composerHandoff = composerHandoff,
+            skillDisplayNames = installedSkillDisplayNames,
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
         ),
         localChatFeatureUiContribution(
