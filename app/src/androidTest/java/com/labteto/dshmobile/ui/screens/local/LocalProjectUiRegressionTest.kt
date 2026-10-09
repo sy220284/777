@@ -114,4 +114,52 @@ class LocalProjectUiRegressionTest {
         compose.onNodeWithText(context.getString(R.string.local_project_backup_and_reset)).assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, reset) }
     }
+
+    @Test fun failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry() {
+        val catalog = MutableStateFlow(LocalProjectCatalogState(
+            projects = listOf(
+                LocalProject("local-workspace", "默认项目"),
+                LocalProject("custom", "历史引用项目"),
+            ),
+            activeId = "custom",
+        ))
+        var attempts = 0
+        compose.setContent {
+            DshTheme {
+                LocalProjectScreen(
+                    actions = LocalProjectUiActions(
+                        catalog = catalog,
+                        recoveryNotice = MutableStateFlow(null),
+                        backupAndReset = {},
+                        createProjectWorkSession = { false },
+                        onProjectSessionAccepted = {},
+                        create = { "" }, select = {}, rename = { _, _ -> },
+                        delete = { id ->
+                            attempts++
+                            if (attempts == 1) throw IllegalStateException("历史会话仍引用项目")
+                            catalog.value = catalog.value.copy(
+                                projects = catalog.value.projects.filterNot { it.id == id },
+                                activeId = "local-workspace",
+                            )
+                        },
+                        updateInstructions = { _, _ -> },
+                    ),
+                    onBack = {},
+                )
+            }
+        }
+        val label = context.getString(R.string.local_project_delete)
+        compose.onNodeWithText(label).performScrollTo().performClick()
+        compose.onNodeWithTag("local_project_confirm_delete").performClick()
+        compose.waitUntil(5_000) { attempts == 1 }
+        compose.onNodeWithText("历史会话仍引用项目").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals("custom", catalog.value.activeId)
+            assertEquals(2, catalog.value.projects.size)
+        }
+        compose.onNodeWithText(label).performScrollTo().performClick()
+        compose.onNodeWithTag("local_project_confirm_delete").performClick()
+        compose.waitUntil(5_000) { attempts == 2 && catalog.value.activeId == "local-workspace" }
+        compose.runOnIdle { assertEquals(1, catalog.value.projects.size) }
+    }
 }

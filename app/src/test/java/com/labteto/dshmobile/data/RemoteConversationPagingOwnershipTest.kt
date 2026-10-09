@@ -115,4 +115,24 @@ class RemoteConversationPagingOwnershipTest {
         assertFalse(f.loading.value)
         assertEquals(1, f.recovered)
     }
+
+    @Test fun staleFailureCannotClearLoadingOfNewPageAfterReturningToSameSession() = runTest {
+        val f = Fixture(backgroundScope, GateTransport(true))
+        f.install()
+        val old = async { f.runtime.loadOlder() }
+        f.gate.started.await()
+        f.session = "B"; f.install()
+        f.session = "A"; f.install(30)
+        val current = async { f.runtime.loadOlder() }
+        f.gate.secondStarted.await()
+        f.gate.release.complete(Unit)
+        old.await()
+        assertTrue(f.loading.value)
+        assertFalse(f.failed.value)
+        assertEquals("A", f.conversation.value?.sessionId)
+        f.gate.secondRelease.complete(Unit)
+        current.await()
+        assertFalse(f.loading.value)
+        assertTrue(f.failed.value)
+    }
 }

@@ -1969,7 +1969,8 @@
       "path": "第三层｜平台、远程与工程保障 / 远程 Harness 控制 / 远程会话 / 远程会话分页归属隔离",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/data/RemoteConversationPagingOwnershipTest.kt#returningToSameSessionCannotAcceptOldPageOrClearNewLoading"
+        "app/src/test/java/com/labteto/dshmobile/data/RemoteConversationPagingOwnershipTest.kt#returningToSameSessionCannotAcceptOldPageOrClearNewLoading",
+        "app/src/test/java/com/labteto/dshmobile/data/RemoteConversationPagingOwnershipTest.kt#staleFailureCannotClearLoadingOfNewPageAfterReturningToSameSession"
       ]
     },
     {
