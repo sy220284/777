@@ -109,6 +109,7 @@ internal data class LocalTeamMemberSnapshot(
     val context: LocalTeamMemberContext,
     val phase: LocalTeamMemberPhase,
     val error: String? = null,
+    val displayName: String = "",
 )
 
 @Serializable
@@ -166,6 +167,7 @@ internal class LocalAgentTeamRuntime(
         maxSteps: Int,
         context: LocalTeamMemberContext,
         parentCallId: String?,
+        grantedExtensions: Set<String>,
     ) -> com.labteto.dshmobile.harness.jobs.JobStartResult,
     private val sendToTeammate: (
         agentId: String,
@@ -221,6 +223,7 @@ internal class LocalAgentTeamRuntime(
                 sessionId = binding.sessionId,
                 name = args.requiredTeamString("name"),
                 description = args.optionalTeamString("description").orEmpty(),
+                displayName = args.optionalTeamString("display_name").orEmpty(),
                 context = args.optionalTeamContext(),
             )
             "team_start_member" -> startMember(
@@ -231,17 +234,20 @@ internal class LocalAgentTeamRuntime(
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
                     ?: binding.aggregateSnapshot().subagentMaxSteps,
                 parentCallId = call.id,
+                grantedExtensions = args.teamStringArray("allowed_extensions").toSet(),
             )
             "team_spawn" -> spawn(
                 binding = binding,
                 name = args.requiredTeamString("name"),
                 description = args.optionalTeamString("description").orEmpty(),
+                displayName = args.optionalTeamString("display_name").orEmpty(),
                 task = args.requiredTeamString("task"),
                 model = args.optionalTeamString("model"),
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
                     ?: binding.aggregateSnapshot().subagentMaxSteps,
                 context = args.optionalTeamContext(),
                 parentCallId = call.id,
+                grantedExtensions = args.teamStringArray("allowed_extensions").toSet(),
             )
             "team_send_message" -> sendMessage(
                 sessionId = binding.sessionId,
@@ -351,6 +357,7 @@ internal class LocalAgentTeamRuntime(
                 jobId = member.jobId,
                 name = member.name,
                 description = member.description,
+                displayName = member.displayName,
                 phase = member.phase.name.lowercase(),
                 activity = activity,
                 currentTask = currentTask?.subject,
@@ -434,6 +441,7 @@ internal class LocalAgentTeamRuntime(
         sessionId: String,
         name: String,
         description: String,
+        displayName: String,
         context: LocalTeamMemberContext,
     ): String {
         return synchronized(commandLock) {
@@ -448,6 +456,7 @@ internal class LocalAgentTeamRuntime(
                 id = memberId,
                 jobId = teamJobId(memberId),
                 name = cleanName,
+                displayName = displayName.trim().take(32),
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -470,6 +479,7 @@ internal class LocalAgentTeamRuntime(
         model: String?,
         maxSteps: Int,
         parentCallId: String,
+        grantedExtensions: Set<String>,
     ): String {
         val (member, cleanTask, provisioning) = synchronized(commandLock) {
             val before = project(binding.sessionId)
@@ -528,6 +538,7 @@ internal class LocalAgentTeamRuntime(
                     LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                     member.context,
                     parentCallId.takeIf { member.context == LocalTeamMemberContext.FORK },
+                    grantedExtensions,
                 )
                 if (!started.accepted || started.id != member.jobId) {
                     appendMember(
@@ -641,11 +652,13 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
         name: String,
         description: String,
+        displayName: String,
         task: String,
         model: String?,
         maxSteps: Int,
         context: LocalTeamMemberContext,
         parentCallId: String,
+        grantedExtensions: Set<String>,
     ): String {
         val provisioning = synchronized(commandLock) {
             val cleanName = normalizeName(name)
@@ -660,6 +673,7 @@ internal class LocalAgentTeamRuntime(
                 id = memberId,
                 jobId = jobId,
                 name = cleanName,
+                displayName = displayName.trim().take(32),
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -689,6 +703,7 @@ internal class LocalAgentTeamRuntime(
                 LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                 context,
                 parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
+                grantedExtensions,
             )
             if (!started.accepted || started.id != jobId) {
                 appendMember(
