@@ -7,12 +7,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.CharacterEvolutionState
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.pressDeviceBack
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -58,7 +58,7 @@ class CharacterBehaviorTuningDialogTest {
 
         compose.onNodeWithText(done).assertIsNotEnabled()
         compose.onNodeWithText(restore).assertIsNotEnabled()
-        pressBack()
+        pressDeviceBack()
         compose.waitForIdle()
         assertEquals(0, dismissCount.get())
 
