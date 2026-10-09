@@ -75,17 +75,25 @@ class LocalWorkspace(
     fun read(relativePath: String, startLine: Int = 1, endLine: Int = startLine + 399): String {
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：$relativePath" }
-        require(file.length() <= MAX_TEXT_BYTES) { "文件超过 ${MAX_TEXT_BYTES / 1024} KB：$relativePath" }
+        val from = startLine.coerceAtLeast(1)
+        val requestedEnd = endLine.coerceAtLeast(from)
+        // Stream only the requested page instead of loading the entire file into memory.
+        val until = minOf(requestedEnd.toLong(), from.toLong() + MAX_READ_LINES - 1)
         val before = fingerprint(file)
-        val lines = file.readLines()
+        val rows = mutableListOf<String>()
+        file.bufferedReader().use { reader ->
+            var lineNumber = 0L
+            while (lineNumber < until) {
+                val line = readBoundedLine(reader, MAX_READ_LINE_CHARS) ?: break
+                lineNumber++
+                if (lineNumber >= from) rows += "$lineNumber: $line"
+            }
+        }
         val after = fingerprint(file)
         require(before == after) { "文件在读取过程中发生变化，请重新读取：$relativePath" }
         observations.put(file.path, after)
-        val from = (startLine.coerceAtLeast(1) - 1).coerceAtMost(lines.size)
-        val to = endLine.coerceAtLeast(startLine).coerceAtMost(lines.size)
-        return lines.subList(from, to).mapIndexed { index, line ->
-            "${from + index + 1}: $line"
-        }.joinToString("\n")
+        return rows.joinToString("\n") +
+            if (until < requestedEnd.toLong()) "\n[仅返回前 $MAX_READ_LINES 行；请从 start_line=${until + 1} 继续读取]" else ""
     }
 
     /** Replace one UTF-8 file, creating its parent directories. */
@@ -196,34 +204,63 @@ class LocalWorkspace(
         return if (rows.isEmpty()) "目录为空" else rows.joinToString("\n")
     }
 
-    /** Plain-text recursive search with deterministic, bounded output. */
-    fun search(query: String, relativePath: String = ".", regex: Boolean = false): String {
+    /**
+     * Bounded, resumable recursive search. Cursor is (traversal entry, last consumed line).
+     * As traversal order is deterministic, repeat with the same query/path/regex to resume.
+     * Restart from the beginning after changing the workspace tree.
+     */
+    fun search(query: String, relativePath: String = ".", regex: Boolean = false, cursor: String? = null): String {
         require(query.isNotBlank()) { "搜索内容不能为空" }
         val expression = if (regex) runCatching { Regex(query, RegexOption.IGNORE_CASE) }
             .getOrElse { throw IllegalArgumentException("正则表达式无效：${it.message}") }
         else null
         val directory = resolve(relativePath)
         require(directory.exists()) { "路径不存在：$relativePath" }
+        val parts = cursor?.split(':')
+        require(parts == null || parts.size == 2) { "搜索游标无效，请从头搜索" }
+        val resumeEntry = parts?.get(0)?.toIntOrNull() ?: 0
+        val resumeLine = parts?.get(1)?.toIntOrNull() ?: 0
+        require(resumeEntry >= 0 && resumeLine >= 0 &&
+            (parts == null || parts.all { it.toIntOrNull() != null })) {
+            "搜索游标无效，请从头搜索"
+        }
         val files = if (directory.isFile) sequenceOf(directory) else safeWalk(
-            directory,
-            maxDepth = MAX_SCAN_DEPTH,
-            maxVisited = MAX_SCAN_ENTRIES,
-            maxMillis = MAX_SCAN_MILLIS,
+            directory, maxDepth = MAX_SCAN_DEPTH, maxVisited = Int.MAX_VALUE, maxMillis = Long.MAX_VALUE,
         )
         val matches = mutableListOf<String>()
+        val warnings = mutableListOf<String>()
         var outputChars = 0
-        for (file in files) {
-            if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) break
-            if (!file.isFile || !isInsideWorkspace(file) || file.length() > MAX_TEXT_BYTES) continue
-            runCatching {
-                file.useLines { lines ->
-                    for ((index, line) in lines.withIndex()) {
-                        if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) break
+        var pageEntries = 0
+        var resumeFound = cursor == null
+        var nextCursor: String? = null
+        val startedAt = System.nanoTime()
+        for ((entry, file) in files.withIndex()) {
+            if (entry < resumeEntry) continue
+            resumeFound = true
+            if (pageEntries >= MAX_SCAN_ENTRIES ||
+                (System.nanoTime() - startedAt) / 1_000_000L >= MAX_SCAN_MILLIS) {
+                nextCursor = "$entry:${if (entry == resumeEntry) resumeLine else 0}"
+                break
+            }
+            pageEntries++
+            if (!file.isFile || !isInsideWorkspace(file)) continue
+            try {
+                file.bufferedReader().use { reader ->
+                    var lineNumber = 0
+                    while (true) {
+                        if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS ||
+                            (System.nanoTime() - startedAt) / 1_000_000L >= MAX_SCAN_MILLIS) {
+                            nextCursor = "$entry:$lineNumber"
+                            break
+                        }
+                        val line = readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) ?: break
+                        lineNumber++
+                        if (entry == resumeEntry && lineNumber <= resumeLine) continue
                         val matchStart = expression?.find(line)?.range?.first
                             ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
                         if (matchStart >= 0) {
                             val previewStart = (matchStart - 100).coerceAtLeast(0)
-                            val row = "${displayPath(file)}:${index + 1}: " +
+                            val row = "${displayPath(file)}:$lineNumber: " +
                                 (if (previewStart > 0) "…" else "") +
                                 line.substring(previewStart, minOf(line.length, previewStart + MAX_SEARCH_PREVIEW_CHARS)) +
                                 if (line.length > previewStart + MAX_SEARCH_PREVIEW_CHARS) "…" else ""
@@ -232,9 +269,23 @@ class LocalWorkspace(
                         }
                     }
                 }
+            } catch (error: Exception) {
+                warnings += "文件 ${displayPath(file)} 无法完整检索：${error.message.orEmpty().take(180)}"
+            }
+            if (nextCursor != null) break
+        }
+        require(resumeFound) { "搜索游标已经失效，工作区可能发生变化；请从头搜索" }
+        return buildString {
+            append(if (matches.isEmpty()) {
+                if (nextCursor == null && warnings.isEmpty()) "未找到匹配内容" else "本页未找到匹配内容"
+            } else matches.joinToString("\n"))
+            if (warnings.isNotEmpty()) append("\n[部分文件读取失败：${warnings.take(4).joinToString("；")}；共 ${warnings.size} 项]")
+            if (nextCursor != null) {
+                append("\n[搜索未完成：再次调用 grep，保持 query/path/regex 不变并传入 cursor=\"")
+                append(nextCursor)
+                append("\" 继续；如文件发生增删，请从头搜索]")
             }
         }
-        return if (matches.isEmpty()) "未找到匹配内容" else matches.joinToString("\n")
     }
 
     /** Snapshot real files for the app UI without exposing raw File handles outside the sandbox. */
@@ -415,7 +466,7 @@ class LocalWorkspace(
         }.filter(LocalSkillMetadata::modelInvocable)
         if (eligible.isEmpty()) return "未安装可由模型调用的技能"
 
-        val relevance = query.lowercase().split(Regex("""[^\\p{L}\\p{N}]+"""))
+        val relevance = query.lowercase().split(Regex("""[^\p{L}\p{N}]+"""))
             .filter { it.length >= 2 }.take(32)
         val ordered = if (relevance.isEmpty()) eligible else eligible.sortedWith(
             compareByDescending<LocalSkillMetadata> { skill ->
@@ -535,7 +586,8 @@ class LocalWorkspace(
     ): Sequence<File> = sequence {
         val queue = ArrayDeque<Pair<File, Int>>()
         queue.add(directory to 0)
-        val deadlineNanos = System.nanoTime() + maxMillis.coerceAtLeast(1L) * 1_000_000L
+        val deadlineNanos = if (maxMillis == Long.MAX_VALUE) Long.MAX_VALUE
+        else System.nanoTime() + maxMillis.coerceAtLeast(1L) * 1_000_000L
         var visited = 0
         while (queue.isNotEmpty() && visited < maxVisited && System.nanoTime() <= deadlineNanos) {
             val (candidate, depth) = queue.removeFirst()
@@ -613,6 +665,9 @@ class LocalWorkspace(
         )
 
         const val MAX_TEXT_BYTES = 5_242_880L
+        const val MAX_READ_LINES = 400
+        const val MAX_READ_LINE_CHARS = 256 * 1024
+        const val MAX_SEARCH_LINE_CHARS = 256 * 1024
         const val MAX_WRITE_BYTES = 2_097_152
         const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024
         const val MAX_LIST_ROWS = 400
