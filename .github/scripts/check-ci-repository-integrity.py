@@ -253,21 +253,23 @@ for token in relay_contract_tokens:
 
 # Every check-*.py file is a gate by convention. Reachability uses real run steps and
 # interpreter invocations, not arbitrary mentions in comments, filenames or YAML conditions.
-def workflow_run_commands(source: str) -> str:
+def workflow_run_steps(source: str) -> list[str]:
+    """Keep independent CI run steps separate: each starts a fresh shell process."""
     lines = source.splitlines()
-    commands: list[str] = []
+    steps: list[str] = []
     index = 0
     while index < len(lines):
         line = lines[index]
-        match = re.match(r"^(\s*)(?:-\s*)?run:\s*(.*)$", line)
+        match = re.match(r"^(\\s*)(?:-\\s*)?run:\\s*(.*)$", line)
         if not match:
             index += 1
             continue
         indent = len(match.group(1))
         inline = match.group(2).strip()
         if inline not in ("|", "|-", ">", ">-", ""):
-            commands.append(inline)
+            steps.append(inline)
         else:
+            commands: list[str] = []
             index += 1
             while index < len(lines):
                 continuation = lines[index]
@@ -277,9 +279,9 @@ def workflow_run_commands(source: str) -> str:
                 if continuation.strip() and not continuation.lstrip().startswith("#"):
                     commands.append(continuation.strip())
                 index += 1
+            steps.append("\\n".join(commands))
         index += 1
-    return "\n".join(commands)
-
+    return steps
 
 script_invocation = re.compile(
     r"(?m)^\s*(?:(?:&&|\|\||;)\s*)?(?:(?:python3?|bash|sh)\s+)?(?:\./)?"
@@ -356,10 +358,10 @@ assert invoked_script_paths('echo .github/scripts/check-example.py') == set()
 assert invoked_script_paths('echo python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('# python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('python3 -m py_compile .github/scripts/check-example.py') == set()
-assert invoked_script_paths(workflow_run_commands('run: |\n  python3 .github/scripts/check-example.py\n')) == {
+assert invoked_script_paths(workflow_run_steps('run: |\n  python3 .github/scripts/check-example.py\n')) == {
     '.github/scripts/check-example.py'
 }
-assert invoked_script_paths(workflow_run_commands(
+assert invoked_script_paths(workflow_run_steps(
     'run: echo ".github/scripts/check-example.py"\n'
 )) == set()
 assert invoked_script_paths(
@@ -392,6 +394,21 @@ assert invoked_script_paths(
     'python3 .github/scripts/check-real.py'
 ) == {'.github/scripts/check-real.py'}
 
+# Every Actions run step is a fresh process. A prior step's exit cannot
+# make a later required gate unreachable (nor make an earlier false path count).
+independent_steps = workflow_run_steps(
+    'steps:\n'
+    '  - name: Early exit\n'
+    '    run: exit 0\n'
+    '  - name: Required gate\n'
+    '    run: |\n'
+    '      python3 .github/scripts/check-example.py\n'
+)
+assert len(independent_steps) == 2
+assert invoked_script_paths(independent_steps[0]) == set()
+assert invoked_script_paths(independent_steps[1]) == {'.github/scripts/check-example.py'}
+assert invoked_script_paths('exit 0\npython3 .github/scripts/check-example.py') == set()
+
 
 script_sources: dict[str, str] = {}
 for candidate in sorted(SCRIPTS.iterdir()):
@@ -404,8 +421,9 @@ for candidate in sorted(SCRIPTS.iterdir()):
 
 reachable_scripts: set[str] = set()
 frontier_sources = [
-    workflow_run_commands(workflow.read_text(encoding="utf-8"))
+    step
     for workflow in sorted(WORKFLOWS.glob("*.yml"))
+    for step in workflow_run_steps(workflow.read_text(encoding="utf-8"))
 ]
 while frontier_sources:
     source = frontier_sources.pop()
