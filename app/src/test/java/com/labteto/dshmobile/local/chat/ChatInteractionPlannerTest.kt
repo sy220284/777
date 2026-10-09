@@ -1215,19 +1215,23 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun wrongRootStateTypePreservesValidSuggestionsAndDiary() {
+    fun invalidRootStateCannotBeMarkedProcessedBySuggestionsOrInvalidDiary() {
         val previous = ChatCharacterState(mood = "旧情绪")
-        val plan = planner.parse(
-            """{"state":false,"suggestions":[{"label":"回应","text":"我们接着聊"}],
-            "diaryDelta":{"event":"彼此道别","importance":"无效"},"turnSignificance":"MINOR"}""",
+        val payload = """{"state":false,"suggestions":[{"label":"回应","text":"我们接着聊"}],
+            "diaryDelta":{"event":"彼此道别","importance":"无效"},"turnSignificance":"MINOR"}"""
+        // Chat post-turn is a durable state update, so invalid state plus unusable diary
+        // must stay pending rather than silently consuming its cursor.
+        assertEquals(null, planner.parse(
+            payload,
             previous = previous,
             userMessage = "回头见",
             assistantMessage = "再见",
-        )!!
-        assertEquals("旧情绪", plan.state.mood)
-        assertEquals(1, plan.suggestions.size)
-        assertEquals("我们接着聊", plan.suggestions.single().text)
-        assertEquals("彼此道别", plan.diaryDelta?.event)
+        ))
+        assertEquals("state_patch_unusable", planner.postTurnParseFailureKind(payload))
+        // The separate suggestion path remains usable: no blanket rejection of good copy.
+        val suggestions = planner.parseSuggestions(payload)!!
+        assertEquals(1, suggestions.size)
+        assertEquals("我们接着聊", suggestions.single().text)
     }
 
     @Test
