@@ -94,6 +94,7 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
+    val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     val remotePlugins: PluginInventorySnapshot? = null,
     val webhook: LocalWebhookUiState = LocalWebhookUiState(),
     val notice: ToolsNotice? = null,
@@ -152,6 +153,7 @@ class ToolsViewModel @Inject constructor(
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
                     skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
                     remotePlugins = sessionStore.plugins.value,
                     webhook = localTools.webhookStatus(),
                 )
@@ -165,6 +167,34 @@ class ToolsViewModel @Inject constructor(
             }
         }
     }
+
+    private fun changeSkills(action: suspend () -> Unit) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null)
+            try {
+                action()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    feedbackRes = R.string.skills_saved,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.skills_operation_failed else null,
+                )
+            }
+        }
+    }
+
+    fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
+    fun createSkill(id: String, description: String, instructions: String) =
+        changeSkills { localTools.createSkill(id, description, instructions) }
+    fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
 
     fun connectHttp(serverId: String, endpoint: String) {
         launchOperation {
@@ -468,6 +498,7 @@ fun ToolsScreen(
         PluginInventoryBrowser(
             localIds = state.localPlugins,
             skills = state.skills,
+            presets = state.presets,
             skillsOnly = skillsOnly,
             loading = state.loading,
             error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
@@ -480,6 +511,9 @@ fun ToolsScreen(
             },
             onReturnToChat = onClose,
             onUseCapability = onUseCapability,
+            onInstallPreset = viewModel::installPreset,
+            onCreateSkill = viewModel::createSkill,
+            onRemoveSkill = viewModel::removeSkill,
         )
     } else {
     Box(Modifier.fillMaxSize()) {
