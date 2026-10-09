@@ -13,6 +13,58 @@ import org.junit.Test
 class ChatInteractionPlannerTest {
 
     @Test
+    fun confirmedDatingExpressionsAdvanceRelationshipWithoutRigidKeywordRejection() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val patch = """{"state":{"dynamics":{"stage":"DATING"}},"turnSignificance":"MAJOR"}"""
+        listOf("我们决定交往了", "我们开始交往了", "我们正在交往").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "好，我们说定了",
+            )!!
+            assertEquals("DATING", result.state.dynamics.stage)
+        }
+    }
+
+    @Test
+    fun confirmedCoupleExpressionsAdvanceButNegatedAndHypotheticalDoNot() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "DATING"))
+        val patch = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        listOf("我们已经是情侣了", "我们成为情侣了", "我们确定恋爱关系了").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "嗯",
+            )!!
+            assertEquals("COMMITTED", result.state.dynamics.stage)
+        }
+        listOf("我们还没成为情侣", "如果我们成为情侣", "我朋友已经是情侣了").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "知道了",
+            )!!
+            assertEquals("DATING", result.state.dynamics.stage)
+        }
+    }
+
+    @Test
+    fun firstPersonTopicSwitchClearsOldTopicButQuotationAndNegationDoNot() {
+        val previous = ChatCharacterState(
+            currentFocus = "未解决的旧话题",
+            currentAgenda = "继续旧讨论",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val patch = """{"state":{},"turnSignificance":"NONE"}"""
+        listOf("我想换个话题", "我们先换个话题", "我想先不聊这个", "我希望换个话题").forEach { user ->
+            val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
+            assertEquals("", state.currentFocus)
+            assertEquals("", state.currentAgenda)
+            assertTrue(state.unresolvedThreads.isEmpty())
+        }
+        listOf("我不想换个话题", "昨天他说我想换个话题").forEach { user ->
+            val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
+            assertEquals("未解决的旧话题", state.currentFocus)
+            assertEquals(listOf("旧线索"), state.unresolvedThreads)
+        }
+    }
+
+
+    @Test
     fun shortLivedStateExpiresWhenPlannerKeepsReturningNone() {
         var state = ChatCharacterState(
             currentFocus = "刚才的争执",
