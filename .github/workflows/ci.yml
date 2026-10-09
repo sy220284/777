@@ -42,6 +42,7 @@ jobs:
             .github/scripts/check-ci-repository-integrity.py
           python3 .github/scripts/classify-ci-scope.py --self-test
           python3 .github/scripts/check-ci-repository-integrity.py
+          python3 .github/scripts/check-release-gate-evidence.py
       - name: Collect changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
