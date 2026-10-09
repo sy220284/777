@@ -1072,6 +1072,19 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun observerDiaryWithMalformedImportanceStillKeepsValidEvent() {
+        val raw = Json.parseToJsonElement(
+            """{"event":"看到朋友和解","importance":"略高","feeling":"放松"}""",
+        ).jsonObject
+        val delta = Json.decodeFromJsonElement(
+            ChatDiaryDelta.serializer(), normalizeChatDiaryDelta(raw),
+        )
+        assertEquals("看到朋友和解", delta.event)
+        assertEquals("放松", delta.feeling)
+        assertEquals(0, delta.importance)
+    }
+
+    @Test
     fun malformedObserverIdsNeverBreakOtherGroupEntries() {
         fun id(value: String): String? = validGroupGalleryId(
             Json.parseToJsonElement("""{"galleryId":$value}""").jsonObject,

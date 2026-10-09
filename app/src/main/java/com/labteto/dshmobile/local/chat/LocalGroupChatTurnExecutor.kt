@@ -578,7 +578,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 val diaryObject = item["diaryDelta"] as? JsonObject
                 val delta = diaryObject?.let {
                     runCatching {
-                        json.decodeFromJsonElement(ChatDiaryDelta.serializer(), it)
+                        json.decodeFromJsonElement(ChatDiaryDelta.serializer(), normalizeChatDiaryDelta(it))
                     }.getOrNull()
                 }
                 recordGroupDiaryDelta(

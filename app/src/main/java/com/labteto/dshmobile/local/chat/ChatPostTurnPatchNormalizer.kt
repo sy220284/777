@@ -145,19 +145,7 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         if (value !is JsonObject && value !is kotlinx.serialization.json.JsonNull) {
             result.remove("diaryDelta")
         } else if (value is JsonObject) {
-            val diary = value.toMutableMap()
-            listOf("event", "feeling", "innerThought", "relationshipMeaning",
-                "unresolvedEcho", "disclosure").forEach { key ->
-                diary[key]?.let { field ->
-                    if (field !is JsonPrimitive || !field.isString) diary.remove(key)
-                }
-            }
-            diary["importance"]?.let { field ->
-                val score = (field as? JsonPrimitive)?.intOrNull
-                if (score == null) diary.remove("importance")
-                else diary["importance"] = JsonPrimitive(score)
-            }
-            result["diaryDelta"] = JsonObject(diary)
+            result["diaryDelta"] = normalizeChatDiaryDelta(value)
         }
     }
     return JsonObject(result)
@@ -167,4 +155,21 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
 internal fun normalizeChatReplySuggestionPayload(root: JsonObject): JsonObject {
     val withState = JsonObject(root + ("state" to JsonObject(emptyMap())))
     return JsonObject(normalizeChatPostTurnPatch(withState).filterKeys { it != "state" })
+}
+
+/** Shared Chat/Group observer diary normalization. Invalid optional values retain defaults. */
+internal fun normalizeChatDiaryDelta(raw: JsonObject): JsonObject {
+    val fields = raw.toMutableMap()
+    listOf("event", "feeling", "innerThought", "relationshipMeaning",
+        "unresolvedEcho", "disclosure").forEach { key ->
+        fields[key]?.let { value ->
+            if (value !is JsonPrimitive || !value.isString) fields.remove(key)
+        }
+    }
+    fields["importance"]?.let { value ->
+        val score = (value as? JsonPrimitive)?.intOrNull
+        if (score == null) fields.remove("importance")
+        else fields["importance"] = JsonPrimitive(score)
+    }
+    return JsonObject(fields)
 }
