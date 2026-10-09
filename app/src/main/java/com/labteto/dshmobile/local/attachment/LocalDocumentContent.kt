@@ -222,6 +222,7 @@ internal object LocalDocumentContent {
 
     private fun extractEpub(file: File, maxChars: Int): LocalDocumentText {
         val out = BoundedText(maxChars)
+        var incomplete = false
         withSafeZip(file) { zip ->
             val pages = zip.entries().asSequence()
                 .map { it.name }
@@ -231,10 +232,16 @@ internal object LocalDocumentContent {
                 }
                 .filterNot { it.contains("nav", ignoreCase = true) && it.count { ch -> ch == '/' } <= 2 }
                 .sorted()
-                .take(MAX_ARCHIVE_ENTRIES)
+                .take(MAX_ARCHIVE_ENTRIES + 1)
                 .toList()
-            pages.forEach { name ->
-                val html = zip.readEntryText(name) ?: return@forEach
+            if (pages.size > MAX_ARCHIVE_ENTRIES) incomplete = true
+            for (name in pages.take(MAX_ARCHIVE_ENTRIES)) {
+                if (out.truncated) break
+                val html = zip.readEntryText(name)
+                if (html == null) {
+                    incomplete = true
+                    continue
+                }
                 val text = htmlToText(html)
                 if (text.isNotBlank()) {
                     out.appendLine("[${name.substringAfterLast('/')}]")
@@ -242,7 +249,7 @@ internal object LocalDocumentContent {
                 }
             }
         }
-        return LocalDocumentText("EPUB", out.value(), out.truncated)
+        return LocalDocumentText("EPUB", out.value(), out.truncated || incomplete)
     }
 
     private fun extractRtf(file: File, maxChars: Int): LocalDocumentText {
@@ -357,11 +364,14 @@ internal object LocalDocumentContent {
 
     private fun extractZip(file: File, maxChars: Int): LocalDocumentText {
         val out = BoundedText(maxChars)
+        var incomplete = false
         withSafeZip(file) { zip ->
-            val entries = zip.entries().asSequence()
+            val discovered = zip.entries().asSequence()
                 .filterNot { it.isDirectory }
-                .take(MAX_ARCHIVE_ENTRIES)
+                .take(MAX_ARCHIVE_ENTRIES + 1)
                 .toList()
+            val entries = discovered.take(MAX_ARCHIVE_ENTRIES)
+            incomplete = discovered.size > MAX_ARCHIVE_ENTRIES
             out.appendLine("压缩包文件列表（最多显示 $MAX_ARCHIVE_ENTRIES 项）：")
             entries.forEach { out.appendLine("- ${it.name}（${it.size.coerceAtLeast(0)} B）") }
             entries.filter { entry ->
@@ -380,7 +390,7 @@ internal object LocalDocumentContent {
                 )
             }
         }
-        return LocalDocumentText("ZIP", out.value(), out.truncated)
+        return LocalDocumentText("ZIP", out.value(), out.truncated || incomplete)
     }
 
     private fun extractGzip(file: File, displayName: String, maxChars: Int): LocalDocumentText {
@@ -412,7 +422,10 @@ internal object LocalDocumentContent {
             offset = (dataStart.toLong() + padded).coerceAtMost(bytes.size.toLong()).toInt()
             entries += 1
         }
-        return LocalDocumentText("TAR", out.value(), out.truncated)
+        val moreEntries = if (entries >= MAX_ARCHIVE_ENTRIES && offset + 512 <= bytes.size) {
+            bytes.copyOfRange(offset, offset + 512).any { it != 0.toByte() }
+        } else false
+        return LocalDocumentText("TAR", out.value(), out.truncated || moreEntries)
     }
 
     private fun extractLegacyOffice(file: File, extension: String, maxChars: Int): LocalDocumentText {
