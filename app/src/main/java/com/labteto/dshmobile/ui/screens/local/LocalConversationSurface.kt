@@ -183,9 +183,9 @@ internal fun LocalConversationSurface(
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
-    var reasoningMode by remember(state.sessionId) {
+    var reasoningMode by remember(state.sessionId, state.usageMode) {
         LocalReasoningControls.attach(appContext)
-        mutableStateOf(LocalReasoningControls.mode(state.sessionId))
+        mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
     val drafts = rememberSaveable(
         saver = listSaver(
@@ -889,7 +889,7 @@ internal fun LocalConversationSurface(
             reasoningMode = reasoningMode,
             onReasoningModeChange = { mode ->
                 LocalReasoningControls.setMode(state.sessionId, mode)
-                reasoningMode = LocalReasoningControls.mode(state.sessionId)
+                reasoningMode = LocalReasoningControls.mode(state.sessionId, state.usageMode)
             },
             onPlanModeChange = onPlanModeChange,
             onFocusChanged = { focused ->
