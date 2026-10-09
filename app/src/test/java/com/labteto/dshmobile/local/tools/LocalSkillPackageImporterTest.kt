@@ -98,4 +98,21 @@ class LocalSkillPackageImporterTest {
         assertEquals("sample-skill", importer.install("pkg.zip", archive("SKILL.md" to example.toByteArray())))
         assertTrue(workspace.skills().contains("sample-skill"))
     }
+    @Test fun rejectsExcessiveDirectoryEntriesWithoutCreatingSkill() = runInWorkspace { importer, workspace, _ ->
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("pkg/SKILL.md"))
+            zip.write(example.toByteArray())
+            zip.closeEntry()
+            repeat(128) { i ->
+                zip.putNextEntry(ZipEntry("pkg/directory-${i}/"))
+                zip.closeEntry()
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            importer.install("many-directories.zip", output.toByteArray())
+        }
+        assertFalse(workspace.skills().contains("sample-skill"))
+    }
+
 }
