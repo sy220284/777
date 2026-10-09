@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,10 +31,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
-        compose.waitForIdle()
-
-        assertEquals(1, backCount.get())
+        assertDeviceBackDeliveredToForegroundActivity(backCount)
     }
 
     @Test
@@ -50,9 +48,22 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        assertDeviceBackDeliveredToForegroundActivity(backCount)
+    }
+    /** Ensure the Compose owner actually has focus before injecting a real system Back.
+     *  Never retry the key press: that would hide a double-dispatch navigation bug.
+     */
+    private fun assertDeviceBackDeliveredToForegroundActivity(backCount: AtomicInteger) {
         compose.waitForIdle()
+        compose.waitUntil(timeoutMillis = 10_000L) {
+            compose.activity.window.decorView.hasWindowFocus()
+        }
 
+        pressDeviceBack()
+        // Shell keyevent completion and Activity dispatch can be one frame apart;
+        // wait for the observable callback instead of asserting on a scheduler race.
+        compose.waitUntil(timeoutMillis = 5_000L) { backCount.get() != 0 }
         assertEquals(1, backCount.get())
     }
+
 }
