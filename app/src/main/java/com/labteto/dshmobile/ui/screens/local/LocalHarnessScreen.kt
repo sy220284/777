@@ -298,6 +298,7 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         backgroundJobOutput = viewModel::backgroundJobOutput,
         artifactsForUi = viewModel::artifactsForUi,
+        artifactHistoryForUi = viewModel::artifactHistoryForUi,
         toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         toolEvidenceForUi = viewModel::toolEvidenceForUi,
@@ -315,6 +316,7 @@ fun LocalHarnessScreen(
         create = viewModel::createProject,
         select = viewModel::selectProject,
         rename = viewModel::renameProject,
+        delete = viewModel::deleteProject,
         updateInstructions = viewModel::updateProjectInstructions,
     )
     val automationActions = LocalAutomationFeatureUiActions(

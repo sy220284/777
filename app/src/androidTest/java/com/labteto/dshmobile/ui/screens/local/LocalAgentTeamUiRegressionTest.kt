@@ -56,6 +56,27 @@ class LocalAgentTeamUiRegressionTest {
     }
 
     @Test
+    fun memberOutputFailureShowsRetryAndKeepsThePanelAvailable() {
+        val attempts = java.util.concurrent.atomic.AtomicInteger()
+        setSheet(
+            team = LocalAgentTeamUiState(members = listOf(member())),
+            readOutput = {
+                if (attempts.incrementAndGet() == 1) error("private-path")
+                "恢复后的输出"
+            },
+        )
+        compose.onNodeWithText("核验助手", substring = false).performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("暂时无法读取助手输出，已保留上次成功内容。请重试。")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("重试").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("恢复后的输出").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
     fun expandingOutputAndTaskDetailsRevealsHiddenContent() {
         val output = "开头核验证据" + "中间资料".repeat(450) + "末尾结论"
         setSheet(
@@ -80,11 +101,16 @@ class LocalAgentTeamUiRegressionTest {
         compose.onNodeWithText("存在并发写入范围冲突").assertExists()
     }
 
-    private fun setSheet(team: LocalAgentTeamUiState, output: String = "", onLeadFollowup: (String) -> Unit = {}) {
+    private fun setSheet(
+        team: LocalAgentTeamUiState,
+        output: String = "",
+        onLeadFollowup: (String) -> Unit = {},
+        readOutput: (String) -> String = { output },
+    ) {
         compose.setContent {
             DshTheme {
                 LocalAgentTeamSheet(
-                    team = team, onMemberOutput = { output },
+                    team = team, onMemberOutput = readOutput,
                     onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已投递") },
                     onStopMember = { LocalWorkUiActionResult(true, "已停止") },
                     onStopAll = { LocalWorkUiActionResult(true, "已停止") },

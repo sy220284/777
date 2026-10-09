@@ -45,6 +45,9 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ExecutionStatusCard(
@@ -122,6 +125,7 @@ internal fun ExecutionStatusCard(
 
             if (actionRequiredJobs.isNotEmpty()) {
                 RunCenterJobsSection(
+                    sessionId = state.sessionId,
                     jobs = actionRequiredJobs,
                     attention = true,
                     showAll = showAll,
@@ -157,6 +161,7 @@ internal fun ExecutionStatusCard(
 
             if (backgroundJobs.isNotEmpty()) {
                 RunCenterJobsSection(
+                    sessionId = state.sessionId,
                     jobs = backgroundJobs,
                     attention = false,
                     showAll = showAll,
@@ -288,6 +293,7 @@ private fun LocalJobInfo.needsUserAttention(): Boolean =
 
 @Composable
 private fun RunCenterJobsSection(
+    sessionId: String,
     jobs: List<LocalJobInfo>,
     attention: Boolean,
     showAll: Boolean,
@@ -297,11 +303,31 @@ private fun RunCenterJobsSection(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
-    var agentMessageDraft by remember { mutableStateOf("") }
-    var agentMessageFeedback by remember { mutableStateOf("") }
-    var agentMessageSending by remember { mutableStateOf(false) }
-    var expandedJobId by remember { mutableStateOf<String?>(null) }
-    var expandedJobOutput by remember { mutableStateOf("") }
+    var agentMessageDraft by remember(sessionId) { mutableStateOf("") }
+    var agentMessageFeedback by remember(sessionId) { mutableStateOf("") }
+    var agentMessageSending by remember(sessionId) { mutableStateOf(false) }
+    var jobActionFeedback by remember(sessionId) { mutableStateOf("") }
+    var expandedJobId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var expandedJobOutput by remember(sessionId) { mutableStateOf("") }
+    var expandedOutputError by remember(sessionId) { mutableStateOf(false) }
+    val outputFailedMessage = stringResource(R.string.local_run_job_output_read_failed)
+    val agentActionFailedMessage = stringResource(R.string.local_team_action_failed)
+
+    fun refreshJobOutput(jobId: String) {
+        scope.launch {
+            try {
+                val updated = withContext(Dispatchers.IO) { onJobOutput(jobId) }
+                if (expandedJobId == jobId) {
+                    expandedJobOutput = updated
+                    expandedOutputError = false
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (expandedJobId == jobId) expandedOutputError = true
+            }
+        }
+    }
     val orderedJobs = jobs.sortedWith(
         compareBy<LocalJobInfo> {
             when {
@@ -402,9 +428,12 @@ private fun RunCenterJobsSection(
                                     expandedJobOutput = ""
                                 } else {
                                     expandedJobId = job.id
-                                    expandedJobOutput = onJobOutput(job.id)
+                                    expandedJobOutput = ""
+                                    expandedOutputError = false
+                                    refreshJobOutput(job.id)
                                     agentMessageDraft = ""
                                     agentMessageFeedback = ""
+                                    jobActionFeedback = ""
                                 }
                             },
                             variant = DsButtonVariant.Ghost,
@@ -429,6 +458,13 @@ private fun RunCenterJobsSection(
                             maxLines = 12,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (expandedOutputError) {
+                            Text(
+                                outputFailedMessage,
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.error,
+                            )
+                        }
                         if (job.isAgent) {
                             if (job.status == "dormant") {
                                 Text(
@@ -473,6 +509,10 @@ private fun RunCenterJobsSection(
                                                         val result = onSendAgentMessage(job.id, message)
                                                         agentMessageFeedback = result.message
                                                         if (result.accepted) agentMessageDraft = ""
+                                                    } catch (cancelled: CancellationException) {
+                                                        throw cancelled
+                                                    } catch (_: Exception) {
+                                                        agentMessageFeedback = agentActionFailedMessage
                                                     } finally {
                                                         agentMessageSending = false
                                                     }
@@ -500,7 +540,7 @@ private fun RunCenterJobsSection(
                         ) {
                             DsButton(
                                 text = stringResource(R.string.local_run_job_refresh),
-                                onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                onClick = { refreshJobOutput(job.id) },
                                 variant = DsButtonVariant.Ghost,
                                 size = DsButtonSize.Small,
                             )
@@ -508,13 +548,30 @@ private fun RunCenterJobsSection(
                                 DsButton(
                                     text = stringResource(R.string.local_run_job_stop),
                                     onClick = {
-                                        onStopJob(job.id)
-                                        expandedJobOutput = onJobOutput(job.id)
+                                        scope.launch {
+                                            try {
+                                                val message = withContext(Dispatchers.IO) { onStopJob(job.id) }
+                                                if (expandedJobId == job.id) jobActionFeedback = message
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) {
+                                                if (expandedJobId == job.id) jobActionFeedback = agentActionFailedMessage
+                                            } finally {
+                                                refreshJobOutput(job.id)
+                                            }
+                                        }
                                     },
                                     variant = DsButtonVariant.Danger,
                                     size = DsButtonSize.Small,
                                 )
                             }
+                        }
+                        if (jobActionFeedback.isNotBlank()) {
+                            Text(
+                                jobActionFeedback,
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
                         }
                     }
                 }
