@@ -166,6 +166,9 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override fun createSkill(id: String, description: String, instructions: String) =
         skillManager.create(id, description, instructions)
     override fun removeSkill(id: String) = skillManager.remove(id)
+    override fun readSkillDocument(id: String) = skillManager.readDocument(id)
+    override fun updateSkillDocument(id: String, document: String) = skillManager.updateDocument(id, document)
+    override fun setSkillModelInvocable(id: String, enabled: Boolean) = skillManager.setModelInvocable(id, enabled)
 
     override suspend fun connectHttp(serverId: String, endpoint: String): String =
         plugins.connectMcpHttp(serverId, endpoint)
