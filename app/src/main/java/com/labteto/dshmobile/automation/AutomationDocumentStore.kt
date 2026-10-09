@@ -3,8 +3,8 @@ package com.labteto.dshmobile.automation
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+import com.labteto.dshmobile.local.persistence.commitSnapshotAndClearJournal
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -47,9 +47,8 @@ internal class AutomationDocumentStore(
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
-        val base = decodeDocument(file) ?: when {
-            !file.isFile && !backup.isFile -> AutomationDocument()
-            else -> recoverSnapshot()
+        val base = RecoveringDocumentFile(file).read(::AutomationDocument) { encoded ->
+            json.decodeFromString(AutomationDocument.serializer(), encoded)
         }
         val document = replayJournal(base)
         cachedDocument = document
@@ -87,18 +86,6 @@ internal class AutomationDocumentStore(
         }
     }
 
-    private fun recoverSnapshot(): AutomationDocument {
-        val corrupt = File(root, "automations.corrupt-${System.currentTimeMillis()}.json")
-        if (file.isFile) {
-            runCatching { file.copyTo(corrupt, overwrite = false) }
-        }
-        val recovered = decodeDocument(backup) ?: throw IllegalStateException(
-            "自动任务存储已损坏，主文件与备份均无法读取；损坏数据已保留供恢复",
-        )
-        runCatching { backup.copyTo(file, overwrite = true) }
-        return recovered
-    }
-
     private fun appendMutation(mutation: AutomationJournalMutation) {
         val encoded = json.encodeToString(AutomationJournalMutation.serializer(), mutation) + "\n"
         FileOutputStream(journal, true).use { output ->
@@ -128,39 +115,20 @@ internal class AutomationDocumentStore(
         }
         if (validBytes < journal.length()) {
             val damaged = File(root, "automations.wal.corrupt-${System.currentTimeMillis()}.jsonl")
-            runCatching { journal.copyTo(damaged, overwrite = false) }
-            java.io.RandomAccessFile(journal, "rw").use { it.setLength(validBytes) }
+            com.labteto.dshmobile.local.persistence.DurableFileCommit.replace(damaged, journal.readBytes())
+            java.io.RandomAccessFile(journal, "rw").use { it.setLength(validBytes); it.fd.sync() }
             AppLog.warn("AutomationStore", "自动任务 WAL 检测到残损尾部，已截断并保留损坏副本")
         }
         return base.copy(tasks = tasks.values.toList(), generationWatermark = watermark)
     }
 
-    private fun decodeDocument(source: File): AutomationDocument? {
-        if (!source.isFile) return null
-        return runCatching {
-            json.decodeFromString(AutomationDocument.serializer(), source.readText())
-        }.getOrNull()
-    }
-
     private fun writeSnapshot(document: AutomationDocument) {
-        root.mkdirs()
-        val temporary = File(root, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(AutomationDocument.serializer(), document))
-        runCatching {
-            Files.move(
-                temporary.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        }.getOrElse {
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-        check(decodeDocument(file) != null) { "自动任务快照写入后校验失败" }
-
-        // Snapshot 与 backup 必须使用同一 WAL 基线，再清空 WAL。
-        file.copyTo(backup, overwrite = true)
-        FileOutputStream(journal, false).use { it.fd.sync() }
+        commitSnapshotAndClearJournal(
+            file, backup, journal, json.encodeToString(AutomationDocument.serializer(), document),
+            validate = { candidate -> runCatching {
+                json.decodeFromString(AutomationDocument.serializer(), candidate)
+            }.isSuccess },
+        )
         cachedDocument = document
         cachedStamp = documentStamp()
     }

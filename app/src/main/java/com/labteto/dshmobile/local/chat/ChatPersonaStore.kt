@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+import com.labteto.dshmobile.local.persistence.DocumentFileStamp
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -123,6 +124,7 @@ class ChatPersonaStore internal constructor(
     private val json: Json,
     private val legacyFile: File? = null,
     private val migrationMarker: File? = null,
+    private val onDocumentDecode: () -> Unit = {},
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(
@@ -136,7 +138,7 @@ class ChatPersonaStore internal constructor(
 
     private val backupFile = File(file.parentFile, "${file.name}.bak")
     private var cachedDocument: PersonaDocument? = null
-    private var cachedStamp: DocumentStamp? = null
+    private var cachedStamp: DocumentFileStamp? = null
 
     @Synchronized
     fun list(): List<PersonaProfile> = read().personas.sortedByDescending(PersonaProfile::updatedAt)
@@ -255,9 +257,9 @@ class ChatPersonaStore internal constructor(
             .toList()
 
     private fun read(): PersonaDocument {
-        migrateLegacyIfNeeded()
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
+        migrateLegacyIfNeeded()
         val document = durableFile.read(
             defaultValue = ::PersonaDocument,
             decode = ::decodeDocument,
@@ -279,6 +281,7 @@ class ChatPersonaStore internal constructor(
         if (marker.isFile && currentReadable) return
         if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
 
+        var needsRecovery = false
         val current = runCatching {
             durableFile.read(
                 defaultValue = ::PersonaDocument,
@@ -287,6 +290,7 @@ class ChatPersonaStore internal constructor(
         }.getOrElse {
             // A retained legacy source is a valid recovery source. Fail closed only after both
             // the current generation and the migration source are unavailable.
+            needsRecovery = true
             PersonaDocument()
         }
         val legacyDocument = PersonaSchemaMigration.readLegacyPersonaDocument(legacy, json)
@@ -302,7 +306,13 @@ class ChatPersonaStore internal constructor(
                 merged += migrated
             }
         }
-        write(current.copy(version = 2, personas = merged))
+        val migrated = current.copy(version = 2, personas = merged)
+        if (needsRecovery) {
+            durableFile.restoreFromRecoverySource(json.encodeToString(PersonaDocument.serializer(), migrated)) {
+                runCatching { decodeDocument(it) }.isSuccess
+            }
+            cachedDocument = null
+        } else write(migrated)
         markMigrationDone(marker)
     }
 
@@ -329,25 +339,19 @@ class ChatPersonaStore internal constructor(
         cachedStamp = documentStamp()
     }
 
-    private fun decodeDocument(encoded: String): PersonaDocument =
-        json.decodeFromString(PersonaDocument.serializer(), encoded).also { document ->
+    private fun decodeDocument(encoded: String): PersonaDocument {
+        onDocumentDecode()
+        return json.decodeFromString(PersonaDocument.serializer(), encoded).also { document ->
             require(document.version == 2) {
                 "人物库版本不受支持；新版角色系统不读取旧人物数据"
             }
         }
 
-    private fun documentStamp(): DocumentStamp = DocumentStamp(
-        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
-        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
-        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
-        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
-    )
+    }
 
-    private data class DocumentStamp(
-        val primaryModified: Long,
-        val primaryLength: Long,
-        val backupModified: Long,
-        val backupLength: Long,
+    private fun documentStamp(): DocumentFileStamp = DocumentFileStamp.of(
+        file, backupFile, File(file.parentFile, "${file.name}.recovery-required"),
+        legacyFile, migrationMarker,
     )
 
     private companion object {

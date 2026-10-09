@@ -3,8 +3,8 @@ package com.labteto.dshmobile.local.memory
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+import com.labteto.dshmobile.local.persistence.commitSnapshotAndClearJournal
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -39,20 +39,8 @@ internal class MemoryDocumentStore(
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
-        val base = decodeDocument(file) ?: when {
-            !file.isFile && !backup.isFile -> MemoryDocument()
-            else -> {
-                val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
-                if (file.isFile) {
-                    val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
-                    if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
-                }
-                decodeDocument(backup)?.also {
-                    runCatching { backup.copyTo(file, overwrite = true) }
-                } ?: throw IllegalStateException(
-                    "长期记忆存储已损坏，主文件与备份均无法读取；损坏数据已保留供恢复",
-                )
-            }
+        val base = RecoveringDocumentFile(file).read(::MemoryDocument) { encoded ->
+            json.decodeFromString(MemoryDocument.serializer(), encoded)
         }
         val document = replayJournal(base)
         cachedDocument = document
@@ -111,40 +99,20 @@ internal class MemoryDocumentStore(
         }
         if (validBytes < journal.length()) {
             val damaged = File(root, "memories.wal.corrupt-${System.currentTimeMillis()}.jsonl")
-            runCatching { journal.copyTo(damaged, overwrite = false) }
-            java.io.RandomAccessFile(journal, "rw").use { it.setLength(validBytes) }
+            com.labteto.dshmobile.local.persistence.DurableFileCommit.replace(damaged, journal.readBytes())
+            java.io.RandomAccessFile(journal, "rw").use { it.setLength(validBytes); it.fd.sync() }
             AppLog.warn("MemoryStore", "长期记忆 WAL 检测到残损尾部，已截断并保留损坏副本")
         }
         return MemoryDocument(records = records.values.toList())
     }
 
-    private fun decodeDocument(source: File): MemoryDocument? {
-        if (!source.isFile) return null
-        return runCatching {
-            json.decodeFromString(MemoryDocument.serializer(), source.readText())
-        }.getOrNull()
-    }
-
     private fun writeSnapshot(document: MemoryDocument) {
-        root.mkdirs()
-        val temporary = File(root, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
-        runCatching {
-            Files.move(
-                temporary.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        }.getOrElse {
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-        check(decodeDocument(file) != null) { "长期记忆快照写入后校验失败" }
-
-        // Snapshot 与 backup 必须是同一 WAL 基线。先同步 backup，再清空 WAL：
-        // 任一中间崩溃窗口里，至少存在一组可重放的一致 base + WAL。
-        file.copyTo(backup, overwrite = true)
-        FileOutputStream(journal, false).use { it.fd.sync() }
+        commitSnapshotAndClearJournal(
+            file, backup, journal, json.encodeToString(MemoryDocument.serializer(), document),
+            validate = { candidate -> runCatching {
+                json.decodeFromString(MemoryDocument.serializer(), candidate)
+            }.isSuccess },
+        )
         cachedDocument = document
         cachedStamp = documentStamp()
     }

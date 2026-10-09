@@ -1,83 +1,68 @@
 package com.labteto.dshmobile.local.persistence
 
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
-internal enum class RecoveringDocumentFailurePolicy {
-    FAIL_CLOSED,
-    RECREATE_DEFAULT,
-}
+internal enum class RecoveringDocumentFailurePolicy { FAIL_CLOSED, RECREATE_DEFAULT }
 
-/**
- * Durable text document with a last-known-good backup and corrupt-file quarantine.
- *
- * This is persistence infrastructure only. Callers own decoding, validation and domain semantics.
- */
+/** Callers own decoding and domain semantics; quarantine never turns existing data into new data. */
 internal class RecoveringDocumentFile(
     private val file: File,
     private val clock: () -> Long = System::currentTimeMillis,
     private val failurePolicy: RecoveringDocumentFailurePolicy = RecoveringDocumentFailurePolicy.FAIL_CLOSED,
 ) {
-    private val root: File = requireNotNull(file.parentFile) {
-        "持久数据文件必须位于目录中：${file.path}"
-    }
+    private val root = requireNotNull(file.parentFile)
     private val backup = File(root, "${file.name}.bak")
+    private val recoveryRequired = File(root, "${file.name}.recovery-required")
 
+    @Synchronized
     fun <T> read(defaultValue: () -> T, decode: (String) -> T): T {
-        decodeFile(file, decode)?.let { return it }
+        decodeFile(file, decode)?.let {
+            DurableFileCommit.delete(recoveryRequired)
+            return it
+        }
+        decodeFile(backup, decode)?.let {
+            if (file.isFile) quarantineCorrupt(file)
+            DurableFileCommit.replace(file, backup.readBytes())
+            DurableFileCommit.delete(recoveryRequired)
+            return it
+        }
+        val hadData = file.exists() || backup.exists() || recoveryRequired.exists() || hasLegacyQuarantine()
+        if (!hadData) return defaultValue()
 
-        if (!file.isFile) {
-            decodeFile(backup, decode)?.let { recovered ->
-                restoreBackup()
-                return recovered
-            }
-            if (backup.isFile) {
-                return when (failurePolicy) {
-                    RecoveringDocumentFailurePolicy.FAIL_CLOSED ->
-                        throw IllegalStateException("持久数据备份已损坏，无法自动恢复：${backup.path}")
-                    RecoveringDocumentFailurePolicy.RECREATE_DEFAULT -> {
-                        quarantineCorrupt(backup)
-                        defaultValue()
-                    }
-                }
-            }
-            return defaultValue()
+        // Persist before moving either source: interruption cannot make the next read look new.
+        if (!recoveryRequired.exists()) {
+            DurableFileCommit.replace(recoveryRequired, "recovery-required\n".toByteArray())
         }
-
-        quarantineCorrupt(file)
-        decodeFile(backup, decode)?.let { recovered ->
-            restoreBackup()
-            return recovered
-        }
-        if (backup.isFile && failurePolicy == RecoveringDocumentFailurePolicy.RECREATE_DEFAULT) {
-            quarantineCorrupt(backup)
-        }
-        return when (failurePolicy) {
-            RecoveringDocumentFailurePolicy.FAIL_CLOSED -> throw IllegalStateException(
-                "持久数据主文件已损坏且备份不可用；损坏主文件已隔离，未用空数据覆盖原内容",
-            )
-            RecoveringDocumentFailurePolicy.RECREATE_DEFAULT -> defaultValue()
-        }
+        if (file.isFile) quarantineCorrupt(file)
+        if (backup.isFile) quarantineCorrupt(backup)
+        if (failurePolicy == RecoveringDocumentFailurePolicy.RECREATE_DEFAULT) return defaultValue()
+        error("持久数据已损坏且备份不可用；损坏数据已隔离，需恢复后才能继续：${file.path}")
     }
 
+    @Synchronized
     fun write(serialized: String, validate: (String) -> Boolean) {
-        root.mkdirs()
         require(validate(serialized)) { "拒绝写入无法解析的持久数据" }
+        // Validate existing state even if this caller has not read it. FAIL_CLOSED blocks blind writes.
+        read(defaultValue = { Unit }, decode = { check(validate(it)); Unit })
+        commit(serialized, validate)
+    }
 
-        val currentText = if (file.isFile) runCatching { file.readText() }.getOrNull() else null
-        if (currentText != null && validate(currentText)) {
-            file.copyTo(backup, overwrite = true)
-        }
+    /** Explicit import/migration recovery from an independently validated durable source. */
+    @Synchronized
+    fun restoreFromRecoverySource(serialized: String, validate: (String) -> Boolean) {
+        require(validate(serialized)) { "恢复来源无法解析" }
+        commit(serialized, validate)
+    }
 
-        val temporary = File(root, "${file.name}.tmp")
-        temporary.writeText(serialized)
-        moveReplace(temporary, file)
-
-        val backupText = if (backup.isFile) runCatching { backup.readText() }.getOrNull() else null
+    private fun commit(serialized: String, validate: (String) -> Boolean) {
+        val current = if (file.isFile) file.readText() else null
+        if (current != null && validate(current)) DurableFileCommit.replace(backup, current.toByteArray())
+        DurableFileCommit.replace(file, serialized.toByteArray())
+        val backupText = if (backup.isFile) backup.readText() else null
         if (backupText == null || !validate(backupText)) {
-            file.copyTo(backup, overwrite = true)
+            DurableFileCommit.replace(backup, serialized.toByteArray())
         }
+        DurableFileCommit.delete(recoveryRequired)
     }
 
     private fun <T> decodeFile(source: File, decode: (String) -> T): T? {
@@ -85,37 +70,14 @@ internal class RecoveringDocumentFile(
         return runCatching { decode(source.readText()) }.getOrNull()
     }
 
+    private fun hasLegacyQuarantine(): Boolean = root.listFiles().orEmpty().any {
+        (it.name.startsWith(file.name + ".") || it.name.startsWith(file.nameWithoutExtension + ".")) &&
+            it.name.contains(".corrupt-")
+    }
+
     private fun quarantineCorrupt(target: File) {
-        if (!target.isFile) return
-        val corrupt = File(root, "${target.name}.corrupt-${clock()}")
-        if (runCatching { target.renameTo(corrupt) }.getOrDefault(false)) return
-
-        val copied = runCatching {
-            target.copyTo(corrupt, overwrite = false)
-            true
-        }.getOrDefault(false)
-        check(copied) { "持久数据损坏且无法隔离：${target.path}" }
-        check(target.delete()) { "持久数据已备份但无法移除损坏文件：${target.path}" }
-    }
-
-    private fun restoreBackup() {
-        if (!backup.isFile) return
-        root.mkdirs()
-        val temporary = File(root, "${file.name}.restore.tmp")
-        backup.copyTo(temporary, overwrite = true)
-        moveReplace(temporary, file)
-    }
-
-    private fun moveReplace(source: File, target: File) {
-        runCatching {
-            Files.move(
-                source.toPath(),
-                target.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        }.getOrElse {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
+        val corrupt = File.createTempFile(target.name + ".corrupt-${clock()}-", ".quarantine", root)
+        DurableFileCommit.replace(corrupt, target.readBytes())
+        DurableFileCommit.delete(target)
     }
 }

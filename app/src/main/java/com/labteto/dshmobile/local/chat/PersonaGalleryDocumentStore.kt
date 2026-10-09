@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+import com.labteto.dshmobile.local.persistence.DocumentFileStamp
 
 import java.io.File
 import kotlinx.serialization.json.Json
@@ -18,7 +19,7 @@ internal class PersonaGalleryDocumentStore(
     private val durableFile = RecoveringDocumentFile(file)
     private val backupFile = File(file.parentFile, "${file.name}.bak")
     private var cachedDocument: GalleryDocument? = null
-    private var cachedStamp: DocumentStamp? = null
+    private var cachedStamp: DocumentFileStamp? = null
 
     @Synchronized
     fun read(): GalleryDocument {
@@ -57,17 +58,14 @@ internal class PersonaGalleryDocumentStore(
         cachedStamp = documentStamp()
     }
 
-    private fun documentStamp(): DocumentStamp = DocumentStamp(
-        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
-        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
-        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
-        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
-    )
+    internal fun restoreFromRecoverySource(document: GalleryDocument) {
+        durableFile.restoreFromRecoverySource(json.encodeToString(GalleryDocument.serializer(), document)) {
+            runCatching { json.decodeFromString(GalleryDocument.serializer(), it) }.isSuccess
+        }
+        cachedDocument = null
+        cachedStamp = null
+    }
 
-    private data class DocumentStamp(
-        val primaryModified: Long,
-        val primaryLength: Long,
-        val backupModified: Long,
-        val backupLength: Long,
-    )
+    private fun documentStamp() = DocumentFileStamp.of(file, backupFile,
+        File(file.parentFile, "${file.name}.recovery-required"))
 }
