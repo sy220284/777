@@ -392,6 +392,8 @@ internal fun LocalAgentTeamSheet(
         DsToastHost(toast)
     }
 
+    val actionFailedText = stringResource(R.string.local_team_action_failed)
+
     if (confirmStopAll) {
         DsDialog(
             title = stringResource(R.string.local_team_stop_confirm_title),
@@ -421,6 +423,10 @@ internal fun LocalAgentTeamSheet(
                         scope.launch {
                             val result = try {
                                 onStopAll()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                LocalWorkUiActionResult(false, actionFailedText)
                             } finally {
                                 stopAllBusy = false
                             }
@@ -565,6 +571,7 @@ private fun TeamMemberDetail(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
+    val actionFailedText = stringResource(R.string.local_team_action_failed)
     var draft by rememberSaveable(member.id) { mutableStateOf("") }
     var sending by remember(member.id) { mutableStateOf(false) }
     var stopping by remember(member.id) { mutableStateOf(false) }
@@ -652,6 +659,10 @@ private fun TeamMemberDetail(
                     scope.launch {
                         val result = try {
                             onSendMemberMessage(member.id, text)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            LocalWorkUiActionResult(false, actionFailedText)
                         } finally {
                             sending = false
                         }
@@ -683,6 +694,10 @@ private fun TeamMemberDetail(
                     scope.launch {
                         val result = try {
                             onStopMember(member.id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            LocalWorkUiActionResult(false, actionFailedText)
                         } finally {
                             stopping = false
                         }
