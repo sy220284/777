@@ -15,7 +15,7 @@ class LocalWorkSkillActivationTest {
             val workspace = LocalWorkspace(root)
             workspace.write(".dsh/skills/writing-polish/SKILL.md",
                 "---\ndescription: polish\n---\n# Rules\nKeep voice and meaning.\n")
-            val context = resolveLocalWorkSkillGuidance(workspace, "【技能:writing-polish】\n帮我修改这段文字")
+            val context = resolveLocalWorkSkillGuidance(workspace, "@skill:writing-polish\n帮我修改这段文字")
             assertTrue(context.contains("[本轮技能已加载：writing-polish]"))
             assertTrue(context.contains("Keep voice and meaning."))
             assertFalse(context.contains("本地技能目录"))
@@ -32,10 +32,10 @@ class LocalWorkSkillActivationTest {
             workspace.write(".dsh/skills/private-notes/SKILL.md",
                 "---\ndescription: private\ndisable-model-invocation: true\n---\nsecret")
             assertThrows(IllegalArgumentException::class.java) {
-                resolveLocalWorkSkillGuidance(workspace, "【技能:private-notes】\n内容")
+                resolveLocalWorkSkillGuidance(workspace, "@skill:private-notes\n内容")
             }
             assertThrows(IllegalArgumentException::class.java) {
-                resolveLocalWorkSkillGuidance(workspace, "【技能:missing-one】\n内容")
+                resolveLocalWorkSkillGuidance(workspace, "@skill:missing-one\n内容")
             }
         } finally {
             root.deleteRecursively()
