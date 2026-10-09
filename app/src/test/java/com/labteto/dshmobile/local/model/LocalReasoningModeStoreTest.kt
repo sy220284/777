@@ -10,6 +10,31 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun workTemperatureKeepsSessionSelectionAndUsesOfficialBounds() {
+        val first = "work-temp-a-20261009"
+        val second = "work-temp-b-20261009"
+        try {
+            assertEquals(2, LocalWorkTemperatureStore.level(first))
+            LocalWorkTemperatureStore.setLevel(first, 0)
+            assertEquals(0.0, LocalWorkTemperatureStore.requestTemperature(
+                first, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.0)
+            LocalWorkTemperatureStore.setLevel(first, 4)
+            assertEquals(2.0, LocalWorkTemperatureStore.requestTemperature(
+                first, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.0)
+            assertEquals(2, LocalWorkTemperatureStore.level(second))
+            assertNull(LocalWorkTemperatureStore.requestTemperature(first, "unknown", "https://example.org"))
+            LocalWorkTemperatureStore.setLevel(first, 2)
+            assertNull(LocalWorkTemperatureStore.requestTemperature(
+                first, "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai",
+            ))
+        } finally {
+            LocalWorkTemperatureStore.setLevel(first, 2)
+            LocalWorkTemperatureStore.setLevel(second, 2)
+        }
+    }
+
     @Test fun newChatDefaultsToFastWithoutChangingWorkOrExplicitSelections() {
         val session = "new-chat-fast-default-20261009"
         val deepSeek = LocalModelProfile("chat-default-ds", "deepseek-flash", "https://api.deepseek.com")
