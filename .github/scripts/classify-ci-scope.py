@@ -247,6 +247,14 @@ def classify(
         if is_documentation(path) or is_repository_metadata(path):
             continue
 
+        # Local developer installers do not enter the Android binary. Keep
+        # their real Artifact install regression in the separate toolchain workflow.
+        # The shared version manifest is excluded: FontTools/JDK values also
+        # influence reproducible packaged Android assets and build baselines.
+        if path.startswith("tools/dev/") and path != "tools/dev/toolchain-versions.env":
+            automation = True
+            continue
+
         if path == ".github/release-version":
             full = True
             affects_release = True
@@ -373,6 +381,9 @@ def self_test() -> None:
     verify([".github/workflows/release.yml"], full=True, release=False)
     verify([".github/scripts/check-local-architecture-boundaries.py"],
            required=("static", "architecture"), release=False)
+    verify(["tools/dev/install.sh"], required=("static",),
+           excluded=("unit", "build", "android16", "android17", "relay"), release=False)
+    verify(["tools/dev/toolchain-versions.env"], full=True, release=True)
     verify([".github/release-version"], full=True, release=True)
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],
            required=("static", "architecture", "unit", "build"),
