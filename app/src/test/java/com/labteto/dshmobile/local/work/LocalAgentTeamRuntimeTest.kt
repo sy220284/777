@@ -1500,6 +1500,16 @@ class LocalAgentTeamRuntimeTest {
         fixture.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
             member(session, "member-2", "writer2", "active"))
         startLiveChild(fixture, session)
+        // Two independent live jobs are required; otherwise recovery correctly marks member-2 failed
+        // before the second task can reach the write-scope conflict check.
+        fixture.jobs.startPersistent(
+            label = "子代理：writer2",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session,
+            continuable = true,
+            requestedId = "job-team-2",
+        ) { _, _ -> awaitCancellation() }
         fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
             task(session, "task-1", 1, emptyList(), writeScopes = listOf("app/src")))
         fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
