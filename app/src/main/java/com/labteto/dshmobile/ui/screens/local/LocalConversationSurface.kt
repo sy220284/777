@@ -193,6 +193,7 @@ internal fun LocalConversationSurface(
         androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureStore.level(state.sessionId))
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
+    var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
     val drafts = rememberSaveable(
         saver = listSaver(
             save = { cache -> cache.save() },
@@ -896,8 +897,9 @@ internal fun LocalConversationSurface(
             temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
                 workTemperatureLevel
             } else {
-                ((state.chatState.behaviorTuning.expressionVariation.coerceIn(0, 100) + 12) / 25).coerceIn(0, 4)
+                state.chatState.behaviorTuning.composerTemperatureLevel()
             },
+            temperatureSaveFailed = temperatureSaveFailed,
             temperatureEnabled = state.usageMode == LocalUsageMode.WORK ||
                 (!state.groupChat.enabled && !temperatureSaving),
             onTemperatureLevelChange = { level ->
@@ -906,14 +908,17 @@ internal fun LocalConversationSurface(
                     workTemperatureLevel = LocalWorkTemperatureStore.level(state.sessionId)
                 } else if (!state.groupChat.enabled && !temperatureSaving) {
                     temperatureSaving = true
+                    temperatureSaveFailed = false
                     scope.launch {
                         try {
                             val proposed = state.chatPersona.copy(
-                                behaviorTuning = state.chatState.behaviorTuning.copy(
-                                    expressionVariation = level.coerceIn(0, 4) * 25,
-                                ),
+                                behaviorTuning = state.chatState.behaviorTuning.withComposerTemperatureLevel(level),
                             )
-                            onConfigureChatPersona(proposed)
+                            temperatureSaveFailed = onConfigureChatPersona(proposed).isFailure
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            temperatureSaveFailed = true
                         } finally {
                             temperatureSaving = false
                         }
