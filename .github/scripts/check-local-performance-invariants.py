@@ -225,28 +225,38 @@ for token in (
     if token not in transcript_history_loader:
         violations.append("foreground transcript loading lost total-call budget: " + token)
 
-# Full-history events() is forbidden in foreground/recovery hot paths.
+# Reject unbounded event calls, even with whitespace, aliases or bound references.
+# The guard searches for calls rather than relying on an eventLog variable name.
+FULL_HISTORY_CALL = re.compile(r"(?:\?\s*)?\.\s*events\s*\(\s*\)|::\s*events\b")
+
+
+def has_full_history_scan(source: str) -> bool:
+    return FULL_HISTORY_CALL.search(strip_comments(source)) is not None
+
+
 for path, source in merge_sources(chat_sources, work_sources).items():
-    if ".events()" in source:
+    if has_full_history_scan(source):
         violations.append(f"{path} scans the full Session event archive on a Feature hot path")
 
-def check_full_history_reference(source_map: dict[str, str], relative: str, token: str) -> str | None:
-    """A missing audit target must fail closed instead of silently scanning an empty string."""
+
+def check_full_history_reference(source_map: dict[str, str], relative: str) -> str | None:
+    """A missing audit target fails closed instead of scanning an empty string."""
     source = source_map.get(relative)
     if source is None:
         return f"missing required full-history audit target: {relative}"
-    if token in source:
+    if has_full_history_scan(source):
         return f"{relative} uses full-history events() for recent attribution"
     return None
 
 
-for relative, token, owner_sources in (
-    ("app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt", "eventLog().events()", work_sources),
-    ("app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt", "eventLog.events()", all_local_sources),
+for relative, owner_sources in (
+    ("app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt", work_sources),
+    ("app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt", all_local_sources),
 ):
-    violation = check_full_history_reference(owner_sources, relative, token)
+    violation = check_full_history_reference(owner_sources, relative)
     if violation:
         violations.append(violation)
+
 
 if (
     "fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)" not in transcript_runtime
@@ -451,9 +461,17 @@ for path, source in active_chat_context_sources.items():
 # Mutation-style regression checks: both historical bypasses must fail closed.
 if "--self-test" in sys.argv:
     target = "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt"
-    assert check_full_history_reference({}, target, "eventLog().events()") is not None
-    assert check_full_history_reference({target: "eventLog().events()"}, target, "eventLog().events()") is not None
-    assert check_full_history_reference({target: "eventLog().latestMatching()"}, target, "eventLog().events()") is None
+    assert check_full_history_reference({}, target) is not None
+    for sample in (
+        "eventLog().events()",
+        "eventLog () . events ( )",
+        "val log = eventLog(); log . events(\n )",
+        "eventLog()?.events()",
+        "val reader = eventLog()::events",
+    ):
+        assert check_full_history_reference({target: sample}, target) is not None, sample
+    for safe in ("eventLog().latestMatching()", "val events = listOf(1)", "// log.events()"):
+        assert check_full_history_reference({target: safe}, target) is None, safe
     print("[architecture-3] execution guard self-test passed")
     sys.exit(0)
 

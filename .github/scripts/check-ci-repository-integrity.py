@@ -288,10 +288,57 @@ script_invocation = re.compile(
 
 
 def invoked_script_paths(source: str) -> set[str]:
-    return set(script_invocation.findall(
-        "\n".join(line for line in source.splitlines()
-                  if not line.lstrip().startswith("#"))
-    ))
+    """Conservatively credit only executable calls, excluding dead/potential branches.
+
+    This is a fail-closed static check, not a complete Bash interpreter. Uncertain
+    conditions and loop/case bodies cannot establish guaranteed gate execution.
+    """
+    found: set[str] = set()
+    frames: list[tuple[str, bool | None]] = []
+    terminated = False
+    for raw in source.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or terminated:
+            continue
+        if re.match(r"^if\b.*\bthen\s*$", line):
+            condition: bool | None = None
+            if re.fullmatch(r"if\s+true\s*;\s*then", line):
+                condition = True
+            elif re.fullmatch(r"if\s+false\s*;\s*then", line):
+                condition = False
+            frames.append(("if", condition))
+            continue
+        if re.match(r"^elif\b.*\bthen\s*$", line) and frames and frames[-1][0] == "if":
+            frames[-1] = ("if", None)
+            continue
+        if line == "else" and frames and frames[-1][0] == "if":
+            condition = frames[-1][1]
+            frames[-1] = ("if", None if condition is None else not condition)
+            continue
+        if line == "fi" and frames and frames[-1][0] == "if":
+            frames.pop()
+            continue
+        if re.match(r"^(?:for|while|until)\b.*\bdo\s*$", line):
+            frames.append(("loop", None))
+            continue
+        if re.match(r"^done(?:\s|$)", line) and frames and frames[-1][0] == "loop":
+            frames.pop()
+            continue
+        if re.match(r"^case\b.*\bin\s*$", line):
+            frames.append(("case", None))
+            continue
+        if line == "esac" and frames and frames[-1][0] == "case":
+            frames.pop()
+            continue
+        if any(active is not True for _, active in frames):
+            continue
+        if re.fullmatch(r"(?:exit|return)(?:\s+\d+)?\s*;?", line):
+            terminated = True
+            continue
+        match = script_invocation.match(line)
+        if match:
+            found.add(match.group(1))
+    return found
 
 
 # Guard against commented mentions, echo-only references and non-executing compile checks.
@@ -309,6 +356,29 @@ assert invoked_script_paths(workflow_run_commands('run: |\n  python3 .github/scr
 assert invoked_script_paths(workflow_run_commands(
     'run: echo ".github/scripts/check-example.py"\n'
 )) == set()
+assert invoked_script_paths(
+    'if false; then\n python3 .github/scripts/check-example.py\nfi'
+) == set()
+assert invoked_script_paths(
+    'if [ "1" = "0" ]; then\n python3 .github/scripts/check-example.py\nfi'
+) == set()
+assert invoked_script_paths(
+    'if true; then\n python3 .github/scripts/check-example.py\nfi'
+) == {'.github/scripts/check-example.py'}
+assert invoked_script_paths(
+    'if false; then\n echo no\nelse\n python3 .github/scripts/check-example.py\nfi'
+) == {'.github/scripts/check-example.py'}
+assert invoked_script_paths(
+    'exit 0\npython3 .github/scripts/check-example.py'
+) == set()
+assert invoked_script_paths(
+    'case "$value" in\nx) python3 .github/scripts/check-example.py ;;\nesac'
+) == set()
+assert invoked_script_paths(
+    'while IFS= read -r path; do\n echo "$path"\ndone < changed-files.txt\n'
+    'python3 .github/scripts/check-example.py'
+) == {'.github/scripts/check-example.py'}
+
 
 script_sources: dict[str, str] = {}
 for candidate in sorted(SCRIPTS.iterdir()):
