@@ -43,6 +43,7 @@ internal fun localWorkFeatureUiContribution(
                 state = workState,
                 onJobOutput = actions.backgroundJobOutput,
                 onArtifacts = actions.artifactsForUi,
+                onArtifactHistory = actions.artifactHistoryForUi,
                 onToolActivities = actions.toolActivitiesForUi,
                 onEventSequence = actions.eventSequenceForUi,
                 onToolEvidence = actions.toolEvidenceForUi,
