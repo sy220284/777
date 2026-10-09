@@ -110,10 +110,6 @@ enum class SettingsDestination {
     ACCOUNT,
     SESSION,
     APPEARANCE,
-    APPEARANCE_THEME,
-    APPEARANCE_ACCENT,
-    APPEARANCE_READING,
-    APPEARANCE_BACKGROUND,
     CHAT,
     MODELS,
     MODEL_USAGE,
@@ -143,10 +139,6 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
     SettingsDestination.ADVANCED -> SettingsDestination.ROOT
-    SettingsDestination.APPEARANCE_THEME,
-    SettingsDestination.APPEARANCE_ACCENT,
-    SettingsDestination.APPEARANCE_READING,
-    SettingsDestination.APPEARANCE_BACKGROUND -> SettingsDestination.APPEARANCE
     SettingsDestination.MEMORY_SETTINGS,
     SettingsDestination.MEMORY_MANAGEMENT -> SettingsDestination.MEMORY
     SettingsDestination.CHAT -> SettingsDestination.SESSION
@@ -331,10 +323,6 @@ fun SettingsScreen(
         SettingsDestination.ACCOUNT -> stringResource(R.string.settings_account)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
-        SettingsDestination.APPEARANCE_THEME -> stringResource(R.string.settings_appearance)
-        SettingsDestination.APPEARANCE_ACCENT -> stringResource(R.string.settings_accent_theme)
-        SettingsDestination.APPEARANCE_READING -> stringResource(R.string.settings_reading_preferences)
-        SettingsDestination.APPEARANCE_BACKGROUND -> stringResource(R.string.settings_background_image)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
@@ -522,57 +510,46 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        AppSettingsSection {
-                            AppSettingsRow(FeatherIcons.SunMoon, stringResource(R.string.settings_appearance),
-                                value = stringResource(when (settings.themePreference) {
-                                    "light" -> R.string.settings_appearance_light
-                                    "dark" -> R.string.settings_appearance_dark
-                                    "matte_black" -> R.string.settings_appearance_matte_black
-                                    else -> R.string.settings_appearance_system
-                                }), onClick = { page = SettingsDestination.APPEARANCE_THEME })
-                            AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.Palette, stringResource(R.string.settings_accent_theme),
-                                onClick = { page = SettingsDestination.APPEARANCE_ACCENT })
-                            AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.BookOpen, stringResource(R.string.settings_reading_preferences),
-                                value = stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
-                                onClick = { page = SettingsDestination.APPEARANCE_READING })
-                            AppSettingsDivider()
-                            AppSettingsRow(FeatherIcons.Image, stringResource(R.string.settings_background_image),
-                                onClick = { page = SettingsDestination.APPEARANCE_BACKGROUND })
+                        // 所有外观与阅读调节项集中在当前页面，避免再次深入设置导航。
+                        SettingsCard(stringResource(R.string.settings_appearance)) {
+                            AppearanceRow(settings) { mode ->
+                                viewModel.set { it.copy(themePreference = mode) }
+                            }
+                        }
+                        SettingsCard(stringResource(R.string.settings_accent_theme)) {
+                            AccentThemeRow(settings) { key ->
+                                viewModel.set { it.copy(accentTheme = key) }
+                            }
+                        }
+                        SettingsCard(stringResource(R.string.settings_reading_preferences)) {
+                            ReadingPreferencesRow(
+                                settings,
+                                onTextScaleChange = { value ->
+                                    viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) }
+                                },
+                                onTextWeightChange = { value ->
+                                    viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
+                                },
+                                onTransparencyChange = { value ->
+                                    viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) }
+                                },
+                            )
+                        }
+                        SettingsCard(stringResource(R.string.settings_background_image)) {
+                            BackgroundRow(
+                                settings.backgroundImagePath,
+                                settings.backgroundAdaptiveContrast,
+                                onAdaptiveContrastChange = { enabled ->
+                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
+                                },
+                                onPick = viewModel::setBackgroundImage,
+                                onClear = viewModel::clearBackgroundImage,
+                            )
                         }
                         SettingsCard(stringResource(R.string.settings_appearance_preview)) {
                             AppearanceReadingPreview()
                         }
                     }
-                    SettingsDestination.APPEARANCE_THEME -> {
-                        SettingsCard(stringResource(R.string.settings_appearance)) {
-                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
-                        }
-                    }
-                    SettingsDestination.APPEARANCE_ACCENT -> {
-                        SettingsCard(stringResource(R.string.settings_accent_theme)) {
-                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
-                        }
-                    }
-                    SettingsDestination.APPEARANCE_READING -> {
-                        SettingsCard(stringResource(R.string.settings_reading_preferences)) {
-                            ReadingPreferencesRow(settings,
-                                onTextScaleChange = { value -> viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) } },
-                                onTextWeightChange = { value -> viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) } },
-                                onTransparencyChange = { value -> viewModel.set { it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f)) } },
-                            )
-                        }
-                        SettingsCard(stringResource(R.string.settings_appearance_preview)) { AppearanceReadingPreview() }
-                    }
-                    SettingsDestination.APPEARANCE_BACKGROUND -> {
-                        SettingsCard(stringResource(R.string.settings_background_image)) {
-                            BackgroundRow(settings.backgroundImagePath, settings.backgroundAdaptiveContrast,
-                                onAdaptiveContrastChange = { enabled -> viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) } },
-                                onPick = viewModel::setBackgroundImage, onClear = viewModel::clearBackgroundImage)
-                        }
-                    }
-
                     SettingsDestination.CHAT -> {
                         val builtInFilters = viewModel.chatStyleGuardBuiltInPhrases
                         val customFilters = localHarness.chatStyleGuardCustomPhrases
