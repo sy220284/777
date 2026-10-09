@@ -151,10 +151,18 @@ data class LocalModelTemperatureRange(
     val chatDefault: Double,
     val requiresDisabledThinking: Boolean = false,
     val omitAtChatDefault: Boolean = false,
+    val defaultPosition: Int = 50,
 ) {
     init {
         require(minimum.isFinite() && maximum.isFinite() && chatDefault.isFinite())
         require(minimum < maximum && chatDefault in minimum..maximum)
+        require(defaultPosition in 1..100)
+    }
+
+    /** Convert an unsplit, legacy expression value without changing its previous temperature. */
+    fun legacyPosition(expressionVariation: Int): Int {
+        val safe = expressionVariation.coerceIn(0, 100)
+        return if (defaultPosition == 100) (safe * 2).coerceAtMost(100) else safe
     }
 
     fun at(position: Int): Double {
@@ -162,8 +170,10 @@ data class LocalModelTemperatureRange(
         return when {
             safe == 0 -> minimum
             safe == 100 -> maximum
-            safe <= 50 -> minimum + (chatDefault - minimum) * (safe / 50.0)
-            else -> chatDefault + (maximum - chatDefault) * ((safe - 50) / 50.0)
+            safe <= defaultPosition ->
+                minimum + (chatDefault - minimum) * (safe / defaultPosition.toDouble())
+            else -> chatDefault + (maximum - chatDefault) *
+                ((safe - defaultPosition) / (100 - defaultPosition).toDouble())
         }
     }
 }
@@ -605,7 +615,10 @@ object LocalModelPresets {
         // Both official DeepSeek entrypoints are equivalent; proxies cannot inherit the range.
         if (normalized in setOf("https://api.deepseek.com", "https://api.deepseek.com/v1") &&
             model.lowercase() in setOf("deepseek-flash", "deepseek-v4-pro")) {
-            return LocalModelTemperatureRange(0.0, 2.0, 1.3, requiresDisabledThinking = true)
+            // Product-level cap: use the entire slider for 0..1.3, with Chat starting at 1.3.
+            return LocalModelTemperatureRange(
+                0.0, 1.3, 1.3, requiresDisabledThinking = true, defaultPosition = 100,
+            )
         }
         val preset = find(model, baseUrl) ?: return null
         if (!preset.temperatureSupported) return null
