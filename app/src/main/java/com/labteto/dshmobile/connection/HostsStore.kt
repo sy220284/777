@@ -30,9 +30,6 @@ class HostsStore @Inject constructor(
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
         val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
-        val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
-        val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
-        val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
         val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
         val THEME = stringPreferencesKey("theme")
         val ACCENT_THEME = stringPreferencesKey("accent_theme")
@@ -73,9 +70,6 @@ class HostsStore @Inject constructor(
 
     private fun decodeSettings(prefs: Preferences): AppSettings =
         AppSettings(
-            notifyTurnComplete = prefs[Keys.NOTIFY_TURN] ?: true,
-            notifyGoal = prefs[Keys.NOTIFY_GOAL] ?: true,
-            notifyNeedsAction = prefs[Keys.NOTIFY_ACTION] ?: true,
             notifyLocalJobs = prefs[Keys.NOTIFY_LOCAL_JOBS] ?: true,
             themePreference = prefs[Keys.THEME] ?: "system",
             accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
@@ -99,9 +93,6 @@ class HostsStore @Inject constructor(
         var committed: AppSettings? = null
         dataStore.edit { prefs ->
             val next = transform(decodeSettings(prefs))
-            prefs[Keys.NOTIFY_TURN] = next.notifyTurnComplete
-            prefs[Keys.NOTIFY_GOAL] = next.notifyGoal
-            prefs[Keys.NOTIFY_ACTION] = next.notifyNeedsAction
             prefs[Keys.NOTIFY_LOCAL_JOBS] = next.notifyLocalJobs
             prefs[Keys.THEME] = next.themePreference
             prefs[Keys.ACCENT_THEME] = next.accentTheme

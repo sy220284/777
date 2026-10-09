@@ -794,42 +794,12 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
-                        // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
-                        SettingsCard(stringResource(R.string.settings_notifications_group_agent)) {
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_turn),
-                                settings.notifyTurnComplete,
-                                stringResource(R.string.settings_notifications_turn_hint),
-                            ) { viewModel.set { it.copy(notifyTurnComplete = !it.notifyTurnComplete) } }
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_goal),
-                                settings.notifyGoal,
-                                stringResource(R.string.settings_notifications_goal_hint),
-                            ) { viewModel.set { it.copy(notifyGoal = !it.notifyGoal) } }
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_action),
-                                settings.notifyNeedsAction,
-                                stringResource(R.string.settings_notifications_action_hint),
-                            ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
-                        }
                         SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
                                 settings.notifyLocalJobs,
                                 stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
-                        }
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = DsShapes.row,
-                            color = colors.warnTertiary,
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_notifications_usage_hint),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.warnLabel,
-                                modifier = Modifier.padding(DsSpacing.medium),
-                            )
                         }
                     }
 

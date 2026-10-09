@@ -2,9 +2,6 @@ package com.labteto.dshmobile.connection
 
 /** Local application preferences persisted through DataStore. */
 data class AppSettings(
-    val notifyTurnComplete: Boolean = true,
-    val notifyGoal: Boolean = true,
-    val notifyNeedsAction: Boolean = true,
     val notifyLocalJobs: Boolean = true,
     val themePreference: String = "system", // light | dark | matte_black | system
     val accentTheme: String = "celadon", // 中国风传统色卡 key，见 ui/theme/AccentPalettes
