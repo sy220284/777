@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +67,7 @@ internal fun PluginInventoryBrowser(
     localIds: List<String>,
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    createdSkillId: String? = null,
     skillsOnly: Boolean = false,
     loading: Boolean = false,
     error: String? = null,
@@ -88,6 +90,14 @@ internal fun PluginInventoryBrowser(
     var newSkillId by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
+    LaunchedEffect(createdSkillId) {
+        if (showCreateSkill && createdSkillId != null && createdSkillId == newSkillId) {
+            showCreateSkill = false
+            newSkillId = ""
+            newSkillDescription = ""
+            newSkillBody = ""
+        }
+    }
     val installedStatus = stringResource(R.string.tools_catalog_installed)
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
     val local = localIds.sorted().map { id ->
@@ -340,10 +350,6 @@ internal fun PluginInventoryBrowser(
                     text = stringResource(R.string.skills_install),
                     onClick = {
                         onCreateSkill(newSkillId, newSkillDescription, newSkillBody)
-                        showCreateSkill = false
-                        newSkillId = ""
-                        newSkillDescription = ""
-                        newSkillBody = ""
                     },
                     enabled = canCreate && !loading,
                     modifier = Modifier.fillMaxWidth(),
