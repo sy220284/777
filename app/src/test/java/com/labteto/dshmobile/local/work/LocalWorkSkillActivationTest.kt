@@ -25,15 +25,13 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
-    fun manualOnlyOrDeletedSkillIsNotSilentlyExecuted() {
+    fun userOnlyRequiresExplicitSelectionButRemovedSkillFails() {
         val root = Files.createTempDirectory("skill-disabled").toFile()
         try {
             val workspace = LocalWorkspace(root)
             workspace.write(".dsh/skills/private-notes/SKILL.md",
                 "---\ndescription: private\ndisable-model-invocation: true\n---\nsecret")
-            assertThrows(IllegalArgumentException::class.java) {
-                resolveLocalWorkSkillGuidance(workspace, "@skill:private-notes\n内容")
-            }
+            assertTrue(resolveLocalWorkSkillGuidance(workspace, "@skill:private-notes\n内容").contains("secret"))
             assertThrows(IllegalArgumentException::class.java) {
                 resolveLocalWorkSkillGuidance(workspace, "@skill:missing-one\n内容")
             }
