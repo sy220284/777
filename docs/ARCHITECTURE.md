@@ -596,3 +596,7 @@ Feature Catalog 与路由门禁现包括：
 - 安全边界：[`SECURITY.md`](SECURITY.md)
 - UI / UX：[`UI-UX.zh-CN.md`](UI-UX.zh-CN.md)
 - 本机 Harness 当前状态：[`ANDROID-HARNESS-STATUS.zh-CN.md`](ANDROID-HARNESS-STATUS.zh-CN.md)
+
+### 2026-10-09 审计机制收口
+
+存储层由 `RecoveringDocumentFile` 保留待恢复状态，`DurableFileCommit` 定义可靠提交顺序，`JournalDocumentFile` 维护有界 WAL 与缓存；领域继续拥有变更编解码和归约。上下文放置与压缩机制共享，Chat/Work 摘要内容和完整技能规则由 Feature 解释。团队使用独立事件 codec 与纯 reducer；命令副作用仍只有 `LocalAgentTeamRuntime` 所有者。Work 智能体操作、后台执行及邮箱恢复从组合根移入对应服务。运行中心完整历史使用已有 EventLog 游标，无新增持久事实库。
