@@ -42,6 +42,7 @@ import com.labteto.dshmobile.ui.components.DsFilterChip
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -68,6 +69,8 @@ internal fun PluginInventoryBrowser(
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     createdSkillId: String? = null,
+    skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    savedSkillId: String? = null,
     skillsOnly: Boolean = false,
     loading: Boolean = false,
     error: String? = null,
@@ -80,6 +83,10 @@ internal fun PluginInventoryBrowser(
     onInstallPreset: ((String) -> Unit)? = null,
     onCreateSkill: ((String, String, String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
+    onOpenSkillEditor: ((String) -> Unit)? = null,
+    onCloseSkillEditor: (() -> Unit)? = null,
+    onSaveSkillDocument: ((String, String) -> Unit)? = null,
+    onSetSkillModelInvocable: ((String, Boolean) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     var query by rememberSaveable { mutableStateOf("") }
@@ -90,6 +97,7 @@ internal fun PluginInventoryBrowser(
     var newSkillId by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
+    var editedSkillBody by remember { mutableStateOf("") }
     LaunchedEffect(createdSkillId) {
         if (showCreateSkill && createdSkillId != null && createdSkillId == newSkillId) {
             showCreateSkill = false
@@ -97,6 +105,9 @@ internal fun PluginInventoryBrowser(
             newSkillDescription = ""
             newSkillBody = ""
         }
+    }
+    LaunchedEffect(skillEditor?.id, skillEditor?.document) {
+        if (skillEditor != null) editedSkillBody = skillEditor.document
     }
     val installedStatus = stringResource(R.string.tools_catalog_installed)
     val connectionStatus = stringResource(R.string.tools_catalog_connections)
@@ -324,6 +335,37 @@ internal fun PluginInventoryBrowser(
             }
 
 
+
+            if (item.installedSkill && onOpenSkillEditor != null) {
+                DsButton(
+                    text = stringResource(R.string.skills_edit),
+                    variant = DsButtonVariant.Info,
+                    onClick = {
+                        onOpenSkillEditor(item.id.substringAfter(":"))
+                        selectedRow = null
+                    },
+                )
+            }
+            if (item.installedSkill && onSetSkillModelInvocable != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        stringResource(R.string.skills_auto_invocation),
+                        style = DsType.std14.withReadingWeight(),
+                        color = colors.labelSecondary,
+                    )
+                    DsSwitch(
+                        checked = item.available,
+                        onCheckedChange = {
+                            onSetSkillModelInvocable(item.id.substringAfter(":"), it)
+                            selectedRow = null
+                        },
+                    )
+                }
+            }
             if (item.installedSkill && onRemoveSkill != null) {
                 DsButton(
                     text = stringResource(R.string.common_remove),
@@ -397,6 +439,35 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(stringResource(R.string.skills_remove_message, id),
                 style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
+        }
+    }
+
+    if (skillEditor != null && onSaveSkillDocument != null) {
+        DsBottomSheet(
+            title = stringResource(R.string.skills_edit),
+            onDismiss = { onCloseSkillEditor?.invoke() },
+            scrollable = true,
+            footer = {
+                DsButton(
+                    text = stringResource(R.string.common_save),
+                    onClick = { onSaveSkillDocument(skillEditor.id, editedSkillBody) },
+                    enabled = !loading && editedSkillBody.isNotBlank() && editedSkillBody.length <= 20_000,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+        ) {
+            Text(
+                stringResource(R.string.skills_edit_hint),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            DsTextField(
+                value = editedSkillBody,
+                onValueChange = { editedSkillBody = it },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 10,
+                label = { Text(stringResource(R.string.skills_instruction_label)) },
+            )
         }
     }
 
