@@ -9,6 +9,13 @@ internal interface LocalToolsManagementPort {
     fun installedPluginIds(): List<String>
 
     fun installedSkills(): List<LocalInstalledSkill>
+    fun presetSkills(): List<LocalPresetSkill>
+    fun installPreset(id: String)
+    fun createSkill(id: String, description: String, instructions: String)
+    fun removeSkill(id: String)
+    fun readSkillDocument(id: String): String
+    fun updateSkillDocument(id: String, document: String)
+    fun setSkillModelInvocable(id: String, enabled: Boolean)
 
     suspend fun connectHttp(serverId: String, endpoint: String): String
 

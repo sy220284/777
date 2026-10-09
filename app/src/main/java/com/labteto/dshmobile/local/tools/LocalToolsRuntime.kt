@@ -17,6 +17,22 @@ class LocalToolsRuntime @Inject internal constructor(
     internal fun installedPluginIds(): List<String> = management.installedPluginIds()
     internal suspend fun installedSkills(): List<LocalInstalledSkill> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installedSkills() }
+    internal suspend fun presetSkills(): List<LocalPresetSkill> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.presetSkills() }
+    internal suspend fun installPreset(id: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installPreset(id) }
+    internal suspend fun createSkill(id: String, description: String, instructions: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            management.createSkill(id, description, instructions)
+        }
+    internal suspend fun removeSkill(id: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.removeSkill(id) }
+    internal suspend fun readSkillDocument(id: String): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.readSkillDocument(id) }
+    internal suspend fun updateSkillDocument(id: String, document: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.updateSkillDocument(id, document) }
+    internal suspend fun setSkillModelInvocable(id: String, enabled: Boolean) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.setSkillModelInvocable(id, enabled) }
     internal suspend fun connectHttp(serverId: String, endpoint: String): String =
         management.connectHttp(serverId, endpoint)
     internal suspend fun connectStdio(

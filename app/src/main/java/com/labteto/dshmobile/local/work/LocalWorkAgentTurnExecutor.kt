@@ -261,7 +261,13 @@ internal class LocalWorkAgentTurnExecutor(
                     if (!requestPrepared) {
                         workModelHistoryRuntime.ensureSystemMessage(binding)
                         val snapshot = runState.value
-                        workPromptContext = contextComposer.composeWorkTurnContext(input, snapshot, workspacePath, projectContext.instructionsFor(snapshot.projectId))
+                        workPromptContext = contextComposer.composeWorkTurnContext(
+                            input = input,
+                            snapshot = snapshot,
+                            workspacePath = workspacePath,
+                            projectInstructions = projectContext.instructionsFor(snapshot.projectId),
+                            skillGuidance = resolveLocalWorkSkillGuidance(sessionStorage.files.workspace, input),
+                        )
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
@@ -272,7 +278,8 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
-                            estimateModelTokens(workPromptContext.dynamic)
+                            estimateModelTokens(workPromptContext.dynamic) +
+                            estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         workModelHistoryRuntime.compactIfNeeded(
                             binding = binding,
@@ -283,6 +290,7 @@ internal class LocalWorkAgentTurnExecutor(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
                         workPromptContext.dynamic,
+                        workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
                         snapshot.modelState.imageInputMode,
