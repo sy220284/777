@@ -222,6 +222,29 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun searchCanResumeAfterLargeLineAndDirectoryPrefixes() {
+        val docs = root.resolve("resume-docs")
+        docs.mkdirs()
+        repeat(1_200) { index ->
+            docs.resolve("entry-" + index.toString().padStart(5, '0') + ".txt")
+                .writeText(if (index == 1_199) "late-needle" else "ordinary record")
+        }
+        // Cursor counts the directory itself and preceding files. The resumed page
+        // must get its own time budget instead of repeatedly expiring on that prefix.
+        val page = workspace.search("late-needle", "resume-docs", cursor = "1100:0")
+        assertTrue(page.contains("entry-01199.txt:1: late-needle"))
+
+        val large = root.resolve("resume-lines.txt")
+        large.bufferedWriter().use { writer ->
+            repeat(5_500) { line ->
+                writer.append(if (line == 5_499) "late-line-needle\\n" else "regular row\\n")
+            }
+        }
+        val resumed = workspace.search("late-line-needle", "resume-lines.txt", cursor = "0:5000")
+        assertTrue(resumed.contains("resume-lines.txt:5500: late-line-needle"))
+    }
+
+    @Test
     fun largeFileReadStreamsRequestedLinesWithoutSizeRejection() {
         val big = root.resolve("large.txt")
         big.bufferedWriter().use { writer ->
