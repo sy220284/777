@@ -48,9 +48,11 @@ internal class LocalToolSchemaProjection(
         planModeEnabled: Boolean,
         history: List<JsonObject>,
         enabledOptional: Set<String>? = null,
+        agentTeamMode: Boolean = false,
     ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
-        val promptBudget = optionalToolPromptBudgetForRoute(modelState, history)
+        val promptBudget = if (agentTeamMode) LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
+            else optionalToolPromptBudgetForRoute(modelState, history)
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
         val tools = registry.names()
             .mapNotNull(registry::get)

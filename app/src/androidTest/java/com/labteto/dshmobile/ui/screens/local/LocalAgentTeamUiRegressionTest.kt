@@ -30,6 +30,42 @@ class LocalAgentTeamUiRegressionTest {
     }
 
     @Test
+    fun dismissedTeamCardIsNotRenderedInChat() {
+        compose.setContent {
+            DshTheme {
+                LocalAgentTeamStatusBar(
+                    team = LocalAgentTeamUiState(members = listOf(member())),
+                    launchPending = false,
+                    onClick = {},
+                    dismissed = true,
+                )
+            }
+        }
+        compose.onNodeWithText("Agent 集群").assertDoesNotExist()
+    }
+
+    @Test
+    fun reviewedTeamSheetCanCollapseWithoutStoppingTheTeam() {
+        var collapseCount = 0
+        compose.setContent {
+            DshTheme {
+                LocalAgentTeamSheet(
+                    team = LocalAgentTeamUiState(members = listOf(member())),
+                    onMemberOutput = { "" },
+                    onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已发送") },
+                    onStopMember = { LocalWorkUiActionResult(true, "已停止") },
+                    onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onLeadFollowup = {},
+                    onDismiss = {},
+                    onCollapse = { collapseCount++ },
+                )
+            }
+        }
+        compose.onNodeWithText("看完收起 · 返回聊天").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, collapseCount) }
+    }
+
+    @Test
     fun inactiveMemberDisablesSendingAndOffersLeadHandoff() {
         var handedToLead: String? = null
         setSheet(

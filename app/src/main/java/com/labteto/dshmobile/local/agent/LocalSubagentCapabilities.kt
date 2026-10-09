@@ -25,6 +25,8 @@ internal data class LocalSubagentCapabilities(
     val maxDepth: Int = 1,
     val toolAllowlist: Set<String>? = null,
     val outputSchema: JsonObject? = null,
+    val teamManaged: Boolean = false,
+    val initialOptionalTools: Set<String> = emptySet(),
 )
 
 internal data class LocalSubagentLaunchSpec(
@@ -51,7 +53,7 @@ internal fun validateLocalSubagentLaunchSpec(
     require(spec.capabilities.maxDepth == 1) {
         "SUBAGENT_DEPTH_NOT_SUPPORTED：当前子代理能力只允许 depth=1"
     }
-    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation) {
+    require(!spec.capabilities.continuable || !spec.capabilities.allowMutation || spec.capabilities.teamManaged) {
         "SUBAGENT_CONTINUATION_MUTATION_BLOCKED：可继续子代理必须保持只读，避免冷恢复重放未知副作用"
     }
     require(
@@ -76,6 +78,13 @@ internal fun validateLocalSubagentLaunchSpec(
         )?.let { problem ->
             throw IllegalArgumentException("SUBAGENT_OUTPUT_SCHEMA_INVALID：$problem")
         }
+    }
+    require(!spec.capabilities.teamManaged || spec.backgroundJobId != null) {
+        "SUBAGENT_TEAM_REQUIRES_PERSISTENT_JOB：可写团队助手必须绑定持久任务身份"
+    }
+    require(spec.capabilities.initialOptionalTools.size <= 24 &&
+        spec.capabilities.initialOptionalTools.none(String::isBlank)) {
+        "SUBAGENT_TEAM_GRANTS_INVALID：扩展授权列表无效"
     }
     spec.capabilities.toolAllowlist?.let { allowlist ->
         require(allowlist.none(String::isBlank)) {
@@ -132,6 +141,10 @@ internal fun encodeLocalSubagentCapabilities(
         put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
     }
     capabilities.outputSchema?.let { put("output_schema", it) }
+    if (capabilities.teamManaged) put("team_managed", true)
+    if (capabilities.initialOptionalTools.isNotEmpty()) {
+        put("initial_optional_tools", JsonArray(capabilities.initialOptionalTools.sorted().map(::JsonPrimitive)))
+    }
 }
 
 internal fun decodeLocalSubagentCapabilities(
@@ -167,5 +180,8 @@ internal fun decodeLocalSubagentCapabilities(
         maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
         toolAllowlist = toolAllowlist,
         outputSchema = data["output_schema"] as? JsonObject,
+        teamManaged = data["team_managed"]?.jsonPrimitive?.booleanOrNull ?: false,
+        initialOptionalTools = (data["initial_optional_tools"] as? JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }?.toSet().orEmpty(),
     )
 }

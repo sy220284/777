@@ -109,6 +109,9 @@ internal data class LocalTeamMemberSnapshot(
     val context: LocalTeamMemberContext,
     val phase: LocalTeamMemberPhase,
     val error: String? = null,
+    val displayName: String = "",
+    val mutableToolsEnabled: Boolean = false,
+    val grantedExtensions: Set<String> = emptySet(),
 )
 
 @Serializable
@@ -166,6 +169,7 @@ internal class LocalAgentTeamRuntime(
         maxSteps: Int,
         context: LocalTeamMemberContext,
         parentCallId: String?,
+        grantedExtensions: Set<String>,
     ) -> com.labteto.dshmobile.harness.jobs.JobStartResult,
     private val sendToTeammate: (
         agentId: String,
@@ -221,6 +225,7 @@ internal class LocalAgentTeamRuntime(
                 sessionId = binding.sessionId,
                 name = args.requiredTeamString("name"),
                 description = args.optionalTeamString("description").orEmpty(),
+                displayName = args.optionalTeamString("display_name").orEmpty(),
                 context = args.optionalTeamContext(),
             )
             "team_start_member" -> startMember(
@@ -231,17 +236,20 @@ internal class LocalAgentTeamRuntime(
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
                     ?: binding.aggregateSnapshot().subagentMaxSteps,
                 parentCallId = call.id,
+                grantedExtensions = args.teamStringArray("allowed_extensions").toSet(),
             )
             "team_spawn" -> spawn(
                 binding = binding,
                 name = args.requiredTeamString("name"),
                 description = args.optionalTeamString("description").orEmpty(),
+                displayName = args.optionalTeamString("display_name").orEmpty(),
                 task = args.requiredTeamString("task"),
                 model = args.optionalTeamString("model"),
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
                     ?: binding.aggregateSnapshot().subagentMaxSteps,
                 context = args.optionalTeamContext(),
                 parentCallId = call.id,
+                grantedExtensions = args.teamStringArray("allowed_extensions").toSet(),
             )
             "team_send_message" -> sendMessage(
                 sessionId = binding.sessionId,
@@ -351,12 +359,20 @@ internal class LocalAgentTeamRuntime(
                 jobId = member.jobId,
                 name = member.name,
                 description = member.description,
+                displayName = member.displayName,
+                mutableToolsEnabled = member.mutableToolsEnabled,
+                grantedExtensions = member.grantedExtensions,
                 phase = member.phase.name.lowercase(),
                 activity = activity,
                 currentTask = currentTask?.subject,
                 hasCurrentTaskResult = currentTask != null && activity in setOf("dormant", "completed") &&
                     hasFreshTaskResult(sessionId, currentTask, member.jobId),
-                progressPercent = memberProgressPercent(sessionId, member, activity),
+                progressPercent = if (currentTask != null && activity in setOf("dormant", "completed")) {
+                    // 成员已交回结果，但任务仍待 Lead 核验；展示不得提前满格。
+                    95
+                } else {
+                    memberProgressPercent(sessionId, member, activity)
+                },
                 resultMessageCount = messageCounts[member.id] ?: 0,
                 pendingMessageCount =
                     state.pendingMessages.count { it.targetId == member.id } +
@@ -370,7 +386,11 @@ internal class LocalAgentTeamRuntime(
                 subject = task.subject,
                 description = task.description,
                 status = task.status.name.lowercase(),
-                ownerName = task.ownerId?.let { memberById[it]?.name },
+                ownerName = task.ownerId?.let { id ->
+                    memberById[id]?.let { member ->
+                        member.displayName.ifBlank { teamMemberFriendlyName(member.name) }
+                    }
+                },
                 blockedByTitles = task.blockedBy.map { blockerId ->
                     taskById[blockerId]?.subject ?: blockerId
                 },
@@ -434,6 +454,7 @@ internal class LocalAgentTeamRuntime(
         sessionId: String,
         name: String,
         description: String,
+        displayName: String,
         context: LocalTeamMemberContext,
     ): String {
         return synchronized(commandLock) {
@@ -448,6 +469,7 @@ internal class LocalAgentTeamRuntime(
                 id = memberId,
                 jobId = teamJobId(memberId),
                 name = cleanName,
+                displayName = displayName.trim().take(32),
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -470,6 +492,7 @@ internal class LocalAgentTeamRuntime(
         model: String?,
         maxSteps: Int,
         parentCallId: String,
+        grantedExtensions: Set<String>,
     ): String {
         val (member, cleanTask, provisioning) = synchronized(commandLock) {
             val before = project(binding.sessionId)
@@ -483,7 +506,18 @@ internal class LocalAgentTeamRuntime(
             if (member.phase == LocalTeamMemberPhase.DISABLED && jobs.snapshotInfos().any { it.id == member.jobId }) {
                 JobInboxContract.normalize(QueuedAgentInput(id = "team-resume-validation", content = cleanTask, memoryInput = cleanTask))
             }
-            val provisioning = member.copy(phase = LocalTeamMemberPhase.PROVISIONING, error = null)
+            val resumingExisting = member.phase == LocalTeamMemberPhase.DISABLED &&
+                jobs.snapshotInfos().any { it.id == member.jobId }
+            require(!resumingExisting || grantedExtensions.isEmpty() ||
+                grantedExtensions == member.grantedExtensions) {
+                "TEAM_GRANTS_IMMUTABLE：历史成员的持久执行权限不能直接变更；请让 Lead 重新招募成员"
+            }
+            val provisioning = member.copy(
+                phase = LocalTeamMemberPhase.PROVISIONING,
+                error = null,
+                mutableToolsEnabled = if (resumingExisting) member.mutableToolsEnabled else true,
+                grantedExtensions = if (resumingExisting) member.grantedExtensions else grantedExtensions,
+            )
             appendMember(binding.sessionId, provisioning)
             startingMembers.add(binding.sessionId to member.id)
             Triple(member, cleanTask, provisioning)
@@ -528,6 +562,7 @@ internal class LocalAgentTeamRuntime(
                     LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                     member.context,
                     parentCallId.takeIf { member.context == LocalTeamMemberContext.FORK },
+                    grantedExtensions,
                 )
                 if (!started.accepted || started.id != member.jobId) {
                     appendMember(
@@ -641,11 +676,13 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
         name: String,
         description: String,
+        displayName: String,
         task: String,
         model: String?,
         maxSteps: Int,
         context: LocalTeamMemberContext,
         parentCallId: String,
+        grantedExtensions: Set<String>,
     ): String {
         val provisioning = synchronized(commandLock) {
             val cleanName = normalizeName(name)
@@ -660,6 +697,9 @@ internal class LocalAgentTeamRuntime(
                 id = memberId,
                 jobId = jobId,
                 name = cleanName,
+                displayName = displayName.trim().take(32),
+                mutableToolsEnabled = true,
+                grantedExtensions = grantedExtensions,
                 description = boundedTeamText(
                     value = description,
                     field = "description",
@@ -689,6 +729,7 @@ internal class LocalAgentTeamRuntime(
                 LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                 context,
                 parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
+                grantedExtensions,
             )
             if (!started.accepted || started.id != jobId) {
                 appendMember(
@@ -1119,6 +1160,13 @@ internal class LocalAgentTeamRuntime(
                     )
                 }
                 else -> error("TEAM_TASK_ACTION_INVALID：不支持的 action=$action")
+            }
+            if (next.status == LocalTeamTaskStatus.IN_PROGRESS) {
+                val conflicts = writeScopeWarnings(next, state.tasks)
+                require(conflicts.isEmpty()) {
+                    "TEAM_WRITE_SCOPE_CONFLICT：当前任务与其他运行中任务的写入范围重叠：" +
+                        conflicts.joinToString("；") + "。请等对方完成或重新划分写入范围。"
+                }
             }
             validateTaskTransition(state.tasks, previous = current, next = next)
             appendTask(sessionId, next)
@@ -1673,6 +1721,10 @@ internal class LocalAgentTeamRuntime(
         require(normalized.size <= MAX_WRITE_SCOPES) {
             "TEAM_TASK_WRITE_SCOPE_LIMIT：最多允许 $MAX_WRITE_SCOPES 个 write scope"
         }
+        require(normalized.none { scope ->
+            scope.split('/').any { it == "." || it == ".." } || scope.startsWith("~") ||
+                scope.contains(':') || scope.startsWith("//")
+        }) { "TEAM_WRITE_SCOPE_INVALID：写入范围只能是工作区内的相对目录或文件路径" }
         return normalized
     }
 

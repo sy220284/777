@@ -135,13 +135,13 @@ internal fun LocalAgentSwarmLaunchEntry(
 internal fun LocalAgentTeamStatusBar(
     team: LocalAgentTeamUiState,
     launchPending: Boolean,
-    dismissed: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    dismissed: Boolean = false,
 ) {
     val colors = DsTheme.colors
     AnimatedVisibility(
-        visible = launchPending || (team.visible && !dismissed),
+        visible = !dismissed && (launchPending || team.visible),
         enter = fadeIn(DsAnimations.composerFade) +
             expandVertically(animationSpec = DsAnimations.composerReveal),
         exit = fadeOut(DsAnimations.composerFade) +
@@ -228,7 +228,7 @@ internal fun LocalAgentTeamStatusBar(
                                 ) {
                                     StateDot(memberDotState(member), size = 6.dp)
                                     Text(
-                                        member.name,
+                                        member.friendlyName,
                                         style = DsType.caption11Strong.withReadingWeight(),
                                         color = colors.labelPrimary,
                                         maxLines = 1,
@@ -311,13 +311,13 @@ internal fun LocalAgentTeamSheet(
                 Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.labelSecondary)
                 return@Column
             }
+            TeamProgressBlock(team)
             DsButton(
                 text = stringResource(R.string.local_team_collapse_after_view),
                 onClick = onCollapse,
                 variant = DsButtonVariant.Ghost,
                 size = DsButtonSize.Small,
             )
-            TeamProgressBlock(team)
             Text(
                 stringResource(R.string.local_team_readonly_hint),
                 style = DsType.caption11, color = colors.labelSecondary,
@@ -492,6 +492,13 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
                 trackColor = colors.borderL3,
             )
         }
+        if (team.returnedMemberCount > 0 && team.tasks.isNotEmpty()) {
+            Text(
+                stringResource(R.string.local_team_results_pending, team.returnedMemberCount),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
         if (team.blockedTaskCount > 0) {
             Text(
                 stringResource(R.string.local_team_blocked_count, team.blockedTaskCount),
@@ -537,7 +544,7 @@ private fun TeamMemberRow(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
                 Text(
-                    member.name,
+                    member.friendlyName,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
@@ -625,6 +632,24 @@ private fun TeamMemberDetail(
                     stringResource(R.string.local_team_role_description, description),
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
+                )
+            }
+            Text(
+                stringResource(
+                    if (member.mutableToolsEnabled) R.string.local_team_permission_full
+                    else R.string.local_team_permission_limited,
+                ),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            if (member.grantedExtensions.isNotEmpty()) {
+                Text(
+                    stringResource(
+                        R.string.local_team_permission_grants,
+                        member.grantedExtensions.sorted().joinToString("、"),
+                    ),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.accent,
                 )
             }
             TeamMemberWorksite(member, output)
@@ -888,6 +913,7 @@ private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = str
         member.activity == "completed" -> R.string.local_team_state_task_done
         member.activity == "killed" -> R.string.local_team_state_dismissed
         member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
+        member.activity == "dormant" && member.resultMessageCount > 0 -> R.string.local_team_state_awaiting_review
         member.activity == "dormant" -> R.string.local_team_state_offwork
         else -> R.string.local_team_state_waiting
     },
@@ -935,7 +961,9 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
                 Icon(painterResource(R.drawable.ic_ui_task_subagent), contentDescription = null, tint = colors.labelSecondary)
                 Column(Modifier.weight(1f)) {
                     Text(
-                        listOfNotNull(activity.memberName, stringResource(status)).joinToString(" · "),
+                        listOfNotNull(activity.memberName?.let { name ->
+                            team.members.firstOrNull { it.name == name }?.friendlyName ?: name
+                        }, stringResource(status)).joinToString(" · "),
                         style = DsType.small13Strong,
                         color = if (activity.status == "failed") colors.error else colors.labelPrimary,
                     )
