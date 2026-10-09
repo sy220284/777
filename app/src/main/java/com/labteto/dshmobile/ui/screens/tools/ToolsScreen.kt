@@ -149,7 +149,6 @@ class ToolsViewModel @Inject constructor(
                     localPlugins = plugins,
                     skills = localTools.installedSkills(),
                     remotePlugins = sessionStore.plugins.value,
-                    webhook = localTools.webhookStatus(),
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
