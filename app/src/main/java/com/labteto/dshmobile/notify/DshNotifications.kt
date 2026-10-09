@@ -22,6 +22,8 @@ class DshNotifications @Inject constructor(
 ) {
     fun ensureChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
+        // Remove channels created by the retired remote-control client (also clears their notifications).
+        listOf("completions", "needs_action", "connection").forEach(manager::deleteNotificationChannel)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_LOCAL_JOBS, context.getString(R.string.notif_channel_local_jobs), NotificationManager.IMPORTANCE_LOW),
         )
