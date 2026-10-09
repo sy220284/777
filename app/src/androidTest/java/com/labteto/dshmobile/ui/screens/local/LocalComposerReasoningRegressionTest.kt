@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -32,7 +33,7 @@ class LocalComposerReasoningRegressionTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val deepSeek = LocalModelProfile("composer-ds", "deepseek-flash", "https://api.deepseek.com")
 
-    @Test fun modelSwitchUpdatesButtonSliderAndDefaultHintTogether() {
+    @Test fun modelSwitchRefreshesReasoningModesWithoutDroppingSupportedMax() {
         val profile = mutableStateOf(deepSeek)
         compose.setContent {
             DshTheme {
@@ -50,18 +51,42 @@ class LocalComposerReasoningRegressionTest {
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
                 ProgressBarRangeInfo(4f, 0f..4f, 3)))
+
+        // GPT-6 Luna supports MAX in Chat mode; a profile switch must not silently reset it.
         compose.runOnIdle {
             profile.value = LocalModelProfile("composer-api", "gpt-6-luna", "https://api.openai.com/v1")
         }
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
-            context.getString(R.string.local_composer_reasoning_default))).assertIsDisplayed()
+            context.getString(R.string.local_composer_reasoning_max))).assertIsDisplayed()
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
-                ProgressBarRangeInfo(0f, 0f..3f, 2)))
-        compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_default_tip)).assertIsDisplayed()
-        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
-                context.getString(R.string.local_composer_reasoning_default)))
+                ProgressBarRangeInfo(4f, 0f..4f, 3)))
+        compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_default_tip))
+            .assertDoesNotExist()
+
+        // Mandatory-reasoning models expose LOW through FAST, shortening the slider by one slot.
+        compose.runOnIdle {
+            profile.value = LocalModelProfile("composer-required", "gpt-6-astra",
+                "https://api.openai.com/v1")
+        }
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
+            context.getString(R.string.local_composer_reasoning_max))).assertIsDisplayed()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(3f, 0f..3f, 2)))
+
+        // Unknown models have no native reasoning override: the action projects DEFAULT
+        // and the open panel must not leave behind a stale slider.
+        compose.runOnIdle {
+            profile.value = LocalModelProfile("composer-unsupported", "unknown-model",
+                "https://api.openai.com/v1")
+        }
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
+            context.getString(R.string.local_composer_reasoning_default))).assertIsDisplayed()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+            .assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_unsupported))
+            .assertIsDisplayed()
     }
 
 
