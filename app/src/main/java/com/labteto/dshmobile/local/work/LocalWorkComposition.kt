@@ -4,6 +4,7 @@ import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
@@ -20,6 +21,7 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.localImageRequestBudgetForModelConcurrency
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
+import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
@@ -189,6 +191,21 @@ internal class LocalWorkComposition @Inject constructor(
                     parentCallId,
                     grantedExtensions,
                 ->
+                // 授权必须命中当前实际注册的扩展工具，不能静默丢弃或绕过设备/团队边界。
+                val unavailable = grantedExtensions.filter { name ->
+                    name in SUBAGENT_EXCLUDED_TOOLS ||
+                        tools.registry.get(name)?.exposure != ToolExposure.OPTIONAL
+                }
+                require(unavailable.isEmpty()) {
+                    "TEAM_EXTENSION_UNAVAILABLE：工具未注册或不能下放：" + unavailable.sorted().joinToString("、")
+                }
+                if (grantedExtensions.any { name ->
+                    tools.registry.get(name)?.metadata?.family.equals("GitHub", ignoreCase = true)
+                }) {
+                    require(tools.plugins.githubConfigured()) {
+                        "TEAM_GITHUB_CREDENTIAL_REQUIRED：请先配置 GitHub 连接凭据"
+                    }
+                }
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
                     model = model,
@@ -204,10 +221,10 @@ internal class LocalWorkComposition @Inject constructor(
                     allowMutation = true,
                     teamManaged = true,
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
-                    initialOptionalTools = grantedExtensions + setOf(
+                    initialOptionalTools = setOf(
                         "skill", "web_search", "web_fetch", "job_list", "job_output",
                         "job_kill", "json_query", "environment_info", "download_file",
-                    ),
+                    ) + grantedExtensions,
                 )
             },
             sendToTeammate = { agentId, input, sessionId ->
