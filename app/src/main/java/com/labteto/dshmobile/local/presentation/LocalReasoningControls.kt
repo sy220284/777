@@ -18,8 +18,10 @@ internal object LocalWorkTemperatureControls {
     fun attach(context: Context) =
         com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
 
-    fun level(sessionId: String): Int =
-        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.level(sessionId)
+    fun level(
+        sessionId: String,
+        range: com.labteto.dshmobile.local.model.LocalModelTemperatureRange? = null,
+    ): Int = com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.level(sessionId, range)
 
     fun setLevel(sessionId: String, level: Int) =
         com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.setLevel(sessionId, level)
