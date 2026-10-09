@@ -138,7 +138,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         // Foreground Chat and background state consolidation have distinct prompt series.
         // This changes diagnostics only; actual provider caching and message content stay untouched.
         val cacheDiagnosticSurface = when {
-            snapshot.usageMode == LocalUsageMode.CHAT && step >= CHAT_POST_TURN_MODEL_STEP -> "chat_auxiliary"
+            snapshot.usageMode == LocalUsageMode.CHAT && step >= CHAT_POST_TURN_MODEL_STEP -> "chat_auxiliary_$step"
             snapshot.usageMode == LocalUsageMode.CHAT -> "chat_foreground"
             else -> "work"
         }
