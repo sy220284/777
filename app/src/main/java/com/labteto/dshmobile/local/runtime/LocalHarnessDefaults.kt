@@ -18,7 +18,6 @@ internal const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
 internal const val MAX_HANDOFF_CHARS = 3_500
 internal const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
 internal const val CHAT_RECENT_HISTORY_MESSAGES = 20
-internal const val CHAT_ROLEPLAY_TEMPERATURE = 0.85
 internal const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
 internal const val MAX_PENDING_INPUTS = 16
 internal const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
