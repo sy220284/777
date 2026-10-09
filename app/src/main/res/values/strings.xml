@@ -1740,6 +1740,10 @@
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
     <string name="skills_create">添加自定义技能</string>
+    <string name="skills_import_file">上传技能文件</string>
+    <string name="skills_create_in_chat">对话创建技能</string>
+    <string name="skills_create_manual">手动填写技能</string>
+    <string name="skills_import_hint">支持 SKILL.md 和 ZIP 技能包；对话创建需在工作模式确认后保存到本地。</string>
     <string name="skills_install">添加</string>
     <string name="skills_id_label">技能标识</string>
     <string name="skills_id_hint">2—48 位小写英文、数字或连字符，以字母开头；例：my-skill</string>
