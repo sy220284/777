@@ -107,6 +107,7 @@ data class LocalAgentTeamActivityUiState(
 )
 
 internal fun teamMemberFriendlyName(name: String): String = when {
+    name.any { it in '\u4e00'..'\u9fff' } -> name
     name.contains("web", true) || name.contains("network", true) -> "联网验证员"
     name.contains("capability", true) || name.contains("tool", true) -> "能力检查员"
     name.contains("workspace", true) || name.contains("audit", true) -> "工作区审计员"
