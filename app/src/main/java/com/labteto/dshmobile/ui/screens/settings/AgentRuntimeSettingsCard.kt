@@ -226,9 +226,9 @@ private fun StepperRow(
                 DsButton(
                     text = labelText,
                     onClick = {
-                    if (value < range.last) tick()
-                    applyValue(range.last, announce = true)
-                },
+                        if (value < range.last) tick()
+                        applyValue(range.last, announce = true)
+                    },
                     enabled = value < range.last,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Ghost,
