@@ -61,8 +61,9 @@ for build_file in sorted(ROOT.glob("*/build.gradle.kts")):
     if "JvmTarget.JVM_21" not in text or "JvmTarget.JVM_17" in text:
         fail(f"{build_file.relative_to(ROOT)} 的 Kotlin JVM target 必须统一为 21")
 
-if configured_modules < 8:
-    fail(f"只检查到 {configured_modules} 个 JVM/Android 模块，低于当前基线 8")
+# The obsolete mock-harness module was retired with the remote-control client.
+if configured_modules < 7:
+    fail(f"只检查到 {configured_modules} 个 JVM/Android 模块，低于当前基线 7")
 
 for relative in ("app/build.gradle.kts", "harness-device-android/build.gradle.kts"):
     text = (ROOT / relative).read_text(encoding="utf-8")
