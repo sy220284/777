@@ -16,6 +16,8 @@ data class LocalAgentTeamUiState(
         get() = rebuilding || members.isNotEmpty() || tasks.isNotEmpty() || failure != null
     val runningMemberCount: Int
         get() = members.count { it.activity == "running" }
+    val stoppingMemberCount: Int
+        get() = members.count { it.activity == "stopping" }
     val provisioningMemberCount: Int
         get() = members.count { it.phase == "provisioning" }
     val completedMemberCount: Int
@@ -35,12 +37,8 @@ data class LocalAgentTeamUiState(
         return copy(
             members = members.map { member ->
                 val jobStatus = byId[member.jobId]?.status
-                val activity = when {
-                    member.phase == "failed" -> "failed"
-                    member.phase == "provisioning" -> "provisioning"
-                    jobStatus != null -> jobStatus
-                    else -> member.activity
-                }
+                // Only an admitted active member derives activity from its Child Job.
+                val activity = if (member.phase == "active") jobStatus ?: member.activity else member.phase
                 member.copy(activity = activity)
             },
         )
@@ -61,6 +59,9 @@ data class LocalAgentTeamMemberUiState(
     val error: String? = null,
     val hasCurrentTaskResult: Boolean = false,
 ) {
+    val canReceiveMessage: Boolean
+        get() = phase == "active"
+
     val awaitingReview: Boolean
         get() = hasCurrentTaskResult && activity in setOf("dormant", "completed")
 }

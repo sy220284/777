@@ -6,14 +6,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
@@ -28,9 +26,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalAgentTeamMemberUiState
@@ -258,6 +260,7 @@ internal fun LocalAgentTeamSheet(
     onSendMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onStopMember: suspend (String) -> LocalWorkUiActionResult,
     onStopAll: suspend () -> LocalWorkUiActionResult,
+    onLeadFollowup: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -274,6 +277,7 @@ internal fun LocalAgentTeamSheet(
 
     DsBottomSheet(
         title = stringResource(R.string.local_team_title),
+        scrollable = true,
         subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
             R.string.local_team_sheet_summary,
             team.members.size,
@@ -294,9 +298,7 @@ internal fun LocalAgentTeamSheet(
         onDismiss = onDismiss,
     ) {
         Column(
-            modifier = Modifier
-                .heightIn(max = 560.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
             if (team.rebuilding) {
@@ -305,6 +307,16 @@ internal fun LocalAgentTeamSheet(
             }
             TeamActivityFeed(team)
             TeamProgressBlock(team)
+            Text(
+                stringResource(R.string.local_team_readonly_hint),
+                style = DsType.caption11, color = colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.local_team_lead_followup),
+                onClick = { onLeadFollowup("") },
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
 
             Text(
                 stringResource(if (team.provisioningMemberCount > 0) R.string.local_team_recruit_title else R.string.local_team_assistants),
@@ -341,6 +353,7 @@ internal fun LocalAgentTeamSheet(
                                 onSendMemberMessage = onSendMemberMessage,
                                 onStopMember = onStopMember,
                                 onFeedback = toast.second,
+                                onLeadFollowup = onLeadFollowup,
                             )
                         }
                     }
@@ -477,9 +490,10 @@ private fun TeamMemberRow(
     onClick: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
         border = BorderStroke(
@@ -544,6 +558,7 @@ private fun TeamMemberDetail(
     onSendMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onStopMember: suspend (String) -> LocalWorkUiActionResult,
     onFeedback: (String) -> Unit,
+    onLeadFollowup: (String) -> Unit,
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -555,7 +570,7 @@ private fun TeamMemberDetail(
     LaunchedEffect(member.jobId, member.activity) {
         do {
             output = runCatching { onMemberOutput(member.jobId) }.getOrDefault("")
-            if (member.activity != "running") break
+            if (member.activity != "running" && member.activity != "stopping") break
             delay(900)
         } while (true)
     }
@@ -589,7 +604,7 @@ private fun TeamMemberDetail(
                 value = draft,
                 onValueChange = { draft = it },
                 modifier = Modifier.weight(1f),
-                enabled = !sending,
+                enabled = member.canReceiveMessage && !sending,
                 singleLine = true,
                 placeholder = {
                     Text(
@@ -601,11 +616,11 @@ private fun TeamMemberDetail(
             DsIconButton(
                 icon = FeatherIcons.ArrowUp,
                 contentDescription = stringResource(R.string.local_team_send_message),
-                enabled = draft.isNotBlank() && !sending,
+                enabled = member.canReceiveMessage && draft.isNotBlank() && !sending,
                 selected = draft.isNotBlank(),
                 onClick = {
                     val text = draft.trim()
-                    if (text.isEmpty() || sending) return@DsIconButton
+                    if (!member.canReceiveMessage || text.isEmpty() || sending) return@DsIconButton
                     sending = true
                     scope.launch {
                         val result = try {
@@ -617,6 +632,18 @@ private fun TeamMemberDetail(
                         if (result.accepted && draft.trim() == text) draft = ""
                     }
                 },
+            )
+        }
+
+        if (!member.canReceiveMessage) {
+            Text(stringResource(R.string.local_team_message_unavailable), style = DsType.caption11, color = colors.labelTertiary)
+        }
+        if (member.phase == "failed" || member.activity in setOf("failed", "interrupted", "cancelled", "killed", "disabled", "dismissed")) {
+            DsButton(
+                text = stringResource(R.string.local_team_lead_recover),
+                onClick = { onLeadFollowup(member.name) },
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
             )
         }
 
@@ -666,77 +693,73 @@ private fun TeamMemberDetail(
 @Composable
 private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
     val colors = DsTheme.colors
+    var expanded by rememberSaveable(task.id) { mutableStateOf(false) }
+    val expansionLabel = stringResource(if (expanded) R.string.local_team_expanded else R.string.local_team_collapsed)
     val blocked = task.status == "pending" && !task.ready && task.blockedByTitles.isNotEmpty()
-    val detail = when {
-        blocked -> stringResource(
-            R.string.local_team_blocked_by,
-            task.blockedByTitles.joinToString("、"),
-        )
-        task.writeConflict -> stringResource(R.string.local_team_write_conflict)
-        task.ownerName != null -> stringResource(R.string.local_team_owner, task.ownerName)
-        task.description.isNotBlank() -> task.description
-        else -> null
+    val details = buildList {
+        task.ownerName?.let { add(stringResource(R.string.local_team_owner, it)) }
+        if (task.blockedByTitles.isNotEmpty()) add(stringResource(R.string.local_team_blocked_by, task.blockedByTitles.joinToString("、")))
+        if (task.writeConflict) add(stringResource(R.string.local_team_write_conflict))
+        if (task.description.isNotBlank()) add(task.description)
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        onClick = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.row,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
         border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = DsSpacing.medium,
-                vertical = DsSpacing.small,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        Column(
+            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Icon(
-                imageVector = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
-                contentDescription = null,
-                tint = if (task.status == "completed") colors.accent else colors.labelSecondary,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                Text(
-                    task.subject,
-                    style = DsType.small13Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Icon(
+                    imageVector = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
+                    contentDescription = null,
+                    tint = if (task.status == "completed") colors.accent else colors.labelSecondary,
                 )
-                detail?.let {
-                    Text(
-                        it,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = if (task.writeConflict || blocked) colors.warnLabel else colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    task.subject, modifier = Modifier.weight(1f),
+                    style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
+                )
+                Text(taskStatusLabel(task), style = DsType.caption11Strong, color = colors.labelTertiary)
+                Icon(if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight, contentDescription = null, tint = colors.labelCaption)
             }
-            Text(
-                taskStatusLabel(task),
-                style = DsType.caption11Strong.withReadingWeight(),
-                color = if (task.status == "in_progress") colors.accent else colors.labelTertiary,
-            )
+            if (expanded) {
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                        details.forEach { detail ->
+                            Text(detail, style = DsType.caption11, color = colors.labelSecondary)
+                        }
+                    }
+                }
+            } else if (details.isNotEmpty()) {
+                Text(
+                    details.joinToString(" · "), style = DsType.caption11,
+                    color = if (task.writeConflict || blocked) colors.warnLabel else colors.labelSecondary,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun teamSummary(team: LocalAgentTeamUiState, launchPending: Boolean): String = when {
+    team.rebuilding -> stringResource(R.string.local_team_rebuilding)
     launchPending && !team.visible ->
         stringResource(R.string.local_team_assigning_tasks)
+    team.failure != null -> stringResource(R.string.local_team_state_failed)
+    team.failedMemberCount > 0 -> stringResource(R.string.local_team_failed_count, team.failedMemberCount)
     team.provisioningMemberCount > 0 ->
         stringResource(R.string.local_team_recruiting)
     team.runningMemberCount > 0 ->
         stringResource(R.string.local_team_running_count, team.runningMemberCount)
-    team.failedMemberCount > 0 && team.tasks.isEmpty() ->
-        stringResource(R.string.local_team_failed_count, team.failedMemberCount)
+    team.stoppingMemberCount > 0 ->
+        stringResource(R.string.local_team_stopping_count, team.stoppingMemberCount)
     team.members.isNotEmpty() && team.tasks.isEmpty() ->
         stringResource(R.string.local_team_recruited_count, team.members.size)
     team.tasks.any { task ->
@@ -754,10 +777,11 @@ private fun teamSummary(team: LocalAgentTeamUiState, launchPending: Boolean): St
 }
 
 private fun teamDotState(team: LocalAgentTeamUiState, launchPending: Boolean): StateDotState = when {
+    team.rebuilding -> StateDotState.Idle
+    team.failure != null || team.failedMemberCount > 0 -> StateDotState.Error
     launchPending || team.provisioningMemberCount > 0 || team.runningMemberCount > 0 ->
         StateDotState.Running
-    team.failure != null || team.failedMemberCount > 0 ->
-        StateDotState.Error
+    team.stoppingMemberCount > 0 -> StateDotState.Warning
     team.tasks.isNotEmpty() && team.completedTaskCount == team.tasks.size ->
         StateDotState.Done
     team.blockedTaskCount > 0 ->
@@ -767,6 +791,7 @@ private fun teamDotState(team: LocalAgentTeamUiState, launchPending: Boolean): S
 }
 
 private fun teamMemberPriority(member: LocalAgentTeamMemberUiState): Int = when {
+    member.phase == "disabled" || member.phase == "dismissed" -> 4
     member.awaitingReview -> 2
     member.activity == "running" || member.activity == "stopping" -> 0
     member.phase == "provisioning" -> 1
@@ -778,6 +803,7 @@ private fun teamMemberPriority(member: LocalAgentTeamMemberUiState): Int = when 
 }
 
 private fun memberDotState(member: LocalAgentTeamMemberUiState): StateDotState = when {
+    member.phase == "disabled" || member.phase == "dismissed" -> StateDotState.Warning
     member.awaitingReview -> StateDotState.Idle
     member.phase == "failed" || member.activity == "failed" -> StateDotState.Error
     member.phase == "provisioning" -> StateDotState.Running
@@ -790,10 +816,13 @@ private fun memberDotState(member: LocalAgentTeamMemberUiState): StateDotState =
 @Composable
 private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = stringResource(
     when {
+        member.phase == "disabled" -> R.string.local_team_state_disabled
+        member.phase == "dismissed" -> R.string.local_team_state_dismissed
         member.awaitingReview -> R.string.local_team_state_awaiting_review
         member.phase == "failed" || member.activity == "failed" -> R.string.local_team_state_failed
         member.phase == "provisioning" -> R.string.local_team_state_booting
-        member.activity == "running" || member.activity == "stopping" -> R.string.local_team_state_thinking
+        member.activity == "stopping" -> R.string.local_team_state_stopping
+        member.activity == "running" -> R.string.local_team_state_thinking
         member.activity == "completed" -> R.string.local_team_state_task_done
         member.activity == "killed" -> R.string.local_team_state_dismissed
         member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
@@ -854,6 +883,8 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
 @Composable
 private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: String) {
     val colors = DsTheme.colors
+    val clipboard = LocalClipboardManager.current
+    var expanded by rememberSaveable(member.id) { mutableStateOf(false) }
     Surface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, color = colors.bgLayer1) {
         Column(Modifier.padding(DsSpacing.small), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -866,11 +897,29 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
                 stringResource(R.string.app_team_worksite),
                 style = DsType.caption11Strong, color = colors.labelTertiary,
             )
-            Text(
-                output.takeLast(1600).ifBlank { member.error ?: member.description },
-                style = DsType.small13, color = colors.labelSecondary, maxLines = 14,
-                overflow = TextOverflow.Ellipsis,
-            )
+            SelectionContainer {
+                Text(
+                    (if (expanded) output else output.takeLast(1600)).ifBlank { member.error ?: member.description },
+                    style = DsType.small13, color = colors.labelSecondary,
+                    maxLines = if (expanded) Int.MAX_VALUE else 14,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (output.isNotBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    DsButton(
+                        text = stringResource(if (expanded) R.string.local_team_collapse_output else R.string.local_team_expand_output),
+                        onClick = { expanded = !expanded },
+                        variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                    )
+                    DsButton(
+                        text = stringResource(R.string.common_copy),
+                        onClick = { clipboard.setText(AnnotatedString(output)) },
+                        variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                    )
+                }
+                Text(stringResource(R.string.local_team_output_scope), style = DsType.caption11, color = colors.labelTertiary)
+            }
         }
     }
 }
