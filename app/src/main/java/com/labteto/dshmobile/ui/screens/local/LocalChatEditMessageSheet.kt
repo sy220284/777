@@ -27,6 +27,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable
 internal fun LocalChatEditMessageSheet(
@@ -128,6 +129,10 @@ internal fun LocalChatEditMessageSheet(
                                 LocalChatUserEditResult.EMPTY -> error = emptyMessage
                                 LocalChatUserEditResult.UNCHANGED -> error = unchangedMessage
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            error = failure.message?.takeIf(String::isNotBlank) ?: failedMessage
                         } finally {
                             submitting = false
                         }

@@ -25,7 +25,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -132,7 +131,7 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 put("reason", "user-edited")
                 put("transcript", encodeTranscriptMessages(prior))
                 put("model_history", JsonArray(history))
-                put("plan", JsonArray(controls.plan.map(::JsonPrimitive)))
+                put("plan", JsonArray(controls.plan.map { JsonPrimitive(it) }))
                 put("todos", JsonArray(controls.todos.map { item ->
                     buildJsonObject {
                         put("content", item.content)

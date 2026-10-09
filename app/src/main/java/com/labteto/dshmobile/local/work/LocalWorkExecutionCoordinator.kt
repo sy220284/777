@@ -372,7 +372,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
                     else {
                         runtimeStateStore.projection.publishError(
-                            "历史修改已保存，但新任务未能启动（\u0024{sent.rejectReason ?: sent.disposition}）；请从输入框重新发送修改后的内容",
+                            "历史修改已保存，但新任务未能启动（${sent.rejectReason ?: sent.disposition}）；请从输入框重新发送修改后的内容",
                         )
                         LocalUserMessageEditResult.FAILED
                     }
@@ -380,7 +380,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             }
         } catch (error: Exception) {
             runtimeStateStore.projection.publishError(
-                "Work 历史编辑失败：\u0024{error.message ?: error::class.java.simpleName}",
+                "Work 历史编辑失败：${error.message ?: error::class.java.simpleName}",
             )
             LocalUserMessageEditResult.FAILED
         }
