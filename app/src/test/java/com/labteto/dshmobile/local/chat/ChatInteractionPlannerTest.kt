@@ -1081,7 +1081,7 @@ class ChatInteractionPlannerTest {
     fun brokenJsonNeverAppliesAPartialPatch() {
         val previous = ChatCharacterState(mood = "平静")
         assertEquals(null, planner.parse("""{"state":{"mood":"开心","initiative":""", previous))
-        assertEquals("invalid_json", ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        assertEquals("incomplete_json", ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
             .parseFailureKind("""{"state":{"mood":"开心","initiative":"""))
     }
 

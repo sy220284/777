@@ -71,6 +71,17 @@ internal class LocalWorkExecutionBudget(
         }
     }
 
+    /**
+     * A Work turn is one bounded request slice. Retain cumulative exposure and calibration;
+     * reset only admission count once all previous requests have settled.
+     */
+    @Synchronized
+    fun beginExecutionSlice(): Boolean {
+        if (reservedRequests != 0) return false
+        admittedRequests = 0
+        return true
+    }
+
     @Synchronized
     fun snapshot(): Snapshot = Snapshot(
         committedExposureTokens = committedExposureTokens(),
@@ -146,7 +157,7 @@ internal class LocalWorkExecutionBudget(
 
     private fun budgetExceeded(detail: String) = LocalModelException(
         code = "WORK_BUDGET_EXHAUSTED",
-        message = "$detail；已有进度会保留，请缩小任务范围或开始新的工作回合",
+        message = "$detail；当前执行片会保存已有进度；无排队用户输入时可安全续接未完成部分",
         retryable = false,
         // This guard is per execution slice; resume from the durable checkpoint, never replay the request.
         continuationEligible = true,

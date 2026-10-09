@@ -27,6 +27,21 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun nextSliceResetsAdmissionCountWithoutLosingUsageOrPendingSafety() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        val first = budget.reserve(20)
+        assertFalse(budget.beginExecutionSlice())
+        first.commit(reportedInputTokens = 15)
+        assertEquals(1, budget.snapshot().admittedRequests)
+        assertTrue(budget.beginExecutionSlice())
+        assertEquals(0, budget.snapshot().admittedRequests)
+        assertEquals(15L, budget.snapshot().reportedExposureTokens)
+        budget.reserve(20).commit(reportedInputTokens = 15)
+        assertEquals(1, budget.snapshot().admittedRequests)
+        assertEquals(30L, budget.snapshot().reportedExposureTokens)
+    }
+
+    @Test
     fun perSliceRequestLimitAllowsBoundedCheckpointContinuation() = runTest {
         val budget = LocalWorkExecutionBudget(maxRequests = 1)
         budget.reserve(1).commit()

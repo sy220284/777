@@ -139,6 +139,9 @@ internal class LocalWorkAgentTurnExecutor(
             check(runState.value.usageMode == LocalUsageMode.WORK) {
                 "Work Agent 回合只能处理 Work 模式"
             }
+            // A new user turn or checkpoint continuation starts a new request slice.
+            // When child requests remain in flight the shared budget stays intact.
+            binding.executionControl.budget.beginExecutionSlice()
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
             workTurnToolRuntime.clear(binding)
             workTurnToolRuntime.prepare(binding, input)

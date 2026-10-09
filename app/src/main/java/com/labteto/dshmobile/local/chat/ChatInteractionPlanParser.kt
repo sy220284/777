@@ -26,7 +26,8 @@ internal class ChatInteractionPlanParser(
     fun parseFailureKind(text: String): String = parsePlanWithFailure(text).second
 
     private fun parsePlanWithFailure(text: String): Pair<ParsedChatPostTurnPlan?, String> {
-        val body = extractJsonObject(text) ?: return null to "missing_json_object"
+        val body = extractJsonObject(text) ?: return null to
+            if (text.contains('{')) "incomplete_json" else "missing_json_object"
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             ?: return null to "invalid_json"
         val normalized = normalizeChatPostTurnPatch(root)
