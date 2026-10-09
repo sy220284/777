@@ -34,7 +34,11 @@ class CharacterBehaviorTuningTest {
 
     @Test
     fun modelSpecificTemperatureBoundsRejectUnknownAndFixedRoutes() {
-        assertEquals(1.0, CharacterBehaviorTuning().roleplayTemperature(
+        assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai"))
+        assertEquals(1.0, com.labteto.dshmobile.local.model.LocalModelPresets.chatTemperatureRangeFor(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!.at(50), 0.0)
+        assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = 0).roleplayTemperature(
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
         assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
