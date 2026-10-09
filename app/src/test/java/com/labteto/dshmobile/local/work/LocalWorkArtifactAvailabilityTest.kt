@@ -25,4 +25,19 @@ class LocalWorkArtifactAvailabilityTest {
             outside.delete()
         }
     }
+
+    @Test fun symlinkCannotEscapeWorkspaceEvenWhenTargetExists() {
+        val root = Files.createTempDirectory("artifact-symlink-root-").toFile()
+        val outside = Files.createTempFile("artifact-private-", ".txt").toFile()
+        try {
+            outside.writeText("private")
+            val link = File(root, "external.txt").toPath()
+            Files.createSymbolicLink(link, outside.toPath())
+            assertFalse(localWorkArtifactFileAvailable(root, "external.txt"))
+            assertFalse(localWorkArtifactFileAvailable(root, "../${outside.name}"))
+        } finally {
+            root.deleteRecursively()
+            outside.delete()
+        }
+    }
 }
