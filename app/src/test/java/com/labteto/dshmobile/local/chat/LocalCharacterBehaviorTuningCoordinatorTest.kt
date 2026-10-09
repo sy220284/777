@@ -111,7 +111,8 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
             val changed = current.chatState.behaviorTuning.withComposerTemperatureLevel(level)
             assertTrue(coordinator.configure(current.chatPersona.copy(behaviorTuning = changed)).isSuccess)
             val currentTuning = state.value.chat.chatState.behaviorTuning
-            assertEquals(level * 25, currentTuning.expressionVariation)
+            assertEquals(level * 25, currentTuning.samplingTemperaturePosition)
+            assertEquals(100, currentTuning.expressionVariation)
             assertTrue(currentTuning.updatedAt > lastTimestamp)
             lastTimestamp = currentTuning.updatedAt
             assertEquals(currentTuning, state.value.chat.chatPersona.behaviorTuning)
@@ -122,7 +123,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
             val restored = reconcileCharacterBehaviorTuning(
                 personas, gallery, original.id, entry.id, state.value.chat.chatState,
             )
-            assertEquals(level * 25, restored.chatState.behaviorTuning.expressionVariation)
+            assertEquals(level * 25, restored.chatState.behaviorTuning.samplingTemperaturePosition)
             assertEquals(currentTuning, restored.persona.behaviorTuning)
         }
     }
