@@ -186,10 +186,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#sameNameDifferentWorldSettingsStaySeparate"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线持续演化",
@@ -268,7 +266,7 @@
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告生成与保存",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#explicitWriteIsDurableBeforeReturnAndSupersedesQueuedSnapshot"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinatorTest.kt#authorityFailureLeavesAnnouncementUnchangedAndReleasesLease"
       ]
     },
     {
@@ -847,7 +845,7 @@
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#selectedProjectStartsExactlyOneWorkSession"
       ]
     },
     {
@@ -899,10 +897,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#missingProjectAfterCatalogResetRejectsColdSessionBeforeWorkRulesAreSilentlyDropped"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
@@ -1423,10 +1419,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型参数、推理模式和上下文长度",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#hardBudgetCanDisableInnerAdaptiveCompactionUntilOuterGovernorTriggers"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 主智能体与子智能体模型配置",
@@ -1435,10 +1429,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 本机累计 Token",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#reportedUsageCalibratesLaterUncertainExposure"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
@@ -1467,10 +1459,8 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#reportedUsageCalibratesLaterUncertainExposure"
-      ]
+      "state": "unverified",
+      "evidence": []
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
