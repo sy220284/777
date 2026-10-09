@@ -54,6 +54,26 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamMemberChineseNameAndExtensionsSurviveEventRoundTrip() {
+        val id = "member-display-test"
+        val member = LocalTeamMemberSnapshot(
+            id = id,
+            jobId = LocalAgentTeamEventCodec.teamJobId(id),
+            name = "web-verifier",
+            description = "联网验证",
+            provider = "local",
+            context = LocalTeamMemberContext.FRESH,
+            phase = LocalTeamMemberPhase.CREATED,
+            displayName = "联网验证员",
+            mutableToolsEnabled = true,
+            grantedExtensions = setOf("github_search", "mcp_read"),
+        )
+        val event = with(LocalAgentTeamEventCodec) { member.toEvent("test-team") }
+        val decoded = LocalAgentTeamEventCodec.decodeMember(event)
+        assertEquals(member, decoded)
+    }
+
+    @Test
     fun productionProjectionMatchesOfficialAgentTeamGolden() {
         val official = requireNotNull(
             javaClass.classLoader?.getResourceAsStream("official-semantic/advanced.json"),
