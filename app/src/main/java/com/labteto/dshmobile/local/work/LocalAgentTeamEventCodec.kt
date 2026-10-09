@@ -25,6 +25,7 @@ internal object LocalAgentTeamEventCodec {
             put("id", id)
             put("name", name)
             put("description", description)
+            if (displayName.isNotBlank()) put("displayName", displayName)
             put("provider", provider)
             put("context", context.name.lowercase())
             put("phase", phase.name.lowercase())
@@ -82,6 +83,7 @@ internal object LocalAgentTeamEventCodec {
             jobId = teamJobId(id),
             name = member.requiredTeamString("name"),
             description = member.optionalTeamString("description").orEmpty(),
+            displayName = member.optionalTeamString("displayName").orEmpty(),
             provider = member.requiredTeamString("provider"),
             context = runCatching {
                 LocalTeamMemberContext.valueOf(member.requiredTeamString("context").uppercase())
