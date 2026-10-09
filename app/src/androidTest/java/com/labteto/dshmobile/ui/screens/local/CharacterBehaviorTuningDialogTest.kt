@@ -143,6 +143,33 @@ class CharacterBehaviorTuningDialogTest {
     }
 
     @Test
+    fun geminiNaturalTemperatureIndicatesProviderDefault() {
+        compose.setContent {
+            DshTheme {
+                CharacterBehaviorTuningDialog(
+                    personaName = "角色",
+                    portraitPath = "",
+                    relationshipState = "熟悉",
+                    mood = "平静",
+                    evolution = CharacterEvolutionState(),
+                    initial = CharacterBehaviorTuning(),
+                    temperatureTuningAvailable = true,
+                    temperatureRange = LocalModelTemperatureRange(
+                        0.0, 2.0, 1.0, omitAtChatDefault = true,
+                    ),
+                    onSave = { Result.success(Unit) },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
+            .performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(
+            R.string.local_character_tuning_temperature_provider_default, 1.0, 50,
+        )).assertExists()
+    }
+
+    @Test
     fun advancedParametersStayHiddenUntilRequestedAndRemainReachable() {
         compose.setContent {
             DshTheme {
