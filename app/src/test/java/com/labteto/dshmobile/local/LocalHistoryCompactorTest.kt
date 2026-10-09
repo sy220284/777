@@ -98,7 +98,7 @@ class LocalHistoryCompactorTest {
             }
         }
 
-        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 1_000,
             tailChars = 500,
             maxSummaryChars = 1_000,
@@ -126,7 +126,7 @@ class LocalHistoryCompactorTest {
             message("assistant", "正在继续" + "新".repeat(120)),
         )
 
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 300,
             maxSummaryChars = 3_000,
@@ -163,7 +163,7 @@ class LocalHistoryCompactorTest {
             message("assistant", "最近答复" + "新".repeat(500)),
         )
 
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 260,
             maxSummaryChars = 4_000,
@@ -206,7 +206,7 @@ class LocalHistoryCompactorTest {
             tools = listOf("github_api_request"),
         )
 
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 500,
             tailChars = 260,
             maxSummaryChars = 4_000,
@@ -252,7 +252,7 @@ class LocalHistoryCompactorTest {
             add(message("user", "继续最后的验证"))
         }
 
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 800,
             tailChars = 320,
             maxSummaryChars = 4_000,
@@ -299,7 +299,7 @@ class LocalHistoryCompactorTest {
             message("user", "最近请求" + "新".repeat(400)),
             message("assistant", "最近答复" + "新".repeat(400)),
         )
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 1_000,
             tailChars = 700,
             maxSummaryChars = 2_000,
@@ -452,7 +452,7 @@ class LocalHistoryCompactorTest {
         val beforeChars = history.sumOf { it.toString().length }
         assertTrue(beforeChars < 10_000)
 
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 10_000,
             tailChars = 1_500,
             maxSummaryChars = 1_000,

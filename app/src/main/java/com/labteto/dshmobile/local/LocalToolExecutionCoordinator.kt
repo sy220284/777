@@ -367,4 +367,3 @@ internal data class LocalToolExecutionIdentity(
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
-

@@ -98,4 +98,3 @@ internal data class LocalWorkCheckpoint(
         }
     }
 }
-

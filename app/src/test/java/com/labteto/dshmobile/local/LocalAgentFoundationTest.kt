@@ -54,7 +54,7 @@ class LocalAgentFoundationTest {
             add(message("assistant", "当前回复" + "新".repeat(300)))
         }
 
-        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, 
+        val compacted = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries,
             maxHistoryChars = 800,
             tailChars = 500,
             maxSummaryChars = 1_200,

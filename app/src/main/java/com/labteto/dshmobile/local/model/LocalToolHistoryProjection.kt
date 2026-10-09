@@ -104,4 +104,3 @@ internal fun compactHistoryWithStaleToolProjection(
         estimatedTokensBefore = projection?.estimatedTokensBefore ?: compaction.estimatedTokensBefore,
     )
 }
-
