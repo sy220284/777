@@ -2,11 +2,35 @@ package com.labteto.dshmobile.local.model.chatgpt
 
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalReasoningMode
+import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptModelProfilesTest {
+    @Test
+    fun accountCatalogRoutesModernGptEffortsThroughPlanResponses() {
+        val modelIds = listOf("gpt-5.6-sol", "gpt-6-sol", "gpt-6-luna",
+            "gpt-6-astra", "gpt-6.1-sol")
+        val accountA = chatGptPlanProfiles("account-a", modelIds.map { ChatGptModelOption(it, it) })
+        val accountB = chatGptPlanProfiles("account-b", listOf(ChatGptModelOption("gpt-6-sol", "Sol")))
+        val session = "plan-account-reasoning-test"
+        try {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+            for (profile in accountA + accountB) {
+                assertEquals(LocalModelProtocol.RESPONSES, profile.protocol)
+                assertTrue(LocalReasoningModeStore.isSupported(profile, withTools = true))
+                assertEquals("max", LocalReasoningModeStore.effortFor(session, profile, withTools = true))
+            }
+            assertTrue(accountA.first { it.model == "gpt-6-sol" }.id != accountB.single().id)
+            val missingBinding = accountA.first().copy(credentialRef = null)
+            assertTrue(!LocalReasoningModeStore.isSupported(missingBinding, withTools = true))
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+        }
+    }
+
     @Test
     fun everyRefreshedCatalogModelBecomesAPlanResponsesProfileWithoutNameAllowlist() {
         val profiles = chatGptPlanProfiles(
