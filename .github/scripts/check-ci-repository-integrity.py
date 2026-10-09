@@ -202,12 +202,12 @@ ci_dag = {
     "static-gates": ("scope",),
     "architecture-3-gates": ("scope",),
     "fixture-provenance": ("scope",),
-    "unit-tests": ("scope", "static-gates"),
-    "relay-conformance": ("scope", "static-gates"),
-    "build-arm64": ("scope", "static-gates"),
-    "device-artifacts-x86": ("scope", "static-gates"),
-    "android-16-instrumented": ("scope",),
-    "android-17-instrumented": ("scope",),
+    "unit-tests": ("scope", "static-gates", "architecture-3-gates"),
+    "relay-conformance": ("scope", "static-gates", "architecture-3-gates"),
+    "build-arm64": ("scope", "static-gates", "architecture-3-gates"),
+    "device-artifacts-x86": ("scope", "static-gates", "architecture-3-gates"),
+    "android-16-instrumented": ("scope", "static-gates", "architecture-3-gates"),
+    "android-17-instrumented": ("scope", "static-gates", "architecture-3-gates"),
 }
 for lane, dependencies in ci_dag.items():
     source = ci_job_source(lane)
@@ -222,6 +222,8 @@ for lane, dependencies in ci_dag.items():
             condition = "needs.scope.result == 'success'"
         elif dependency == "static-gates":
             condition = "needs.static-gates.result == 'success'"
+        elif dependency == "architecture-3-gates":
+            condition = "needs.architecture-3-gates.result == 'success'"
         else:
             condition = "needs.device-artifacts-x86.result == 'success'"
         if condition not in source:
