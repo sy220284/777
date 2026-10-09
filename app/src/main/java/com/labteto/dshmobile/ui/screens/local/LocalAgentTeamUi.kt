@@ -635,6 +635,24 @@ private fun TeamMemberDetail(
                     color = colors.labelSecondary,
                 )
             }
+            Text(
+                stringResource(
+                    if (member.mutableToolsEnabled) R.string.local_team_permission_full
+                    else R.string.local_team_permission_limited,
+                ),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            if (member.grantedExtensions.isNotEmpty()) {
+                Text(
+                    stringResource(
+                        R.string.local_team_permission_grants,
+                        member.grantedExtensions.sorted().joinToString("、"),
+                    ),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.accent,
+                )
+            }
             TeamMemberWorksite(member, output)
             if (outputReadFailed) {
                 Text(
