@@ -90,6 +90,19 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun longTaskContextPreservesExplicitToolIntentAtBothEnds() {
+        val tools = listOf(
+            tool("first_tool", "首部任务", ToolExposure.OPTIONAL, "测试", setOf("first-keyword")),
+            tool("last_tool", "尾部任务", ToolExposure.OPTIONAL, "测试", setOf("last-keyword")),
+        )
+        val context = "first-keyword " + "无关正文".repeat(5_000) + " last-keyword"
+        assertEquals(
+            listOf("first_tool", "last_tool"),
+            LocalToolRouter.relevantOptionalToolNames(tools, context),
+        )
+    }
+
+    @Test
     fun deferredBuiltInsCutBaseSchemaCostWhileKeepingCoreExecutionSurface() {
         val tools = LocalToolCatalog.specs.map { schemaElement ->
             val schema = schemaElement.jsonObject
