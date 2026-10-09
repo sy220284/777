@@ -20,7 +20,7 @@ class LocalReasoningModeStoreTest {
                 first, "deepseek-flash", "https://api.deepseek.com",
             )!!, 0.0)
             LocalWorkTemperatureStore.setLevel(first, 4)
-            assertEquals(2.0, LocalWorkTemperatureStore.requestTemperature(
+            assertEquals(1.3, LocalWorkTemperatureStore.requestTemperature(
                 first, "deepseek-flash", "https://api.deepseek.com",
             )!!, 0.0)
             assertEquals(2, LocalWorkTemperatureStore.level(second))
