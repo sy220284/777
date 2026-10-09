@@ -8,8 +8,6 @@ import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import java.io.IOException
 import java.net.SocketTimeoutException
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -670,18 +668,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         cause: Throwable? = null,
     ): LocalModelException = protocolErrorStatic(detail, requestId, cause)
 
-    private fun parseRetryAfterMillis(
-        value: String?,
-        nowMillis: Long = System.currentTimeMillis(),
-    ): Long? {
-        val raw = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        raw.toLongOrNull()?.let { return it.coerceIn(0L, Long.MAX_VALUE / 1_000L) * 1_000L }
-        return runCatching {
-            val atMillis = ZonedDateTime.parse(raw, DateTimeFormatter.RFC_1123_DATE_TIME)
-                .toInstant().toEpochMilli()
-            (atMillis - nowMillis).coerceAtLeast(0L)
-        }.getOrNull()
-    }
+    private fun parseRetryAfterMillis(value: String?, nowMillis: Long = System.currentTimeMillis()): Long? =
+        retryAfterMillis(value, nowMillis)
 
     private fun safeAdd(left: Long, right: Long): Long =
         if (left > Long.MAX_VALUE - right.coerceAtLeast(0L)) Long.MAX_VALUE
