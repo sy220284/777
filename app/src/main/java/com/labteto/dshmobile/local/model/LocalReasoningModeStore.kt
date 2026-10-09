@@ -27,6 +27,52 @@ internal class LocalReasoningPreferences(private val preferences: SharedPreferen
     }
 }
 
+/**
+ * Work sampling is owned by the session. Chat reads its character's persisted expression axis.
+ * Pending changes are buffered until Android preferences have been attached.
+ */
+internal object LocalWorkTemperatureStore {
+    private val pending = ConcurrentHashMap<String, Int>()
+    @Volatile private var preferences: SharedPreferences? = null
+
+    fun attach(context: Context) {
+        if (preferences == null) synchronized(this) {
+            if (preferences == null) {
+                val saved = context.applicationContext.getSharedPreferences(
+                    "conversation_work_temperature", Context.MODE_PRIVATE,
+                )
+                pending.forEach { (id, level) -> saved.edit().putInt("level:$id", level).apply() }
+                preferences = saved
+                pending.clear()
+            }
+        }
+    }
+
+    fun level(sessionId: String): Int = if (sessionId.isBlank()) 2 else {
+        val saved = preferences
+        when {
+            saved?.contains("level:$sessionId") == true -> saved.getInt("level:$sessionId", 2)
+            else -> pending[sessionId] ?: 2
+        }.coerceIn(0, 4)
+    }
+
+    fun setLevel(sessionId: String, level: Int) {
+        if (sessionId.isBlank()) return
+        synchronized(this) {
+            val safe = level.coerceIn(0, 4)
+            preferences?.edit()?.putInt("level:$sessionId", safe)?.apply()
+                ?: run { pending[sessionId] = safe }
+        }
+    }
+
+    fun requestTemperature(sessionId: String, model: String, baseUrl: String): Double? {
+        val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
+        val selected = level(sessionId)
+        if (selected == 2 && range.omitAtChatDefault) return null
+        return range.at(selected * 25)
+    }
+}
+
 internal object LocalReasoningModeStore {
     private val pending = ConcurrentHashMap<String, LocalReasoningMode>()
     @Volatile private var preferences: LocalReasoningPreferences? = null
