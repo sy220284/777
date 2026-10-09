@@ -432,6 +432,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
+        var providerStartedNanos: Long? = null
         var attemptStreamTail = ""
         var attemptStreamChars = 0
 
@@ -458,6 +459,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
                         attemptStartedNanos = System.nanoTime()
+                        providerStartedNanos = null
                         lastProviderError = null
                         attemptStreamTail = ""
                         attemptStreamChars = 0
@@ -470,6 +472,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let(streamingPreviewStore::begin)
                         }
                         val durationMs = (System.nanoTime() - attemptStartedNanos) / 1_000_000
+                        // Step time includes scheduling; provider time starts after resource grant.
+                        val preProviderMs = providerStartedNanos?.let { (it - attemptStartedNanos).coerceAtLeast(0L) / 1_000_000 }
+                        val providerExecutionMs = providerStartedNanos?.let { (System.nanoTime() - it).coerceAtLeast(0L) / 1_000_000 }
                         val providerError = lastProviderError
                         val localPreflight = providerError?.code in setOf(
                             "WORK_BUDGET_EXHAUSTED",
@@ -483,6 +488,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
                                 append("model=${snapshot.modelState.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
+                                preProviderMs?.let { append("pre_provider_ms=$it ") }
+                                providerExecutionMs?.let { append("provider_execution_ms=$it ") }
                                 providerError?.code?.let { append("code=$it ") }
                                 providerError?.let {
                                     append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ")
@@ -525,6 +532,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("request_uid", requestUid)
                             put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                             put("duration_ms", durationMs)
+                            preProviderMs?.let { put("pre_provider_ms", it) }
+                            providerExecutionMs?.let { put("provider_execution_ms", it) }
                             put("session_id", snapshot.sessionId)
                             put("step", step)
                             put("attempt", event.attempt)
@@ -773,7 +782,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             promptCacheTtl = promptCacheTtl,
                             allowImageGeneration = effectiveImageGeneration,
                             admission = admission,
-                            beforeProviderInvoke = persistProviderAttempt,
+                            beforeProviderInvoke = {
+                                persistProviderAttempt()
+                                providerStartedNanos = System.nanoTime()
+                            },
                             onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     appendAttemptStream(visible)
@@ -786,6 +798,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             log.append("request/cancelled", buildJsonObject {
                                 put("request_uid", requestUid)
                                 put("step", step)
+                                put("cancellation_type", cancelled::class.java.simpleName)
+                                providerStartedNanos?.let { put("provider_execution_ms",
+                                    (System.nanoTime() - it).coerceAtLeast(0L) / 1_000_000) }
                                 admissionState?.let {
                                     put("admission_state", it.name.lowercase())
                                     put(
@@ -813,6 +828,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 put("failure_kind", modelFailureKind(error))
                                 put("admission_state", error.admissionState.name.lowercase())
                                 put("continuation_eligible", error.continuationEligible)
+                                error.cause?.let { put("cause_type", it::class.java.simpleName) }
+                                providerStartedNanos?.let { put("provider_execution_ms",
+                                    (System.nanoTime() - it).coerceAtLeast(0L) / 1_000_000) }
                                 error.cause?.message?.takeIf(String::isNotBlank)?.let {
                                     put("cause_detail", it.take(800))
                                 }

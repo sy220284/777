@@ -63,13 +63,19 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
             val list = value as? JsonArray
             if (list == null) fields.remove(key)
             else fields[key] = JsonArray(list.filterIsInstance<JsonObject>().map { candidate ->
-                JsonObject(candidate.filter { (field, v) ->
-                    when (field) {
-                        "text", "source" -> v is JsonPrimitive && v.isString
-                        "confidence" -> (v as? JsonPrimitive)?.intOrNull != null
-                        else -> true
+                val normalizedEvidence = candidate.toMutableMap()
+                listOf("text", "source").forEach { field ->
+                    val value = normalizedEvidence[field]
+                    if (value != null && (value !is JsonPrimitive || !value.isString)) {
+                        normalizedEvidence.remove(field)
                     }
-                })
+                }
+                normalizedEvidence["confidence"]?.let { value ->
+                    val score = (value as? JsonPrimitive)?.intOrNull
+                    if (score == null) normalizedEvidence.remove("confidence")
+                    else normalizedEvidence["confidence"] = JsonPrimitive(score)
+                }
+                JsonObject(normalizedEvidence)
             })
             // String facts are not converted to evidence: provenance must be verified.
         }
