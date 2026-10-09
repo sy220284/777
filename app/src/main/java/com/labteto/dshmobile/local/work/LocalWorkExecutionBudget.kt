@@ -31,6 +31,7 @@ internal class LocalWorkExecutionBudget(
     private var pendingExposureTokens: Long = 0L
     private var reservedRequests: Int = 0
     private var admittedRequests: Int = 0
+    private var nextSlicePending: Boolean = false
     private data class EstimateCalibration(
         var scale: Double = 1.0,
         var samples: Int = 0,
@@ -49,6 +50,12 @@ internal class LocalWorkExecutionBudget(
         while (true) {
             var reservedEstimate = 0L
             val reserved = synchronized(this) {
+                if (nextSlicePending) {
+                    // A previous slice may still have subagent calls in flight.
+                    if (reservedRequests != 0) return@synchronized false
+                    admittedRequests = 0
+                    nextSlicePending = false
+                }
                 if (admittedRequests + reservedRequests >= maxRequests) {
                     throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
                 }
@@ -77,8 +84,12 @@ internal class LocalWorkExecutionBudget(
      */
     @Synchronized
     fun beginExecutionSlice(): Boolean {
-        if (reservedRequests != 0) return false
+        if (reservedRequests != 0) {
+            nextSlicePending = true
+            return false
+        }
         admittedRequests = 0
+        nextSlicePending = false
         return true
     }
 
