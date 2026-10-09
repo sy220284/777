@@ -22,6 +22,7 @@ class LocalWorkAgentTeamSendTest {
         assertEquals("审计当前仓库", prepared.memoryInput)
         assertEquals("审计当前仓库", prepared.content)
         assertEquals("审计当前仓库", prepared.modelMessage["content"]!!.jsonPrimitive.content)
+        assertTrue(isLocalAgentTeamTurn(listOf(prepared.modelMessage)))
         val request = withLocalWorkExecutionMode(listOf(prepared.modelMessage))
         assertTrue(request.first()["content"]!!.jsonPrimitive.content.contains("Lead"))
         assertFalse(request.last().containsKey(LOCAL_WORK_EXECUTION_MODE_KEY))
@@ -33,6 +34,7 @@ class LocalWorkAgentTeamSendTest {
         val team = requireNotNull(prepareLocalAgentTeamSend("并行审计", emptyList())).modelMessage
         val ordinary = buildJsonObject { put("role", "user"); put("content", "解释结果") }
         val history = listOf(team, ordinary)
+        assertFalse(isLocalAgentTeamTurn(history))
         val request = withLocalWorkExecutionMode(history)
         assertEquals(2, request.size)
         assertEquals("并行审计", request.first()["content"]!!.jsonPrimitive.content)
