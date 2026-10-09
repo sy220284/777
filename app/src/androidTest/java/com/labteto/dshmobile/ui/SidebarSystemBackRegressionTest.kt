@@ -30,7 +30,11 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        // BackHandler registration and shell input delivery cross separate UI queues.
+        // Wait for the actual system Back callback, then enforce exactly-once delivery.
+        compose.waitForIdle()
         pressDeviceBack()
+        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -50,7 +54,11 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        // BackHandler registration and shell input delivery cross separate UI queues.
+        // Wait for the actual system Back callback, then enforce exactly-once delivery.
+        compose.waitForIdle()
         pressDeviceBack()
+        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
