@@ -4,7 +4,7 @@ import com.labteto.dshmobile.local.tools.LocalToolsRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean)
+data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean, val displayName: String = name)
 data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
 data class LocalSkillEditorUiEntry(val id: String, val document: String)
 
@@ -19,14 +19,15 @@ class LocalToolsUiFacade @Inject constructor(
     internal suspend fun clearGitHub() = tools.clearGitHub()
     internal fun installedPluginIds() = tools.installedPluginIds()
     internal suspend fun installedSkills() = tools.installedSkills().map {
-        LocalSkillUiEntry(it.name, it.description, it.modelInvocable)
+        LocalSkillUiEntry(it.name, it.description, it.modelInvocable, it.displayName)
     }
     internal suspend fun presetSkills() = tools.presetSkills().map {
         LocalPresetSkillUiEntry(it.id, it.title, it.description, it.installed)
     }
     internal suspend fun installPreset(id: String) = tools.installPreset(id)
-    internal suspend fun createSkill(id: String, description: String, instructions: String) =
-        tools.createSkill(id, description, instructions)
+    internal suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
+        tools.createSkill(id, displayName, description, instructions)
+    internal suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
     internal suspend fun removeSkill(id: String) = tools.removeSkill(id)
     internal suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     internal suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)

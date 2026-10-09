@@ -33,6 +33,7 @@ fun DsComposerField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     maxLines: Int = 6,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     onFocusedChange: (Boolean) -> Unit = {},
 ) {
     val colors = DsTheme.colors
@@ -50,7 +51,7 @@ fun DsComposerField(
         ),
         cursorBrush = SolidColor(colors.accent),
         maxLines = maxLines,
-        visualTransformation = VisualTransformation.None,
+        visualTransformation = visualTransformation,
         decorationBox = { innerTextField ->
             Box(
                 contentAlignment = Alignment.CenterStart,
