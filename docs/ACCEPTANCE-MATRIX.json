@@ -37,13 +37,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#coalescesSnapshotsWithoutDroppingOtherSessions"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 历史消息加载与分页",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalInfiniteSessionScaleTest.kt#newestTranscriptPageStaysBoundedAcrossLargeHistories"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
@@ -62,8 +66,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#concurrentPendingExposureWaitsUntilReservationSettles"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
@@ -173,13 +179,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线和人物世界观",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#sameNameSameWorldDifferentFranchisesStaySeparate"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#sameNameDifferentWorldSettingsStaySeparate"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线持续演化",
@@ -228,18 +238,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员身份与参与规则",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalGroupChatTest.kt#referentialNameMentionDoesNotForceThatCharacterToReply"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊发言编排与点名",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalGroupChatTest.kt#explicitMentionRoutesOnlyToNamedCharacter"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 成员回复顺序和失败反馈",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalGroupChatTest.kt#multipleNaturalAddressesKeepMentionOrder"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员关系和记忆隔离",
@@ -250,8 +266,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告生成与保存",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#explicitWriteIsDurableBeforeReturnAndSupersedesQueuedSnapshot"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊状态恢复",
@@ -267,8 +285,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与未完成话题",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalGroupChatContinuityTest.kt#completeRefreshMergesIndependentFieldsInReplyOrderAndCommitsPending"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 用户互动习惯",
@@ -317,13 +337,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#galleryIdentityWinsOverPersonaIdentity"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 关系记忆提取和召回",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物日记生成和管理",
@@ -342,13 +366,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记导入、导出与回滚恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#timelineRollbackDropsNewMemoriesAndReactivatesSupersededValidState"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 删除和重新编辑后的记忆维护",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#messageProvenanceRollsBackOnlyDiscardedTurnEvenWithBroadTimeBoundary"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 上下文和人物事实组装",
@@ -412,8 +440,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作请求发送与排队",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#largeRequestRunsAndConcurrentPendingExposureWaits"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 目标、约束和当前进展提取",
@@ -489,8 +519,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 工具结果回填与继续推理",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#durableFinalAssistantReplyIsNotGeneratedTwiceAfterRestart"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
@@ -506,18 +538,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 步骤、资源和上下文预算",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#cumulativeInputDoesNotStopLongWorkRun"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 任务取消、停止、受控结束",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#cancellationBeforeRequestBodyIsSentReleasesBudgetAndRequestSlot"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 输出真实性与完成声明检查",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt#requiredEvidenceTriggersOneReassignmentAndReportsRealCheck"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 普通子代理与分叉子代理",
@@ -526,8 +564,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久子代理与冷启动恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#readonlySubagentCanReplayAfterInterruptedTool"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 独立身份指令与本轮任务",
@@ -553,13 +593,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 并行执行和流水线工作流",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkflowCoordinatorTest.kt#requiredEvidenceTriggersOneReassignmentAndReportsRealCheck"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理模型选路与调用消耗",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#calibrationIsIsolatedByModelRoute"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 资料研究代理预设",
@@ -728,13 +772,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt#exposesLatestTypedEventForRecovery"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#blockedRecoveryCheckpointPreservesReason"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
@@ -797,8 +845,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
@@ -812,7 +862,8 @@
         "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#cancellingProjectDeletionDoesNotInvokeAnyWrite",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#doubleDeleteIsBlockedWhileTheFirstRequestIsAwaitingStorage"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#doubleDeleteIsBlockedWhileTheFirstRequestIsAwaitingStorage",
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#queuedDeletionCannotResurrectProjectReferenceAfterRestart"
       ]
     },
     {
@@ -848,8 +899,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#missingProjectAfterCatalogResetRejectsColdSessionBeforeWorkRulesAreSilentlyDropped"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
@@ -858,8 +911,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务启用、停用与暂停",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationExecutionSafetyTest.kt#interactionPolicyUpdatePreservesScheduleAndWaitingState"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 手动执行和执行记录",
@@ -868,18 +923,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#januaryAnchorRestoresDayAfterShortMonth"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 本地时间与时区处理",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#leapYearAndMissedMonthsRetainOriginalHour"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 日程生成和下一次运行计算",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationMonthlyScheduleTest.kt#workAndChatBothUseCalendarChaining"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 触发去重与并发限制",
@@ -939,8 +1000,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 中断及恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAutomationChatRecoveryTest.kt#recoveryPagesBackwardAcrossLongTailAndClosesInterruptedTurn"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 定时发起工作任务",
@@ -959,18 +1022,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / Webhook 接收和校验",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/WebhookExecutionTest.kt#unknownPersistedWebhookStatusDegradesToFailedOnDowngrade"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 请求大小及执行边界",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/WebhookExecutionTest.kt#executionLimiterRejectsOverflowAndRecoversCapacity"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 触发结果保存和查询",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/WebhookExecutionTest.kt#successfulRunStoresResult"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 任务持久化和冷恢复",
@@ -981,8 +1050,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / Worker 状态与真实执行对账",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#durableWorkerStyleMutationsPublishLatestTaskState"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 删除／重建后阻止旧任务结算",
@@ -993,8 +1064,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 暂停／恢复与手动执行代次保护",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#generationOwnershipRejectsEffectsAfterEditOrRemoval"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
@@ -1093,18 +1166,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件读取和内容检索",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt#writeReadListAndSearchStayInsideWorkspace"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件编辑与差异修改",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt#editRequiresFreshObservationAndRejectsStaleReads"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件名匹配与全文搜索",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt#literalAndRegexSearchAreExplicitAndBounded"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / JSON 结构查询",
@@ -1113,8 +1192,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / Shell 命令与脚本执行",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt#backgroundShellFailureModeRejectsNonZeroExit"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 长输出分页读取",
@@ -1205,8 +1286,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#repeatedTransientFailuresOpenCooldownBeforeBudgetOrProviderCall"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
@@ -1309,8 +1392,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型服务商和协议选择",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelProfileStoreRecoveryTest.kt#configurationAndActiveSelectionAreCommittedTogetherAndRemovalBackupCannotResurrect"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型配置新增、编辑、切换和移除",
@@ -1321,8 +1406,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / API 密钥与连接测试",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelConfigurationTransactionTest.kt#failedCommitRestoresCredentialAndDoesNotPublishActivation"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 账户授权登录",
@@ -1336,8 +1423,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型参数、推理模式和上下文长度",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#hardBudgetCanDisableInnerAdaptiveCompactionUntilOuterGovernorTriggers"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 主智能体与子智能体模型配置",
@@ -1346,8 +1435,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 本机累计 Token",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#reportedUsageCalibratesLaterUncertainExposure"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
@@ -1376,8 +1467,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkExecutionBudgetTest.kt#reportedUsageCalibratesLaterUncertainExposure"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
@@ -1386,18 +1479,24 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 全局／项目／对话链记忆归属",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#lineageWriteRestartRecallIsIsolatedFromIndependentConversations"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#updateAndForgetPersistAcrossRestart"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 人物私有记忆隔离展示",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#searchFiltersRelationshipOwnerBeforeResultLimit"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
@@ -1426,8 +1525,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 运行步数和执行预算",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRuntimeLimitsTest.kt#configuredStepsUseSharedSafetyBoundary"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
@@ -1490,13 +1591,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话归属、运行租约与唯一写入者",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#deletionCannotBeUndoneByQueuedSnapshots"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 消息块和正文记录",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionTranscriptPagerTest.kt#allRebuildsEveryPageInChronologicalOrder"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话事件流水账",
@@ -1529,8 +1634,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 模型历史检查点和尾部重放",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#safeRecoveryIncludesLatestTypedWorkCheckpoint"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 工具活动只读投影",
@@ -1539,13 +1646,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 前台会话恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#recoveryQueuedForegroundRunRejectsLateEvents"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 中断运行的事实核对",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#unknownToolOutcomeBlocksAutomaticResume"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 已知与未知副作用区分",
@@ -1556,8 +1667,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话清理与归档维护",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionStorageManagerTest.kt#compactAllConvertsLegacyRawSegmentWithoutDroppingEvent"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 批次投影和中断后重建",
@@ -1566,8 +1679,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / OpenAI 响应协议",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#responsesCanonicalReplyReplacesNativeTextButRetainsReasoningAndCallOrder"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / Anthropic 消息协议",
@@ -1622,8 +1737,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 运行中配置变化隔离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelConfigurationTransactionTest.kt#processDeathBeforeDecisionRollsBackOnNextOwner"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 连接健康诊断和重试约束",
@@ -1642,13 +1759,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 网络中断、取消和重试",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#cancellationClosesChatAndResponsesStreamsAfterHeaders"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求证据和响应终态",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#errorFrameAndTruncatedStreamNeverBecomeSuccessfulReplies"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 图片等多模态输入",
@@ -1669,8 +1790,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Token 压力与上下文预算",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#summaryIsBoundedForVeryLargeOlderMessages"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Prompt 缓存指纹与连续性",
@@ -1679,8 +1802,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 工作语义检查点",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#workCompactionPersistsTypedCheckpointForResume"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
@@ -1689,18 +1814,24 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 主代理与子代理公共契约",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#childRunCheckpointCannotTriggerForegroundRecovery"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 运行标识和父子层级",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#childRunCheckpointCannotTriggerForegroundRecovery"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 全局步数和动态预算",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRuntimeLimitsTest.kt#configuredStepsUseSharedSafetyBoundary"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 创建和启动规格",
@@ -1734,23 +1865,31 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 步骤和历史检查点",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#queuedRecoveryCheckpointSurvivesRestart"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 最终结果先验证再提交",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#durableFinalAssistantEventWinsEvenBeforeAssistantCheckpoint"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 中断恢复和未知副作用保护",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#automationWithPossibleToolSideEffectBlocksReplay"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 过期结果不能提交",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#recoveryQueuedForegroundRunRejectsLateEvents"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 并行与流水线工作流",
@@ -1766,18 +1905,24 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 取消及继续执行契约",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationRunTest.kt#cancellationWaitsForEngineCleanup"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具目录与能力声明",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#capabilitySearchEnablesOptionalToolForCurrentTurn"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 模型可见工具定义与过滤",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#planModeSchemaProjectionOmitsToolsThatExecutionWouldReject"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具调用入场和权限判断",
@@ -1807,8 +1952,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionEventLogTest.kt#streamedEventsMatchSnapshotAcrossRotatedSegmentsAndSequenceAdvances"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
@@ -1819,13 +1966,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 作用域和可见性",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#lineageWriteRestartRecallIsIsolatedFromIndependentConversations"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆冲突与来源合并",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#duplicateRefreshMovesProvenanceToNewestSession"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆维护、过期和删除",
@@ -1855,8 +2006,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 子任务持久化与队列",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalJobManagerTest.kt#persistentInboxWriteNeverTruncatesAndRejectsOversizeWithoutReplacingDisk"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 请求并发控制和取消传播",
@@ -1888,8 +2041,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 发送状态和队列控制",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalInteractionCoordinatorTest.kt#concurrentInteractionsAreSerializedInsteadOfOverwritingState"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 后台结果到前台状态同步",
@@ -1925,8 +2080,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 本地数据持久化与备份",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt#firstWriteBackupRecoversCorruptedPrimary"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 原子写入、损坏恢复和版本迁移",
@@ -1942,8 +2099,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 文件访问路径边界",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt#writesAndToolOutputsCannotEscapeThroughTraversalOrSymlink"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 网络安全边界",
@@ -1954,8 +2113,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 权限及副作用约束",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#executorThrowAfterAdmissionIsNeverMarkedSafeToRetry"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动只执行一次",

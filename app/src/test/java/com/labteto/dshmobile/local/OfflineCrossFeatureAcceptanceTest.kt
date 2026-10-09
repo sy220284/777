@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.io.File
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -124,6 +125,42 @@ class OfflineCrossFeatureAcceptanceTest {
             } finally {
                 reopened.close()
             }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun queuedDeletionCannotResurrectProjectReferenceAfterRestart() = runTest {
+        val root = kotlin.io.path.createTempDirectory("cross-delete-queued-").toFile()
+        try {
+            val sessions = LocalSessionRepository(root, Json, backgroundScope, {}, {})
+            val catalog = LocalProjectCatalogState(
+                projects = listOf(
+                    LocalProject(DEFAULT_PROJECT_ID, "默认项目"),
+                    LocalProject("protected", "关联项目", "执行前校验引用"),
+                ),
+                activeId = "protected",
+            )
+            sessions.enqueue(LocalHarnessSession(id = "pending", projectId = "protected", title = "旧"))
+            runCurrent()
+            assertThrows(IllegalStateException::class.java) {
+                planProjectDeletion(catalog, "protected") { id ->
+                    check(sessions.summaries().none { it.projectId == id }) { "引用存在" }
+                }
+            }
+            sessions.enqueue(LocalHarnessSession(id = "pending", projectId = "protected", title = "迟到更新"))
+            assertTrue(sessions.delete("pending"))
+            runCurrent()
+            val cold = LocalSessionRepository(root, Json, backgroundScope, {}, {})
+            assertEquals(null, cold.read("pending"))
+            assertFalse(cold.summaries().any { it.projectId == "protected" })
+            val deleted = planProjectDeletion(catalog, "protected") { id ->
+                check(cold.summaries().none { it.projectId == id })
+            }
+            assertEquals(DEFAULT_PROJECT_ID, deleted.activeId)
+            assertTrue(deleted.projects.none { it.id == "protected" })
         } finally {
             root.deleteRecursively()
         }
