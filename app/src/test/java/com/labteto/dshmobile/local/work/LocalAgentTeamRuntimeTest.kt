@@ -1488,6 +1488,41 @@ class LocalAgentTeamRuntimeTest {
     )
 
     @Test
+    fun overlappingWriteScopesCannotBeClaimedByConcurrentTasks() = runBlocking {
+        val session = "team-scope-lock"
+        val fixture = fixture(session)
+        appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList(), writeScopes = listOf("app/src")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 2, emptyList(), status = "in_progress",
+                ownerId = "member-1", writeScopes = listOf("app/src")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-2", 1, emptyList(), writeScopes = listOf("app/src/main")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-3", 1, emptyList(), writeScopes = listOf("docs")))
+        val binding = teamBinding(fixture, session)
+        suspend fun claim(id: String) = fixture.runtime.execute(
+            LocalToolCall("claim-$id", "team_task_update", buildJsonObject {
+                put("task_id", id)
+                put("expected_revision", 1)
+                put("action", "claim")
+                put("owner", "worker")
+            }, "{}"), binding,
+        )
+        val conflict = runCatching { claim("task-2") }.exceptionOrNull()
+        assertNotNull(conflict)
+        assertTrue(conflict!!.message.orEmpty().contains("TEAM_WRITE_SCOPE_CONFLICT"))
+        claim("task-3")
+        val tasks = fixture.runtime.project(session).tasks.associateBy { it.id }
+        assertEquals(LocalTeamTaskStatus.PENDING, tasks["task-2"]?.status)
+        assertEquals(1, tasks["task-2"]?.revision)
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, tasks["task-3"]?.status)
+        assertNull(fixture.runtime.project(session).failure)
+    }
+
+    @Test
     fun competingClaimsHaveOneWinnerAndPreserveHealthyProjection() {
         val session = "team-claim-race"
         val fixture = fixture(session)
