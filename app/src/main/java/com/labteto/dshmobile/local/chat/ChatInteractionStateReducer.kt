@@ -441,8 +441,22 @@ internal class ChatInteractionStateReducer {
         return conversation.any { message ->
             message.split(Regex("[。！？!?；;\\n]")).any { clause ->
                 val current = clause.trim()
-                stageWords.containsMatchIn(current) &&
-                    (Regex("我们|咱们|你和我|我和你|我喜欢你|你喜欢我").containsMatchIn(current))
+                stageWords.findAll(current).any { match ->
+                    val before = current.take(match.range.first).takeLast(20)
+                    val after = current.drop(match.range.last + 1).take(6)
+                    val firstPerson = Regex("我们|咱们|你和我|我和你|我喜欢你|你喜欢我")
+                        .containsMatchIn(before + match.value + after)
+                    // Check the matched event's immediate wording instead of banning the
+                    // entire sentence; actual decisions may follow an earlier hypothetical.
+                    val thirdParty = Regex("前任|朋友|同事|室友|他们|她们|别人")
+                        .containsMatchIn(before.takeLast(10))
+                    val hypothetical = Regex("如果|假如|要是|希望|计划|打算|梦见|听说")
+                        .containsMatchIn(before.takeLast(8))
+                    val negated = Regex("没有|还没|尚未|并未|不会|不想|不要|不是")
+                        .containsMatchIn(before.takeLast(6))
+                    val questioned = after.contains('吗') || after.contains('？') || after.contains('?')
+                    firstPerson && !thirdParty && !hypothetical && !negated && !questioned
+                }
             }
         }
     }

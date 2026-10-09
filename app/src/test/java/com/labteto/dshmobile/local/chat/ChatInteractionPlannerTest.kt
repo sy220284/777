@@ -65,6 +65,26 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun negatedQuestionedOrThirdPartyEventsDoNotChangeOurRelationshipStage() {
+        val separated = ChatCharacterState(dynamics = RelationshipDynamics(stage = "COMMITTED"))
+        val breakup = """{"state":{"dynamics":{"stage":"SEPARATED"}},"turnSignificance":"MAJOR"}"""
+        listOf(
+            "我们没有分手",
+            "我们不会分手",
+            "我们分手了吗？",
+            "我们昨天听说前任分手了",
+            "假如我们分手了会怎样",
+        ).forEach { user ->
+            val result = planner.parse(breakup, separated, userMessage = user, assistantMessage = "知道了")!!
+            assertEquals("COMMITTED", result.state.dynamics.stage)
+        }
+        val confirmed = planner.parse(
+            breakup, separated, userMessage = "我们昨天决定分手了", assistantMessage = "好",
+        )!!
+        assertEquals("SEPARATED", confirmed.state.dynamics.stage)
+    }
+
+    @Test
     fun stageEventMustMatchRequestedRelationshipDirection() {
         val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
         val payload = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
