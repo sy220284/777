@@ -1076,7 +1076,7 @@ class ChatInteractionPlannerTest {
         fun id(value: String): String? = validGroupGalleryId(
             Json.parseToJsonElement("""{"galleryId":$value}""").jsonObject,
         )
-        assertEquals("role-a", id("\\"role-a\\""))
+        assertEquals("role-a", id("\"role-a\""))
         assertEquals(null, id("""{"id":"role-a"}"""))
         assertEquals(null, id("""["role-a"]"""))
         assertEquals(null, id("42"))
