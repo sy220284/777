@@ -27,10 +27,12 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable
 internal fun LocalChatEditMessageSheet(
     message: LocalHarnessMessage,
+    workMode: Boolean,
     actionsEnabled: Boolean,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onDismiss: () -> Unit,
@@ -43,6 +45,10 @@ internal fun LocalChatEditMessageSheet(
     val busyMessage = stringResource(R.string.local_edit_user_message_busy)
     val missingMessage = stringResource(R.string.local_edit_user_message_missing)
     val unavailableMessage = stringResource(R.string.local_edit_user_message_unavailable)
+    val wrongModeMessage = stringResource(R.string.local_edit_user_message_wrong_mode)
+    val unconfiguredMessage = stringResource(R.string.local_edit_user_message_unconfigured)
+    val unavailableHistoryMessage = stringResource(R.string.local_edit_user_message_history_unavailable)
+    val failedMessage = stringResource(R.string.local_edit_user_message_failed)
     val emptyMessage = stringResource(R.string.local_edit_user_message_empty)
     val unchangedMessage = stringResource(R.string.local_edit_user_message_unchanged)
 
@@ -55,6 +61,13 @@ internal fun LocalChatEditMessageSheet(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
+        if (workMode) {
+            Text(
+                stringResource(R.string.local_edit_work_side_effect_notice),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
         if (chatMessageHasAttachmentContext(message)) {
             val retainedNames = message.blocks.mapNotNull { block ->
                 when (block) {
@@ -109,9 +122,17 @@ internal fun LocalChatEditMessageSheet(
                                 LocalChatUserEditResult.BUSY -> error = busyMessage
                                 LocalChatUserEditResult.MESSAGE_MISSING -> error = missingMessage
                                 LocalChatUserEditResult.UNAVAILABLE -> error = unavailableMessage
+                                LocalChatUserEditResult.WRONG_MODE -> error = wrongModeMessage
+                                LocalChatUserEditResult.UNCONFIGURED -> error = unconfiguredMessage
+                                LocalChatUserEditResult.HISTORY_UNAVAILABLE -> error = unavailableHistoryMessage
+                                LocalChatUserEditResult.FAILED -> error = failedMessage
                                 LocalChatUserEditResult.EMPTY -> error = emptyMessage
                                 LocalChatUserEditResult.UNCHANGED -> error = unchangedMessage
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            error = failure.message?.takeIf(String::isNotBlank) ?: failedMessage
                         } finally {
                             submitting = false
                         }

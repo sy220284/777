@@ -1077,6 +1077,7 @@ internal fun LocalConversationSurface(
     editingUserMessage?.let { message ->
         LocalChatEditMessageSheet(
             message = message,
+            workMode = state.usageMode == LocalUsageMode.WORK,
             actionsEnabled = messageActionsEnabled,
             onEditAndResend = onEditAndResend,
             onDismiss = { editingUserMessage = null },

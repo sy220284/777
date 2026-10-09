@@ -13,6 +13,8 @@ import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.send.LocalSendDisposition
+import com.labteto.dshmobile.local.session.LocalUserMessageEditResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -71,6 +73,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     private val enqueueSnapshot: (String) -> Boolean,
     private val startPreparedTurn: (LocalPreparedSend, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease) -> Job,
     private val startRegeneration: (String) -> Job,
+    private val prepareEditedTurn: (String, String) -> LocalWorkMessageEditPreparation,
     private val prepareDetachedSession: suspend (String, String?) -> String = { _, _ ->
         error("Work 后台执行入口尚未装配")
     },
@@ -85,6 +88,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         turn: LocalWorkTurnPort,
         regenerator: LocalWorkReplyRegenerator,
         automationExecution: LocalWorkAutomationExecutionCoordinator,
+        userMessageEditor: LocalWorkUserMessageEditor,
     ) : this(
         workRunRegistry = workRunRegistry,
         runtimeStateStore = runtimeStateStore,
@@ -92,6 +96,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
         startPreparedTurn = turn::startPrepared,
         startRegeneration = regenerator::start,
+        prepareEditedTurn = userMessageEditor::rewrite,
         prepareDetachedSession = automationExecution::prepareSession,
         runDetached = automationExecution::run,
     )
@@ -353,6 +358,32 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         }
         started?.start()
         return result
+    }
+
+    override fun editAndResendUserMessage(
+        messageId: String,
+        replacement: String,
+    ): LocalUserMessageEditResult = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        try {
+            when (val edit = prepareEditedTurn(messageId, replacement)) {
+                is LocalWorkMessageEditPreparation.Rejected -> edit.reason
+                is LocalWorkMessageEditPreparation.Ready -> {
+                    val sent = sendPrepared(edit.send)
+                    if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
+                    else {
+                        runtimeStateStore.projection.publishError(
+                            "历史修改已保存，但新任务未能启动（${sent.rejectReason ?: sent.disposition}）；请从输入框重新发送修改后的内容",
+                        )
+                        LocalUserMessageEditResult.FAILED
+                    }
+                }
+            }
+        } catch (error: Exception) {
+            runtimeStateStore.projection.publishError(
+                "Work 历史编辑失败：${error.message ?: error::class.java.simpleName}",
+            )
+            LocalUserMessageEditResult.FAILED
+        }
     }
 
     override fun regenerateReply(messageId: String): Boolean {

@@ -52,8 +52,11 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
 
         val result = synchronized(handle.lock) {
             val before = runtimeStateStore.state.value
-            if (!before.modelState.configured || before.usageMode != LocalUsageMode.CHAT) {
-                return@synchronized LocalChatUserEditResult.UNAVAILABLE
+            if (before.usageMode != LocalUsageMode.CHAT) {
+                return@synchronized LocalChatUserEditResult.WRONG_MODE
+            }
+            if (!before.modelState.configured) {
+                return@synchronized LocalChatUserEditResult.UNCONFIGURED
             }
             if (
                 before.loading ||

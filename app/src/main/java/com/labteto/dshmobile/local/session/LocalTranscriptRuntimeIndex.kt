@@ -57,7 +57,7 @@ internal fun projectLocalTranscriptRuntimeIndexTail(
         .sortedBy(LocalSessionEventLog.Event::sequence)
         .forEach { event ->
             val decoded = decodeTranscriptMessages(event.data) ?: return@forEach
-            if (event.type == "chat/active-transcript") {
+            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
                 current = buildLocalTranscriptRuntimeIndex(decoded)
                 return@forEach
             }

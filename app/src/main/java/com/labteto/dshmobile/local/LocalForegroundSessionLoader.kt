@@ -25,6 +25,7 @@ import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.chat.projectChatSessionControls
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.projectWorkSessionControls
+import com.labteto.dshmobile.local.work.LocalWorkTimelineMemoryRecovery
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -60,6 +61,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val contextComposer: ContextComposer,
     private val chatRestore: com.labteto.dshmobile.local.chat.LocalChatSessionRestorer,
+    private val workTimelineMemoryRecovery: LocalWorkTimelineMemoryRecovery,
     private val approvalPreferences: LocalApprovalPreferences,
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
@@ -247,6 +249,9 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         runtimeStateStore.projection.update { restoredState }
 
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
+            if (runtimeStateStore.state.value.usageMode == LocalUsageMode.WORK) {
+                workTimelineMemoryRecovery.recover(log)
+            }
             chatRestore.repairPostTurnProjections(log)
             var wroteHistoryCheckpoint = false
             val state = runtimeStateStore.state.value
