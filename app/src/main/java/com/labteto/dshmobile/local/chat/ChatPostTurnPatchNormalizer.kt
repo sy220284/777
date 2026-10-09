@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Normalizes only safely interpretable model patch values, never the persisted source of truth.
@@ -96,5 +97,58 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     nested("continuity", emptySet(), emptySet(),
         setOf("recentEvents", "recurringEvents", "decisions", "unfinished"))
 
-    return JsonObject(root.toMutableMap().apply { put("state", JsonObject(state)) })
+    // Decode only model-owned patch fields. The reducer computes the rest from durable history.
+    val allowedStateFields = setOf(
+        "physicalState", "mood", "relationshipState", "currentFocus",
+        "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
+        "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
+        "dynamics", "userPattern", "continuity",
+    )
+    val normalizedState = JsonObject(state.filterKeys { it in allowedStateFields })
+    val result = root.toMutableMap().apply { put("state", normalizedState) }
+    result["turnSignificance"]?.let { value ->
+        if (value !is JsonPrimitive || !value.isString) result.remove("turnSignificance")
+    }
+    result["suggestions"]?.let { value ->
+        val entries = value as? JsonArray
+        if (entries == null) {
+            result.remove("suggestions")
+        } else {
+            result["suggestions"] = JsonArray(entries.mapNotNull { element ->
+                val candidate = element as? JsonObject ?: return@mapNotNull null
+                val label = candidate["label"] as? JsonPrimitive
+                if (label?.isString != true) return@mapNotNull null
+                val fields = candidate.toMutableMap()
+                listOf("text", "style").forEach { key ->
+                    fields[key]?.let { field ->
+                        if (field !is JsonPrimitive || !field.isString) fields.remove(key)
+                    }
+                }
+                fields["bold"]?.let { field ->
+                    if ((field as? JsonPrimitive)?.booleanOrNull == null) fields.remove("bold")
+                }
+                JsonObject(fields)
+            })
+        }
+    }
+    result["diaryDelta"]?.let { value ->
+        if (value !is JsonObject && value !is kotlinx.serialization.json.JsonNull) {
+            result.remove("diaryDelta")
+        } else if (value is JsonObject) {
+            val diary = value.toMutableMap()
+            listOf("event", "feeling", "innerThought", "relationshipMeaning",
+                "unresolvedEcho", "disclosure").forEach { key ->
+                diary[key]?.let { field ->
+                    if (field !is JsonPrimitive || !field.isString) diary.remove(key)
+                }
+            }
+            diary["importance"]?.let { field ->
+                val score = (field as? JsonPrimitive)?.intOrNull
+                if (score == null) diary.remove("importance")
+                else diary["importance"] = JsonPrimitive(score)
+            }
+            result["diaryDelta"] = JsonObject(diary)
+        }
+    }
+    return JsonObject(result)
 }
