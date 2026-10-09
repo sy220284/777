@@ -32,4 +32,3 @@ data class AppSettings(
     /** 0=clearer/more opaque, 1=more transparent; 0.5 preserves the previous visual baseline. */
     val wallpaperSurfaceTransparency: Float = 0.5f,
 )
-
