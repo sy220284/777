@@ -237,7 +237,7 @@ class LocalWorkspaceTest {
         val large = root.resolve("resume-lines.txt")
         large.bufferedWriter().use { writer ->
             repeat(5_500) { line ->
-                writer.append(if (line == 5_499) "late-line-needle\\n" else "regular row\\n")
+                writer.append(if (line == 5_499) "late-line-needle\n" else "regular row\n")
             }
         }
         val resumed = workspace.search("late-line-needle", "resume-lines.txt", cursor = "0:5000")
