@@ -176,6 +176,7 @@ class McpToolBridgePlugin(
     private val mutex = Mutex()
     private val servers = linkedMapOf<String, ServerBinding>()
     private val connectingIds = linkedSetOf<String>()
+    private val reconnectingIds = linkedSetOf<String>()
     private var connectingDrained: CompletableDeferred<Unit>? = null
     private var acceptingConnections = true
 
@@ -425,10 +426,14 @@ class McpToolBridgePlugin(
         transport: String,
         displayTarget: String,
         clientFactory: () -> McpClient,
+        fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)
         mutex.withLock {
             require(acceptingConnections) { "MCP 插件正在卸载，暂不接受新连接" }
+            require(serverId !in reconnectingIds || fromReconnect) {
+                "MCP 服务正在重连：$serverId"
+            }
             require(serverId !in servers && serverId !in connectingIds) {
                 "MCP 服务已连接或正在连接：$serverId"
             }
@@ -563,17 +568,33 @@ class McpToolBridgePlugin(
 
     private suspend fun reconnect(context: HarnessContext, rawId: String): String {
         val serverId = validateServerId(rawId)
-        val existing = mutex.withLock { servers[serverId] }
-            ?: error("MCP 服务未连接：$serverId。请先用 mcp_http_connect 或 mcp_stdio_connect 建立连接")
-        // Explicit operator action only: drain in-flight calls, close old transport, then discover
-        // and register a fresh one. Never replay a failed remote tools/call.
-        disconnect(context, serverId)
-        return connect(context, serverId, existing.transport, existing.displayTarget, existing.clientFactory)
+        val existing = mutex.withLock {
+            require(reconnectingIds.add(serverId)) { "MCP 服务正在重连：$serverId" }
+            servers[serverId]
+        }
+        try {
+            requireNotNull(existing) {
+                "MCP 服务未连接：$serverId。请先用 mcp_http_connect 或 mcp_stdio_connect 建立连接"
+            }
+            // Reconnect only after in-flight calls drain; never replay the failed tools/call.
+            disconnect(context, serverId, fromReconnect = true)
+            return connect(context, serverId, existing.transport, existing.displayTarget,
+                existing.clientFactory, fromReconnect = true)
+        } finally {
+            withContext(NonCancellable) { mutex.withLock { reconnectingIds.remove(serverId) } }
+        }
     }
 
-    private suspend fun disconnect(context: HarnessContext, rawId: String): String {
+    private suspend fun disconnect(
+        context: HarnessContext,
+        rawId: String,
+        fromReconnect: Boolean = false,
+    ): String {
         val serverId = validateServerId(rawId)
         val prepared = mutex.withLock {
+            require(serverId !in reconnectingIds || fromReconnect) {
+                "MCP 服务正在重连：$serverId"
+            }
             val binding = servers[serverId] ?: return@withLock null
             binding to binding.beginDisconnect()
         } ?: return "MCP 服务未连接：$serverId"
