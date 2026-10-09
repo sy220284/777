@@ -17,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,8 +63,10 @@ fun DsSegmented(
     role: Role = Role.RadioButton,
     enabled: Boolean = true,
     stretch: Boolean = false,
+    hapticOnChange: Boolean = false,
 ) {
     val colors = DsTheme.colors
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier
             .clip(DsShapes.pillFull)
@@ -81,7 +85,12 @@ fun DsSegmented(
                 selected = segment.key == selectedKey,
                 enabled = enabled,
                 role = role,
-                onClick = { onSelect(segment.key) },
+                onClick = {
+                    if (hapticOnChange && segment.key != selectedKey) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onSelect(segment.key)
+                },
                 modifier = Modifier.weight(1f, fill = stretch),
             )
         }

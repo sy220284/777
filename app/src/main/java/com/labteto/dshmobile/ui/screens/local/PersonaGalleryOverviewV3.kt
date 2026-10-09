@@ -439,14 +439,14 @@ internal fun PersonaGalleryOverviewV3(
                                 },
                                 onTogglePin = { persistPinned(pinnedIds - entry.id) },
                                 onMove = { direction ->
-                                    persistOrder(
-                                        movePersonaGalleryEntry(
-                                            orderIds,
-                                            entry.id,
-                                            direction,
-                                            pinnedEntries.mapTo(linkedSetOf(), PersonaGalleryEntry::id),
-                                        ),
+                                    val moved = movePersonaGalleryEntry(
+                                        orderIds, entry.id, direction,
+                                        pinnedEntries.mapTo(linkedSetOf(), PersonaGalleryEntry::id),
                                     )
+                                    if (moved == orderIds) false else {
+                                        persistOrder(moved)
+                                        true
+                                    }
                                 },
                             )
                         }
@@ -478,14 +478,14 @@ internal fun PersonaGalleryOverviewV3(
                                 },
                                 onTogglePin = { persistPinned(pinnedIds + entry.id) },
                                 onMove = { direction ->
-                                    persistOrder(
-                                        movePersonaGalleryEntry(
-                                            orderIds,
-                                            entry.id,
-                                            direction,
-                                            regularEntries.mapTo(linkedSetOf(), PersonaGalleryEntry::id),
-                                        ),
+                                    val moved = movePersonaGalleryEntry(
+                                        orderIds, entry.id, direction,
+                                        regularEntries.mapTo(linkedSetOf(), PersonaGalleryEntry::id),
                                     )
+                                    if (moved == orderIds) false else {
+                                        persistOrder(moved)
+                                        true
+                                    }
                                 },
                             )
                         }

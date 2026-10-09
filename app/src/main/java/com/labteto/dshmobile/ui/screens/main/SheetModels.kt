@@ -201,6 +201,7 @@ private fun ModelRow(
                     DsSegmented(
                         segments = efforts.map { DsSegment(it.id, it.name) },
                         selectedKey = selectedEffort,
+                        hapticOnChange = true,
                         onSelect = onSelectEffort,
                     )
                 }

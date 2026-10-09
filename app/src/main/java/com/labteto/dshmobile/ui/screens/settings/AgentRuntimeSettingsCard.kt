@@ -33,6 +33,7 @@ import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -126,6 +127,7 @@ private fun StepperRow(
 ) {
     val colors = DsTheme.colors
     val focusManager = LocalFocusManager.current
+    val tick = rememberHapticPulse(minIntervalMillis = 90L)
     var draft by remember(value) { mutableStateOf(value.toString()) }
 
     fun applyValue(candidate: Int, announce: Boolean) {
@@ -138,7 +140,9 @@ private fun StepperRow(
 
     fun applyDelta(delta: Int, announce: Boolean) {
         val base = draft.toIntOrNull()?.coerceIn(range.first, range.last) ?: value
-        applyValue(base + delta, announce)
+        val next = (base + delta).coerceIn(range.first, range.last)
+        if (next != value) tick()
+        applyValue(next, announce)
     }
 
     fun commitDraft(announce: Boolean) {
@@ -221,7 +225,10 @@ private fun StepperRow(
             maximumLabel?.let { labelText ->
                 DsButton(
                     text = labelText,
-                    onClick = { applyValue(range.last, announce = true) },
+                    onClick = {
+                    if (value < range.last) tick()
+                    applyValue(range.last, announce = true)
+                },
                     enabled = value < range.last,
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Ghost,

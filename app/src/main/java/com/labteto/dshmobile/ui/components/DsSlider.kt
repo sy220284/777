@@ -19,11 +19,20 @@ fun DsSlider(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
+    hapticSegments: Int = 0,
 ) {
     val colors = DsTheme.colors
+    val tick = rememberHapticTickFeedback(
+        hapticTickIndex(value, valueRange.start, valueRange.endInclusive, hapticSegments),
+    )
     Slider(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = { next ->
+            if (hapticSegments > 0) {
+                tick(hapticTickIndex(next, valueRange.start, valueRange.endInclusive, hapticSegments))
+            }
+            onValueChange(next)
+        },
         modifier = modifier,
         enabled = enabled,
         valueRange = valueRange,
