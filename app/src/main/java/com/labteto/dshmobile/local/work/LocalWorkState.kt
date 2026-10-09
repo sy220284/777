@@ -26,6 +26,8 @@ data class LocalAgentTeamUiState(
         get() = members.count { it.phase == "failed" || it.activity == "failed" }
     val completedTaskCount: Int
         get() = tasks.count { it.status == "completed" }
+    val returnedMemberCount: Int
+        get() = members.count { it.resultMessageCount > 0 || it.activity == "completed" }
     val blockedTaskCount: Int
         get() = tasks.count {
             it.status == "pending" && !it.ready && it.blockedByTitles.isNotEmpty()
@@ -58,7 +60,10 @@ data class LocalAgentTeamMemberUiState(
     val pendingMessageCount: Int = 0,
     val error: String? = null,
     val hasCurrentTaskResult: Boolean = false,
+    val displayName: String = "",
 ) {
+    val friendlyName: String
+        get() = displayName.ifBlank { teamMemberFriendlyName(name) }
     val canReceiveMessage: Boolean
         get() = phase == "active"
 
@@ -100,3 +105,14 @@ data class LocalAgentTeamActivityUiState(
     val status: String,
     val memberName: String? = null,
 )
+
+internal fun teamMemberFriendlyName(name: String): String = when {
+    name.contains("web", true) || name.contains("network", true) -> "联网验证员"
+    name.contains("capability", true) || name.contains("tool", true) -> "能力检查员"
+    name.contains("workspace", true) || name.contains("audit", true) -> "工作区审计员"
+    name.contains("code", true) || name.contains("developer", true) -> "开发工程师"
+    name.contains("test", true) || name.contains("qa", true) -> "测试工程师"
+    name.contains("research", true) -> "研究助手"
+    name.contains("review", true) -> "审查助手"
+    else -> "协作助手" + ((name.hashCode().ushr(1) % 90) + 10)
+}
