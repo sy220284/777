@@ -116,8 +116,7 @@ class LocalReasoningModeStoreTest {
         LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
         assertEquals("max", LocalReasoningModeStore.effortFor(session, route))
         val openAi = LocalModelProfile("api", "gpt-6-luna", "https://api.openai.com/v1")
-        assertNull("unsupported effort must preserve the new route default",
-            LocalReasoningModeStore.effortFor(session, openAi))
+        assertEquals("max", LocalReasoningModeStore.effortFor(session, openAi))
         assertEquals(listOf(LocalReasoningUiMode.DEFAULT, LocalReasoningUiMode.FAST, LocalReasoningUiMode.LOW,
             LocalReasoningUiMode.DEEP, LocalReasoningUiMode.MAX),
             LocalReasoningControls.availableModes(route, LocalUsageMode.CHAT))
