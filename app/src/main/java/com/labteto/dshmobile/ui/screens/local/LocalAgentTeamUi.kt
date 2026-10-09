@@ -39,6 +39,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalAgentTeamMemberUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamTaskUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
+import com.labteto.dshmobile.local.work.teamMemberFriendlyName
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -943,7 +944,9 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
                 Icon(painterResource(R.drawable.ic_ui_task_subagent), contentDescription = null, tint = colors.labelSecondary)
                 Column(Modifier.weight(1f)) {
                     Text(
-                        listOfNotNull(activity.memberName, stringResource(status)).joinToString(" · "),
+                        listOfNotNull(activity.memberName?.let { name ->
+                            team.members.firstOrNull { it.name == name }?.friendlyName ?: teamMemberFriendlyName(name)
+                        }, stringResource(status)).joinToString(" · "),
                         style = DsType.small13Strong,
                         color = if (activity.status == "failed") colors.error else colors.labelPrimary,
                     )
