@@ -78,10 +78,14 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
     private fun decodeZip(bytes: ByteArray): LinkedHashMap<String, ByteArray> {
         val raw = linkedMapOf<String, ByteArray>()
         var expanded = 0L
+        var entryCount = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
+                entryCount++
+                require(entryCount <= MAX_ENTRY_COUNT) { "技能包目录和文件数量超过安全限制" }
                 val name = entry.name
+                require(name.length <= 512 && name.count { it == '/' } <= 16) { "技能包文件路径过长或嵌套过深" }
                 require(name.isNotBlank() && '\\' !in name && !name.startsWith("/") &&
                     ':' !in name && name.split('/').none { it == "." || it == ".." || it.isEmpty() && !name.endsWith("/") }) {
                     "技能包包含不安全的文件路径"
