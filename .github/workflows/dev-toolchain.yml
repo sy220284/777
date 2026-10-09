@@ -101,7 +101,23 @@ jobs:
       - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          # Keep app JVM test execution isolated from R8/Lint and other Gradle workers.
+          # Its existing two-minute hang/deadlock timeout remains unchanged; competing
+          # minification once pushed a healthy test run across that bound.
+          ./gradlew :app:testDebugUnitTest --max-workers=2 --no-parallel --stacktrace --console=plain
+          ./gradlew \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :reference-validation:test \
+            --max-workers=2 --no-parallel --stacktrace --console=plain
+          # Build/lint use the outputs of the completed tests; no test deadline
+          # now competes with resource-heavy R8 and APK packaging.
+          ./gradlew :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleOptimized \
+            --max-workers=2 --stacktrace --console=plain
 
       - name: 拆分并校验组件包
         run: |
