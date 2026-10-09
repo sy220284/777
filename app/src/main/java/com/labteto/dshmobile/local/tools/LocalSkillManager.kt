@@ -145,8 +145,8 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
 
     fun installed(): List<LocalInstalledSkill> = workspace.skills().map { name ->
         try {
-            val doc = workspace.readRaw(".dsh/skills/" + name + "/SKILL.md")
-            val metadata = parseLocalSkillMetadata(name, doc)
+            val metadata = workspace.skillMetadata(name)
+            val doc = workspace.readSkill(name)
             val display = metadata.displayName
                 ?: LocalPresetSkillCatalog.entries.firstOrNull { it.id == name }?.title
                 ?: doc.lineSequence().firstOrNull { it.trimStart().startsWith("# ") }
