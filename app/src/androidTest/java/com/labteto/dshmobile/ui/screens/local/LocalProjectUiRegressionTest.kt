@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
@@ -84,7 +84,7 @@ class LocalProjectUiRegressionTest {
         }
         val label = context.getString(R.string.local_project_delete)
         compose.onNodeWithText(label).performScrollTo().performClick()
-        compose.onAllNodesWithText(label)[1].performClick()
+        compose.onNodeWithTag("local_project_confirm_delete").performClick()
         compose.waitUntil(5_000) { called == 1 }
         compose.runOnIdle {
             assertEquals("local-workspace", catalog.value.activeId)
