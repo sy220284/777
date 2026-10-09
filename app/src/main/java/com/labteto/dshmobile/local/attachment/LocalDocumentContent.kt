@@ -149,6 +149,7 @@ internal object LocalDocumentContent {
 
     private fun extractXlsx(file: File, maxChars: Int): LocalDocumentText {
         val out = BoundedText(maxChars)
+        var incomplete = false
         withSafeZip(file) { zip ->
             val shared = zip.readEntryText("xl/sharedStrings.xml")
                 ?.let(::xlsxSharedStrings)
@@ -157,29 +158,37 @@ internal object LocalDocumentContent {
                 .map { it.name }
                 .filter { it.matches(Regex("""xl/worksheets/sheet\d+\.xml""")) }
                 .sortedWith(compareBy { sheetNumber(it) })
-                .take(200)
                 .toList()
-            sheets.forEachIndexed { index, name ->
-                val xml = zip.readEntryText(name) ?: return@forEachIndexed
+            for ((index, name) in sheets.withIndex()) {
+                if (out.truncated) break
+                val xml = zip.readEntryText(name)
+                if (xml == null) {
+                    incomplete = true
+                    continue
+                }
                 out.appendLine("[工作表 ${index + 1}]")
                 xlsxCells(xml, shared).forEach(out::appendLine)
-                if (out.truncated) return@forEachIndexed
             }
         }
-        return LocalDocumentText("Excel XLSX", out.value(), out.truncated)
+        return LocalDocumentText("Excel XLSX", out.value(), out.truncated || incomplete)
     }
 
     private fun extractPptx(file: File, maxChars: Int): LocalDocumentText {
         val out = BoundedText(maxChars)
+        var incomplete = false
         withSafeZip(file) { zip ->
             val slides = zip.entries().asSequence()
                 .map { it.name }
                 .filter { it.matches(Regex("""ppt/slides/slide\d+\.xml""")) }
                 .sortedWith(compareBy { slideNumber(it) })
-                .take(300)
                 .toList()
-            slides.forEachIndexed { index, name ->
-                val xml = zip.readEntryText(name) ?: return@forEachIndexed
+            for ((index, name) in slides.withIndex()) {
+                if (out.truncated) break
+                val xml = zip.readEntryText(name)
+                if (xml == null) {
+                    incomplete = true
+                    continue
+                }
                 val text = officeTextRuns(xml, "a:t", "a:p")
                 if (text.isNotBlank()) {
                     out.appendLine("[幻灯片 ${index + 1}]")
@@ -187,7 +196,7 @@ internal object LocalDocumentContent {
                 }
             }
         }
-        return LocalDocumentText("PowerPoint PPTX", out.value(), out.truncated)
+        return LocalDocumentText("PowerPoint PPTX", out.value(), out.truncated || incomplete)
     }
 
     private fun extractOpenDocument(file: File, extension: String, maxChars: Int): LocalDocumentText {
