@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun LocalConversationComposer(
     state: LocalConversationSurfaceState,
+    skillDisplayNames: Map<String, String> = emptyMap(),
     activeModelProfile: LocalModelProfile?,
     input: String,
     attachments: List<LocalImportedAttachment>,
@@ -86,7 +87,9 @@ internal fun LocalConversationComposer(
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val colors = DsTheme.colors
-    val skillCallTransformation = remember(colors.accent) { LocalSkillCallVisualTransformation(colors.accent) }
+    val skillCallTransformation = remember(colors.accent, skillDisplayNames) {
+        LocalSkillCallVisualTransformation(colors.accent, skillDisplayNames)
+    }
     val backgroundState = LocalAppBackgroundState.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
