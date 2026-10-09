@@ -16,8 +16,10 @@ internal fun withWorkTurnContext(
     history: List<JsonObject>,
     stableContext: String,
     dynamicContext: String,
+    selectedSkillContext: String = "",
 ): List<JsonObject> {
-    if (stableContext.isBlank() && dynamicContext.isBlank()) return history
+    if (stableContext.isBlank() && dynamicContext.isBlank() && selectedSkillContext.isBlank()) return history
+    require(selectedSkillContext.length <= MAX_SELECTED_SKILL_CHARS) { "所选技能规则超过 24,000 字符，请缩短后重试" }
 
     val dynamicReserve = minOf(WORK_DYNAMIC_CONTEXT_RESERVE_CHARS, dynamicContext.length)
     val stableBudget = (MAX_EPHEMERAL_CONTEXT_CHARS - dynamicReserve).coerceAtLeast(0)
@@ -46,7 +48,18 @@ internal fun withWorkTurnContext(
         }
         result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, dynamicMessage)
     }
+    if (selectedSkillContext.isNotBlank()) {
+        val skillMessage = buildJsonObject {
+            put("role", "system")
+            put("content", selectedSkillContext)
+        }
+        val currentUserIndex = result.indexOfLast { message ->
+            message["role"]?.jsonPrimitive?.contentOrNull == "user"
+        }
+        result.add(if (currentUserIndex >= 0) currentUserIndex else result.size, skillMessage)
+    }
     return result
 }
 
 private const val WORK_DYNAMIC_CONTEXT_RESERVE_CHARS = 4_000
+private const val MAX_SELECTED_SKILL_CHARS = 24_000
