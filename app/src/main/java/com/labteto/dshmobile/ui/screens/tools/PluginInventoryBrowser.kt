@@ -58,6 +58,7 @@ private data class InventoryRow(
     val remote: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
     val available: Boolean = true,
+    val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
     val installablePreset: Boolean = false,
 )
@@ -151,7 +152,7 @@ internal fun PluginInventoryBrowser(
         val display = presets.firstOrNull { it.id == skill.name }?.title ?: skill.name
         InventoryRow("skill:" + skill.name, display, skill.description,
             remote = false, icon = FeatherIcons.BookOpen,
-            available = skill.modelInvocable, installedSkill = true)
+            available = true, modelInvocable = skill.modelInvocable, installedSkill = true)
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         InventoryRow("skill:" + preset.id, preset.title, preset.description,
@@ -330,7 +331,7 @@ internal fun PluginInventoryBrowser(
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
-            if (item.installedSkill && !item.available) {
+            if (item.installedSkill && !item.modelInvocable) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
             }
 
@@ -358,7 +359,7 @@ internal fun PluginInventoryBrowser(
                         color = colors.labelSecondary,
                     )
                     DsSwitch(
-                        checked = item.available,
+                        checked = item.modelInvocable,
                         onCheckedChange = {
                             onSetSkillModelInvocable(item.id.substringAfter(":"), it)
                             selectedRow = null
