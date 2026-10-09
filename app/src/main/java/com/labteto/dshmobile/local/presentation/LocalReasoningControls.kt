@@ -13,6 +13,18 @@ import com.labteto.dshmobile.local.model.LocalReasoningModeStore
  */
 internal enum class LocalReasoningUiMode { DEFAULT, FAST, LOW, DEEP, MAX }
 
+/** Presentation boundary for Work sampling; UI never imports the persistence implementation. */
+internal object LocalWorkTemperatureControls {
+    fun attach(context: Context) =
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
+
+    fun level(sessionId: String): Int =
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.level(sessionId)
+
+    fun setLevel(sessionId: String, level: Int) =
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.setLevel(sessionId, level)
+}
+
 internal object LocalReasoningControls {
     fun mode(sessionId: String, usageMode: LocalUsageMode? = null): LocalReasoningUiMode =
         when (LocalReasoningModeStore.mode(sessionId, defaultChatFast = usageMode == LocalUsageMode.CHAT)) {
