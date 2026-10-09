@@ -112,7 +112,11 @@ internal fun LocalConversationComposer(
     val expanded = state.usageMode == LocalUsageMode.WORK || focused || input.contains('\n') || attachments.isNotEmpty() ||
         teamDispatchSelected || capabilityPanel != null
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
+    // A chat temperature change is committed asynchronously. Do not submit the next
+    // turn with the old sampling value while the new persona setting is still saving.
+    val temperatureWritePending = state.usageMode == LocalUsageMode.CHAT && temperatureSaving
     val canSend = !state.loading &&
+        !temperatureWritePending &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
     val moreActionsLabel = stringResource(R.string.local_composer_more_actions)
@@ -140,6 +144,7 @@ internal fun LocalConversationComposer(
     }
 
     fun submit() {
+        if (temperatureWritePending) return
         // Sending is a conversation action, even when the model is not configured.
         // Let the send coordinator reject it with visible feedback and keep the draft.
         val result = if (
