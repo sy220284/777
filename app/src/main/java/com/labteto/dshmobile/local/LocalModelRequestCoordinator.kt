@@ -70,7 +70,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val foregroundCompaction: LocalForegroundHistoryCompactionRuntime,
     @ApplicationContext context: Context,
 ) {
-    init { LocalReasoningModeStore.attach(context) }
+    init {
+        LocalReasoningModeStore.attach(context)
+        com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
+    }
 
     private val resourceScheduler
         get() = runtimeStateStore.resourceScheduler
@@ -127,7 +130,18 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         )
         val runSurface = frozenProfile.toRunModelSurface()
         // Freeze per-turn model reasoning preference before admission and retries.
-        val reasoningEffort = LocalReasoningModeStore.effortFor(snapshot.sessionId, frozenProfile, tools.isNotEmpty())
+        val reasoningEffort = LocalReasoningModeStore.effortFor(
+            sessionId = snapshot.sessionId,
+            profile = frozenProfile,
+            withTools = tools.isNotEmpty(),
+            defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
+        )
+        // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
+        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
+            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
+                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+            )
+        } else null
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
@@ -407,7 +421,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("request_envelope_fingerprint", requestEnvelopeFingerprint)
             put("plan_mode", snapshot.work.planMode)
             reasoningEffort?.let { put("reasoning_effort", it) }
-            temperature?.let { put("temperature", it) }
+            effectiveTemperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
             put("version", REQUEST_EVIDENCE_VERSION)
@@ -684,7 +698,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         add(JsonPrimitive(activeEvidence.messageDigest))
                         add(JsonPrimitive(activeEvidence.resolvedToolSurfaceDigest))
                         add(JsonPrimitive(activeEvidence.contextDigest))
-                        add(JsonPrimitive(temperature?.toString() ?: "null"))
+                        add(JsonPrimitive(effectiveTemperature?.toString() ?: "null"))
                         add(JsonPrimitive(reasoningEffort ?: "default"))
                         add(JsonPrimitive(cacheComparisonResponseId ?: "null"))
                         add(JsonPrimitive(promptCacheKey ?: "null"))
@@ -708,7 +722,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("image_generation_requested", allowImageGeneration)
                             put("image_generation_enabled", effectiveImageGeneration)
                             put("native_tool_names", nativeTools)
-                            temperature?.let { put("temperature", it) }
+                            effectiveTemperature?.let { put("temperature", it) }
                             cacheComparisonResponseId?.let {
                                 put("prompt_cache_comparison_response_id", it)
                             }
@@ -764,7 +778,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 messages = activeMessages,
                                 tools = tools,
                                 streaming = true,
-                                temperature = temperature,
+                                temperature = effectiveTemperature,
                                 reasoningEffort = reasoningEffort,
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,

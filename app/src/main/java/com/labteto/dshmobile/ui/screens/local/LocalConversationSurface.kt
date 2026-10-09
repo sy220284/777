@@ -73,6 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.presentation.LocalWorkTemperatureControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
@@ -184,10 +185,16 @@ internal fun LocalConversationSurface(
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
-    var reasoningMode by remember(state.sessionId) {
+    var reasoningMode by remember(state.sessionId, state.usageMode) {
         LocalReasoningControls.attach(appContext)
-        mutableStateOf(LocalReasoningControls.mode(state.sessionId))
+        mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
+    var workTemperatureLevel by remember(state.sessionId) {
+        LocalWorkTemperatureControls.attach(appContext)
+        androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureControls.level(state.sessionId))
+    }
+    var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
+    var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
     val drafts = rememberSaveable(
         saver = listSaver(
             save = { cache -> cache.save() },
@@ -890,9 +897,46 @@ internal fun LocalConversationSurface(
             onClearTeamDispatch = { teamDispatchSelected = false },
             onStop = onStop,
             reasoningMode = reasoningMode,
+            temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
+                workTemperatureLevel
+            } else {
+                state.chatState.behaviorTuning.composerTemperatureLevel()
+            },
+            temperaturePosition = if (state.usageMode == LocalUsageMode.CHAT) {
+                state.chatState.behaviorTuning.expressionVariation
+            } else null,
+            temperatureSaveFailed = temperatureSaveFailed,
+            temperatureSaving = temperatureSaving,
+            temperatureGroupChat = state.groupChat.enabled,
+            temperatureEnabled = state.usageMode == LocalUsageMode.WORK ||
+                (!state.groupChat.enabled && !temperatureSaving && !state.loading && !state.running),
+            onTemperatureLevelChange = { level ->
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    LocalWorkTemperatureControls.setLevel(state.sessionId, level)
+                    workTemperatureLevel = LocalWorkTemperatureControls.level(state.sessionId)
+                } else if (!state.groupChat.enabled && !temperatureSaving &&
+                    !state.loading && !state.running) {
+                    temperatureSaving = true
+                    temperatureSaveFailed = false
+                    scope.launch {
+                        try {
+                            val proposed = state.chatPersona.copy(
+                                behaviorTuning = state.chatState.behaviorTuning.withComposerTemperatureLevel(level),
+                            )
+                            temperatureSaveFailed = onConfigureChatPersona(proposed).isFailure
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            temperatureSaveFailed = true
+                        } finally {
+                            temperatureSaving = false
+                        }
+                    }
+                }
+            },
             onReasoningModeChange = { mode ->
                 LocalReasoningControls.setMode(state.sessionId, mode)
-                reasoningMode = LocalReasoningControls.mode(state.sessionId)
+                reasoningMode = LocalReasoningControls.mode(state.sessionId, state.usageMode)
             },
             onPlanModeChange = onPlanModeChange,
             onFocusChanged = { focused ->
@@ -960,13 +1004,18 @@ internal fun LocalConversationSurface(
         portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
         state = state.chatState,
         temperatureTuningAvailable = activeModelProfile?.let { profile ->
+            val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)
             LocalModelPresets.runtimeCapabilitiesFor(
                 model = profile.model,
                 baseUrl = profile.baseUrl,
                 protocol = profile.protocol,
                 authKind = profile.authKind,
-            ).temperature
-        } ?: true,
+            ).temperature && range != null &&
+                (!range.requiresDisabledThinking || reasoningMode == LocalReasoningUiMode.FAST)
+        } ?: false,
+        temperatureRange = activeModelProfile?.let {
+            LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+        },
         onConfigurePersona = onConfigureChatPersona,
         onDismiss = { showCharacterTuning = false },
     )

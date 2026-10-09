@@ -140,6 +140,34 @@ data class LocalPromptCachePolicy(
     val supportsCacheOptions: Boolean = false,
 )
 
+/**
+ * Provider-verified chat sampling window, separate from the 0..100 user control.
+ * Keeping a documented middle anchor means neutral (50) is useful for conversation while
+ * 0 and 100 reach the *exact inclusive* provider bounds.
+ */
+data class LocalModelTemperatureRange(
+    val minimum: Double,
+    val maximum: Double,
+    val chatDefault: Double,
+    val requiresDisabledThinking: Boolean = false,
+    val omitAtChatDefault: Boolean = false,
+) {
+    init {
+        require(minimum.isFinite() && maximum.isFinite() && chatDefault.isFinite())
+        require(minimum < maximum && chatDefault in minimum..maximum)
+    }
+
+    fun at(position: Int): Double {
+        val safe = position.coerceIn(0, 100)
+        return when {
+            safe == 0 -> minimum
+            safe == 100 -> maximum
+            safe <= 50 -> minimum + (chatDefault - minimum) * (safe / 50.0)
+            else -> chatDefault + (maximum - chatDefault) * ((safe - 50) / 50.0)
+        }
+    }
+}
+
 data class LocalModelRuntimeCapabilities(
     val streaming: Boolean = true,
     val toolCalling: Boolean = true,
@@ -560,6 +588,36 @@ object LocalModelPresets {
 
     fun protocolFor(model: String, baseUrl: String): LocalModelProtocol =
         find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+
+    /**
+     * Only expose a Chat slider where the exact official model/host has verified inclusive
+     * sampling bounds. Unknown proxies, fixed-temperature models and models without a
+     * verified range keep provider defaults rather than making up endpoints.
+     *
+     * DeepSeek: https://api-docs.deepseek.com/zh-cn/api/create-chat-completion
+     *            https://api-docs.deepseek.com/zh-cn/quick_start/parameter_settings/
+     * Gemini:   https://ai.google.dev/api/generate-content (0..2)
+     * Gemini 3 recommends temperature=1.0; its center anchor follows that guidance.
+     */
+    fun chatTemperatureRangeFor(model: String, baseUrl: String): LocalModelTemperatureRange? {
+        val normalized = runCatching { normalizeModelBaseUrl(baseUrl).lowercase() }.getOrNull()
+            ?: return null
+        // Both official DeepSeek entrypoints are equivalent; proxies cannot inherit the range.
+        if (normalized in setOf("https://api.deepseek.com", "https://api.deepseek.com/v1") &&
+            model.lowercase() in setOf("deepseek-flash", "deepseek-v4-pro")) {
+            return LocalModelTemperatureRange(0.0, 2.0, 1.3, requiresDisabledThinking = true)
+        }
+        val preset = find(model, baseUrl) ?: return null
+        if (!preset.temperatureSupported) return null
+        return when (preset.provider) {
+            // Gemini 3.x recommends leaving sampling parameters unset at the normal default.
+            "Google Gemini" -> LocalModelTemperatureRange(
+                0.0, 2.0, 1.0, omitAtChatDefault = true,
+            )
+            // Others require a model-specific confirmed range or a fixed-value/unsupported rule.
+            else -> null
+        }
+    }
 
     fun samplingTemperatureFor(model: String, baseUrl: String, requested: Double?): Double? =
         requested?.takeIf { find(model, baseUrl)?.temperatureSupported != false }

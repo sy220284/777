@@ -1678,6 +1678,8 @@
     <string name="local_character_tuning_expression_variation">表达变化度</string>
     <string name="local_character_tuning_expression_variation_low">稳定</string>
     <string name="local_character_tuning_expression_variation_high">丰富</string>
+    <string name="local_character_tuning_temperature_value">温度 %1$.2f · %2$d</string>
+    <string name="local_character_tuning_temperature_provider_default">温度 %1$.2f（模型默认）· %2$d</string>
 
     <string name="app_tool_search_results">搜索结果</string>
     <string name="app_tool_web_content">网页内容</string>
@@ -1822,6 +1824,20 @@
     <string name="persona_gallery_notes_done">收起</string>
     <string name="persona_gallery_notes_empty">记下关键经历，下次继续更容易衔接。</string>
     <string name="local_composer_reasoning_title">思考强度</string>
+    <string name="local_composer_temperature_title">温度调节</string>
+    <string name="local_composer_temperature_work_low">严谨</string>
+    <string name="local_composer_temperature_natural">自然</string>
+    <string name="local_composer_temperature_work_high">创意</string>
+    <string name="local_composer_temperature_chat_low">呆瓜</string>
+    <string name="local_composer_temperature_chat_high">疯癫</string>
+    <string name="local_composer_temperature_unavailable">当前模型未核实可调温度范围，使用模型默认设置</string>
+    <string name="local_composer_temperature_thinking">当前思考档位下温度不会生效，请先切换到关闭思考</string>
+    <string name="local_composer_temperature_group_hint">群聊人物分别保存表达变化度，请在各人物设置中调整</string>
+    <string name="local_composer_temperature_saving">正在保存人物温度设置</string>
+    <string name="local_composer_temperature_busy">会话忙碌，请在回复结束后调整温度</string>
+    <string name="local_composer_temperature_value">温度 %1$.2f</string>
+    <string name="local_composer_temperature_provider_default">模型默认（%1$.2f）</string>
+    <string name="local_composer_temperature_save_failed">人物温度保存失败，请重试</string>
     <string name="local_composer_reasoning_default">默认</string>
     <string name="local_composer_reasoning_off">关闭</string>
     <string name="local_composer_reasoning_short_off">关</string>

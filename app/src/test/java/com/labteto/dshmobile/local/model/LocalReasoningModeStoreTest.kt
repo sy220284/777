@@ -10,6 +10,59 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
+    @Test fun workTemperatureKeepsSessionSelectionAndUsesOfficialBounds() {
+        val first = "work-temp-a-20261009"
+        val second = "work-temp-b-20261009"
+        try {
+            assertEquals(2, LocalWorkTemperatureStore.level(first))
+            LocalWorkTemperatureStore.setLevel(first, 0)
+            assertEquals(0.0, LocalWorkTemperatureStore.requestTemperature(
+                first, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.0)
+            LocalWorkTemperatureStore.setLevel(first, 4)
+            assertEquals(2.0, LocalWorkTemperatureStore.requestTemperature(
+                first, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.0)
+            assertEquals(2, LocalWorkTemperatureStore.level(second))
+            assertNull(LocalWorkTemperatureStore.requestTemperature(first, "unknown", "https://example.org"))
+            LocalWorkTemperatureStore.setLevel(first, 2)
+            assertNull(LocalWorkTemperatureStore.requestTemperature(
+                first, "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai",
+            ))
+        } finally {
+            LocalWorkTemperatureStore.setLevel(first, 2)
+            LocalWorkTemperatureStore.setLevel(second, 2)
+        }
+    }
+
+    @Test fun newChatDefaultsToFastWithoutChangingWorkOrExplicitSelections() {
+        val session = "new-chat-fast-default-20261009"
+        val deepSeek = LocalModelProfile("chat-default-ds", "deepseek-flash", "https://api.deepseek.com")
+        val mandatory = LocalModelProfile("chat-default-astra", "gpt-6-astra", "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES)
+        val unsupported = LocalModelProfile("chat-default-custom", "custom", "https://example.com")
+        // No stored preference: Chat disables optional thinking; Work still uses provider default.
+        assertEquals(LocalReasoningMode.FAST, LocalReasoningModeStore.mode(session, defaultChatFast = true))
+        assertEquals(LocalReasoningUiMode.FAST, LocalReasoningControls.mode(session, LocalUsageMode.CHAT))
+        assertEquals(LocalReasoningUiMode.DEFAULT, LocalReasoningControls.mode(session, LocalUsageMode.WORK))
+        assertEquals("none", LocalReasoningModeStore.effortFor(session, deepSeek, defaultChatFast = true))
+        assertNull(LocalReasoningModeStore.effortFor(session, deepSeek))
+        assertEquals("low", LocalReasoningModeStore.effortFor(session, mandatory, defaultChatFast = true))
+        assertNull(LocalReasoningModeStore.effortFor(session, unsupported, defaultChatFast = true))
+        // Manually restoring provider DEFAULT must be distinct from the unset Chat default.
+        try {
+            LocalReasoningControls.setMode(session, LocalReasoningUiMode.DEFAULT)
+            assertEquals(LocalReasoningUiMode.DEFAULT, LocalReasoningControls.mode(session, LocalUsageMode.CHAT))
+            assertNull(LocalReasoningModeStore.effortFor(session, deepSeek, defaultChatFast = true))
+            LocalReasoningControls.setMode(session, LocalReasoningUiMode.DEEP)
+            assertEquals("high", LocalReasoningModeStore.effortFor(session, deepSeek, defaultChatFast = true))
+            LocalReasoningControls.setMode(session, LocalReasoningUiMode.FAST)
+            assertEquals("none", LocalReasoningModeStore.effortFor(session, deepSeek, defaultChatFast = true))
+        } finally {
+            LocalReasoningControls.restoreDefault(session)
+        }
+    }
+
     @Test fun modernGptModelsExposeNativeMaxEffortForApiKeyAndChatGptPlan() {
         val models = listOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-sol", "gpt-6-luna",
             "gpt-6-astra", "gpt-6.1-sol")

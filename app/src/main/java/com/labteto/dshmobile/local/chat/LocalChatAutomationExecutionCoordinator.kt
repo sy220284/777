@@ -598,7 +598,9 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
-        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
+        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
+            profile.model, profile.baseUrl,
+        ),
         profile = profile,
     )
 }

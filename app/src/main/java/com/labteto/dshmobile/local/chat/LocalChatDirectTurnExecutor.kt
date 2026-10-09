@@ -242,7 +242,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     ),
                     persistOverflowHistory = true,
                     requestLog = eventLog,
-                    temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
+                    temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
+                        snapshot.modelState.model, snapshot.modelState.baseUrl,
+                    ),
                     previewGuard = {
                         runtimeStateStore.currentSessionId == sessionId &&
                             runtimeStateStore.state.value.sessionId == sessionId
@@ -288,7 +290,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
                         requestLog = eventLog,
-                        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(),
+                        temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
+                            snapshot.modelState.model, snapshot.modelState.baseUrl,
+                        ),
                         previewGuard = {
                             runtimeStateStore.currentSessionId == sessionId &&
                                 runtimeStateStore.state.value.sessionId == sessionId

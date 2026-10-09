@@ -14,6 +14,44 @@ import org.junit.Test
 
 class LocalModelGatewayRoutingTest {
     @Test
+    fun deepSeekChatSendsOfficialTemperatureExtremesOnlyWithoutThinking() {
+        val profile = LocalModelProfile("ds-range", "deepseek-flash", "https://api.deepseek.com")
+        val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)!!
+        val modelRoute = LocalResolvedModelRoute(
+            profileId = profile.id,
+            provider = "DeepSeek",
+            model = profile.model,
+            baseUrl = profile.baseUrl,
+            authKind = LocalModelAuthKind.API_KEY,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+            bearerToken = "test",
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(profile.model, profile.baseUrl),
+        )
+        val messages = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "你好")
+        })
+        for ((slider, expected) in listOf(0 to 0.0, 50 to 1.3, 100 to 2.0)) {
+            val actual = prepareLocalModelAdapterRequest(
+                route = modelRoute, messages = messages, tools = JsonArray(emptyList()),
+                temperature = range.at(slider), reasoningEffort = "none", streaming = true,
+            )
+            assertEquals(expected, actual.request.temperature!!, 0.000001)
+            val thinking = prepareLocalModelAdapterRequest(
+                route = modelRoute, messages = messages, tools = JsonArray(emptyList()),
+                temperature = range.at(slider), reasoningEffort = "high", streaming = true,
+            )
+            assertNull(thinking.request.temperature)
+            // Provider-default DeepSeek mode enables thinking; its temperature must not be sent.
+            val providerDefault = prepareLocalModelAdapterRequest(
+                route = modelRoute, messages = messages, tools = JsonArray(emptyList()),
+                temperature = range.at(slider), reasoningEffort = null, streaming = true,
+            )
+            assertNull(providerDefault.request.temperature)
+        }
+    }
+
+    @Test
     fun oldEmptyAssistantDoesNotPoisonARequestAfterSwitchingProviders() {
         val empty = buildJsonObject { put("role", "assistant") }
         val user = buildJsonObject { put("role", "user"); put("content", "continue") }

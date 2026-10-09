@@ -14,18 +14,63 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
-    fun expressionVariationKeepsNaturalSamplingAndUsesRestrainedRange() {
-        assertEquals(0.85, CharacterBehaviorTuning().roleplayTemperature(), 0.0001)
-        assertEquals(
-            0.55,
-            CharacterBehaviorTuning(expressionVariation = 0).roleplayTemperature(),
-            0.0001,
-        )
-        assertEquals(
-            1.15,
-            CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(),
-            0.0001,
-        )
+    fun composerAndPersonaShareOneStoredTemperaturePosition() {
+        val fine = CharacterBehaviorTuning(expressionVariation = 60)
+        assertEquals(2, fine.composerTemperatureLevel())
+        val high = fine.withComposerTemperatureLevel(4)
+        assertEquals(100, high.expressionVariation)
+        assertEquals(4, high.composerTemperatureLevel())
+        assertEquals(0, high.withComposerTemperatureLevel(-1).expressionVariation)
+        assertEquals(100, high.withComposerTemperatureLevel(9).expressionVariation)
+    }
+
+    @Test
+    fun expressionVariationUsesOfficialBoundsAndConversationDefault() {
+        val model = "deepseek-flash"
+        val endpoint = "https://api.deepseek.com"
+        assertEquals(1.3, CharacterBehaviorTuning().roleplayTemperature(model, endpoint)!!, 0.000001)
+        assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = 0)
+            .roleplayTemperature(model, endpoint)!!, 0.0)
+        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100)
+            .roleplayTemperature(model, endpoint)!!, 0.0)
+        assertEquals(0.65, CharacterBehaviorTuning(expressionVariation = 25)
+            .roleplayTemperature(model, endpoint)!!, 0.000001)
+        assertEquals(1.65, CharacterBehaviorTuning(expressionVariation = 75)
+            .roleplayTemperature(model, endpoint)!!, 0.000001)
+        assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = -500)
+            .roleplayTemperature(model, endpoint)!!, 0.0)
+        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 500)
+            .roleplayTemperature(model, endpoint)!!, 0.0)
+    }
+
+    @Test
+    fun modelSpecificTemperatureBoundsRejectUnknownAndFixedRoutes() {
+        assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai"))
+        assertEquals(1.0, com.labteto.dshmobile.local.model.LocalModelPresets.chatTemperatureRangeFor(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!.at(50), 0.0)
+        assertEquals(0.0, CharacterBehaviorTuning(expressionVariation = 0).roleplayTemperature(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
+        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
+            "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
+        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
+            "deepseek-flash", "https://api.deepseek.com/v1")!!, 0.0)
+        assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
+            "deepseek-flash", "https://proxy.example.com/v1"))
+        assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
+            "kimi-for-coding", "https://api.kimi.com/coding/v1"))
+        assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
+            "gpt-6-astra", "https://api.openai.com/v1"))
+    }
+
+    @Test
+    fun temperatureRangeSupportsArbitraryVerifiedProviderLimits() {
+        val range = com.labteto.dshmobile.local.model.LocalModelTemperatureRange(0.15, 0.95, 0.75)
+        assertEquals(0.15, range.at(0), 0.0)
+        assertEquals(0.75, range.at(50), 0.0)
+        assertEquals(0.95, range.at(100), 0.0)
+        assertEquals(0.45, range.at(25), 0.000001)
+        assertEquals(0.85, range.at(75), 0.000001)
     }
 
     @Test

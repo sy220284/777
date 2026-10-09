@@ -44,6 +44,7 @@ import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.CharacterEvolutionState
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.LocalModelTemperatureRange
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -74,6 +75,7 @@ internal fun CharacterBehaviorTuningDialogHost(
     portraitPath: String,
     state: ChatCharacterState,
     temperatureTuningAvailable: Boolean = true,
+    temperatureRange: LocalModelTemperatureRange? = null,
     onConfigurePersona: suspend (PersonaProfile) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
@@ -86,6 +88,7 @@ internal fun CharacterBehaviorTuningDialogHost(
         evolution = state.evolution,
         initial = state.behaviorTuning,
         temperatureTuningAvailable = temperatureTuningAvailable,
+        temperatureRange = temperatureRange,
         onSave = { tuning ->
             onConfigurePersona(persona.copy(behaviorTuning = tuning))
         },
@@ -103,6 +106,7 @@ internal fun CharacterBehaviorTuningDialog(
     evolution: CharacterEvolutionState,
     initial: CharacterBehaviorTuning,
     temperatureTuningAvailable: Boolean = true,
+    temperatureRange: LocalModelTemperatureRange? = null,
     onSave: suspend (CharacterBehaviorTuning) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
@@ -431,6 +435,18 @@ internal fun CharacterBehaviorTuningDialog(
                         low = stringResource(R.string.local_character_tuning_expression_variation_low),
                         high = stringResource(R.string.local_character_tuning_expression_variation_high),
                         value = draft.expressionVariation,
+                        displayValue = temperatureRange?.let { range ->
+                            val label = if (range.omitAtChatDefault && draft.expressionVariation == 50) {
+                                R.string.local_character_tuning_temperature_provider_default
+                            } else {
+                                R.string.local_character_tuning_temperature_value
+                            }
+                            stringResource(
+                                label,
+                                range.at(draft.expressionVariation),
+                                draft.expressionVariation,
+                            )
+                        },
                         onValueChange = { draft = draft.copy(expressionVariation = it) },
                         enabled = !saving,
                     )
@@ -498,6 +514,7 @@ private fun BehaviorSlider(
     value: Int,
     onValueChange: (Int) -> Unit,
     enabled: Boolean = true,
+    displayValue: String? = null,
 ) {
     val colors = DsTheme.colors
     val clean = value.coerceIn(0, 100)
@@ -518,7 +535,7 @@ private fun BehaviorSlider(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                "$valueLabel · $clean",
+                displayValue ?: "$valueLabel · $clean",
                 style = DsType.small13Strong.withReadingWeight(),
                 color = colors.characterAccent,
             )
