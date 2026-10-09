@@ -227,7 +227,7 @@ def self_test() -> None:
     assert target not in local_references('val label = "' + target + '"')
     assert target not in local_references("// " + target)
     # A qualified implementation method must not evade the UI internal suffix check.
-    qualified = target + ".execute"
+    qualified = "com.labteto.dshmobile.local.work.LocalWorkCoordinator.execute"
     assert any(part.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES) for part in qualified.split(".")[5:])
 
 
