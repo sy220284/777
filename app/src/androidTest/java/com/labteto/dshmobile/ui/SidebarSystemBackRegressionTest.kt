@@ -1,30 +1,33 @@
 package com.labteto.dshmobile.ui
 
-import androidx.activity.OnBackPressedDispatcher
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private fun pressBackWhenWindowFocused() {
+        // A device-level key event targets the focused window; cold Android 16
+        // emulator runs sometimes finish Compose idle before Activity focus.
+        // Keep the OS Back injection (and the exact-once assertion) intact.
+        compose.waitForIdle()
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.activity.window.decorView.hasWindowFocus()
+        }
+        pressDeviceBack()
+    }
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
         val backCount = AtomicInteger(0)
-        val backDispatcher = AtomicReference<OnBackPressedDispatcher>()
 
         compose.setContent {
-            val backOwner = requireNotNull(LocalOnBackPressedDispatcherOwner.current) {
-                "Compose host must expose its AndroidX system Back dispatcher"
-            }
-            SideEffect { backDispatcher.set(backOwner.onBackPressedDispatcher) }
             DshTheme {
                 PersonaGalleryAddPanel(
                     presets = emptyList(),
@@ -39,21 +42,20 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        pressBackWhenWindowFocused()
+        // A completed shell command does not guarantee UI-thread callback delivery.
+        // Wait for the observable result; a second dispatch still fails the assertion.
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() != 0 }
         compose.waitForIdle()
-        dispatchHostBack(requireNotNull(backDispatcher.get()))
-        compose.runOnIdle { assertEquals(1, backCount.get()) }
+
+        assertEquals(1, backCount.get())
     }
 
     @Test
     fun remoteRelayStatusConsumesSystemBackAndReturnsToLocalAction() {
         val backCount = AtomicInteger(0)
-        val backDispatcher = AtomicReference<OnBackPressedDispatcher>()
 
         compose.setContent {
-            val backOwner = requireNotNull(LocalOnBackPressedDispatcherOwner.current) {
-                "Compose host must expose its AndroidX system Back dispatcher"
-            }
-            SideEffect { backDispatcher.set(backOwner.onBackPressedDispatcher) }
             DshTheme {
                 RemoteRelayStatus(
                     failed = true,
@@ -63,8 +65,12 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        pressBackWhenWindowFocused()
+        // A completed shell command does not guarantee UI-thread callback delivery.
+        // Wait for the observable result; a second dispatch still fails the assertion.
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() != 0 }
         compose.waitForIdle()
-        dispatchHostBack(requireNotNull(backDispatcher.get()))
-        compose.runOnIdle { assertEquals(1, backCount.get()) }
+
+        assertEquals(1, backCount.get())
     }
 }
