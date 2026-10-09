@@ -49,4 +49,29 @@ class LocalWorkPromptContextTest {
         assertEquals(first.take(4), second.take(4))
         assertTrue(second.indexOfFirst { it["content"]?.toString()?.contains("本轮召回记忆-B") == true } > 4)
     }
+    @Test
+    fun explicitlySelectedSkillIsKeptWholeOutsideRecallBudget() {
+        val skill = "SKILL_BEGIN" + "X".repeat(12_000) + "SKILL_END"
+        val result = withWorkTurnContext(
+            history = listOf(message("system", "system"), message("user", "task")),
+            stableContext = "stable".repeat(4_000),
+            dynamicContext = "recall".repeat(4_000),
+            selectedSkillContext = skill,
+        )
+        val selected = result.single { it["content"]?.toString()?.contains("SKILL_BEGIN") == true }
+        assertTrue(selected["content"].toString().contains("SKILL_END"))
+        assertEquals("task", result.last()["content"]?.toString()?.trim('"'))
+    }
+
+    @Test
+    fun oversizeExplicitSkillFailsRatherThanSilentlyTruncating() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            withWorkTurnContext(
+                history = listOf(message("user", "task")),
+                stableContext = "", dynamicContext = "",
+                selectedSkillContext = "x".repeat(24_001),
+            )
+        }
+    }
+
 }
