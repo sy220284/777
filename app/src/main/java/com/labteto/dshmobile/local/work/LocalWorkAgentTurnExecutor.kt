@@ -278,7 +278,8 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
-                            estimateModelTokens(workPromptContext.dynamic)
+                            estimateModelTokens(workPromptContext.dynamic) +
+                            estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         workModelHistoryRuntime.compactIfNeeded(
                             binding = binding,
@@ -289,6 +290,7 @@ internal class LocalWorkAgentTurnExecutor(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
                         workPromptContext.dynamic,
+                        workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(
                         snapshot.modelState.imageInputMode,
