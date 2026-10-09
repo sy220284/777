@@ -119,13 +119,24 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
             val earlierEvents = log.withEvents { all ->
                 all.takeWhile { it.sequence < source.sequence }.toList()
             }
-            val history = restoreLocalModelHistory(
+            val prior = transcript.take(index)
+            val replayed = restoreLocalModelHistory(
                 earlierEvents, emptyList(), ModelHistoryCheckpointCodec(),
             ).messages
-            if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "system") {
+            val history = if (replayed.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+                replayed
+            } else if (prior.isEmpty()) {
+                // Editing the first instruction needs no earlier dialogue. Legacy sessions may
+                // have no system/prompt event before that initial user message.
+                listOf(buildJsonObject {
+                    put("role", "system")
+                    put("content", com.labteto.dshmobile.local.model.workSystemPrompt(
+                        now.workspacePath, now.work.planMode,
+                    ))
+                })
+            } else {
                 return rejected(LocalUserMessageEditResult.HISTORY_UNAVAILABLE)
             }
-            val prior = transcript.take(index)
             val controls = projectWorkSessionControls(LocalWorkState(), earlierEvents)
             val event = log.append("work/active-transcript", buildJsonObject {
                 put("reason", "user-edited")
