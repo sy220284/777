@@ -119,6 +119,18 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun invalidStateCannotBeMaskedBySuggestionsOrUnusableDiary() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        val withSuggestion = """{"state":{"initiative":"略升"},
+            "suggestions":[{"label":"聊聊","text":"你好"}],"turnSignificance":"MINOR"}"""
+        assertEquals("state_patch_unusable", parser.parseFailureKind(withSuggestion))
+        val withoutPerspective = """{"state":{"initiative":"略升"},
+            "diaryDelta":{"event":"今天发生了一件重要的事情","importance":4},
+            "turnSignificance":"MINOR"}"""
+        assertEquals("state_patch_unusable", parser.parseFailureKind(withoutPerspective))
+    }
+
+    @Test
     fun missingStateAndEmptyResponseCannotSilentlySettlePendingChatTurns() {
         val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
         assertEquals("state_patch_missing", parser.parseFailureKind("{}"))
@@ -136,7 +148,7 @@ class ChatInteractionPlannerTest {
         assertEquals("state_patch_unusable", parser.parseFailureKind(bad))
         assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
         assertNotNull(parser.parsePlan(
-            """{"state":{"initiative":"略升"},"diaryDelta":{"event":"真正发生的事情","importance":4},"turnSignificance":"MINOR"}""",
+            """{"state":{"initiative":"略升"},"diaryDelta":{"event":"真正发生的事情","importance":4,"feeling":"当时很开心"},"turnSignificance":"MINOR"}""",
         ))
     }
 

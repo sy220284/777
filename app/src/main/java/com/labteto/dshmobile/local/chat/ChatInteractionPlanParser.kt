@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
 internal data class ParsedChatPostTurnPlan(
@@ -49,14 +50,18 @@ internal class ChatInteractionPlanParser(
                 (field as? JsonObject)?.isNotEmpty() == true
         } == true
         val diary = normalized["diaryDelta"] as? JsonObject
-        val hasDiary = (diary?.get("event") as? kotlinx.serialization.json.JsonPrimitive)
-            ?.takeIf { it.isString }?.content?.isNotBlank() == true
-        val suggestions = normalized["suggestions"] as? kotlinx.serialization.json.JsonArray
-        val hasSuggestions = suggestions?.any { element ->
-            val suggestion = element as? JsonObject
-            (suggestion?.get("text") as? kotlinx.serialization.json.JsonPrimitive)
+        val diaryEvent = (diary?.get("event") as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeIf { it.isString }?.content.orEmpty()
+        val diaryImportance = (diary?.get("importance") as? kotlinx.serialization.json.JsonPrimitive)
+            ?.intOrNull ?: 0
+        val diaryHasPerspective = listOf("feeling", "innerThought").any { name ->
+            (diary?.get(name) as? kotlinx.serialization.json.JsonPrimitive)
                 ?.takeIf { it.isString }?.content?.isNotBlank() == true
-        } == true
+        }
+        // Only a substantive diary can independently justify processing a pending turn.
+        // Reply suggestions are generated in a separate flow and cannot mask a bad patch.
+        val hasDiary = diaryEvent.trim().length >= 6 && diaryImportance >= 2 &&
+            diaryHasPerspective
         // A model can include system-owned fields (scene, evolution, lifeState) as
         // decoration. Those fields are intentionally ignored and must not turn a
         // valid no-op result into a retry loop. Reject only an unusable requested
@@ -72,12 +77,12 @@ internal class ChatInteractionPlanParser(
         val discardedRequestedState =
             (requestedModelStateChange && !hasStateUpdate) ||
                 (root.containsKey("state") && originalState == null)
-        if (discardedRequestedState && !hasDiary && !hasSuggestions) {
+        if (discardedRequestedState && !hasDiary) {
             return null to "state_patch_unusable"
         }
         // A bare {} or significance-only response contains no actionable state and
         // must not consume the persisted pending-turn cursor as a successful refresh.
-        if (!root.containsKey("state") && !hasDiary && !hasSuggestions) {
+        if (!root.containsKey("state") && !hasDiary) {
             return null to "state_patch_missing"
         }
         val decoded = runCatching {
