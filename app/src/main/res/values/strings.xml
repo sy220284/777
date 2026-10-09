@@ -1676,6 +1676,7 @@
     <string name="local_character_tuning_expression_variation">表达变化度</string>
     <string name="local_character_tuning_expression_variation_low">稳定</string>
     <string name="local_character_tuning_expression_variation_high">丰富</string>
+    <string name="local_character_tuning_temperature_value">温度 %1$.2f · %2$d</string>
 
     <string name="app_tool_search_results">搜索结果</string>
     <string name="app_tool_web_content">网页内容</string>
