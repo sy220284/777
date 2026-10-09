@@ -10,12 +10,20 @@ import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 
 class AppSettingsMenuRegressionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun appearanceIsOneSettingsPageWithoutNestedDestinations() {
+        assertEquals(SettingsDestination.ROOT, SettingsDestination.APPEARANCE.parentDestination())
+        assertEquals(1, SettingsDestination.APPEARANCE.navigationDepth())
+        assertFalse(SettingsDestination.entries.any { it.name.startsWith("APPEARANCE_") })
+    }
 
     @Test
     fun groupedSettingsRowsRemainIndependentlyClickable() {
