@@ -38,6 +38,8 @@ class CharacterBehaviorTuningTest {
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
         assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
             "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")!!, 0.0)
+        assertEquals(2.0, CharacterBehaviorTuning(expressionVariation = 100).roleplayTemperature(
+            "deepseek-flash", "https://api.deepseek.com/v1")!!, 0.0)
         assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
             "deepseek-flash", "https://proxy.example.com/v1"))
         assertEquals(null, CharacterBehaviorTuning().roleplayTemperature(
