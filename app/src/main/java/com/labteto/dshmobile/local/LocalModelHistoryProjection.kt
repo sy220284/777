@@ -173,8 +173,13 @@ private fun applyModelHistoryEvent(
             }
             true
         }
-        "chat/active-transcript" -> {
-            val rewritten = timelineRewriteModelHistory(event.data) ?: return false
+        "chat/active-transcript", "work/active-transcript" -> {
+            val rewritten = if (event.type == "chat/active-transcript") {
+                timelineRewriteModelHistory(event.data)
+            } else {
+                val encoded = event.data["model_history"] as? JsonArray ?: return false
+                encoded.map { it as? JsonObject ?: return false }
+            } ?: return false
             history.clear()
             history += rewritten
             true

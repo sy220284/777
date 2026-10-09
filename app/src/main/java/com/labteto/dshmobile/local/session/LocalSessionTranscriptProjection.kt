@@ -139,7 +139,7 @@ internal fun projectSessionTranscriptTail(
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy { event -> event.sequence }
         .forEach { event ->
-            if (event.type == "chat/active-transcript") {
+            if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
                 val decoded = decodeTranscriptMessages(event.data)
                 if (decoded != null) {
                     messages.clear()

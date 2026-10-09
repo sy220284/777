@@ -5,6 +5,9 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
@@ -12,13 +15,43 @@ import kotlinx.serialization.json.contentOrNull
 internal fun projectWorkSessionControls(
     snapshot: LocalHarnessSession,
     events: List<LocalSessionEventLog.Event>,
+): LocalWorkState = projectWorkSessionControls(
+    LocalWorkState(
+        plan = snapshot.plan,
+        todos = snapshot.todos,
+        goal = snapshot.goal,
+        planMode = snapshot.planMode,
+    ),
+    events,
+)
+
+/** Replay controls from a clean point in the Work timeline before editing a historical instruction. */
+internal fun projectWorkSessionControls(
+    baseline: LocalWorkState,
+    events: List<LocalSessionEventLog.Event>,
 ): LocalWorkState {
-    var plan = snapshot.plan
-    var todos = snapshot.todos
-    var goal = snapshot.goal
-    var planMode = snapshot.planMode
+    var plan = baseline.plan
+    var todos = baseline.todos
+    var goal = baseline.goal
+    var planMode = baseline.planMode
     events.forEach { event ->
         when (event.type) {
+                "work/active-transcript" -> {
+                    plan = decodePlanState(buildJsonObject {
+                        put("items", event.data["plan"] ?: JsonArray(emptyList()))
+                    }) ?: emptyList()
+                    todos = decodeTodoState(buildJsonObject {
+                        put("items", event.data["todos"] ?: JsonArray(emptyList()))
+                    }) ?: emptyList()
+                    val recordedGoal = event.data["goal"] as? JsonObject
+                    goal = recordedGoal?.let { fields ->
+                        val description = (fields["description"] as? JsonPrimitive)?.contentOrNull
+                        val status = (fields["status"] as? JsonPrimitive)?.contentOrNull
+                        if (description.isNullOrBlank() || status.isNullOrBlank()) null
+                        else LocalGoal(description, status, (fields["note"] as? JsonPrimitive)?.contentOrNull)
+                    }
+                    planMode = (event.data["plan_mode"] as? JsonPrimitive)?.booleanOrNull ?: planMode
+                }
                 "plan/approved" -> decodePlanState(event.data)?.let {
                     plan = it
                     planMode = false
