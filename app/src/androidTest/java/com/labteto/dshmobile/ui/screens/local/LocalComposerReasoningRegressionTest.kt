@@ -111,7 +111,7 @@ class LocalComposerReasoningRegressionTest {
         }
     }
 
-    @Test fun modelSwitchUpdatesButtonSliderAndDefaultHintTogether() {
+    @Test fun modelSwitchKeepsGpt6MaxReasoningControlAvailable() {
         val profile = mutableStateOf(deepSeek)
         compose.setContent {
             DshTheme {
@@ -134,14 +134,14 @@ class LocalComposerReasoningRegressionTest {
             profile.value = LocalModelProfile("composer-api", "gpt-6-luna", "https://api.openai.com/v1")
         }
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
-            context.getString(R.string.local_composer_reasoning_default))).assertIsDisplayed()
+            context.getString(R.string.local_composer_reasoning_max))).assertIsDisplayed()
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
-                ProgressBarRangeInfo(0f, 0f..3f, 2)))
-        compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_default_tip)).assertIsDisplayed()
+                ProgressBarRangeInfo(4f, 0f..4f, 3)))
+        compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_default_tip)).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
-                context.getString(R.string.local_composer_reasoning_default)))
+                context.getString(R.string.local_composer_reasoning_max)))
     }
 
     @Test fun deepSeekSliderCanRestoreProviderDefault() {
