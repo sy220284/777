@@ -9,6 +9,8 @@ import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
 import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +20,7 @@ class LocalWorkRuntime @Inject internal constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val eventLogs: LocalSessionEventLogRegistry,
+    private val sessionFiles: LocalSessionFilesRuntime,
     private val toolActivity: LocalToolActivityProjectionRuntime,
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
@@ -36,9 +39,21 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
 
-    internal fun artifactsForUi(sessionId: String): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
+    internal fun artifactsForUi(
+        sessionId: String,
+        eventLimit: Int = 384,
+    ): List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem> {
         if (sessionId != runtimeStateStore.currentSessionId) return emptyList()
-        return projectLocalWorkArtifacts(eventLogs.get(sessionId).pageBeforeChronological(limit = 384))
+        val boundedScan = eventLimit.coerceIn(384, 4_096)
+        val root = File(sessionFiles.workspace.path)
+        return projectLocalWorkArtifacts(
+            eventLogs.get(sessionId).pageBeforeChronological(limit = boundedScan),
+            limit = (boundedScan / 8).coerceIn(40, 100),
+        ).map { item ->
+            if (item.category == "file") item.copy(
+                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference),
+            ) else item
+        }
     }
 
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
@@ -143,3 +158,10 @@ class LocalWorkRuntime @Inject internal constructor(
             planMode.setEnabled(enabled)
         }
 }
+
+/** For historical results, verify access at presentation time; never trust the event path. */
+internal fun localWorkArtifactFileAvailable(root: File, relative: String): Boolean = runCatching {
+    val canonicalRoot = root.canonicalFile.toPath()
+    val target = File(root, relative).canonicalFile.toPath()
+    target != canonicalRoot && target.startsWith(canonicalRoot) && java.nio.file.Files.isRegularFile(target)
+}.getOrDefault(false)
