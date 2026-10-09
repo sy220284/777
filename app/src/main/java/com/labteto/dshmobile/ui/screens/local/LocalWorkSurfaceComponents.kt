@@ -45,6 +45,9 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ExecutionStatusCard(
@@ -302,6 +305,25 @@ private fun RunCenterJobsSection(
     var agentMessageSending by remember { mutableStateOf(false) }
     var expandedJobId by remember { mutableStateOf<String?>(null) }
     var expandedJobOutput by remember { mutableStateOf("") }
+    var expandedOutputError by remember { mutableStateOf(false) }
+    val outputFailedMessage = stringResource(R.string.local_run_job_output_read_failed)
+    val agentActionFailedMessage = stringResource(R.string.local_team_action_failed)
+
+    fun refreshJobOutput(jobId: String) {
+        scope.launch {
+            try {
+                val updated = withContext(Dispatchers.IO) { onJobOutput(jobId) }
+                if (expandedJobId == jobId) {
+                    expandedJobOutput = updated
+                    expandedOutputError = false
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (expandedJobId == jobId) expandedOutputError = true
+            }
+        }
+    }
     val orderedJobs = jobs.sortedWith(
         compareBy<LocalJobInfo> {
             when {
@@ -402,7 +424,9 @@ private fun RunCenterJobsSection(
                                     expandedJobOutput = ""
                                 } else {
                                     expandedJobId = job.id
-                                    expandedJobOutput = onJobOutput(job.id)
+                                    expandedJobOutput = ""
+                                    expandedOutputError = false
+                                    refreshJobOutput(job.id)
                                     agentMessageDraft = ""
                                     agentMessageFeedback = ""
                                 }
@@ -429,6 +453,13 @@ private fun RunCenterJobsSection(
                             maxLines = 12,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (expandedOutputError) {
+                            Text(
+                                outputFailedMessage,
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.error,
+                            )
+                        }
                         if (job.isAgent) {
                             if (job.status == "dormant") {
                                 Text(
@@ -473,6 +504,10 @@ private fun RunCenterJobsSection(
                                                         val result = onSendAgentMessage(job.id, message)
                                                         agentMessageFeedback = result.message
                                                         if (result.accepted) agentMessageDraft = ""
+                                                    } catch (cancelled: CancellationException) {
+                                                        throw cancelled
+                                                    } catch (_: Exception) {
+                                                        agentMessageFeedback = agentActionFailedMessage
                                                     } finally {
                                                         agentMessageSending = false
                                                     }
@@ -500,7 +535,7 @@ private fun RunCenterJobsSection(
                         ) {
                             DsButton(
                                 text = stringResource(R.string.local_run_job_refresh),
-                                onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                onClick = { refreshJobOutput(job.id) },
                                 variant = DsButtonVariant.Ghost,
                                 size = DsButtonSize.Small,
                             )
@@ -508,8 +543,17 @@ private fun RunCenterJobsSection(
                                 DsButton(
                                     text = stringResource(R.string.local_run_job_stop),
                                     onClick = {
-                                        onStopJob(job.id)
-                                        expandedJobOutput = onJobOutput(job.id)
+                                        scope.launch {
+                                            try {
+                                                agentMessageFeedback = withContext(Dispatchers.IO) { onStopJob(job.id) }
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (_: Exception) {
+                                                agentMessageFeedback = agentActionFailedMessage
+                                            } finally {
+                                                refreshJobOutput(job.id)
+                                            }
+                                        }
                                     },
                                     variant = DsButtonVariant.Danger,
                                     size = DsButtonSize.Small,
