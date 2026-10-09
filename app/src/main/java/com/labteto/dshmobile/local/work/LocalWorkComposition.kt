@@ -187,6 +187,7 @@ internal class LocalWorkComposition @Inject constructor(
                     maxSteps,
                     context,
                     parentCallId,
+                    grantedExtensions,
                 ->
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
@@ -200,6 +201,13 @@ internal class LocalWorkComposition @Inject constructor(
                     boundState = binding.aggregateSnapshot(),
                     historySnapshot = binding.runHandle.modelHistory::snapshot,
                     requestedJobId = requestedJobId,
+                    allowMutation = true,
+                    teamManaged = true,
+                    // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
+                    initialOptionalTools = grantedExtensions + setOf(
+                        "skill", "web_search", "web_fetch", "job_list", "job_output",
+                        "job_kill", "json_query", "environment_info", "download_file",
+                    ),
                 )
             },
             sendToTeammate = { agentId, input, sessionId ->
