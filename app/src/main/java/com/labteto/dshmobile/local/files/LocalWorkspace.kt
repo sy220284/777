@@ -171,37 +171,67 @@ class LocalWorkspace(
         return "已编辑 $relativePath"
     }
 
-    /** Glob-style file discovery without relying on a bundled desktop ripgrep binary. */
-    fun glob(pattern: String, relativePath: String = "."): String {
+    /** Glob-style file discovery, paged instead of silently cutting off a large workspace. */
+    fun glob(pattern: String, relativePath: String = ".", cursor: Int = 0): String {
         require(pattern.isNotBlank()) { "匹配模式不能为空" }
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val matcher = globRegex(pattern.replace('\\', '/'))
-        val rows = safeWalk(directory)
-            .filter { it.isFile && isInsideWorkspace(it) }
-            .map { it.relativeTo(directory).invariantSeparatorsPath }
-            .filter { matcher.matches(it) }
-            .take(MAX_LIST_ROWS)
-            .toList()
-        return if (rows.isEmpty()) "未找到匹配文件" else rows.joinToString("\n")
+        return discoverPage(directory, MAX_SCAN_DEPTH, cursor, "glob", "未找到匹配文件") { file ->
+            file.takeIf { it.isFile && isInsideWorkspace(it) }
+                ?.relativeTo(directory)?.invariantSeparatorsPath
+                ?.takeIf(matcher::matches)
+        }
     }
 
-    /** List descendants without following a path outside the app workspace. */
-    fun list(relativePath: String = ".", depth: Int = 3): String {
+    /** List descendants with a cursor that preserves the full discoverable set. */
+    fun list(relativePath: String = ".", depth: Int = 3, cursor: Int = 0): String {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
-        val baseDepth = directory.toPath().nameCount
-        val rows = safeWalk(directory, maxDepth = depth.coerceIn(1, 8))
-            .filter {
-                it != directory && isInsideWorkspace(it)
+        return discoverPage(directory, depth.coerceIn(1, 8), cursor, "list_files", "目录为空") { file ->
+            file.takeIf { it != directory && isInsideWorkspace(it) }?.let {
+                val suffix = if (it.isDirectory) "/" else " (${it.length()} B)"
+                displayPath(it) + suffix
             }
-            .take(MAX_LIST_ROWS)
-            .map { file ->
-                val suffix = if (file.isDirectory) "/" else " (${file.length()} B)"
-                displayPath(file) + suffix
+        }
+    }
+
+    private fun discoverPage(
+        directory: File,
+        depth: Int,
+        cursor: Int,
+        toolName: String,
+        emptyMessage: String,
+        project: (File) -> String?,
+    ): String {
+        require(cursor >= 0) { "目录扫描游标不能为负数" }
+        val rows = mutableListOf<String>()
+        var pageEntries = 0
+        var cursorFound = cursor == 0
+        var nextCursor: Int? = null
+        val started = System.nanoTime()
+        for ((entry, file) in safeWalk(directory, maxDepth = depth, maxVisited = Int.MAX_VALUE,
+            maxMillis = Long.MAX_VALUE).withIndex()) {
+            if (entry < cursor) continue
+            cursorFound = true
+            if (pageEntries >= MAX_SCAN_ENTRIES || rows.size >= MAX_LIST_ROWS ||
+                (System.nanoTime() - started) / 1_000_000L >= MAX_SCAN_MILLIS) {
+                nextCursor = entry
+                break
             }
-            .toList()
-        return if (rows.isEmpty()) "目录为空" else rows.joinToString("\n")
+            pageEntries++
+            project(file)?.let(rows::add)
+        }
+        require(cursorFound) { "目录扫描游标已失效，请从头查询" }
+        return buildString {
+            append(if (rows.isEmpty()) {
+                if (nextCursor == null) emptyMessage else "本页没有匹配文件"
+            } else rows.joinToString("\n"))
+            if (nextCursor != null) {
+                append("\n[目录扫描未完：再次调用 $toolName，保持路径、匹配条件与深度不变，")
+                append("传入 cursor=$nextCursor 继续；目录发生增删时请从头扫描]")
+            }
+        }
     }
 
     /**
