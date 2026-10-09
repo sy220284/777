@@ -31,7 +31,6 @@ harness-core/             平台无关 Agent 核心
 harness-runtime-android/  Android 进程 / 持久终端
 harness-interop/          MCP / LSP
 harness-device-android/   Android 设备能力
-mock-harness/             测试 Harness
 reference-validation/     官方 Harness 差分验证
 ```
 
@@ -108,7 +107,7 @@ app 内采用架构 3.0 的模块化单体：产品业务归所属 Feature，跨
 本地常用：
 
 ```sh
-./gradlew :core:test   :harness-core:test   :harness-runtime-android:test   :harness-interop:test   :harness-device-android:testDebugUnitTest   :mock-harness:test   :app:testDebugUnitTest
+./gradlew :core:test   :harness-core:test   :harness-runtime-android:test   :harness-interop:test   :harness-device-android:testDebugUnitTest      :app:testDebugUnitTest
 
 ./gradlew :reference-validation:test
 ./gradlew :app:lintDebug

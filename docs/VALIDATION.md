@@ -113,7 +113,6 @@ CI 采用 **四级风险分流、独立合并门禁、发布资格严格隔离**
 :harness-runtime-android:test
 :harness-interop:test
 :harness-device-android:testDebugUnitTest
-:mock-harness:test
 :app:testDebugUnitTest
 :reference-validation:test
 ```

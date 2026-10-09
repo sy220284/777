@@ -132,7 +132,6 @@ def is_test_tooling(path: str) -> bool:
             "tools/reference-validation/",
             "tools/capture/",
             "reference-validation/",
-            "mock-harness/",
             "upstream/",
         )
     )
@@ -278,7 +277,7 @@ def classify(
 
         if path.startswith(("app/src/main/", "core/src/main/", "harness-core/src/main/",
                             "harness-interop/src/main/", "harness-runtime-android/src/main/",
-                            "harness-device-android/src/main/", "mock-harness/src/main/")):
+                            "harness-device-android/src/main/")):
             unit = True
             build = True
             affects_release = True

@@ -237,7 +237,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Unit tests and Harness conformance
         run: |
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
+          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
       - name: Verify JVM 21 bytecode output
         run: python3 .github/scripts/check-jvm21-bytecode.py
 

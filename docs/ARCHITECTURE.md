@@ -91,7 +91,6 @@ Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery �
 | `harness-runtime-android/` | Android 进程运行时与持久终端 |
 | `harness-interop/` | MCP / LSP / GitHub 等互通能力 |
 | `harness-device-android/` | Android 设备能力 |
-| `mock-harness/` | 协议与行为测试服务端 |
 | `reference-validation/` | 官方语义与差分验证 |
 
 只有当某个能力拥有明显更小且稳定的依赖集合、独立测试/发布价值，并且不会制造循环依赖时，才升级为新的 Gradle module。

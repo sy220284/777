@@ -292,7 +292,7 @@ Shared Runtime / Feature 初始化与恢复
 1. **钉版**——`upstream/deepseek-harness.lock.json` 锁定官方 commit，避免语义基准漂移。
 2. **黄金结果**——`tools/capture/` 对锁定版本运行真实行为并录制一致性夹具。
 3. **原生比对**——`reference-validation` 用同一输入驱动 Android 本机实现，与黄金结果比对。
-4. **模拟对手**——`mock-harness` 提供常驻 Ktor 测试服务端。
+4. **本机语义验证**——`reference-validation` 对照锁定的官方基线检验本机 Agent 语义。
 5. **CI 门禁**——先按改动性质分配验证范围；产品 / 构建 / Runtime 变更执行架构、性能、UI、Kotlin、单元测试、Harness、Lint、optimized APK 与 Android 16 / 17 完整验证，文档、自动化和测试-only 改动只运行对应检查，最终统一由 merge-gate 放行。
 
 除了“测试通过”，仓库还对热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。

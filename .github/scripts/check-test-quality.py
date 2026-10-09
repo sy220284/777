@@ -20,7 +20,6 @@ TEST_ROOTS = (
     ROOT / "harness-device-android" / "src" / "test",
     ROOT / "harness-interop" / "src" / "test",
     ROOT / "harness-runtime-android" / "src" / "test",
-    ROOT / "mock-harness" / "src" / "test",
     ROOT / "reference-validation" / "src" / "test",
 )
 

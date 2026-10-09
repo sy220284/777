@@ -546,7 +546,7 @@
 - **底层协议与兼容**：`app/src/main/java/com/labteto/dshmobile/local/model/`（本机模型协议）；`core/` 保留的旧远程协议代码不属于当前产品入口
 - **外部互通适配**：`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`
 - **构建与持续集成**：`.github/workflows/ci.yml`、`.github/scripts/`、`docs/VALIDATION.md`
-- **测试与语义验证**：`reference-validation/src/`、`mock-harness/src/`、`app/src/test/`
+- **测试与语义验证**：`reference-validation/src/`、`harness-core/src/test/`、`app/src/test/`
 - **发布与升级**：`app/src/main/java/com/labteto/dshmobile/update/`、`.github/workflows/`
 ## 本轮实现定位与验证边界
 
