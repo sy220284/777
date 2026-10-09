@@ -44,6 +44,7 @@ object LocalToolCatalog {
         add(tool("glob", "按 glob 模式发现工作区文件", properties(
             "pattern" to string("例如 **/*.kt"),
             "path" to string("相对路径，默认 ."),
+            "cursor" to integer("可选；目录扫描未完时返回的下一页游标"),
         ), listOf("pattern")))
         add(tool("grep", "在工作区文件中搜索文字；默认字面量，可指定正则表达式", properties(
             "query" to string("搜索内容；regex=true 时按正则表达式解析"),
