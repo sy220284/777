@@ -1767,6 +1767,9 @@
     <string name="skills_remove_title">移除技能</string>
     <string name="skills_remove_message">移除 %1$s 后，模型和技能列表将不再调用它。预置技能以后可以重新添加，其他附属文件会保留。</string>
     <string name="skills_saved">技能已更新</string>
+    <string name="skills_edit">编辑技能规则</string>
+    <string name="skills_edit_hint">直接编辑当前 SKILL.md 原文。修改后影响后续调用，不更改技能标识及其他附属文件。</string>
+    <string name="skills_auto_invocation">允许模型自动调用</string>
     <string name="skills_operation_failed">技能操作失败</string>
     <string name="local_project_start_work_session">用当前项目开始新工作</string>
     <string name="local_project_backup_and_reset">备份损坏目录并恢复默认项目</string>
