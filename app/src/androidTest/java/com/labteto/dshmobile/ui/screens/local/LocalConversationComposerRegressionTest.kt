@@ -50,8 +50,6 @@ class LocalConversationComposerRegressionTest {
                     onSend = { _, _ -> LocalSendResult.Empty },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                 )
             }
         }
@@ -92,8 +90,6 @@ class LocalConversationComposerRegressionTest {
                     onSend = { _, _ -> LocalSendResult.Empty },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                     onFocusChanged = { focusChanges += it },
                 )
             }
@@ -139,8 +135,6 @@ class LocalConversationComposerRegressionTest {
                     onSend = { _, _ -> LocalSendResult.Empty },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                 )
             }
         }
@@ -178,8 +172,6 @@ class LocalConversationComposerRegressionTest {
                     onSend = { _, _ -> LocalSendResult.Empty },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                     onFocusChanged = { focused = it },
                 )
             }
@@ -230,8 +222,6 @@ class LocalConversationComposerRegressionTest {
                     },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                 )
             }
         }
@@ -291,8 +281,6 @@ class LocalConversationComposerRegressionTest {
                     onSend = { _, _ -> LocalSendResult.Empty },
                     onStop = {},
                     onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
                 )
             }
         }
@@ -309,42 +297,5 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains(draft)
     }
 
-    @Test
-    fun chatWebActionExplainsToolBoundaryAndOffersWorkHandoff() {
-        var workRequests = 0
-        compose.setContent {
-            DshTheme {
-                LocalConversationComposer(
-                    state = LocalConversationSurfaceState(
-                        loading = false, configured = true,
-                        sessionId = "web-work-handoff",
-                        usageMode = LocalUsageMode.CHAT,
-                    ),
-                    activeModelProfile = null,
-                    input = "",
-                    attachments = emptyList(),
-                    onInputChange = {},
-                    onRemoveAttachment = {},
-                    onClearAttachments = {},
-                    onOpenAttachmentPicker = {},
-                    onShowReplySuggestions = {},
-                    onGenerateReplySuggestions = { false },
-                    onSend = { _, _ -> LocalSendResult.Empty },
-                    onStop = {},
-                    onRequestWorkWebSearch = { workRequests++ },
-                    onPlanModeChange = {},
-                    onAutoApprove = {},
-                    onDisableAutoApprove = {},
-                )
-            }
-        }
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick()
-        compose.onNodeWithContentDescription(
-            context.getString(R.string.local_composer_web_work_only),
-        ).performClick()
-        compose.onNodeWithText(context.getString(R.string.local_composer_web_to_work))
-            .performClick()
-        compose.runOnIdle { assertEquals(1, workRequests) }
-    }
 
 }
