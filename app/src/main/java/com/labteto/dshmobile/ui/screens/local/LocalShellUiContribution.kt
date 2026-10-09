@@ -7,7 +7,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -24,8 +23,6 @@ internal fun localShellFeatureUiContribution(
     state: StateFlow<LocalConversationSurfaceState>,
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
-    approvalMode: LocalApprovalMode,
-    networkSearchEnabled: Boolean,
     gallery: List<PersonaGalleryEntry>,
     transcriptHistory: LocalTranscriptHistoryState,
     modeIntro: LocalModeIntro?,
@@ -55,10 +52,6 @@ internal fun localShellFeatureUiContribution(
             onOpenDrawer = onOpenDrawer,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
-            approvalMode = approvalMode,
-            networkSearchEnabled = networkSearchEnabled,
-            onNetworkSearchChange = actions.setNetworkSearchEnabled,
-            onDefaultApproval = actions.useDefaultApproval,
             streamingState = actions.streamingState,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
@@ -101,11 +94,9 @@ internal fun localShellFeatureUiContribution(
             onPlanModeChange = actions.setPlanMode,
             onApprove = actions.approve,
             onDeny = actions.deny,
-            onAutoApprove = actions.enableAutoApproval,
             onAutoApprovePending = actions.enableAutoApprovalForPending,
             onApproveDeviceTurn = actions.enableDeviceApprovalLease,
             onDisableDeviceTurn = actions.disableDeviceApprovalLease,
-            onDisableAutoApprove = actions.disableAutoApproval,
             onAnswerQuestion = actions.answerQuestion,
             onCancelQuestion = actions.cancelQuestion,
         )
