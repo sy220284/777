@@ -170,19 +170,36 @@ internal class LocalToolExecutionCoordinator(
         if (matches.isEmpty()) {
             return "未找到匹配的扩展能力；可换用联网、下载、记忆、会话、GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
         }
-        synchronized(target) {
-            target += matches.map(HarnessTool::name)
+        val currentEnabled = synchronized(target) {
+            // Explicitly discovered capabilities outrank speculative pre-activation. This changes
+            // the next tool surface intentionally, so the request projection can update its cache generation.
+            val selected = matches.map(HarnessTool::name)
+            val previous = target.filterNot { it in selected }
+            target.clear()
+            target.addAll(selected)
+            target.addAll(previous)
+            target.toSet()
         }
+        val projected = LocalToolRouter.visibleSchemas(
+            tools = tools.filter { isNetworkSearchPermitted(it.name) },
+            enabledOptional = currentEnabled,
+        ).mapNotNull { element ->
+            val function = (element as? JsonObject)?.get("function") as? JsonObject
+            (function?.get("name") as? JsonPrimitive)?.content
+        }.toSet()
+        val omitted = matches.count { it.name !in projected }
         return buildString {
-            appendLine("已登记 " + matches.size + " 个候选扩展工具；具体能否使用以下一次模型请求实际提供的工具表为准：")
+            appendLine("发现 ${matches.size} 个候选扩展工具；其中 ${matches.size - omitted} 个按当前模型工具表预算可在下一步使用：")
             matches.forEach { tool ->
                 append("- ").append(tool.name)
+                if (tool.name !in projected) append(" [未装入工具表：定义预算、复杂度或数量限制]")
                 LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
                     append("：").append(it)
                 }
                 appendLine()
             }
-            append("候选工具仍受当前代理权限、可用性与模型工具表预算限制。")
+            if (omitted > 0) appendLine("有 $omitted 个候选未进入工具表，不能直接调用；请按精确工具名重新搜索，或精简其工具定义。")
+            append("实际调用仍以下一次模型请求真实提供的工具表及代理权限为准。")
         }.trimEnd()
     }
 
