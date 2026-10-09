@@ -697,7 +697,7 @@ class LocalWorkspace(
         const val MAX_TEXT_BYTES = 5_242_880L
         const val MAX_READ_LINES = 400
         const val MAX_READ_LINE_CHARS = 256 * 1024
-        const val MAX_SEARCH_LINE_CHARS = 256 * 1024
+        const val MAX_SEARCH_LINE_CHARS = 8 * 1024 * 1024
         const val MAX_WRITE_BYTES = 2_097_152
         const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024
         const val MAX_LIST_ROWS = 400
