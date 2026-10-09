@@ -131,43 +131,12 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    DsButton(stringResource(R.string.local_model_add), onClick = {
+    SettingsCard(stringResource(R.string.local_api_models_title)) {
+    DsButton(stringResource(R.string.local_api_model_add), onClick = {
         editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
         custom = false
         showEditor = true
     }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
-    SettingsCard(stringResource(R.string.advanced_model_settings)) {
-        Text(
-            stringResource(R.string.local_model_image_mode_title),
-            style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-        )
-        DsSegmented(
-            segments = listOf(
-                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
-                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.local_model_image_mode_native)),
-                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.local_model_image_mode_tool)),
-            ),
-            selectedKey = local.imageInputMode.name,
-            onSelect = { key ->
-                runCatching { LocalImageInputMode.valueOf(key) }
-                    .getOrNull()
-                    ?.let(viewModel::configureImageInputMode)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            stretch = true,
-        )
-        Text(
-            stringResource(
-                when (local.imageInputMode) {
-                    LocalImageInputMode.AUTO -> R.string.local_model_image_mode_auto_hint
-                    LocalImageInputMode.NATIVE -> R.string.local_model_image_mode_native_hint
-                    LocalImageInputMode.TOOL -> R.string.local_model_image_mode_tool_hint
-                },
-            ),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelTertiary,
-        )
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (apiProfiles.isEmpty()) {
@@ -233,6 +202,35 @@ internal fun LocalModelSettingsCard(
             }
         }
     }
+    SettingsCard(stringResource(R.string.local_model_image_mode_title)) {
+        DsSegmented(
+            segments = listOf(
+                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
+                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.local_model_image_mode_native)),
+                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.local_model_image_mode_tool)),
+            ),
+            selectedKey = local.imageInputMode.name,
+            onSelect = { key ->
+                runCatching { LocalImageInputMode.valueOf(key) }
+                    .getOrNull()
+                    ?.let(viewModel::configureImageInputMode)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            stretch = true,
+        )
+        Text(
+            stringResource(
+                when (local.imageInputMode) {
+                    LocalImageInputMode.AUTO -> R.string.local_model_image_mode_auto_hint
+                    LocalImageInputMode.NATIVE -> R.string.local_model_image_mode_native_hint
+                    LocalImageInputMode.TOOL -> R.string.local_model_image_mode_tool_hint
+                },
+            ),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+        )
+    }
+
 
     if (showEditor) {
         DsBottomSheet(

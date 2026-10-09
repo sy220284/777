@@ -107,7 +107,6 @@ import kotlinx.coroutines.withContext
  */
 enum class SettingsDestination {
     ROOT,
-    ACCOUNT,
     SESSION,
     APPEARANCE,
     APPEARANCE_THEME,
@@ -134,7 +133,6 @@ enum class SettingsDestination {
 
 internal fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
     SettingsDestination.ROOT -> null
-    SettingsDestination.ACCOUNT,
     SettingsDestination.SESSION,
     SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
@@ -258,7 +256,6 @@ fun SettingsScreen(
         }
     }
     var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
-    var accountReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var usageDetailSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
         mutableStateOf<UsageDetailSelection?>(null)
     }
@@ -293,9 +290,7 @@ fun SettingsScreen(
     }
 
     fun navigateBack() {
-        if (page == SettingsDestination.ACCOUNT) {
-            page = accountReturnPage
-        } else if (page == SettingsDestination.USAGE_DETAIL) {
+        if (page == SettingsDestination.USAGE_DETAIL) {
             if (usageDetailReturnPage == SettingsDestination.USAGE_DETAIL && usageDetailBackSelection != null) {
                 usageDetailSelection = usageDetailBackSelection
                 usageDetailBackSelection = null
@@ -328,7 +323,6 @@ fun SettingsScreen(
 
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
-        SettingsDestination.ACCOUNT -> stringResource(R.string.settings_account)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.APPEARANCE_THEME -> stringResource(R.string.settings_appearance)
@@ -397,13 +391,6 @@ fun SettingsScreen(
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
-                            AppSettingsRow(
-                                icon = FeatherIcons.User,
-                                title = stringResource(R.string.settings_account),
-                                onClick = { accountReturnPage = SettingsDestination.ROOT; page = SettingsDestination.ACCOUNT },
-                                compact = true,
-                            )
-                            AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Bell,
                                 title = stringResource(R.string.settings_page_notifications),
@@ -700,11 +687,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsDestination.ACCOUNT -> {
+                    SettingsDestination.MODELS -> {
                         val account by viewModel.chatGptState.collectAsStateWithLifecycle()
                         ChatGptAccountPanel(account, localHarness, viewModel, toast.second)
-                    }
-                    SettingsDestination.MODELS -> {
                         LocalModelSettingsCard(localHarness, viewModel, toast.second)
                         ModelServicesCard(modelServices, viewModel)
                     }

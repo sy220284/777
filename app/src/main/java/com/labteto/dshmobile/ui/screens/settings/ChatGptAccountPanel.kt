@@ -121,11 +121,13 @@ internal fun ChatGptAccountPanel(
                         style = DsType.std14Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
-                    Text(
-                        stringResource(R.string.chatgpt_account_hint),
-                        style = DsType.caption11.withReadingWeight(),
-                        color = colors.labelSecondary,
-                    )
+                    if (selected == null) {
+                        Text(
+                            stringResource(R.string.chatgpt_account_hint),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelSecondary,
+                        )
+                    }
                 }
                 DsStatusPill(
                     state = when {
@@ -216,83 +218,6 @@ internal fun ChatGptAccountPanel(
                     }
                 }
 
-                if (selected.signedIn && selected.sharingEnabled) {
-                    Text(
-                        stringResource(R.string.chatgpt_account_models_title, planModels.size),
-                        style = DsType.small13Strong.withReadingWeight(),
-                        color = colors.labelPrimary,
-                    )
-                    if (!state.connected && planModels.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.chatgpt_account_models_cached),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
-                        )
-                    }
-                    if (planModels.isEmpty()) {
-                        Text(
-                            stringResource(
-                                if (state.connected) R.string.chatgpt_account_models_empty
-                                else R.string.chatgpt_account_models_pending,
-                            ),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
-                        )
-                    }
-                    planModels.forEach { model ->
-                        Surface(
-                            shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                                    ) {
-                                        Text(
-                                            model.displayName,
-                                            style = DsType.std14Strong.withReadingWeight(),
-                                            color = colors.labelPrimary,
-                                            modifier = Modifier.weight(1f, fill = false),
-                                        )
-                                        if (model.active) {
-                                            DsStatusPill(
-                                                DsStatus.Done,
-                                                stringResource(R.string.local_model_in_use),
-                                            )
-                                        }
-                                    }
-                                    if (model.slug != model.displayName) {
-                                        Text(
-                                            model.slug,
-                                            style = DsType.caption11.withReadingWeight(),
-                                            color = colors.labelTertiary,
-                                        )
-                                    }
-                                    ModelCapabilityTags(
-                                        LocalModelPresets.clientCapabilitiesFor(model.slug, CHATGPT_RESOURCE),
-                                    )
-                                }
-                                if (!model.active && state.connected) {
-                                    model.profileId?.let { profileId ->
-                                        DsButton(
-                                            text = stringResource(R.string.chatgpt_account_use_model),
-                                            onClick = { viewModel.selectLocalModel(profileId) },
-                                            size = DsButtonSize.Small,
-                                            variant = DsButtonVariant.Ghost,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
                 if (!selected.sharingEnabled && selected.signedIn) {
                     Text(
                         stringResource(R.string.chatgpt_plan_disabled_hint),
@@ -309,12 +234,6 @@ internal fun ChatGptAccountPanel(
                         size = DsButtonSize.Small,
                     )
                 }
-                Text(
-                    stringResource(R.string.chatgpt_session_persistence_hint),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-
                 if (otherAccounts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.chatgpt_saved_accounts),
@@ -455,6 +374,83 @@ internal fun ChatGptAccountPanel(
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
                     )
+                }
+                if (selected.signedIn && selected.sharingEnabled) {
+                    Text(
+                        stringResource(R.string.chatgpt_account_models_title, planModels.size),
+                        style = DsType.small13Strong.withReadingWeight(),
+                        color = colors.labelPrimary,
+                    )
+                    if (!state.connected && planModels.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.chatgpt_account_models_cached),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
+                    }
+                    if (planModels.isEmpty()) {
+                        Text(
+                            stringResource(
+                                if (state.connected) R.string.chatgpt_account_models_empty
+                                else R.string.chatgpt_account_models_pending,
+                            ),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
+                    }
+                    planModels.forEach { model ->
+                        Surface(
+                            shape = DsShapes.row,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                                    ) {
+                                        Text(
+                                            model.displayName,
+                                            style = DsType.std14Strong.withReadingWeight(),
+                                            color = colors.labelPrimary,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                        if (model.active) {
+                                            DsStatusPill(
+                                                DsStatus.Done,
+                                                stringResource(R.string.local_model_in_use),
+                                            )
+                                        }
+                                    }
+                                    if (model.slug != model.displayName) {
+                                        Text(
+                                            model.slug,
+                                            style = DsType.caption11.withReadingWeight(),
+                                            color = colors.labelTertiary,
+                                        )
+                                    }
+                                    ModelCapabilityTags(
+                                        LocalModelPresets.clientCapabilitiesFor(model.slug, CHATGPT_RESOURCE),
+                                    )
+                                }
+                                if (!model.active && state.connected) {
+                                    model.profileId?.let { profileId ->
+                                        DsButton(
+                                            text = stringResource(R.string.chatgpt_account_use_model),
+                                            onClick = { viewModel.selectLocalModel(profileId) },
+                                            size = DsButtonSize.Small,
+                                            variant = DsButtonVariant.Ghost,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

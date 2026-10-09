@@ -14,6 +14,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsModelProfileFiltersTest {
+    @Test
+    fun modelAndAccountShareOneNavigationDestination() {
+        assertTrue(SettingsDestination.entries.none { it.name == "ACCOUNT" })
+        assertEquals(SettingsDestination.ROOT, SettingsDestination.MODELS.parentDestination())
+    }
+
     private val api = LocalModelProfile(id = "api", model = "same", baseUrl = "https://example.com")
     private val planA = LocalModelProfile(
         id = "plan-a", model = "same", baseUrl = "https://api.openai.com/v1",
