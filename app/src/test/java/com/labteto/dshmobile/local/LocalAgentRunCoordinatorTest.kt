@@ -9,7 +9,7 @@ import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
