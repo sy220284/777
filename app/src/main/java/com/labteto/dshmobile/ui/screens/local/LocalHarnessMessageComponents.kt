@@ -142,6 +142,7 @@ internal fun LocalMessageRow(
     onSelectVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     streaming: Boolean = false,
+    skillDisplayNames: Map<String, String> = emptyMap(),
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -194,6 +195,8 @@ internal fun LocalMessageRow(
                         LocalUserMessageContent(
                             message = message,
                             workspacePath = workspacePath,
+                            showSkillNames = !chatMode,
+                            skillDisplayNames = skillDisplayNames,
                         )
                     }
                     DsContextActionMenu(
@@ -337,6 +340,8 @@ internal fun LocalMessageRow(
 private fun LocalUserMessageContent(
     message: LocalHarnessMessage,
     workspacePath: String,
+    showSkillNames: Boolean,
+    skillDisplayNames: Map<String, String>,
 ) {
     Column(
         horizontalAlignment = Alignment.End,
@@ -345,7 +350,7 @@ private fun LocalUserMessageContent(
         message.visibleBlocks().forEach { block ->
             when (block) {
                 is LocalMessageBlock.Text -> if (block.text.isNotBlank()) {
-                    UserBubble(block.text)
+                    UserBubble(if (showSkillNames) localSkillCallDisplayText(block.text, skillDisplayNames) else block.text)
                 }
                 is LocalMessageBlock.Image -> LocalTranscriptImage(
                     image = block,

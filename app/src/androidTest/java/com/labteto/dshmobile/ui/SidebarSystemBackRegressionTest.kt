@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.test.espresso.Espresso.pressBack
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,7 +30,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressBack()
+        pressDeviceBack()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -51,7 +50,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressBack()
+        pressDeviceBack()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())

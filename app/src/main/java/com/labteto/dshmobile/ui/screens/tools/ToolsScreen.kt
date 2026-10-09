@@ -1,6 +1,15 @@
 package com.labteto.dshmobile.ui.screens.tools
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -129,6 +138,7 @@ internal class ToolsOperationGate {
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
+    @ApplicationContext private val appContext: Context,
     private val sessionStore: SessionStore,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -213,8 +223,49 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
-    fun createSkill(id: String, description: String, instructions: String) =
-        changeSkills(createdId = id) { localTools.createSkill(id, description, instructions) }
+    fun createSkill(id: String, displayName: String, description: String, instructions: String) =
+        changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun importSkill(uri: Uri) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val (filename, bytes) = withContext(Dispatchers.IO) {
+                    val resolver = appContext.contentResolver
+                    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment?.substringAfterLast('/') ?: ""
+                    val input = resolver.openInputStream(uri) ?: error(appContext.getString(R.string.skills_import_open_failed))
+                    val output = ByteArrayOutputStream()
+                    input.use { stream ->
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            require(output.size() + count <= 8 * 1024 * 1024) { appContext.getString(R.string.skills_import_too_large) }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                    name to output.toByteArray()
+                }
+                val id = localTools.importSkill(filename, bytes)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = id,
+                    feedback = appContext.getString(R.string.skills_import_success, id),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message ?: appContext.getString(R.string.skills_import_failed),
+                )
+            }
+        }
+    }
+
     fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
 
     fun openSkillEditor(id: String) {
@@ -389,6 +440,9 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val skillFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importSkill(uri)
+    }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
@@ -414,6 +468,9 @@ fun ToolsScreen(
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
     var skillsOnly by remember(startAtSkills) { mutableStateOf(startAtSkills) }
+    LaunchedEffect(showPluginBrowser, skillsOnly) {
+        if (showPluginBrowser && skillsOnly) viewModel.refresh()
+    }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
@@ -505,6 +562,7 @@ fun ToolsScreen(
             onUseCapability = onUseCapability,
             onInstallPreset = viewModel::installPreset,
             onCreateSkill = viewModel::createSkill,
+            onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,

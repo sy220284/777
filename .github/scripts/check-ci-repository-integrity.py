@@ -185,8 +185,8 @@ for control_path in critical_architecture_controls:
     if control_path not in CI:
         violations.append(f"scope coverage verification lost architecture control path: {control_path}")
 
-# Keep independent CI lanes concurrent without allowing expensive jobs to run
-# before the cheap static smoke gates. The final merge gate remains authoritative.
+# Keep the static smoke gate before builds, but overlap emulator startup with
+# the device APK build. Final device artifacts and merge gate remain authoritative.
 def ci_job_source(lane: str) -> str:
     match = re.search(
         rf"(?ms)^  {re.escape(lane)}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
@@ -206,8 +206,8 @@ ci_dag = {
     "relay-conformance": ("scope", "static-gates"),
     "build-arm64": ("scope", "static-gates"),
     "device-artifacts-x86": ("scope", "static-gates"),
-    "android-16-instrumented": ("scope", "device-artifacts-x86"),
-    "android-17-instrumented": ("scope", "device-artifacts-x86"),
+    "android-16-instrumented": ("scope",),
+    "android-17-instrumented": ("scope",),
 }
 for lane, dependencies in ci_dag.items():
     source = ci_job_source(lane)
@@ -499,8 +499,22 @@ if "connectedDebugAndroidTest" in CI:
     violations.append("CI must not rebuild through connectedDebugAndroidTest inside emulator lanes")
 if "android-x86_64-test-apks" not in CI:
     violations.append("CI must publish/reuse one x86_64 device artifact set for Android 16/17")
-if "actions/download-artifact@" not in CI:
-    violations.append("Android lanes must download the shared x86_64 test artifact")
+artifact_waiter_path = ROOT / ".github" / "scripts" / "wait-android-device-artifacts.sh"
+artifact_waiter = artifact_waiter_path.read_text(encoding="utf-8") if artifact_waiter_path.is_file() else ""
+for lane in ("android-16-instrumented", "android-17-instrumented"):
+    emulator = ci_job_source(lane)
+    if emulator.count("bash .github/scripts/wait-android-device-artifacts.sh") != 1:
+        violations.append(f"{lane}: must wait for the shared current-run APK exactly once")
+    if "GH_TOKEN: ${{ github.token }}" not in emulator:
+        violations.append(f"{lane}: must use the scoped token to retrieve Actions artifacts")
+    if "needs.device-artifacts-x86" in emulator:
+        violations.append(f"{lane}: emulator prewarming must overlap device APK build")
+for token in ("gh run download", "GITHUB_RUN_ID", "GITHUB_REPOSITORY",
+              "android-x86_64-test-apks", "device-artifacts-x86"):
+    if token not in artifact_waiter:
+        violations.append(f"device artifact waiter lacks same-run safety control: {token}")
+if "actions: read" not in CI:
+    violations.append("CI must explicitly allow read-only GitHub Actions artifacts")
 # ABI-scoped downloads must be verified and saved BEFORE costly build tasks, even when
 # those tasks later fail. Keep product validation unchanged.
 runtime_action_file = ROOT / ".github" / "actions" / "setup-runtime-cached" / "action.yml"

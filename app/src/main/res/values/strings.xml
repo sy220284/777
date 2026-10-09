@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">神言神语</string>
+    <string name="skills_display_name_label">技能中文名称</string>
+    <string name="skills_display_name_hint">用于技能列表与调用展示，不影响英文调用标识</string>
     <string name="sidebar_avatar_open">设置侧边栏头像</string>
     <string name="sidebar_avatar_title">选择头像</string>
     <string name="sidebar_avatar_subtitle">使用人物预置或本地图片；本地图可拖动缩放裁剪，动图保留播放效果</string>
@@ -1779,6 +1781,15 @@
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
     <string name="skills_create">添加自定义技能</string>
+    <string name="skills_import_file">上传技能文件</string>
+    <string name="skills_create_in_chat">对话创建技能</string>
+    <string name="skills_create_manual">手动填写技能</string>
+    <string name="skills_import_hint">支持 SKILL.md 和 ZIP 技能包；对话创建需在工作模式确认后保存到本地。</string>
+    <string name="skills_import_open_failed">无法打开所选技能文件</string>
+    <string name="skills_import_too_large">技能文件不能超过 8 MB</string>
+    <string name="skills_import_success">技能已安装：%1$s</string>
+    <string name="skills_import_failed">技能导入失败，请检查文件格式</string>
+    <string name="skills_create_in_chat_prompt">请帮我创建一个可在本应用重复使用的自定义技能。先问清楚用途、触发时机、输入输出格式和关键限制，给出规则草案让我确认。得到我的确认后，在当前本地工作区使用文件工具写入 .dsh/skills/英文技能标识/SKILL.md。文件必须有以 --- 分隔的元数据，其中 name 为2至48位小写英文、数字或连字符（以字母开头），description 为技能用途，display-name 为中文名称；后面填写完整执行规则。先检查是否有同名技能，禁止覆盖已有文件。写入成功后重新读取文件进行校验，并提醒我回到「工具→技能」列表刷新查看。未实际写入成功时请直接说明，不得宣称已安装。现在请先询问我想创建什么技能。</string>
     <string name="skills_install">添加</string>
     <string name="skills_id_label">技能标识</string>
     <string name="skills_id_hint">2—48 位小写英文、数字或连字符，以字母开头；例：my-skill</string>

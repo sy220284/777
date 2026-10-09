@@ -5,19 +5,20 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
-import androidx.test.espresso.Espresso.pressBack
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.pressDeviceBack
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -78,7 +79,7 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithText("重命名故事").assertIsDisplayed()
         compose.onNodeWithText("保存本次对话进展").assertDoesNotExist()
         compose.onNodeWithText("人物检查").performScrollTo().assertIsDisplayed()
-        pressBack()
+        pressDeviceBack()
         compose.onNodeWithText("人物详情").assertIsDisplayed()
         compose.onNodeWithText("继续这条故事").assertIsDisplayed().assertIsEnabled()
     }
@@ -89,8 +90,10 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
-        closeSoftKeyboard()
-        pressBack()
+        // Renaming is inline in the actions sheet: cancel the edit, then close the sheet.
+        // Device Back may first dismiss the IME without cancelling the inline edit.
+        compose.onAllNodesWithText("取消").onFirst().performClick()
+        compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("继续这条故事").assertIsEnabled()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("删除这条故事").performScrollTo().performClick()

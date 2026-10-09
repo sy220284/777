@@ -173,6 +173,7 @@ internal fun LocalConversationSurface(
     onAnswerQuestion: (String, String) -> Unit,
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
+    skillDisplayNames: Map<String, String> = emptyMap(),
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onUseWorkCapability: ((String) -> Unit)? = null,
@@ -695,6 +696,7 @@ internal fun LocalConversationSurface(
                             message = transcriptItem.message,
                             chatMode = state.usageMode == LocalUsageMode.CHAT,
                             workspacePath = state.workspacePath,
+                            skillDisplayNames = skillDisplayNames,
                             groupMode = state.groupChat.enabled,
                             canEdit = messageEditingEnabled &&
                                 messageActionsEnabled &&
@@ -872,6 +874,7 @@ internal fun LocalConversationSurface(
 
         LocalConversationComposer(
             state = state,
+            skillDisplayNames = skillDisplayNames,
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
