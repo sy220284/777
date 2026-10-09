@@ -1758,6 +1758,16 @@
     <string name="tasks_chat_optimize">优化任务</string>
     <string name="tasks_chat_optimization_seed">请优化以下定时任务的清晰度、可执行性与结果质量，保留原来的日期、触发条件、频率、角色身份和真实上下文，不编造经历；如确实需要改动时间，先明确依据。原任务：%1$s。原时间安排：%2$s。</string>
     <string name="skills_catalog_search">搜索技能</string>
+    <string name="skills_create">添加自定义技能</string>
+    <string name="skills_install">添加</string>
+    <string name="skills_id_label">技能标识</string>
+    <string name="skills_id_hint">2—48 位小写英文、数字或连字符，以字母开头；例：my-skill</string>
+    <string name="skills_description_label">技能作用</string>
+    <string name="skills_instruction_label">技能执行说明</string>
+    <string name="skills_remove_title">移除技能</string>
+    <string name="skills_remove_message">移除 %1$s 后，模型和技能列表将不再调用它。预置技能以后可以重新添加，其他附属文件会保留。</string>
+    <string name="skills_saved">技能已更新</string>
+    <string name="skills_operation_failed">技能操作失败</string>
     <string name="local_project_start_work_session">用当前项目开始新工作</string>
     <string name="local_project_backup_and_reset">备份损坏目录并恢复默认项目</string>
     <string name="local_project_cannot_switch_session">现在暂时无法开始新的工作，请稍后再试。</string>
