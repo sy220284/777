@@ -92,4 +92,37 @@ class LocalSkillStoreTest {
             external.deleteRecursively()
         }
     }
+    @Test
+    fun editingAndModelInvocationToggleUseTheSameSkillFile() = inWorkspace { store, workspace, _ ->
+        store.create("edited-one", "编辑前", "Original instructions.")
+        val original = store.readDocument("edited-one")
+        store.updateDocument("edited-one", original.replace("Original instructions.", "Revised instructions."))
+        assertTrue(workspace.readModelSkill("edited-one").contains("Revised instructions."))
+        store.setModelInvocable("edited-one", false)
+        assertFalse(store.installed().first { it.name == "edited-one" }.modelInvocable)
+        assertThrows(IllegalArgumentException::class.java) { workspace.readModelSkill("edited-one") }
+        store.setModelInvocable("edited-one", true)
+        assertTrue(workspace.readModelSkill("edited-one").contains("Revised instructions."))
+    }
+
+    @Test
+    fun disabledHeaderlessSkillPreservesBody() = inWorkspace { store, workspace, _ ->
+        workspace.write(".dsh/skills/plain-note/SKILL.md", "# Keep this\nDo work")
+        store.setModelInvocable("plain-note", false)
+        assertTrue(store.readDocument("plain-note").contains("Do work"))
+        assertFalse(store.installed().first { it.name == "plain-note" }.modelInvocable)
+        store.setModelInvocable("plain-note", true)
+        assertTrue(workspace.readModelSkill("plain-note").contains("Do work"))
+    }
+
+    @Test
+    fun editedAndRemovedPresetsStayUnchangedOnSeedRestart() = inWorkspace { store, workspace, _ ->
+        store.seedOnce()
+        store.updateDocument("code-review", store.readDocument("code-review") + "\n用户自定义后续规则\n")
+        store.remove("research-check")
+        store.seedOnce()
+        assertTrue(store.readDocument("code-review").contains("用户自定义后续规则"))
+        assertFalse(workspace.skills().contains("research-check"))
+    }
+
 }
