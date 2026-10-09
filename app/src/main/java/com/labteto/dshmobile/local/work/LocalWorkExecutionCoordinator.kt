@@ -48,7 +48,8 @@ internal val LOCAL_AGENT_TEAM_DIRECTIVE = """
     成员失败、停用或解雇后，其未完成任务会自动释放回任务板，由 Lead 重新分配。
     临时停止用 team_interrupt；保留成员但停止使用可 team_disable_member；永久移除用 team_dismiss_member；整体暂停用 team_stop_all。
     关键任务未完成、仍有成员运行或结果尚未回收时禁止宣称整体完成。
-    每位成员使用稳定英文内部 name 和清晰中文 display_name，界面只展示中文名；授权额外 MCP、LSP、GitHub 能力前由 Lead 核实任务用途与连接条件，再通过 allowed_extensions 显式授予。\n    最终回复面向用户说明结果，不把 tool 名、task id、revision、mailbox 等内部实现术语当成答复主体。
+    每位成员使用稳定英文内部 name 和清晰中文 display_name，界面只展示中文名；授权额外 MCP、LSP、GitHub 能力前由 Lead 核实任务用途与连接条件，再通过 allowed_extensions 显式授予。
+    最终回复面向用户说明结果，不把 tool 名、task id、revision、mailbox 等内部实现术语当成答复主体。
 """.trimIndent()
 
 internal fun prepareLocalAgentTeamSend(
