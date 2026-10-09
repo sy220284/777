@@ -30,6 +30,32 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun mutableTeamWorkerRequiresStableJobAndPersistsLeadGrants() {
+        val caps = LocalSubagentCapabilities(
+            allowMutation = true,
+            continuable = true,
+            teamManaged = true,
+            initialOptionalTools = setOf("skill", "github_status", "mcp_search"),
+        )
+        val accepted = launch(caps)
+        assertEquals(accepted, validateLocalSubagentLaunchSpec(accepted))
+        val payload = buildJsonObject {
+            put("capabilities", encodeLocalSubagentCapabilities(caps))
+        }
+        assertEquals(caps, decodeLocalSubagentCapabilities(payload, version = 3))
+        val missingJob = accepted.copy(backgroundJobId = null)
+        assertTrue(
+            requireFailure { validateLocalSubagentLaunchSpec(missingJob) }
+                .contains("SUBAGENT_TEAM_REQUIRES_PERSISTENT_JOB"),
+        )
+        val unsafeOrdinary = launch(caps.copy(teamManaged = false))
+        assertTrue(
+            requireFailure { validateLocalSubagentLaunchSpec(unsafeOrdinary) }
+                .contains("SUBAGENT_CONTINUATION_MUTATION_BLOCKED"),
+        )
+    }
+
+    @Test
     fun rejectsOversizedStableInstructionsBeforeExecution() {
         val spec = LocalSubagentLaunchSpec(
             task = "任务",
