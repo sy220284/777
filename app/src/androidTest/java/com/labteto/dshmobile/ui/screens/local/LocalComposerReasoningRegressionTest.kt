@@ -170,9 +170,11 @@ class LocalComposerReasoningRegressionTest {
             SemanticsProperties.StateDescription,
             context.getString(R.string.local_composer_temperature_value, 0.78),
         ))
+        // The control has five detents: 60% is displayed at the nearest (50%) stop,
+        // while StateDescription above retains the exact persona temperature (0.78).
         slider.assert(SemanticsMatcher.expectValue(
             SemanticsProperties.ProgressBarRangeInfo,
-            ProgressBarRangeInfo(2.4f, 0f..4f, 3),
+            ProgressBarRangeInfo(2f, 0f..4f, 3),
         ))
         compose.runOnIdle { position.value = 75 }
         slider.assert(SemanticsMatcher.expectValue(
