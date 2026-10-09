@@ -150,6 +150,7 @@ data class LocalModelTemperatureRange(
     val maximum: Double,
     val chatDefault: Double,
     val requiresDisabledThinking: Boolean = false,
+    val omitAtChatDefault: Boolean = false,
 ) {
     init {
         require(minimum.isFinite() && maximum.isFinite() && chatDefault.isFinite())
@@ -609,7 +610,10 @@ object LocalModelPresets {
         val preset = find(model, baseUrl) ?: return null
         if (!preset.temperatureSupported) return null
         return when (preset.provider) {
-            "Google Gemini" -> LocalModelTemperatureRange(0.0, 2.0, 1.0)
+            // Gemini 3.x recommends leaving sampling parameters unset at the normal default.
+            "Google Gemini" -> LocalModelTemperatureRange(
+                0.0, 2.0, 1.0, omitAtChatDefault = true,
+            )
             // Others require a model-specific confirmed range or a fixed-value/unsupported rule.
             else -> null
         }
