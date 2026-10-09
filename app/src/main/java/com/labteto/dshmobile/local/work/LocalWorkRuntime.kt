@@ -58,11 +58,15 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?): com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi {
         if (sessionId != runtimeStateStore.currentSessionId) return com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
-        val page = projectLocalWorkHistoryPage(eventLogs.get(sessionId), cursor)
-        return if (sessionId == runtimeStateStore.currentSessionId) page.copy(records = page.records.map { record ->
+        val log = eventLogs.get(sessionId)
+        val generation = log.resetGeneration
+        val root = File(sessionFiles.workspace.path)
+        val page = projectLocalWorkHistoryPage(log, cursor)
+        val projected = page.copy(records = page.records.map { record ->
             record.copy(artifacts = record.artifacts.map { item -> if (item.category == "file") item.copy(
-                currentlyAvailable = localWorkArtifactFileAvailable(File(sessionFiles.workspace.path), item.reference)) else item })
+                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference)) else item })
         })
+        return if (sessionId == runtimeStateStore.currentSessionId && !log.isClosed && generation == log.resetGeneration) projected
         else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
     }
 

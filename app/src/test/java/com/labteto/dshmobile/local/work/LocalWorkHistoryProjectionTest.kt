@@ -16,7 +16,7 @@ class LocalWorkHistoryProjectionTest {
     @Test fun pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates() {
         val log = LocalSessionEventLog(File(temporary.root, "events.jsonl"), Json, maxBytes = 64 * 1024)
         try {
-            val early = log.append("tool/result", buildJsonObject { put("name", "write_file"); put("content", "early artifact report.md") })
+            val early = log.append("tool/result", buildJsonObject { put("name", "write_file"); put("path", "reports/early.md"); put("content", "early artifact report.md") })
             repeat(4200) { i -> log.append("tool/call", buildJsonObject { put("name", "read_file"); put("arguments", "page-$i") }) }
             val sequences = hashSetOf<Long>()
             var cursor: LocalWorkHistoryCursor? = null
@@ -25,7 +25,11 @@ class LocalWorkHistoryProjectionTest {
                 assertFalse(page.invalidated)
                 assertTrue(page.records.size <= 160)
                 page.records.forEach { assertTrue(sequences.add(it.sequence)) }
-                if (page.older == null) assertTrue(page.records.any { it.sequence == early.sequence && it.content.contains("report.md") })
+                if (page.older == null) {
+                    val record = page.records.single { it.sequence == early.sequence }
+                    assertTrue(record.content.contains("report.md"))
+                    assertEquals("reports/early.md", record.artifacts.single().reference)
+                }
                 cursor = page.older
             } while (cursor != null)
             assertEquals(4201, sequences.size)
