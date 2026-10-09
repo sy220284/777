@@ -345,7 +345,7 @@ internal fun LocalRunCenterScreen(
     }
 
     if (showFullHistory && onHistoryPage != null) {
-        LocalWorkHistorySheet(state.sessionId, onHistoryPage) { showFullHistory = false }
+        LocalWorkHistorySheet(state.sessionId, onHistoryPage, onToolEvidence, onOpenResults) { showFullHistory = false }
     }
 
     if (showAgentLauncher) {

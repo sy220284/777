@@ -20,7 +20,8 @@ internal fun projectLocalWorkHistoryPage(log: LocalSessionEventLog, cursor: Loca
         val content = (event.data["content"] as? JsonPrimitive)?.contentOrNull
             ?: event.data["arguments"]?.toString() ?: event.data.toString()
         LocalWorkHistoryRecord(event.sequence, event.type, name,
-            com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4_000))
+            com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(content, 4_000),
+            (event.data["id"] as? JsonPrimitive)?.contentOrNull, projectLocalWorkArtifacts(listOf(event)))
     }
     if (log.isClosed || generation != log.resetGeneration) return LocalWorkHistoryPageUi(emptyList(), null, true)
     return LocalWorkHistoryPageUi(records, if (events.size > PAGE_SIZE) {
