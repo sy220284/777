@@ -43,6 +43,7 @@ class DshApplication : Application() {
         // to Android's installer is kept only until either this installed build reaches the target
         // version or the short installer handoff window expires.
         maintenanceScope.launch {
+            hostsStore.clearRetiredRemoteData()
             hostsStore.clearRetiredLocalePreference()
             val retryAfter = UpdateCache.cleanupStale(
                 cacheDir = cacheDir,
