@@ -77,6 +77,8 @@ internal fun LocalComposerCapabilityActions(
     temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
+    temperatureSaving: Boolean = false,
+    temperatureGroupChat: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
     running: Boolean,
     showLabels: Boolean,
@@ -125,6 +127,8 @@ internal fun LocalComposerCapabilityActions(
                     temperaturePosition = temperaturePosition,
                     temperatureEnabled = temperatureEnabled,
                     temperatureSaveFailed = temperatureSaveFailed,
+                    temperatureSaving = temperatureSaving,
+                    temperatureGroupChat = temperatureGroupChat,
                     onTemperatureLevelChange = onTemperatureLevelChange,
                     onReasoningModeChange = onReasoningModeChange,
                 )
@@ -144,6 +148,8 @@ internal fun LocalComposerCapabilityPanel(
     temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
+    temperatureSaving: Boolean = false,
+    temperatureGroupChat: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
     val colors = DsTheme.colors
@@ -207,8 +213,15 @@ internal fun LocalComposerCapabilityPanel(
             val range = profile?.let {
                 LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
             }
-            val thinkingBlocksSampling = range?.requiresDisabledThinking == true &&
-                effectiveMode != LocalReasoningUiMode.FAST
+            // Mirror LocalModelGateway: explicit LOW/DEEP/MAX never transmit temperature;
+            // DeepSeek also needs thinking explicitly disabled for sampling to take effect.
+            val thinkingBlocksSampling =
+                effectiveMode in setOf(
+                    LocalReasoningUiMode.LOW,
+                    LocalReasoningUiMode.DEEP,
+                    LocalReasoningUiMode.MAX,
+                ) || (range?.requiresDisabledThinking == true &&
+                    effectiveMode != LocalReasoningUiMode.FAST)
             if (range == null) {
                 Text(
                     stringResource(R.string.local_composer_temperature_unavailable),
@@ -287,7 +300,12 @@ internal fun LocalComposerCapabilityPanel(
                     Text(stringResource(R.string.local_composer_temperature_thinking),
                         style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 } else if (!temperatureEnabled && usageMode == LocalUsageMode.CHAT) {
-                    Text(stringResource(R.string.local_composer_temperature_group_hint),
+                    val hint = when {
+                        temperatureGroupChat -> R.string.local_composer_temperature_group_hint
+                        temperatureSaving -> R.string.local_composer_temperature_saving
+                        else -> R.string.local_composer_temperature_busy
+                    }
+                    Text(stringResource(hint),
                         style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
