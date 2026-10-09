@@ -231,21 +231,25 @@ internal fun LocalComposerCapabilityPanel(
             } else {
                 val selectedLevel = temperatureLevel.coerceIn(0, 4)
                 var temperatureSelection by remember(
-                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureEnabled,
+                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureSaveFailed,
                 ) {
                     mutableFloatStateOf(selectedLevel.toFloat())
                 }
                 var temperatureInteracted by remember(
-                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureEnabled,
+                    profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureSaveFailed,
                 ) { androidx.compose.runtime.mutableStateOf(false) }
                 val temperatureTick = rememberHapticTickFeedback(selectedLevel)
                 val temperatureText = stringResource(R.string.local_composer_temperature_title)
                 // A persona may have a fine 0..100 value between composer detents.
                 // Show that actual value until the user touches this five-stop slider.
-                val visiblePosition = if (
+                // Display the precise persona position until this slider is touched. Keeping
+                // the local in-progress selection while saving/running avoids jumping back to
+                // the last persisted value before the save result arrives.
+                val sliderPosition = if (
                     usageMode == LocalUsageMode.CHAT && !temperatureInteracted && temperaturePosition != null
-                ) temperaturePosition.coerceIn(0, 100)
-                else temperatureSelection.roundToInt().coerceIn(0, 4) * 25
+                ) temperaturePosition.coerceIn(0, 100) / 25f
+                else temperatureSelection
+                val visiblePosition = (sliderPosition * 25).roundToInt().coerceIn(0, 100)
                 val temperatureSample = range.at(visiblePosition)
                 val temperatureState = if (range.omitAtChatDefault && visiblePosition == 50) {
                     stringResource(R.string.local_composer_temperature_provider_default, temperatureSample)
@@ -265,7 +269,7 @@ internal fun LocalComposerCapabilityPanel(
                             contentDescription = temperatureText
                             stateDescription = temperatureState
                         },
-                    value = temperatureSelection,
+                    value = sliderPosition,
                     enabled = allowTemperature,
                     onValueChange = { next ->
                         temperatureSelection = next
