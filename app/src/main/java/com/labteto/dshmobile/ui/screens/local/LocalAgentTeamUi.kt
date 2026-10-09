@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
@@ -308,7 +309,6 @@ internal fun LocalAgentTeamSheet(
                 Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.labelSecondary)
                 return@Column
             }
-            TeamActivityFeed(team)
             TeamProgressBlock(team)
             Text(
                 stringResource(R.string.local_team_readonly_hint),
@@ -373,6 +373,8 @@ internal fun LocalAgentTeamSheet(
                     team.tasks.forEach { task -> TeamTaskRow(task) }
                 }
             }
+
+            TeamActivityFeed(team)
 
             if (team.pendingMessageCount > 0) {
                 Text(
@@ -504,7 +506,9 @@ private fun TeamMemberRow(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        color = if (selected) colors.accent.copy(alpha = 0.06f) else {
+            colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM)
+        },
         border = BorderStroke(
             1.dp,
             if (selected) colors.accent.copy(alpha = 0.32f) else colors.borderL2,
@@ -514,7 +518,7 @@ private fun TeamMemberRow(
         Row(
             modifier = Modifier.padding(
                 horizontal = DsSpacing.medium,
-                vertical = DsSpacing.small,
+                vertical = DsSpacing.medium,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -554,6 +558,7 @@ private fun TeamMemberRow(
                     if (selected) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
                     contentDescription = null,
                     tint = colors.labelCaption,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -596,138 +601,144 @@ private fun TeamMemberDetail(
         } while (true)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.settingsGroup,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        border = BorderStroke(1.dp, colors.borderL2),
+        tonalElevation = 0.dp,
     ) {
-        member.description.takeIf(String::isNotBlank)?.let { description ->
-            Text(
-                stringResource(R.string.local_team_role_description, description),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelSecondary,
-            )
-        }
-        TeamMemberWorksite(member, output)
-        if (outputReadFailed) {
-            Text(
-                stringResource(R.string.local_team_output_read_failed),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
-            )
-            DsButton(
-                text = stringResource(R.string.common_retry),
-                onClick = { outputRetry += 1 },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
-            )
-        }
-
-        Text(
-            stringResource(R.string.local_team_messages),
-            style = DsType.caption11Strong.withReadingWeight(),
-            color = colors.labelTertiary,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        Column(
+            modifier = Modifier.padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            DsTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.weight(1f),
-                enabled = member.canReceiveMessage && !sending,
-                singleLine = true,
-                placeholder = {
-                    Text(
-                        stringResource(R.string.local_team_message_hint),
-                        style = DsType.small13.withReadingWeight(),
-                    )
-                },
-            )
-            DsIconButton(
-                icon = FeatherIcons.ArrowUp,
-                contentDescription = stringResource(R.string.local_team_send_message),
-                enabled = member.canReceiveMessage && draft.isNotBlank() && !sending,
-                selected = draft.isNotBlank(),
-                onClick = {
-                    val text = draft.trim()
-                    if (!member.canReceiveMessage || text.isEmpty() || sending) return@DsIconButton
-                    sending = true
-                    scope.launch {
-                        val result = try {
-                            onSendMemberMessage(member.id, text)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            LocalWorkUiActionResult(false, actionFailedText)
-                        } finally {
-                            sending = false
-                        }
-                        onFeedback(result.message)
-                        if (result.accepted && draft.trim() == text) draft = ""
-                    }
-                },
-            )
-        }
+            member.description.takeIf(String::isNotBlank)?.let { description ->
+                Text(
+                    stringResource(R.string.local_team_role_description, description),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
+            TeamMemberWorksite(member, output)
+            if (outputReadFailed) {
+                Text(
+                    stringResource(R.string.local_team_output_read_failed),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.error,
+                )
+                DsButton(
+                    text = stringResource(R.string.common_retry),
+                    onClick = { outputRetry += 1 },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
 
-        if (!member.canReceiveMessage) {
-            Text(stringResource(R.string.local_team_message_unavailable), style = DsType.caption11, color = colors.labelTertiary)
-        }
-        if (member.phase == "failed" || member.activity in setOf("failed", "interrupted", "cancelled", "killed", "disabled", "dismissed")) {
-            DsButton(
-                text = stringResource(R.string.local_team_lead_recover),
-                onClick = { onLeadFollowup(member.name) },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
-            )
-        }
-
-        if (member.activity == "running") {
-            DsButton(
-                text = stringResource(R.string.local_team_stop_member),
-                onClick = {
-                    if (stopping) return@DsButton
-                    stopping = true
-                    scope.launch {
-                        val result = try {
-                            onStopMember(member.id)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            LocalWorkUiActionResult(false, actionFailedText)
-                        } finally {
-                            stopping = false
-                        }
-                        onFeedback(result.message)
-                    }
-                },
-                enabled = !stopping,
-                loading = stopping,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
-                icon = FeatherIcons.Square,
-            )
-        }
-
-        if (member.pendingMessageCount > 0) {
             Text(
-                stringResource(
-                    R.string.local_team_member_pending_messages,
-                    member.pendingMessageCount,
-                ),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.warnLabel,
+                stringResource(R.string.local_team_messages),
+                style = DsType.caption11Strong.withReadingWeight(),
+                color = colors.labelTertiary,
             )
-        }
-        member.error?.takeIf(String::isNotBlank)?.let { error ->
-            Text(
-                error,
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f),
+                    enabled = member.canReceiveMessage && !sending,
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.local_team_message_hint),
+                            style = DsType.small13.withReadingWeight(),
+                        )
+                    },
+                )
+                DsIconButton(
+                    icon = FeatherIcons.ArrowUp,
+                    contentDescription = stringResource(R.string.local_team_send_message),
+                    enabled = member.canReceiveMessage && draft.isNotBlank() && !sending,
+                    selected = draft.isNotBlank(),
+                    onClick = {
+                        val text = draft.trim()
+                        if (!member.canReceiveMessage || text.isEmpty() || sending) return@DsIconButton
+                        sending = true
+                        scope.launch {
+                            val result = try {
+                                onSendMemberMessage(member.id, text)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                LocalWorkUiActionResult(false, actionFailedText)
+                            } finally {
+                                sending = false
+                            }
+                            onFeedback(result.message)
+                            if (result.accepted && draft.trim() == text) draft = ""
+                        }
+                    },
+                )
+            }
+
+            if (!member.canReceiveMessage) {
+                Text(stringResource(R.string.local_team_message_unavailable), style = DsType.caption11, color = colors.labelTertiary)
+            }
+            if (member.phase == "failed" || member.activity in setOf("failed", "interrupted", "cancelled", "killed", "disabled", "dismissed")) {
+                DsButton(
+                    text = stringResource(R.string.local_team_lead_recover),
+                    onClick = { onLeadFollowup(member.name) },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                )
+            }
+
+            if (member.activity == "running") {
+                DsButton(
+                    text = stringResource(R.string.local_team_stop_member),
+                    onClick = {
+                        if (stopping) return@DsButton
+                        stopping = true
+                        scope.launch {
+                            val result = try {
+                                onStopMember(member.id)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                LocalWorkUiActionResult(false, actionFailedText)
+                            } finally {
+                                stopping = false
+                            }
+                            onFeedback(result.message)
+                        }
+                    },
+                    enabled = !stopping,
+                    loading = stopping,
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    icon = FeatherIcons.Square,
+                )
+            }
+
+            if (member.pendingMessageCount > 0) {
+                Text(
+                    stringResource(
+                        R.string.local_team_member_pending_messages,
+                        member.pendingMessageCount,
+                    ),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.warnLabel,
+                )
+            }
+            member.error?.takeIf(String::isNotBlank)?.let { error ->
+                Text(
+                    error,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.error,
+                )
+            }
         }
     }
 }
@@ -760,7 +771,8 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
                 Icon(
                     imageVector = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
                     contentDescription = null,
-                    tint = if (task.status == "completed") colors.accent else colors.labelSecondary,
+                    tint = if (task.status == "in_progress") colors.accent else colors.labelSecondary,
+                    modifier = Modifier.size(20.dp),
                 )
                 Text(
                     task.subject, modifier = Modifier.weight(1f),
@@ -888,10 +900,17 @@ private const val MAX_INLINE_TEAM_MEMBERS = 2
 @Composable
 private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
     val colors = DsTheme.colors
+    var expanded by rememberSaveable { mutableStateOf(false) }
     if (team.activities.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        Text(stringResource(R.string.app_team_activity_feed), style = DsType.std14Strong, color = colors.labelPrimary)
-        team.activities.takeLast(12).forEach { activity ->
+        DsButton(
+            text = stringResource(R.string.app_team_activity_feed),
+            onClick = { expanded = !expanded },
+            variant = DsButtonVariant.Ghost,
+            size = DsButtonSize.Small,
+            icon = if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
+        )
+        team.activities.takeLast(if (expanded) 12 else 3).forEach { activity ->
             val status = when (activity.status) {
                 "provisioning" -> R.string.local_team_recruiting
                 "active" -> R.string.app_team_started
@@ -931,14 +950,8 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
         Column(Modifier.padding(DsSpacing.small), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Delegate, member.activity == "running" || member.phase == "provisioning")
-                Text(member.name, style = DsType.small13Strong, color = colors.labelPrimary, modifier = Modifier.weight(1f))
-                Text(memberStatusLabel(member), style = DsType.caption11, color = colors.labelTertiary)
+                Text(stringResource(R.string.app_team_worksite), style = DsType.small13Strong, color = colors.labelPrimary, modifier = Modifier.weight(1f))
             }
-            member.currentTask?.let { Text(it, style = DsType.small13, color = colors.labelPrimary) }
-            Text(
-                stringResource(R.string.app_team_worksite),
-                style = DsType.caption11Strong, color = colors.labelTertiary,
-            )
             SelectionContainer {
                 Text(
                     (if (expanded) output else output.takeLast(1600)).ifBlank { member.error ?: member.description },
