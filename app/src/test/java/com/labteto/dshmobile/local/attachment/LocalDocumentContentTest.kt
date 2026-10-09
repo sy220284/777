@@ -147,6 +147,29 @@ class LocalDocumentContentTest {
     }
 
     @Test
+    fun archiveDiscoveryOverBudgetReportsIncompleteInsteadOfPretendingEverythingWasRead() {
+        val entries = (1..85).associate { index ->
+            "doc-" + index.toString().padStart(3, '0') + ".txt" to "entry-$index"
+        }
+        val zip = zipFile("overflow.zip", entries)
+        val epub = zipFile("overflow.epub", (1..85).associate { index ->
+            "OPS/page-" + index.toString().padStart(3, '0') + ".xhtml" to
+                "<html><body><p>正文 $index</p></body></html>"
+        })
+        try {
+            val zipResult = LocalDocumentContent.extract(zip, zip.name, "application/zip", maxChars = 50_000)
+            val epubResult = LocalDocumentContent.extract(epub, epub.name, "application/epub+zip", maxChars = 50_000)
+            assertTrue(zipResult.truncated)
+            assertTrue(epubResult.truncated)
+            assertTrue(zipResult.text.contains("doc-080"))
+            assertFalse(zipResult.text.contains("doc-081"))
+        } finally {
+            zip.parentFile?.deleteRecursively()
+            epub.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
     fun readsOpenDocumentAndEpubText() {
         val odt = zipFile(
             "sample.odt",
