@@ -139,13 +139,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / 人设导入、导出与版本迁移",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#structuredRuntimeFieldsSurviveSaveExportAndImport"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集创建、编辑、删除和归档",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#interruptedPhysicalDeletionCompletesFromDurableTombstoneOnRestart"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物与会话绑定",
@@ -239,8 +243,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员关系和记忆隔离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt#workToolsDoNotSurfaceRelationshipMemories"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告生成与保存",
@@ -249,8 +255,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊状态恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#groupChatStatePersistsSeparatelyFromSingleChatStories"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态",
@@ -439,8 +447,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 只读规划与修改权限边界",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#planModeBlocksMutationBeforeExecutorRuns"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
@@ -489,8 +499,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 高风险操作审批",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#deniedApprovalNeverRecordsExecutorStart"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 步骤、资源和上下文预算",
@@ -524,8 +536,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理权限、工具名单和深度限制",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSubagentToolCallPolicyTest.kt#unexposedProviderCallIsRejectedBeforeExecution"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理任务邮箱和消息接收",
@@ -754,13 +768,17 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果当前可用性和安全路径核对",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkArtifactAvailabilityTest.kt#symlinkCannotEscapeWorkspaceEvenWhenTargetExists"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作状态压缩与恢复检查点",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#workCompactionPersistsTypedCheckpointForResume"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 自动工作任务执行入口",
@@ -789,8 +807,11 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
@@ -894,8 +915,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 任务更新与原调度器复用",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#generationOwnershipRejectsEffectsAfterEditOrRemoval"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 角色主动互动任务",
@@ -1158,8 +1181,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 公网地址及重定向安全检查",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWebSafetyTest.kt#proxyPinnedUriKeepsPathAndQueryButUsesValidatedIp"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
@@ -1238,8 +1263,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具可用范围",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#disabledNetworkSearchBlocksDiscoverySchemasAndExecution"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 副作用识别",
@@ -1253,8 +1280,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 修改型工具隔离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#readOnlyScopeBlocksMutationBeforeApprovalOrExecution"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具执行轨迹和失败状态",
@@ -1390,8 +1419,10 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 工具审批策略",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#deniedApprovalNeverRecordsExecutorStart"
+      ]
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
@@ -1548,13 +1579,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 身份令牌校验及刷新",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptRefreshLifecycleAndroidTest.kt#staleInvalidGrantCannotInvalidateANewerLogin"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 账号权限和套餐凭据隔离",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt#refreshScopeDowngradeImmediatelyBecomesSignedInPlanDisabledState"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型目录与能力识别",
@@ -1608,8 +1643,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 模型历史窗口和压缩",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalHistoryCompactorTest.kt#overflowCompactionPreservesHeadAndTailSystemOrderingAndShrinksRequest"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Token 压力与上下文预算",
@@ -1725,13 +1762,17 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具调用入场和权限判断",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#readOnlyScopeBlocksMutationBeforeApprovalOrExecution"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具执行身份与真实启动记录",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#executionIdentityIsStableAcrossToolContextAndDurableStartCallback"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
@@ -1740,8 +1781,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 错误、超时、取消与结果恢复",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#executorThrowAfterAdmissionIsNeverMarkedSafeToRetry"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
@@ -1750,8 +1793,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt#lineageToolRejectsGhostWritesAndRecallsOnlyContinuation"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 作用域和可见性",
@@ -1765,8 +1810,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆维护、过期和删除",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt#listExposesStableIdAndUpdateForgetRespectVisibleScope"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆库只读分类投影",
@@ -1852,8 +1899,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 原子写入、损坏恢复和版本迁移",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/automation/AutomationStoreRecoveryTest.kt#corruptPrimaryRecoversLastKnownGoodBackup"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 密钥安全存储",
@@ -1867,8 +1916,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 网络安全边界",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWebSafetyTest.kt#proxyPinnedUriKeepsPathAndQueryButUsesValidatedIp"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 权限及副作用约束",
@@ -1877,8 +1928,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动只执行一次",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernelAndroidTest.kt#startIsIdempotentAndPersistsGeneratedSessionIdentity"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 进程生命周期协程范围",
@@ -1887,8 +1940,10 @@
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动初始化及恢复触发",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernelAndroidTest.kt#startReusesPersistedSessionIdentity"
+      ]
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 初始化失败状态投影",
@@ -1917,8 +1972,10 @@
     },
     {
       "path": "第三层｜平台、远程与工程保障 / Android 本机运行时 / 前台服务和 Android 后台执行",
-      "state": "unverified",
-      "evidence": []
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/LocalTurnForegroundLeaseAndroidTest.kt#rejectedForegroundStartDoesNotExecuteProtectedTurn"
+      ]
     },
     {
       "path": "第三层｜平台、远程与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
