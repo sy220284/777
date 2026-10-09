@@ -32,6 +32,7 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -197,6 +198,7 @@ internal fun LocalComposerPlanAction(
     onToggle: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val pulse = rememberHapticPulse()
     val label = stringResource(
         when {
             waitingForApproval -> R.string.local_composer_plan_waiting_approval
@@ -210,7 +212,7 @@ internal fun LocalComposerPlanAction(
             .testTag("local-composer-plan-toggle")
             .semantics { stateDescription = label },
         contentDescription = stringResource(R.string.local_composer_plan_title) + " · " + label,
-        onClick = onToggle,
+        onClick = { pulse(); onToggle() },
         enabled = enabled && !waitingForApproval,
         tint = if (selected) colors.accent else colors.labelSecondary,
         containerColor = if (selected) colors.accent.copy(alpha = 0.12f) else Color.Transparent,

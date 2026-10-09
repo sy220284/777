@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -87,6 +88,26 @@ class LocalComposerReasoningRegressionTest {
             SemanticsProperties.StateDescription,
             context.getString(R.string.local_composer_plan_start),
         ))
+    }
+
+    @Test fun planIconDisablesWhileRunningOrAwaitingApproval() {
+        val running = mutableStateOf(false)
+        val waiting = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                LocalComposerPlanAction(
+                    selected = false,
+                    enabled = !running.value,
+                    waitingForApproval = waiting.value,
+                    onToggle = {},
+                )
+            }
+        }
+        val control = compose.onNodeWithTag("local-composer-plan-toggle")
+        compose.runOnIdle { waiting.value = true }
+        control.assertIsNotEnabled()
+        compose.runOnIdle { waiting.value = false; running.value = true }
+        control.assertIsNotEnabled()
     }
 
     @Test fun deepSeekSliderCanRestoreProviderDefault() {

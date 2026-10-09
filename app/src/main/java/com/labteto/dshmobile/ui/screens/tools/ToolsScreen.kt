@@ -55,6 +55,7 @@ import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.rememberDsToast
@@ -283,8 +284,10 @@ fun ToolsScreen(
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
     val autoApprovalEnabled = approvalMode == LocalApprovalMode.AUTO
+    val pulse = rememberHapticPulse()
     var confirmAutoApproval by remember { mutableStateOf(false) }
     val toggleAutoApproval: (Boolean) -> Unit = { enabled ->
+        pulse()
         if (enabled) confirmAutoApproval = true
         else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
     }
@@ -439,11 +442,11 @@ fun ToolsScreen(
                                 if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
                             ),
                             state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
-                            onClick = { viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
+                            onClick = { pulse(); viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
                             trailing = {
                                 DsSwitch(
                                     checked = networkSearchEnabled,
-                                    onCheckedChange = viewModel::setNetworkSearchEnabled,
+                                    onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
                                 )
                             },
                         )
