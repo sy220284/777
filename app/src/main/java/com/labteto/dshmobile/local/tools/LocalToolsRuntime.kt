@@ -21,9 +21,9 @@ class LocalToolsRuntime @Inject internal constructor(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.presetSkills() }
     internal suspend fun installPreset(id: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.installPreset(id) }
-    internal suspend fun createSkill(id: String, description: String, instructions: String) =
+    internal suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            management.createSkill(id, description, instructions)
+            management.createSkill(id, displayName, description, instructions)
         }
     internal suspend fun removeSkill(id: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.removeSkill(id) }
