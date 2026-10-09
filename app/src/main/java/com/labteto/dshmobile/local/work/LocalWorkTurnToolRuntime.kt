@@ -44,12 +44,28 @@ internal class LocalWorkTurnToolRuntime(
         binding: LocalWorkRunBinding,
         input: String,
     ) {
+        val history = binding.runHandle.modelHistory.snapshot()
         execution.prepareWorkTurnCapabilities(
             input = input,
-            history = binding.runHandle.modelHistory.snapshot(),
+            history = history,
             gitHubConfigured = githubConfigured,
             target = binding.enabledOptionalTools,
         )
+        if (isLocalAgentTeamTurn(history)) {
+            // 模型可选工具上限不能挤掉任务板的认领与结算。
+            val priority = listOf(
+                "team_task_list", "team_task_update", "team_messages",
+                "team_wait_for_message", "team_members", "team_task_get",
+                "team_create_member", "team_start_member", "team_spawn",
+                "team_send_message", "team_wait", "skill",
+            ).filter { registry.get(it) != null }
+            synchronized(binding.enabledOptionalTools) {
+                val previous = binding.enabledOptionalTools.toList()
+                binding.enabledOptionalTools.clear()
+                binding.enabledOptionalTools.addAll(priority)
+                binding.enabledOptionalTools.addAll(previous)
+            }
+        }
     }
 
     internal fun schemas(
@@ -65,6 +81,7 @@ internal class LocalWorkTurnToolRuntime(
             planModeEnabled = binding.state.value.work.planMode,
             history = binding.runHandle.modelHistory.snapshot(),
             enabledOptional = enabled,
+            agentTeamMode = isLocalAgentTeamTurn(binding.runHandle.modelHistory.snapshot()),
         )
     }
 

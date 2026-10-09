@@ -25,3 +25,8 @@ internal fun withLocalWorkExecutionMode(history: List<JsonObject>): List<JsonObj
         }) + messages.drop(1)
     } else listOf(instruction) + messages
 }
+
+/** 最新用户回合决定集群工具权限，不能从旧对话推断。 */
+internal fun isLocalAgentTeamTurn(history: List<JsonObject>): Boolean =
+    history.lastOrNull { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
+        ?.get(LOCAL_WORK_EXECUTION_MODE_KEY)?.jsonPrimitive?.contentOrNull == "agent_team"
