@@ -62,6 +62,26 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitlyDiscoveredToolTakesPrecedenceOverEarlierOptionalBudget() {
+        val registry = ToolRegistry().apply {
+            repeat(18) { index ->
+                register(tool(name = "background_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "后台扩展", keywords = setOf("background")) { ToolResult("ok") })
+            }
+            register(tool(name = "critical_lookup", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "精确发现", keywords = setOf("critical")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 18).map { "background_$it" })
+        assertFalse("critical_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        val response = coordinator.searchCapabilities("critical_lookup")
+        assertTrue(response.contains("critical_lookup"))
+        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).contains("critical_lookup"))
+    }
+
+    @Test
     fun disabledNetworkSearchBlocksDiscoverySchemasAndExecution() = runBlocking {
         var networkEnabled = false
         var executed = 0
