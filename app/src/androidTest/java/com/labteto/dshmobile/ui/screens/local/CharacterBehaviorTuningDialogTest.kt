@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.CharacterEvolutionState
+import com.labteto.dshmobile.local.model.LocalModelTemperatureRange
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -116,6 +117,29 @@ class CharacterBehaviorTuningDialogTest {
 
         compose.onNodeWithText(advanced).performScrollTo().performClick()
         compose.onNodeWithText(expressionVariation).assertDoesNotExist()
+    }
+
+    @Test
+    fun expressionVariationDisplaysMappedChatTemperature() {
+        compose.setContent {
+            DshTheme {
+                CharacterBehaviorTuningDialog(
+                    personaName = "角色",
+                    portraitPath = "",
+                    relationshipState = "熟悉",
+                    mood = "平静",
+                    evolution = CharacterEvolutionState(),
+                    initial = CharacterBehaviorTuning(),
+                    temperatureTuningAvailable = true,
+                    temperatureRange = LocalModelTemperatureRange(0.0, 2.0, 1.3),
+                    onSave = { Result.success(Unit) },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
+            .performScrollTo().performClick()
+        compose.onNodeWithText("温度 1.30 · 50").assertExists()
     }
 
     @Test
