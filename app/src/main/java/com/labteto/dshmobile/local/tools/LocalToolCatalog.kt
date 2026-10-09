@@ -48,6 +48,7 @@ object LocalToolCatalog {
             "query" to string("搜索内容；regex=true 时按正则表达式解析"),
             "path" to string("相对路径，默认 ."),
             "regex" to boolean("是否按正则表达式搜索，默认 false"),
+            "cursor" to string("可选；上次返回的搜索未完成游标，保持 query/path/regex 不变以继续扫描"),
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
