@@ -15,6 +15,7 @@ internal fun ContextComposer.composeWorkTurnContext(
     snapshot: LocalHarnessState,
     workspacePath: String,
     projectInstructions: String = "",
+    skillGuidance: String = "",
 ): LocalWorkTurnPromptContext {
     val composed = composeParts(
         ContextRequest(
@@ -34,6 +35,6 @@ internal fun ContextComposer.composeWorkTurnContext(
             snapshot.modelState.baseUrl,
             snapshot.modelState.modelSelection.activeProfile,
         ),
-        dynamic = composed.dynamic,
+        dynamic = listOf(skillGuidance, composed.dynamic).filter(String::isNotBlank).joinToString("\n\n"),
     )
 }
