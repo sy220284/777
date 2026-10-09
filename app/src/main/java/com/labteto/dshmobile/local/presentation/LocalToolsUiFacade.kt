@@ -27,6 +27,7 @@ class LocalToolsUiFacade @Inject constructor(
     internal suspend fun installPreset(id: String) = tools.installPreset(id)
     internal suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
+    internal suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
     internal suspend fun removeSkill(id: String) = tools.removeSkill(id)
     internal suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     internal suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
