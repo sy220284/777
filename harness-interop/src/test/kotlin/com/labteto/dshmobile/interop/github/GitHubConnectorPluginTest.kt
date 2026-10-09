@@ -19,6 +19,48 @@ import org.junit.Test
 
 class GitHubConnectorPluginTest {
     @Test
+    fun distinguishesExpiredCredentialAndRateLimitWithoutRetryingWrites() = runBlocking {
+        for ((httpCode, remaining, expectedCode) in listOf(
+            Triple(401, "60", "GITHUB_AUTH_INVALID"),
+            Triple(403, "0", "GITHUB_RATE_LIMITED"),
+            Triple(403, "42", "GITHUB_PERMISSION_DENIED"),
+        )) {
+            var calls = 0
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                calls++
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(httpCode)
+                    .message("Test error")
+                    .header("X-RateLimit-Remaining", remaining)
+                    .body("""{"message":"denied"}""".toResponseBody(JSON_MEDIA))
+                    .build()
+            }.build()
+            val registry = PluginRegistry()
+            registry.install(GitHubConnectorPlugin(
+                http = http, json = Json,
+                credentialProvider = { "github_pat_test_secret_1234567890" },
+                apiBaseUrl = "https://api.github.test",
+            ))
+            val failed = registry.context.tools.execute(
+                "github_api_request",
+                buildJsonObject {
+                    put("method", "POST")
+                    put("path", "/repos/owner/repo/issues")
+                    put("body", buildJsonObject { put("title", "test") })
+                },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue(failed.isError)
+            assertEquals(expectedCode, failed.errorCode)
+            assertFalse(failed.retryable)
+            assertTrue(failed.recoveryHint.orEmpty().isNotBlank())
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
     fun connectorInjectsCredentialWithoutReturningItToTheModel() = runBlocking {
         val token = "github_pat_test_secret_1234567890"
         var authorization: String? = null
