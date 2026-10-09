@@ -35,6 +35,27 @@ class LocalReasoningModeStoreTest {
         }
     }
 
+    @Test fun deepSeekWorkUnsetPreferenceKeepsPreviousOnePointThreeDefault() {
+        val session = "deepseek-work-untouched-capped-default-20261009"
+        val range = LocalModelPresets.chatTemperatureRangeFor(
+            "deepseek-flash", "https://api.deepseek.com",
+        )!!
+        assertEquals(4, LocalWorkTemperatureStore.level(session, range))
+        assertEquals(1.3, LocalWorkTemperatureStore.requestTemperature(
+            session, "deepseek-flash", "https://api.deepseek.com",
+        )!!, 0.000001)
+        // A deliberate user choice of the center detent must remain 0.65.
+        LocalWorkTemperatureStore.setLevel(session, 2)
+        try {
+            assertEquals(2, LocalWorkTemperatureStore.level(session, range))
+            assertEquals(0.65, LocalWorkTemperatureStore.requestTemperature(
+                session, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.000001)
+        } finally {
+            LocalWorkTemperatureStore.setLevel(session, 4)
+        }
+    }
+
     @Test fun newChatDefaultsToFastWithoutChangingWorkOrExplicitSelections() {
         val session = "new-chat-fast-default-20261009"
         val deepSeek = LocalModelProfile("chat-default-ds", "deepseek-flash", "https://api.deepseek.com")
