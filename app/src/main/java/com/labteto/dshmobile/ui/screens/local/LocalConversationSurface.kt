@@ -73,7 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
-import com.labteto.dshmobile.local.model.LocalWorkTemperatureStore
+import com.labteto.dshmobile.local.presentation.LocalWorkTemperatureControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
@@ -189,8 +189,8 @@ internal fun LocalConversationSurface(
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
     var workTemperatureLevel by remember(state.sessionId) {
-        LocalWorkTemperatureStore.attach(appContext)
-        androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureStore.level(state.sessionId))
+        LocalWorkTemperatureControls.attach(appContext)
+        androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureControls.level(state.sessionId))
     }
     var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     var temperatureSaveFailed by remember(state.sessionId) { mutableStateOf(false) }
@@ -904,8 +904,8 @@ internal fun LocalConversationSurface(
                 (!state.groupChat.enabled && !temperatureSaving),
             onTemperatureLevelChange = { level ->
                 if (state.usageMode == LocalUsageMode.WORK) {
-                    LocalWorkTemperatureStore.setLevel(state.sessionId, level)
-                    workTemperatureLevel = LocalWorkTemperatureStore.level(state.sessionId)
+                    LocalWorkTemperatureControls.setLevel(state.sessionId, level)
+                    workTemperatureLevel = LocalWorkTemperatureControls.level(state.sessionId)
                 } else if (!state.groupChat.enabled && !temperatureSaving) {
                     temperatureSaving = true
                     temperatureSaveFailed = false
