@@ -217,14 +217,14 @@ class ToolsViewModel @Inject constructor(
                     val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                         if (cursor.moveToFirst()) cursor.getString(0) else null
                     } ?: uri.lastPathSegment?.substringAfterLast('/') ?: ""
-                    val input = resolver.openInputStream(uri) ?: error("无法打开所选技能文件")
+                    val input = resolver.openInputStream(uri) ?: error(appContext.getString(R.string.skills_import_open_failed))
                     val output = ByteArrayOutputStream()
                     input.use { stream ->
                         val buffer = ByteArray(8192)
                         while (true) {
                             val count = stream.read(buffer)
                             if (count < 0) break
-                            require(output.size() + count <= 8 * 1024 * 1024) { "技能文件不能超过 8 MB" }
+                            require(output.size() + count <= 8 * 1024 * 1024) { appContext.getString(R.string.skills_import_too_large) }
                             output.write(buffer, 0, count)
                         }
                     }
@@ -236,14 +236,14 @@ class ToolsViewModel @Inject constructor(
                     skills = localTools.installedSkills(),
                     presets = localTools.presetSkills(),
                     createdSkillId = id,
-                    feedback = "技能已安装：$id",
+                    feedback = appContext.getString(R.string.skills_import_success, id),
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    feedback = error.message ?: "技能导入失败，请检查文件格式",
+                    feedback = error.message ?: appContext.getString(R.string.skills_import_failed),
                 )
             }
         }
@@ -446,6 +446,9 @@ fun ToolsScreen(
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
     var skillsOnly by remember(startAtSkills) { mutableStateOf(startAtSkills) }
+    LaunchedEffect(showPluginBrowser, skillsOnly) {
+        if (showPluginBrowser && skillsOnly) viewModel.refresh()
+    }
 
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
