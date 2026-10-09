@@ -194,6 +194,7 @@ internal fun LocalMessageRow(
                         LocalUserMessageContent(
                             message = message,
                             workspacePath = workspacePath,
+                            showSkillNames = !chatMode,
                         )
                     }
                     DsContextActionMenu(
@@ -337,6 +338,7 @@ internal fun LocalMessageRow(
 private fun LocalUserMessageContent(
     message: LocalHarnessMessage,
     workspacePath: String,
+    showSkillNames: Boolean,
 ) {
     Column(
         horizontalAlignment = Alignment.End,
@@ -345,7 +347,7 @@ private fun LocalUserMessageContent(
         message.visibleBlocks().forEach { block ->
             when (block) {
                 is LocalMessageBlock.Text -> if (block.text.isNotBlank()) {
-                    UserBubble(localSkillCallDisplayText(block.text))
+                    UserBubble(if (showSkillNames) localSkillCallDisplayText(block.text) else block.text)
                 }
                 is LocalMessageBlock.Image -> LocalTranscriptImage(
                     image = block,
