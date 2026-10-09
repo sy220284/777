@@ -118,7 +118,7 @@ def is_fixture_provenance_path(path: str) -> bool:
 
 
 def is_documentation(path: str) -> bool:
-    return path.endswith(".md") or path.startswith("docs/") or path in DOC_ROOT_FILES
+    return path.startswith("docs/") or path in DOC_ROOT_FILES or ("/" not in path and path.endswith(".md"))
 
 
 def is_repository_metadata(path: str) -> bool:
@@ -398,6 +398,12 @@ def self_test() -> None:
     verify(["app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalComposer.kt"],
            full=True, main=True, release=True)
     verify(["README.md"], main=True, release=False)
+    # A Markdown prompt/asset shipped within the app is product code, never
+    # classified as documentation solely because of its extension.
+    verify(["app/src/main/assets/prompts/system.md"], required=("unit", "build"),
+           release=True)
+    verify(["app/src/main/assets/prompts/system.md"], main=True, full=True,
+           release=True)
     verify(["docs/FEATURE-TREE.zh-CN.md"], required=("static",),
            excluded=("unit", "build", "device"), release=False)
     verify(["docs/ACCEPTANCE-MATRIX.json"], required=("static",),
