@@ -7,26 +7,28 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
-import com.labteto.dshmobile.local.presentation.localPresetSkillTitle
 
 // A display-only projection: the persisted draft, copied source, and submitted prompt retain @skill:<id>.
 private val selectedSkillMarker = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?=\\r?\\n|$)")
 
-private fun selectedSkillLabel(source: String): Pair<Int, String>? {
+private fun selectedSkillLabel(source: String, displayNames: Map<String, String>): Pair<Int, String>? {
     val match = selectedSkillMarker.find(source) ?: return null
-    val title = localPresetSkillTitle(match.groupValues[1]) ?: return null
+    val title = displayNames[match.groupValues[1]]?.takeIf(String::isNotBlank) ?: return null
     return match.value.length to "@$title"
 }
 
-internal fun localSkillCallDisplayText(source: String): String {
-    val (markerLength, label) = selectedSkillLabel(source) ?: return source
+internal fun localSkillCallDisplayText(source: String, displayNames: Map<String, String>): String {
+    val (markerLength, label) = selectedSkillLabel(source, displayNames) ?: return source
     return label + source.substring(markerLength)
 }
 
 /** Replaces the invocation prefix visually while keeping editing offsets aligned with the raw marker. */
-internal class LocalSkillCallVisualTransformation(private val accent: Color) : VisualTransformation {
+internal class LocalSkillCallVisualTransformation(
+    private val accent: Color,
+    private val displayNames: Map<String, String>,
+) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val (markerLength, label) = selectedSkillLabel(text.text)
+        val (markerLength, label) = selectedSkillLabel(text.text, displayNames)
             ?: return TransformedText(text, OffsetMapping.Identity)
         val transformed = buildAnnotatedString {
             pushStyle(SpanStyle(color = accent))
