@@ -274,7 +274,7 @@
     <string name="local_team_sheet_summary">%1$d 个助手 · %2$d / %3$d 项任务完成</string>
     <string name="local_team_reopen">查看已收起的智能体集群</string>
     <string name="local_team_permission_full">可执行文件读写、命令、技能和基础联网任务</string>
-    <string name="local_team_permission_limited">历史成员为只读模式，重新派活后可启用完整工作能力</string>
+    <string name="local_team_permission_limited">历史成员仍使用旧只读权限；请让主代理重新招募，才能启用完整工作能力</string>
     <string name="local_team_permission_grants">主代理已授权扩展：%1$s</string>
     <string name="local_team_collapse_after_view">看完收起 · 返回聊天</string>
     <string name="local_team_results_pending">已回收 %1$d 位助手的结果，待主代理核验结算</string>
