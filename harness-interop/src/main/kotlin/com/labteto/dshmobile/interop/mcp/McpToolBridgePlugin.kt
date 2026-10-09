@@ -46,17 +46,21 @@ internal fun boundedMcpToolResult(
 
 /** Explicit MCP failures; never expose remote response bodies or credential-bearing endpoint URLs. */
 internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting: Boolean): ToolResult {
-    val code = when (error) {
-        is McpHttpException -> when (error.statusCode) {
+    val code = when {
+        error.message.orEmpty().contains("正在重连") -> "MCP_CONNECTION_BUSY"
+        error.message.orEmpty().contains("MCP 服务未连接") -> "MCP_NOT_CONNECTED"
+        error is McpHttpException -> when (error.statusCode) {
             401, 403 -> "MCP_AUTH_REQUIRED"
             404, 410 -> "MCP_ENDPOINT_UNAVAILABLE"
             429 -> "MCP_RATE_LIMITED"
             else -> "MCP_HTTP_FAILED"
         }
-        is IOException -> "MCP_TRANSPORT_FAILED"
+        error is IOException -> "MCP_TRANSPORT_FAILED"
         else -> if (connecting) "MCP_CONNECT_FAILED" else "MCP_REMOTE_CALL_FAILED"
     }
     val hint = when (code) {
+        "MCP_CONNECTION_BUSY" -> "服务正在重连，请等待当前操作结束后再查看连接状态。"
+        "MCP_NOT_CONNECTED" -> "服务已断开，请先连接 MCP 服务并重新发现可用工具。"
         "MCP_AUTH_REQUIRED" -> "核实 MCP 服务认证信息和访问权限，并重新建立连接。"
         "MCP_ENDPOINT_UNAVAILABLE" -> "核实 MCP 端点和协议；先断开再使用正确地址连接。"
         "MCP_RATE_LIMITED" -> "MCP 服务正在限流，请稍后检查服务状态。"
@@ -332,7 +336,14 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 MCP 服务必须已连接"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(disconnect(context, input.required("server_id")))
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(disconnect(context, serverId))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = false)
+                    }
                 },
             ),
         )
