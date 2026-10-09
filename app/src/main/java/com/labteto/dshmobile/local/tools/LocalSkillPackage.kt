@@ -32,6 +32,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
         val documentBytes = entries["SKILL.md"] ?: throw IllegalArgumentException("技能包缺少 SKILL.md")
         require(documentBytes.size <= MAX_DOCUMENT_BYTES) { "SKILL.md 超过 24 KB，请拆分附属资料后重试" }
         val document = decodeUtf8(documentBytes)
+        entries["SKILL.md"] = document.toByteArray(Charsets.UTF_8)
         val lines = document.lines()
         require(lines.firstOrNull()?.trim() == "---") { "SKILL.md 缺少开头的元数据" }
         val end = lines.drop(1).indexOfFirst { it.trim() == "---" } + 1
@@ -49,6 +50,9 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
         val destination = File(skillRoot, id)
         require(!destination.exists() && !Files.isSymbolicLink(destination.toPath())) { "同名技能已经存在：$id" }
         val stagingRoot = File(workspace.path, ".dsh").apply { mkdirs() }
+        require(!Files.isSymbolicLink(stagingRoot.toPath()) && !Files.isSymbolicLink(skillRoot.toPath())) {
+            "技能目录不能是符号链接"
+        }
         val staging = Files.createTempDirectory(stagingRoot.toPath(), ".skill-import-").toFile()
         try {
             // Stage outside the catalog, so a failed import never advertises a partial skill.
@@ -111,7 +115,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
         return LinkedHashMap<String, ByteArray>().apply {
             for ((name, content) in raw) {
                 val relative = name.removePrefix(prefix)
-                require(relative.isNotBlank() && relative != "SKILL.md" || relative == "SKILL.md")
+                require(relative.isNotBlank())
                 put(relative, content)
             }
         }
