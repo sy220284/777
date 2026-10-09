@@ -312,6 +312,15 @@ class LocalToolExecutionCoordinatorTest {
             register(tool("io_probe", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
                 throw java.io.IOException("临时读取中断")
             })
+            register(tool("missing_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.NoSuchFileException("missing.txt")
+            })
+            register(tool("denied_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.AccessDeniedException("private.txt")
+            })
+            register(tool("lsp_start_denied", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalStateException("用户拒绝启动代码智能进程")
+            })
         }
         val coordinator = coordinator(registry)
         suspend fun result(name: String) = coordinator.execute(
@@ -324,6 +333,11 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals("TOOL_IO_ERROR", io.errorCode)
         assertTrue(io.retryable)
         assertEquals(AgentToolSideEffect.NONE, io.sideEffect)
+        assertEquals("TOOL_NOT_FOUND", result("missing_file").errorCode)
+        val denied = result("denied_file")
+        assertEquals("TOOL_PERMISSION_DENIED", denied.errorCode)
+        assertFalse(denied.retryable)
+        assertEquals("APPROVAL_DENIED", result("lsp_start_denied").errorCode)
     }
 
     @Test
