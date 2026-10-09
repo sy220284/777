@@ -825,78 +825,70 @@
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
       "state": "automated_partial",
       "evidence": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/BundledRuntimeUpgradeCleanupTest.kt#legacyRuntimeLayoutIsRemovedAndRebuiltAfterUpgrade"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / Android 本机运行时 / 前台服务和 Android 后台执行",
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 前台服务和 Android 后台执行",
       "state": "automated_partial",
       "evidence": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalTurnForegroundLeaseAndroidTest.kt#rejectedForegroundStartDoesNotExecuteProtectedTurn"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 远程 Harness 控制 / 远程会话 / 远程会话分页归属隔离",
-      "state": "automated_partial",
-      "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/data/RemoteConversationPagingOwnershipTest.kt#returningToSameSessionCannotAcceptOldPageOrClearNewLoading",
-        "app/src/test/java/com/labteto/dshmobile/data/RemoteConversationPagingOwnershipTest.kt#staleFailureCannotClearLoadingOfNewPageAfterReturningToSameSession"
-      ]
-    },
-    {
-      "path": "第三层｜平台、远程与工程保障 / 底层协议与兼容 / JSON 请求与响应",
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / JSON 请求与响应",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#responsesRejectMalformedOrMissingToolIdentityAndArguments"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 底层协议与兼容 / 流式帧组装和断线重连",
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 流式响应和断流处理",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#errorFrameAndTruncatedStreamNeverBecomeSuccessfulReplies"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 底层协议与兼容 / 状态同步和错误分类",
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 请求状态和错误分类",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt#errorFrameAndTruncatedStreamNeverBecomeSuccessfulReplies"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 外部互通适配 / GitHub 接口工具",
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / GitHub 接口工具",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt#githubKeywordPreactivationCannotBypassNegationOrCredentialGate"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 外部互通适配 / LSP 语言服务器适配",
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / LSP 语言服务器适配",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LanguageServerCommandTest.kt#refusesAmbiguousShellStringsAndNonStringArguments"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 外部互通适配 / Android 设备权限提供方",
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / Android 设备权限提供方",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalSubagentToolCallPolicyTest.kt#virtualScreenCallMustUseAssignedScreenId"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 测试与语义验证 / Android 应用单元测试",
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / Android 应用单元测试",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt#deletionCannotBeUndoneByQueuedSnapshots"
       ]
     },
     {
-      "path": "第三层｜平台、远程与工程保障 / 测试与语义验证 / 核心智能体循环测试",
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 核心智能体循环测试",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt#unknownToolOutcomeBlocksAutomaticResume"

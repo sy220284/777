@@ -1,12 +1,12 @@
 # Security
 
-777 可以在手机本机运行 Agent，也可以通过 HTTPS 中继控制远程 Harness。
+777 当前只在手机本机运行 Agent，远程 Harness 控制和中继配对功能已退役。
 
 Agent 具备读取 / 修改工作区文件、执行进程、访问网络和调用设备能力的权限，因此安全边界属于产品核心能力。
 
 ## 凭据
 
-- 模型密钥和中继凭据使用 Android Keystore 加密保存。
+- 模型密钥和本机账户凭据使用 Android Keystore 加密保存。
 - 完整凭据不进入模型上下文、Session Event Log 或普通诊断日志。
 - Token usage 日志记录 usage、模型、动作和运行归属，不要求保存完整 prompt 正文。
 - 敏感剪贴板、凭据和高权限操作保持显式权限边界。
@@ -24,17 +24,6 @@ Agent 具备读取 / 修改工作区文件、执行进程、访问网络和调�
 - access token、refresh token、ID Token 和账户注册记录使用 Android Keystore 加密保存，不进入 Session Event Log、模型上下文或诊断日志。
 - 多账户按 issued client id + subject 隔离；切换账户后重新读取对应可见模型。
 - ChatGPT 登录不授予 777 读取 ChatGPT 历史会话或 Memory 的权限。
-- 手机本机的 ChatGPT OAuth 凭据不会自动转发给远程 Harness；远程执行主机需要独立授权边界。
-
-## 远程连接
-
-远程控制只支持 HTTPS 中继配对。
-
-- 不提供 LAN 扫描或明文 Harness 直连。
-- 配对可固定中继证书指纹。
-- 证书变化不会静默继承旧信任。
-- 认证请求禁止 HTTPS → HTTP 降级。
-- 手机不跨网络携带 Harness 自己的浏览器 Session Cookie；由中继管理上游 Harness 会话。
 
 ## 本机工作区
 

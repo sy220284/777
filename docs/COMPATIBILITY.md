@@ -63,36 +63,6 @@ upstream/deepseek-harness.lock.json
 
 这个版本只用于本机原生 Harness 的差分验证。
 
-## 远程模式
-
-当前远程协议基线：
-
-```text
-Harness 0.1.6-alpha.1
-0d1f50007f9bca3f52b06e1c3074fa14d5fb0720
-```
-
-中继：
-
-```text
-dsh-relay 0.2.1
-HTTPS pairing
-```
-
-远程访问只支持配对中继，不支持旧的 LAN 扫描 / 明文直连路径。
-
-## 兼容策略
-
-777 以当前协议形状为准，不维护一套按 Harness 版本号切换的协议实现。
-
-兼容规则：
-
-- 未知 JSON 字段忽略。
-- 未知事件 / 内容块保留 passthrough 或诊断信息。
-- 可选 endpoint 返回 404 时按“能力不可用”降级。
-- 认证失败、Host/Origin 拒绝和业务失败分别处理。
-- 协议基线只在完成 fixture 刷新和一致性验证后升级。
-
 ## 平台差异
 
 Android 本机模式目标是语义等价，不要求复制桌面宿主的物理实现。
