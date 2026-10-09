@@ -43,6 +43,9 @@ class SidebarSystemBackRegressionTest {
         }
 
         pressBackWhenWindowFocused()
+        // A completed shell command does not guarantee UI-thread callback delivery.
+        // Wait for the observable result; a second dispatch still fails the assertion.
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -63,6 +66,9 @@ class SidebarSystemBackRegressionTest {
         }
 
         pressBackWhenWindowFocused()
+        // A completed shell command does not guarantee UI-thread callback delivery.
+        // Wait for the observable result; a second dispatch still fails the assertion.
+        compose.waitUntil(timeoutMillis = 5_000) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())

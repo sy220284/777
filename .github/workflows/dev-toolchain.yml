@@ -101,8 +101,12 @@ jobs:
       - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
         run: |
           set -euo pipefail
-          # Warm the same test dependencies first, without running R8/asset packaging
-          # concurrently with the JVM test timeout watchdog. No test or build lane is removed.
+          # Run the Android app JVM tests in their own bounded execution graph.
+          # Their two-minute hang/deadlock watchdog is unchanged. Never race R8
+          # or unrelated module tests against this timeout on shared runners.
+          ./gradlew :app:testDebugUnitTest --no-parallel --max-workers=2 --stacktrace --console=plain
+
+          # Keep all seven remaining JVM modules as executable tests.
           ./gradlew \
             :core:test \
             :harness-core:test \
@@ -110,17 +114,16 @@ jobs:
             :harness-interop:test \
             :harness-device-android:testDebugUnitTest \
             :mock-harness:test \
-            :app:testDebugUnitTest \
             :reference-validation:test \
-            --stacktrace
-          # Keep release shrinker, lint, instrumentation APK and both regular APKs
-          # in this prewarm so the exported offline Gradle cache remains complete.
+            --no-parallel --max-workers=2 --stacktrace --console=plain
+
+          # Restore the same APK, test APK, lint and optimized-R8 prewarm scope.
           ./gradlew \
             :app:lintDebug \
             :app:assembleDebug \
             :app:assembleDebugAndroidTest \
             :app:assembleOptimized \
-            --stacktrace
+            --stacktrace --console=plain
 
       - name: 拆分并校验组件包
         run: |
