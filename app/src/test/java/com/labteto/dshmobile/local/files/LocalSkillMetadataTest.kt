@@ -13,6 +13,7 @@ class LocalSkillMetadataTest {
             """
                 ---
                 name: arbitrary-display-name
+                display-name: "代码审查"
                 description: "Review code changes"
                 when-to-use: For code review and analysis
                 disable-model-invocation: true
@@ -21,6 +22,7 @@ class LocalSkillMetadataTest {
             """.trimIndent(),
         )
         assertEquals("safe-audit", skill.name)
+        assertEquals("代码审查", skill.displayName)
         assertEquals("Review code changes", skill.description)
         assertEquals("For code review and analysis", skill.whenToUse)
         assertFalse(skill.modelInvocable)

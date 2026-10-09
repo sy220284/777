@@ -4,6 +4,7 @@ package com.labteto.dshmobile.local.files
 internal data class LocalSkillMetadata(
     val name: String,
     val description: String = "",
+    val displayName: String? = null,
     val whenToUse: String? = null,
     val modelInvocable: Boolean = true,
 )
@@ -29,6 +30,8 @@ internal fun parseLocalSkillMetadata(name: String, document: String): LocalSkill
     val disabled = entries["disable-model-invocation"]?.equals("true", ignoreCase = true) == true
     return LocalSkillMetadata(
         name = name,
+        displayName = (entries["display-name"] ?: entries["displayname"] ?: entries["title"])
+            ?.takeIf { it.length in 1..40 && it.any { c -> c in '\u4e00'..'\u9fff' } },
         description = entries["description"].orEmpty().take(MAX_SKILL_SUMMARY_CHARS),
         whenToUse = (entries["when-to-use"] ?: entries["whentouse"])
             ?.takeIf(String::isNotBlank)

@@ -148,4 +148,33 @@ class PluginInventoryBrowserRegressionTest {
         }
     }
 
+    @Test
+    fun skillsPageExposesFileImportAndConversationalCreation() {
+        var imported = 0
+        var creationPrompt: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    remote = null,
+                    skillsOnly = true,
+                    onBack = {},
+                    onManageConnections = {},
+                    onReturnToChat = {},
+                    onImportSkill = { imported++ },
+                    onUseCapability = { creationPrompt = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("skill-import-file").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, imported) }
+        compose.onNodeWithTag("skill-create-in-chat").assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            val prompt = requireNotNull(creationPrompt)
+            org.junit.Assert.assertTrue(prompt.contains("SKILL.md"))
+            org.junit.Assert.assertTrue(prompt.contains("确认"))
+            org.junit.Assert.assertTrue(prompt.contains(".dsh/skills/"))
+        }
+    }
+
 }

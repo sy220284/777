@@ -11,7 +11,8 @@ internal interface LocalToolsManagementPort {
     fun installedSkills(): List<LocalInstalledSkill>
     fun presetSkills(): List<LocalPresetSkill>
     fun installPreset(id: String)
-    fun createSkill(id: String, description: String, instructions: String)
+    fun createSkill(id: String, displayName: String, description: String, instructions: String)
+    fun importSkill(filename: String, bytes: ByteArray): String
     fun removeSkill(id: String)
     fun readSkillDocument(id: String): String
     fun updateSkillDocument(id: String, document: String)

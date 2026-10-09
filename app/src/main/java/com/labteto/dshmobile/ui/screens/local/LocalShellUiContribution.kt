@@ -33,6 +33,7 @@ internal fun localShellFeatureUiContribution(
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
     composerHandoff: List<String>,
+    skillDisplayNames: Map<String, String>,
     onUseWorkCapability: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
     onOpenDrawer: () -> Unit,
@@ -47,6 +48,7 @@ internal fun localShellFeatureUiContribution(
         LocalConversationSurface(
             state = surface,
             composerHandoff = composerHandoff,
+            skillDisplayNames = skillDisplayNames,
             onUseWorkCapability = onUseWorkCapability,
             onConsumeComposerHandoff = onConsumeComposerHandoff,
             onOpenDrawer = onOpenDrawer,
