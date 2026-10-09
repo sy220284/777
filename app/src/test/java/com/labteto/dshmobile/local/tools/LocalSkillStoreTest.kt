@@ -126,4 +126,20 @@ class LocalSkillStoreTest {
         assertFalse(workspace.skills().contains("research-check"))
     }
 
+
+    @Test
+    fun existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename() = inWorkspace { store, workspace, _ ->
+        workspace.write(".dsh/skills/legacy-note/SKILL.md", "---\ndescription: notes\n---\n# 故事规划\n内容")
+        assertEquals("故事规划", store.installed().first { it.name == "legacy-note" }.displayName)
+        store.updateDocument("legacy-note",
+            "---\ndescription: notes\ndisplay-name: \"长篇创作\"\n---\n# 故事规划\n内容")
+        assertEquals("长篇创作", store.installed().first { it.name == "legacy-note" }.displayName)
+        assertEquals(true, workspace.readModelSkill("legacy-note").contains("内容"))
+    }
+
+    @Test
+    fun presetTitleWorksForHistoricalInstalledDocumentWithoutNewField() = inWorkspace { store, workspace, _ ->
+        workspace.write(".dsh/skills/data-insights/SKILL.md", "---\ndescription: analyze\n---\n# data-insights\nAnalyze")
+        assertEquals("数据分析", store.installed().first { it.name == "data-insights" }.displayName)
+    }
 }
