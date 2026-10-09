@@ -69,8 +69,12 @@ data class CharacterBehaviorTuning(
      * Center (50) uses its conversation-friendly temperature without changing saved sliders.
      * Missing/unsupported model bounds leave its default sampling behavior intact.
      */
-    internal fun roleplayTemperature(model: String, baseUrl: String): Double? =
-        LocalModelPresets.chatTemperatureRangeFor(model, baseUrl)?.at(expressionVariation)
+    internal fun roleplayTemperature(model: String, baseUrl: String): Double? {
+        val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
+        // Gemini 3.x official guidance recommends omitting sampling fields at the default.
+        if (range.omitAtChatDefault && expressionVariation == 50) return null
+        return range.at(expressionVariation)
+    }
 
     internal fun evolutionStepBonus(): Int = when {
         evolution <= 20 -> -1
