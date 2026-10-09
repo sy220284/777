@@ -240,6 +240,7 @@ internal fun LocalRunCenterScreen(
                                     subtitle = label,
                                     modifier = Modifier.weight(1f),
                                     onClick = {
+                                        artifactActionFailed = false
                                         when (artifact.category) {
                                             "file" -> {
                                                 if (artifact.currentlyAvailable == false) {
