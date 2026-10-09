@@ -147,13 +147,15 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
 
     /** Remove only SKILL.md; never destroy extra files supplied by the user. */
     fun remove(id: String) {
-        require(LOCAL_SKILL_ID_PATTERN.matches(id) || id == "workspace-guide") { "无效的技能标识" }
+        require(id.isNotBlank() && id != "." && id != ".." &&
+            '/' !in id && '\\' !in id && '\u0000' !in id) { "无效的技能标识" }
         val dir = File(skillsDir, id)
         val target = File(dir, "SKILL.md")
         require(!Files.isSymbolicLink(dir.toPath()) && !Files.isSymbolicLink(target.toPath())) {
             "不能移除符号链接技能"
         }
-        require(target.isFile && target.canonicalFile.parentFile == dir.canonicalFile) { "技能未安装" }
+        require(dir.canonicalFile.parentFile == skillsDir.canonicalFile &&
+            target.isFile && target.canonicalFile.parentFile == dir.canonicalFile) { "技能未安装" }
         require(target.delete()) { "技能移除失败" }
         dir.delete()
     }
