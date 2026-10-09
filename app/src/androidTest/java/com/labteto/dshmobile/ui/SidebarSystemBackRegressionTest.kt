@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -30,7 +31,10 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // Await a fully composed foreground Activity before routing a real Back key.
+        // Shell-level 'input keyevent' can be consumed by a different window on CI emulators.
+        compose.waitForIdle()
+        Espresso.pressBack()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -50,7 +54,10 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // Await a fully composed foreground Activity before routing a real Back key.
+        // Shell-level 'input keyevent' can be consumed by a different window on CI emulators.
+        compose.waitForIdle()
+        Espresso.pressBack()
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())

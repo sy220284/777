@@ -98,10 +98,33 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$ARCHIVE" -C "$RUNNER_TEMP/actionlint-bin"
           "$RUNNER_TEMP/actionlint-bin/actionlint" -version
 
-      - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
+      # app:testDebugUnitTest has a 2-minute deadlock watchdog. Running it alongside
+      # R8, lint and multiple APK assemblies can starve its test workers on a fresh runner.
+      # Keep the watchdog and every task; isolate the test phase before heavy packaging.
+      - name: 预热 JVM 单元测试与 Kotlin 依赖
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          ./gradlew \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :app:testDebugUnitTest \
+            :reference-validation:test \
+            --max-workers=2 \
+            --stacktrace
+
+      - name: 预热 Android Lint、安装包与 Runtime 构建依赖
+        run: |
+          set -euo pipefail
+          ./gradlew \
+            :app:lintDebug \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:assembleOptimized \
+            --stacktrace
 
       - name: 拆分并校验组件包
         run: |
