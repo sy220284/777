@@ -83,6 +83,7 @@ internal fun LocalConversationComposer(
     reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
     temperatureLevel: Int = 2,
+    temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
@@ -372,6 +373,7 @@ internal fun LocalConversationComposer(
                     usageMode = state.usageMode,
                     reasoningMode = reasoningMode,
                     temperatureLevel = temperatureLevel,
+                    temperaturePosition = temperaturePosition,
                     temperatureEnabled = temperatureEnabled,
                     temperatureSaveFailed = temperatureSaveFailed,
                     onTemperatureLevelChange = {
