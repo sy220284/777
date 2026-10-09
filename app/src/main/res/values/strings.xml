@@ -245,7 +245,7 @@
     <string name="questions_answer_refused">Harness 未接受该答案（%1$s）。</string>
     <string name="questions_answer_unsent">无法连接到 Harness。</string>
     <string name="local_team_title">Agent 集群</string>
-    <string name="local_team_readonly_hint">助手负责检索、分析与审查；文件修改由主智能体处理。</string>
+    <string name="local_team_readonly_hint">助手可按授权执行读写与技能任务；任务验收和扩展授权由主代理负责。</string>
     <string name="local_team_rebuilding">正在恢复团队状态</string>
     <string name="local_team_state_stopping">正在停止</string>
     <string name="local_team_stopping_count">%1$d 个助手正在停止</string>
@@ -276,6 +276,12 @@
     <string name="local_team_progress_count">已完成 %1$d / %2$d</string>
     <string name="local_team_progress_compact">%1$d / %2$d</string>
     <string name="local_team_sheet_summary">%1$d 个助手 · %2$d / %3$d 项任务完成</string>
+    <string name="local_team_reopen">查看已收起的智能体集群</string>
+    <string name="local_team_permission_full">可执行文件读写、命令、技能和基础联网任务</string>
+    <string name="local_team_permission_limited">历史成员仍使用旧只读权限；请让主代理重新招募，才能启用完整工作能力</string>
+    <string name="local_team_permission_grants">主代理已授权扩展：%1$s</string>
+    <string name="local_team_collapse_after_view">看完收起 · 返回聊天</string>
+    <string name="local_team_results_pending">已回收 %1$d 位助手的结果，待主代理核验结算</string>
     <string name="local_team_assistants">助手</string>
     <string name="local_team_recruit_title">助手招募</string>
     <string name="local_team_more_assistants">还有 %1$d 个助手，点开查看</string>
