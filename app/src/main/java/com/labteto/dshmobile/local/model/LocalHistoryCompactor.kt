@@ -135,6 +135,7 @@ internal class LocalHistoryCompactor(
                 buildTrustedContextCheckpointModelMessage(summaryMode, rendered.modelBlock),
             )
 
+            protectedTailSystem?.let(::add)
             addAll(source.drop(start).filterNot { isTrustedContextCheckpointModelMessage(it) })
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
