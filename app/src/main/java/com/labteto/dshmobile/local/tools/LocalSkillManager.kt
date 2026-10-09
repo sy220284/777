@@ -149,9 +149,83 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
         return LocalPresetSkillCatalog.entries.map { it.copy(installed = it.id in names) }
     }
 
+    private val legacyInstructions: Map<String, String> = mapOf(
+        "writing-polish" to """
+            1. 先提取写作目的、受众、原文语气及不可更改的内容。
+            2. 检查歧义、重复、语病、信息缺失与节奏；不得凭空添加事实或剧情。
+            3. 给出能直接使用的修订稿，保留人物口吻和专有名词。
+            4. 只在必要时说明关键修改与待作者决定的歧义。
+        """.trimIndent(),
+        "longform-outline" to """
+            1. 确定题材、读者、主线目标、篇幅、人物欲望和已确立世界规则。
+            2. 用起因、行动、阻力、代价、转折、收束搭建连续推进的情节链。
+            3. 记录主要人物动机、能力边界、重要选择及成长，并校验连续性。
+            4. 交付分阶段大纲与关键伏笔回收表，避免重复事件和无代价转折。
+            5. 对已有章节先核实原文；未知条件须标为待确定，不自行改动设定。
+        """.trimIndent(),
+        "document-summary" to """
+            1. 使用当前可用的文件工具读取材料；若只读到部分内容，标注范围。
+            2. 分清原文事实、作者观点、推断和未定事项。
+            3. 先给核心结论，再按需要整理依据、行动事项、责任人与风险。
+            4. 回查日期、数字、姓名与约束，保留文件及段落位置。
+            5. 严禁杜撰未阅读的章节、引文或决定。
+        """.trimIndent(),
+        "research-check" to """
+            1. 明确待核实主张和时间范围，分辨哪些结论要求最新资料。
+            2. 优先使用官方和一手来源，用现有联网或文件工具取得证据。
+            3. 逐项对比事实、推断、争议和无法验证的部分。
+            4. 给出结论、可回查来源及其日期，指出适用边界。
+            5. 缺少联网或原始证据时直接说明，不虚构来源或结论。
+        """.trimIndent(),
+        "code-review" to """
+            1. 读取相关代码、调用链、测试和仓库权威规范，确认目标与基线。
+            2. 沿输入、状态、执行、副作用、错误处理和恢复路径核对缺陷。
+            3. 明确列出可复现问题、代码位置、触发条件与影响，按严重度排序。
+            4. 使用现有测试工具验证关键问题，不得把静态阅读称为测试通过。
+            5. 修复建议应指向根因并覆盖横向关联和纵向链路。
+        """.trimIndent(),
+        "bug-investigation" to """
+            1. 记录现象、复现条件、时间线、最近变动和期望结果。
+            2. 用现有日志与代码工具追踪首个异常状态及上游来源。
+            3. 分清报错表象与根因，设计能证伪不同假设的检查步骤。
+            4. 处理后检查正常、异常、并发、取消及恢复路径。
+            5. 最后区分已验证结果与仍待验证的部分。
+        """.trimIndent(),
+        "data-insights" to """
+            1. 明确数据来源、单位、口径、缺失值与分析时间范围。
+            2. 用可用工具实际计算，检查重复记录、分母和汇总方式。
+            3. 解释趋势、分组差异与异常，避免将相关性当成因果。
+            4. 提供关键发现、支持数字、限制条件和下一步建议。
+            5. 假设、预测和观测值必须清晰区分。
+        """.trimIndent(),
+        "translation-localization" to """
+            1. 识别源语言、目标语言、用途、受众和语气。
+            2. 忠实保留数字、专有名词、链接、格式、代码及限定条件。
+            3. 使用地道目标语言，保持术语一致，避免逐字硬译。
+            4. 对双关、文化背景和歧义提供简短说明或选项。
+            5. 不添写原文没有的事实或立场。
+        """.trimIndent(),
+    )
+
+    /** Upgrade only exact original presets; preserve user edits and removed skills. */
+    private fun upgradeUntouchedPresets() {
+        for (preset in LocalPresetSkillCatalog.entries) {
+            val previousInstructions = legacyInstructions[preset.id] ?: continue
+            if (!workspace.skills().contains(preset.id)) continue
+            val before = buildLocalSkillDocument(preset.id, preset.description, previousInstructions)
+            val path = ".dsh/skills/" + preset.id + "/SKILL.md"
+            if (workspace.readRaw(path) == before) {
+                workspace.write(path, buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse))
+            }
+        }
+    }
+
     /** First launch only: users removing a bundled skill must not see it reappear on restart. */
     fun seedOnce() {
-        if (File(workspace.path, seedMarker).exists()) return
+        if (File(workspace.path, seedMarker).exists()) {
+            upgradeUntouchedPresets()
+            return
+        }
         for (entry in LocalPresetSkillCatalog.entries) {
             if (!File(skillsDir, entry.id).exists()) install(entry.id)
         }
