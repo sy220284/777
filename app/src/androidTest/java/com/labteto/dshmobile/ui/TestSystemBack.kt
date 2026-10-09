@@ -9,6 +9,9 @@ import androidx.test.platform.app.InstrumentationRegistry
  */
 internal fun pressDeviceBack() {
     val instrumentation = InstrumentationRegistry.getInstrumentation()
+    // A freshly composed BackHandler is registered on the UI thread. Do not inject
+    // the platform key before the host's pending lifecycle/recomposition work settles.
+    instrumentation.waitForIdleSync()
     ParcelFileDescriptor.AutoCloseInputStream(
         instrumentation.uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK"),
     ).use { it.readBytes() }

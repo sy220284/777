@@ -30,9 +30,11 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // Keep the real system key event. Wait for the composable BackHandler to
+        // register before dispatch; then wait for its observable callback result.
         compose.waitForIdle()
-
+        pressDeviceBack()
+        compose.waitUntil(timeoutMillis = 3_000) { backCount.get() == 1 }
         assertEquals(1, backCount.get())
     }
 
@@ -50,9 +52,11 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
+        // Keep the real system key event. Wait for the composable BackHandler to
+        // register before dispatch; then wait for its observable callback result.
         compose.waitForIdle()
-
+        pressDeviceBack()
+        compose.waitUntil(timeoutMillis = 3_000) { backCount.get() == 1 }
         assertEquals(1, backCount.get())
     }
 }
