@@ -110,6 +110,8 @@ internal data class LocalTeamMemberSnapshot(
     val phase: LocalTeamMemberPhase,
     val error: String? = null,
     val displayName: String = "",
+    val mutableToolsEnabled: Boolean = false,
+    val grantedExtensions: Set<String> = emptySet(),
 )
 
 @Serializable
@@ -358,6 +360,8 @@ internal class LocalAgentTeamRuntime(
                 name = member.name,
                 description = member.description,
                 displayName = member.displayName,
+                mutableToolsEnabled = member.mutableToolsEnabled,
+                grantedExtensions = member.grantedExtensions,
                 phase = member.phase.name.lowercase(),
                 activity = activity,
                 currentTask = currentTask?.subject,
@@ -497,7 +501,14 @@ internal class LocalAgentTeamRuntime(
             if (member.phase == LocalTeamMemberPhase.DISABLED && jobs.snapshotInfos().any { it.id == member.jobId }) {
                 JobInboxContract.normalize(QueuedAgentInput(id = "team-resume-validation", content = cleanTask, memoryInput = cleanTask))
             }
-            val provisioning = member.copy(phase = LocalTeamMemberPhase.PROVISIONING, error = null)
+            val resumingExisting = member.phase == LocalTeamMemberPhase.DISABLED &&
+                jobs.snapshotInfos().any { it.id == member.jobId }
+            val provisioning = member.copy(
+                phase = LocalTeamMemberPhase.PROVISIONING,
+                error = null,
+                mutableToolsEnabled = if (resumingExisting) member.mutableToolsEnabled else true,
+                grantedExtensions = if (resumingExisting) member.grantedExtensions else grantedExtensions,
+            )
             appendMember(binding.sessionId, provisioning)
             startingMembers.add(binding.sessionId to member.id)
             Triple(member, cleanTask, provisioning)
@@ -678,6 +689,8 @@ internal class LocalAgentTeamRuntime(
                 jobId = jobId,
                 name = cleanName,
                 displayName = displayName.trim().take(32),
+                mutableToolsEnabled = true,
+                grantedExtensions = grantedExtensions,
                 description = boundedTeamText(
                     value = description,
                     field = "description",
