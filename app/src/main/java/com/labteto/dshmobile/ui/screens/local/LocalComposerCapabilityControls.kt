@@ -75,6 +75,7 @@ internal fun LocalComposerCapabilityActions(
     reasoningMode: LocalReasoningUiMode,
     temperatureLevel: Int = 2,
     temperatureEnabled: Boolean = true,
+    temperatureSaveFailed: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
     running: Boolean,
     showLabels: Boolean,
@@ -121,6 +122,7 @@ internal fun LocalComposerCapabilityActions(
                     reasoningMode = reasoningMode,
                     temperatureLevel = temperatureLevel,
                     temperatureEnabled = temperatureEnabled,
+                    temperatureSaveFailed = temperatureSaveFailed,
                     onTemperatureLevelChange = onTemperatureLevelChange,
                     onReasoningModeChange = onReasoningModeChange,
                 )
@@ -138,6 +140,7 @@ internal fun LocalComposerCapabilityPanel(
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
     temperatureLevel: Int = 2,
     temperatureEnabled: Boolean = true,
+    temperatureSaveFailed: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
     val colors = DsTheme.colors
@@ -211,7 +214,7 @@ internal fun LocalComposerCapabilityPanel(
                 )
             } else {
                 val selectedLevel = temperatureLevel.coerceIn(0, 4)
-                var temperatureSelection by remember(profile?.id, usageMode, selectedLevel) {
+                var temperatureSelection by remember(profile?.id, usageMode, selectedLevel, temperatureEnabled) {
                     mutableFloatStateOf(selectedLevel.toFloat())
                 }
                 val temperatureTick = rememberHapticTickFeedback(selectedLevel)
@@ -253,6 +256,10 @@ internal fun LocalComposerCapabilityPanel(
                             R.string.local_composer_temperature_chat_high
                         else R.string.local_composer_temperature_work_high,
                     ), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                }
+                if (temperatureSaveFailed && usageMode == LocalUsageMode.CHAT) {
+                    Text(stringResource(R.string.local_composer_temperature_save_failed),
+                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
                 if (thinkingBlocksSampling) {
                     Text(stringResource(R.string.local_composer_temperature_thinking),
