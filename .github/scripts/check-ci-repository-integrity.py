@@ -59,6 +59,14 @@ for workflow in sorted(WORKFLOWS.glob("*.yml")):
             if "timeout-minutes:" not in window:
                 violations.append(f"{workflow.name}:{index + 1}: every runner job must declare timeout-minutes")
 
+# Composite actions execute inside workflows; audit their external dependencies too.
+for action_file in sorted((ROOT / ".github" / "actions").glob("*/action.yml")):
+    for use in uses_pattern.findall(action_file.read_text(encoding="utf-8")):
+        if use.startswith("./"):
+            continue
+        if use.startswith("docker://") or "@" not in use or not re.fullmatch(r"[0-9a-fA-F]{40}", use.rsplit("@", 1)[-1]):
+            violations.append(f"{action_file.relative_to(ROOT)}: external action must be pinned to a full commit SHA: {use}")
+
 # Authority documents and the CI control plane must stay mutually reachable and internally aligned.
 authority_refs = (
     "docs/ARCHITECTURE.md",
@@ -493,8 +501,42 @@ if "android-x86_64-test-apks" not in CI:
     violations.append("CI must publish/reuse one x86_64 device artifact set for Android 16/17")
 if "actions/download-artifact@" not in CI:
     violations.append("Android lanes must download the shared x86_64 test artifact")
-if ".gradle/runtime-cache" not in CI or "actions/cache@" not in CI:
-    violations.append("CI must cache verified Runtime downloads instead of redownloading per runner")
+# ABI-scoped downloads must be verified and saved BEFORE costly build tasks, even when
+# those tasks later fail. Keep product validation unchanged.
+runtime_action_file = ROOT / ".github" / "actions" / "setup-runtime-cached" / "action.yml"
+if not runtime_action_file.is_file():
+    violations.append("missing shared verified Runtime cache action")
+else:
+    runtime_action = runtime_action_file.read_text(encoding="utf-8")
+    required_runtime_tokens = (
+        "actions/cache/restore@",
+        "actions/cache/save@",
+        ".gradle/runtime-cache",
+        "steps.runtime-cache.outputs.cache-hit != 'true'",
+        "hashFiles(",
+        "inputs.abi",
+        "prepare-termux-*.sh",
+        "prepare-hdiffpatch.sh",
+        "runtime-download.sh",
+        "verify-termux-signature.sh",
+        ":app:prepareBundledNodeRuntime",
+        ":app:prepareBundledPythonRuntime",
+        ":app:prepareBundledGitRuntime",
+        ":app:prepareUpdatePatcher",
+    )
+    for token in required_runtime_tokens:
+        if token not in runtime_action:
+            violations.append(f"verified Runtime cache action missing {token}")
+    if runtime_action.find("actions/cache/restore@") > runtime_action.find(":app:prepareBundledNodeRuntime"):
+        violations.append("Runtime restore must precede runtime preparation")
+    if runtime_action.find(":app:prepareBundledNodeRuntime") > runtime_action.find("actions/cache/save@"):
+        violations.append("Runtime must be prepared before the cache is saved")
+for lane, abi in (("build-arm64", "arm64-v8a"), ("device-artifacts-x86", "x86_64")):
+    source = ci_job_source(lane)
+    if source.count("uses: ./.github/actions/setup-runtime-cached") != 1 or f"abi: {abi}" not in source:
+        violations.append(f"{lane}: must prepare and immediately cache verified {abi} runtime")
+    if source.find("setup-runtime-cached") > source.find("Lint and assemble optimized APK" if lane == "build-arm64" else "Build shared Android test artifacts"):
+        violations.append(f"{lane}: runtime must be primed before full APK build")
 
 # Architecture 3.0 CI is authoritative on both PR and main. Main must classify every
 # change instead of bypassing control/test changes through workflow-level path ignores.

@@ -169,7 +169,11 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 94371840 bytes（90 MiB）
 ```
 
-Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache；仍由原脚本执行版本与 SHA 校验，缓存不替代完整性验证。
+Runtime 下载复用 `setup-runtime-cached` 组合 Action：在完整 APK 构建前分别按 OS、ABI、Runtime 脚本及其下载/签名校验逻辑的哈希恢复缓存，调用原有 Gradle 任务完成 Node.js、Python、Git、HDiffPatch 的签名、版本与 SHA-256 校验，并立即保存已校验的包。后续 Lint、APK 构建或设备测试失败，不会再导致本轮已准备的 Runtime 缓存因 Job 结束失败而无法保存。命中缓存仍执行既有完整性校验；缓存缺失或不匹配时按原脚本重新下载，禁止放宽签名或校验条件。
+
+`build-arm64` 与 `device-artifacts-x86` 分别使用单一 ABI 缓存，Android 16/17 仍只消费同一组 x86_64 测试 APK。运行时间和缓存命中情况写入对应 Job 的 `GITHUB_STEP_SUMMARY`；这仅用于性能诊断，不参与放行。Gradle 已启用 Build Cache 与 Configuration Cache，本次不另建不受控的构建缓存、不跨 PR Head 复用 APK。
+
+验收应按改造前后可比样本分别记录冷/热缓存、ARM64/x86_64 构建、Android 16/17 模拟器、整个 CI 的中位与 P95 耗时。目标是完整 CI 中位耗时减少至少 30%、P95 减少至少 20%；这些是验证目标，未经重复实测不宣称达标。静态、架构和单测仍尽早给出失败反馈，全部产品源代码改动照常执行完整矩阵。
 
 ### device-artifacts-x86
 
