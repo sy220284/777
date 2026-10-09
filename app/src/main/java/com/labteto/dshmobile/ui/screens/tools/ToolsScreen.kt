@@ -507,7 +507,7 @@ fun ToolsScreen(
             createdSkillId = state.createdSkillId,
             skillsOnly = skillsOnly,
             loading = state.loading,
-            error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
+            error = if (!skillsOnly && state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
             onRetry = viewModel::refresh,
             remote = state.remotePlugins,
             onBack = { showPluginBrowser = false },
