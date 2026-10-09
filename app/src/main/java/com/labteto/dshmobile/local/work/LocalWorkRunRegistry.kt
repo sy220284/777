@@ -211,6 +211,12 @@ class LocalWorkRunRegistry internal constructor(
                 )
             }
             if (next == null) return@synchronized null
+            // A separate user input is a fresh task allowance. Only internal continuation
+            // inputs retain the bounded count for their original interrupted task.
+            if (!next.id.startsWith("continuation-")) {
+                binding.automaticContinuationCount = 0
+                binding.continuationParentRunId = null
+            }
 
             val durableMessage = next.modelMessage ?: buildJsonObject {
                 put("role", "user")
