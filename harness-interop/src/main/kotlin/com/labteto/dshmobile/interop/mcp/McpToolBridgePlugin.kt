@@ -411,7 +411,8 @@ class McpToolBridgePlugin(
             rawId = rawId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
-        ) { McpClient(transportFactory(endpoint)) }
+            clientFactory = { McpClient(transportFactory(endpoint)) },
+        )
     }
 
     private suspend fun connectStdio(
@@ -428,7 +429,8 @@ class McpToolBridgePlugin(
             rawId = rawId,
             transport = "stdio",
             displayTarget = "stdio:$executable",
-        ) { McpClient(stdioTransportFactory(normalizedCommand, resolvedDirectory)) }
+            clientFactory = { McpClient(stdioTransportFactory(normalizedCommand, resolvedDirectory)) },
+        )
     }
 
     private suspend fun connect(
