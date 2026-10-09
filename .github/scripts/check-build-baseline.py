@@ -83,14 +83,18 @@ def workflow_toolchain_violations(source: str) -> list[str]:
     findings: list[str] = []
     lines = source.splitlines()
     for index, line in enumerate(lines):
-        match = re.match(r"^(\s*)-\s*uses:\s*actions/setup-(node|java)@", line)
+        match = re.match(r"^(\s*)(-\s*)?uses:\s*actions/setup-(node|java)@", line)
         if not match:
             continue
-        indent, kind = match.groups()
+        indent, dash, kind = match.groups()
+        step_indent = len(indent) if dash else len(indent) - 2
+        if step_indent < 0:
+            findings.append(f"setup-{kind} has invalid YAML step indentation")
+            continue
         field = "node-version" if kind == "node" else "java-version"
         step_lines: list[str] = []
         for following in lines[index + 1:]:
-            if re.match(r"^" + re.escape(indent) + r"-\s+", following):
+            if re.match(r"^" + " " * step_indent + r"-\s+", following):
                 break
             step_lines.append(following)
         version_match = re.search(
@@ -118,6 +122,13 @@ def toolchain_self_test() -> None:
         field = "node-version" if kind == "node" else "java-version"
         return f"steps:\n  - uses: actions/setup-{kind}@0123456789abcdef\n    with:\n      {field}: {version}\n"
     assert workflow_toolchain_violations(sample("node", "24")) == []
+    named_step = ("steps:\n  - name: Install Node\n    uses: actions/setup-node@0123456789abcdef\n"
+                  "    with:\n      node-version: '24.21.0'\n")
+    assert workflow_toolchain_violations(named_step)
+    named_java = ("steps:\n  - name: Install Java\n    uses: actions/setup-java@0123456789abcdef\n"
+                  "    with:\n      java-version: '26'\n")
+    assert workflow_toolchain_violations(named_java)
+
     assert workflow_toolchain_violations(sample("java", "'27'")) == []
     for value in ("24.21.0", "'24.21.0'", '"24.21.0"', "23", '"23"', "unknown"):
         assert workflow_toolchain_violations(sample("node", value)), value
