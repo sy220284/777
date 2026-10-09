@@ -146,6 +146,7 @@ internal fun LocalComposerCapabilityPanel(
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
+    val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)
     Column(
         Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
@@ -159,7 +160,6 @@ internal fun LocalComposerCapabilityPanel(
                 Text(stringResource(R.string.local_composer_reasoning_unsupported),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             } else {
-                val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
                 }
