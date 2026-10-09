@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReasoningModeStoreTest {
-    @Test fun workTemperatureKeepsSessionSelectionAndUsesOfficialBounds() {
+    @Test fun workTemperatureKeepsSessionSelectionAndAppliesModelBounds() {
         val first = "work-temp-a-20261009"
         val second = "work-temp-b-20261009"
         try {
@@ -53,6 +53,68 @@ class LocalReasoningModeStoreTest {
             )!!, 0.000001)
         } finally {
             LocalWorkTemperatureStore.setLevel(session, 4)
+        }
+    }
+
+    @Test fun deepSeekWorkFiveStopsCapAtOnePointThreeForBothOfficialModelsOnly() {
+        val officialUrls = listOf("https://api.deepseek.com", "https://api.deepseek.com/v1")
+        val deepSeekModels = listOf("deepseek-flash", "deepseek-v4-pro")
+        val session = "deepseek-work-five-stops-20261009"
+        try {
+            for (model in deepSeekModels) {
+                for (url in officialUrls) {
+                    val range = LocalModelPresets.chatTemperatureRangeFor(model, url)!!
+                    assertEquals(0.0, range.minimum, 0.0)
+                    assertEquals(1.3, range.maximum, 0.0)
+                    for ((level, expected) in listOf(
+                        0 to 0.0, 1 to 0.325, 2 to 0.65, 3 to 0.975, 4 to 1.3,
+                    )) {
+                        LocalWorkTemperatureStore.setLevel(session, level)
+                        assertEquals(level, LocalWorkTemperatureStore.level(session, range))
+                        assertEquals(expected, LocalWorkTemperatureStore.requestTemperature(
+                            session, model, url,
+                        )!!, 0.000001)
+                    }
+                }
+            }
+        } finally {
+            LocalWorkTemperatureStore.setLevel(session, 4)
+        }
+    }
+
+    @Test fun deepSeekWorkCapDoesNotConstrainGeminiOrUnverifiedRoutes() {
+        val session = "model-scoped-temperature-cap-20261009"
+        val geminiModel = "gemini-3.8-flash"
+        val geminiUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
+        val geminiRange = LocalModelPresets.chatTemperatureRangeFor(geminiModel, geminiUrl)!!
+        val deepSeekRange = LocalModelPresets.chatTemperatureRangeFor(
+            "deepseek-flash", "https://api.deepseek.com",
+        )!!
+        try {
+            assertEquals(2.0, geminiRange.maximum, 0.0)
+            assertEquals(50, geminiRange.defaultPosition)
+            assertEquals(1.3, deepSeekRange.maximum, 0.0)
+            // The same work session may switch models; its level maps using the active provider.
+            LocalWorkTemperatureStore.setLevel(session, 4)
+            assertEquals(1.3, LocalWorkTemperatureStore.requestTemperature(
+                session, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.0)
+            assertEquals(2.0, LocalWorkTemperatureStore.requestTemperature(
+                session, geminiModel, geminiUrl,
+            )!!, 0.0)
+            LocalWorkTemperatureStore.setLevel(session, 2)
+            assertEquals(0.65, LocalWorkTemperatureStore.requestTemperature(
+                session, "deepseek-flash", "https://api.deepseek.com",
+            )!!, 0.000001)
+            assertNull(LocalWorkTemperatureStore.requestTemperature(session, geminiModel, geminiUrl))
+            assertNull(LocalWorkTemperatureStore.requestTemperature(
+                session, "deepseek-flash", "https://proxy.example.com/v1",
+            ))
+            assertNull(LocalWorkTemperatureStore.requestTemperature(
+                session, "custom-model", "https://api.deepseek.com",
+            ))
+        } finally {
+            LocalWorkTemperatureStore.setLevel(session, 2)
         }
     }
 
