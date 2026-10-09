@@ -260,7 +260,7 @@ def workflow_run_steps(source: str) -> list[str]:
     index = 0
     while index < len(lines):
         line = lines[index]
-        match = re.match(r"^(\\s*)(?:-\\s*)?run:\\s*(.*)$", line)
+        match = re.match(r"^(\s*)(?:-\s*)?run:\s*(.*)$", line)
         if not match:
             index += 1
             continue
@@ -279,7 +279,7 @@ def workflow_run_steps(source: str) -> list[str]:
                 if continuation.strip() and not continuation.lstrip().startswith("#"):
                     commands.append(continuation.strip())
                 index += 1
-            steps.append("\\n".join(commands))
+            steps.append("\n".join(commands))
         index += 1
     return steps
 
