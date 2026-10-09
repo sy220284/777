@@ -86,6 +86,8 @@ internal fun LocalConversationComposer(
     temperaturePosition: Int? = null,
     temperatureEnabled: Boolean = true,
     temperatureSaveFailed: Boolean = false,
+    temperatureSaving: Boolean = false,
+    temperatureGroupChat: Boolean = false,
     onTemperatureLevelChange: (Int) -> Unit = {},
     onPlanModeChange: (Boolean) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {},
@@ -376,6 +378,8 @@ internal fun LocalConversationComposer(
                     temperaturePosition = temperaturePosition,
                     temperatureEnabled = temperatureEnabled,
                     temperatureSaveFailed = temperatureSaveFailed,
+                    temperatureSaving = temperatureSaving,
+                    temperatureGroupChat = temperatureGroupChat,
                     onTemperatureLevelChange = {
                         if (!state.running) onTemperatureLevelChange(it)
                     },
