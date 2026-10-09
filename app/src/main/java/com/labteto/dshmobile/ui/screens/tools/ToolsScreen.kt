@@ -95,6 +95,7 @@ data class ToolsUiState(
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val createdSkillId: String? = null,
     val remotePlugins: PluginInventorySnapshot? = null,
     val webhook: LocalWebhookUiState = LocalWebhookUiState(),
     val notice: ToolsNotice? = null,
@@ -168,15 +169,16 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
-    private fun changeSkills(action: suspend () -> Unit) {
+    private fun changeSkills(createdId: String? = null, action: suspend () -> Unit) {
         launchOperation {
-            _state.value = _state.value.copy(loading = true, feedback = null)
+            _state.value = _state.value.copy(loading = true, feedback = null, createdSkillId = null)
             try {
                 action()
                 _state.value = _state.value.copy(
                     loading = false,
                     skills = localTools.installedSkills(),
                     presets = localTools.presetSkills(),
+                    createdSkillId = createdId,
                     feedbackRes = R.string.skills_saved,
                 )
             } catch (cancelled: CancellationException) {
@@ -193,7 +195,7 @@ class ToolsViewModel @Inject constructor(
 
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, description: String, instructions: String) =
-        changeSkills { localTools.createSkill(id, description, instructions) }
+        changeSkills(createdId = id) { localTools.createSkill(id, description, instructions) }
     fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
 
     fun connectHttp(serverId: String, endpoint: String) {
@@ -499,6 +501,7 @@ fun ToolsScreen(
             localIds = state.localPlugins,
             skills = state.skills,
             presets = state.presets,
+            createdSkillId = state.createdSkillId,
             skillsOnly = skillsOnly,
             loading = state.loading,
             error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
