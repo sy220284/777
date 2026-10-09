@@ -68,6 +68,7 @@ class LocalHarnessViewModel @Inject constructor(
     )
     internal fun createProject(name: String) = projects.create(name)
     internal fun selectProject(id: String) = projects.select(id)
+    internal suspend fun deleteProject(id: String) = projects.delete(id)
     internal fun renameProject(id: String, name: String) = projects.rename(id, name)
     internal fun updateProjectInstructions(id: String, instructions: String) = projects.updateInstructions(id, instructions)
     private val personaGalleryController = LocalPersonaGalleryUiController(
@@ -227,6 +228,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    fun artifactHistoryForUi(sessionId: String, eventLimit: Int) =
+        runtime.work.artifactsForUi(sessionId, eventLimit)
     fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
         runtime.work.toolEvidenceForUi(sessionId, callId, sequence)

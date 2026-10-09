@@ -112,6 +112,23 @@ data class ToolsUiState(
     val feedbackRes: Int? = null,
 )
 
+/** Safe user-facing classification; never surface raw URLs, tokens or command-line contents. */
+internal fun localToolConnectionErrorMessageRes(error: Throwable): Int {
+    var cause: Throwable = error
+    repeat(4) {
+        val nested = cause.cause ?: return@repeat
+        cause = nested
+    }
+    return when (cause) {
+        is java.net.UnknownHostException -> R.string.tools_error_dns
+        is java.net.SocketTimeoutException -> R.string.tools_error_timeout
+        is java.net.ConnectException -> R.string.tools_error_unreachable
+        is SecurityException -> R.string.tools_error_permission
+        is IllegalArgumentException -> R.string.tools_error_config
+        else -> R.string.tools_error_generic
+    }
+}
+
 internal class ToolsOperationGate {
     private val mutex = Mutex()
 
@@ -308,10 +325,11 @@ class ToolsViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    notice = ToolsNotice.CONNECT_FAILED,
+                    notice = null,
+                    feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }
@@ -330,10 +348,11 @@ class ToolsViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    notice = ToolsNotice.CONNECT_FAILED,
+                    notice = null,
+                    feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }
@@ -352,10 +371,11 @@ class ToolsViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    notice = ToolsNotice.CONNECT_FAILED,
+                    notice = null,
+                    feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }
@@ -373,10 +393,11 @@ class ToolsViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    notice = ToolsNotice.DISCONNECT_FAILED,
+                    notice = null,
+                    feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }
@@ -395,10 +416,11 @@ class ToolsViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    notice = ToolsNotice.DISCONNECT_FAILED,
+                    notice = null,
+                    feedbackRes = localToolConnectionErrorMessageRes(error),
                 )
             }
         }

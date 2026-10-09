@@ -21,6 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
@@ -63,6 +67,7 @@ internal fun LocalRunCenterScreen(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
     onArtifacts: (String) -> List<LocalArtifactUiItem>,
+    onArtifactHistory: (String, Int) -> List<LocalArtifactUiItem> = { _, _ -> emptyList() },
     onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
     onEventSequence: (String) -> Long = { 0L },
     onToolEvidence: (String, String, Long) -> String? = { _, _, _ -> null },
@@ -75,6 +80,8 @@ internal fun LocalRunCenterScreen(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
     var researchPreset by remember(state.sessionId) { mutableStateOf(false) }
@@ -83,21 +90,33 @@ internal fun LocalRunCenterScreen(
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
     var selectedToolCallId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
+    var artifactScanLimit by remember(state.sessionId) { mutableStateOf(384) }
+    var artifactActionFailed by remember(state.sessionId) { mutableStateOf(false) }
+    var activityRefreshFailed by remember(state.sessionId) { mutableStateOf(false) }
     // Bounded, visible-only refresh reads the single Session EventLog cursor, including tool
     // state changes that leave WorkState unchanged. No duplicate persistent event stream.
-    LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos) {
+    LaunchedEffect(state.sessionId, state.running, state.jobs, state.todos, artifactScanLimit) {
         var lastSequence = Long.MIN_VALUE
         while (true) {
-            val (sequence, recent) = withContext(Dispatchers.IO) {
-                val seq = onEventSequence(state.sessionId)
-                seq to if (seq != lastSequence) {
-                    onArtifacts(state.sessionId) to onToolActivities(state.sessionId)
-                } else null
-            }
-            if (recent != null) {
-                artifacts = recent.first
-                toolActivities = recent.second
-                lastSequence = sequence
+            try {
+                val (sequence, recent) = withContext(Dispatchers.IO) {
+                    val seq = onEventSequence(state.sessionId)
+                    seq to if (seq != lastSequence) {
+                        (if (artifactScanLimit == 384) onArtifacts(state.sessionId)
+                        else onArtifactHistory(state.sessionId, artifactScanLimit)) to onToolActivities(state.sessionId)
+                    } else null
+                }
+                if (recent != null) {
+                    artifacts = recent.first
+                    toolActivities = recent.second
+                    lastSequence = sequence
+                }
+                activityRefreshFailed = false
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Keep the last successful projection; the next poll retries.
+                activityRefreshFailed = true
             }
             delay(750)
         }
@@ -124,14 +143,24 @@ internal fun LocalRunCenterScreen(
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
-                DsPageEmptyState(
-                    icon = FeatherIcons.Activity,
-                    title = stringResource(R.string.local_run_center_empty_title),
-                    body = stringResource(R.string.local_run_center_empty_body),
-                    modifier = Modifier.fillMaxSize(),
-                    actionText = stringResource(R.string.local_run_agent_start),
-                    onAction = { showAgentLauncher = true },
-                )
+                Column(Modifier.fillMaxSize()) {
+                    DsPageEmptyState(
+                        icon = FeatherIcons.Activity,
+                        title = stringResource(R.string.local_run_center_empty_title),
+                        body = stringResource(R.string.local_run_center_empty_body),
+                        modifier = Modifier.weight(1f),
+                        actionText = stringResource(R.string.local_run_agent_start),
+                        onAction = { showAgentLauncher = true },
+                    )
+                    if (artifactScanLimit < 4_096) {
+                        DsButton(
+                            text = stringResource(R.string.local_artifact_more_history),
+                            onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
+                            variant = DsButtonVariant.Ghost,
+                            modifier = Modifier.padding(DsSpacing.medium),
+                        )
+                    }
+                }
             } else {
                 Column(
                     modifier = Modifier
@@ -147,11 +176,19 @@ internal fun LocalRunCenterScreen(
                         onOpenResults = onOpenResults,
                         showHeader = false,
                     )
+                    if (activityRefreshFailed) {
+                        Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.error)
+                    }
                     if (toolActivities.isNotEmpty()) {
                         Text(
                             stringResource(R.string.local_tool_activity_title),
                             style = DsType.base16Strong.withReadingWeight(),
                             color = colors.labelPrimary,
+                        )
+                        Text(
+                            stringResource(R.string.local_tool_history_scope),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
                         )
                         toolActivities.forEach { activity ->
                             val phase = when (activity.phase) {
@@ -175,16 +212,68 @@ internal fun LocalRunCenterScreen(
                             style = DsType.base16Strong.withReadingWeight(),
                             color = colors.labelPrimary,
                         )
+                        Text(
+                            stringResource(R.string.local_artifact_reference_hint),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
+                        Text(
+                            stringResource(R.string.local_artifact_history_scope, artifactScanLimit),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
                         artifacts.forEach { artifact ->
-                            Text(
-                                artifact.reference,
-                                style = DsType.small13.withReadingWeight(),
-                                color = colors.labelSecondary,
-                            )
+                            val label = when (artifact.category) {
+                                "file" -> if (artifact.currentlyAvailable == false)
+                                    stringResource(R.string.local_artifact_file_unavailable)
+                                    else stringResource(R.string.local_artifact_file)
+                                "link" -> stringResource(R.string.local_artifact_link)
+                                else -> stringResource(R.string.local_artifact_revision)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                            ) {
+                                DsSheetChoiceRow(
+                                    title = artifact.reference,
+                                    subtitle = label,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        artifactActionFailed = false
+                                        when (artifact.category) {
+                                            "file" -> {
+                                                if (artifact.currentlyAvailable == false) {
+                                                    artifactActionFailed = true
+                                                } else onOpenResults()
+                                            }
+                                            "link" -> runCatching { uriHandler.openUri(artifact.reference) }
+                                                .onFailure { artifactActionFailed = true }
+                                            else -> clipboard.setText(AnnotatedString(artifact.reference))
+                                        }
+                                    },
+                                )
+                                DsButton(
+                                    text = stringResource(R.string.common_copy),
+                                    onClick = { clipboard.setText(AnnotatedString(artifact.reference)) },
+                                    variant = DsButtonVariant.Ghost,
+                                    size = DsButtonSize.Small,
+                                )
+                            }
+                        }
+                        if (artifactActionFailed) {
+                            Text(stringResource(R.string.local_artifact_open_failed), color = colors.error)
                         }
                         DsButton(
                             text = stringResource(R.string.local_artifacts_open_files),
                             onClick = onOpenResults,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                    if (artifactScanLimit < 4_096) {
+                        DsButton(
+                            text = stringResource(R.string.local_artifact_more_history),
+                            onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
                             variant = DsButtonVariant.Ghost,
                         )
                     }

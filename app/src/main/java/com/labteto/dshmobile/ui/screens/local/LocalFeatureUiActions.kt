@@ -97,6 +97,7 @@ internal data class LocalWorkFeatureUiActions(
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val backgroundJobOutput: (String) -> String,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
+    val artifactHistoryForUi: (String, Int) -> List<LocalArtifactUiItem> = { _, _ -> emptyList() },
     val toolActivitiesForUi: (String) -> List<LocalToolActivityUiItem>,
     val eventSequenceForUi: (String) -> Long,
     val toolEvidenceForUi: (String, String, Long) -> String? = { _, _, _ -> null },

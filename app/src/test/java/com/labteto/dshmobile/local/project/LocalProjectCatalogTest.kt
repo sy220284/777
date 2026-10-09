@@ -53,6 +53,29 @@ class LocalProjectCatalogTest {
         }
         assertEquals("", resolveLocalProjectInstructions(catalog, "目录损坏", null))
         assertEquals("", resolveLocalProjectInstructions(LocalProjectCatalogState(), null, DEFAULT_PROJECT_ID))
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            resolveLocalProjectInstructions(LocalProjectCatalogState(), null, "missing-after-reset")
+        }
+    }
+
+    @Test fun projectDeletionCannotOrphanReferencesOrRemoveDefault() {
+        val initial = LocalProjectCatalogState(
+            listOf(LocalProject(DEFAULT_PROJECT_ID, "默认项目"), LocalProject("a", "甲", "指令甲"), LocalProject("b", "乙", "指令乙")),
+            "a",
+        )
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            planProjectDeletion(initial, "a") { throw IllegalStateException("仍有会话关联") }
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            planProjectDeletion(initial, DEFAULT_PROJECT_ID) {}
+        }
+        val after = planProjectDeletion(initial, "a") {}
+        assertEquals(DEFAULT_PROJECT_ID, after.activeId)
+        assertEquals(listOf(DEFAULT_PROJECT_ID, "b"), after.projects.map { it.id })
+        assertEquals("指令乙", after.projects.last().instructions)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            planProjectDeletion(after, "a") {}
+        }
     }
 
 }

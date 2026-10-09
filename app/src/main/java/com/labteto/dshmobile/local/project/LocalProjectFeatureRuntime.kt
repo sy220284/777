@@ -83,6 +83,13 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
         save(current.copy(activeId = id))
     }
 
+    /** Delete only when the owning Session and Memory boundaries report no references. */
+    @Synchronized
+    fun delete(id: String, assertUnreferenced: (String) -> Unit) {
+        val next = planProjectDeletion(mutableCatalog.value, id, assertUnreferenced)
+        save(next)
+    }
+
     @Synchronized
     fun rename(id: String, name: String) {
         val normalized = validateName(name)
@@ -140,7 +147,24 @@ internal fun resolveLocalProjectInstructions(
 ): String {
     if (projectId.isNullOrBlank()) return ""
     check(recoveryNotice == null) { "项目目录无法读取，请先到项目页备份并恢复，任务尚未执行" }
-    return catalog.projects.firstOrNull { it.id == projectId }?.instructions.orEmpty()
+    return requireNotNull(catalog.projects.firstOrNull { it.id == projectId }) {
+        "项目已不存在或目录已重置，请重新选择项目；任务尚未执行"
+    }.instructions
+}
+
+/** Refuse unsafe deletion instead of detaching Session/Memory facts owned elsewhere. */
+internal fun planProjectDeletion(
+    catalog: LocalProjectCatalogState,
+    id: String,
+    assertUnreferenced: (String) -> Unit,
+): LocalProjectCatalogState {
+    require(id != DEFAULT_PROJECT_ID) { "默认项目不能删除" }
+    require(catalog.projects.any { it.id == id }) { "项目不存在" }
+    assertUnreferenced(id)
+    return catalog.copy(
+        projects = catalog.projects.filterNot { it.id == id },
+        activeId = if (catalog.activeId == id) DEFAULT_PROJECT_ID else catalog.activeId,
+    )
 }
 
 /** Testable validation of every persisted project identity and instruction. */
