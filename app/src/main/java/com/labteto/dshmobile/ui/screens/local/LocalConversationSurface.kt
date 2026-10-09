@@ -490,6 +490,16 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
+                // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
+                if (state.usageMode == LocalUsageMode.WORK &&
+                    teamCardDismissed && state.team.visible) {
+                    DsIconButton(
+                        icon = FeatherIcons.Users,
+                        contentDescription = stringResource(R.string.local_team_reopen),
+                        onClick = { showTeamPanel = true },
+                        tint = colors.labelSecondary,
+                    )
+                }
             }
         }
 
