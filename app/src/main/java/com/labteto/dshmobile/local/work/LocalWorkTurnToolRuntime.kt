@@ -51,37 +51,37 @@ internal class LocalWorkTurnToolRuntime(
             gitHubConfigured = githubConfigured,
             target = binding.enabledOptionalTools,
         )
-        if (isLocalAgentTeamTurn(history)) {
-            // 模型可选工具上限不能挤掉任务板的认领与结算。
-            val priority = listOf(
-                "team_task_list", "team_task_update", "team_messages",
-                "team_wait_for_message", "team_members", "team_task_get",
-                "team_create_member", "team_start_member", "team_spawn",
-                "team_send_message", "team_wait", "skill",
-            ).filter { registry.get(it) != null }
-            synchronized(binding.enabledOptionalTools) {
-                val previous = binding.enabledOptionalTools.toList()
-                binding.enabledOptionalTools.clear()
-                binding.enabledOptionalTools.addAll(priority)
-                binding.enabledOptionalTools.addAll(previous)
-            }
-        }
     }
 
     internal fun schemas(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
     ): JsonArray {
+        // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
+        val history = binding.runHandle.modelHistory.snapshot()
+        val teamMode = isLocalAgentTeamTurn(history)
         val enabled = synchronized(binding.enabledOptionalTools) {
+            if (teamMode) {
+                val priority = listOf(
+                    "team_task_list", "team_task_update", "team_messages",
+                    "team_wait_for_message", "team_members", "team_task_get",
+                    "team_create_member", "team_start_member", "team_spawn",
+                    "team_send_message", "team_wait", "skill",
+                ).filter { registry.get(it) != null }
+                val previous = binding.enabledOptionalTools.toList()
+                binding.enabledOptionalTools.clear()
+                binding.enabledOptionalTools.addAll(priority)
+                binding.enabledOptionalTools.addAll(previous)
+            }
             binding.enabledOptionalTools.toSet()
         }
         return schemas.modelSchemas(
             policy = policy,
             modelState = binding.state.value.modelState,
             planModeEnabled = binding.state.value.work.planMode,
-            history = binding.runHandle.modelHistory.snapshot(),
+            history = history,
             enabledOptional = enabled,
-            agentTeamMode = isLocalAgentTeamTurn(binding.runHandle.modelHistory.snapshot()),
+            agentTeamMode = teamMode,
         )
     }
 
