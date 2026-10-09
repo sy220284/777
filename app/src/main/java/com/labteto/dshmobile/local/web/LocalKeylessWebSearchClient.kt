@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.web
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import com.labteto.dshmobile.local.LocalWebException
 import java.io.StringReader
 import java.net.URI

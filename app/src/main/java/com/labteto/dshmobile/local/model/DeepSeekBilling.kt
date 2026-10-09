@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.io.readBoundedBody
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import android.content.Context
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
