@@ -1224,6 +1224,15 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun quotedBooleanSuggestionIsNormalizedWithoutRejectingValidSuggestion() {
+        val suggestions = planner.parseSuggestions(
+            """{"suggestions":[{"label":"继续","text":"接着","bold":"true"}]}""",
+        )!!
+        assertEquals(1, suggestions.size)
+        assertTrue(suggestions.single().bold)
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
