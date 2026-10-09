@@ -1,10 +1,6 @@
 package com.labteto.dshmobile.connection
 
-import com.labteto.dshmobile.observability.AppLog
 
-import android.content.Context
-import android.content.Intent
-import androidx.core.content.ContextCompat
 import com.labteto.dshmobile.core.wire.ConnectionLoop
 import com.labteto.dshmobile.core.wire.ConnectionState
 import com.labteto.dshmobile.core.wire.DshApiClient
@@ -19,7 +15,6 @@ import com.labteto.dshmobile.core.wire.RemoteStreamMux
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.core.wire.TransportFailure
 import com.labteto.dshmobile.core.wire.TransportFailures
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,12 +61,10 @@ data class ConnectionUiState(
 
 /**
  * Owns the live connection to one harness: the ConnectionLoop (readiness
- * handshake + reconnect/backoff), the foreground service binding for
- * background operation, and the UI state mirror. Single active host at a time.
+ * handshake + reconnect/backoff), the UI state mirror. Single active host at a time.
  */
 @Singleton
 class ConnectionManager @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val clientFactory: HarnessClientFactory,
     private val hostsStore: HostsStore,
 ) {
@@ -154,7 +147,6 @@ class ConnectionManager @Inject constructor(
                     attempts = 0,
                     hasConnected = true,
                 )
-                maybeStartService()
             }
         }
 
@@ -230,7 +222,7 @@ class ConnectionManager @Inject constructor(
         // Keep an already-running foreground service alive while replacing the
         // transport. This is essential when the service itself is restoring a
         // persisted desired connection after process recreation.
-        disconnectRuntime(stopBackgroundService = false)
+        disconnectRuntime()
         if (!config.isRelay || !config.useTls) {
             hostsStore.setDesiredHost(null)
             _state.value = ConnectionUiState(host = config, failure = ConnectFailure.PairingRequired)
@@ -291,7 +283,7 @@ class ConnectionManager @Inject constructor(
         }
     }
 
-    private fun disconnectRuntime(stopBackgroundService: Boolean = true) {
+    private fun disconnectRuntime() {
         val retired = synchronized(transportLock) {
             transportEpoch.incrementAndGet()
             val previous = loop
@@ -303,7 +295,6 @@ class ConnectionManager @Inject constructor(
             previous
         }
         retired?.stop()
-        if (stopBackgroundService) stopService()
     }
 
     suspend fun restoreDesiredConnectionIfNeeded() {
@@ -358,7 +349,6 @@ class ConnectionManager @Inject constructor(
 
                 // Rebuilding through the factory rather than reusing `api` blindly: a relay token can be
                 // rotated or dropped while the app is backgrounded, and the credential is baked into the
-                // client at construction. This is the path [KeepAliveWorker] takes, which is exactly
                 // when that is most likely to have happened.
                 val nextApi = try {
                     clientFactory.clientFor(host)
@@ -434,7 +424,6 @@ class ConnectionManager @Inject constructor(
                 true
             }
         }
-        if (accepted) stopService()
     }
 
     /**
@@ -507,42 +496,11 @@ class ConnectionManager @Inject constructor(
         }
         if (!accepted) return
         retired?.stop()
-        stopService()
         val intentVersion = desiredIntentVersion.incrementAndGet()
         scope.launch {
             if (desiredIntentVersion.get() == intentVersion) hostsStore.setDesiredHost(null)
         }
     }
 
-    private fun maybeStartService() {
-        val connectedHost = activeHost ?: return
-        scope.launch {
-            try {
-                val settings = hostsStore.settingsOnce()
-                if (
-                    settings.keepConnectedInBackground &&
-                    activeHost?.id == connectedHost.id &&
-                    _state.value.phase == ConnectionPhase.CONNECTED
-                ) {
-                    startService()
-                }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                // A failed foreground service must not conceal loss of background protection.
-                AppLog.warn("ConnectionManager", "后台连接服务启动失败，改用周期恢复", error)
-                KeepAliveWorker.schedule(context)
-            }
-        }
-    }
-
-    private fun startService() {
-        val intent = Intent(context, ConnectionService::class.java)
-        ContextCompat.startForegroundService(context, intent)
-    }
-
-    private fun stopService() {
-        context.stopService(Intent(context, ConnectionService::class.java))
-    }
 
 }

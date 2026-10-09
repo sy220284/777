@@ -380,10 +380,6 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
-    // QR scanning for relay pairing. ZXing rather than ML Kit: it needs no Google Play Services, so
-    // it works on a de-Googled device, and pairing is the one flow a user cannot route around.
-    implementation(libs.zxing.android.embedded)
-
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     // The mock harness carries this project's port of the host's answer-acceptance law. The

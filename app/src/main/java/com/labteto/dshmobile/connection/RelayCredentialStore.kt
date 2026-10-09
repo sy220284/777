@@ -40,8 +40,7 @@ import javax.inject.Singleton
  * has, so the ~40 lines are written out instead.
  *
  * User authentication is deliberately *not* required on the key: the foreground service and
- * [KeepAliveWorker] reconnect while the screen is locked, and a key that needed a present user
- * would turn every background reconnect into a silent failure.
+ * historical relay credentials were readable while the screen was locked.
  */
 @Singleton
 class RelayCredentialStore @Inject constructor(

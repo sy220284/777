@@ -15,26 +15,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Notification channels + post helpers. Completion events come from the
- * core CompletionClassifier (turn end, goal complete/blocked, plan review,
- * approval/question requested).
- */
+/** Local session notifications only. */
 @Singleton
 class DshNotifications @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     fun ensureChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_COMPLETIONS, context.getString(R.string.notif_channel_completions), NotificationManager.IMPORTANCE_DEFAULT),
-        )
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ACTION, context.getString(R.string.notif_channel_action), NotificationManager.IMPORTANCE_HIGH),
-        )
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_CONNECTION, context.getString(R.string.notif_channel_connection), NotificationManager.IMPORTANCE_LOW),
-        )
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_LOCAL_JOBS, context.getString(R.string.notif_channel_local_jobs), NotificationManager.IMPORTANCE_LOW),
         )
@@ -44,49 +31,6 @@ class DshNotifications @Inject constructor(
         context,
         android.Manifest.permission.POST_NOTIFICATIONS,
     ) == PackageManager.PERMISSION_GRANTED
-
-    /**
-     * Post a completion/action notification that deep-links to a session.
-     * [canPost] gates the POST_NOTIFICATIONS runtime permission (API 33+);
-     * the lint suppression covers that checked gate.
-     */
-    @android.annotation.SuppressLint("MissingPermission")
-    fun postSession(
-        channel: String,
-        id: Int,
-        title: String,
-        text: String,
-        sessionId: String?,
-        actionLabel: String? = null,
-    ) {
-        if (!canPost()) return
-        val open = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            if (sessionId != null) {
-                data = android.net.Uri.Builder().scheme("dshmobile").authority("host")
-                    .appendPath("current").appendPath("session").appendPath(sessionId).build()
-                putExtra(EXTRA_SESSION_ID, sessionId)
-            }
-        }
-        val pending = PendingIntent.getActivity(
-            context,
-            id,
-            open,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val builder = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(if (channel == CHANNEL_ACTION) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
-        if (actionLabel != null) {
-            builder.addAction(0, actionLabel, pending)
-        }
-        val tag = "session:$channel:${sessionId.orEmpty()}"
-        NotificationManagerCompat.from(context).notify(tag, id, builder.build())
-    }
 
     @android.annotation.SuppressLint("MissingPermission")
     fun postLocalSession(
@@ -130,11 +74,7 @@ class DshNotifications @Inject constructor(
     }
 
     companion object {
-        const val CHANNEL_COMPLETIONS = "completions"
-        const val CHANNEL_ACTION = "needs_action"
-        const val CHANNEL_CONNECTION = "connection"
         const val CHANNEL_LOCAL_JOBS = "local-jobs"
-        const val EXTRA_SESSION_ID = "dsh_session_id"
         const val EXTRA_LOCAL_SESSION_ID = "dsh_local_session_id"
     }
 }
