@@ -1132,12 +1132,5 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
     }
 }
 
-private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
-    settings.notifyTurnComplete,
-    settings.notifyGoal,
-    settings.notifyNeedsAction,
-    settings.notifyLocalJobs,
-).count { it }
-
 private const val MAX_CUSTOM_CHAT_FILTERS = 50
 private const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32

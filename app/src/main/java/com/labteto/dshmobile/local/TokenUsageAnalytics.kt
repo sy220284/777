@@ -260,41 +260,6 @@ internal fun buildTokenUsageContext(
     action = action,
 )
 
-internal fun buildToolTokenUsageContext(
-    snapshot: LocalHarnessState,
-    eventLog: LocalSessionEventLog,
-    sessionId: String,
-    callId: String?,
-    action: TokenUsageAction,
-    fallbackTaskLabel: String? = null,
-): TokenUsageContext {
-    val checkpoint = callId?.takeIf(String::isNotBlank)?.let { targetCallId ->
-        eventLog.latestMatching(TOOL_USAGE_CHECKPOINT_TYPES) { data ->
-            data["call_id"]?.jsonPrimitive?.contentOrNull == targetCallId
-        }?.data
-    }
-    val runId = checkpoint?.get("run_id")?.jsonPrimitive?.contentOrNull
-    val parentRunId = checkpoint?.get("parent_run_id")?.jsonPrimitive?.contentOrNull
-    val agentId = checkpoint?.get("agent_id")?.jsonPrimitive?.contentOrNull
-    val runKind = checkpoint?.get("run_kind")?.jsonPrimitive?.contentOrNull?.let { value ->
-        LocalAgentRunKind.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
-    }
-    val taskLabel = checkpoint?.get("input")?.jsonPrimitive?.contentOrNull
-        ?.takeIf(String::isNotBlank)
-        ?: fallbackTaskLabel
-    return buildTokenUsageContext(
-        snapshot = snapshot,
-        action = action,
-        turnId = runId,
-        runId = runId,
-        parentRunId = parentRunId,
-        runKind = runKind,
-        agentId = agentId,
-        taskLabel = taskLabel,
-        step = checkpoint?.get("step")?.jsonPrimitive?.intOrNull,
-    ).copy(sessionId = sessionId)
-}
-
 internal fun DeepSeekUsageTracker.record(
     model: String,
     reply: LocalModelReply,
@@ -868,11 +833,6 @@ private fun Map<TokenUsageAction, MutableTokenAggregate>.freezeActions(): List<T
 private fun average(value: Long, count: Int): Long =
     if (count <= 0) 0L else value / count.toLong()
 
-private val TOOL_USAGE_CHECKPOINT_TYPES = setOf(
-    LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
-    LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT,
-    LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT,
-)
 
 private val MEMORY_MARKERS = listOf(
     "【用户长期规则】",
