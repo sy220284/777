@@ -27,6 +27,22 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun nextSliceWaitsForExistingSubagentReservationInsteadOfRejecting() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        val priorChild = budget.reserve(20)
+        assertFalse(budget.beginExecutionSlice())
+        val successor = async { budget.reserve(10) }
+        runCurrent()
+        assertFalse(successor.isCompleted)
+        priorChild.commit(reportedInputTokens = 15)
+        advanceUntilIdle()
+        successor.await().commit(reportedInputTokens = 9)
+        assertEquals(24L, budget.snapshot().reportedExposureTokens)
+        assertEquals(1, budget.snapshot().admittedRequests)
+        assertEquals(0, budget.snapshot().reservedRequests)
+    }
+
+    @Test
     fun nextSliceResetsAdmissionCountWithoutLosingUsageOrPendingSafety() = runTest {
         val budget = LocalWorkExecutionBudget(maxRequests = 1)
         val first = budget.reserve(20)
