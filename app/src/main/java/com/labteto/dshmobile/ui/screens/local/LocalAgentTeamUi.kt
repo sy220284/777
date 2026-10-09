@@ -60,6 +60,9 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 @Composable
@@ -565,11 +568,22 @@ private fun TeamMemberDetail(
     var draft by rememberSaveable(member.id) { mutableStateOf("") }
     var sending by remember(member.id) { mutableStateOf(false) }
     var stopping by remember(member.id) { mutableStateOf(false) }
-    var output by remember(member.id) { mutableStateOf("") }
+    var output by remember(member.jobId) { mutableStateOf("") }
+    var outputReadFailed by remember(member.jobId) { mutableStateOf(false) }
+    var outputRetry by remember(member.jobId) { mutableStateOf(0) }
 
-    LaunchedEffect(member.jobId, member.activity) {
+    // May touch durable job state; keep synchronous reads off the Compose dispatcher.
+    LaunchedEffect(member.jobId, member.activity, outputRetry) {
         do {
-            output = runCatching { onMemberOutput(member.jobId) }.getOrDefault("")
+            try {
+                val next = withContext(Dispatchers.IO) { onMemberOutput(member.jobId) }
+                output = next
+                outputReadFailed = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                outputReadFailed = true
+            }
             if (member.activity != "running" && member.activity != "stopping") break
             delay(900)
         } while (true)
@@ -589,6 +603,19 @@ private fun TeamMemberDetail(
             )
         }
         TeamMemberWorksite(member, output)
+        if (outputReadFailed) {
+            Text(
+                stringResource(R.string.local_team_output_read_failed),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.error,
+            )
+            DsButton(
+                text = stringResource(R.string.common_retry),
+                onClick = { outputRetry += 1 },
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
 
         Text(
             stringResource(R.string.local_team_messages),
