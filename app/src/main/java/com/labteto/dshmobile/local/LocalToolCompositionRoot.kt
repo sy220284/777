@@ -50,6 +50,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
     private val approvalRuntime: LocalToolApprovalRuntime,
     private val activityProjection: LocalToolActivityProjectionRuntime,
     private val networkSearchSettings: LocalNetworkSearchSettings,
+    private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -159,11 +160,15 @@ internal class LocalToolCompositionRoot @Inject constructor(
 
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
 
-    override fun installedSkills(): List<com.labteto.dshmobile.local.tools.LocalInstalledSkill> =
-        workspace.skills().map { name ->
-            val metadata = com.labteto.dshmobile.local.files.parseLocalSkillMetadata(name, workspace.readSkill(name).lineSequence().map { it.substringAfter(": ", it) }.joinToString("\n"))
-            com.labteto.dshmobile.local.tools.LocalInstalledSkill(name, metadata.description, metadata.modelInvocable)
-        }
+    override fun installedSkills() = skillManager.installed()
+    override fun presetSkills() = skillManager.presets()
+    override fun installPreset(id: String) = skillManager.install(id)
+    override fun createSkill(id: String, description: String, instructions: String) =
+        skillManager.create(id, description, instructions)
+    override fun removeSkill(id: String) = skillManager.remove(id)
+    override fun readSkillDocument(id: String) = skillManager.readDocument(id)
+    override fun updateSkillDocument(id: String, document: String) = skillManager.updateDocument(id, document)
+    override fun setSkillModelInvocable(id: String, enabled: Boolean) = skillManager.setModelInvocable(id, enabled)
 
     override suspend fun connectHttp(serverId: String, endpoint: String): String =
         plugins.connectMcpHttp(serverId, endpoint)

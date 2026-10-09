@@ -27,6 +27,7 @@ internal fun LocalConversationComposerExpandedRow(
     state: LocalConversationSurfaceState,
     menuControl: @Composable () -> Unit,
     replySuggestionsControl: @Composable () -> Unit,
+    planControl: @Composable () -> Unit,
     capabilityControls: @Composable (showLabels: Boolean) -> Unit,
     stopControl: @Composable () -> Unit,
     sendControl: @Composable (queue: Boolean) -> Unit,
@@ -55,6 +56,7 @@ internal fun LocalConversationComposerExpandedRow(
                 ) {
                     menuControl()
                     capabilityControls(showLabels)
+                    planControl()
                     replySuggestionsControl()
                 }
                 if (state.running) {

@@ -116,7 +116,6 @@ all_local_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobil
 root_execution_sources = {}
 for relative in (
     "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
 ):
     path = ROOT / relative
@@ -231,13 +230,23 @@ for path, source in merge_sources(chat_sources, work_sources).items():
     if ".events()" in source:
         violations.append(f"{path} scans the full Session event archive on a Feature hot path")
 
-for relative, token in (
-    ("app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt", "eventLog().events()"),
-    ("app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt", "eventLog.events()"),
-):
-    source = root_execution_sources.get(relative, "")
+def check_full_history_reference(source_map: dict[str, str], relative: str, token: str) -> str | None:
+    """A missing audit target must fail closed instead of silently scanning an empty string."""
+    source = source_map.get(relative)
+    if source is None:
+        return f"missing required full-history audit target: {relative}"
     if token in source:
-        violations.append(f"{relative} uses full-history events() for recent attribution")
+        return f"{relative} uses full-history events() for recent attribution"
+    return None
+
+
+for relative, token, owner_sources in (
+    ("app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt", "eventLog().events()", work_sources),
+    ("app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt", "eventLog.events()", all_local_sources),
+):
+    violation = check_full_history_reference(owner_sources, relative, token)
+    if violation:
+        violations.append(violation)
 
 if (
     "fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)" not in transcript_runtime
@@ -438,6 +447,15 @@ for path, source in active_chat_context_sources.items():
         violations.append(
             f"{path} uses compatibility Chat context fallback inside active execution"
         )
+
+# Mutation-style regression checks: both historical bypasses must fail closed.
+if "--self-test" in sys.argv:
+    target = "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt"
+    assert check_full_history_reference({}, target, "eventLog().events()") is not None
+    assert check_full_history_reference({target: "eventLog().events()"}, target, "eventLog().events()") is not None
+    assert check_full_history_reference({target: "eventLog().latestMatching()"}, target, "eventLog().events()") is None
+    print("[architecture-3] execution guard self-test passed")
+    sys.exit(0)
 
 if violations:
     print("Architecture 3.0 execution invariant guard failed:", file=sys.stderr)

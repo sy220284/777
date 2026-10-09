@@ -28,7 +28,13 @@ DOCS_INDEX = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
 violations: list[str] = []
 
 # External GitHub Actions must be immutable. Local actions are allowed.
-uses_pattern = re.compile(r"^\s*-\s*uses:\s*([^\s#]+)", re.MULTILINE)
+# Both step-level `- uses:` and job-level / nested `uses:` are valid workflow syntax.
+uses_pattern = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", re.MULTILINE)
+# Both supported action shapes must be recognized; neither should evade pin checks.
+assert uses_pattern.findall("  - uses: actions/checkout@abcdef\n    uses: actions/cache@123456\n") == [
+    "actions/checkout@abcdef", "actions/cache@123456"
+]
+
 for workflow in sorted(WORKFLOWS.glob("*.yml")):
     source = workflow.read_text(encoding="utf-8")
     if "permissions:" not in source:
@@ -245,36 +251,90 @@ for token in relay_contract_tokens:
     if token not in CI:
         violations.append(f"real relay conformance lane lost pinned contract: {token}")
 
-# Every check-*.py file is a gate by convention; it must be reachable from a workflow,
-# directly or through another reachable automation script. Mutual references between orphaned
-# scripts do not count as execution coverage.
-script_sources: dict[Path, str] = {}
-for candidate in sorted(SCRIPTS.glob("*")):
+# Every check-*.py file is a gate by convention. Reachability uses real run steps and
+# interpreter invocations, not arbitrary mentions in comments, filenames or YAML conditions.
+def workflow_run_commands(source: str) -> str:
+    lines = source.splitlines()
+    commands: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        match = re.match(r"^(\s*)(?:-\s*)?run:\s*(.*)$", line)
+        if not match:
+            index += 1
+            continue
+        indent = len(match.group(1))
+        inline = match.group(2).strip()
+        if inline not in ("|", "|-", ">", ">-", ""):
+            commands.append(inline)
+        else:
+            index += 1
+            while index < len(lines):
+                continuation = lines[index]
+                if continuation.strip() and len(continuation) - len(continuation.lstrip()) <= indent:
+                    index -= 1
+                    break
+                if continuation.strip() and not continuation.lstrip().startswith("#"):
+                    commands.append(continuation.strip())
+                index += 1
+        index += 1
+    return "\n".join(commands)
+
+
+script_invocation = re.compile(
+    r"(?m)^\s*(?:(?:&&|\|\||;)\s*)?(?:(?:python3?|bash|sh)\s+)?(?:\./)?"
+    r"(\.github/scripts/[A-Za-z0-9_.-]+\.(?:py|sh))\b"
+)
+
+
+def invoked_script_paths(source: str) -> set[str]:
+    return set(script_invocation.findall(
+        "\n".join(line for line in source.splitlines()
+                  if not line.lstrip().startswith("#"))
+    ))
+
+
+# Guard against commented mentions, echo-only references and non-executing compile checks.
+assert invoked_script_paths('python3 .github/scripts/check-example.py') == {
+    '.github/scripts/check-example.py'
+}
+assert invoked_script_paths('.github/scripts/check-example.py') == {'.github/scripts/check-example.py'}
+assert invoked_script_paths('echo .github/scripts/check-example.py') == set()
+assert invoked_script_paths('echo python3 .github/scripts/check-example.py') == set()
+assert invoked_script_paths('# python3 .github/scripts/check-example.py') == set()
+assert invoked_script_paths('python3 -m py_compile .github/scripts/check-example.py') == set()
+assert invoked_script_paths(workflow_run_commands('run: |\n  python3 .github/scripts/check-example.py\n')) == {
+    '.github/scripts/check-example.py'
+}
+assert invoked_script_paths(workflow_run_commands(
+    'run: echo ".github/scripts/check-example.py"\n'
+)) == set()
+
+script_sources: dict[str, str] = {}
+for candidate in sorted(SCRIPTS.iterdir()):
     if not candidate.is_file():
         continue
     try:
-        script_sources[candidate] = candidate.read_text(encoding="utf-8")
+        script_sources[candidate.relative_to(ROOT).as_posix()] = candidate.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         continue
 
-reachable_scripts: set[Path] = set()
+reachable_scripts: set[str] = set()
 frontier_sources = [
-    workflow.read_text(encoding="utf-8")
+    workflow_run_commands(workflow.read_text(encoding="utf-8"))
     for workflow in sorted(WORKFLOWS.glob("*.yml"))
 ]
 while frontier_sources:
     source = frontier_sources.pop()
-    for candidate, candidate_source in script_sources.items():
-        if candidate in reachable_scripts:
+    for relative in invoked_script_paths(source):
+        if relative not in script_sources or relative in reachable_scripts:
             continue
-        relative = candidate.relative_to(ROOT).as_posix()
-        if candidate.name in source or relative in source:
-            reachable_scripts.add(candidate)
-            frontier_sources.append(candidate_source)
+        reachable_scripts.add(relative)
+        frontier_sources.append(script_sources[relative])
 
 for guard in sorted(SCRIPTS.glob("check-*.py")):
-    if guard not in reachable_scripts:
-        violations.append(f"{guard.name}: gate script is not reachable from any workflow execution chain")
+    if guard.relative_to(ROOT).as_posix() not in reachable_scripts:
+        violations.append(f"{guard.name}: gate is not invoked by any reachable workflow run step")
 
 # Gradle wrapper and dependency verification are supply-chain boundaries.
 if "distributionSha256Sum=" not in WRAPPER:

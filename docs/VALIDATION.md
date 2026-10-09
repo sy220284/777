@@ -116,6 +116,8 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 这两份脚本不再冻结 UI 样式、Prompt 文案、固定方法体、构造依赖数量、文件行数、字段数量或具体变量名。业务语义由单元 / conformance / 设备测试证明；架构门禁只证明 3.0 边界与关键运行不变量。
 
+架构门禁执行前先运行 `--self-test` 反向样例，确认全限定名直接访问不会绕过依赖检查、历史事件全量扫描和已迁移检查目标缺失能被拦截。UI contribution 依据实际注册文件及 `LocalFeatureCatalog` 的 Owner 动态核对，不再维护固定文件名列表。CI 完整性检查覆盖 `uses:` 两种合法写法，并从实际 `run` 命令追溯门禁调用路径。
+
 
 ### fixture-provenance
 

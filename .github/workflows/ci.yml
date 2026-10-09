@@ -186,6 +186,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify Architecture 3.0 guard catches regression samples
+        run: |
+          python3 .github/scripts/check-local-architecture-boundaries.py --self-test
+          python3 .github/scripts/check-local-performance-invariants.py --self-test
       - name: Validate Architecture 3.0 ownership and dependencies
         run: python3 .github/scripts/check-local-architecture-boundaries.py
       - name: Validate Architecture 3.0 execution invariants

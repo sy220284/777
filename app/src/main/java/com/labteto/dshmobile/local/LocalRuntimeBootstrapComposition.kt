@@ -39,6 +39,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val tools: LocalToolCompositionRoot,
+    private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val work: LocalWorkComposition,
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
@@ -70,7 +71,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     }
 
     override suspend fun prepareAndRestore(scope: CoroutineScope, initialSessionId: String) {
-        seedLocalWorkspaceGuide(workspace.path)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { skillManager.initializeDefaults() }
         migrateLegacySessionFiles(root, sessionsRoot, initialSessionId)
         prepareLocalHarnessStartup(
             prepareRuntime = bundledRuntimeManager::prepare,
@@ -120,21 +121,6 @@ private fun migrateLegacySessionFiles(
     legacy.copyTo(destination, overwrite = false)
     File(root, "session.events.jsonl").takeIf(File::isFile)
         ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
-}
-
-private fun seedLocalWorkspaceGuide(workspacePath: String) {
-    val skill = File(workspacePath, ".dsh/skills/workspace-guide/SKILL.md")
-    if (skill.exists()) return
-    skill.parentFile?.mkdirs()
-    skill.writeText(
-        """
-        # 工作区指南
-
-        - 文件操作限当前工作区。
-        - 修改前读取，修改后复核。
-        - shell 使用 `/system/bin/sh` 和现有命令。
-        """.trimIndent() + "\n",
-    )
 }
 
 private fun cleanupUnreferencedLocalImagesNow(

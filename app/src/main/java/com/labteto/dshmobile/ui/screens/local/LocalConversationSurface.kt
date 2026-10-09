@@ -64,7 +64,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -167,21 +166,15 @@ internal fun LocalConversationSurface(
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
     onDeny: (String) -> Unit,
-    onAutoApprove: () -> Unit,
     onAutoApprovePending: (String) -> Unit,
     onApproveDeviceTurn: (String) -> Unit,
     onDisableDeviceTurn: () -> Unit,
-    onDisableAutoApprove: () -> Unit,
     onAnswerQuestion: (String, String) -> Unit,
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onUseWorkCapability: ((String) -> Unit)? = null,
-    approvalMode: LocalApprovalMode = LocalApprovalMode.DEFAULT,
-    networkSearchEnabled: Boolean = true,
-    onNetworkSearchChange: (Boolean) -> Unit = {},
-    onDefaultApproval: () -> Unit = {},
 ) {
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
@@ -870,7 +863,6 @@ internal fun LocalConversationSurface(
             ),
         )
 
-        val webSearchHandoffPrompt = stringResource(R.string.composer_web_prompt)
         LocalConversationComposer(
             state = state,
             activeModelProfile = activeModelProfile,
@@ -899,12 +891,7 @@ internal fun LocalConversationSurface(
                 LocalReasoningControls.setMode(state.sessionId, mode)
                 reasoningMode = LocalReasoningControls.mode(state.sessionId)
             },
-            networkSearchEnabled = networkSearchEnabled,
-            onNetworkSearchChange = onNetworkSearchChange,
-            onRequestWorkWebSearch = { onUseWorkCapability?.invoke(webSearchHandoffPrompt) },
             onPlanModeChange = onPlanModeChange,
-            onAutoApprove = onAutoApprove,
-            onDisableAutoApprove = onDisableAutoApprove,
             onFocusChanged = { focused ->
                 composerTailViewportAnchor = if (focused && listState.isConversationTailVisible()) {
                     listState.conversationViewportExtent().takeIf { it > 0 }
@@ -1154,40 +1141,6 @@ internal fun LocalConversationSurface(
                 )
             }
             if (state.usageMode == LocalUsageMode.WORK) {
-                val waitingForPlanApproval = state.pendingQuestion?.let(::localPlanReviewOf) != null
-                LocalComposerSheetSlider(
-                    title = stringResource(R.string.local_composer_plan_title),
-                    labels = listOf(stringResource(R.string.local_composer_plan_off), stringResource(R.string.local_composer_plan_start)),
-                    selectedIndex = if (state.planMode && !waitingForPlanApproval) 1 else 0,
-                    enabled = !state.running && !waitingForPlanApproval,
-                    hint = stringResource(
-                        if (waitingForPlanApproval)
-                            R.string.local_composer_plan_waiting_approval
-                        else R.string.local_composer_plan_tip,
-                    ),
-                    onSelect = { index ->
-                        if (!waitingForPlanApproval && (index == 1) != state.planMode) {
-                            onPlanModeChange(index == 1)
-                        }
-                    },
-                )
-                LocalComposerSheetSlider(
-                    title = stringResource(R.string.local_composer_approval_title),
-                    labels = listOf(stringResource(R.string.local_composer_approval_default), stringResource(R.string.local_composer_approval_manual), stringResource(R.string.local_composer_approval_auto)),
-                    selectedIndex = when (approvalMode) {
-                        LocalApprovalMode.DEFAULT -> 0
-                        LocalApprovalMode.MANUAL -> 1
-                        LocalApprovalMode.AUTO -> 2
-                    },
-                    hint = stringResource(R.string.local_composer_approval_tip),
-                    onSelect = { index ->
-                        when (index) {
-                            0 -> onDefaultApproval()
-                            1 -> onDisableAutoApprove()
-                            2 -> onAutoApprove()
-                        }
-                    },
-                )
                 LocalAgentSwarmLaunchEntry(
                     selected = teamDispatchSelected,
                     onClick = {

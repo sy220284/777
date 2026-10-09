@@ -82,4 +82,70 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithText("已安装").assertDoesNotExist()
     }
 
+    @Test
+    fun missingPresetCanBeInstalledFromSkillsPage() {
+        var selected: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), remote = null,
+                    presets = listOf(com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry(
+                        "research-check", "资料研究与核实", "查证材料", false,
+                    )),
+                    skillsOnly = true, onBack = {},
+                    onManageConnections = {}, onReturnToChat = {},
+                    onInstallPreset = { selected = it },
+                )
+            }
+        }
+        compose.onNodeWithText("资料研究与核实").assertIsDisplayed()
+        compose.onNodeWithText("添加").performClick()
+        compose.runOnIdle { assertEquals("research-check", selected) }
+    }
+
+    @Test
+    fun installedSkillRequiresConfirmationBeforeRemoval() {
+        var removed: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), remote = null,
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "my-skill", "My instructions", true,
+                    )),
+                    skillsOnly = true, onBack = {},
+                    onManageConnections = {}, onReturnToChat = {},
+                    onRemoveSkill = { removed = it },
+                )
+            }
+        }
+        compose.onNodeWithText("my-skill").performClick()
+        compose.onNodeWithText("移除").performClick()
+        compose.runOnIdle { assertEquals(null, removed) }
+        compose.onNodeWithText("移除技能").assertIsDisplayed()
+        compose.onNodeWithText("移除").performClick()
+        compose.runOnIdle { assertEquals("my-skill", removed) }
+    }
+
+    @Test
+    fun userOnlySkillCanStillBeInvokedExplicitly() {
+        var prompt: String? = null
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), remote = null, skillsOnly = true,
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "manual-review", "Only on user request", false,
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onUseCapability = { prompt = it },
+                )
+            }
+        }
+        compose.onNodeWithText("使用").performClick()
+        compose.runOnIdle {
+            org.junit.Assert.assertEquals("@skill:manual-review\n", prompt)
+        }
+    }
+
 }

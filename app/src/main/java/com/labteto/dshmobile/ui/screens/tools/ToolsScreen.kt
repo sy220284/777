@@ -44,6 +44,7 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -54,6 +55,7 @@ import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.rememberDsToast
@@ -91,8 +93,14 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
+    val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val createdSkillId: String? = null,
+    val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    val savedSkillId: String? = null,
     val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
+    val feedback: String? = null,
+    val feedbackRes: Int? = null,
 )
 
 internal class ToolsOperationGate {
@@ -130,10 +138,17 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun acknowledgeFeedback() {
+        _state.value = _state.value.copy(feedback = null, feedbackRes = null)
+    }
+
     fun refresh() {
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
+                val skills = localTools.installedSkills()
+                val presets = localTools.presetSkills()
+                _state.value = _state.value.copy(skills = skills, presets = presets)
                 sessionStore.refreshPlugins()
                 val (servers, plugins) = localTools.servers() to localTools.installedPluginIds()
                 _state.value = ToolsUiState(
@@ -141,7 +156,8 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
-                    skills = localTools.installedSkills(),
+                    skills = skills,
+                    presets = presets,
                     remotePlugins = sessionStore.plugins.value,
                 )
             } catch (cancelled: CancellationException) {
@@ -153,6 +169,79 @@ class ToolsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun changeSkills(createdId: String? = null, action: suspend () -> Unit) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, createdSkillId = null)
+            try {
+                action()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = createdId,
+                    feedbackRes = R.string.skills_saved,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.skills_operation_failed else null,
+                )
+            }
+        }
+    }
+
+    fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
+    fun createSkill(id: String, description: String, instructions: String) =
+        changeSkills(createdId = id) { localTools.createSkill(id, description, instructions) }
+    fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
+
+    fun openSkillEditor(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, skillEditor = null, savedSkillId = null)
+            try {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skillEditor = com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry(
+                        id, localTools.readSkillDocument(id),
+                    ),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun closeSkillEditor() {
+        _state.value = _state.value.copy(skillEditor = null, savedSkillId = null)
+    }
+
+    fun saveSkillDocument(id: String, content: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, savedSkillId = null)
+            try {
+                localTools.updateSkillDocument(id, content)
+                _state.value = _state.value.copy(
+                    loading = false, skillEditor = null, savedSkillId = id,
+                    skills = localTools.installedSkills(), presets = localTools.presetSkills(),
+                    feedbackRes = R.string.skills_saved,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun setSkillModelInvocable(id: String, enabled: Boolean) = changeSkills {
+        localTools.setSkillModelInvocable(id, enabled)
     }
 
     fun connectHttp(serverId: String, endpoint: String) {
@@ -279,6 +368,16 @@ fun ToolsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
+    val autoApprovalEnabled = approvalMode == LocalApprovalMode.AUTO
+    val pulse = rememberHapticPulse()
+    var confirmAutoApproval by remember { mutableStateOf(false) }
+    val toggleAutoApproval: (Boolean) -> Unit = { enabled ->
+        pulse()
+        if (enabled) confirmAutoApproval = true
+        else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
+    }
     val colors = DsTheme.colors
     val toast = rememberDsToast()
     var serverId by remember { mutableStateOf("") }
@@ -288,6 +387,7 @@ fun ToolsScreen(
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
@@ -335,9 +435,16 @@ fun ToolsScreen(
             ?.let(viewModel::acknowledgeNotice)
     }
 
+    val feedbackMessage = state.feedback ?: state.feedbackRes?.let { stringResource(it) }
+    LaunchedEffect(feedbackMessage) {
+        feedbackMessage?.let { message ->
+            toast.second(message)
+            viewModel.acknowledgeFeedback()
+        }
+    }
+
     if (showAgentSettings) {
-        val agentSettingsViewModel: SettingsViewModel = hiltViewModel()
-        val agentSettings by agentSettingsViewModel.localHarnessState.collectAsStateWithLifecycle()
+        val agentSettings by settingsViewModel.localHarnessState.collectAsStateWithLifecycle()
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 DsTopBar(
@@ -349,7 +456,7 @@ fun ToolsScreen(
                     modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
                         .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
                 ) {
-                    LocalAgentSettingsCard(agentSettings, agentSettingsViewModel, toast.second)
+                    LocalAgentSettingsCard(agentSettings, settingsViewModel, toast.second)
                 }
                 DsToastHost(toast)
             }
@@ -358,9 +465,13 @@ fun ToolsScreen(
         PluginInventoryBrowser(
             localIds = state.localPlugins,
             skills = state.skills,
+            presets = state.presets,
+            createdSkillId = state.createdSkillId,
+            skillEditor = state.skillEditor,
+            savedSkillId = state.savedSkillId,
             skillsOnly = skillsOnly,
             loading = state.loading,
-            error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
+            error = if (!skillsOnly && state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
             onRetry = viewModel::refresh,
             remote = state.remotePlugins,
             onBack = { showPluginBrowser = false },
@@ -370,6 +481,13 @@ fun ToolsScreen(
             },
             onReturnToChat = onClose,
             onUseCapability = onUseCapability,
+            onInstallPreset = viewModel::installPreset,
+            onCreateSkill = viewModel::createSkill,
+            onRemoveSkill = viewModel::removeSkill,
+            onOpenSkillEditor = viewModel::openSkillEditor,
+            onCloseSkillEditor = viewModel::closeSkillEditor,
+            onSaveSkillDocument = viewModel::saveSkillDocument,
+            onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
         )
     } else {
     Box(Modifier.fillMaxSize()) {
@@ -411,12 +529,12 @@ fun ToolsScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(
-                            stringResource(R.string.tools_capability_group),
+                            stringResource(R.string.cap_center_settings_group),
                             style = DsType.std14.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         Text(
-                            stringResource(R.string.tools_capability_group_hint),
+                            stringResource(R.string.cap_center_settings_group_hint),
                             style = DsType.small13.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
@@ -430,11 +548,31 @@ fun ToolsScreen(
                                 if (networkSearchEnabled) R.string.common_enabled else R.string.common_disabled,
                             ),
                             state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
-                            onClick = { viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
+                            onClick = { pulse(); viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
                             trailing = {
                                 DsSwitch(
                                     checked = networkSearchEnabled,
-                                    onCheckedChange = viewModel::setNetworkSearchEnabled,
+                                    onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
+                                )
+                            },
+                        )
+                        ToolCapabilityRow(
+                            icon = FeatherIcons.Shield,
+                            title = stringResource(R.string.cap_center_auto_approval),
+                            subtitle = stringResource(R.string.cap_center_auto_approval_hint),
+                            status = stringResource(
+                                when (approvalMode) {
+                                    LocalApprovalMode.AUTO -> R.string.common_enabled
+                                    LocalApprovalMode.MANUAL -> R.string.settings_approval_mode_manual
+                                    LocalApprovalMode.DEFAULT -> R.string.common_disabled
+                                },
+                            ),
+                            state = if (autoApprovalEnabled) StateDotState.Done else StateDotState.Idle,
+                            onClick = { toggleAutoApproval(!autoApprovalEnabled) },
+                            trailing = {
+                                DsSwitch(
+                                    checked = autoApprovalEnabled,
+                                    onCheckedChange = toggleAutoApproval,
                                 )
                             },
                         )
@@ -446,6 +584,15 @@ fun ToolsScreen(
                             state = StateDotState.Done,
                             onClick = { showAgentSettings = true },
                         )
+
+                    }
+
+                    Text(
+                        stringResource(R.string.cap_center_extensions_group),
+                        style = DsType.std14.withReadingWeight(),
+                        color = colors.labelTertiary,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         val builtinAvailable = "local-builtin" in state.localPlugins
                         ToolCapabilityRow(
                             iconPainter = painterResource(R.drawable.ic_ui_plugin),
@@ -455,15 +602,6 @@ fun ToolsScreen(
                             state = if (builtinAvailable) StateDotState.Done else StateDotState.Idle,
                             onClick = { skillsOnly = true; showPluginBrowser = true },
                         )
-
-                    }
-
-                    Text(
-                        stringResource(R.string.tools_connection_group),
-                        style = DsType.std14.withReadingWeight(),
-                        color = colors.labelTertiary,
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         ToolCapabilityRow(
                             icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
@@ -582,11 +720,26 @@ fun ToolsScreen(
                             )
                         }
                         DsButton(
+                            text = stringResource(R.string.cap_center_view_tools),
+                            onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
+                            enabled = server.tools.isNotEmpty(),
+                            size = DsButtonSize.Small,
+                            variant = DsButtonVariant.Ghost,
+                        )
+                        DsButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
                             enabled = !state.loading,
                             size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
+                        )
+                    }
+                    if (expandedMcpServer == server.id) {
+                        Text(
+                            server.tools.joinToString(" · "),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelSecondary,
+                            modifier = Modifier.padding(bottom = DsSpacing.small),
                         )
                     }
                 }
@@ -669,6 +822,34 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 icon = FeatherIcons.Terminal,
             )
+        }
+    }
+
+    if (confirmAutoApproval) {
+        DsDialog(
+            title = stringResource(R.string.cap_center_auto_approval_confirm_title),
+            onDismiss = { confirmAutoApproval = false },
+        ) {
+            Text(
+                stringResource(R.string.cap_center_auto_approval_confirm_body),
+                style = DsType.std14.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmAutoApproval = false },
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.cap_center_auto_approval_confirm_action),
+                    onClick = {
+                        confirmAutoApproval = false
+                        settingsViewModel.configureApprovalMode(LocalApprovalMode.AUTO)
+                    },
+                    variant = DsButtonVariant.Danger,
+                )
+            }
         }
     }
 

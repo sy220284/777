@@ -82,8 +82,8 @@ for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
     text = workflow.read_text(encoding="utf-8")
     if "java-version: 17" in text:
         fail(f"{workflow.relative_to(ROOT)} 仍使用 JDK 17")
-    if "node-version: 24.21.0" in text:
-        fail(f"{workflow.relative_to(ROOT)} 仍精确锁定 Node 22.23.3")
+    if re.search(r"node-version:\s*[0-9]+\.[0-9]+\.[0-9]+", text):
+        fail(f"{workflow.relative_to(ROOT)} 仍将 Node 锁定到精确补丁版本；应使用满足当前最低版本的主版本范围")
 
 print(
     f"[build-baseline] OK: Kotlin-only, JDK >= {EXPECTED_JDK_MIN}, "
