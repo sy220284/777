@@ -93,8 +93,14 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
+    val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
+    val createdSkillId: String? = null,
+    val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
+    val savedSkillId: String? = null,
     val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
+    val feedback: String? = null,
+    val feedbackRes: Int? = null,
 )
 
 internal class ToolsOperationGate {
@@ -132,10 +138,17 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun acknowledgeFeedback() {
+        _state.value = _state.value.copy(feedback = null, feedbackRes = null)
+    }
+
     fun refresh() {
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
+                val skills = localTools.installedSkills()
+                val presets = localTools.presetSkills()
+                _state.value = _state.value.copy(skills = skills, presets = presets)
                 sessionStore.refreshPlugins()
                 val (servers, plugins) = localTools.servers() to localTools.installedPluginIds()
                 _state.value = ToolsUiState(
@@ -143,7 +156,8 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
-                    skills = localTools.installedSkills(),
+                    skills = skills,
+                    presets = presets,
                     remotePlugins = sessionStore.plugins.value,
                 )
             } catch (cancelled: CancellationException) {
@@ -155,6 +169,79 @@ class ToolsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun changeSkills(createdId: String? = null, action: suspend () -> Unit) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, createdSkillId = null)
+            try {
+                action()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = createdId,
+                    feedbackRes = R.string.skills_saved,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.skills_operation_failed else null,
+                )
+            }
+        }
+    }
+
+    fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
+    fun createSkill(id: String, description: String, instructions: String) =
+        changeSkills(createdId = id) { localTools.createSkill(id, description, instructions) }
+    fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
+
+    fun openSkillEditor(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, skillEditor = null, savedSkillId = null)
+            try {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skillEditor = com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry(
+                        id, localTools.readSkillDocument(id),
+                    ),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun closeSkillEditor() {
+        _state.value = _state.value.copy(skillEditor = null, savedSkillId = null)
+    }
+
+    fun saveSkillDocument(id: String, content: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, savedSkillId = null)
+            try {
+                localTools.updateSkillDocument(id, content)
+                _state.value = _state.value.copy(
+                    loading = false, skillEditor = null, savedSkillId = id,
+                    skills = localTools.installedSkills(), presets = localTools.presetSkills(),
+                    feedbackRes = R.string.skills_saved,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(loading = false, feedback = error.message)
+            }
+        }
+    }
+
+    fun setSkillModelInvocable(id: String, enabled: Boolean) = changeSkills {
+        localTools.setSkillModelInvocable(id, enabled)
     }
 
     fun connectHttp(serverId: String, endpoint: String) {
@@ -348,6 +435,14 @@ fun ToolsScreen(
             ?.let(viewModel::acknowledgeNotice)
     }
 
+    val feedbackMessage = state.feedback ?: state.feedbackRes?.let { stringResource(it) }
+    LaunchedEffect(feedbackMessage) {
+        feedbackMessage?.let { message ->
+            toast.second(message)
+            viewModel.acknowledgeFeedback()
+        }
+    }
+
     if (showAgentSettings) {
         val agentSettings by settingsViewModel.localHarnessState.collectAsStateWithLifecycle()
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -370,9 +465,13 @@ fun ToolsScreen(
         PluginInventoryBrowser(
             localIds = state.localPlugins,
             skills = state.skills,
+            presets = state.presets,
+            createdSkillId = state.createdSkillId,
+            skillEditor = state.skillEditor,
+            savedSkillId = state.savedSkillId,
             skillsOnly = skillsOnly,
             loading = state.loading,
-            error = if (state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
+            error = if (!skillsOnly && state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
             onRetry = viewModel::refresh,
             remote = state.remotePlugins,
             onBack = { showPluginBrowser = false },
@@ -382,6 +481,13 @@ fun ToolsScreen(
             },
             onReturnToChat = onClose,
             onUseCapability = onUseCapability,
+            onInstallPreset = viewModel::installPreset,
+            onCreateSkill = viewModel::createSkill,
+            onRemoveSkill = viewModel::removeSkill,
+            onOpenSkillEditor = viewModel::openSkillEditor,
+            onCloseSkillEditor = viewModel::closeSkillEditor,
+            onSaveSkillDocument = viewModel::saveSkillDocument,
+            onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
         )
     } else {
     Box(Modifier.fillMaxSize()) {

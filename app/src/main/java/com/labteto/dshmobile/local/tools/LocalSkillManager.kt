@@ -1,0 +1,335 @@
+package com.labteto.dshmobile.local.tools
+
+import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import java.io.File
+import java.nio.file.Files
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** Preset instructions use the existing SKILL.md model tool contract. */
+internal data class LocalPresetSkill(
+    val id: String,
+    val title: String,
+    val description: String,
+    val instructions: String,
+    val installed: Boolean = false,
+    val whenToUse: String = "",
+)
+
+internal object LocalPresetSkillCatalog {
+    private val triggers = mapOf(
+        "writing-polish" to "润色、改写和精修段落",
+        "longform-outline" to "小说大纲、人物弧线、伏笔和章节规划",
+        "document-summary" to "文档总结、会议纪要和待办提取",
+        "research-check" to "资料查询、来源核实和事实查证",
+        "code-review" to "代码审查、PR 和回归风险",
+        "bug-investigation" to "故障排查、日志分析和崩溃定位",
+        "data-insights" to "数据统计、报表和趋势分析",
+        "translation-localization" to "翻译、术语统一和本地化",
+    )
+    val entries = listOf(
+        LocalPresetSkill("writing-polish", "写作润色", "改善文笔、逻辑和节奏，保留原意与风格。",
+            """
+            1. 先提取写作目的、受众、原文语气及不可更改的内容。
+            2. 检查歧义、重复、语病、信息缺失与节奏；不得凭空添加事实或剧情。
+            3. 给出能直接使用的修订稿，保留人物口吻和专有名词。
+            4. 只在必要时说明关键修改与待作者决定的歧义。
+            5. 复核人称、时间、术语和事实没有被改坏；说明原句确有歧义的地方。
+            6. 交付顺序：修订稿、必要修改说明；没有提供原文时先确认目标，不凭空代写。
+            """.trimIndent()),
+        LocalPresetSkill("longform-outline", "长文与小说大纲", "设计人物、冲突、章节推进与伏笔回收。",
+            """
+            1. 确定题材、读者、主线目标、篇幅、人物欲望和已确立世界规则。
+            2. 用起因、行动、阻力、代价、转折、收束搭建连续推进的情节链。
+            3. 记录主要人物动机、能力边界、重要选择及成长，并校验连续性。
+            4. 交付分阶段大纲与关键伏笔回收表，避免重复事件和无代价转折。
+            5. 对已有章节先核实原文；未知条件须标为待确定，不自行改动设定。
+            6. 将已确定设定与临时假设分开，逐章检查时间线、人物位置、角色知情范围和状态变化。
+            7. 对关键伏笔登记埋设章、证据与回收时机；无法从现有资料确认的地方明确标注。
+            8. 交付包括主线推进、人物弧线、阶段事件表和连续性风险，不为了制造冲突强行违背设定。
+            """.trimIndent()),
+        LocalPresetSkill("document-summary", "文档提炼", "提取材料结论、待办、风险和可复核依据。",
+            """
+            1. 使用当前可用的文件工具读取材料；若只读到部分内容，标注范围。
+            2. 分清原文事实、作者观点、推断和未定事项。
+            3. 先给核心结论，再按需要整理依据、行动事项、责任人与风险。
+            4. 回查日期、数字、姓名与约束，保留文件及段落位置。
+            5. 严禁杜撰未阅读的章节、引文或决定。
+            6. 对行动项列出责任人、期限、完成标准；原文没有的信息标为未指定。
+            7. 交付前核对每项结论能否从已读材料追溯，不能证明的判断独立列为推断。
+            """.trimIndent()),
+        LocalPresetSkill("research-check", "资料研究与核实", "交叉查证事实、来源与时效性。",
+            """
+            1. 明确待核实主张和时间范围，分辨哪些结论要求最新资料。
+            2. 优先使用官方和一手来源，用现有联网或文件工具取得证据。
+            3. 逐项对比事实、推断、争议和无法验证的部分。
+            4. 给出结论、可回查来源及其日期，指出适用边界。
+            5. 缺少联网或原始证据时直接说明，不虚构来源或结论。
+            6. 查证至少尝试对比两个独立来源；不能获得时写明来源不足与检索边界。
+            7. 交付结论、证据列表、来源日期、互相冲突的说法及仍需核实的点。
+            """.trimIndent()),
+        LocalPresetSkill("code-review", "代码审查", "核查改动正确性、安全边界及回归问题。",
+            """
+            1. 读取相关代码、调用链、测试和仓库权威规范，确认目标与基线。
+            2. 沿输入、状态、执行、副作用、错误处理和恢复路径核对缺陷。
+            3. 明确列出可复现问题、代码位置、触发条件与影响，按严重度排序。
+            4. 使用现有测试工具验证关键问题，不得把静态阅读称为测试通过。
+            5. 修复建议应指向根因并覆盖横向关联和纵向链路。
+            6. 对每项缺陷核对输入、预期、实际、触发路径与回归范围；区分已复现和静态推断。
+            7. 修复后实际运行可用测试，检查失败、并发、权限和恢复场景；没有跑过的测试不能报通过。
+            8. 按严重度列出阻塞项和证据，清楚说明已验证与未验证。
+            """.trimIndent()),
+        LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因并验证修复。",
+            """
+            1. 记录现象、复现条件、时间线、最近变动和期望结果。
+            2. 用现有日志与代码工具追踪首个异常状态及上游来源。
+            3. 分清报错表象与根因，设计能证伪不同假设的检查步骤。
+            4. 处理后检查正常、异常、并发、取消及恢复路径。
+            5. 最后区分已验证结果与仍待验证的部分。
+            6. 用日志、调用链和状态转移验证根因，避免只消除表面报错。
+            7. 修复前记录可复现的输入与预期，修复后同一场景复测并增加对应回归检查。
+            8. 交付根因、证据、改动与回归结果，未实测部分不能写成已解决。
+            """.trimIndent()),
+        LocalPresetSkill("data-insights", "数据分析", "核算指标、整理趋势与异常，说明统计口径。",
+            """
+            1. 明确数据来源、单位、口径、缺失值与分析时间范围。
+            2. 用可用工具实际计算，检查重复记录、分母和汇总方式。
+            3. 解释趋势、分组差异与异常，避免将相关性当成因果。
+            4. 提供关键发现、支持数字、限制条件和下一步建议。
+            5. 假设、预测和观测值必须清晰区分。
+            6. 对关键合计和比率复算，核查空值、异常值、样本量、单位和分母；不要编造数字。
+            7. 数据来自表格时优先用可用计算工具得出结果，记录口径及公式，不能计算时标注限制。
+            8. 交付关键数值、计算依据、异常解释和适用条件。
+            """.trimIndent()),
+        LocalPresetSkill("translation-localization", "翻译与本地化", "保持语义准确，适配目标语言的自然表达。",
+            """
+            1. 识别源语言、目标语言、用途、受众和语气。
+            2. 忠实保留数字、专有名词、链接、格式、代码及限定条件。
+            3. 使用地道目标语言，保持术语一致，避免逐字硬译。
+            4. 对双关、文化背景和歧义提供简短说明或选项。
+            5. 不添写原文没有的事实或立场。
+            6. 校验遗漏、错译、数字和术语一致性；需要保留原格式的内容逐项对应。
+            7. 交付完整译文，存在歧义时给出处置建议，不随意改写原作者观点。
+            """.trimIndent()),
+    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) }
+}
+
+internal val LOCAL_SKILL_ID_PATTERN = Regex("[a-z][a-z0-9-]{1,47}")
+
+internal fun buildLocalSkillDocument(id: String, description: String, instructions: String, whenToUse: String = ""): String {
+    require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能标识需由 2—48 位小写字母、数字或连字符组成，并以字母开头" }
+    val summary = description.trim()
+    val body = instructions.trim()
+    require(summary.isNotEmpty() && summary.length <= 240 && '\n' !in summary && '\r' !in summary) {
+        "技能描述需要 1—240 个字符且不能换行"
+    }
+    require(body.isNotEmpty() && body.length <= 12_000) { "技能说明需要 1—12000 个字符" }
+    val scalar = summary.replace('"', '\'').replace(" #", " ＃")
+    require(whenToUse.length <= 240 && '\n' !in whenToUse && '\r' !in whenToUse) { "使用条件不能超过 240 字或换行" }
+    val trigger = if (whenToUse.isBlank()) emptyList() else listOf("when-to-use: \"" + whenToUse.replace('"', '\'') + "\"")
+    return (listOf("---", "name: " + id, "description: \"" + scalar + "\"") +
+        trigger + listOf("---", "# " + id, "", body, "")).joinToString("\n")
+}
+
+/** Single writer for workspace SKILL.md files; both the UI and the model read these same files. */
+internal class LocalSkillStore(private val workspace: LocalWorkspace) {
+    private val skillsDir get() = File(workspace.path, ".dsh/skills")
+    private val seedMarker = ".dsh/skills/.preset-seed-v1"
+
+    fun installed(): List<LocalInstalledSkill> = workspace.skills().map { name ->
+        val doc = workspace.readRaw(".dsh/skills/" + name + "/SKILL.md")
+        val metadata = parseLocalSkillMetadata(name, doc)
+        LocalInstalledSkill(name, metadata.description, metadata.modelInvocable)
+    }
+
+    fun presets(): List<LocalPresetSkill> {
+        val names = workspace.skills().toSet()
+        return LocalPresetSkillCatalog.entries.map { it.copy(installed = it.id in names) }
+    }
+
+    private val legacyInstructions: Map<String, String> = mapOf(
+        "writing-polish" to """
+            1. 先提取写作目的、受众、原文语气及不可更改的内容。
+            2. 检查歧义、重复、语病、信息缺失与节奏；不得凭空添加事实或剧情。
+            3. 给出能直接使用的修订稿，保留人物口吻和专有名词。
+            4. 只在必要时说明关键修改与待作者决定的歧义。
+        """.trimIndent(),
+        "longform-outline" to """
+            1. 确定题材、读者、主线目标、篇幅、人物欲望和已确立世界规则。
+            2. 用起因、行动、阻力、代价、转折、收束搭建连续推进的情节链。
+            3. 记录主要人物动机、能力边界、重要选择及成长，并校验连续性。
+            4. 交付分阶段大纲与关键伏笔回收表，避免重复事件和无代价转折。
+            5. 对已有章节先核实原文；未知条件须标为待确定，不自行改动设定。
+        """.trimIndent(),
+        "document-summary" to """
+            1. 使用当前可用的文件工具读取材料；若只读到部分内容，标注范围。
+            2. 分清原文事实、作者观点、推断和未定事项。
+            3. 先给核心结论，再按需要整理依据、行动事项、责任人与风险。
+            4. 回查日期、数字、姓名与约束，保留文件及段落位置。
+            5. 严禁杜撰未阅读的章节、引文或决定。
+        """.trimIndent(),
+        "research-check" to """
+            1. 明确待核实主张和时间范围，分辨哪些结论要求最新资料。
+            2. 优先使用官方和一手来源，用现有联网或文件工具取得证据。
+            3. 逐项对比事实、推断、争议和无法验证的部分。
+            4. 给出结论、可回查来源及其日期，指出适用边界。
+            5. 缺少联网或原始证据时直接说明，不虚构来源或结论。
+        """.trimIndent(),
+        "code-review" to """
+            1. 读取相关代码、调用链、测试和仓库权威规范，确认目标与基线。
+            2. 沿输入、状态、执行、副作用、错误处理和恢复路径核对缺陷。
+            3. 明确列出可复现问题、代码位置、触发条件与影响，按严重度排序。
+            4. 使用现有测试工具验证关键问题，不得把静态阅读称为测试通过。
+            5. 修复建议应指向根因并覆盖横向关联和纵向链路。
+        """.trimIndent(),
+        "bug-investigation" to """
+            1. 记录现象、复现条件、时间线、最近变动和期望结果。
+            2. 用现有日志与代码工具追踪首个异常状态及上游来源。
+            3. 分清报错表象与根因，设计能证伪不同假设的检查步骤。
+            4. 处理后检查正常、异常、并发、取消及恢复路径。
+            5. 最后区分已验证结果与仍待验证的部分。
+        """.trimIndent(),
+        "data-insights" to """
+            1. 明确数据来源、单位、口径、缺失值与分析时间范围。
+            2. 用可用工具实际计算，检查重复记录、分母和汇总方式。
+            3. 解释趋势、分组差异与异常，避免将相关性当成因果。
+            4. 提供关键发现、支持数字、限制条件和下一步建议。
+            5. 假设、预测和观测值必须清晰区分。
+        """.trimIndent(),
+        "translation-localization" to """
+            1. 识别源语言、目标语言、用途、受众和语气。
+            2. 忠实保留数字、专有名词、链接、格式、代码及限定条件。
+            3. 使用地道目标语言，保持术语一致，避免逐字硬译。
+            4. 对双关、文化背景和歧义提供简短说明或选项。
+            5. 不添写原文没有的事实或立场。
+        """.trimIndent(),
+    )
+
+    /** Upgrade only exact original presets; preserve user edits and removed skills. */
+    private fun upgradeUntouchedPresets() {
+        for (preset in LocalPresetSkillCatalog.entries) {
+            val previousInstructions = legacyInstructions[preset.id] ?: continue
+            if (!workspace.skills().contains(preset.id)) continue
+            val before = buildLocalSkillDocument(preset.id, preset.description, previousInstructions)
+            val path = ".dsh/skills/" + preset.id + "/SKILL.md"
+            if (workspace.readRaw(path) == before) {
+                workspace.write(path, buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse))
+            }
+        }
+    }
+
+    /** First launch only: users removing a bundled skill must not see it reappear on restart. */
+    fun seedOnce() {
+        if (File(workspace.path, seedMarker).exists()) {
+            upgradeUntouchedPresets()
+            return
+        }
+        for (entry in LocalPresetSkillCatalog.entries) {
+            if (!File(skillsDir, entry.id).exists()) install(entry.id)
+        }
+        workspace.write(seedMarker, "v1\n")
+    }
+
+    fun install(id: String) {
+        val preset = LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }
+            ?: throw IllegalArgumentException("未知预置技能")
+        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse))
+    }
+
+    fun create(id: String, description: String, instructions: String) {
+        require(LocalPresetSkillCatalog.entries.none { it.id == id }) { "预置技能标识已保留，请使用安装功能" }
+        addDocument(id, buildLocalSkillDocument(id, description, instructions))
+    }
+
+    private fun addDocument(id: String, document: String) {
+        require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "无效的技能标识" }
+        val dir = File(skillsDir, id)
+        require(!Files.isSymbolicLink(dir.toPath())) { "不能安装到符号链接目录" }
+        val target = File(dir, "SKILL.md")
+        require(!target.exists() && !Files.isSymbolicLink(target.toPath())) { "技能已经安装" }
+        workspace.write(".dsh/skills/" + id + "/SKILL.md", document)
+    }
+
+
+    private fun requireInstalled(id: String) {
+        require(id.isNotBlank() && id != "." && id != ".." && '/' !in id && '\\' !in id && '\u0000' !in id) {
+            "无效的技能标识"
+        }
+        val dir = File(skillsDir, id)
+        val target = File(dir, "SKILL.md")
+        require(dir.canonicalFile.parentFile == skillsDir.canonicalFile &&
+            !Files.isSymbolicLink(dir.toPath()) && !Files.isSymbolicLink(target.toPath()) &&
+            target.isFile && target.canonicalFile.parentFile == dir.canonicalFile) {
+            "技能未安装或路径不安全"
+        }
+    }
+
+    fun readDocument(id: String): String {
+        requireInstalled(id)
+        return workspace.readRaw(".dsh/skills/$id/SKILL.md").also {
+            require(it.toByteArray(Charsets.UTF_8).size <= 24_000) {
+                "技能说明超过 24 KB，请通过工作区文件工具编辑"
+            }
+        }
+    }
+
+    fun updateDocument(id: String, document: String) {
+        requireInstalled(id)
+        require(document.isNotBlank() && document.toByteArray(Charsets.UTF_8).size <= 24_000) {
+            "技能文件不能为空，且不能超过 24 KB"
+        }
+        require(document.lineSequence().firstOrNull()?.trim() != "---" ||
+            document.lineSequence().drop(1).take(95).any { it.trim() == "---" }) {
+            "技能元数据缺少结束分隔符"
+        }
+        workspace.write(".dsh/skills/$id/SKILL.md", document.trimEnd() + "\n")
+    }
+
+    fun setModelInvocable(id: String, enabled: Boolean) {
+        val original = readDocument(id)
+        val lines = original.lines().toMutableList()
+        if (lines.firstOrNull()?.trim() == "---") {
+            val end = lines.drop(1).indexOfFirst { it.trim() == "---" } + 1
+            require(end > 0) { "技能元数据格式无效" }
+            val flag = lines.subList(1, end).indexOfFirst {
+                it.trim().startsWith("disable-model-invocation:")
+            }
+            if (flag >= 0) lines[flag + 1] = "disable-model-invocation: ${!enabled}"
+            else lines.add(end, "disable-model-invocation: ${!enabled}")
+            updateDocument(id, lines.joinToString("\n"))
+        } else if (!enabled) {
+            updateDocument(id, "---\ndisable-model-invocation: true\n---\n" + original)
+        }
+    }
+
+    /** Remove only SKILL.md; never destroy extra files supplied by the user. */
+    fun remove(id: String) {
+        require(id.isNotBlank() && id != "." && id != ".." &&
+            '/' !in id && '\\' !in id && '\u0000' !in id) { "无效的技能标识" }
+        val dir = File(skillsDir, id)
+        val target = File(dir, "SKILL.md")
+        require(!Files.isSymbolicLink(dir.toPath()) && !Files.isSymbolicLink(target.toPath())) {
+            "不能移除符号链接技能"
+        }
+        require(dir.canonicalFile.parentFile == skillsDir.canonicalFile &&
+            target.isFile && target.canonicalFile.parentFile == dir.canonicalFile) { "技能未安装" }
+        require(target.delete()) { "技能移除失败" }
+        dir.delete()
+    }
+}
+
+@Singleton
+internal class LocalSkillManager @Inject constructor(storage: LocalSessionStorageRuntime) {
+    private val store = LocalSkillStore(storage.files.workspace)
+    fun initializeDefaults() = store.seedOnce()
+    fun installed(): List<LocalInstalledSkill> = store.installed()
+    fun presets(): List<LocalPresetSkill> = store.presets()
+    fun install(id: String) = store.install(id)
+    fun create(id: String, description: String, instructions: String) = store.create(id, description, instructions)
+    fun remove(id: String) = store.remove(id)
+    fun readDocument(id: String) = store.readDocument(id)
+    fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
+    fun setModelInvocable(id: String, enabled: Boolean) = store.setModelInvocable(id, enabled)
+}
