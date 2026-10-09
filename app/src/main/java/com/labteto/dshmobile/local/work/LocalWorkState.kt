@@ -61,6 +61,8 @@ data class LocalAgentTeamMemberUiState(
     val error: String? = null,
     val hasCurrentTaskResult: Boolean = false,
     val displayName: String = "",
+    val mutableToolsEnabled: Boolean = false,
+    val grantedExtensions: Set<String> = emptySet(),
 ) {
     val friendlyName: String
         get() = displayName.ifBlank { teamMemberFriendlyName(name) }
