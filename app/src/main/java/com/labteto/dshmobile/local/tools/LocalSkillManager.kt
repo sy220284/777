@@ -202,8 +202,8 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
             val flag = lines.subList(1, end).indexOfFirst {
                 it.trim().startsWith("disable-model-invocation:")
             }
-            if (flag >= 0) lines[flag + 1] = "disable-model-invocation: \${!enabled}"
-            else lines.add(end, "disable-model-invocation: \${!enabled}")
+            if (flag >= 0) lines[flag + 1] = "disable-model-invocation: ${!enabled}"
+            else lines.add(end, "disable-model-invocation: ${!enabled}")
             updateDocument(id, lines.joinToString("\n"))
         } else if (!enabled) {
             updateDocument(id, "---\ndisable-model-invocation: true\n---\n" + original)
