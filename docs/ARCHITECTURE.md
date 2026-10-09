@@ -238,6 +238,10 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - 模型请求可重建证据、脱敏 Message / Context / Tool Surface 版本，以及按 requestUid 自动重建和一致性验证；
 - ModelHistory Checkpoint 事件水位与尾部重放；
 - Session Projection 提供统一注册底座、状态版本与 `asOfSequence` 时间切面；新接入 Projection 由 Feature 持有强类型句柄，Registry 不提供无类型全局状态读取；现有 Feature 投影按 Owner 渐进迁移，不另起第二套事实源；
+- Team 的冷投影通过有界批次和可丢弃检查点恢复；Shared Session 只负责检查点文件、日志身份与生命周期，Team Feature 解释并持有领域投影。检查点不是业务事实源；会话身份、状态版本、日志重置或关闭变化后不得复用或回写旧状态，未恢复完成不得发布空团队成功态。
+- 后台代理消息的准入与持久化共同遵循 `JobInboxContract`；消息头计入预算，超限在写入队列事实前拒绝，禁止截断已接受正文。历史无法接收消息必须保留原始事实并显式记录拒绝原因。
+- Automation 的任务代次由 Store 分配并保留删除后的持久高水位；同 ID 覆盖或重建不得复用旧代次。排程、取消、手动运行、结算和用户反馈均服从被捕获的任务身份。
+- 项目目录不可读取时，绑定项目的执行入口必须拒绝执行，不能把缺失规则解释为空规则。技能规则读取与通用文件预览分页分离，按独立字节预算完整读取或明确拒绝；目录元数据读取隔离单个损坏技能。
 - 恢复时的所有权裁决。
 
 Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。

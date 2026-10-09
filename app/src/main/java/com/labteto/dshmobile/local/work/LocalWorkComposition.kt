@@ -179,7 +179,7 @@ internal class LocalWorkComposition @Inject constructor(
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
         updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
     )
-    private val agentTeams by lazy {
+    private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(
             jobs = runtimeStateStore.jobManager,
             startTeammate = {
@@ -211,6 +211,8 @@ internal class LocalWorkComposition @Inject constructor(
             },
             eventLogFor = sessionStorage.eventLogs::get,
             projectionRegistry = sessionStorage.projectionRegistry,
+            projectionScope = scope,
+            onProjectionReady = { sessionId -> teamRefreshQueue.schedule(sessionId, reconcile = true) },
         )
     }
     private val agentControlBuiltins by lazy {
@@ -246,7 +248,7 @@ internal class LocalWorkComposition @Inject constructor(
         runTurn = turnExecutor::run,
     )
 
-    private val teamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
+    private val teamRefreshQueue: LocalTeamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
         if (reconcile) runCatching { agentTeams.recoverMailbox(sessionId) }
             .onFailure { AppLog.warn("LocalWorkComposition", "Agent Team 后台状态恢复失败 session=$sessionId", it) }
         runCatching { publishTeamUiState(sessionId) }

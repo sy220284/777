@@ -344,7 +344,8 @@ internal class LocalSessionLifecycleCoordinator(
                             sessionsRoot.listFiles().orEmpty()
                                 .filter {
                                     it.name == "$id.events.jsonl" ||
-                                        it.name.startsWith("$id.events.jsonl.part-")
+                                        it.name.startsWith("$id.events.jsonl.part-") ||
+                                        it.name.startsWith("$id.events.jsonl.projection-")
                                 }
                                 .forEach(File::delete)
                         }

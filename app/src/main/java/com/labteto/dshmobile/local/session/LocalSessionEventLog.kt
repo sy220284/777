@@ -8,6 +8,7 @@ import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import java.security.MessageDigest
 import java.io.FilterInputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
@@ -44,6 +45,30 @@ class LocalSessionEventLog(
         onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
     )
 
+    private val checkpoints = LocalSessionProjectionCheckpoints(file, json)
+    private var checkpointIdentity: String? = null
+
+    private fun projectionIdentity(): String = checkpointIdentity ?: run {
+        val first = delegate.pageAfter(-1L, 1).firstOrNull()
+        val encoded = first?.let { json.encodeToString(com.labteto.dshmobile.harness.session.SessionEvent.serializer(), it) }.orEmpty()
+        MessageDigest.getInstance("SHA-256").digest(encoded.toByteArray())
+            .joinToString("") { "%02x".format(it) }.also { checkpointIdentity = it }
+    }
+
+    @Synchronized
+    internal fun readProjectionCheckpoint(name: String, version: Int): LocalSessionProjectionCheckpoint? =
+        if (isClosed) null else checkpoints.read(name)?.takeIf {
+            it.version == version && it.identity == projectionIdentity() &&
+                it.throughSequence in -1L..latestSequence()
+        }
+
+    @Synchronized
+    internal fun writeProjectionCheckpoint(name: String, version: Int, throughSequence: Long,
+        payload: String, generation: Long) {
+        if (isClosed || generation != resetGeneration || throughSequence > latestSequence()) return
+        checkpoints.write(name, LocalSessionProjectionCheckpoint(version, projectionIdentity(), throughSequence, payload))
+    }
+
     fun append(type: String, data: JsonObject): Event =
         delegate.append(type, data).toLocalEvent()
 
@@ -55,7 +80,16 @@ class LocalSessionEventLog(
 
     fun diagnostics() = delegate.diagnostics()
 
-    fun close() = delegate.close()
+    @Volatile internal var isClosed: Boolean = false
+        private set
+
+    @Synchronized
+    fun close() {
+        if (isClosed) return
+        isClosed = true
+        resetGeneration += 1L
+        delegate.close()
+    }
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()
@@ -150,6 +184,8 @@ class LocalSessionEventLog(
     fun clear() = synchronized(this) {
         delegate.clear()
         resetGeneration += 1L
+        checkpointIdentity = null
+        checkpoints.clear()
     }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(

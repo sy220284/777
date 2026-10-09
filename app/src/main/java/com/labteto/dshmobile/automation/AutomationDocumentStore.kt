@@ -12,12 +12,14 @@ import kotlinx.serialization.json.Json
 internal data class AutomationDocument(
     val version: Int = 1,
     val tasks: List<AutomationTask> = emptyList(),
+    val generationWatermark: Long = -1L,
 )
 
 @Serializable
 private data class AutomationJournalMutation(
     val upserts: List<AutomationTask> = emptyList(),
     val removedIds: List<String> = emptyList(),
+    val generationWatermark: Long? = null,
 )
 
 /**
@@ -69,8 +71,9 @@ internal class AutomationDocumentStore(
         val mutation = AutomationJournalMutation(
             upserts = document.tasks.filter { task -> before[task.id] != task },
             removedIds = before.keys.filter { it !in after },
+            generationWatermark = document.generationWatermark.takeIf { it != previous.generationWatermark },
         )
-        if (mutation.upserts.isEmpty() && mutation.removedIds.isEmpty()) return
+        if (mutation.upserts.isEmpty() && mutation.removedIds.isEmpty() && mutation.generationWatermark == null) return
 
         appendMutation(mutation)
         cachedDocument = document
@@ -107,6 +110,7 @@ internal class AutomationDocumentStore(
     private fun replayJournal(base: AutomationDocument): AutomationDocument {
         if (!journal.isFile || journal.length() == 0L) return base
         val tasks = base.tasks.associateByTo(linkedMapOf(), AutomationTask::id)
+        var watermark = maxOf(base.generationWatermark, base.tasks.maxOfOrNull { it.scheduleGeneration } ?: -1L)
         var validBytes = 0L
         journal.bufferedReader().use { reader ->
             while (true) {
@@ -116,6 +120,8 @@ internal class AutomationDocumentStore(
                     json.decodeFromString(AutomationJournalMutation.serializer(), line)
                 }.getOrNull() ?: break
                 mutation.removedIds.forEach(tasks::remove)
+                watermark = maxOf(watermark, tasks.values.maxOfOrNull { it.scheduleGeneration } ?: -1L,
+                    mutation.generationWatermark ?: -1L, mutation.upserts.maxOfOrNull { it.scheduleGeneration } ?: -1L)
                 mutation.upserts.forEach { task -> tasks[task.id] = task }
                 validBytes += encodedBytes
             }
@@ -126,7 +132,7 @@ internal class AutomationDocumentStore(
             java.io.RandomAccessFile(journal, "rw").use { it.setLength(validBytes) }
             AppLog.warn("AutomationStore", "自动任务 WAL 检测到残损尾部，已截断并保留损坏副本")
         }
-        return AutomationDocument(tasks = tasks.values.toList())
+        return base.copy(tasks = tasks.values.toList(), generationWatermark = watermark)
     }
 
     private fun decodeDocument(source: File): AutomationDocument? {

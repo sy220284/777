@@ -486,4 +486,20 @@ class LocalJobManagerTest {
         }
     }
 
+
+    @Test fun persistentInboxWriteNeverTruncatesAndRejectsOversizeWithoutReplacingDisk() {
+        val root = kotlin.io.path.createTempDirectory("persistent-inbox-lossless").toFile()
+        try {
+            val store = LocalPersistentJobStore(File(root, "jobs.json"), Json)
+            val message = QueuedAgentInput("x".repeat(3_998) + "尾部", id = "message")
+            val snapshot = JobSnapshot("child", "子代理：worker", "interrupted", "", inbox = listOf(message))
+            store.write(listOf(snapshot))
+            assertEquals(message, store.read().single().inbox.single())
+            org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+                store.write(listOf(snapshot.copy(inbox = listOf(message.copy(content = message.content + "!")))))
+            }
+            assertEquals(message, store.read().single().inbox.single())
+        } finally { root.deleteRecursively() }
+    }
+
 }

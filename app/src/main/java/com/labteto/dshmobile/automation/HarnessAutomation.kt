@@ -317,6 +317,8 @@ internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
     )
 }
 
+internal data class AutomationTaskAdmission(val admitted: AutomationTask, val replaced: AutomationTask?)
+
 @Singleton
 class AutomationStore internal constructor(
     private val file: File,
@@ -338,10 +340,18 @@ class AutomationStore internal constructor(
     fun get(id: String): AutomationTask? = read().tasks.firstOrNull { it.id == id }
 
     @Synchronized
-    fun upsert(task: AutomationTask) {
+    internal fun upsert(task: AutomationTask): AutomationTaskAdmission {
         val document = read()
-        val current = document.tasks.filterNot { it.id == task.id } + normalizeAutomationTask(task)
-        write(AutomationDocument(tasks = current))
+        val replaced = document.tasks.firstOrNull { it.id == task.id }
+        val watermark = maxOf(document.generationWatermark,
+            document.tasks.maxOfOrNull { it.scheduleGeneration } ?: -1L)
+        require(watermark < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
+        val admitted = normalizeAutomationTask(task).copy(
+            scheduleGeneration = maxOf(task.scheduleGeneration, watermark + 1L),
+        )
+        val current = document.tasks.filterNot { it.id == task.id } + admitted
+        write(document.copy(tasks = current, generationWatermark = admitted.scheduleGeneration))
+        return AutomationTaskAdmission(admitted, replaced)
     }
 
     @Synchronized
@@ -349,8 +359,17 @@ class AutomationStore internal constructor(
         val document = read()
         val remaining = document.tasks.filterNot { it.id == id }
         if (remaining.size == document.tasks.size) return false
-        write(document.copy(tasks = remaining))
+        write(document.copy(tasks = remaining, generationWatermark = maxOf(document.generationWatermark,
+            document.tasks.maxOfOrNull { it.scheduleGeneration } ?: -1L)))
         return true
+    }
+
+    @Synchronized
+    fun removeIfGeneration(id: String, generation: Long): Boolean {
+        val document = read()
+        val task = document.tasks.firstOrNull { it.id == id } ?: return false
+        if (task.scheduleGeneration != generation) return false
+        return remove(id)
     }
 
     @Synchronized
@@ -367,6 +386,7 @@ class AutomationStore internal constructor(
         val task = document.tasks.firstOrNull { it.id == id } ?: return null
         if (!predicate(task)) return null
         val updated = transform(task)
+        require(updated.id == task.id && updated.scheduleGeneration >= task.scheduleGeneration) { "自动任务身份不能回退或替换" }
         write(document.copy(tasks = document.tasks.map { if (it.id == id) updated else it }))
         return updated
     }
@@ -390,8 +410,10 @@ class AutomationStore internal constructor(
         }
 
     private fun write(document: AutomationDocument) {
-        documents.write(document)
-        taskState.value = document.tasks.map(::normalizeAutomationTask).sortedBy { it.nextRunAt }
+        val durable = document.copy(generationWatermark = maxOf(document.generationWatermark,
+            document.tasks.maxOfOrNull { it.scheduleGeneration } ?: -1L))
+        documents.write(durable)
+        taskState.value = durable.tasks.map(::normalizeAutomationTask).sortedBy { it.nextRunAt }
     }
 
 }

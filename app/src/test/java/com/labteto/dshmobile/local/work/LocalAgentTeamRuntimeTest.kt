@@ -910,6 +910,7 @@ class LocalAgentTeamRuntimeTest {
             ),
         )
 
+        runBlocking { fixture.runtime.awaitProjection("team-message-deep-scan") }
         val messages = fixture.runtime.agentMessages(
             sessionId = "team-message-deep-scan",
             targetName = "worker",
@@ -919,6 +920,46 @@ class LocalAgentTeamRuntimeTest {
 
         assertEquals(1, messages.size)
         assertEquals("深层结果仍可找到", messages.single().content)
+    }
+
+    @Test
+    fun coldProjectionCompletionResumesMailboxRecoveryWithoutAnotherUserAction() {
+        val session = "team-cold-mailbox"
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also(scopes::add)
+        val recovered = CountDownLatch(1)
+        lateinit var fixture: Fixture
+        val refreshQueue = LocalTeamRefreshQueue(scope) { id, reconcile ->
+            if (reconcile) fixture.runtime.recoverMailbox(id)
+            recovered.countDown()
+        }
+        fixture = fixture(session, projectionScope = scope,
+            onProjectionReady = { refreshQueue.schedule(it, reconcile = true) })
+        appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
+        repeat(2_000) { fixture.log.append("test/noise", buildJsonObject { put("i", it) }) }
+        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, "legacy-cold", "member-1", "文".repeat(4_001)))
+        assertTrue(fixture.runtime.uiState(session).rebuilding)
+        assertTrue("冷投影完成后必须主动恢复邮箱", recovered.await(5, TimeUnit.SECONDS))
+        val state = fixture.runtime.project(session)
+        assertTrue(state.pendingMessages.isEmpty())
+        assertTrue("legacy-cold" in state.discardedMessageIds)
+    }
+
+    @Test
+    fun oversizedHistoricalMessageIsExplicitlyDiscardedWithRetryGuidance() {
+        val session = "team-legacy-oversized"
+        val fixture = fixture(session)
+        appendActiveMember(fixture.log, session)
+        startLiveChild(fixture, session)
+        fixture.log.append(LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            teamMessage(session, "legacy-long", "member-1", "文".repeat(4_001)))
+        fixture.runtime.recoverMailbox(session)
+        val state = fixture.runtime.project(session)
+        assertTrue(state.pendingMessages.isEmpty())
+        assertTrue("legacy-long" in state.discardedMessageIds)
+        assertTrue(state.activities.any { it.status == "failed" && it.title.contains("请拆分") })
+        assertTrue(state.deliveredMessageIds.isEmpty())
     }
 
     @Test
@@ -1407,6 +1448,7 @@ class LocalAgentTeamRuntimeTest {
         fixture.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
             encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 1, emptyList(), emptySet(),
                 terminalOutput = "末尾结果", resultId = "result-end"))
+        runBlocking { fixture.runtime.awaitProjection(session) }
         val first = fixture.runtime.scanAgentMessages(session, "worker", 1, baseline)
         assertTrue(first.messages.isEmpty())
         assertTrue(first.hasMore)
@@ -1558,6 +1600,17 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(fixture.runtime.uiState(session).members.single().awaitingReview)
     }
 
+    @Test fun tooLongTeamMessageIsRejectedBeforeQueuedAndDeliveredFacts() {
+        val fixture = fixture("team-oversize", sender = { _, _, _ -> error("must reject before delivery") })
+        appendActiveMember(fixture.log, "team-oversize")
+        startLiveChild(fixture, "team-oversize")
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            fixture.runtime.sendUiMessage("team-oversize", "member-1", "x".repeat(4_000))
+        }
+        assertEquals(0, fixture.runtime.project("team-oversize").pendingMessages.size)
+        assertEquals(0, fixture.runtime.project("team-oversize").deliveredMessageIds.size)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,
@@ -1566,6 +1619,8 @@ class LocalAgentTeamRuntimeTest {
 
     private fun fixture(
         sessionId: String,
+        projectionScope: CoroutineScope? = null,
+        onProjectionReady: (String) -> Unit = {},
         sender: (String, QueuedAgentInput, String) -> JobMessageAdmission = { _, _, _ ->
             JobMessageAdmission(false, false, false, "测试不投递")
         },
@@ -1584,6 +1639,8 @@ class LocalAgentTeamRuntimeTest {
             sendToTeammate = sender,
             eventLogFor = { log },
             projectionRegistry = SessionProjectionRegistry(),
+            projectionScope = projectionScope,
+            onProjectionReady = onProjectionReady,
         )
         return Fixture(runtime, log, jobs)
     }

@@ -44,4 +44,15 @@ class LocalProjectCatalogTest {
         )
         broken.forEach { raw -> assertTrue(runCatching { decodeLocalProjectCatalog(raw, json) }.isFailure) }
     }
+
+    @Test fun unavailableProjectCannotBeConsumedAsEmptyRules() {
+        val catalog = LocalProjectCatalogState(listOf(LocalProject("bound", "项目", "保留原文件")), "bound")
+        assertEquals("保留原文件", resolveLocalProjectInstructions(catalog, null, "bound"))
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            resolveLocalProjectInstructions(LocalProjectCatalogState(), "目录损坏", "bound")
+        }
+        assertEquals("", resolveLocalProjectInstructions(catalog, "目录损坏", null))
+        assertEquals("", resolveLocalProjectInstructions(LocalProjectCatalogState(), null, DEFAULT_PROJECT_ID))
+    }
+
 }

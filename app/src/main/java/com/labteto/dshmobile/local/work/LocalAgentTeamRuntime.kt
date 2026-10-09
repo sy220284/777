@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.jobs.JobInboxContract
 import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.harness.session.SessionProjectionRegistry
 import com.labteto.dshmobile.harness.session.SessionReducer
@@ -12,6 +13,8 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.util.UUID
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -57,6 +60,7 @@ internal fun recoverTeamStartPhase(
 internal enum class LocalTeamMemberContext { FRESH, FORK }
 internal enum class LocalTeamTaskStatus { PENDING, IN_PROGRESS, COMPLETED, DELETED }
 
+@Serializable
 internal data class LocalTeamMemberSnapshot(
     val id: String,
     val jobId: String,
@@ -68,6 +72,7 @@ internal data class LocalTeamMemberSnapshot(
     val error: String? = null,
 )
 
+@Serializable
 internal data class LocalTeamTaskSnapshot(
     val id: String,
     val revision: Int,
@@ -79,6 +84,7 @@ internal data class LocalTeamTaskSnapshot(
     val writeScopes: List<String> = emptyList(),
 )
 
+@Serializable
 internal data class LocalTeamMessageSnapshot(
     val id: String,
     val senderId: String,
@@ -97,6 +103,7 @@ internal data class LocalTeamAgentMessageSnapshot(
     val step: Int,
 )
 
+@Serializable
 internal data class LocalTeamProjection(
     val members: List<LocalTeamMemberSnapshot> = emptyList(),
     val tasks: List<LocalTeamTaskSnapshot> = emptyList(),
@@ -128,14 +135,22 @@ internal class LocalAgentTeamRuntime(
     ) -> com.labteto.dshmobile.harness.jobs.JobMessageAdmission,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     projectionRegistry: SessionProjectionRegistry,
+    projectionScope: CoroutineScope? = null,
+    onProjectionReady: (String) -> Unit = {},
 ) {
     // All synchronous Team commands share one commit boundary; suspend starts reserve first.
     private val commandLock = Any()
     private val startingMembers = mutableSetOf<Pair<String, String>>()
-    private data class ProjectionEntry(val log: LocalSessionEventLog, val generation: Long, val cursor: Long, val state: LocalTeamProjection)
-    private val projections = object : LinkedHashMap<String, ProjectionEntry>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ProjectionEntry>): Boolean = size > 32
-    }
+    private val projectionRuntime = LocalAgentTeamProjectionRuntime(
+        version = LOCAL_TEAM_PROJECTION_STATE_VERSION,
+        reduce = { sessionId, state, event ->
+            if (event.type in TEAM_EVENTS && event.data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId) {
+                applyEvent(state, SessionEvent(event.sequence, event.type, event.createdAt, event.data))
+            } else state
+        },
+        scope = projectionScope,
+        onReady = onProjectionReady,
+    )
 
     private val teamProjection = projectionRegistry.register(
         name = "work.agent-team",
@@ -151,6 +166,7 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
     ): String? {
         if (call.name !in TOOL_NAMES) return null
+        awaitProjection(binding.sessionId)
         if (call.name in MUTATING_TOOL_NAMES) {
             synchronizeTeamRuntime(binding.sessionId)
         }
@@ -261,7 +277,9 @@ internal class LocalAgentTeamRuntime(
     }
 
     internal fun uiState(sessionId: String): LocalAgentTeamUiState {
-        val state = project(sessionId)
+        val state = try { project(sessionId) } catch (_: LocalTeamProjectionRebuilding) {
+            return LocalAgentTeamUiState(rebuilding = true)
+        }
         val jobsById = jobs.snapshotInfos().associateBy { it.id }
         val visibleTasks = state.tasks
             .filter { it.status != LocalTeamTaskStatus.DELETED }
@@ -423,6 +441,9 @@ internal class LocalAgentTeamRuntime(
                     " 当前 phase=" + member.phase.name.lowercase()
             }
             val cleanTask = boundedTeamText(task, "task", MAX_TASK_CHARS, allowEmpty = false)
+            if (member.phase == LocalTeamMemberPhase.DISABLED && jobs.snapshotInfos().any { it.id == member.jobId }) {
+                JobInboxContract.normalize(QueuedAgentInput(id = "team-resume-validation", content = cleanTask, memoryInput = cleanTask))
+            }
             val provisioning = member.copy(phase = LocalTeamMemberPhase.PROVISIONING, error = null)
             appendMember(binding.sessionId, provisioning)
             startingMembers.add(binding.sessionId to member.id)
@@ -689,6 +710,7 @@ internal class LocalAgentTeamRuntime(
                 targetId = member.id,
                 content = cleanMessage,
             )
+            teamInboxInput(snapshot) // Reject before recording an undeliverable message.
             val log = eventLogFor(sessionId)
             log.append(TEAM_MESSAGE_QUEUED, snapshot.toEvent(sessionId))
             val delivered = deliverMessage(sessionId, snapshot, member)
@@ -707,20 +729,29 @@ internal class LocalAgentTeamRuntime(
     ) {
         synchronized(commandLock) {
             val pending = project(sessionId).pendingMessages.filter { it.targetId == memberId }
-            pending.forEach { message ->
-                eventLogFor(sessionId).append(
-                    TEAM_MESSAGE_DISCARDED,
-                    buildJsonObject {
-                        put("version", TEAM_EVENT_VERSION)
-                        put("teamId", sessionId)
-                        put("messageId", message.id)
-                        put("targetId", memberId)
-                        put("reason", reason.take(MAX_ERROR_CHARS))
-                    },
-                )
-            }
+            pending.forEach { message -> discardMessage(sessionId, message, reason) }
         }
     }
+
+    private fun discardMessage(sessionId: String, message: LocalTeamMessageSnapshot, reason: String) {
+        eventLogFor(sessionId).append(
+            TEAM_MESSAGE_DISCARDED,
+            buildJsonObject {
+                put("version", TEAM_EVENT_VERSION)
+                put("teamId", sessionId)
+                put("messageId", message.id)
+                put("targetId", message.targetId)
+                put("reason", reason.take(MAX_ERROR_CHARS))
+            },
+        )
+    }
+
+    private fun teamInboxInput(message: LocalTeamMessageSnapshot): QueuedAgentInput =
+        JobInboxContract.normalize(QueuedAgentInput(
+            id = message.id,
+            content = "[Team message ${message.id} from ${message.senderName}] ${message.content}",
+            memoryInput = message.content,
+        ))
 
     private fun deliverMessage(
         sessionId: String,
@@ -733,14 +764,9 @@ internal class LocalAgentTeamRuntime(
             if (before.pendingMessages.none { it.id == message.id }) return false
             val currentMember = before.members.singleOrNull { it.id == member.id }
             if (currentMember?.phase != LocalTeamMemberPhase.ACTIVE) return false
-            val framed = "[Team message ${message.id} from ${message.senderName}] ${message.content}"
             val admission = sendToTeammate(
                 member.jobId,
-                QueuedAgentInput(
-                    id = message.id,
-                    content = framed,
-                    memoryInput = message.content,
-                ),
+                teamInboxInput(message),
                 sessionId,
             )
             if (!admission.accepted) return false
@@ -766,6 +792,12 @@ internal class LocalAgentTeamRuntime(
         if (state.failure != null || state.pendingMessages.isEmpty()) return@synchronized
         val members = state.members.associateBy(LocalTeamMemberSnapshot::id)
         state.pendingMessages.forEach { message ->
+            try {
+                teamInboxInput(message)
+            } catch (error: IllegalArgumentException) {
+                discardMessage(sessionId, message, error.message ?: "消息无法接收，请拆分后重发")
+                return@forEach
+            }
             val member = members[message.targetId] ?: return@forEach
             if (member.phase != LocalTeamMemberPhase.ACTIVE) return@forEach
             runCatching { deliverMessage(sessionId, message, member) }
@@ -1550,27 +1582,12 @@ internal class LocalAgentTeamRuntime(
             jobs = jobs.snapshotInfos(),
         )
 
-    internal fun project(sessionId: String): LocalTeamProjection = synchronized(commandLock) {
-        val log = eventLogFor(sessionId)
-        val generation = log.resetGeneration
-        val latest = log.latestSequence()
-        val cached = projections[sessionId]?.takeIf { it.log === log && it.generation == generation && it.cursor <= latest }
-        var state = cached?.state ?: LocalTeamProjection()
-        var cursor = cached?.cursor ?: -1L
-        while (cursor < latest) {
-            val page = log.pageAfter(cursor, AGENT_MESSAGE_SCAN_PAGE)
-            if (page.isEmpty()) break
-            for (event in page) {
-                if (event.sequence > latest) break
-                cursor = event.sequence
-                if (event.type in TEAM_EVENTS && event.data["teamId"]?.jsonPrimitive?.contentOrNull == sessionId) {
-                    state = applyEvent(state, SessionEvent(event.sequence, event.type, event.createdAt, event.data))
-                }
-            }
-        }
-        projections[sessionId] = ProjectionEntry(log, generation, cursor, state)
-        state
+    internal suspend fun awaitProjection(sessionId: String) {
+        projectionRuntime.awaitReady(sessionId, eventLogFor(sessionId))
     }
+
+    internal fun project(sessionId: String): LocalTeamProjection =
+        projectionRuntime.project(sessionId, eventLogFor(sessionId))
 
     private fun applyEvent(
         state: LocalTeamProjection,
@@ -1703,6 +1720,13 @@ internal class LocalAgentTeamRuntime(
                 }
                 TEAM_MESSAGE_DELIVERED -> LocalAgentTeamActivityUiState(
                     event.sequence, "message", "", "delivered",
+                    next.members.firstOrNull {
+                        it.id == event.data["targetId"]?.jsonPrimitive?.contentOrNull
+                    }?.name,
+                )
+                TEAM_MESSAGE_DISCARDED -> LocalAgentTeamActivityUiState(
+                    event.sequence, "message",
+                    event.data["reason"]?.jsonPrimitive?.contentOrNull.orEmpty(), "failed",
                     next.members.firstOrNull {
                         it.id == event.data["targetId"]?.jsonPrimitive?.contentOrNull
                     }?.name,
