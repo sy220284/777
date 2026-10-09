@@ -11,7 +11,9 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
+import java.io.IOException
 import java.net.URI
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -40,6 +42,40 @@ internal fun boundedMcpToolResult(
     val head = retained * 2 / 3
     val tail = retained - head
     return text.take(head) + notice + text.takeLast(tail)
+}
+
+/** Explicit MCP failures; never expose remote response bodies or credential-bearing endpoint URLs. */
+internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting: Boolean): ToolResult {
+    val code = when {
+        error.message.orEmpty().contains("正在重连") -> "MCP_CONNECTION_BUSY"
+        error.message.orEmpty().contains("MCP 服务未连接") -> "MCP_NOT_CONNECTED"
+        error is McpHttpException -> when (error.statusCode) {
+            401, 403 -> "MCP_AUTH_REQUIRED"
+            404, 410 -> "MCP_ENDPOINT_UNAVAILABLE"
+            429 -> "MCP_RATE_LIMITED"
+            else -> "MCP_HTTP_FAILED"
+        }
+        error is IOException -> "MCP_TRANSPORT_FAILED"
+        else -> if (connecting) "MCP_CONNECT_FAILED" else "MCP_REMOTE_CALL_FAILED"
+    }
+    val hint = when (code) {
+        "MCP_CONNECTION_BUSY" -> "服务正在重连，请等待当前操作结束后再查看连接状态。"
+        "MCP_NOT_CONNECTED" -> "服务已断开，请先连接 MCP 服务并重新发现可用工具。"
+        "MCP_AUTH_REQUIRED" -> "核实 MCP 服务认证信息和访问权限，并重新建立连接。"
+        "MCP_ENDPOINT_UNAVAILABLE" -> "核实 MCP 端点和协议；先断开再使用正确地址连接。"
+        "MCP_RATE_LIMITED" -> "MCP 服务正在限流，请稍后检查服务状态。"
+        "MCP_TRANSPORT_FAILED" -> "检查网络或本地 MCP 进程是否运行；必要时断开后重新连接。"
+        else -> if (connecting) "检查服务进程、工作目录、网络和启动命令。"
+            else "请求可能已到达远端；先核对实际执行结果，禁止盲目重放写入请求。"
+    }
+    return ToolResult(
+        content = "MCP 服务 $serverId ${if (connecting) "连接" else "执行"}失败" +
+            (if (error is McpHttpException) "（HTTP ${error.statusCode}）" else "") + "：$hint",
+        isError = true,
+        errorCode = code,
+        retryable = false,
+        recoveryHint = hint,
+    )
 }
 
 internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
@@ -82,6 +118,7 @@ class McpToolBridgePlugin(
         val id: String,
         val transport: String,
         val displayTarget: String,
+        val clientFactory: () -> McpClient,
         val client: McpClient,
         val toolNames: List<String>,
         val definitionBytes: Int,
@@ -143,6 +180,7 @@ class McpToolBridgePlugin(
     private val mutex = Mutex()
     private val servers = linkedMapOf<String, ServerBinding>()
     private val connectingIds = linkedSetOf<String>()
+    private val reconnectingIds = linkedSetOf<String>()
     private var connectingDrained: CompletableDeferred<Unit>? = null
     private var acceptingConnections = true
 
@@ -175,7 +213,14 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 MCP HTTP/HTTPS 服务必须可访问"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(connectHttp(context, input.required("server_id"), input.required("endpoint")))
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(connectHttp(context, serverId, input.required("endpoint")))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
                 },
             ),
         )
@@ -207,14 +252,15 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 stdio 命令必须已安装且工作目录位于 Harness 工作区内"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(
-                        connectStdio(
-                            context = context,
-                            rawId = input.required("server_id"),
-                            command = input.requiredStringArray("command"),
-                            workingDirectory = input.optional("working_directory"),
-                        ),
-                    )
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(connectStdio(context, serverId, input.requiredStringArray("command"),
+                            input.optional("working_directory")))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
                 },
             ),
         )
@@ -241,6 +287,36 @@ class McpToolBridgePlugin(
         )
         context.tools.register(
             HarnessTool(
+                name = "mcp_reconnect",
+                schema = functionToolSchema(
+                    name = "mcp_reconnect",
+                    description = "显式重建失效 MCP 服务的进程或网络连接；不会重放之前的远端工具请求",
+                    properties = buildJsonObject { put("server_id", stringSchema("已连接的 MCP 服务标识")) },
+                    required = setOf("server_id"),
+                ),
+                access = ToolAccess.PRIVILEGED,
+                approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                timeoutMillis = CONNECT_TIMEOUT_MILLIS + REMOTE_TOOL_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = listOf("已有连接记录；必须人工批准重新连接"),
+                ),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(reconnect(context, serverId))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = true)
+                    }
+                },
+            ),
+        )
+        context.tools.register(
+            HarnessTool(
                 name = "mcp_disconnect",
                 schema = functionToolSchema(
                     name = "mcp_disconnect",
@@ -260,7 +336,14 @@ class McpToolBridgePlugin(
                     requirements = listOf("目标 MCP 服务必须已连接"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
-                    ToolResult(disconnect(context, input.required("server_id")))
+                    val serverId = input.required("server_id")
+                    try {
+                        ToolResult(disconnect(context, serverId))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        mcpExtensionFailure(serverId, error, connecting = false)
+                    }
                 },
             ),
         )
@@ -328,7 +411,8 @@ class McpToolBridgePlugin(
             rawId = rawId,
             transport = "http",
             displayTarget = displayEndpoint(endpoint),
-        ) { McpClient(transportFactory(endpoint)) }
+            clientFactory = { McpClient(transportFactory(endpoint)) },
+        )
     }
 
     private suspend fun connectStdio(
@@ -345,7 +429,8 @@ class McpToolBridgePlugin(
             rawId = rawId,
             transport = "stdio",
             displayTarget = "stdio:$executable",
-        ) { McpClient(stdioTransportFactory(normalizedCommand, resolvedDirectory)) }
+            clientFactory = { McpClient(stdioTransportFactory(normalizedCommand, resolvedDirectory)) },
+        )
     }
 
     private suspend fun connect(
@@ -354,10 +439,14 @@ class McpToolBridgePlugin(
         transport: String,
         displayTarget: String,
         clientFactory: () -> McpClient,
+        fromReconnect: Boolean = false,
     ): String {
         val serverId = validateServerId(rawId)
         mutex.withLock {
             require(acceptingConnections) { "MCP 插件正在卸载，暂不接受新连接" }
+            require(serverId !in reconnectingIds || fromReconnect) {
+                "MCP 服务正在重连：$serverId"
+            }
             require(serverId !in servers && serverId !in connectingIds) {
                 "MCP 服务已连接或正在连接：$serverId"
             }
@@ -389,6 +478,7 @@ class McpToolBridgePlugin(
                 id = serverId,
                 transport = transport,
                 displayTarget = displayTarget,
+                clientFactory = clientFactory,
                 client = client,
                 toolNames = names,
                 definitionBytes = definitionBytes,
@@ -453,10 +543,19 @@ class McpToolBridgePlugin(
                                 } else {
                                     try {
                                         val result = client.callTool(definition.name, input)
+                                        val remoteError = result["isError"]?.jsonPrimitive?.booleanOrNull == true
                                         ToolResult(
                                             content = boundedMcpToolResult(result),
-                                            isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
+                                            isError = remoteError,
+                                            errorCode = if (remoteError) "MCP_REMOTE_REJECTED" else null,
+                                            recoveryHint = if (remoteError)
+                                                "远端工具报告失败；先检查副作用和参数，不要直接重放。"
+                                                else null,
                                         )
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (error: Exception) {
+                                        mcpExtensionFailure(serverId, error, connecting = false)
                                     } finally {
                                         binding.endCall()
                                     }
@@ -480,9 +579,35 @@ class McpToolBridgePlugin(
         }
     }
 
-    private suspend fun disconnect(context: HarnessContext, rawId: String): String {
+    private suspend fun reconnect(context: HarnessContext, rawId: String): String {
+        val serverId = validateServerId(rawId)
+        val existing = mutex.withLock {
+            require(reconnectingIds.add(serverId)) { "MCP 服务正在重连：$serverId" }
+            servers[serverId]
+        }
+        try {
+            requireNotNull(existing) {
+                "MCP 服务未连接：$serverId。请先用 mcp_http_connect 或 mcp_stdio_connect 建立连接"
+            }
+            // Reconnect only after in-flight calls drain; never replay the failed tools/call.
+            disconnect(context, serverId, fromReconnect = true)
+            return connect(context, serverId, existing.transport, existing.displayTarget,
+                existing.clientFactory, fromReconnect = true)
+        } finally {
+            withContext(NonCancellable) { mutex.withLock { reconnectingIds.remove(serverId) } }
+        }
+    }
+
+    private suspend fun disconnect(
+        context: HarnessContext,
+        rawId: String,
+        fromReconnect: Boolean = false,
+    ): String {
         val serverId = validateServerId(rawId)
         val prepared = mutex.withLock {
+            require(serverId !in reconnectingIds || fromReconnect) {
+                "MCP 服务正在重连：$serverId"
+            }
             val binding = servers[serverId] ?: return@withLock null
             binding to binding.beginDisconnect()
         } ?: return "MCP 服务未连接：$serverId"
@@ -655,6 +780,7 @@ class McpToolBridgePlugin(
             "mcp_http_connect",
             "mcp_stdio_connect",
             "mcp_server_list",
+            "mcp_reconnect",
             "mcp_disconnect",
         )
     }

@@ -15,6 +15,7 @@ import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,6 +29,32 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+
+/** Structured failure for missing, rejected or crashed language servers. */
+internal fun lspExtensionFailure(toolName: String, error: Exception): ToolResult {
+    val message = error.message.orEmpty()
+    val code = when {
+        message.contains("未检测到可运行的语言服务器") -> "LSP_SERVER_UNAVAILABLE"
+        message.contains("拒绝启动") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
+        message.contains("启动失败") || error is IOException -> "LSP_START_FAILED"
+        error is IllegalArgumentException -> "LSP_INPUT_INVALID"
+        else -> "LSP_REQUEST_FAILED"
+    }
+    val hint = when (code) {
+        "LSP_SERVER_UNAVAILABLE" -> "安装匹配的语言服务器；当前仍可使用 read、grep、glob 和编译测试。"
+        "LSP_START_APPROVAL_REQUIRED" -> "返回当前会话批准语言服务器首次启动，再重新执行查询。"
+        "LSP_START_FAILED" -> "核对可执行文件、运行环境和启动命令；修复后重新查询可再次启动。"
+        "LSP_INPUT_INVALID" -> "检查路径、大小、语言类型和工具查询参数。"
+        else -> "检查语言服务器状态；此次调用停止，下次查询会按需重新启动。"
+    }
+    return ToolResult(
+        content = "$toolName 无法完成：$hint",
+        isError = true,
+        errorCode = code,
+        retryable = false,
+        recoveryHint = hint,
+    )
+}
 
 /**
  * Workspace-scoped language intelligence.
@@ -75,7 +102,15 @@ class LspPlugin(
                         ),
                     ),
                     executor = HarnessToolExecutor { toolContext, input, _ ->
-                        mutex.withLock { execute(name, input, toolContext) }
+                        mutex.withLock {
+                            try {
+                                execute(name, input, toolContext)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                lspExtensionFailure(name, error)
+                            }
+                        }
                     },
                 ),
             )

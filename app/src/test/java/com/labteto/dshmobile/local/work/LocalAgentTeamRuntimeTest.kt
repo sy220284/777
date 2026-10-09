@@ -54,6 +54,26 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamMemberChineseNameAndExtensionsSurviveEventRoundTrip() {
+        val id = "member-display-test"
+        val member = LocalTeamMemberSnapshot(
+            id = id,
+            jobId = LocalAgentTeamEventCodec.teamJobId(id),
+            name = "web-verifier",
+            description = "联网验证",
+            provider = "local",
+            context = LocalTeamMemberContext.FRESH,
+            phase = LocalTeamMemberPhase.CREATED,
+            displayName = "联网验证员",
+            mutableToolsEnabled = true,
+            grantedExtensions = setOf("github_search", "mcp_read"),
+        )
+        val event = with(LocalAgentTeamEventCodec) { member.toEvent("test-team") }
+        val decoded = LocalAgentTeamEventCodec.decodeMember(event)
+        assertEquals(member, decoded)
+    }
+
+    @Test
     fun productionProjectionMatchesOfficialAgentTeamGolden() {
         val official = requireNotNull(
             javaClass.classLoader?.getResourceAsStream("official-semantic/advanced.json"),
@@ -486,7 +506,7 @@ class LocalAgentTeamRuntimeTest {
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).also(scopes::add),
                 onChanged = {},
             ),
-            startTeammate = { _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "重建测试不启动子代理")
             },
             sendToTeammate = { _, _, _ ->
@@ -729,8 +749,11 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(LocalTeamTaskStatus.IN_PROGRESS, task.status)
         assertEquals(2, task.revision)
         assertEquals("member-1", task.ownerId)
-        assertTrue(fixture.runtime.uiState("team-auto-complete").members.single().awaitingReview)
-        assertEquals(0, fixture.runtime.uiState("team-auto-complete").completedTaskCount)
+        val displayed = fixture.runtime.uiState("team-auto-complete")
+        assertTrue(displayed.members.single().awaitingReview)
+        assertEquals(95, displayed.members.single().progressPercent)
+        assertEquals(1, displayed.returnedMemberCount)
+        assertEquals(0, displayed.completedTaskCount)
     }
 
     @Test
@@ -1468,6 +1491,55 @@ class LocalAgentTeamRuntimeTest {
     )
 
     @Test
+    fun overlappingWriteScopesCannotBeClaimedByConcurrentTasks() = runBlocking {
+        val session = "team-scope-lock"
+        val fixture = fixture(session)
+        appendActiveMember(fixture.log, session)
+        fixture.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "writer2", "provisioning"))
+        fixture.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-2", "writer2", "active"))
+        startLiveChild(fixture, session)
+        // Two independent live jobs are required; otherwise recovery correctly marks member-2 failed
+        // before the second task can reach the write-scope conflict check.
+        fixture.jobs.startPersistent(
+            label = "子代理：writer2",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerSessionId = session,
+            continuable = true,
+            requestedId = "job-team-2",
+        ) { _, _ -> awaitCancellation() }
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList(), writeScopes = listOf("app/src")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 2, emptyList(), status = "in_progress",
+                ownerId = "member-1", writeScopes = listOf("app/src")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-2", 1, emptyList(), writeScopes = listOf("app/src/main")))
+        fixture.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-3", 1, emptyList(), writeScopes = listOf("docs")))
+        val binding = teamBinding(fixture, session)
+        suspend fun claim(id: String) = fixture.runtime.execute(
+            LocalToolCall("claim-$id", "team_task_update", buildJsonObject {
+                put("task_id", id)
+                put("expected_revision", 1)
+                put("action", "claim")
+                put("owner", "writer2")
+            }, "{}"), binding,
+        )
+        val conflict = runCatching { claim("task-2") }.exceptionOrNull()
+        assertNotNull(conflict)
+        assertTrue(conflict!!.message.orEmpty().contains("TEAM_WRITE_SCOPE_CONFLICT"))
+        claim("task-3")
+        val tasks = fixture.runtime.project(session).tasks.associateBy { it.id }
+        assertEquals(LocalTeamTaskStatus.PENDING, tasks["task-2"]?.status)
+        assertEquals(1, tasks["task-2"]?.revision)
+        assertEquals(LocalTeamTaskStatus.IN_PROGRESS, tasks["task-3"]?.status)
+        assertNull(fixture.runtime.project(session).failure)
+    }
+
+    @Test
     fun competingClaimsHaveOneWinnerAndPreserveHealthyProjection() {
         val session = "team-claim-race"
         val fixture = fixture(session)
@@ -1635,7 +1707,7 @@ class LocalAgentTeamRuntimeTest {
         ).also(logs::add)
         val runtime = LocalAgentTeamRuntime(
             jobs = jobs,
-            startTeammate = { _, _, _, _, _, _, _, _ ->
+            startTeammate = { _, _, _, _, _, _, _, _, _ ->
                 JobStartResult(false, null, "测试不启动子代理")
             },
             sendToTeammate = sender,

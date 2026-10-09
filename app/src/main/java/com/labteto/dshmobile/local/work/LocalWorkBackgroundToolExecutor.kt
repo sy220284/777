@@ -147,6 +147,7 @@ internal class LocalWorkBackgroundToolExecutor(
         enabledOptionalTools: MutableSet<String>,
     ): AgentToolResult {
         val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+        // 文件类副作用由统一执行协调器序列化，Lead/成员使用同一把闸门。
         return executeUtility(canonical, sessionId, memoryTools, enabledOptionalTools)
             ?: tools.execution.executeScoped(
                 original = canonical,

@@ -215,6 +215,7 @@ internal fun LocalConversationSurface(
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showTeamPanel by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var teamCardDismissed by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
@@ -488,6 +489,16 @@ internal fun LocalConversationSurface(
                             onDeleteSession = onDeleteSession,
                         )
                     }
+                }
+                // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
+                if (state.usageMode == LocalUsageMode.WORK &&
+                    teamCardDismissed && state.team.visible) {
+                    DsIconButton(
+                        icon = FeatherIcons.Users,
+                        contentDescription = stringResource(R.string.local_team_reopen),
+                        onClick = { showTeamPanel = true },
+                        tint = colors.labelSecondary,
+                    )
                 }
             }
         }
@@ -863,6 +874,7 @@ internal fun LocalConversationSurface(
         LocalAgentTeamStatusBar(
             team = state.team,
             launchPending = teamLaunchPending,
+            dismissed = teamCardDismissed,
             onClick = {
                 if (state.team.visible) showTeamPanel = true
             },
@@ -889,6 +901,7 @@ internal fun LocalConversationSurface(
                 onSendTeam(text, files).also { result ->
                     if (result.accepted) {
                         teamLaunchPending = true
+                        teamCardDismissed = false
                         teamLaunchSawRunning = false
                     }
                 }
@@ -1192,6 +1205,16 @@ internal fun LocalConversationSurface(
                     },
                 )
             }
+            if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_team_reopen),
+                    icon = FeatherIcons.ChevronRight,
+                    onClick = {
+                        showAttachmentPicker = false
+                        showTeamPanel = true
+                    },
+                )
+            }
             if (state.usageMode == LocalUsageMode.WORK) {
                 LocalAgentSwarmLaunchEntry(
                     selected = teamDispatchSelected,
@@ -1222,7 +1245,14 @@ internal fun LocalConversationSurface(
                 teamDispatchSelected = true
                 showTeamPanel = false
             },
-            onDismiss = { showTeamPanel = false },
+            onDismiss = {
+                teamCardDismissed = true
+                showTeamPanel = false
+            },
+            onCollapse = {
+                teamCardDismissed = true
+                showTeamPanel = false
+            },
         )
     }
 }

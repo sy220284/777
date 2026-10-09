@@ -107,18 +107,23 @@ internal class LocalPersistentJobRecoveryCoordinator(
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
         requestedJobId: String? = null,
+        allowMutation: Boolean = false,
+        teamManaged: Boolean = false,
+        initialOptionalTools: Set<String> = emptySet(),
     ): JobStartResult {
         val runProfile = modelGateway.profileForRun(model)
         val protocol = effectiveProtocol(runProfile)
         val runner = subagentRunner(sessionId, boundState, historySnapshot)
         val capabilities = LocalSubagentCapabilities(
-            allowMutation = false,
+            allowMutation = allowMutation,
             continuable = true,
             virtualScreen = virtualScreen,
             historyMode = LocalSubagentHistoryMode.ISOLATED,
             maxDepth = 1,
             toolAllowlist = toolAllowlist,
             outputSchema = outputSchema,
+            teamManaged = teamManaged,
+            initialOptionalTools = initialOptionalTools,
         )
         validateLocalSubagentLaunchSpec(
             LocalSubagentLaunchSpec(
@@ -358,6 +363,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ownerSessionId = sessionId,
             )
         ) {
+            return
+        }
+        // 可写代理已经产生的副作用不能跨进程无条件重放；恢复前交由 Lead 核验并重派。
+        if (capabilities.teamManaged && capabilities.allowMutation) {
+            jobs.failResumable(
+                snapshot.id,
+                "可写团队成员在应用中断后停止自动续跑；请由主代理先核验文件和任务状态，再重新分配。",
+            )
             return
         }
         // Only an actual model continuation needs a live, session-owned execution context.
