@@ -48,11 +48,14 @@ internal object LocalWorkTemperatureStore {
         }
     }
 
-    fun level(sessionId: String): Int = if (sessionId.isBlank()) 2 else {
+    fun level(sessionId: String, range: LocalModelTemperatureRange? = null): Int {
+        val defaultLevel = (range?.defaultPosition ?: 50) / 25
+        if (sessionId.isBlank()) return defaultLevel
         val saved = preferences
-        when {
-            saved?.contains("level:$sessionId") == true -> saved.getInt("level:$sessionId", 2)
-            else -> pending[sessionId] ?: 2
+        return when {
+            saved?.contains("level:$sessionId") == true ->
+                saved.getInt("level:$sessionId", defaultLevel)
+            else -> pending[sessionId] ?: defaultLevel
         }.coerceIn(0, 4)
     }
 
@@ -67,8 +70,8 @@ internal object LocalWorkTemperatureStore {
 
     fun requestTemperature(sessionId: String, model: String, baseUrl: String): Double? {
         val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
-        val selected = level(sessionId)
-        if (selected == 2 && range.omitAtChatDefault) return null
+        val selected = level(sessionId, range)
+        if (selected * 25 == range.defaultPosition && range.omitAtChatDefault) return null
         return range.at(selected * 25)
     }
 }
