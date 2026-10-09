@@ -105,6 +105,35 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
+    fun workEditUsesItsOwnExecutionPortAndStartsOneNewWorkTurn() {
+        val fake = RecordingTurnPort()
+        val coordinator = coordinator(
+            fake,
+            prepareEditedTurn = { messageId, text ->
+                assertEquals("old-user-message", messageId)
+                LocalWorkMessageEditPreparation.Ready(
+                    requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+                )
+            },
+        )
+        val result = coordinator.editAndResendUserMessage("old-user-message", "更新任务")
+        assertEquals(com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT, result)
+        assertEquals(1, fake.startCalls)
+        assertEquals("更新任务", fake.lastPrepared?.content)
+    }
+
+    @Test
+    fun workEditReturnsPreciseHistoryFailureWithoutStartingAnotherRun() {
+        val fake = RecordingTurnPort()
+        val coordinator = coordinator(fake)
+        assertEquals(
+            com.labteto.dshmobile.local.session.LocalUserMessageEditResult.HISTORY_UNAVAILABLE,
+            coordinator.editAndResendUserMessage("missing", "更新任务"),
+        )
+        assertEquals(0, fake.startCalls)
+    }
+
+    @Test
     fun regenerateAdmissionIsOwnedByWorkFeatureBeforeStartingRegenerationOwner() {
         val fake = RecordingTurnPort()
         val runtime = readyRuntimeForRegeneration()
@@ -126,6 +155,11 @@ class LocalWorkExecutionCoordinatorTest {
         },
         runDetached: suspend (String, String?, Long, Boolean) -> LocalWorkAutomationResult =
             { _, target, _, _ -> LocalWorkAutomationResult(requireNotNull(target), "ok") },
+        prepareEditedTurn: (String, String) -> LocalWorkMessageEditPreparation = { _, _ ->
+            LocalWorkMessageEditPreparation.Rejected(
+                com.labteto.dshmobile.local.session.LocalUserMessageEditResult.HISTORY_UNAVAILABLE,
+            )
+        },
     ): LocalWorkExecutionCoordinator =
         LocalWorkExecutionCoordinator(
             workRunRegistry = LocalWorkRunRegistry(runtime),
@@ -134,11 +168,7 @@ class LocalWorkExecutionCoordinatorTest {
             enqueueSnapshot = { error("首轮启动不得写排队快照") },
             startPreparedTurn = turn::startPrepared,
             startRegeneration = turn::startRegeneration,
-            prepareEditedTurn = { _, _ ->
-                LocalWorkMessageEditPreparation.Rejected(
-                    com.labteto.dshmobile.local.session.LocalUserMessageEditResult.HISTORY_UNAVAILABLE,
-                )
-            },
+            prepareEditedTurn = prepareEditedTurn,
             prepareDetachedSession = prepareDetachedSession,
             runDetached = runDetached,
         )
