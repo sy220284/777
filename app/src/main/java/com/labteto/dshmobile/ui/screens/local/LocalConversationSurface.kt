@@ -73,6 +73,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalWorkTemperatureStore
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
@@ -187,6 +188,11 @@ internal fun LocalConversationSurface(
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
+    var workTemperatureLevel by remember(state.sessionId) {
+        LocalWorkTemperatureStore.attach(appContext)
+        androidx.compose.runtime.mutableIntStateOf(LocalWorkTemperatureStore.level(state.sessionId))
+    }
+    var temperatureSaving by remember(state.sessionId) { mutableStateOf(false) }
     val drafts = rememberSaveable(
         saver = listSaver(
             save = { cache -> cache.save() },
@@ -887,6 +893,33 @@ internal fun LocalConversationSurface(
             onClearTeamDispatch = { teamDispatchSelected = false },
             onStop = onStop,
             reasoningMode = reasoningMode,
+            temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
+                workTemperatureLevel
+            } else {
+                ((state.chatState.behaviorTuning.expressionVariation.coerceIn(0, 100) + 12) / 25).coerceIn(0, 4)
+            },
+            temperatureEnabled = state.usageMode == LocalUsageMode.WORK ||
+                (!state.groupChat.enabled && !temperatureSaving),
+            onTemperatureLevelChange = { level ->
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    LocalWorkTemperatureStore.setLevel(state.sessionId, level)
+                    workTemperatureLevel = LocalWorkTemperatureStore.level(state.sessionId)
+                } else if (!state.groupChat.enabled && !temperatureSaving) {
+                    temperatureSaving = true
+                    scope.launch {
+                        try {
+                            val proposed = state.chatPersona.copy(
+                                behaviorTuning = state.chatState.behaviorTuning.copy(
+                                    expressionVariation = level.coerceIn(0, 4) * 25,
+                                ),
+                            )
+                            onConfigureChatPersona(proposed)
+                        } finally {
+                            temperatureSaving = false
+                        }
+                    }
+                }
+            },
             onReasoningModeChange = { mode ->
                 LocalReasoningControls.setMode(state.sessionId, mode)
                 reasoningMode = LocalReasoningControls.mode(state.sessionId, state.usageMode)
