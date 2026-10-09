@@ -132,11 +132,11 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.local_api_models_title)) {
-    DsButton(stringResource(R.string.local_api_model_add), onClick = {
-        editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
-        custom = false
-        showEditor = true
-    }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
+        DsButton(stringResource(R.string.local_api_model_add), onClick = {
+            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
+            custom = false
+            showEditor = true
+        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (apiProfiles.isEmpty()) {
@@ -185,17 +185,15 @@ internal fun LocalModelSettingsCard(
                             if (!local.modelSelection.isActive(profile))
                                 MenuItem(text = stringResource(R.string.local_model_use),
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
-                            if (profile.authKind == LocalModelAuthKind.API_KEY)
-                                MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
-                                    editRoute(profile.model, profile.baseUrl, profile.id)
-                                    custom = LocalModelPresets.entries.none {
-                                        it.model == profile.model && it.baseUrl == profile.baseUrl
-                                    }
-                                    showEditor = true
-                                }) else null,
-                            if (profile.authKind == LocalModelAuthKind.API_KEY)
-                                MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
-                                    onClick = { pendingRemoveId = profile.id }) else null,
+                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                                editRoute(profile.model, profile.baseUrl, profile.id)
+                                custom = LocalModelPresets.entries.none {
+                                    it.model == profile.model && it.baseUrl == profile.baseUrl
+                                }
+                                showEditor = true
+                            }),
+                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                                onClick = { pendingRemoveId = profile.id }),
                         ),
                     )
                 }
@@ -230,7 +228,6 @@ internal fun LocalModelSettingsCard(
             color = colors.labelTertiary,
         )
     }
-
 
     if (showEditor) {
         DsBottomSheet(
