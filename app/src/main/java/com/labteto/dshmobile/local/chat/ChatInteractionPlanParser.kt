@@ -14,8 +14,11 @@ internal class ChatInteractionPlanParser(
 ) {
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? {
         val body = extractJsonObject(text) ?: return null
+        val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            ?: return null
+        val normalized = normalizeChatReplySuggestionPayload(root)
         val decoded = runCatching {
-            json.decodeFromString(ChatReplySuggestionPlan.serializer(), body)
+            json.decodeFromString(ChatReplySuggestionPlan.serializer(), normalized.toString())
         }.getOrNull() ?: return null
         return sanitizeSuggestions(decoded.suggestions)
     }
