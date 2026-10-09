@@ -49,7 +49,7 @@ class HostsStore @Inject constructor(
     /** Retire obsolete host and pairing data while preserving all current user preferences. */
     suspend fun clearRetiredRemoteData() {
         dataStore.edit { prefs ->
-            retiredStringKeys.forEach(prefs::remove)
+            retiredStringKeys.forEach { key -> prefs.remove(key) }
             prefs.remove(booleanPreferencesKey("background"))
         }
         // Token encryption key was only used by legacy remote pairing.
