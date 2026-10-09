@@ -30,6 +30,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        compose.waitForIdle() // ensure BackHandler is registered before the key
         pressDeviceBack()
         compose.waitForIdle()
 
@@ -50,6 +51,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
+        compose.waitForIdle() // ensure BackHandler is registered before the key
         pressDeviceBack()
         compose.waitForIdle()
 
