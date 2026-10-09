@@ -171,6 +171,7 @@ class LocalWorkspaceTest {
 
         assertEquals(".dsh/fetches/large.json", path)
         assertEquals(content, workspace.readRaw(path))
+        assertTrue(workspace.read(path, 1, 1).contains(middleMarker))
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
     }
 
