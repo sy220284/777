@@ -900,10 +900,14 @@ internal fun LocalConversationSurface(
             temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
                 workTemperatureLevel
             } else {
-                state.chatState.behaviorTuning.composerTemperatureLevel()
+                state.chatState.behaviorTuning.composerTemperatureLevel(
+                    activeModelProfile?.let { LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl) },
+                )
             },
             temperaturePosition = if (state.usageMode == LocalUsageMode.CHAT) {
-                state.chatState.behaviorTuning.expressionVariation
+                activeModelProfile?.let {
+                    LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+                }?.let { state.chatState.behaviorTuning.temperaturePosition(it) }
             } else null,
             temperatureSaveFailed = temperatureSaveFailed,
             temperatureSaving = temperatureSaving,
