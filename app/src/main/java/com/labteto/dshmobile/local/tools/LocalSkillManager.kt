@@ -336,13 +336,15 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
 
 @Singleton
 internal class LocalSkillManager @Inject constructor(storage: LocalSessionStorageRuntime) {
-    private val store = LocalSkillStore(storage.files.workspace)
+    private val storageWorkspace = storage.files.workspace
+    private val store = LocalSkillStore(storageWorkspace)
     fun initializeDefaults() = store.seedOnce()
     fun installed(): List<LocalInstalledSkill> = store.installed()
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
     fun create(id: String, displayName: String, description: String, instructions: String) =
         store.create(id, displayName, description, instructions)
+    fun importSkill(filename: String, bytes: ByteArray): String = LocalSkillPackageImporter(storageWorkspace).install(filename, bytes)
     fun remove(id: String) = store.remove(id)
     fun readDocument(id: String) = store.readDocument(id)
     fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
