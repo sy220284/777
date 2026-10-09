@@ -12,9 +12,7 @@ import kotlinx.serialization.json.put
 private const val CHAT_BRANCH_ROOT = "__chat_root__"
 private const val LOCAL_IMPORTED_ATTACHMENT_MARKER = "本次附件已导入本机工作区："
 
-enum class LocalChatUserEditResult {
-    SENT, BUSY, UNAVAILABLE, MESSAGE_MISSING, EMPTY, UNCHANGED,
-}
+typealias LocalChatUserEditResult = com.labteto.dshmobile.local.session.LocalUserMessageEditResult
 
 @Serializable
 data class LocalChatBranchNode(

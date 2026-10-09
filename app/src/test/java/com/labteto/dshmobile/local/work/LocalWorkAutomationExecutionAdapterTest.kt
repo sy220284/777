@@ -17,6 +17,12 @@ class LocalWorkAutomationExecutionAdapterTest {
                 attachments: List<LocalImportedAttachment>,
             ): LocalSendResult = error("unused")
 
+            override fun editAndResendUserMessage(
+                messageId: String,
+                replacement: String,
+            ): com.labteto.dshmobile.local.session.LocalUserMessageEditResult =
+                com.labteto.dshmobile.local.session.LocalUserMessageEditResult.UNAVAILABLE
+
             override fun regenerateReply(messageId: String): Boolean = false
 
             override suspend fun prepareSession(

@@ -80,7 +80,12 @@
     <string name="local_edit_user_message_resend">从这里重新生成</string>
     <string name="local_edit_user_message_busy">聊天仍在处理消息，请等当前回复结束后重试。</string>
     <string name="local_edit_user_message_missing">这条消息已不在当前对话中，请重新进入聊天后再试。</string>
-    <string name="local_edit_user_message_unavailable">请切换到已配置模型的聊天会话后重试。</string>
+    <string name="local_edit_user_message_unavailable">当前会话无法执行编辑重发，请重新进入会话后重试。</string>
+    <string name="local_edit_user_message_wrong_mode">会话模式已变化，请重新进入对应会话后重试。</string>
+    <string name="local_edit_user_message_unconfigured">当前没有已配置的可用模型，请选择模型后重试。</string>
+    <string name="local_edit_user_message_history_unavailable">此处之前的模型上下文无法可靠恢复，原消息没有改变。请换一条消息编辑或新建会话。</string>
+    <string name="local_edit_user_message_failed">编辑重发未能启动。如果历史已更新，请从输入框重新发送修改后的内容。</string>
+    <string name="local_edit_work_side_effect_notice">工作模式将从这条消息重新执行任务。此前已执行的文件修改、工具调用和外部操作不会自动撤销；请确认实际结果，避免重复操作。</string>
     <string name="local_edit_user_message_empty">消息内容不能为空。</string>
     <string name="local_edit_user_message_unchanged">请先修改消息内容再发送。</string>
     <string name="local_previous_variant">上一版本</string>

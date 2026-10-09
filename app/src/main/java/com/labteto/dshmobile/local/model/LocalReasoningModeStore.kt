@@ -41,18 +41,39 @@ internal object LocalWorkTemperatureStore {
                 val saved = context.applicationContext.getSharedPreferences(
                     "conversation_work_temperature", Context.MODE_PRIVATE,
                 )
-                pending.forEach { (id, level) -> saved.edit().putInt("level:$id", level).apply() }
+                pending.forEach { (id, level) ->
+                    saved.edit().putInt("level:$id", level).putBoolean("capped-v2:$id", true).apply()
+                }
                 preferences = saved
                 pending.clear()
             }
         }
     }
 
-    fun level(sessionId: String): Int = if (sessionId.isBlank()) 2 else {
-        val saved = preferences
-        when {
-            saved?.contains("level:$sessionId") == true -> saved.getInt("level:$sessionId", 2)
-            else -> pending[sessionId] ?: 2
+    /** Old Work detents meant 0 / 0.65 / 1.3 / 1.65 / 2.0 for DeepSeek.
+     * Preserve their actual capped sampling values when first opening a saved session. */
+    internal fun migrateLegacyDeepSeekLevel(level: Int): Int = when (level.coerceIn(0, 4)) {
+        0 -> 0
+        1 -> 2
+        else -> 4
+    }
+
+    fun level(sessionId: String, range: LocalModelTemperatureRange? = null): Int {
+        val defaultLevel = (range?.defaultPosition ?: 50) / 25
+        if (sessionId.isBlank()) return defaultLevel
+        return synchronized(this) {
+            val saved = preferences
+            if (saved?.contains("level:$sessionId") == true) {
+                val prior = saved.getInt("level:$sessionId", defaultLevel).coerceIn(0, 4)
+                val deepSeekCapped = range != null && range.defaultPosition == 100 &&
+                    range.minimum == 0.0 && range.maximum == 1.3
+                if (deepSeekCapped && !saved.getBoolean("capped-v2:$sessionId", false)) {
+                    val migrated = migrateLegacyDeepSeekLevel(prior)
+                    saved.edit().putInt("level:$sessionId", migrated)
+                        .putBoolean("capped-v2:$sessionId", true).apply()
+                    migrated
+                } else prior
+            } else pending[sessionId] ?: defaultLevel
         }.coerceIn(0, 4)
     }
 
@@ -60,15 +81,16 @@ internal object LocalWorkTemperatureStore {
         if (sessionId.isBlank()) return
         synchronized(this) {
             val safe = level.coerceIn(0, 4)
-            preferences?.edit()?.putInt("level:$sessionId", safe)?.apply()
+            preferences?.edit()?.putInt("level:$sessionId", safe)
+                ?.putBoolean("capped-v2:$sessionId", true)?.apply()
                 ?: run { pending[sessionId] = safe }
         }
     }
 
     fun requestTemperature(sessionId: String, model: String, baseUrl: String): Double? {
         val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
-        val selected = level(sessionId)
-        if (selected == 2 && range.omitAtChatDefault) return null
+        val selected = level(sessionId, range)
+        if (selected * 25 == range.defaultPosition && range.omitAtChatDefault) return null
         return range.at(selected * 25)
     }
 }

@@ -141,9 +141,9 @@ data class LocalPromptCachePolicy(
 )
 
 /**
- * Provider-verified chat sampling window, separate from the 0..100 user control.
- * Keeping a documented middle anchor means neutral (50) is useful for conversation while
- * 0 and 100 reach the *exact inclusive* provider bounds.
+ * Client-exposed sampling window, constrained to verified provider bounds.
+ * Most providers keep a conversational midpoint; DeepSeek caps its product slider at 1.3
+ * and uses the full 0..100 scale with the default at the maximum.
  */
 data class LocalModelTemperatureRange(
     val minimum: Double,
@@ -151,10 +151,18 @@ data class LocalModelTemperatureRange(
     val chatDefault: Double,
     val requiresDisabledThinking: Boolean = false,
     val omitAtChatDefault: Boolean = false,
+    val defaultPosition: Int = 50,
 ) {
     init {
         require(minimum.isFinite() && maximum.isFinite() && chatDefault.isFinite())
         require(minimum < maximum && chatDefault in minimum..maximum)
+        require(defaultPosition in 1..100)
+    }
+
+    /** Convert an unsplit, legacy expression value without changing its previous temperature. */
+    fun legacyPosition(expressionVariation: Int): Int {
+        val safe = expressionVariation.coerceIn(0, 100)
+        return if (defaultPosition == 100) (safe * 2).coerceAtMost(100) else safe
     }
 
     fun at(position: Int): Double {
@@ -162,8 +170,10 @@ data class LocalModelTemperatureRange(
         return when {
             safe == 0 -> minimum
             safe == 100 -> maximum
-            safe <= 50 -> minimum + (chatDefault - minimum) * (safe / 50.0)
-            else -> chatDefault + (maximum - chatDefault) * ((safe - 50) / 50.0)
+            safe <= defaultPosition ->
+                minimum + (chatDefault - minimum) * (safe / defaultPosition.toDouble())
+            else -> chatDefault + (maximum - chatDefault) *
+                ((safe - defaultPosition) / (100 - defaultPosition).toDouble())
         }
     }
 }
@@ -590,9 +600,10 @@ object LocalModelPresets {
         find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
 
     /**
-     * Only expose a Chat slider where the exact official model/host has verified inclusive
-     * sampling bounds. Unknown proxies, fixed-temperature models and models without a
-     * verified range keep provider defaults rather than making up endpoints.
+     * Only expose a slider where the exact official model/host has verified sampling
+     * bounds. Client limits can be narrower than the official API limits (DeepSeek 0..2).
+     * Unknown proxies, fixed-temperature models and models without verified bounds keep
+     * provider defaults rather than making up endpoints.
      *
      * DeepSeek: https://api-docs.deepseek.com/zh-cn/api/create-chat-completion
      *            https://api-docs.deepseek.com/zh-cn/quick_start/parameter_settings/
@@ -605,7 +616,10 @@ object LocalModelPresets {
         // Both official DeepSeek entrypoints are equivalent; proxies cannot inherit the range.
         if (normalized in setOf("https://api.deepseek.com", "https://api.deepseek.com/v1") &&
             model.lowercase() in setOf("deepseek-flash", "deepseek-v4-pro")) {
-            return LocalModelTemperatureRange(0.0, 2.0, 1.3, requiresDisabledThinking = true)
+            // Product-level cap: use the entire slider for 0..1.3, with Chat starting at 1.3.
+            return LocalModelTemperatureRange(
+                0.0, 1.3, 1.3, requiresDisabledThinking = true, defaultPosition = 100,
+            )
         }
         val preset = find(model, baseUrl) ?: return null
         if (!preset.temperatureSupported) return null
