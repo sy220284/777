@@ -143,9 +143,15 @@ internal fun findChatContinuitySourceUserMessageId(
 internal fun shouldRetryChatPostTurnRequest(error: Throwable): Boolean =
     when (error) {
         is LocalModelException -> error.retryable || (
-            error.code == "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION" &&
-                error.admissionState == com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED &&
-                error.continuationEligible
+            error.continuationEligible &&
+                error.admissionState in setOf(
+                    com.labteto.dshmobile.local.model.LocalModelAdmissionState.MAYBE_ADMITTED,
+                    com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED,
+                ) &&
+                (
+                    error.code in setOf("MODEL_NETWORK", "MODEL_TIMEOUT", "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION") ||
+                        error.code.endsWith("_STREAM_INTERRUPTED")
+                    )
             )
         is IOException -> true
         else -> false
