@@ -63,7 +63,7 @@ internal class LocalWorkTurnToolRuntime(
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {
                 val priority = listOf(
-                    "team_task_list", "team_task_update", "team_messages",
+                    "team_task_create", "team_task_list", "team_task_update", "team_messages",
                     "team_wait_for_message", "team_members", "team_task_get",
                     "team_create_member", "team_start_member", "team_spawn",
                     "team_send_message", "team_wait", "skill",
