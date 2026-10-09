@@ -11,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
@@ -89,8 +88,8 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
-        closeSoftKeyboard()
-        pressDeviceBack()
+        pressDeviceBack() // Dismiss the IME without Espresso's root-focus selection.
+        pressDeviceBack() // Dismiss the rename dialog.
         compose.onNodeWithText("继续这条故事").assertIsEnabled()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("删除这条故事").performScrollTo().performClick()
