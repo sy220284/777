@@ -39,6 +39,7 @@ object LocalToolCatalog {
         add(tool("list_files", "列出工作区目录", properties(
             "path" to string("相对路径，默认 ."),
             "depth" to integer("递归深度，1 到 8"),
+            "cursor" to integer("可选；目录扫描未完时返回的下一页游标"),
         )))
         add(tool("glob", "按 glob 模式发现工作区文件", properties(
             "pattern" to string("例如 **/*.kt"),
