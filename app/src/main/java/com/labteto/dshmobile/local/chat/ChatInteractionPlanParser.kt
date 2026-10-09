@@ -57,8 +57,21 @@ internal class ChatInteractionPlanParser(
             (suggestion?.get("text") as? kotlinx.serialization.json.JsonPrimitive)
                 ?.takeIf { it.isString }?.content?.isNotBlank() == true
         } == true
+        // A model can include system-owned fields (scene, evolution, lifeState) as
+        // decoration. Those fields are intentionally ignored and must not turn a
+        // valid no-op result into a retry loop. Reject only an unusable requested
+        // model-owned patch, so truly malformed types still preserve pending work.
+        val writableStateFields = setOf(
+            "physicalState", "mood", "relationshipState", "currentFocus",
+            "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
+            "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
+            "dynamics", "userPattern", "continuity",
+        )
+        val requestedModelStateChange = originalState?.any { (key, value) ->
+            key in writableStateFields && (value !is JsonObject || value.isNotEmpty())
+        } == true
         val discardedRequestedState =
-            (originalState != null && originalState.isNotEmpty() && !hasStateUpdate) ||
+            (requestedModelStateChange && !hasStateUpdate) ||
                 (root.containsKey("state") && originalState == null)
         if (discardedRequestedState && !hasDiary && !hasSuggestions) {
             return null to "state_patch_unusable"
