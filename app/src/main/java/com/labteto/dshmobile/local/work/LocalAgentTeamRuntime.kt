@@ -377,7 +377,11 @@ internal class LocalAgentTeamRuntime(
                 subject = task.subject,
                 description = task.description,
                 status = task.status.name.lowercase(),
-                ownerName = task.ownerId?.let { memberById[it]?.name },
+                ownerName = task.ownerId?.let { id ->
+                    memberById[id]?.let { member ->
+                        member.displayName.ifBlank { teamMemberFriendlyName(member.name) }
+                    }
+                },
                 blockedByTitles = task.blockedBy.map { blockerId ->
                     taskById[blockerId]?.subject ?: blockerId
                 },
