@@ -398,23 +398,57 @@ class LocalWorkspace(
         }
     }
 
-    /** Model-facing skill catalog. User-only skills stay installed but are hidden from tools. */
-    fun modelSkillCatalog(): String {
-        val visible = skills().take(MAX_MODEL_SKILL_LIST)
-            .mapNotNull { name ->
-                try {
-                    skillMetadata(name)
-                } catch (error: Exception) {
-                    AppLog.warn("LocalSkills", "技能目录条目无法读取：$name", error)
-                    null
-                }
+    /** A page of the full eligible catalog; never filter *after* taking the first N directories. */
+    fun modelSkillCatalog(
+        offset: Int = 0,
+        limit: Int = MAX_MODEL_SKILL_LIST,
+        query: String = "",
+        maxChars: Int = Int.MAX_VALUE,
+    ): String {
+        val eligible = skills().mapNotNull { name ->
+            try {
+                skillMetadata(name)
+            } catch (error: Exception) {
+                AppLog.warn("LocalSkills", "技能目录条目无法读取：$name", error)
+                null
             }
-            .filter(LocalSkillMetadata::modelInvocable)
-        if (visible.isEmpty()) return "未安装可由模型调用的技能"
-        return visible.joinToString("\n") { skill ->
+        }.filter(LocalSkillMetadata::modelInvocable)
+        if (eligible.isEmpty()) return "未安装可由模型调用的技能"
+
+        val relevance = query.lowercase().split(Regex("""[^\\p{L}\\p{N}]+"""))
+            .filter { it.length >= 2 }.take(32)
+        val ordered = if (relevance.isEmpty()) eligible else eligible.sortedWith(
+            compareByDescending<LocalSkillMetadata> { skill ->
+                val searchable = "${skill.name} ${skill.description} ${skill.whenToUse.orEmpty()}".lowercase()
+                relevance.count(searchable::contains)
+            }.thenBy(LocalSkillMetadata::name),
+        )
+        val from = offset.coerceAtLeast(0)
+        if (from >= ordered.size) return "技能目录已到末尾（共 ${ordered.size} 项）"
+        val rows = mutableListOf<String>()
+        var usedChars = 0
+        val pageLimit = limit.coerceIn(1, MAX_MODEL_SKILL_LIST)
+        val charBudget = maxChars.coerceAtLeast(160)
+        for (skill in ordered.drop(from).take(pageLimit)) {
             val description = skill.description.ifBlank { "无描述" }
             val guidance = skill.whenToUse?.let { "；适用：$it" }.orEmpty()
-            "${skill.name}：$description$guidance"
+            val row = "${skill.name}：$description$guidance"
+            if (rows.isNotEmpty() && usedChars + row.length + 1 > charBudget) break
+            if (row.length > charBudget) {
+                rows += row.take(charBudget - 1) + "…"
+                break
+            }
+            rows += row
+            usedChars += row.length + 1
+        }
+        val next = from + rows.size
+        return buildString {
+            append(rows.joinToString("\n"))
+            if (next < ordered.size) {
+                append("\n[目录未完：还有 ${ordered.size - next} 项；调用 skill(offset=$next")
+                if (query.isNotBlank()) append(", query=${query.take(80)}")
+                append(") 继续查找；也可填写 name 精确读取]")
+            }
         }
     }
 
