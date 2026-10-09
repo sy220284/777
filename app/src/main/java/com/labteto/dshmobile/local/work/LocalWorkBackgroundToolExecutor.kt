@@ -13,7 +13,6 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -29,12 +28,6 @@ internal class LocalWorkBackgroundToolExecutor(
     private val tools: LocalToolCompositionRoot,
     private val toolApproval: LocalToolApprovalRuntime,
 ) {
-    // 同一个执行器下的持久代理共享写入闸门，避免并行读改写出现交错副作用。
-    private val persistentMutationMutex = Mutex()
-    private val fileMutationTools = setOf(
-        "write", "edit", "apply_patch", "bash", "run_shell", "download_file",
-    )
-
     suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,
         allowMutation: Boolean,
@@ -154,31 +147,21 @@ internal class LocalWorkBackgroundToolExecutor(
         enabledOptionalTools: MutableSet<String>,
     ): AgentToolResult {
         val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
-        suspend fun dispatch(): AgentToolResult =
-            executeUtility(canonical, sessionId, memoryTools, enabledOptionalTools)
-                ?: tools.execution.executeScoped(
-                    original = canonical,
-                    sessionId = sessionId,
-                    allowMutation = allowMutation,
-                    planModeEnabled = false,
-                    approval = { normalized, tool, summary ->
-                        if (sessionId == runtimeStateStore.currentSessionId) {
-                            toolApproval.approve(normalized, tool, summary)
-                        } else {
-                            shouldAutoApproveTool(approvalPreferences.currentMode(), tool)
-                        }
-                    },
-                )
-        return if (allowMutation && canonical.name in fileMutationTools) {
-            persistentMutationMutex.lock()
-            try {
-                dispatch()
-            } finally {
-                persistentMutationMutex.unlock()
-            }
-        } else {
-            dispatch()
-        }
+        // 文件类副作用由统一执行协调器序列化，Lead/成员使用同一把闸门。
+        return executeUtility(canonical, sessionId, memoryTools, enabledOptionalTools)
+            ?: tools.execution.executeScoped(
+                original = canonical,
+                sessionId = sessionId,
+                allowMutation = allowMutation,
+                planModeEnabled = false,
+                approval = { normalized, tool, summary ->
+                    if (sessionId == runtimeStateStore.currentSessionId) {
+                        toolApproval.approve(normalized, tool, summary)
+                    } else {
+                        shouldAutoApproveTool(approvalPreferences.currentMode(), tool)
+                    }
+                },
+            )
     }
 
     private fun executeUtility(call: LocalToolCall, sessionId: String,
