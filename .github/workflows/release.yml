@@ -75,6 +75,13 @@ jobs:
             if [ "$status" != "ahead" ]; then
               return 1
             fi
+            # GitHub compare returns at most 300 changed-file entries. Never
+            # classify an incomplete change list as release-equivalent.
+            count="$(printf '%s' "$comparison" | jq -r '.files | length // 0')"
+            if [ "$count" -ge 300 ]; then
+              echo "发布等价判断：变更文件达到 API 比较上限，拒绝以不完整文件列表放行。" >&2
+              return 1
+            fi
 
             changes="$RUNNER_TEMP/release-change-files.txt"
             printf '%s' "$comparison" | jq -r '.files[]?.filename' > "$changes"
@@ -527,7 +534,8 @@ jobs:
           git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
           git show FETCH_HEAD:.github/scripts/classify-ci-scope.py > "$RUNNER_TEMP/classify-ci-scope.py"
 
-          if [ "$status" = "ahead" ] && python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe; then
+          changed_file_count="$(printf '%s' "$comparison" | jq -r '.files | length // 0')"
+          if [ "$status" = "ahead" ] && [ "$changed_file_count" -lt 300 ] && python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe; then
             echo "current=true" >> "$GITHUB_OUTPUT"
             echo "构建期间 main 仅增加不影响发布产物的变更，继续发布已验证候选。"
           else
