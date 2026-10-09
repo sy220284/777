@@ -1,6 +1,15 @@
 package com.labteto.dshmobile.ui.screens.tools
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -112,6 +121,7 @@ internal class ToolsOperationGate {
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
+    @ApplicationContext private val appContext: Context,
     private val sessionStore: SessionStore,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
@@ -198,6 +208,47 @@ class ToolsViewModel @Inject constructor(
     fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
+    fun importSkill(uri: Uri) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val (filename, bytes) = withContext(Dispatchers.IO) {
+                    val resolver = appContext.contentResolver
+                    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment?.substringAfterLast('/') ?: ""
+                    val input = resolver.openInputStream(uri) ?: error("无法打开所选技能文件")
+                    val output = ByteArrayOutputStream()
+                    input.use { stream ->
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            require(output.size() + count <= 8 * 1024 * 1024) { "技能文件不能超过 8 MB" }
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                    name to output.toByteArray()
+                }
+                val id = localTools.importSkill(filename, bytes)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    skills = localTools.installedSkills(),
+                    presets = localTools.presetSkills(),
+                    createdSkillId = id,
+                    feedback = "技能已安装：$id",
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message ?: "技能导入失败，请检查文件格式",
+                )
+            }
+        }
+    }
+
     fun removeSkill(id: String) = changeSkills { localTools.removeSkill(id) }
 
     fun openSkillEditor(id: String) {
@@ -367,6 +418,9 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val skillFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importSkill(uri)
+    }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
@@ -483,6 +537,7 @@ fun ToolsScreen(
             onUseCapability = onUseCapability,
             onInstallPreset = viewModel::installPreset,
             onCreateSkill = viewModel::createSkill,
+            onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
             onRemoveSkill = viewModel::removeSkill,
             onOpenSkillEditor = viewModel::openSkillEditor,
             onCloseSkillEditor = viewModel::closeSkillEditor,
