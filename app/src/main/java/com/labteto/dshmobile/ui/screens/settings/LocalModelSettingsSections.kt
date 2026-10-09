@@ -92,6 +92,7 @@ internal fun LocalModelSettingsCard(
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
     val scope = rememberCoroutineScope()
+    val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
     var showEditor by remember { mutableStateOf(false) }
     var model by remember { mutableStateOf(LocalModelPresets.entries.first().model) }
     var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
@@ -130,17 +131,76 @@ internal fun LocalModelSettingsCard(
         testStatus = null
     }
 
-    DsButton(stringResource(R.string.local_model_add), onClick = {
-        editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
-        custom = false
-        showEditor = true
-    }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
-    SettingsCard(stringResource(R.string.advanced_model_settings)) {
-        Text(
-            stringResource(R.string.local_model_image_mode_title),
-            style = DsType.small13Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-        )
+    SettingsCard(stringResource(R.string.local_api_models_title)) {
+        DsButton(stringResource(R.string.local_api_model_add), onClick = {
+            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
+            custom = false
+            showEditor = true
+        }, modifier = Modifier.fillMaxWidth(), icon = FeatherIcons.Plus)
+        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
+            color = colors.labelSecondary)
+        if (apiProfiles.isEmpty()) {
+            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13.withReadingWeight(),
+                color = colors.labelTertiary)
+        }
+        local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
+        apiProfiles.forEach { profile ->
+            Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
+                                modifier = Modifier.weight(1f, fill = false), maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                            if (local.modelSelection.isActive(profile)) {
+                                DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
+                            }
+                        }
+                        val duplicateApiRoute = apiProfiles.count {
+                            it.model == profile.model && it.baseUrl == profile.baseUrl
+                        } > 1
+                        Text(
+                            if (duplicateApiRoute) {
+                                "${profile.baseUrl} · ${profile.id.takeLast(6)}"
+                            } else {
+                                profile.baseUrl
+                            },
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        ModelCapabilityTags(
+                            LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
+                        )
+                    }
+                    DsMenu(
+                        anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
+                            modifier = Modifier.padding(horizontal = DsSpacing.small)) },
+                        items = listOfNotNull(
+                            if (!local.modelSelection.isActive(profile))
+                                MenuItem(text = stringResource(R.string.local_model_use),
+                                    onClick = { viewModel.selectLocalModel(profile.id) }) else null,
+                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                                editRoute(profile.model, profile.baseUrl, profile.id)
+                                custom = LocalModelPresets.entries.none {
+                                    it.model == profile.model && it.baseUrl == profile.baseUrl
+                                }
+                                showEditor = true
+                            }),
+                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                                onClick = { pendingRemoveId = profile.id }),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+    SettingsCard(stringResource(R.string.local_model_image_mode_title)) {
         DsSegmented(
             segments = listOf(
                 DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
@@ -167,74 +227,6 @@ internal fun LocalModelSettingsCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary)
-        if (local.modelProfiles.isEmpty()) {
-            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13.withReadingWeight(),
-                color = colors.labelTertiary)
-        }
-        local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
-        local.modelProfiles.forEach { profile ->
-            Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
-                                modifier = Modifier.weight(1f, fill = false), maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
-                            if (local.modelSelection.isActive(profile)) {
-                                DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
-                            }
-                        }
-                        val duplicateApiRoute = profile.authKind == LocalModelAuthKind.API_KEY &&
-                            local.modelProfiles.count {
-                                it.authKind == LocalModelAuthKind.API_KEY &&
-                                    it.model == profile.model && it.baseUrl == profile.baseUrl
-                            } > 1
-                        Text(
-                            if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                stringResource(R.string.chatgpt_model_source, profile.model)
-                            } else if (duplicateApiRoute) {
-                                "${profile.baseUrl} · ${profile.id.takeLast(6)}"
-                            } else {
-                                profile.baseUrl
-                            },
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        ModelCapabilityTags(
-                            LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
-                        )
-                    }
-                    DsMenu(
-                        anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
-                            modifier = Modifier.padding(horizontal = DsSpacing.small)) },
-                        items = listOfNotNull(
-                            if (!local.modelSelection.isActive(profile))
-                                MenuItem(text = stringResource(R.string.local_model_use),
-                                    onClick = { viewModel.selectLocalModel(profile.id) }) else null,
-                            if (profile.authKind == LocalModelAuthKind.API_KEY)
-                                MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
-                                    editRoute(profile.model, profile.baseUrl, profile.id)
-                                    custom = LocalModelPresets.entries.none {
-                                        it.model == profile.model && it.baseUrl == profile.baseUrl
-                                    }
-                                    showEditor = true
-                                }) else null,
-                            if (profile.authKind == LocalModelAuthKind.API_KEY)
-                                MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
-                                    onClick = { pendingRemoveId = profile.id }) else null,
-                        ),
-                    )
-                }
-            }
-        }
     }
 
     if (showEditor) {
@@ -398,7 +390,7 @@ internal fun LocalModelSettingsCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
+internal fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
     if (capabilities.isEmpty()) return
     FlowRow(
         modifier = Modifier.fillMaxWidth(),

@@ -630,7 +630,7 @@
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
 
     <string name="pair_fail_local">配对未能完成：本机保存凭据或准备连接时发生错误。请重试；若持续出现，请重启应用并检查 Android 存储与安全服务。</string>
-    <string name="settings_page_models">模型设置</string>
+    <string name="settings_page_models">模型与账户</string>
     <string name="settings_page_model_usage">模型价格与消耗</string>
     <string name="settings_page_session">会话</string>
     <string name="settings_page_memory">个性化与记忆</string>
@@ -749,7 +749,9 @@
     <string name="advanced_model_services">模型服务</string>
     <string name="advanced_model_services_hint">服务商的地址、协议与密钥由项目动态配置管理；这里显示状态并执行模型发现。</string>
     <string name="advanced_model_settings">模型设置</string>
-    <string name="local_model_list_hint">已保存的模型 · 点右侧菜单切换、编辑或移除</string>
+    <string name="local_model_list_hint">已配置的 API 模型 · 点右侧菜单切换、编辑或移除</string>
+    <string name="local_api_models_title">API 模型</string>
+    <string name="local_api_model_add">添加 API 模型</string>
     <string name="local_model_in_use">使用中</string>
     <string name="local_model_use">使用此模型</string>
     <string name="local_model_edit">编辑</string>
@@ -1531,6 +1533,11 @@
     <string name="chatgpt_account_fallback">ChatGPT 账户</string>
     <string name="chatgpt_plan_usage">ChatGPT 套餐</string>
     <string name="chatgpt_model_count">%1$d 个模型</string>
+    <string name="chatgpt_account_models_title">套餐可用模型（%1$d）</string>
+    <string name="chatgpt_account_models_cached">暂时无法验证模型目录，以下是上次同步的模型；连接恢复后可切换。</string>
+    <string name="chatgpt_account_models_empty">当前账户没有可用的套餐模型。</string>
+    <string name="chatgpt_account_models_pending">模型列表将在连接完成后显示。</string>
+    <string name="chatgpt_account_use_model">使用</string>
     <string name="chatgpt_saved_accounts">其他授权记录</string>
     <string name="chatgpt_current_account">当前</string>
     <string name="chatgpt_use_account">使用</string>
