@@ -84,7 +84,7 @@ class LocalProjectUiRegressionTest {
         }
         val label = context.getString(R.string.local_project_delete)
         compose.onNodeWithText(label).performScrollTo().performClick()
-        compose.onAllNodesWithText(label).onLast().performClick()
+        compose.onAllNodesWithText(label)[1].performClick()
         compose.waitUntil(5_000) { called == 1 }
         compose.runOnIdle {
             assertEquals("local-workspace", catalog.value.activeId)
