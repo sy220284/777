@@ -136,21 +136,38 @@ class LspPluginTest {
         }
     }
 
+    @Test fun firstSemanticQueryWithoutProcessApprovalReturnsRecoveryHint() = runTest {
+        temporary.newFile("example.kt").writeText("fun main() = Unit")
+        val context = HarnessContext()
+        val plugin = LspPlugin(temporary.root, Json, { listOf("mock-language-server") })
+        plugin.install(context)
+        try {
+            val result = context.tools.execute(
+                "lsp_diagnostics",
+                buildJsonObject { put("path", "example.kt") },
+            )
+            assertTrue(result.isError)
+            assertEquals("LSP_START_APPROVAL_REQUIRED", result.errorCode)
+            assertTrue(result.recoveryHint.orEmpty().contains("批准"))
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
     @Test fun missingServerFailsWithUsefulFallback() = runTest {
         temporary.newFile("example.kt").writeText("fun main() = Unit")
         val context = HarnessContext()
         val plugin = LspPlugin(temporary.root, Json, { emptyList() })
         plugin.install(context)
         try {
-            val result = runCatching {
-                context.tools.execute(
-                    "lsp_hover",
-                    buildJsonObject { put("path", "example.kt") },
-                    context = ToolContext(approval = { true }),
-                )
-            }
-            assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("read、grep、glob"))
+            val result = context.tools.execute(
+                "lsp_hover",
+                buildJsonObject { put("path", "example.kt") },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue(result.isError)
+            assertEquals("LSP_SERVER_UNAVAILABLE", result.errorCode)
+            assertTrue(result.recoveryHint.orEmpty().contains("read、grep、glob"))
         } finally {
             plugin.uninstall(context)
         }

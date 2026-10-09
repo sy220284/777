@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -25,6 +26,9 @@ internal object LocalAgentTeamEventCodec {
             put("id", id)
             put("name", name)
             put("description", description)
+            if (displayName.isNotBlank()) put("displayName", displayName)
+            if (mutableToolsEnabled) put("mutableToolsEnabled", true)
+            if (grantedExtensions.isNotEmpty()) put("grantedExtensions", JsonArray(grantedExtensions.sorted().map(::JsonPrimitive)))
             put("provider", provider)
             put("context", context.name.lowercase())
             put("phase", phase.name.lowercase())
@@ -82,6 +86,10 @@ internal object LocalAgentTeamEventCodec {
             jobId = teamJobId(id),
             name = member.requiredTeamString("name"),
             description = member.optionalTeamString("description").orEmpty(),
+            displayName = member.optionalTeamString("displayName").orEmpty(),
+            mutableToolsEnabled = member["mutableToolsEnabled"]?.jsonPrimitive?.booleanOrNull ?: false,
+            grantedExtensions = (member["grantedExtensions"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull }?.toSet().orEmpty(),
             provider = member.requiredTeamString("provider"),
             context = runCatching {
                 LocalTeamMemberContext.valueOf(member.requiredTeamString("context").uppercase())
