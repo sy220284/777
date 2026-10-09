@@ -61,7 +61,6 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
-import java.util.Locale
 import kotlinx.coroutines.launch
 
 private data class TuningPreset(
@@ -437,8 +436,11 @@ internal fun CharacterBehaviorTuningDialog(
                         high = stringResource(R.string.local_character_tuning_expression_variation_high),
                         value = draft.expressionVariation,
                         displayValue = temperatureRange?.let { range ->
-                            String.format(Locale.US, "温度 %.2f · %d", range.at(draft.expressionVariation),
-                                draft.expressionVariation)
+                            stringResource(
+                                R.string.local_character_tuning_temperature_value,
+                                range.at(draft.expressionVariation),
+                                draft.expressionVariation,
+                            )
                         },
                         onValueChange = { draft = draft.copy(expressionVariation = it) },
                         enabled = !saving,
