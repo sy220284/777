@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when the complete 427-leaf inventory drifts or claimed test evidence disappears.
+"""Fail CI when the feature tree and acceptance evidence index drift.
 
 A passing audit-index check proves index integrity, NEVER functional acceptance.
 """
@@ -37,8 +37,9 @@ def validate(root=ROOT):
     leaves = leaves_from_tree((root / "docs/FEATURE-TREE.zh-CN.md").read_text(encoding="utf-8"))
     matrix = json.loads((root / "docs/ACCEPTANCE-MATRIX.json").read_text(encoding="utf-8"))
     items = matrix["items"]
-    if len(leaves) != 427 or len(items) != 427:
-        raise ValueError(f"expected 427 leaves and items, got {len(leaves)}, {len(items)}")
+    if not leaves or not items:
+        raise ValueError("feature tree and acceptance index must not be empty")
+    # The feature tree is authoritative: additions/removals cannot be hidden by a frozen count.
     if [item["path"] for item in items] != leaves or len(set(leaves)) != len(leaves):
         raise ValueError("feature tree differs from acceptance index; regenerate and review the index")
     partial = 0

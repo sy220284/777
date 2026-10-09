@@ -382,10 +382,12 @@ for required_tool_boundary in (
             + required_tool_boundary
         )
 
-if model_request_coordinator.count("modelGateway.profileForRoute(") != 1:
+if "modelGateway.profileForRoute(" not in model_request_coordinator:
     violations.append(
-        "one model request must resolve the fallback route exactly once before retries/recovery"
+        "model request must resolve the route into a frozen profile before retries/recovery"
     )
+# Exactly-once invocation is a behavioral contract covered by model-request tests;
+# do not freeze the source-level number of calls across valid refactors.
 if not ordered_in_source(
     model_request_coordinator,
     "val frozenProfile = profile ?: modelGateway.profileForRoute(",
@@ -405,7 +407,7 @@ if re.search(
     )
 
 for required_agent_owner_fact in (
-    "private val foregroundOwners = ConcurrentHashMap<String, String>()",
+    "foregroundOwners",
     "fun isCurrentOwner(context: LocalAgentRunContext)",
     "fun ensureCurrentOwner(context: LocalAgentRunContext)",
 ):

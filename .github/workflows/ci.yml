@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve completed full-validation evidence when a docs-only main push follows.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   scope:
@@ -72,6 +73,8 @@ jobs:
           args=(--paths-file changed-files.txt --github-output "$GITHUB_OUTPUT")
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             args+=(--force-full)
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            args+=(--main-full-on-release)
           fi
           python3 .github/scripts/classify-ci-scope.py "${args[@]}"
       - name: Verify selected scope coverage
@@ -100,9 +103,14 @@ jobs:
 
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/ci.yml|.github/scripts/classify-ci-scope.py)
+              .github/workflows/ci.yml|.github/workflows/release.yml|.github/scripts/classify-ci-scope.py)
                 require_true "$RUN_STATIC" "static-gates" "$path"
                 require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
+                require_true "$RUN_UNIT" "unit-tests" "$path"
+                require_true "$RUN_BUILD" "build-arm64" "$path"
+                require_true "$RUN_DEVICE" "device-artifacts-x86" "$path"
+                require_true "$RUN_ANDROID16" "android-16-instrumented" "$path"
+                require_true "$RUN_ANDROID17" "android-17-instrumented" "$path"
                 require_true "$RUN_RELAY" "relay-conformance" "$path"
                 ;;
               AGENTS.md|docs/ARCHITECTURE.md|docs/SYSTEM-AUDIT-GUIDE.zh-CN.md|docs/VALIDATION.md|.github/scripts/check-ci-repository-integrity.py|.github/scripts/check-local-architecture-boundaries.py|.github/scripts/check-local-performance-invariants.py)
@@ -220,8 +228,8 @@ jobs:
           git diff --exit-code -- reference-validation/src/test/resources/official reference-validation/src/test/resources/official-semantic
 
   unit-tests:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -242,8 +250,8 @@ jobs:
 
 
   relay-conformance:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_relay == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_relay == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -280,8 +288,8 @@ jobs:
             --stacktrace
 
   build-arm64:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -320,8 +328,8 @@ jobs:
           retention-days: 3
 
   device-artifacts-x86:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -363,8 +371,8 @@ jobs:
 
   android-16-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
-    needs: scope
-    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -404,8 +412,8 @@ jobs:
 
   android-17-instrumented:
     # Prewarm emulator and SDK in parallel with shared APK compilation.
-    needs: scope
-    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.architecture-3-gates.result == 'success' || needs.architecture-3-gates.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

@@ -42,10 +42,78 @@ RULES = (
     ),
 )
 
+def mask_non_code(source: str) -> str:
+    """Mask comments, Kotlin strings and character literals, retaining line positions."""
+    output = list(source)
+    i, n, depth = 0, len(source), 0
+    while i < n:
+        if depth:
+            if source.startswith("/*", i):
+                output[i:i+2] = [" ", " "]
+                depth += 1
+                i += 2
+            elif source.startswith("*/", i):
+                output[i:i+2] = [" ", " "]
+                depth -= 1
+                i += 2
+            else:
+                if source[i] != "\n":
+                    output[i] = " "
+                i += 1
+            continue
+        if source.startswith("//", i):
+            end = source.find("\n", i)
+            if end < 0:
+                end = n
+            output[i:end] = " " * (end - i)
+            i = end
+            continue
+        if source.startswith("/*", i):
+            output[i:i+2] = [" ", " "]
+            depth = 1
+            i += 2
+            continue
+        if source.startswith('"""', i):
+            end = source.find('"""', i + 3)
+            end = n if end < 0 else end + 3
+            for j in range(i, end):
+                if source[j] != "\n":
+                    output[j] = " "
+            i = end
+            continue
+        if source[i] in ('"', "'"):
+            quote = source[i]
+            j = i + 1
+            while j < n:
+                if source[j] == "\\":
+                    j += 2
+                    continue
+                if source[j] == quote:
+                    j += 1
+                    break
+                j += 1
+            for k in range(i, min(j, n)):
+                if source[k] != "\n":
+                    output[k] = " "
+            i = j
+            continue
+        i += 1
+    return "".join(output)
+
+def self_test() -> None:
+    sample = '// Dialog(ignored)\nval text = "Popup(fake)"\n/* AlertDialog(no) */\nDialog(real)'
+    result = mask_non_code(sample)
+    assert "Dialog(real)" in result
+    assert "Dialog(ignored)" not in result
+    assert "Popup(fake)" not in result
+    assert "AlertDialog(no)" not in result
+
+self_test()
+
 violations = []
 for path in UI.rglob("*.kt"):
     relative = path.relative_to(UI).as_posix()
-    text = path.read_text(encoding="utf-8")
+    text = mask_non_code(path.read_text(encoding="utf-8"))
     for pattern, allowed, hint in RULES:
         if relative in allowed:
             continue

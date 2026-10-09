@@ -10,15 +10,12 @@ on:
       - 'tools/runtime/**'
       - 'tools/fonts/**'
       - '.github/workflows/dev-toolchain.yml'
-      - '.github/workflows/ci.yml'
       - '.github/actions/setup-android-cached/**'
+      - '.github/actions/setup-runtime-cached/**'
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/verification-metadata.xml'
       - 'gradle/wrapper/gradle-wrapper.jar'
-      - 'docs/DEVELOPMENT.md'
-      - 'docs/README.md'
-      - 'CONTRIBUTING.md'
   schedule:
     # Artifact 保留 30 天；每月 1 日和 20 日刷新组件产物。
     - cron: '17 3 1,20 * *'
@@ -28,15 +25,12 @@ on:
       - 'tools/runtime/**'
       - 'tools/fonts/**'
       - '.github/workflows/dev-toolchain.yml'
-      - '.github/workflows/ci.yml'
       - '.github/actions/setup-android-cached/**'
+      - '.github/actions/setup-runtime-cached/**'
       - 'gradle/wrapper/gradle-wrapper.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/verification-metadata.xml'
       - 'gradle/wrapper/gradle-wrapper.jar'
-      - 'docs/DEVELOPMENT.md'
-      - 'docs/README.md'
-      - 'CONTRIBUTING.md'
 
 permissions:
   contents: read

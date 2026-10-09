@@ -87,6 +87,30 @@ jobs:
               --jq '[.workflow_runs[] | select(.name == "CI" and .conclusion == "success")] | length'
           }
 
+          # An ordinary CI success (docs/automation lane) is not release evidence.
+          # Only a completed full main CI matrix may authorize a binary release.
+          has_full_main_validation() {
+            candidate_sha="$1"
+            ids="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$candidate_sha&status=success&per_page=100" \
+              --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .id')"
+            [ -n "$ids" ] || return 1
+            while IFS= read -r run_id; do
+              [ -n "$run_id" ] || continue
+              jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
+              if printf '%s' "$jobs" | jq -e '
+                [.jobs[] | select(.conclusion == "success") | .name] as $passed
+                | (["scope", "static-gates", "architecture-3-gates",
+                    "unit-tests", "relay-conformance", "build-arm64",
+                    "device-artifacts-x86", "android-16-instrumented",
+                    "android-17-instrumented", "merge-gate"]
+                   | all(. as $lane | $passed | index($lane) != null))
+              ' >/dev/null; then
+                return 0
+              fi
+            done <<< "$ids"
+            return 1
+          }
+
           if [ "$IS_TAG" = "false" ]; then
             MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
             git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
@@ -138,6 +162,32 @@ jobs:
               grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' || true
           )"
           MAX_RELEASE_TAG="$(printf '%s\n' "$RELEASE_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
+
+          # Compare against the latest *published* binary, not the previous
+          # Git commit. A docs-only main change cannot produce a new APK tag.
+          classifier="$RUNNER_TEMP/classify-ci-scope.py"
+          if [ ! -s "$classifier" ]; then
+            git fetch --no-tags --depth=1 origin "$RELEASE_SHA" >/dev/null 2>&1
+            git show "$RELEASE_SHA:.github/scripts/classify-ci-scope.py" > "$classifier"
+          fi
+          if [ -n "$MAX_RELEASE_TAG" ]; then
+            git fetch --no-tags --depth=1 origin "$RELEASE_SHA" >/dev/null 2>&1
+            git fetch --no-tags --depth=1 origin "refs/tags/$MAX_RELEASE_TAG" >/dev/null 2>&1
+            published_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+            changes="$RUNNER_TEMP/release-since-published.txt"
+            git diff --name-only --diff-filter=ACMRD "$published_sha" "$RELEASE_SHA" > "$changes"
+            if python3 "$classifier" --paths-file "$changes" --release-safe; then
+              echo "相对上一正式 APK 没有影响产物的变化，不发布新版本。"
+              skip_release
+              exit 0
+            fi
+          fi
+
+          if ! has_full_main_validation "$RELEASE_SHA"; then
+            echo "缺少与发布提交一致的完整 main CI 验收（双模拟器、Relay、ARM64、x86），拒绝发布。"
+            skip_release
+            exit 0
+          fi
 
           if [ "$IS_TAG" = "true" ]; then
             VERSION="${GITHUB_REF_NAME#v}"

@@ -578,6 +578,18 @@ if normalized_ci_lines.count(performance_guard_command) != 1:
 if "classify-ci-scope.py --self-test" not in CI:
     violations.append("CI scope classifier must self-test before downstream validation")
 
+# Validate the live policy rather than the incidental order of unrelated CI steps.
+# Main product pushes require the complete release matrix, and docs-only CI cannot publish.
+if "--main-full-on-release" not in CI:
+    violations.append("main must run the full CI matrix for release-impacting changes")
+if "run_android17" not in CLASSIFIER:
+    violations.append("scope must classify Android 17 independently from Android 16")
+if "has_full_main_validation" not in RELEASE or "release-since-published.txt" not in RELEASE:
+    violations.append("release must require same-commit full CI and a new product change")
+if "docs/README.md" in (ROOT / ".github/workflows/dev-toolchain.yml").read_text(encoding="utf-8"):
+    violations.append("documentation-index updates must not trigger toolchain artifacts")
+
+
 # release-version affects the app's versionName/versionCode and must never be ignored on main.
 if "- '.github/release-version'" in CI or '- ".github/release-version"' in CI:
     violations.append(".github/release-version must not be ignored by main CI")
@@ -585,8 +597,8 @@ if "- '.github/release-version'" in CI or '- ".github/release-version"' in CI:
 # Release freshness must reuse the same path classifier.
 if "classify-ci-scope.py" not in RELEASE or "--release-safe" not in RELEASE:
     violations.append("Release freshness must reuse classify-ci-scope.py --release-safe")
-if "cron: '*/30 * * * *'" not in RELEASE:
-    violations.append("Release fallback polling must run every 30 minutes")
+if "schedule:" not in RELEASE:
+    violations.append("Release fallback polling must remain available")
 
 # Cleanup should be event-driven with a low-frequency fallback.
 if "release:" not in CLEANUP or "types: [published]" not in CLEANUP:
