@@ -33,8 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
-import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -76,7 +74,6 @@ internal fun PluginInventoryBrowser(
     loading: Boolean = false,
     error: String? = null,
     onRetry: (() -> Unit)? = null,
-    remote: PluginInventorySnapshot?,
     onBack: () -> Unit,
     onManageConnections: () -> Unit,
     onReturnToChat: () -> Unit,
@@ -141,21 +138,6 @@ internal fun PluginInventoryBrowser(
         }
         InventoryRow("local:$id", label, stringResource(hint), remote = false, icon = icon)
     }
-    val connected = remote?.entries.orEmpty().map { plugin ->
-        val status = when {
-            !plugin.enabled -> stringResource(R.string.tools_plugin_disabled)
-            plugin.fiberPhase == PluginFiberPhase.ACTIVE -> stringResource(R.string.tools_plugin_active)
-            plugin.fiberPhase == PluginFiberPhase.FAILED -> stringResource(R.string.tools_plugin_failed)
-            else -> stringResource(R.string.tools_plugin_enabled)
-        }
-        InventoryRow(
-            "remote:${plugin.moduleName}",
-            plugin.moduleName,
-            status,
-            remote = true,
-            available = plugin.enabled && plugin.fiberPhase != PluginFiberPhase.FAILED,
-        )
-    }
     val installedSkills = skills.map { skill ->
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
@@ -168,7 +150,7 @@ internal fun PluginInventoryBrowser(
             available = false, installablePreset = true)
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
-        1 -> connected
+        1 -> emptyList()
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }

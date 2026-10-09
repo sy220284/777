@@ -5,11 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
-import com.labteto.dshmobile.connection.ConnectionManager
-import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
-import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
@@ -38,19 +34,16 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonElement
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
-    private val connectionManager: ConnectionManager,
     private val localHarness: LocalSettingsRuntime,
     private val settingsData: LocalSettingsDataFacade,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
     private val appContext = context.applicationContext
-    private val remoteSettingsController = RemoteSettingsController(connectionManager, viewModelScope)
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
     private val memorySettingsController = MemorySettingsController(localHarness, settingsData)
 
@@ -79,18 +72,8 @@ class SettingsViewModel @Inject constructor(
 
     val memories: StateFlow<List<MemoryRecord>> = memorySettingsController.memories
 
-    val projectSettings: StateFlow<RemoteProjectSettingsState> =
-        remoteSettingsController.projectSettings
-    val modelServices: StateFlow<ModelServicesState> =
-        remoteSettingsController.modelServices
     val deviceCapabilities: StateFlow<DeviceCapabilitiesState> =
         deviceCapabilitiesController.state
-
-    val connectionState: StateFlow<ConnectionUiState> = connectionManager.state.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        ConnectionUiState(),
-    )
 
     val sessionSort: StateFlow<String> = hostsStore.sessionSort.stateIn(
         viewModelScope,
@@ -161,10 +144,6 @@ class SettingsViewModel @Inject constructor(
         target.absolutePath
     }
 
-    fun disconnect() {
-        connectionManager.disconnect()
-    }
-
     fun setSessionSortByRecency(enabled: Boolean) {
         viewModelScope.launch {
             hostsStore.setSessionSort(if (enabled) "updated" else "manual")
@@ -173,7 +152,6 @@ class SettingsViewModel @Inject constructor(
 
     /** Reload every capability-backed Settings section without requiring an app restart. */
     fun refreshAdvancedSettings() {
-        refreshRemoteSettings()
         refreshDeviceCapabilities()
         refreshMemories()
     }
@@ -181,24 +159,6 @@ class SettingsViewModel @Inject constructor(
     fun refreshDeepSeekPricing() {
         viewModelScope.launch { settingsData.refreshDeepSeekPricing() }
     }
-
-    fun refreshRemoteSettings() = remoteSettingsController.refresh()
-
-    fun setRemoteSetting(
-        namespace: SettingsNamespaceView,
-        path: List<String>,
-        value: JsonElement,
-        onDone: (String?) -> Unit = {},
-    ) = remoteSettingsController.set(namespace, path, value, onDone)
-
-    fun unsetRemoteSetting(
-        namespace: SettingsNamespaceView,
-        path: List<String>,
-        onDone: (String?) -> Unit = {},
-    ) = remoteSettingsController.unset(namespace, path, onDone)
-
-    fun discoverModels(provider: LlmConfigurableProvider) =
-        remoteSettingsController.discoverModels(provider)
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }

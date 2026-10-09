@@ -21,7 +21,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = listOf("local-builtin"),
-                    remote = null,
+                    
                     onBack = {},
                     onManageConnections = {},
                     onReturnToChat = { returned++ },
@@ -38,7 +38,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("android-runtime"), remote = null,
+                    localIds = listOf("android-runtime"), 
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},
                     onUseCapability = { prompt = it },
                 )
@@ -55,7 +55,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("android-runtime", "local-vision"), remote = null,
+                    localIds = listOf("android-runtime", "local-vision"), 
                     onBack = {}, onManageConnections = {}, onReturnToChat = {},
                 )
             }
@@ -71,7 +71,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = listOf("local-builtin"), remote = null,
+                    localIds = listOf("local-builtin"), 
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry("report", "Build a report", true)),
                     skillsOnly = true, onBack = {}, onManageConnections = {}, onReturnToChat = {},
                 )
@@ -88,7 +88,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = emptyList(), remote = null,
+                    localIds = emptyList(), 
                     presets = listOf(com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry(
                         "research-check", "资料研究与核实", "查证材料", false,
                     )),
@@ -109,7 +109,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = emptyList(), remote = null,
+                    localIds = emptyList(), 
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
                         "my-skill", "My instructions", true,
                     )),
@@ -133,7 +133,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
-                    localIds = emptyList(), remote = null, skillsOnly = true,
+                    localIds = emptyList(), skillsOnly = true,
                     skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
                         "manual-review", "Only on user request", false,
                     )),
@@ -156,7 +156,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    remote = null,
+                    
                     skillsOnly = true,
                     onBack = {},
                     onManageConnections = {},

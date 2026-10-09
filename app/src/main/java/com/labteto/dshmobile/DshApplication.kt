@@ -6,8 +6,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.connection.KeepAliveWorker
-import com.labteto.dshmobile.notify.NotificationObserver
+import androidx.work.WorkManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.update.UpdateCache
@@ -23,9 +22,6 @@ import kotlinx.coroutines.launch
 @HiltAndroidApp
 class DshApplication : Application() {
 
-    // Injecting this constructs SessionStore + ConnectionManager and starts
-    // their frame collectors; start() then begins notification classification.
-    @Inject lateinit var notificationObserver: NotificationObserver
     @Inject lateinit var hostsStore: HostsStore
     @Inject lateinit var localRuntimeKernel: LocalRuntimeKernel
 
@@ -39,8 +35,8 @@ class DshApplication : Application() {
         uiModeManager.setApplicationNightMode(
             applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),
         )
-        KeepAliveWorker.schedule(this)
-        notificationObserver.start()
+        // Cancel relay reconnect work left by older installations.
+        WorkManager.getInstance(this).cancelUniqueWork("dsh-keep-alive")
         localRuntimeKernel.start()
 
         // Legacy update files are removed immediately. A verified APK that has already been handed

@@ -51,33 +51,5 @@ class SidebarSystemBackRegressionTest {
         assertEquals(1, backCount.get())
     }
 
-    @Test
-    fun remoteRelayStatusConsumesSystemBackAndReturnsToLocalAction() {
-        val backCount = AtomicInteger(0)
 
-        compose.setContent {
-            val host = LocalView.current
-            SideEffect { composeHostView.set(host) }
-            DshTheme {
-                RemoteRelayStatus(
-                    failed = true,
-                    onRetryPairing = {},
-                    onBack = { backCount.incrementAndGet() },
-                )
-            }
-        }
-
-        // Shell input must target the focused ComposeTestActivity window. Capture
-        // the actual Compose view without launching a second, undeclared Activity,
-        // then dispatch exactly one real system Back key.
-        compose.waitForIdle()
-        compose.waitUntil(timeoutMillis = 10_000L) {
-            composeHostView.get()?.hasWindowFocus() == true
-        }
-        pressDeviceBack()
-        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
-        compose.waitForIdle()
-
-        assertEquals(1, backCount.get())
-    }
 }

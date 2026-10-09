@@ -48,9 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
-import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -106,7 +104,6 @@ data class ToolsUiState(
     val createdSkillId: String? = null,
     val skillEditor: com.labteto.dshmobile.local.presentation.LocalSkillEditorUiEntry? = null,
     val savedSkillId: String? = null,
-    val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
     val feedback: String? = null,
     val feedbackRes: Int? = null,
@@ -139,7 +136,6 @@ internal class ToolsOperationGate {
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
     @ApplicationContext private val appContext: Context,
-    private val sessionStore: SessionStore,
     private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
@@ -176,7 +172,6 @@ class ToolsViewModel @Inject constructor(
                 val skills = localTools.installedSkills()
                 val presets = localTools.presetSkills()
                 _state.value = _state.value.copy(skills = skills, presets = presets)
-                sessionStore.refreshPlugins()
                 val (servers, plugins) = localTools.servers() to localTools.installedPluginIds()
                 _state.value = ToolsUiState(
                     loading = false,
@@ -185,7 +180,6 @@ class ToolsViewModel @Inject constructor(
                     localPlugins = plugins,
                     skills = skills,
                     presets = presets,
-                    remotePlugins = sessionStore.plugins.value,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -552,7 +546,6 @@ fun ToolsScreen(
             loading = state.loading,
             error = if (!skillsOnly && state.notice == ToolsNotice.LOAD_FAILED) stringResource(R.string.tools_load_failed) else null,
             onRetry = viewModel::refresh,
-            remote = state.remotePlugins,
             onBack = { showPluginBrowser = false },
             onManageConnections = {
                 showPluginBrowser = false
@@ -592,7 +585,6 @@ fun ToolsScreen(
                 val initialLoading = state.loading &&
                     state.localPlugins.isEmpty() &&
                     state.servers.isEmpty() &&
-                    state.remotePlugins == null &&
                     !state.githubConfigured
                 if (initialLoading) {
                     DsPageLoadingState(
