@@ -34,6 +34,19 @@ class ChatReplyImmersionGuardTest {
     }
 
     @Test
+    fun clearlyAttributedQuotedMaterialDoesNotBlockLegitimateRoleplay() = runTest {
+        val persona = PersonaProfile(name = "阿青", portrait = "人类摄影师")
+        var attempted = false
+        val text = "她读着纸条：“我是AI，没有身体。”然后将纸条揉成一团。"
+        val result = ChatReplyImmersionGuard.enforce(
+            persona = persona, initial = text, contentOf = { it },
+            retry = { attempted = true; "不应触发" },
+        )
+        assertEquals(text, result)
+        assertTrue(!attempted)
+    }
+
+    @Test
     fun secondOutOfRoleReplyIsBlocked() = runTest {
         val persona = PersonaProfile(
             name = "阿青",
