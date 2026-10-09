@@ -208,7 +208,7 @@ for cached_metric in ("encodedChars", "estimatedTokens"):
 
 # ---- Bounded durable history ----------------------------------------------
 
-for required_event_api in ("pageBefore", "pageAfter", "latestMatching", "forEachAfter"):
+for required_event_api in ("pageBeforeChronological", "pageBeforeNewestFirst", "pageAfter", "latestMatching", "forEachAfter"):
     if re.search(rf"\bfun\s+{required_event_api}\s*\(", event_log) is None:
         violations.append("SessionEventLog lost bounded/recent history API: " + required_event_api)
 
