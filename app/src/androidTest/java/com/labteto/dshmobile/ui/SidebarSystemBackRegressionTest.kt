@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,17 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    // Exercise the Activity's real Back Dispatcher after Compose registration.
+    // Shell KEYCODE_BACK can target another focused window during emulator tests.
+    private fun dispatchActivityBack() {
+        compose.waitForIdle()
+        compose.runOnUiThread {
+            compose.activity.onBackPressedDispatcher.onBackPressed()
+        }
+        compose.waitForIdle()
+    }
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,8 +41,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
-        compose.waitForIdle()
+        dispatchActivityBack()
 
         assertEquals(1, backCount.get())
     }
@@ -50,8 +60,7 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
-        compose.waitForIdle()
+        dispatchActivityBack()
 
         assertEquals(1, backCount.get())
     }
