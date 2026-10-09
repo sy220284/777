@@ -1209,6 +1209,21 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun mixedTypeArraysKeepValidHistoryItemsWithoutTreatingAllBadAsExplicitClear() {
+        val raw = Json.parseToJsonElement(
+            """{"state":{"unresolvedThreads":[false,"仍需回答",42],
+            "continuity":{"recentEvents":["旧事",null,"新事"],"decisions":[false]},
+            "dynamics":{"facts":["不能作为证据"]}}}""",
+        ).jsonObject
+        val state = normalizeChatPostTurnPatch(raw)["state"]!!.jsonObject
+        assertEquals("""["仍需回答"]""", state["unresolvedThreads"].toString())
+        val continuity = state["continuity"]!!.jsonObject
+        assertEquals("""["旧事","新事"]""", continuity["recentEvents"].toString())
+        assertEquals(null, continuity["decisions"])
+        assertEquals(null, state["dynamics"]!!.jsonObject["facts"])
+    }
+
+    @Test
     fun invalidPayloadDoesNotReplaceExistingState() {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
