@@ -73,7 +73,6 @@ AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalWorkExecutionPort",
     "LocalWorkTurnPort",
     "LocalChatAutomationExecutionPort",
-    "LocalWorkAutomationExecutionPort",
     "LocalChatAutomationPolicy",
 }
 
@@ -163,7 +162,7 @@ def strip_comments(source: str) -> str:
 
 
 def imports(source: str) -> set[str]:
-    return set(re.findall(r"^import\s+([^\s]+)\s*$", strip_comments(source), re.MULTILINE))
+    return set(re.findall(r"^import\s+([^\s]+)(?:\s+as\s+\w+)?\s*$", strip_comments(source), re.MULTILINE))
 
 
 def kotlin_sources_under(base: Path):
@@ -205,6 +204,37 @@ def declares_symbol(source: str, symbol: str) -> bool:
         re.MULTILINE,
     ) is not None
 
+
+
+
+def local_references(source: str) -> set[str]:
+    """Find imports and direct fully-qualified references without string/comment false positives."""
+    cleaned = strip_comments(source)
+    cleaned = re.sub(r'"""[\s\S]*?"""', '""', cleaned)
+    cleaned = re.sub(r'"(?:\\.|[^"\\])*"', '""', cleaned)
+    cleaned = re.sub(r"'(?:\\.|[^'\\])*'", "''", cleaned)
+    direct = set(re.findall(
+        r"\bcom\.labteto\.dshmobile\.local\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*",
+        cleaned,
+    ))
+    return imports(source) | direct
+
+
+def self_test() -> None:
+    target = "com.labteto.dshmobile.local.work.LocalSubagentRunner"
+    assert target in local_references("val runner = " + target + "()")
+    assert target in local_references("import " + target + " as Runner")
+    assert target not in local_references('val label = "' + target + '"')
+    assert target not in local_references("// " + target)
+    # A qualified implementation method must not evade the UI internal suffix check.
+    qualified = target + ".execute"
+    assert any(part.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES) for part in qualified.split(".")[5:])
+
+
+if "--self-test" in sys.argv:
+    self_test()
+    print("[architecture-3] ownership/reference guard self-test passed")
+    sys.exit(0)
 
 # ---- Authority -------------------------------------------------------------
 
@@ -267,7 +297,7 @@ for forbidden in (
 
 
 # App shell lifecycle hooks must enter local product behavior through presentation boundaries.
-main_activity_imports = imports(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
+main_activity_imports = local_references(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
 if "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator" in main_activity_imports:
     die(
         "MainActivity bypasses presentation ownership for ChatGPT refresh; "
@@ -278,7 +308,7 @@ if "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator" in main_ac
 
 for feature_name, forbidden_prefixes in FEATURE_FORBIDDEN_IMPORT_PREFIXES.items():
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / feature_name):
-        source_imports = imports(source)
+        source_imports = local_references(source)
         for prefix in forbidden_prefixes:
             if any(item.startswith(prefix) for item in source_imports):
                 die(
@@ -288,7 +318,7 @@ for feature_name, forbidden_prefixes in FEATURE_FORBIDDEN_IMPORT_PREFIXES.items(
 
 for package_name in SHARED_CAPABILITY_PACKAGES:
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / package_name):
-        source_imports = imports(source)
+        source_imports = local_references(source)
         for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES:
             if any(item.startswith(prefix) for item in source_imports):
                 die(
@@ -307,7 +337,7 @@ for package_name in SHARED_CAPABILITY_PACKAGES:
             )
 
 for relative in SHARED_BOUNDARY_FILES:
-    source_imports = imports(read(relative))
+    source_imports = local_references(read(relative))
     for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES:
         if any(item.startswith(prefix) for item in source_imports):
             die(
@@ -323,7 +353,7 @@ shared_reverse_dependency_edges: set[tuple[str, str]] = set()
 for package_name in ("session", "memory"):
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / package_name):
         relative = path.relative_to(ROOT).as_posix()
-        for imported in imports(source):
+        for imported in local_references(source):
             if imported.startswith(FEATURE_INTERNAL_IMPORT_PREFIXES):
                 shared_reverse_dependency_edges.add((relative, imported))
 
@@ -346,7 +376,7 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "session"):
 automation_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
     relative = path.relative_to(ROOT).as_posix()
-    for imported in imports(source):
+    for imported in local_references(source):
         if not imported.startswith((
             "com.labteto.dshmobile.local.chat.",
             "com.labteto.dshmobile.local.work.",
@@ -368,7 +398,7 @@ if automation_internal_edges:
 settings_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "settings"):
     relative = path.relative_to(ROOT).as_posix()
-    for imported in imports(source):
+    for imported in local_references(source):
         if imported.startswith((
             "com.labteto.dshmobile.local.chat.",
             "com.labteto.dshmobile.local.work.",
@@ -414,15 +444,17 @@ ui_feature_behavior_edges: set[tuple[str, str]] = set()
 ui_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(UI_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
-    for imported in imports(source):
+    for imported in local_references(source):
         if not imported.startswith("com.labteto.dshmobile.local."):
             continue
         if imported.startswith(UI_ALLOWED_PRESENTATION_IMPORT_PREFIXES):
             continue
         symbol = imported.rsplit(".", 1)[-1]
-        if symbol.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES):
+        if any(part.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES) for part in imported.split(".")[5:]):
             ui_internal_edges.add((relative, imported))
-        if imported in feature_ui_behavior_symbols:
+        if imported in feature_ui_behavior_symbols or any(
+            imported.startswith(behavior + ".") for behavior in feature_ui_behavior_symbols
+        ):
             ui_feature_behavior_edges.add((relative, imported))
 
 if ui_internal_edges:
@@ -682,7 +714,7 @@ for relative in NARROW_PORT_PATHS:
     if "MutableStateFlow<LocalHarnessState>" in source:
         die(relative + " exposes writable aggregate state through a 3.0 Port")
 
-    source_imports = imports(source)
+    source_imports = local_references(source)
     if "/chat/" in relative:
         forbidden_prefixes = FEATURE_FORBIDDEN_IMPORT_PREFIXES["chat"]
     elif "/work/" in relative:
@@ -805,15 +837,23 @@ for required in ("drawerActions", "backAction", "restorePage"):
     if required not in feature_page_host:
         die("Feature UI contribution lost navigation ownership contract: " + required)
 
-feature_contribution_paths = {
-    "SHELL": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
-    "CHAT": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
-    "WORK": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
-    "PROJECT": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-    "AUTOMATION": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAutomationUiContribution.kt",
-    "TOOLS": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalToolsUiContribution.kt",
-    "SETTINGS": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
-}
+# Discover every real UI contribution from its declared owner; new Features cannot pass
+# by reusing or omitting an old hard-coded filename.
+feature_contribution_paths: dict[str, str] = {}
+for contribution_path in sorted((UI_SOURCE_ROOT / "screens/local").glob("Local*UiContribution.kt")):
+    relative = contribution_path.relative_to(ROOT).as_posix()
+    contribution = strip_comments(contribution_path.read_text(encoding="utf-8"))
+    declared_owners = re.findall(
+        r"\bmoduleId\s*=\s*LocalFeatureModuleId\.([A-Z][A-Z0-9_]*)\b",
+        contribution,
+    )
+    if len(declared_owners) != 1:
+        die(f"{relative} must declare exactly one Feature UI contribution owner; found {declared_owners}")
+    module_id = declared_owners[0]
+    if module_id in feature_contribution_paths:
+        die(f"multiple UI contributions claim {module_id}: {feature_contribution_paths[module_id]}, {relative}")
+    feature_contribution_paths[module_id] = relative
+
 if set(feature_contribution_paths) != module_ids:
     die(
         "Feature UI contribution owners must match LocalFeatureModuleId exactly: "
@@ -849,18 +889,10 @@ feature_shell = strip_comments(read(
 for required in (
     "localFeatureOwnedBackAction(",
     "localFeatureRestoreStack(",
-    "openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.PROJECT)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.DIARY)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.TASKS)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.TOOLS)",
-    "openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS)",
+    "localFeatureDrawerAction(entry, featureContributions)",
 ):
     if required not in feature_shell:
-        die("Shell lost Feature-owned navigation dispatch: " + required)
+        die("Shell lost Feature-owned navigation contract: " + required)
 if re.search(r"openFeatureFromDrawer\(\s*LocalFeaturePage\.", feature_shell):
     die("Shell must not hard-code product Drawer route ownership")
 
