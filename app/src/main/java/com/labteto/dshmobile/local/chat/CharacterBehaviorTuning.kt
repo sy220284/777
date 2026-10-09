@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import kotlin.math.roundToInt
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import kotlinx.serialization.Serializable
 
 /**
@@ -64,12 +65,12 @@ data class CharacterBehaviorTuning(
     }
 
     /**
-     * Maps the user-facing "expression variation" axis to a restrained sampling range.
-     * Natural stays at the historical 0.85; supported routes may vary from 0.55 to 1.15.
-     * Routes that reject temperature already strip the field in LocalModelGateway.
+     * The 0..100 character axis spans the selected model's verified official limits.
+     * Center (50) uses its conversation-friendly temperature without changing saved sliders.
+     * Missing/unsupported model bounds leave its default sampling behavior intact.
      */
-    internal fun roleplayTemperature(): Double =
-        0.55 + expressionVariation.coerceIn(0, 100) * 0.006
+    internal fun roleplayTemperature(model: String, baseUrl: String): Double? =
+        LocalModelPresets.chatTemperatureRangeFor(model, baseUrl)?.at(expressionVariation)
 
     internal fun evolutionStepBonus(): Int = when {
         evolution <= 20 -> -1
