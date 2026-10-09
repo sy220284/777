@@ -32,6 +32,9 @@ class SidebarSystemBackRegressionTest {
 
         compose.waitForIdle() // ensure BackHandler is registered before the key
         pressDeviceBack()
+        // The callback may be posted after input injection completes on Android 16.
+        // Never repeat the key: wait for the first response, then assert exactly once.
+        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
@@ -53,6 +56,9 @@ class SidebarSystemBackRegressionTest {
 
         compose.waitForIdle() // ensure BackHandler is registered before the key
         pressDeviceBack()
+        // The callback may be posted after input injection completes on Android 16.
+        // Never repeat the key: wait for the first response, then assert exactly once.
+        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
         assertEquals(1, backCount.get())
