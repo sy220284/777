@@ -1156,6 +1156,13 @@ internal class LocalAgentTeamRuntime(
                 }
                 else -> error("TEAM_TASK_ACTION_INVALID：不支持的 action=$action")
             }
+            if (next.status == LocalTeamTaskStatus.IN_PROGRESS) {
+                val conflicts = writeScopeWarnings(next, state.tasks)
+                require(conflicts.isEmpty()) {
+                    "TEAM_WRITE_SCOPE_CONFLICT：当前任务与其他运行中任务的写入范围重叠：" +
+                        conflicts.joinToString("；") + "。请等对方完成或重新划分写入范围。"
+                }
+            }
             validateTaskTransition(state.tasks, previous = current, next = next)
             appendTask(sessionId, next)
             return renderTaskView(next, project(sessionId))
@@ -1709,6 +1716,10 @@ internal class LocalAgentTeamRuntime(
         require(normalized.size <= MAX_WRITE_SCOPES) {
             "TEAM_TASK_WRITE_SCOPE_LIMIT：最多允许 $MAX_WRITE_SCOPES 个 write scope"
         }
+        require(normalized.none { scope ->
+            scope.split('/').any { it == "." || it == ".." } || scope.startsWith("~") ||
+                scope.contains(':') || scope.startsWith("//")
+        }) { "TEAM_WRITE_SCOPE_INVALID：写入范围只能是工作区内的相对目录或文件路径" }
         return normalized
     }
 

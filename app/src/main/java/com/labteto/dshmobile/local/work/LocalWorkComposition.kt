@@ -206,6 +206,26 @@ internal class LocalWorkComposition @Inject constructor(
                         "TEAM_GITHUB_CREDENTIAL_REQUIRED：请先配置 GitHub 连接凭据"
                     }
                 }
+                val defaultOptional = setOf(
+                    "skill", "web_search", "web_fetch", "job_list", "job_output",
+                    "job_kill", "json_query", "environment_info", "download_file",
+                )
+                val activeOptional = defaultOptional + grantedExtensions
+                val exposed = tools.schemas.names(
+                    tools.schemas.subagentSchemas(
+                        allowMutation = true,
+                        allowVirtualScreen = false,
+                        enabledOptional = activeOptional,
+                    ),
+                ).toSet()
+                val missing = grantedExtensions - exposed
+                require(missing.isEmpty()) {
+                    "TEAM_EXTENSION_NOT_EXPOSED：已授权工具未进入成员实际工具表（数量或上下文预算限制）：" +
+                        missing.sorted().joinToString("、")
+                }
+                require("skill" !in tools.registry.names() || "skill" in exposed) {
+                    "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
+                }
                 persistentJobs.startReadonlySubagentResult(
                     task = task,
                     model = model,
@@ -221,10 +241,7 @@ internal class LocalWorkComposition @Inject constructor(
                     allowMutation = true,
                     teamManaged = true,
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
-                    initialOptionalTools = setOf(
-                        "skill", "web_search", "web_fetch", "job_list", "job_output",
-                        "job_kill", "json_query", "environment_info", "download_file",
-                    ) + grantedExtensions,
+                    initialOptionalTools = activeOptional,
                 )
             },
             sendToTeammate = { agentId, input, sessionId ->

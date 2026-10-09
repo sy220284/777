@@ -492,7 +492,7 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
                 trackColor = colors.borderL3,
             )
         }
-        if (team.returnedMemberCount > team.completedTaskCount && team.tasks.isNotEmpty()) {
+        if (team.returnedMemberCount > 0 && team.tasks.isNotEmpty()) {
             Text(
                 stringResource(R.string.local_team_results_pending, team.returnedMemberCount),
                 style = DsType.caption11.withReadingWeight(),

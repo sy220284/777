@@ -1235,7 +1235,10 @@ internal fun LocalConversationSurface(
                 teamDispatchSelected = true
                 showTeamPanel = false
             },
-            onDismiss = { showTeamPanel = false },
+            onDismiss = {
+                teamCardDismissed = true
+                showTeamPanel = false
+            },
             onCollapse = {
                 teamCardDismissed = true
                 showTeamPanel = false

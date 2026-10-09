@@ -27,7 +27,7 @@ data class LocalAgentTeamUiState(
     val completedTaskCount: Int
         get() = tasks.count { it.status == "completed" }
     val returnedMemberCount: Int
-        get() = members.count { it.resultMessageCount > 0 || it.activity == "completed" }
+        get() = members.count { it.awaitingReview }
     val blockedTaskCount: Int
         get() = tasks.count {
             it.status == "pending" && !it.ready && it.blockedByTitles.isNotEmpty()
