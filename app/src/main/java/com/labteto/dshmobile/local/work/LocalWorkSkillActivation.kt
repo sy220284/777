@@ -12,9 +12,9 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
     if (match != null) {
         val name = match.groupValues[1]
         val document = try {
-            workspace.readModelSkill(name)
+            workspace.readSkill(name)
         } catch (error: Exception) {
-            throw IllegalArgumentException("所选技能 ${name} 已移除、禁用或无法读取，请返回技能页重新选择。", error)
+            throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
         }
         return """
             [本轮技能已加载：${name}]
