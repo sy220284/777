@@ -101,7 +101,24 @@ jobs:
       - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          # 先完成全部 JVM 单测，再进行耗 CPU / 内存的 Lint、D8、R8 与 APK 构建。
+          # 避免工具链预热把单测与压缩打包同时执行导致整体超时；测试一个不漏。
+          ./gradlew \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :app:testDebugUnitTest \
+            :reference-validation:test \
+            --stacktrace
+          ./gradlew \
+            :app:lintDebug \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:assembleOptimized \
+            --stacktrace
 
       - name: 拆分并校验组件包
         run: |

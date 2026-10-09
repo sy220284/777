@@ -339,8 +339,10 @@ if (System.getenv("CI") == "true") {
             showStandardStreams = false
         }
         if (name == "testDebugUnitTest") {
-            // 该任务在健康基线中约半秒完成；两分钟只用于快速识别挂死/死锁。
-            timeout.set(Duration.ofMinutes(2))
+            // 整个 App JVM 测试集在工具链冷构建中已触及两分钟总时限，
+            // 与 R8/打包抢占 CPU 时会被强行终止；保留五分钟有界挂死检测。
+            // 预热任务另外将单测和打包拆成顺序 Gradle 调用，避免互相争抢。
+            timeout.set(Duration.ofMinutes(5))
         }
     }
 }

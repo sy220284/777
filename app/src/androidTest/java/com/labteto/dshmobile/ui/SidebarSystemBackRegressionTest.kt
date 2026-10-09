@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -9,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -30,8 +31,9 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
-        compose.waitForIdle()
+        // Exercise Activity's real OnBackPressedDispatcher after Compose BackHandler is attached.
+        // Shell KEYCODE_BACK is subject to Android 16 emulator focus/predictive-back timing.
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
 
         assertEquals(1, backCount.get())
     }
@@ -50,8 +52,9 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        pressDeviceBack()
-        compose.waitForIdle()
+        // Exercise Activity's real OnBackPressedDispatcher after Compose BackHandler is attached.
+        // Shell KEYCODE_BACK is subject to Android 16 emulator focus/predictive-back timing.
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
 
         assertEquals(1, backCount.get())
     }
