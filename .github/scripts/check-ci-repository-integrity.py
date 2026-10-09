@@ -300,6 +300,12 @@ def invoked_script_paths(source: str) -> set[str]:
         line = raw.strip()
         if not line or line.startswith("#") or terminated:
             continue
+        if re.fullmatch(r"(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\(\s*\))?\s*\{", line):
+            frames.append(("function", None))
+            continue
+        if line == "}" and frames and frames[-1][0] == "function":
+            frames.pop()
+            continue
         if re.match(r"^if\b.*\bthen\s*$", line):
             condition: bool | None = None
             if re.fullmatch(r"if\s+true\s*;\s*then", line):
@@ -378,6 +384,13 @@ assert invoked_script_paths(
     'while IFS= read -r path; do\n echo "$path"\ndone < changed-files.txt\n'
     'python3 .github/scripts/check-example.py'
 ) == {'.github/scripts/check-example.py'}
+assert invoked_script_paths(
+    'unused_guard() {\n python3 .github/scripts/check-example.py\n}\n'
+) == set()
+assert invoked_script_paths(
+    'unused_guard() {\n python3 .github/scripts/check-example.py\n}\n'
+    'python3 .github/scripts/check-real.py'
+) == {'.github/scripts/check-real.py'}
 
 
 script_sources: dict[str, str] = {}
