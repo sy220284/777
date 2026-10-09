@@ -65,7 +65,7 @@ internal object LocalWorkTemperatureStore {
             val saved = preferences
             if (saved?.contains("level:$sessionId") == true) {
                 val prior = saved.getInt("level:$sessionId", defaultLevel).coerceIn(0, 4)
-                val deepSeekCapped = range?.defaultPosition == 100 &&
+                val deepSeekCapped = range != null && range.defaultPosition == 100 &&
                     range.minimum == 0.0 && range.maximum == 1.3
                 if (deepSeekCapped && !saved.getBoolean("capped-v2:$sessionId", false)) {
                     val migrated = migrateLegacyDeepSeekLevel(prior)
