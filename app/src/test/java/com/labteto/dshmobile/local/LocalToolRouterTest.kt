@@ -218,7 +218,7 @@ class LocalToolRouterTest {
             append("mcp")
         }
 
-        assertTrue(LocalToolRouter.search(listOf(target), hugeQuery).isEmpty())
+        assertEquals(listOf("target"), LocalToolRouter.search(listOf(target), hugeQuery).map(HarnessTool::name))
     }
 
     @Test
