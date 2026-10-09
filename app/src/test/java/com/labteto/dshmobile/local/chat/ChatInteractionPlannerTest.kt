@@ -1045,6 +1045,41 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun malformedArraysCannotClearEarlierThreadsOrContinuity() {
+        val previous = ChatCharacterState(
+            unresolvedThreads = listOf("等待回答"),
+            continuity = ChatContinuityState(recentEvents = listOf("已发生的事")),
+        )
+        val plan = planner.parse(
+            """{"state":{"mood":"开心","unresolvedThreads":[false],
+            "continuity":{"recentEvents":[false],"evidence":"错误格式"}},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "继续",
+            assistantMessage = "好的",
+        )!!
+        assertEquals("开心", plan.state.mood)
+        assertEquals(previous.unresolvedThreads, plan.state.unresolvedThreads)
+        assertEquals(previous.continuity.recentEvents, plan.state.continuity.recentEvents)
+    }
+
+    @Test
+    fun optionalSuggestionAndDiaryDriftCannotRejectValidStatePatch() {
+        val plan = planner.parse(
+            """{"state":{"mood":"开心","transientAges":[1],
+            "userPattern":{"observedTurns":"无效"}},"suggestions":["bad",
+            {"label":"继续","text":"继续聊聊","bold":"yes"}],
+            "diaryDelta":{"event":"开心聊天","importance":"稍高"},"turnSignificance":"MINOR"}""",
+            previous = ChatCharacterState(),
+            userMessage = "今天",
+            assistantMessage = "好的",
+        )!!
+        assertEquals("开心", plan.state.mood)
+        assertEquals(1, plan.suggestions.size)
+        assertEquals("继续聊聊", plan.suggestions.single().text)
+        assertEquals("开心聊天", plan.diaryDelta?.event)
+    }
+
+    @Test
     fun malformedOptionalPatchFieldsPreserveValidStateAndExistingEvidence() {
         val previous = ChatCharacterState(
             initiative = 55,
