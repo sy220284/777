@@ -302,6 +302,7 @@ class SessionStore @Inject constructor(
         currentSessionId = { currentId },
         runningForSession = indexState::running,
         apiProvider = ::apiOrNull,
+        connectionIdentity = { connectionManager.generation },
         followSession = { sessionId, maxMessages ->
             remoteStreams.followSession(sessionId, maxMessages)
         },
@@ -366,7 +367,10 @@ class SessionStore @Inject constructor(
         scope = scope,
         connectionState = connectionManager.state,
         eventFrames = connectionManager.eventFrames,
-        onGenerationRetired = interactionRuntime::clearRetiredGeneration,
+        onGenerationRetired = {
+            interactionRuntime.clearRetiredGeneration()
+            conversationRuntime.reset(blank = true, clearPublished = true)
+        },
         runBaseline = ::baseline,
         onEventFrame = ingress::acceptHostFrame,
         logger = ::log,

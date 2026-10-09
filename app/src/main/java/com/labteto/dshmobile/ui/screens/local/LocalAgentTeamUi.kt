@@ -274,7 +274,7 @@ internal fun LocalAgentTeamSheet(
 
     DsBottomSheet(
         title = stringResource(R.string.local_team_title),
-        subtitle = stringResource(
+        subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
             R.string.local_team_sheet_summary,
             team.members.size,
             team.completedTaskCount,
@@ -299,6 +299,10 @@ internal fun LocalAgentTeamSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
+            if (team.rebuilding) {
+                Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.labelSecondary)
+                return@Column
+            }
             TeamActivityFeed(team)
             TeamProgressBlock(team)
 

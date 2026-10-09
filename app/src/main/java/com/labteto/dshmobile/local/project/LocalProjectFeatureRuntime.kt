@@ -55,10 +55,13 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
     val catalog: StateFlow<LocalProjectCatalogState> = mutableCatalog.asStateFlow()
     val recoveryNotice: StateFlow<String?> = mutableRecoveryNotice.asStateFlow()
 
-    override fun activeProjectId(): String = mutableCatalog.value.activeId
+    override fun activeProjectId(): String {
+        check(mutableRecoveryNotice.value == null) { "项目目录无法读取，请先到项目页备份并恢复，任务尚未执行" }
+        return mutableCatalog.value.activeId
+    }
 
     override fun instructionsFor(projectId: String?): String =
-        projectId?.let { id -> mutableCatalog.value.projects.firstOrNull { it.id == id }?.instructions }.orEmpty()
+        resolveLocalProjectInstructions(mutableCatalog.value, mutableRecoveryNotice.value, projectId)
 
     @Synchronized
     fun create(name: String): String {
@@ -127,6 +130,17 @@ internal class LocalProjectFeatureRuntime @Inject constructor(
     private fun validateName(name: String): String = name.trim().also {
         require(it.isNotEmpty() && it.length <= MAX_PROJECT_NAME_CHARS) { "项目名称长度无效" }
     }
+}
+
+/** An unbound conversation may proceed; a damaged bound project must never become empty rules. */
+internal fun resolveLocalProjectInstructions(
+    catalog: LocalProjectCatalogState,
+    recoveryNotice: String?,
+    projectId: String?,
+): String {
+    if (projectId.isNullOrBlank()) return ""
+    check(recoveryNotice == null) { "项目目录无法读取，请先到项目页备份并恢复，任务尚未执行" }
+    return catalog.projects.firstOrNull { it.id == projectId }?.instructions.orEmpty()
 }
 
 /** Testable validation of every persisted project identity and instruction. */

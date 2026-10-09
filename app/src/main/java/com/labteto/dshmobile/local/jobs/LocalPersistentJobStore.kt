@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.jobs.JobInboxContract
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File
 import java.io.FileOutputStream
@@ -73,13 +74,13 @@ internal class LocalPersistentJobStore(
                     if (snapshot.continuable) put("continuable", true)
                     if (snapshot.inbox.isNotEmpty()) {
                         put("inbox", buildJsonArray {
-                            snapshot.inbox.takeLast(MAX_PERSISTED_INBOX_MESSAGES).forEach { message ->
+                            snapshot.inbox.also { require(it.size <= MAX_PERSISTED_INBOX_MESSAGES) { "后台代理消息队列超过容量" } }.map(JobInboxContract::normalize).forEach { message ->
                                 add(buildJsonObject {
-                                    put("id", message.id.take(MAX_PERSISTED_INBOX_ID_CHARS))
-                                    put("content", message.content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS))
+                                    put("id", message.id)
+                                    put("content", message.content)
                                     put(
                                         "memory_input",
-                                        message.memoryInput.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                                        message.memoryInput,
                                     )
                                     message.modelMessage?.let { put("model_message", it) }
                                 })
@@ -124,14 +125,13 @@ internal class LocalPersistentJobStore(
                     ?.takeIf(String::isNotBlank)
                     ?: error("后台代理Inbox消息缺少 content")
                 QueuedAgentInput(
-                    id = messageId.take(MAX_PERSISTED_INBOX_ID_CHARS),
-                    content = content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                    id = messageId,
+                    content = content,
                     memoryInput = message["memory_input"]?.jsonPrimitive?.contentOrNull
-                        ?.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS)
-                        ?: content.take(MAX_PERSISTED_INBOX_MESSAGE_CHARS),
+                        ?: content,
                     modelMessage = message["model_message"] as? JsonObject,
                 )
-            }?.takeLast(MAX_PERSISTED_INBOX_MESSAGES).orEmpty()
+            }?.also { require(it.size <= MAX_PERSISTED_INBOX_MESSAGES) { "恢复的后台代理消息队列超过容量" } }?.map(JobInboxContract::normalize).orEmpty()
             JobSnapshot(
                 id = id,
                 label = label,
@@ -194,8 +194,8 @@ internal class LocalPersistentJobStore(
         const val MAX_PERSISTED_OUTPUT_CHARS = 8_192
         const val MAX_PERSISTED_INBOX_MESSAGES =
             com.labteto.dshmobile.harness.agent.AgentInputQueue.DEFAULT_CAPACITY
-        const val MAX_PERSISTED_INBOX_ID_CHARS = 64
-        const val MAX_PERSISTED_INBOX_MESSAGE_CHARS = 4_000
+        const val MAX_PERSISTED_INBOX_ID_CHARS = JobInboxContract.MAX_ID_CHARS
+        const val MAX_PERSISTED_INBOX_MESSAGE_CHARS = JobInboxContract.MAX_MESSAGE_CHARS
         val LEGACY_OWNER_INFERENCE_KINDS = setOf("web_fetch", "subagent_readonly")
     }
 }

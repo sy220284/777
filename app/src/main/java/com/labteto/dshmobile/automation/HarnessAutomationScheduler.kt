@@ -86,9 +86,20 @@ class HarnessAutomationScheduler @Inject constructor(
 
     override suspend fun cancel(id: String) {
         val task = store.get(id)
-        store.remove(id)
-        workManager.cancelUniqueWork(workName(id, task?.scheduleGeneration ?: 0L))
-        workManager.cancelUniqueWork(manualWorkName(id))
+        if (task != null && store.removeIfGeneration(id, task.scheduleGeneration)) cancelCapturedWork(task)
+    }
+
+    private fun replaceScheduledTask(task: AutomationTask): AutomationTask {
+        val admission = store.upsert(task)
+        admission.replaced?.let(::cancelCapturedWork)
+        return admission.admitted
+    }
+
+    private fun cancelCapturedWork(task: AutomationTask) {
+        workManager.cancelUniqueWork(workName(task.id, task.scheduleGeneration))
+        workManager.cancelUniqueWork(manualWorkName(task.id, task.scheduleGeneration))
+        // Retire pre-migration manual work without touching new generation-scoped requests.
+        workManager.cancelUniqueWork(manualWorkName(task.id))
     }
 
     fun scheduleOnce(
@@ -120,7 +131,7 @@ class HarnessAutomationScheduler @Inject constructor(
         )
         val now = System.currentTimeMillis()
         val runAt = triggerAtMillis.coerceAtLeast(now)
-        store.upsert(
+        val admitted = replaceScheduledTask(
             AutomationTask(
                 id = id,
                 prompt = prompt,
@@ -141,7 +152,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 proactiveMaxUnanswered = proactiveMaxUnanswered,
             ),
         )
-        enqueueOneTime(id, runAt)
+        enqueueOneTime(id, runAt, admitted.scheduleGeneration)
     }
 
     fun schedulePeriodic(
@@ -203,11 +214,11 @@ class HarnessAutomationScheduler @Inject constructor(
             proactiveMinGapMinutes = proactiveMinGapMinutes,
             proactiveMaxUnanswered = proactiveMaxUnanswered,
         )
-        store.upsert(task)
+        val admitted = replaceScheduledTask(task)
         if (usesChainedAutomationScheduling(task)) {
-            enqueueOneTime(id, firstRun)
+            enqueueOneTime(id, firstRun, admitted.scheduleGeneration)
         } else {
-            enqueuePeriodic(id, intervalMinutes, firstRun)
+            enqueuePeriodic(id, intervalMinutes, firstRun, admitted.scheduleGeneration)
         }
     }
 
@@ -267,8 +278,8 @@ class HarnessAutomationScheduler @Inject constructor(
             proactiveMinGapMinutes = proactiveMinGapMinutes,
             proactiveMaxUnanswered = proactiveMaxUnanswered,
         )
-        store.upsert(task)
-        enqueueOneTime(id, firstRun)
+        val admitted = replaceScheduledTask(task)
+        enqueueOneTime(id, firstRun, admitted.scheduleGeneration)
     }
 
     fun scheduleSilence(
@@ -303,7 +314,7 @@ class HarnessAutomationScheduler @Inject constructor(
         // Run one lightweight transcript check immediately so an already-silent conversation
         // does not restart its silence clock from task creation.
         val firstRun = now
-        store.upsert(
+        val admitted = replaceScheduledTask(
             AutomationTask(
                 id = id,
                 prompt = prompt,
@@ -326,7 +337,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 proactiveMaxUnanswered = proactiveMaxUnanswered,
             ),
         )
-        enqueueOneTime(id, firstRun)
+        enqueueOneTime(id, firstRun, admitted.scheduleGeneration)
     }
 
     val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> get() = store.tasks
@@ -346,8 +357,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 scheduleGeneration = it.scheduleGeneration + 1L,
             )
         } ?: return false
-        workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
-        workManager.cancelUniqueWork(manualWorkName(id))
+        cancelCapturedWork(task)
         return paused.status == AutomationStatus.PAUSED
     }
 
@@ -362,7 +372,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 nextAnchoredAutomationRun(task, now) ?: now
             else -> task.nextRunAt.coerceAtLeast(now)
         }
-        val resumed = store.update(id) {
+        val resumed = store.updateIf(id, { it.scheduleGeneration == task.scheduleGeneration && it.status == AutomationStatus.PAUSED }) {
             it.copy(
                 status = AutomationStatus.SCHEDULED,
                 nextRunAt = runAt,
@@ -372,9 +382,9 @@ class HarnessAutomationScheduler @Inject constructor(
         } ?: return false
 
         if (usesChainedAutomationScheduling(resumed) || resumed.recurringMinutes == null) {
-            enqueueOneTime(id, runAt)
+            enqueueOneTime(id, runAt, resumed.scheduleGeneration)
         } else {
-            enqueuePeriodic(id, requireNotNull(resumed.recurringMinutes), runAt)
+            enqueuePeriodic(id, requireNotNull(resumed.recurringMinutes), runAt, resumed.scheduleGeneration)
         }
         return true
     }
@@ -391,12 +401,13 @@ class HarnessAutomationScheduler @Inject constructor(
             )
             .addTag(WORK_TAG)
             .build()
-        workManager.enqueueUniqueWork(
-            manualWorkName(id),
-            ExistingWorkPolicy.REPLACE,
-            request,
-        )
-        return true
+        return store.withCurrentGeneration(id, task.scheduleGeneration) {
+            workManager.enqueueUniqueWork(
+                manualWorkName(id, task.scheduleGeneration),
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
     }
 
     fun updateTask(
@@ -510,13 +521,12 @@ class HarnessAutomationScheduler @Inject constructor(
         } ?: return false
         if (updated.status != AutomationStatus.PAUSED) {
             if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
-                enqueueOneTime(id, nextRun)
+                enqueueOneTime(id, nextRun, updated.scheduleGeneration)
             } else {
-                enqueuePeriodic(id, requireNotNull(updated.recurringMinutes), nextRun)
+                enqueuePeriodic(id, requireNotNull(updated.recurringMinutes), nextRun, updated.scheduleGeneration)
             }
         }
-        workManager.cancelUniqueWork(workName(id, current.scheduleGeneration))
-        workManager.cancelUniqueWork(manualWorkName(id))
+        cancelCapturedWork(current)
         return true
     }
 
@@ -590,12 +600,13 @@ class HarnessAutomationScheduler @Inject constructor(
                 } ?: return@forEach
                 if (updated.status != AutomationStatus.SCHEDULED || !resumedFromWaiting) return@forEach
                 if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
-                    enqueueOneTime(updated.id, updated.nextRunAt)
+                    enqueueOneTime(updated.id, updated.nextRunAt, updated.scheduleGeneration)
                 } else {
                     enqueuePeriodic(
                         updated.id,
                         requireNotNull(updated.recurringMinutes),
                         updated.nextRunAt,
+                        updated.scheduleGeneration,
                     )
                 }
             }
@@ -603,9 +614,8 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun cancelTask(id: String): Boolean {
         val task = store.get(id) ?: return false
-        if (!store.remove(id)) return false
-        workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
-        workManager.cancelUniqueWork(manualWorkName(id))
+        if (!store.removeIfGeneration(id, task.scheduleGeneration)) return false
+        cancelCapturedWork(task)
         return true
     }
 
@@ -620,15 +630,23 @@ class HarnessAutomationScheduler @Inject constructor(
     private fun enqueueOneTime(
         id: String,
         runAt: Long,
+        generation: Long,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
     ) {
-        val generation = store.get(id)?.scheduleGeneration ?: return
-        enqueueAutomationOneTime(workManager, id, generation, runAt, policy)
+        store.withCurrentGeneration(id, generation) { current ->
+            if (current.status == AutomationStatus.SCHEDULED && current.nextRunAt == runAt) {
+                enqueueAutomationOneTime(workManager, id, generation, runAt, policy)
+            }
+        }
     }
 
-    private fun enqueuePeriodic(id: String, intervalMinutes: Long, firstRunAt: Long) {
-        val generation = store.get(id)?.scheduleGeneration ?: return
-        enqueueAutomationPeriodic(workManager, id, generation, intervalMinutes, firstRunAt)
+    private fun enqueuePeriodic(id: String, intervalMinutes: Long, firstRunAt: Long, generation: Long) {
+        store.withCurrentGeneration(id, generation) { current ->
+            if (current.status == AutomationStatus.SCHEDULED && current.nextRunAt == firstRunAt &&
+                current.recurringMinutes == intervalMinutes) {
+                enqueueAutomationPeriodic(workManager, id, generation, intervalMinutes, firstRunAt)
+            }
+        }
     }
 
     private fun validateChatPolicy(
@@ -661,7 +679,8 @@ class HarnessAutomationScheduler @Inject constructor(
         const val KEY_SCHEDULE_GENERATION = "schedule_generation"
         const val WORK_TAG = "harness-automation"
         fun workName(id: String, generation: Long = 0L) = automationWorkName(id, generation)
-        fun manualWorkName(id: String) = "harness-automation-manual-$id"
+        fun manualWorkName(id: String, generation: Long? = null) =
+            "harness-automation-manual-$id" + (generation?.let { "-generation-$it" } ?: "")
     }
 }
 

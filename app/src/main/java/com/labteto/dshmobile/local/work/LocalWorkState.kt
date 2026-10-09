@@ -10,9 +10,10 @@ data class LocalAgentTeamUiState(
     val pendingMessageCount: Int = 0,
     val failure: String? = null,
     val activities: List<LocalAgentTeamActivityUiState> = emptyList(),
+    val rebuilding: Boolean = false,
 ) {
     val visible: Boolean
-        get() = members.isNotEmpty() || tasks.isNotEmpty() || failure != null
+        get() = rebuilding || members.isNotEmpty() || tasks.isNotEmpty() || failure != null
     val runningMemberCount: Int
         get() = members.count { it.activity == "running" }
     val provisioningMemberCount: Int
@@ -90,6 +91,7 @@ data class LocalWorkState(
 )
 
 /** Bounded display projection of durable team events; never an execution owner. */
+@kotlinx.serialization.Serializable
 data class LocalAgentTeamActivityUiState(
     val sequence: Long,
     val kind: String,

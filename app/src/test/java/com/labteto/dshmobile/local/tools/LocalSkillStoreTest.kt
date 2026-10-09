@@ -125,4 +125,25 @@ class LocalSkillStoreTest {
         assertFalse(workspace.skills().contains("research-check"))
     }
 
+
+    @Test fun validLongSkillPreservesTailAcrossUiModelAndSelectedTurn() = inWorkspace { store, workspace, _ ->
+        val body = "x\n".repeat(900) + "禁止删除原始文件"
+        store.create("long-rules", "完整读取", body)
+        assertTrue(workspace.readModelSkill("long-rules").endsWith("禁止删除原始文件\n"))
+        val prompt = com.labteto.dshmobile.local.work.resolveLocalWorkSkillGuidance(workspace, "@skill:long-rules\n执行")
+        assertTrue(prompt.contains("禁止删除原始文件"))
+        assertEquals("完整读取", store.installed().single().description)
+    }
+
+    @Test fun oversizedSkillIsIsolatedFromCatalogAndBootstrap() = inWorkspace { store, workspace, root ->
+        store.seedOnce()
+        val bad = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        bad.writeText("x".repeat(128 * 1024 + 1))
+        store.seedOnce()
+        assertTrue(workspace.modelSkillCatalog().contains("code-review"))
+        assertFalse(workspace.modelSkillCatalog().contains("writing-polish"))
+        assertFalse(store.installed().single { it.name == "writing-polish" }.modelInvocable)
+        assertThrows(IllegalArgumentException::class.java) { workspace.readSkill("writing-polish") }
+    }
+
 }
