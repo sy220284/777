@@ -27,6 +27,12 @@ class LocalToolsRuntime @Inject internal constructor(
         }
     internal suspend fun removeSkill(id: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.removeSkill(id) }
+    internal suspend fun readSkillDocument(id: String): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.readSkillDocument(id) }
+    internal suspend fun updateSkillDocument(id: String, document: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.updateSkillDocument(id, document) }
+    internal suspend fun setSkillModelInvocable(id: String, enabled: Boolean) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { management.setSkillModelInvocable(id, enabled) }
     internal suspend fun connectHttp(serverId: String, endpoint: String): String =
         management.connectHttp(serverId, endpoint)
     internal suspend fun connectStdio(
