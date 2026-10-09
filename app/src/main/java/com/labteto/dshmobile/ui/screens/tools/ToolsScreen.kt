@@ -93,8 +93,6 @@ data class ToolsUiState(
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val remotePlugins: PluginInventorySnapshot? = null,
     val notice: ToolsNotice? = null,
-    val feedback: String? = null,
-    val feedbackRes: Int? = null,
 )
 
 internal class ToolsOperationGate {
@@ -130,10 +128,6 @@ class ToolsViewModel @Inject constructor(
         if (_state.value.notice == notice) {
             _state.value = _state.value.copy(notice = null)
         }
-    }
-
-    fun acknowledgeFeedback() {
-        _state.value = _state.value.copy(feedback = null, feedbackRes = null)
     }
 
     fun refresh() {
@@ -279,7 +273,6 @@ fun ToolsScreen(
     startAtPlugins: Boolean = false,
     startAtSkills: Boolean = false,
     onUseCapability: ((String) -> Unit)? = null,
-    onOpenTasks: () -> Unit = {},
     onOpenSettings: (SettingsDestination) -> Unit = {},
     handleRootSystemBack: Boolean = true,
     viewModel: ToolsViewModel = hiltViewModel(),
@@ -340,14 +333,6 @@ fun ToolsScreen(
         }
         state.notice?.takeUnless { it == ToolsNotice.CONNECTING }
             ?.let(viewModel::acknowledgeNotice)
-    }
-
-    val feedbackMessage = state.feedback ?: state.feedbackRes?.let { stringResource(it) }
-    LaunchedEffect(feedbackMessage) {
-        feedbackMessage?.let { message ->
-            toast.second(message)
-            viewModel.acknowledgeFeedback()
-        }
     }
 
     if (showAgentSettings) {
