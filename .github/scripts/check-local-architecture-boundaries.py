@@ -847,12 +847,14 @@ feature_contribution_paths: dict[str, str] = {}
 for contribution_path in sorted(UI_SOURCE_ROOT.rglob("*.kt")):
     relative = contribution_path.relative_to(ROOT).as_posix()
     contribution = strip_comments(contribution_path.read_text(encoding="utf-8"))
-    if "LocalFeatureUiContribution(" not in contribution:
-        continue
     declared_owners = re.findall(
         r"\bmoduleId\s*=\s*LocalFeatureModuleId\.([A-Z][A-Z0-9_]*)\b",
         contribution,
     )
+    if not declared_owners:
+        continue
+    if "LocalFeatureUiContribution(" not in contribution:
+        die(f"{relative} declares Feature UI owner without contribution construction")
     if len(declared_owners) != 1:
         die(f"{relative} must declare exactly one Feature UI contribution owner; found {declared_owners}")
     module_id = declared_owners[0]
