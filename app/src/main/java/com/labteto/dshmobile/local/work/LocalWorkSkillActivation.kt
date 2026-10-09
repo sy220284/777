@@ -1,0 +1,35 @@
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.files.LocalWorkspace
+
+/**
+ * Selection marker is durable user text; skill instructions are resolved for this model turn
+ * and never duplicated into persistent model history.
+ */
+internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: String): String {
+    val marker = Regex("^【技能:([a-z][a-z0-9-]{1,47})】(?:\\r?\\n|$)")
+    val match = marker.find(input)
+    if (match != null) {
+        val name = match.groupValues[1]
+        val document = try {
+            workspace.readModelSkill(name)
+        } catch (error: Exception) {
+            throw IllegalArgumentException("所选技能 ${name} 已移除、禁用或无法读取，请返回技能页重新选择。", error)
+        }
+        return """
+            [本轮技能已加载：${name}]
+            用户明确选择了此技能。执行任务前应用下面的技能规则，所用工具仍须遵守当前审批、权限与可用性限制。
+            ${document}
+            [技能规则结束]
+        """.trimIndent()
+    }
+
+    val catalog = workspace.modelSkillCatalog()
+    if (catalog.startsWith("未安装")) return ""
+    return """
+        [本地技能目录]
+        以下技能可通过 skill(name) 工具读取完整规则。若当前任务明显适用某项技能，请先读取，再执行。
+        ${catalog.take(2400)}
+        [目录结束]
+    """.trimIndent()
+}
