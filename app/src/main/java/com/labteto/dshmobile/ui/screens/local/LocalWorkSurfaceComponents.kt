@@ -125,6 +125,7 @@ internal fun ExecutionStatusCard(
 
             if (actionRequiredJobs.isNotEmpty()) {
                 RunCenterJobsSection(
+                    sessionId = state.sessionId,
                     jobs = actionRequiredJobs,
                     attention = true,
                     showAll = showAll,
@@ -160,6 +161,7 @@ internal fun ExecutionStatusCard(
 
             if (backgroundJobs.isNotEmpty()) {
                 RunCenterJobsSection(
+                    sessionId = state.sessionId,
                     jobs = backgroundJobs,
                     attention = false,
                     showAll = showAll,
@@ -291,6 +293,7 @@ private fun LocalJobInfo.needsUserAttention(): Boolean =
 
 @Composable
 private fun RunCenterJobsSection(
+    sessionId: String,
     jobs: List<LocalJobInfo>,
     attention: Boolean,
     showAll: Boolean,
@@ -300,12 +303,13 @@ private fun RunCenterJobsSection(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
-    var agentMessageDraft by remember { mutableStateOf("") }
-    var agentMessageFeedback by remember { mutableStateOf("") }
-    var agentMessageSending by remember { mutableStateOf(false) }
-    var expandedJobId by remember { mutableStateOf<String?>(null) }
-    var expandedJobOutput by remember { mutableStateOf("") }
-    var expandedOutputError by remember { mutableStateOf(false) }
+    var agentMessageDraft by remember(sessionId) { mutableStateOf("") }
+    var agentMessageFeedback by remember(sessionId) { mutableStateOf("") }
+    var agentMessageSending by remember(sessionId) { mutableStateOf(false) }
+    var jobActionFeedback by remember(sessionId) { mutableStateOf("") }
+    var expandedJobId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var expandedJobOutput by remember(sessionId) { mutableStateOf("") }
+    var expandedOutputError by remember(sessionId) { mutableStateOf(false) }
     val outputFailedMessage = stringResource(R.string.local_run_job_output_read_failed)
     val agentActionFailedMessage = stringResource(R.string.local_team_action_failed)
 
@@ -429,6 +433,7 @@ private fun RunCenterJobsSection(
                                     refreshJobOutput(job.id)
                                     agentMessageDraft = ""
                                     agentMessageFeedback = ""
+                                    jobActionFeedback = ""
                                 }
                             },
                             variant = DsButtonVariant.Ghost,
@@ -545,11 +550,12 @@ private fun RunCenterJobsSection(
                                     onClick = {
                                         scope.launch {
                                             try {
-                                                agentMessageFeedback = withContext(Dispatchers.IO) { onStopJob(job.id) }
+                                                val message = withContext(Dispatchers.IO) { onStopJob(job.id) }
+                                                if (expandedJobId == job.id) jobActionFeedback = message
                                             } catch (cancelled: CancellationException) {
                                                 throw cancelled
                                             } catch (_: Exception) {
-                                                agentMessageFeedback = agentActionFailedMessage
+                                                if (expandedJobId == job.id) jobActionFeedback = agentActionFailedMessage
                                             } finally {
                                                 refreshJobOutput(job.id)
                                             }
@@ -559,6 +565,13 @@ private fun RunCenterJobsSection(
                                     size = DsButtonSize.Small,
                                 )
                             }
+                        }
+                        if (jobActionFeedback.isNotBlank()) {
+                            Text(
+                                jobActionFeedback,
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
                         }
                     }
                 }
