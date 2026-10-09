@@ -307,7 +307,7 @@ class LocalToolExecutionCoordinatorTest {
                 throw IllegalArgumentException("目录错误")
             })
             register(tool("lsp_diagnostics", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
-                throw IllegalStateException("未检测到语言服务器")
+                throw IllegalArgumentException("未检测到语言服务器")
             })
             register(tool("io_probe", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
                 throw java.io.IOException("临时读取中断")

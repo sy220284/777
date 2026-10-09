@@ -273,6 +273,8 @@ internal class LocalToolExecutionCoordinator(
         } catch (error: Exception) {
             val code = when {
                 error is java.io.FileNotFoundException -> "TOOL_NOT_FOUND"
+                call.name.startsWith("lsp_") && error is IllegalArgumentException &&
+                    error.message.orEmpty().contains("语言服务器") -> "TOOL_UNAVAILABLE"
                 error is IllegalArgumentException -> "TOOL_INVALID_ARGUMENT"
                 error is IllegalStateException && call.name.startsWith("lsp_") -> "TOOL_UNAVAILABLE"
                 error is IllegalStateException && !executionStarted -> "TOOL_PRECONDITION_FAILED"
