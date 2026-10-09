@@ -283,10 +283,14 @@ internal fun prepareLocalModelAdapterRequest(
     } else {
         canonicalMessages.map { it.copy(replay = null) }
     }
+    val providerRequiresDisabledThinking = LocalModelPresets.chatTemperatureRangeFor(
+        route.model, route.baseUrl,
+    )?.requiresDisabledThinking == true
     val routedTemperature = temperature
         ?.takeIf {
             route.capabilities.temperature &&
-                (reasoningEffort == null || reasoningEffort == "none")
+                (reasoningEffort == null || reasoningEffort == "none") &&
+                (!providerRequiresDisabledThinking || reasoningEffort == "none")
         }
         .takeUnless {
             route.protocol == LocalModelProtocol.RESPONSES &&
