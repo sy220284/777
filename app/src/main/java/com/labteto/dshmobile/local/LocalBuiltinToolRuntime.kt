@@ -285,8 +285,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 }
             }
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readModelSkill)
-                ?: workspace.modelSkillCatalog()
-            "list_skills" -> workspace.modelSkillCatalog()
+                ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
+            "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "read_skill" -> workspace.readModelSkill(args.string("name"))
             "session_search" -> sessionAccess.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
