@@ -209,11 +209,14 @@ class LocalWorkspace(
         var pageEntries = 0
         var cursorFound = cursor == 0
         var nextCursor: Int? = null
-        val started = System.nanoTime()
+        var started = 0L
         for ((entry, file) in safeWalk(directory, maxDepth = depth, maxVisited = Int.MAX_VALUE,
             maxMillis = Long.MAX_VALUE).withIndex()) {
             if (entry < cursor) continue
             cursorFound = true
+            // Page time begins when the continuation point is reached. Otherwise every
+            // later page can immediately expire while replaying the already-seen prefix.
+            if (started == 0L) started = System.nanoTime()
             if (pageEntries >= MAX_SCAN_ENTRIES || rows.size >= MAX_LIST_ROWS ||
                 (System.nanoTime() - started) / 1_000_000L >= MAX_SCAN_MILLIS) {
                 nextCursor = entry
@@ -263,10 +266,13 @@ class LocalWorkspace(
         var pageEntries = 0
         var resumeFound = cursor == null
         var nextCursor: String? = null
-        val startedAt = System.nanoTime()
+        var startedAt = 0L
         for ((entry, file) in files.withIndex()) {
             if (entry < resumeEntry) continue
             resumeFound = true
+            // Reaching an existing cursor can require replaying the directory prefix.
+            // Give the new page its full processing budget once its cursor is reached.
+            if (startedAt == 0L) startedAt = System.nanoTime()
             if (pageEntries >= MAX_SCAN_ENTRIES ||
                 (System.nanoTime() - startedAt) / 1_000_000L >= MAX_SCAN_MILLIS) {
                 nextCursor = "$entry:${if (entry == resumeEntry) resumeLine else 0}"
@@ -277,6 +283,16 @@ class LocalWorkspace(
             try {
                 file.bufferedReader().use { reader ->
                     var lineNumber = 0
+                    // Resume-line replay does not consume this page's matching budget.
+                    // Otherwise a late cursor in a long file can repeatedly time out
+                    // before reading a single new line.
+                    if (entry == resumeEntry && resumeLine > 0) {
+                        while (lineNumber < resumeLine &&
+                            readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) != null) {
+                            lineNumber++
+                        }
+                        startedAt = System.nanoTime()
+                    }
                     while (true) {
                         if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS ||
                             (System.nanoTime() - startedAt) / 1_000_000L >= MAX_SCAN_MILLIS) {
@@ -285,7 +301,6 @@ class LocalWorkspace(
                         }
                         val line = readBoundedLine(reader, MAX_SEARCH_LINE_CHARS) ?: break
                         lineNumber++
-                        if (entry == resumeEntry && lineNumber <= resumeLine) continue
                         val matchStart = expression?.find(line)?.range?.first
                             ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
                         if (matchStart >= 0) {
