@@ -242,9 +242,31 @@ class GitHubConnectorPlugin(
             )
         return runCatching {
             val response = request(token, method, path, body, mutation)
+            val failed = response.status !in 200..299
+            val failureCode = when {
+                !failed -> null
+                response.status == 401 -> "GITHUB_AUTH_INVALID"
+                response.status == 403 && response.headers["X-RateLimit-Remaining"] == "0" -> "GITHUB_RATE_LIMITED"
+                response.status == 403 -> "GITHUB_PERMISSION_DENIED"
+                response.status == 404 -> "GITHUB_RESOURCE_NOT_FOUND"
+                response.status == 429 -> "GITHUB_RATE_LIMITED"
+                response.status >= 500 -> "GITHUB_REMOTE_UNAVAILABLE"
+                else -> "GITHUB_HTTP_FAILED"
+            }
+            val hint = when (failureCode) {
+                "GITHUB_AUTH_INVALID" -> "GitHub 凭据过期或无效，请在工具页重新验证并配置。"
+                "GITHUB_PERMISSION_DENIED" -> "检查 GitHub 安装范围、仓库授权及令牌权限。"
+                "GITHUB_RATE_LIMITED" -> "GitHub 已限流，等待配额恢复后查询状态。"
+                "GITHUB_RESOURCE_NOT_FOUND" -> "核对资源路径，以及是否有该仓库的访问权限。"
+                else -> if (mutation) "写入结果可能已经生效，先查询远端状态，禁止自动重放。"
+                    else "检查 GitHub 网络及 API 状态后再试。"
+            }
             ToolResult(
                 content = response.render(),
-                isError = response.status !in 200..299,
+                isError = failed,
+                errorCode = failureCode,
+                retryable = failed && !mutation && response.status >= 500,
+                recoveryHint = if (failed) hint else null,
             )
         }.getOrElse { error ->
             if (error is CancellationException) throw error
