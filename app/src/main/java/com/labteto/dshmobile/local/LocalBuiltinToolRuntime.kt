@@ -181,8 +181,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 }
                 "补丁已应用" + stat.stdout.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
             }
-            "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
-            "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
+            "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3), args.int("cursor", 0))
+            "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".", args.int("cursor", 0))
             "grep", "search_text" -> workspace.search(
                 args.string("query"),
                 args.optionalString("path") ?: ".",
