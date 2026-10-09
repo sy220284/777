@@ -278,7 +278,7 @@ def classify(
             unit = True
             continue
 
-        if path in ANDROID_PLATFORM_FILES or path.startswith(PLATFORM_PREFIXES):
+        if path in PLATFORM_FILES or path in ANDROID_PLATFORM_FILES or path.startswith(PLATFORM_PREFIXES):
             full = True
             affects_release = True
             continue
