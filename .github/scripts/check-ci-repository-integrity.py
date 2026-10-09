@@ -358,12 +358,12 @@ assert invoked_script_paths('echo .github/scripts/check-example.py') == set()
 assert invoked_script_paths('echo python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('# python3 .github/scripts/check-example.py') == set()
 assert invoked_script_paths('python3 -m py_compile .github/scripts/check-example.py') == set()
-assert invoked_script_paths(workflow_run_steps('run: |\n  python3 .github/scripts/check-example.py\n')) == {
+assert invoked_script_paths(workflow_run_steps('run: |\n  python3 .github/scripts/check-example.py\n')[0]) == {
     '.github/scripts/check-example.py'
 }
 assert invoked_script_paths(workflow_run_steps(
     'run: echo ".github/scripts/check-example.py"\n'
-)) == set()
+)[0]) == set()
 assert invoked_script_paths(
     'if false; then\n python3 .github/scripts/check-example.py\nfi'
 ) == set()
