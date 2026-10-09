@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.session.LocalUserMessageEditResult
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -51,6 +52,7 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
     private val runtime: LocalRuntimeStateStore,
     private val storage: LocalSessionStorageRuntime,
     private val runs: LocalWorkRunRegistry,
+    private val memoryRecovery: LocalWorkTimelineMemoryRecovery,
 ) {
     internal fun rewrite(messageId: String, replacement: String): LocalWorkMessageEditPreparation {
         fun rejected(reason: LocalUserMessageEditResult) =
@@ -120,6 +122,7 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 all.takeWhile { it.sequence < source.sequence }.toList()
             }
             val prior = transcript.take(index)
+            val controls = projectWorkSessionControls(LocalWorkState(), earlierEvents)
             val replayed = restoreLocalModelHistory(
                 earlierEvents, emptyList(), ModelHistoryCheckpointCodec(),
             ).messages
@@ -131,14 +134,20 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 listOf(buildJsonObject {
                     put("role", "system")
                     put("content", com.labteto.dshmobile.local.model.workSystemPrompt(
-                        now.workspacePath, now.work.planMode,
+                        now.workspacePath, controls.planMode,
                     ))
                 })
             } else {
                 return rejected(LocalUserMessageEditResult.HISTORY_UNAVAILABLE)
             }
-            val controls = projectWorkSessionControls(LocalWorkState(), earlierEvents)
+            val editId = UUID.randomUUID().toString()
             val event = log.append("work/active-transcript", buildJsonObject {
+                put("edit_id", editId)
+                put("memory_rollback", buildJsonObject {
+                    put("session_id", now.sessionId)
+                    put("created_at", original.createdAt)
+                    put("message_ids", JsonArray(transcript.drop(index).map { JsonPrimitive(it.id) }))
+                })
                 put("reason", "user-edited")
                 put("transcript", encodeTranscriptMessages(prior))
                 put("model_history", JsonArray(history))
@@ -188,6 +197,8 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 reason = "work/user-edited",
                 asOfSequence = log.latestSequence(),
             ))
+            // If cleanup is interrupted, Session loader retries from this durable rewrite marker.
+            memoryRecovery.recover(log)
             // The event and checkpoint are durable even if the optional materialized snapshot lags.
             if (!storage.enqueueCurrentSnapshot(now.sessionId)) {
                 runtime.projection.publishError("工作历史已重写，快照保存排队失败；将继续从持久事件恢复")
