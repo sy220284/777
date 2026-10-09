@@ -7,7 +7,7 @@ import com.labteto.dshmobile.local.files.LocalWorkspace
  * and never duplicated into persistent model history.
  */
 internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: String): String {
-    val marker = Regex("^【技能:([a-z][a-z0-9-]{1,47})】(?:\\r?\\n|$)")
+    val marker = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
     val match = marker.find(input)
     if (match != null) {
         val name = match.groupValues[1]
