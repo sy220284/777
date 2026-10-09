@@ -40,6 +40,7 @@ import com.labteto.dshmobile.local.model.LOCAL_NATIVE_TOOL_IMAGE_GENERATION
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
 import com.labteto.dshmobile.local.model.resolveLocalNativeToolNames
 import com.labteto.dshmobile.local.model.stableJsonSha256
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -134,6 +135,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
         val cachePolicy = runSurface.promptCachePolicy
+        // Foreground Chat and background state consolidation have distinct prompt series.
+        // This changes diagnostics only; actual provider caching and message content stay untouched.
+        val cacheDiagnosticSurface = when {
+            snapshot.usageMode == LocalUsageMode.CHAT && step >= CHAT_POST_TURN_MODEL_STEP -> "chat_auxiliary"
+            snapshot.usageMode == LocalUsageMode.CHAT -> "chat_foreground"
+            else -> "work"
+        }
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
             promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
@@ -649,6 +657,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     activeMessages,
                     tools,
                     nativeTools,
+                    diagnosticSurface = cacheDiagnosticSurface,
                 )
             } else {
                 null
@@ -847,6 +856,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     tools,
                                     cache.generation,
                                     nativeTools,
+                                    diagnosticSurface = cacheDiagnosticSurface,
                                 )
                             }
                             if (reply.usage.reported) {
