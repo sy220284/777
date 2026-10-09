@@ -25,8 +25,10 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     fun strings(name: String) {
         val value = state[name] ?: return
         val list = value as? JsonArray
-        if (list == null) state.remove(name)
-        else state[name] = JsonArray(list.filter { it is JsonPrimitive && it.isString })
+        if (list == null || list.any { it !is JsonPrimitive || !it.isString }) {
+            // Invalid array elements are not an intentional request to clear old state.
+            state.remove(name)
+        } else state[name] = list
     }
 
     listOf("physicalState", "mood", "relationshipState", "currentFocus",
@@ -55,8 +57,9 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         stringArrays.forEach { key ->
             val value = fields[key] ?: return@forEach
             val list = value as? JsonArray
-            if (list == null) fields.remove(key)
-            else fields[key] = JsonArray(list.filter { it is JsonPrimitive && it.isString })
+            if (list == null || list.any { it !is JsonPrimitive || !it.isString }) {
+                fields.remove(key)
+            } else fields[key] = list
         }
         evidenceArrays.forEach { key ->
             val value = fields[key] ?: return@forEach
