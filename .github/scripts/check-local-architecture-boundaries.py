@@ -220,6 +220,46 @@ def local_references(source: str) -> set[str]:
     return imports(source) | direct
 
 
+def assembled_feature_factories(shell: str, expected: set[str]) -> set[str]:
+    """Verify the actual shell listOf calls, not merely declared UI contributions."""
+    anchor = re.search(r"\bval\s+featureContributions\s*=\s*listOf\s*\(", shell)
+    if anchor is None:
+        raise ValueError("Shell lost the featureContributions assembly list")
+    depth, cursor, beginning = 1, anchor.end(), anchor.end()
+    quote = None
+    while cursor < len(shell) and depth:
+        if shell.startswith('"""', cursor):
+            cursor = shell.find('"""', cursor + 3)
+            if cursor < 0:
+                raise ValueError("unterminated string in Feature assembly")
+            cursor += 3
+            continue
+        char = shell[cursor]
+        if quote:
+            if char == "\\":
+                cursor += 2
+                continue
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        cursor += 1
+    if depth:
+        raise ValueError("unterminated Feature assembly list")
+    body = shell[beginning:cursor - 1]
+    calls = re.findall(r"\b(local[A-Za-z_0-9]+FeatureUiContribution)\s*\(", body)
+    duplicates = sorted({name for name in calls if calls.count(name) != 1})
+    missing = sorted(expected - set(calls))
+    extra = sorted(set(calls) - expected)
+    if duplicates or missing or extra:
+        raise ValueError(f"Shell assembly mismatch: missing={missing}; duplicate={duplicates}; unexpected={extra}")
+    return set(calls)
+
+
 def self_test() -> None:
     target = "com.labteto.dshmobile.local.work.LocalSubagentRunner"
     assert target in local_references("val runner = " + target + "()")
@@ -229,6 +269,22 @@ def self_test() -> None:
     # A qualified implementation method must not evade the UI internal suffix check.
     qualified = "com.labteto.dshmobile.local.work.LocalWorkCoordinator.execute"
     assert any(part.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES) for part in qualified.split(".")[5:])
+    sample = ("val featureContributions = listOf("
+              "localShellFeatureUiContribution(), localToolsFeatureUiContribution())")
+    factories = {"localShellFeatureUiContribution", "localToolsFeatureUiContribution"}
+    assert assembled_feature_factories(sample, factories) == factories
+    for invalid in (
+        sample.replace(", localToolsFeatureUiContribution()", ""),
+        sample.replace("localToolsFeatureUiContribution()", "localShellFeatureUiContribution()"),
+        sample.replace("localToolsFeatureUiContribution()", "localUnknownFeatureUiContribution()"),
+    ):
+        try:
+            assembled_feature_factories(invalid, factories)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Feature assembly regression unexpectedly passed")
+
 
 
 if "--self-test" in sys.argv:
@@ -894,6 +950,22 @@ for module_id, relative in feature_contribution_paths.items():
 feature_shell = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 ))
+contribution_factories: dict[str, str] = {}
+for module_id, relative in feature_contribution_paths.items():
+    declared = re.findall(
+        r"\bfun\s+(local[A-Za-z_0-9]+FeatureUiContribution)\s*\(",
+        strip_comments(read(relative)),
+    )
+    if len(declared) != 1:
+        die(f"{relative} must define exactly one Feature contribution factory: {declared}")
+    contribution_factories[module_id] = declared[0]
+if len(set(contribution_factories.values())) != len(module_ids):
+    die("Feature UI contribution factories must have unique names")
+try:
+    assembled_feature_factories(feature_shell, set(contribution_factories.values()))
+except ValueError as error:
+    die(str(error))
+
 for required in (
     "localFeatureOwnedBackAction(",
     "localFeatureRestoreStack(",
