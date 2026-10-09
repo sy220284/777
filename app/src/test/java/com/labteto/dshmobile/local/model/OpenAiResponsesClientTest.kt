@@ -90,6 +90,50 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun accountLoginReasoningMaxReachesTheActualResponsesRequest() = runBlocking {
+        val accountProfile = chatGptPlanProfiles("account-wire", listOf(
+            ChatGptModelOption("gpt-6-sol", "GPT-6 Sol"),
+        )).single()
+        val session = "plan-wire-reasoning-max-test"
+        var postedBody = ""
+        var postedAuthorization = ""
+        var postedUrl = ""
+        val completed = """data: {"type":"response.completed","response":{"id":"response-test","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"通过"}]}],"usage":{"input_tokens":8,"output_tokens":5}}}""" + "\n\n"
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            postedUrl = chain.request().url.toString()
+            postedAuthorization = chain.request().header("Authorization").orEmpty()
+            postedBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(completed.toResponseBody("text/event-stream".toMediaType()))
+                .build()
+        }.build()
+        try {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.MAX)
+            val result = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-plan-access-token",
+                baseUrl = accountProfile.baseUrl,
+                model = accountProfile.model,
+                messages = chatPostTurnModelMessages("验证"),
+                tools = JsonArray(emptyList()),
+                planSharing = accountProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+                reasoningEffort = LocalReasoningModeStore.effortFor(session, accountProfile, withTools = true),
+            )
+            assertEquals("通过", result.content)
+            assertEquals("https://api.openai.com/v1/responses", postedUrl)
+            assertEquals("Bearer mock-plan-access-token", postedAuthorization)
+            val wire = Json.parseToJsonElement(postedBody).jsonObject
+            assertEquals("gpt-6-sol", wire["model"]!!.jsonPrimitive.content)
+            assertEquals("max", wire["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+            assertEquals("false", wire["store"]!!.jsonPrimitive.content)
+            assertEquals("true", wire["stream"]!!.jsonPrimitive.content)
+            assertFalse(wire.containsKey("temperature"))
+        } finally {
+            LocalReasoningModeStore.setMode(session, LocalReasoningMode.DEFAULT)
+        }
+    }
+
+    @Test
     fun exactReportedCancelWithoutSpaceIsRetryable() {
         val error = client.networkFailure(IOException("stream was reset:CANCEL"))
         assertEquals("MODEL_NETWORK", error.code)
