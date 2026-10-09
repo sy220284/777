@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
@@ -224,6 +225,7 @@ internal fun LocalProjectScreen(
                 )
                 DsButton(
                     text = stringResource(R.string.local_project_delete),
+                    modifier = Modifier.testTag("local_project_confirm_delete"),
                     variant = DsButtonVariant.Danger,
                     loading = deleting,
                     enabled = !deleting,
