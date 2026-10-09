@@ -47,7 +47,7 @@ class LocalComposerReasoningRegressionTest {
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
                 context.getString(R.string.local_composer_reasoning_max)))
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
                 ProgressBarRangeInfo(4f, 0f..4f, 3)))
 
@@ -57,7 +57,7 @@ class LocalComposerReasoningRegressionTest {
         }
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
             context.getString(R.string.local_composer_reasoning_max))).assertIsDisplayed()
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
                 ProgressBarRangeInfo(4f, 0f..4f, 3)))
         compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_default_tip))
@@ -70,7 +70,7 @@ class LocalComposerReasoningRegressionTest {
         }
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
             context.getString(R.string.local_composer_reasoning_max))).assertIsDisplayed()
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
                 ProgressBarRangeInfo(3f, 0f..3f, 2)))
 
@@ -82,12 +82,69 @@ class LocalComposerReasoningRegressionTest {
         }
         compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_action,
             context.getString(R.string.local_composer_reasoning_default))).assertIsDisplayed()
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
             .assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.local_composer_reasoning_unsupported))
             .assertIsDisplayed()
     }
 
+
+    @Test fun workTemperatureHasFiveStopsWithThreeLabels() {
+        val current = mutableStateOf(2)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.WORK,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    temperatureLevel = current.value,
+                    onReasoningModeChange = {},
+                    onTemperatureLevelChange = { current.value = it },
+                )
+            }
+        }
+        val slider = compose.onNodeWithContentDescription(
+            context.getString(R.string.local_composer_temperature_title),
+        )
+        slider.assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(2f, 0f..4f, 3),
+        ))
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_low))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_natural))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_high))
+            .assertIsDisplayed()
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(4f) }
+        compose.runOnIdle { assertEquals(4, current.value) }
+    }
+
+    @Test fun chatTemperatureReflectsPersonaSliderWhenChangedOutsidePanel() {
+        val current = mutableStateOf(2)
+        compose.setContent {
+            DshTheme {
+                LocalComposerCapabilityPanel(
+                    panel = "reasoning", profile = deepSeek,
+                    usageMode = LocalUsageMode.CHAT,
+                    reasoningMode = LocalReasoningUiMode.FAST,
+                    temperatureLevel = current.value,
+                    onReasoningModeChange = {},
+                    onTemperatureLevelChange = { current.value = it },
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_chat_low))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_chat_high))
+            .assertIsDisplayed()
+        compose.runOnIdle { current.value = 4 }
+        compose.onNodeWithContentDescription(context.getString(R.string.local_composer_temperature_title))
+            .assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(4f, 0f..4f, 3),
+            ))
+    }
 
     @Test fun planIconTogglesAndAnnouncesStateWithoutSlider() {
         val selected = mutableStateOf(false)
@@ -151,7 +208,7 @@ class LocalComposerReasoningRegressionTest {
                     )
                 }
             }
-            compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+            compose.onNodeWithContentDescription(context.getString(R.string.local_composer_reasoning_title))
                 .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(0f) }
             compose.runOnIdle {
                 assertEquals(LocalReasoningUiMode.DEFAULT, LocalReasoningControls.mode(session))
