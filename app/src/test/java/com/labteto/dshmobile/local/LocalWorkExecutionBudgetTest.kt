@@ -27,6 +27,67 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun nextSliceDoesNotWaitForPreviousSubagentAndKeepsCumulativeExposure() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        val oldChild = budget.reserve(20)
+        assertTrue(budget.beginExecutionSlice())
+        val newChild = budget.reserve(10)
+        assertEquals(2, budget.snapshot().reservedRequests)
+        assertEquals(0, budget.snapshot().admittedRequests)
+        val overLimit = runCatching { budget.reserve(1) }.exceptionOrNull() as LocalModelException
+        assertEquals("WORK_BUDGET_EXHAUSTED", overLimit.code)
+        oldChild.commit(reportedInputTokens = 15)
+        assertEquals(0, budget.snapshot().admittedRequests)
+        newChild.commit(reportedInputTokens = 9)
+        assertEquals(1, budget.snapshot().admittedRequests)
+        assertEquals(24L, budget.snapshot().reportedExposureTokens)
+        assertEquals(0, budget.snapshot().reservedRequests)
+    }
+
+    @Test
+    fun nextSliceResetsSlotsWithoutLosingUsageOrPendingSafety() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        val oldChild = budget.reserve(20)
+        assertTrue(budget.beginExecutionSlice())
+        oldChild.commit(reportedInputTokens = 15)
+        assertEquals(0, budget.snapshot().admittedRequests)
+        assertEquals(15L, budget.snapshot().reportedExposureTokens)
+        budget.reserve(20).commit(reportedInputTokens = 15)
+        assertEquals(1, budget.snapshot().admittedRequests)
+        assertEquals(30L, budget.snapshot().reportedExposureTokens)
+    }
+
+    @Test
+    fun previousSliceCancellationDoesNotReleaseCurrentSliceSlot() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        val prior = budget.reserve(20)
+        budget.beginExecutionSlice()
+        val new = budget.reserve(10)
+        prior.release()
+        assertEquals(1, budget.snapshot().reservedRequests)
+        val blocked = runCatching { budget.reserve(1) }.exceptionOrNull() as LocalModelException
+        assertEquals("WORK_BUDGET_EXHAUSTED", blocked.code)
+        new.release()
+        val next = budget.reserve(1)
+        next.commit()
+        assertEquals(1, budget.snapshot().admittedRequests)
+    }
+
+    @Test
+    fun perSliceRequestLimitAllowsBoundedCheckpointContinuation() = runTest {
+        val budget = LocalWorkExecutionBudget(maxRequests = 1)
+        budget.reserve(1).commit()
+        val error = runCatching { budget.reserve(1) }.exceptionOrNull()
+        assertTrue(error is LocalModelException)
+        val modelError = error as LocalModelException
+        assertEquals("WORK_BUDGET_EXHAUSTED", modelError.code)
+        assertTrue(modelError.continuationEligible)
+        assertTrue(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 0, 0))
+        assertFalse(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 2, 0))
+        assertFalse(com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure(modelError, 0, 1))
+    }
+
+    @Test
     fun largeRequestRunsAndConcurrentPendingExposureWaits() = runTest {
         val budget = LocalWorkExecutionBudget(
             pendingLimitTokens = 200_000,

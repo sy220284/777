@@ -280,7 +280,27 @@ internal class LocalToolExecutionCoordinator(
         } catch (error: LocalModelException) {
             return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted)
         } catch (error: Exception) {
-            return thrownFailure(call, registered, "TOOL_ERROR", error.message ?: error::class.java.simpleName, executionStarted)
+            val code = when {
+                error is java.io.FileNotFoundException ||
+                    error is java.nio.file.NoSuchFileException -> "TOOL_NOT_FOUND"
+                error is java.nio.file.AccessDeniedException || error is SecurityException ->
+                    "TOOL_PERMISSION_DENIED"
+                call.name.startsWith("lsp_") && error is IllegalStateException &&
+                    error.message.orEmpty().contains("用户拒绝") -> "APPROVAL_DENIED"
+                call.name.startsWith("lsp_") && error is IllegalStateException &&
+                    error.message.orEmpty().contains("人工审批") -> "APPROVAL_REQUIRED"
+                call.name.startsWith("lsp_") && error is IllegalArgumentException &&
+                    error.message.orEmpty().contains("语言服务器") -> "TOOL_UNAVAILABLE"
+                error is IllegalArgumentException -> "TOOL_INVALID_ARGUMENT"
+                error is IllegalStateException && call.name.startsWith("lsp_") -> "TOOL_UNAVAILABLE"
+                error is IllegalStateException && !executionStarted -> "TOOL_PRECONDITION_FAILED"
+                error is java.io.IOException -> "TOOL_IO_ERROR"
+                else -> "TOOL_ERROR"
+            }
+            return thrownFailure(
+                call, registered, code, error.message ?: error::class.java.simpleName,
+                executionStarted, error::class.java.simpleName,
+            )
         } finally {
             if (serializedMutation) workspaceMutationMutex.unlock()
         }
@@ -337,11 +357,12 @@ internal class LocalToolExecutionCoordinator(
         code: String,
         message: String,
         executionStarted: Boolean,
+        exceptionType: String? = null,
     ): AgentToolResult {
         val result = localToolFailure(code, message,
             readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
             executionStarted = executionStarted)
-        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=${result.retryable}")
+        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
         return result
     }
 

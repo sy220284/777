@@ -13,6 +13,23 @@ import org.junit.Test
 
 class LocalPromptCacheContinuityStoreTest {
     @Test
+    fun independentChatSurfacesDoNotPolluteEachOthersCacheDiagnostics() {
+        val store = LocalPromptCacheContinuityStore()
+        val tools = JsonArray(emptyList())
+        val foreground = listOf(message("system", "聊天规则"), message("user", "你好"))
+        val auxiliary = listOf(message("system", "状态整理"), message("user", "JSON"))
+
+        val first = store.assess("s", "route", foreground, tools, diagnosticSurface = "chat_foreground")
+        store.recordSuccess("s", "route", foreground, tools, first.generation,
+            diagnosticSurface = "chat_foreground")
+        assertEquals(LocalPromptPrefixContinuity.COLD,
+            store.assess("s", "route", auxiliary, tools, diagnosticSurface = "chat_auxiliary").continuity)
+        val next = store.assess("s", "route", foreground + message("assistant", "嗨"), tools,
+            diagnosticSurface = "chat_foreground")
+        assertEquals(LocalPromptPrefixContinuity.CONTINUOUS, next.continuity)
+    }
+
+    @Test
     fun nativeToolSurfaceChangeBreaksPrefixContinuity() {
         val store = LocalPromptCacheContinuityStore()
         val messages = listOf(message("user", "画图"))

@@ -298,6 +298,49 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun readonlyToolExceptionsKeepActionableCodesAndSafeRetries() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.io.FileNotFoundException("不存在的文件")
+            })
+            register(tool("glob", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalArgumentException("目录错误")
+            })
+            register(tool("lsp_diagnostics", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalArgumentException("未检测到语言服务器")
+            })
+            register(tool("io_probe", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.io.IOException("临时读取中断")
+            })
+            register(tool("missing_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.NoSuchFileException("missing.txt")
+            })
+            register(tool("denied_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.AccessDeniedException("private.txt")
+            })
+            register(tool("lsp_start_denied", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalStateException("用户拒绝启动代码智能进程")
+            })
+        }
+        val coordinator = coordinator(registry)
+        suspend fun result(name: String) = coordinator.execute(
+            LocalToolCall("c-" + name, name, JsonObject(emptyMap()), "{}"), allowMutation = true,
+        )
+        assertEquals("TOOL_NOT_FOUND", result("read").errorCode)
+        assertEquals("TOOL_INVALID_ARGUMENT", result("glob").errorCode)
+        assertEquals("TOOL_UNAVAILABLE", result("lsp_diagnostics").errorCode)
+        val io = result("io_probe")
+        assertEquals("TOOL_IO_ERROR", io.errorCode)
+        assertTrue(io.retryable)
+        assertEquals(AgentToolSideEffect.NONE, io.sideEffect)
+        assertEquals("TOOL_NOT_FOUND", result("missing_file").errorCode)
+        val denied = result("denied_file")
+        assertEquals("TOOL_PERMISSION_DENIED", denied.errorCode)
+        assertFalse(denied.retryable)
+        assertEquals("APPROVAL_DENIED", result("lsp_start_denied").errorCode)
+    }
+
+    @Test
     fun executorThrowAfterAdmissionIsNeverMarkedSafeToRetry() = runBlocking {
         var executionStarts = 0
         val registry = ToolRegistry().apply {
