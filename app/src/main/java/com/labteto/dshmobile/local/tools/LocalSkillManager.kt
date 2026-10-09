@@ -118,8 +118,12 @@ internal object LocalPresetSkillCatalog {
 
 internal val LOCAL_SKILL_ID_PATTERN = Regex("[a-z][a-z0-9-]{1,47}")
 
-internal fun buildLocalSkillDocument(id: String, description: String, instructions: String, whenToUse: String = ""): String {
+internal fun buildLocalSkillDocument(id: String, description: String, instructions: String, whenToUse: String = "", displayName: String = ""): String {
     require(LOCAL_SKILL_ID_PATTERN.matches(id)) { "技能标识需由 2—48 位小写字母、数字或连字符组成，并以字母开头" }
+    val title = displayName.trim()
+    require(title.isEmpty() || (title.length <= 40 && title.any { it in '\u4e00'..'\u9fff' } && '\n' !in title && '\r' !in title)) {
+        "技能显示名称需包含中文，且不超过40字"
+    }
     val summary = description.trim()
     val body = instructions.trim()
     require(summary.isNotEmpty() && summary.length <= 240 && '\n' !in summary && '\r' !in summary) {
@@ -129,8 +133,9 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
     val scalar = summary.replace('"', '\'').replace(" #", " ＃")
     require(whenToUse.length <= 240 && '\n' !in whenToUse && '\r' !in whenToUse) { "使用条件不能超过 240 字或换行" }
     val trigger = if (whenToUse.isBlank()) emptyList() else listOf("when-to-use: \"" + whenToUse.replace('"', '\'') + "\"")
+    val displayField = if (title.isEmpty()) emptyList() else listOf("display-name: \"" + title.replace('"', '\'') + "\"")
     return (listOf("---", "name: " + id, "description: \"" + scalar + "\"") +
-        trigger + listOf("---", "# " + id, "", body, "")).joinToString("\n")
+        displayField + trigger + listOf("---", "# " + id, "", body, "")).joinToString("\n")
 }
 
 /** Single writer for workspace SKILL.md files; both the UI and the model read these same files. */
@@ -141,7 +146,15 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     fun installed(): List<LocalInstalledSkill> = workspace.skills().map { name ->
         val doc = workspace.readRaw(".dsh/skills/" + name + "/SKILL.md")
         val metadata = parseLocalSkillMetadata(name, doc)
-        LocalInstalledSkill(name, metadata.description, metadata.modelInvocable)
+        val display = metadata.displayName
+            ?: LocalPresetSkillCatalog.entries.firstOrNull { it.id == name }?.title
+            ?: doc.lineSequence().firstOrNull { it.trimStart().startsWith("# ") }
+                ?.trim()?.removePrefix("# ")?.trim()
+                ?.takeIf { it.length in 1..40 && it.any { c -> c in '\u4e00'..'\u9fff' } }
+            ?: metadata.description.substringBefore('，').substringBefore('。').trim()
+                .takeIf { it.length in 2..30 && it.any { c -> c in '\u4e00'..'\u9fff' } }
+            ?: "自定义技能（$name）"
+        LocalInstalledSkill(name, metadata.description, metadata.modelInvocable, display)
     }
 
     fun presets(): List<LocalPresetSkill> {
@@ -235,12 +248,13 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     fun install(id: String) {
         val preset = LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }
             ?: throw IllegalArgumentException("未知预置技能")
-        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse))
+        addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title))
     }
 
-    fun create(id: String, description: String, instructions: String) {
+    fun create(id: String, displayName: String, description: String, instructions: String) {
         require(LocalPresetSkillCatalog.entries.none { it.id == id }) { "预置技能标识已保留，请使用安装功能" }
-        addDocument(id, buildLocalSkillDocument(id, description, instructions))
+        require(displayName.isNotBlank()) { "请填写技能中文名称" }
+        addDocument(id, buildLocalSkillDocument(id, description, instructions, displayName = displayName))
     }
 
     private fun addDocument(id: String, document: String) {
@@ -327,7 +341,8 @@ internal class LocalSkillManager @Inject constructor(storage: LocalSessionStorag
     fun installed(): List<LocalInstalledSkill> = store.installed()
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
-    fun create(id: String, description: String, instructions: String) = store.create(id, description, instructions)
+    fun create(id: String, displayName: String, description: String, instructions: String) =
+        store.create(id, displayName, description, instructions)
     fun remove(id: String) = store.remove(id)
     fun readDocument(id: String) = store.readDocument(id)
     fun updateDocument(id: String, document: String) = store.updateDocument(id, document)
