@@ -107,6 +107,28 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun systemOwnedFieldsAreIgnoredWithoutFalseParseFailureOrRetry() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        listOf(
+            """{"state":{"scene":{"location":"厨房"}},"turnSignificance":"MINOR"}""",
+            """{"state":{"evolution":{"traits":{"courage":99}}}}""",
+            """{"state":{"dynamics":{"systemCounter":3},"continuity":{"evidence":"runtime"}}}""",
+        ).forEach { payload ->
+            assertNotNull(parser.parsePlan(payload))
+        }
+    }
+
+    @Test
+    fun missingStateAndEmptyResponseCannotSilentlySettlePendingChatTurns() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        assertEquals("state_patch_missing", parser.parseFailureKind("{}"))
+        assertEquals("state_patch_missing", parser.parseFailureKind(
+            """{"turnSignificance":"MAJOR"}""",
+        ))
+        assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
+    }
+
+    @Test
     fun invalidStateCannotSilentlyAdvancePendingTurnCursor() {
         val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
         val bad = """{"state":{"initiative":"略升","dynamics":{"facts":["无来源文字"]}},"turnSignificance":"MINOR"}"""

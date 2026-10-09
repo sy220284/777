@@ -61,20 +61,24 @@ internal class ChatInteractionPlanParser(
         // decoration. Those fields are intentionally ignored and must not turn a
         // valid no-op result into a retry loop. Reject only an unusable requested
         // model-owned patch, so truly malformed types still preserve pending work.
-        val writableStateFields = setOf(
-            "physicalState", "mood", "relationshipState", "currentFocus",
-            "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
-            "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
-            "dynamics", "userPattern", "continuity",
-        )
         val requestedModelStateChange = originalState?.any { (key, value) ->
-            key in writableStateFields && (value !is JsonObject || value.isNotEmpty())
+            when {
+                key !in CHAT_MODEL_WRITABLE_STATE_FIELDS -> false
+                key !in CHAT_MODEL_WRITABLE_NESTED_FIELDS -> true
+                value !is JsonObject -> true
+                else -> value.keys.any { it in CHAT_MODEL_WRITABLE_NESTED_FIELDS[key].orEmpty() }
+            }
         } == true
         val discardedRequestedState =
             (requestedModelStateChange && !hasStateUpdate) ||
                 (root.containsKey("state") && originalState == null)
         if (discardedRequestedState && !hasDiary && !hasSuggestions) {
             return null to "state_patch_unusable"
+        }
+        // A bare {} or significance-only response contains no actionable state and
+        // must not consume the persisted pending-turn cursor as a successful refresh.
+        if (!root.containsKey("state") && !hasDiary && !hasSuggestions) {
+            return null to "state_patch_missing"
         }
         val decoded = runCatching {
             json.decodeFromString(ChatPostTurnPlan.serializer(), normalized.toString())

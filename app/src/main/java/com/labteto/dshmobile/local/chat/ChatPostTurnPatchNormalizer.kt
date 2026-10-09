@@ -7,6 +7,28 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.booleanOrNull
 
 /**
+ * Single boundary for model-owned chat state fields. System-owned scene, evolution,
+ * provenance and counters are intentionally ignored; the runtime alone maintains them.
+ */
+internal val CHAT_MODEL_WRITABLE_STATE_FIELDS: Set<String> = setOf(
+    "physicalState", "mood", "relationshipState", "currentFocus",
+    "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
+    "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
+    "dynamics", "userPattern", "continuity",
+)
+
+internal val CHAT_MODEL_WRITABLE_NESTED_FIELDS: Map<String, Set<String>> = mapOf(
+    "dynamics" to setOf(
+        "stage", "warmth", "trust", "reciprocity", "tension", "stability",
+        "unresolvedConflict", "facts", "hypotheses", "unknowns",
+        "sharedMoments", "sharedObjects",
+    ),
+    "userPattern" to setOf("replyLength", "directness", "playfulness",
+        "initiative", "emojiStyle", "preferredTone"),
+    "continuity" to setOf("recentEvents", "recurringEvents", "decisions", "unfinished"),
+)
+
+/**
  * Normalizes only safely interpretable model patch values, never the persisted source of truth.
  * An invalid optional field is omitted so the reducer retains the previous authoritative value.
  */
@@ -97,13 +119,7 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         }
         // These sub-objects also contain system-maintained counters and provenance.
         // Model output may update only fields accepted by the state reducer.
-        val permitted = when (name) {
-            "dynamics" -> numeric + textual + stringArrays + evidenceArrays
-            "userPattern" -> setOf("replyLength", "directness", "playfulness",
-                "initiative", "emojiStyle", "preferredTone")
-            "continuity" -> setOf("recentEvents", "recurringEvents", "decisions", "unfinished")
-            else -> emptySet()
-        }
+        val permitted = CHAT_MODEL_WRITABLE_NESTED_FIELDS[name].orEmpty()
         state[name] = JsonObject(fields.filterKeys { it in permitted })
     }
 
@@ -119,13 +135,7 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         setOf("recentEvents", "recurringEvents", "decisions", "unfinished"))
 
     // Decode only model-owned patch fields. The reducer computes the rest from durable history.
-    val allowedStateFields = setOf(
-        "physicalState", "mood", "relationshipState", "currentFocus",
-        "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
-        "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
-        "dynamics", "userPattern", "continuity",
-    )
-    val normalizedState = JsonObject(state.filterKeys { it in allowedStateFields })
+    val normalizedState = JsonObject(state.filterKeys { it in CHAT_MODEL_WRITABLE_STATE_FIELDS })
     val result = root.toMutableMap().apply { put("state", normalizedState) }
     result["turnSignificance"]?.let { value ->
         if (value !is JsonPrimitive || !value.isString) result.remove("turnSignificance")
