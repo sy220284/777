@@ -14,7 +14,7 @@ import org.junit.Test
 
 class LocalModelGatewayRoutingTest {
     @Test
-    fun deepSeekChatSendsOfficialTemperatureExtremesOnlyWithoutThinking() {
+    fun deepSeekChatSendsCappedTemperatureRangeOnlyWithoutThinking() {
         val profile = LocalModelProfile("ds-range", "deepseek-flash", "https://api.deepseek.com")
         val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)!!
         val modelRoute = LocalResolvedModelRoute(
@@ -31,7 +31,7 @@ class LocalModelGatewayRoutingTest {
             put("role", "user")
             put("content", "你好")
         })
-        for ((slider, expected) in listOf(0 to 0.0, 50 to 1.3, 100 to 2.0)) {
+        for ((slider, expected) in listOf(0 to 0.0, 25 to 0.325, 50 to 0.65, 75 to 0.975, 100 to 1.3)) {
             val actual = prepareLocalModelAdapterRequest(
                 route = modelRoute, messages = messages, tools = JsonArray(emptyList()),
                 temperature = range.at(slider), reasoningEffort = "none", streaming = true,
