@@ -273,7 +273,7 @@ internal fun PluginInventoryBrowser(
                                         style = DsType.small13.withReadingWeight(),
                                     )
                                 }
-                                val usePrompt = if (item.installedSkill) "【技能:${item.id.substringAfter(":")}】\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                                 DsButton(
                                     text = stringResource(
                                         if (item.installablePreset) R.string.skills_install
@@ -301,7 +301,7 @@ internal fun PluginInventoryBrowser(
             onDismiss = { selectedRow = null },
             scrollable = true,
             footer = {
-                val usePrompt = if (item.installedSkill) "【技能:${item.id.substringAfter(":")}】\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
+                val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
                 DsButton(
                     text = stringResource(
                         if (item.installablePreset) R.string.skills_install
