@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +12,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.project.LocalProjectCatalogState
 import com.labteto.dshmobile.local.project.LocalProject
 import com.labteto.dshmobile.ui.theme.DshTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -161,5 +163,83 @@ class LocalProjectUiRegressionTest {
         compose.onNodeWithTag("local_project_confirm_delete").performClick()
         compose.waitUntil(5_000) { attempts == 2 && catalog.value.activeId == "local-workspace" }
         compose.runOnIdle { assertEquals(1, catalog.value.projects.size) }
+    }
+
+    @Test fun cancellingProjectDeletionDoesNotInvokeAnyWrite() {
+        val catalog = MutableStateFlow(LocalProjectCatalogState(
+            projects = listOf(
+                LocalProject("local-workspace", "默认项目"),
+                LocalProject("custom", "不可意外删除"),
+            ),
+            activeId = "custom",
+        ))
+        var called = 0
+        compose.setContent {
+            DshTheme {
+                LocalProjectScreen(
+                    actions = LocalProjectUiActions(
+                        catalog = catalog,
+                        recoveryNotice = MutableStateFlow(null),
+                        backupAndReset = {},
+                        createProjectWorkSession = { false },
+                        onProjectSessionAccepted = {},
+                        create = { "" }, select = {}, rename = { _, _ -> },
+                        delete = { called++ },
+                        updateInstructions = { _, _ -> },
+                    ),
+                    onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_project_delete)).performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
+        compose.runOnIdle {
+            assertEquals(0, called)
+            assertEquals("custom", catalog.value.activeId)
+            assertEquals(2, catalog.value.projects.size)
+        }
+    }
+
+    @Test fun doubleDeleteIsBlockedWhileTheFirstRequestIsAwaitingStorage() {
+        val catalog = MutableStateFlow(LocalProjectCatalogState(
+            projects = listOf(
+                LocalProject("local-workspace", "默认项目"),
+                LocalProject("custom", "等待删除"),
+            ),
+            activeId = "custom",
+        ))
+        val unblock = CompletableDeferred<Unit>()
+        var calls = 0
+        compose.setContent {
+            DshTheme {
+                LocalProjectScreen(
+                    actions = LocalProjectUiActions(
+                        catalog = catalog,
+                        recoveryNotice = MutableStateFlow(null),
+                        backupAndReset = {},
+                        createProjectWorkSession = { false },
+                        onProjectSessionAccepted = {},
+                        create = { "" }, select = {}, rename = { _, _ -> },
+                        delete = { id ->
+                            calls++
+                            unblock.await()
+                            catalog.value = catalog.value.copy(
+                                projects = catalog.value.projects.filterNot { it.id == id },
+                                activeId = "local-workspace",
+                            )
+                        },
+                        updateInstructions = { _, _ -> },
+                    ),
+                    onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_project_delete)).performScrollTo().performClick()
+        compose.onNodeWithTag("local_project_confirm_delete").performClick()
+        compose.waitUntil(5_000) { calls == 1 }
+        compose.onNodeWithTag("local_project_confirm_delete").assertIsNotEnabled()
+        compose.runOnIdle { unblock.complete(Unit) }
+        compose.waitUntil(5_000) { catalog.value.activeId == "local-workspace" }
+        compose.runOnIdle { assertEquals(1, calls) }
     }
 }

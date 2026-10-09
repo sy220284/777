@@ -810,7 +810,9 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt#offscreenSessionReferencesPreventProjectDeletionUntilAllAreRemoved",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#failedProjectDeletionPreservesSelectionAndAllowsExplicitRetry",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#cancellingProjectDeletionDoesNotInvokeAnyWrite",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiRegressionTest.kt#doubleDeleteIsBlockedWhileTheFirstRequestIsAwaitingStorage"
       ]
     },
     {
