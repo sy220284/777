@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.components.DsComposerAction
@@ -72,6 +73,9 @@ internal fun LocalComposerCapabilityActions(
     profile: LocalModelProfile?,
     usageMode: LocalUsageMode,
     reasoningMode: LocalReasoningUiMode,
+    temperatureLevel: Int = 2,
+    temperatureEnabled: Boolean = true,
+    onTemperatureLevelChange: (Int) -> Unit = {},
     running: Boolean,
     showLabels: Boolean,
     openPanel: String?,
@@ -115,10 +119,10 @@ internal fun LocalComposerCapabilityActions(
                     profile = profile,
                     usageMode = usageMode,
                     reasoningMode = reasoningMode,
-                    onReasoningModeChange = {
-                        onReasoningModeChange(it)
-                        onSelectPanel(null)
-                    },
+                    temperatureLevel = temperatureLevel,
+                    temperatureEnabled = temperatureEnabled,
+                    onTemperatureLevelChange = onTemperatureLevelChange,
+                    onReasoningModeChange = onReasoningModeChange,
                 )
             }
         }
@@ -132,6 +136,9 @@ internal fun LocalComposerCapabilityPanel(
     usageMode: LocalUsageMode,
     reasoningMode: LocalReasoningUiMode,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
+    temperatureLevel: Int = 2,
+    temperatureEnabled: Boolean = true,
+    onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
     val colors = DsTheme.colors
     val modes = LocalReasoningControls.availableModes(profile, usageMode)
@@ -182,6 +189,75 @@ internal fun LocalComposerCapabilityPanel(
                 }
                 if (effectiveMode == LocalReasoningUiMode.DEFAULT) {
                     Text(stringResource(R.string.local_composer_reasoning_default_tip),
+                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                }
+            }
+            // Sampling is independently controlled but governed by the same model/reasoning route.
+            Text(
+                stringResource(R.string.local_composer_temperature_title),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+            )
+            val range = profile?.let {
+                LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+            }
+            val thinkingBlocksSampling = range?.requiresDisabledThinking == true &&
+                effectiveMode != LocalReasoningUiMode.FAST
+            if (range == null) {
+                Text(
+                    stringResource(R.string.local_composer_temperature_unavailable),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            } else {
+                val selectedLevel = temperatureLevel.coerceIn(0, 4)
+                var temperatureSelection by remember(profile?.id, usageMode, selectedLevel) {
+                    mutableFloatStateOf(selectedLevel.toFloat())
+                }
+                val temperatureTick = rememberHapticTickFeedback(selectedLevel)
+                val temperatureText = stringResource(R.string.local_composer_temperature_title)
+                val temperatureSample = range.at(temperatureSelection.roundToInt().coerceIn(0, 4) * 25)
+                val allowTemperature = temperatureEnabled && !thinkingBlocksSampling
+                Slider(
+                    modifier = Modifier
+                        .testTag("local-composer-temperature-slider")
+                        .semantics {
+                            contentDescription = temperatureText
+                            stateDescription = stringResource(
+                                R.string.local_composer_temperature_value, temperatureSample,
+                            )
+                        },
+                    value = temperatureSelection,
+                    enabled = allowTemperature,
+                    onValueChange = { next ->
+                        temperatureSelection = next
+                        temperatureTick(next.roundToInt().coerceIn(0, 4))
+                    },
+                    onValueChangeFinished = {
+                        onTemperatureLevelChange(temperatureSelection.roundToInt().coerceIn(0, 4))
+                    },
+                    valueRange = 0f..4f,
+                    steps = 3,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(
+                        if (usageMode == LocalUsageMode.CHAT)
+                            R.string.local_composer_temperature_chat_low
+                        else R.string.local_composer_temperature_work_low,
+                    ), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(stringResource(R.string.local_composer_temperature_natural),
+                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(stringResource(
+                        if (usageMode == LocalUsageMode.CHAT)
+                            R.string.local_composer_temperature_chat_high
+                        else R.string.local_composer_temperature_work_high,
+                    ), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                }
+                if (thinkingBlocksSampling) {
+                    Text(stringResource(R.string.local_composer_temperature_thinking),
+                        style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                } else if (!temperatureEnabled && usageMode == LocalUsageMode.CHAT) {
+                    Text(stringResource(R.string.local_composer_temperature_group_hint),
                         style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
