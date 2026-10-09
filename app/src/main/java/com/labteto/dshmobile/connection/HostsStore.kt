@@ -43,6 +43,10 @@ class HostsStore @Inject constructor(
         "relay_tokens_json", "relay_tokens_json_backup",
     ).map(::stringPreferencesKey)
 
+    private val retiredBooleanKeys = listOf(
+        "background", "notify_turn", "notify_goal", "notify_action",
+    ).map(::booleanPreferencesKey)
+
     val settings: Flow<AppSettings> = dataStore.data.map(::decodeSettings)
     suspend fun settingsOnce(): AppSettings = settings.first()
 
@@ -50,7 +54,7 @@ class HostsStore @Inject constructor(
     suspend fun clearRetiredRemoteData() {
         dataStore.edit { prefs ->
             retiredStringKeys.forEach { key -> prefs.remove(key) }
-            prefs.remove(booleanPreferencesKey("background"))
+            retiredBooleanKeys.forEach { key -> prefs.remove(key) }
         }
         // Token encryption key was only used by legacy remote pairing.
         runCatching {
@@ -114,5 +118,4 @@ class HostsStore @Inject constructor(
         // state ahead of the durable settings.
         DshApplication.storeThemePreference(context, checkNotNull(committed).themePreference)
     }
-
 }
