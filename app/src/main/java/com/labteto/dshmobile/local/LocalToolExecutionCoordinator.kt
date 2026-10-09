@@ -18,6 +18,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -47,6 +48,12 @@ internal class LocalToolExecutionCoordinator(
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
 ) {
+    // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
+    private val workspaceMutationMutex = Mutex()
+    private val serializedWorkspaceTools = setOf(
+        "write", "edit", "apply_patch", "bash", "run_shell", "download_file",
+    )
+
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
 
@@ -237,6 +244,8 @@ internal class LocalToolExecutionCoordinator(
             executionId = executionIdFactory(),
             rootCallId = call.id,
         )
+        val serializedMutation = !readLike && call.name in serializedWorkspaceTools
+        if (serializedMutation) workspaceMutationMutex.lock()
         val invocation = try {
             registry.executeTracked(
                 name = call.name,
@@ -272,6 +281,8 @@ internal class LocalToolExecutionCoordinator(
             return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted)
         } catch (error: Exception) {
             return thrownFailure(call, registered, "TOOL_ERROR", error.message ?: error::class.java.simpleName, executionStarted)
+        } finally {
+            if (serializedMutation) workspaceMutationMutex.unlock()
         }
         executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result

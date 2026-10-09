@@ -206,6 +206,7 @@ object LocalToolCatalog {
         add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "description" to string("可选；职责说明"),
+            "display_name" to string("可选；用户界面展示的中文成员名称"),
             "context" to buildJsonObject {
                 put("type", "string")
                 put("enum", buildJsonArray {
@@ -219,13 +220,16 @@ object LocalToolCatalog {
             "task" to string("本次任务"),
             "model" to string("可选；模型档案编号或无歧义模型名"),
             "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
+            "allowed_extensions" to stringArray("可选；Lead 核实后授权给本次启动成员的扩展工具名称"),
         ), listOf("target", "task")))
-        add(tool("team_spawn", "创建一个具备持久身份和 durable mailbox 的只读 teammate", properties(
+        add(tool("team_spawn", "创建具备持久身份、工作区读写权限和可选扩展授权的团队助手", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "description" to string("可选；职责说明"),
+            "display_name" to string("可选；用户界面展示的中文成员名称"),
             "task" to string("首个任务"),
             "model" to string("可选；模型档案编号或无歧义模型名"),
             "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
+            "allowed_extensions" to stringArray("可选；Lead 显式授权的已连接 MCP、LSP、GitHub 等扩展工具名称"),
             "context" to buildJsonObject {
                 put("type", "string")
                 put("description", "上下文模式；fresh 使用独立新上下文，fork 在创建时把 Lead 当前历史物化为 Child 初始检查点；默认 fresh")
