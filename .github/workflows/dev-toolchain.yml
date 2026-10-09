@@ -101,7 +101,25 @@ jobs:
       - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
+          # Preserve every executable verification, but do not run the full
+          # JVM suite simultaneously with memory/CPU-heavy Android lint + R8.
+          # The app Test task retains its fail-closed two-minute hang guard.
+          ./gradlew \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :app:testDebugUnitTest \
+            :reference-validation:test \
+            --stacktrace --console=plain
+          ./gradlew \
+            :app:lintDebug \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:assembleOptimized \
+            --stacktrace --console=plain
 
       - name: 拆分并校验组件包
         run: |
