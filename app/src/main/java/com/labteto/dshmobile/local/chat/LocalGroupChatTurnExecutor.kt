@@ -256,8 +256,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         maxAttemptsOverride = 1,
                         allowContextOverflowRecovery = false,
                         temperature = persona.behaviorTuning.roleplayTemperature(
-                    snapshot.modelState.model, snapshot.modelState.baseUrl,
-                ),
+                            snapshot.modelState.model, snapshot.modelState.baseUrl,
+                        ),
                     )
                 },
                 appendEvent = { type, data ->
