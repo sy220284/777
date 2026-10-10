@@ -122,6 +122,27 @@ class CharacterLoreEngineTest {
         assertTrue(engine.prompt(persona, "书店", storyStage = "act-2").contains("第二幕才发现"))
     }
 
+    @Test fun scopedSpoilerLoreUnlocksByExplicitStoryVisitAndRevokesOnRewind() {
+        val persona = PersonaProfile(loreEntries = listOf(
+            PersonaLoreEntry(id = "opening", title = "早期身份", content = "在桥边接头",
+                temporalScope = "opening", keywords = listOf("接头"), spoilerLevel = 1),
+            PersonaLoreEntry(id = "later", title = "后续秘密", content = "阿宁其实是调查员",
+                temporalScope = "later", keywords = listOf("接头"), spoilerLevel = 3),
+            PersonaLoreEntry(id = "ungated", title = "更远秘密", content = "第三个秘密",
+                keywords = listOf("接头"), spoilerLevel = 3),
+        ))
+        val engine = CharacterLoreEngine()
+        val first = ChatContextState().withStoryStageSelection("opening")
+        assertEquals(listOf("opening"), engine.activated(persona, "接头",
+            storyStage = first.storyStage, unlockedStages = first.visibleStoryStages()).map { it.id })
+        val second = first.withStoryStageSelection("later")
+        assertEquals(listOf("opening", "later"), engine.activated(persona, "接头",
+            storyStage = second.storyStage, unlockedStages = second.visibleStoryStages()).map { it.id })
+        val rewind = second.withStoryStageSelection("opening")
+        assertEquals(listOf("opening"), engine.activated(persona, "接头",
+            storyStage = rewind.storyStage, unlockedStages = rewind.visibleStoryStages()).map { it.id })
+    }
+
     @Test
     fun promptUsesActualLoreTitle() {
         val persona = PersonaProfile(
