@@ -772,4 +772,25 @@ class ChatPersonaGalleryTest {
         assertEquals(setOf("act-1", "act-2"),
             loaded.map(PersonaLoreEntry::temporalScope).toSet())
     }
+
+    @Test
+    fun galleryDirectSaveNormalizesDuplicateLoreIdsWithoutLosingStage() {
+        val file = File(temporary.root, "gallery-staged-lore.json")
+        val profile = PersonaProfile(name = "阿青", coreIdentity = "学者",
+            loreEntries = listOf(
+                PersonaLoreEntry(id = "same", title = "线索",
+                    content = "早期发现的线索", temporalScope = "opening"),
+                PersonaLoreEntry(id = "same", title = "线索",
+                    content = "后期查明的线索", temporalScope = "later"),
+            ))
+        val saved = ChatPersonaGalleryStore(file, json).save(
+            persona = profile, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+        ).entry
+        val loaded = ChatPersonaGalleryStore(file, json).findEntry(saved.id)!!.persona
+        assertEquals(2, loaded.loreEntries.size)
+        assertEquals(2, loaded.loreEntries.map(PersonaLoreEntry::id).toSet().size)
+        assertEquals(setOf("opening", "later"),
+            loaded.loreEntries.map(PersonaLoreEntry::temporalScope).toSet())
+    }
 }
