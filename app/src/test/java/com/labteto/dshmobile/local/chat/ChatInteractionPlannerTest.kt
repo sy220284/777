@@ -1,12 +1,68 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatInteractionPlannerTest {
+
+    @Test
+    fun confirmedDatingExpressionsAdvanceRelationshipWithoutRigidKeywordRejection() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val patch = """{"state":{"dynamics":{"stage":"DATING"}},"turnSignificance":"MAJOR"}"""
+        listOf("我们决定交往了", "我们开始交往了", "我们正在交往").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "好，我们说定了",
+            )!!
+            assertEquals("DATING", result.state.dynamics.stage)
+        }
+    }
+
+    @Test
+    fun confirmedCoupleExpressionsAdvanceButNegatedAndHypotheticalDoNot() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "DATING"))
+        val patch = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        listOf("我们已经是情侣了", "我们成为情侣了", "我们确定恋爱关系了").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "嗯",
+            )!!
+            assertEquals("COMMITTED", result.state.dynamics.stage)
+        }
+        listOf("我们还没成为情侣", "如果我们成为情侣", "我朋友已经是情侣了").forEach { user ->
+            val result = planner.parse(
+                patch, previous, userMessage = user, assistantMessage = "知道了",
+            )!!
+            assertEquals("DATING", result.state.dynamics.stage)
+        }
+    }
+
+    @Test
+    fun firstPersonTopicSwitchClearsOldTopicButQuotationAndNegationDoNot() {
+        val previous = ChatCharacterState(
+            currentFocus = "未解决的旧话题",
+            currentAgenda = "继续旧讨论",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val patch = """{"state":{},"turnSignificance":"NONE"}"""
+        listOf("我想换个话题", "我们先换个话题", "我想先不聊这个", "我希望换个话题").forEach { user ->
+            val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
+            assertEquals("", state.currentFocus)
+            assertEquals("", state.currentAgenda)
+            assertTrue(state.unresolvedThreads.isEmpty())
+        }
+        listOf("我不想换个话题", "昨天他说我想换个话题").forEach { user ->
+            val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
+            assertEquals("未解决的旧话题", state.currentFocus)
+            assertEquals(listOf("旧线索"), state.unresolvedThreads)
+        }
+    }
+
 
     @Test
     fun shortLivedStateExpiresWhenPlannerKeepsReturningNone() {
@@ -27,6 +83,161 @@ class ChatInteractionPlannerTest {
         assertTrue(state.currentFocus.isBlank())
         assertTrue(state.immediateConcern.isBlank())
         assertTrue(state.unresolvedThreads.isNotEmpty())
+    }
+
+    @Test
+    fun casualTopicWordsDoNotEraseOpenThreads() {
+        val previous = ChatCharacterState(
+            currentFocus = "关于工作的争执",
+            currentAgenda = "等待解释",
+            unresolvedThreads = listOf("周末约定"),
+        )
+        listOf("算了，先去吃饭", "我们说正事吧", "昨天他说换个话题，我不认可").forEach { user ->
+            val result = planner.parse(
+                """{"state":{},"turnSignificance":"NONE"}""",
+                previous = previous,
+                userMessage = user,
+                assistantMessage = "好",
+            )!!
+            assertEquals("关于工作的争执", result.state.currentFocus)
+            assertEquals(listOf("周末约定"), result.state.unresolvedThreads)
+        }
+    }
+
+    @Test
+    fun relationshipCommitmentSupportsNaturalConfirmedLanguage() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "DATING"))
+        val plan = planner.parse(
+            """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}""",
+            previous,
+            userMessage = "我们决定在一起",
+            assistantMessage = "嗯，这次我们是认真的",
+        )!!
+        assertEquals("COMMITTED", plan.state.dynamics.stage)
+    }
+
+    @Test
+    fun negatedQuestionedOrThirdPartyEventsDoNotChangeOurRelationshipStage() {
+        val separated = ChatCharacterState(dynamics = RelationshipDynamics(stage = "COMMITTED"))
+        val breakup = """{"state":{"dynamics":{"stage":"SEPARATED"}},"turnSignificance":"MAJOR"}"""
+        listOf(
+            "我们没有分手",
+            "我们不会分手",
+            "我们分手了吗？",
+            "我们昨天听说前任分手了",
+            "假如我们分手了会怎样",
+        ).forEach { user ->
+            val result = planner.parse(breakup, separated, userMessage = user, assistantMessage = "知道了")!!
+            assertEquals("COMMITTED", result.state.dynamics.stage)
+        }
+        val confirmed = planner.parse(
+            breakup, separated, userMessage = "我们昨天决定分手了", assistantMessage = "好",
+        )!!
+        assertEquals("SEPARATED", confirmed.state.dynamics.stage)
+    }
+
+    @Test
+    fun stageEventMustMatchRequestedRelationshipDirection() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val payload = """{"state":{"dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        val wrongContext = planner.parse(
+            payload, previous, userMessage = "我的前任结婚了", assistantMessage = "哦",
+        )!!
+        assertEquals("FAMILIAR", wrongContext.state.dynamics.stage)
+        val wrongDirection = planner.parse(
+            payload, previous, userMessage = "我们分手了", assistantMessage = "好",
+        )!!
+        assertEquals("FAMILIAR", wrongDirection.state.dynamics.stage)
+        val confirmed = planner.parse(
+            payload, previous, userMessage = "我们确认关系，在一起了", assistantMessage = "好",
+        )!!
+        assertEquals("COMMITTED", confirmed.state.dynamics.stage)
+    }
+
+    @Test
+    fun backgroundConsolidationRegeneratesOnlyRecoverableAdmittedStreamFailures() {
+        val interrupted = modelPostAdmissionFailure(
+            code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+            detail = "模型流中断",
+        )
+        assertTrue(shouldRetryChatPostTurnRequest(interrupted))
+        assertTrue(shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_NETWORK", message = "请求体已发送，等待响应时断开",
+            retryable = false, admissionState = LocalModelAdmissionState.MAYBE_ADMITTED,
+            continuationEligible = true,
+        )))
+        assertTrue(shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_NETWORK", message = "连接前失败", retryable = true,
+        )))
+        assertEquals(false, shouldRetryChatPostTurnRequest(modelPostAdmissionFailure(
+            code = "MODEL_STREAM_PROTOCOL",
+            detail = "协议错误",
+        )))
+        assertEquals(false, shouldRetryChatPostTurnRequest(LocalModelException(
+            code = "MODEL_HTTP_401", message = "身份验证失败", retryable = false,
+        )))
+    }
+
+    @Test
+    fun systemOwnedFieldsAreIgnoredWithoutFalseParseFailureOrRetry() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        listOf(
+            """{"state":{"scene":{"location":"厨房"}},"turnSignificance":"MINOR"}""",
+            """{"state":{"evolution":{"traits":{"courage":99}}}}""",
+            """{"state":{"dynamics":{"systemCounter":3},"continuity":{"evidence":"runtime"}}}""",
+        ).forEach { payload ->
+            assertNotNull(parser.parsePlan(payload))
+        }
+    }
+
+    @Test
+    fun invalidStateCannotBeMaskedBySuggestionsOrUnusableDiary() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        val withSuggestion = """{"state":{"initiative":"略升"},
+            "suggestions":[{"label":"聊聊","text":"你好"}],"turnSignificance":"MINOR"}"""
+        assertEquals("state_patch_unusable", parser.parseFailureKind(withSuggestion))
+        val withoutPerspective = """{"state":{"initiative":"略升"},
+            "diaryDelta":{"event":"今天发生了一件重要的事情","importance":4},
+            "turnSignificance":"MINOR"}"""
+        assertEquals("state_patch_unusable", parser.parseFailureKind(withoutPerspective))
+    }
+
+    @Test
+    fun missingStateAndEmptyResponseCannotSilentlySettlePendingChatTurns() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        assertEquals("state_patch_missing", parser.parseFailureKind("{}"))
+        assertEquals("state_patch_missing", parser.parseFailureKind(
+            """{"turnSignificance":"MAJOR"}""",
+        ))
+        assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
+    }
+
+    @Test
+    fun invalidStateCannotSilentlyAdvancePendingTurnCursor() {
+        val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+        val bad = """{"state":{"initiative":"略升","dynamics":{"facts":["无来源文字"]}},"turnSignificance":"MINOR"}"""
+        assertEquals(null, parser.parsePlan(bad))
+        assertEquals("state_patch_unusable", parser.parseFailureKind(bad))
+        assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
+        assertNotNull(parser.parsePlan(
+            """{"state":{"initiative":"略升"},"diaryDelta":{"event":"真正发生的事情","importance":4,"feeling":"当时很开心"},"turnSignificance":"MINOR"}""",
+        ))
+    }
+
+    @Test
+    fun explicitNaturalTopicChangeStillClearsOldTopic() {
+        val previous = ChatCharacterState(
+            currentFocus = "旧话题",
+            unresolvedThreads = listOf("旧线索"),
+        )
+        val state = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "我们换个话题吧，聊点新的",
+            assistantMessage = "好",
+        )!!.state
+        assertEquals("", state.currentFocus)
+        assertTrue(state.unresolvedThreads.isEmpty())
     }
 
     @Test
@@ -1042,6 +1253,197 @@ class ChatInteractionPlannerTest {
         assertTrue(prompt.contains("建议承接当前互动"))
         assertTrue(prompt.contains("存在中文双关"))
         assertTrue(prompt.contains("不做词义解释"))
+    }
+
+    @Test
+    fun standaloneSuggestionsPreserveValidEntriesWhenOtherEntriesDrift() {
+        val suggestions = planner.parseSuggestions(
+            """{"suggestions":["invalid",{"label":"自然","text":"继续聊","bold":"yes"},
+            {"label":"俏皮","text":"再来一点","bold":true}]}""",
+        )!!
+        assertEquals(2, suggestions.size)
+        assertEquals("继续聊", suggestions[0].text)
+        assertTrue(suggestions[1].bold)
+    }
+
+    @Test
+    fun invalidRootStateCannotBeMarkedProcessedBySuggestionsOrInvalidDiary() {
+        val previous = ChatCharacterState(mood = "旧情绪")
+        val payload = """{"state":false,"suggestions":[{"label":"回应","text":"我们接着聊"}],
+            "diaryDelta":{"event":"彼此道别","importance":"无效"},"turnSignificance":"MINOR"}"""
+        // Chat post-turn is a durable state update, so invalid state plus unusable diary
+        // must stay pending rather than silently consuming its cursor.
+        assertEquals(null, planner.parse(
+            payload,
+            previous = previous,
+            userMessage = "回头见",
+            assistantMessage = "再见",
+        ))
+        assertEquals("state_patch_unusable", planner.postTurnParseFailureKind(payload))
+        // The separate suggestion path remains usable: no blanket rejection of good copy.
+        val suggestions = planner.parseSuggestions(payload)!!
+        assertEquals(1, suggestions.size)
+        assertEquals("我们接着聊", suggestions.single().text)
+    }
+
+    @Test
+    fun observerDiaryWithMalformedImportanceStillKeepsValidEvent() {
+        val raw = Json.parseToJsonElement(
+            """{"event":"看到朋友和解","importance":"略高","feeling":"放松"}""",
+        ).jsonObject
+        val delta = Json.decodeFromJsonElement(
+            ChatDiaryDelta.serializer(), normalizeChatDiaryDelta(raw),
+        )
+        assertEquals("看到朋友和解", delta.event)
+        assertEquals("放松", delta.feeling)
+        assertEquals(0, delta.importance)
+    }
+
+    @Test
+    fun malformedObserverIdsNeverBreakOtherGroupEntries() {
+        fun id(value: String): String? = validGroupGalleryId(
+            Json.parseToJsonElement("""{"galleryId":$value}""").jsonObject,
+        )
+        assertEquals("role-a", id("\"role-a\""))
+        assertEquals(null, id("""{"id":"role-a"}"""))
+        assertEquals(null, id("""["role-a"]"""))
+        assertEquals(null, id("42"))
+        assertEquals(null, id("null"))
+    }
+
+    @Test
+    fun malformedArraysCannotClearEarlierThreadsOrContinuity() {
+        val previous = ChatCharacterState(
+            unresolvedThreads = listOf("等待回答"),
+            continuity = ChatContinuityState(recentEvents = listOf("已发生的事")),
+        )
+        val plan = planner.parse(
+            """{"state":{"mood":"开心","unresolvedThreads":[false],
+            "continuity":{"recentEvents":[false],"evidence":"错误格式"}},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "继续",
+            assistantMessage = "好的",
+        )!!
+        assertEquals("开心", plan.state.mood)
+        assertEquals(previous.unresolvedThreads, plan.state.unresolvedThreads)
+        assertEquals(previous.continuity.recentEvents, plan.state.continuity.recentEvents)
+    }
+
+    @Test
+    fun optionalSuggestionAndDiaryDriftCannotRejectValidStatePatch() {
+        val plan = planner.parse(
+            """{"state":{"mood":"开心","transientAges":[1],
+            "userPattern":{"observedTurns":"无效"}},"suggestions":["bad",
+            {"label":"继续","text":"继续聊聊","bold":"yes"}],
+            "diaryDelta":{"event":"开心聊天","importance":"稍高"},"turnSignificance":"MINOR"}""",
+            previous = ChatCharacterState(),
+            userMessage = "今天",
+            assistantMessage = "好的",
+        )!!
+        assertEquals("开心", plan.state.mood)
+        assertEquals(1, plan.suggestions.size)
+        assertEquals("继续聊聊", plan.suggestions.single().text)
+        assertEquals("开心聊天", plan.diaryDelta?.event)
+    }
+
+    @Test
+    fun malformedOptionalPatchFieldsPreserveValidStateAndExistingEvidence() {
+        val previous = ChatCharacterState(
+            initiative = 55,
+            dynamics = RelationshipDynamics(
+                unresolvedConflict = "尚未解释清楚",
+                facts = listOf(RelationshipEvidence("已有证据", confidence = 95, source = "dialogue")),
+            ),
+        )
+        val result = planner.parse(
+            """{"state":{"mood":"开心","initiative":"略升","dynamics":{"unresolvedConflict":false,"facts":["无来源文字"],"warmth":65}},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "今天很好",
+            assistantMessage = "是呀",
+        )!!
+        assertEquals("开心", result.state.mood)
+        assertEquals(55, result.state.initiative)
+        assertEquals("尚未解释清楚", result.state.dynamics.unresolvedConflict)
+        assertEquals(previous.dynamics.facts, result.state.dynamics.facts)
+    }
+
+    @Test
+    fun numericStringsCanBeNormalizedWithoutGuessingQualitativeConflict() {
+        val result = planner.parse(
+            """{"state":{"initiative":"62","dynamics":{"unresolvedConflict":[]}},"turnSignificance":"MINOR"}""",
+            previous = ChatCharacterState(initiative = 50, dynamics = RelationshipDynamics(unresolvedConflict = "保留")),
+            userMessage = "好的",
+            assistantMessage = "收到",
+        )!!
+        assertEquals(62, result.state.initiative)
+        assertEquals("保留", result.state.dynamics.unresolvedConflict)
+    }
+
+    @Test
+    fun groupPostTurnEnvelopeCanRecoverFencedBatchJson() {
+        val envelope = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+            .parseJsonObjectEnvelope(
+                """结果如下：{"plans":[{"galleryId":"a","plan":{"state":{"mood":"开心"}}}],"observerDiaries":[]} 后续说明""",
+            )
+        assertNotNull(envelope)
+        assertTrue(envelope!!.containsKey("plans"))
+    }
+
+    @Test
+    fun firstCompleteJsonObjectCanBeRecoveredFromAdditionalModelProse() {
+        val result = planner.parse(
+            """以下为更新：{"state":{"mood":"开心","currentFocus":"他提到{旧事}"},"turnSignificance":"MINOR"} 完毕 {"other":"ignored"}""",
+            previous = ChatCharacterState(),
+            userMessage = "聊聊",
+            assistantMessage = "好",
+        )!!
+        assertEquals("开心", result.state.mood)
+        assertEquals("他提到{旧事}", result.state.currentFocus)
+    }
+
+    @Test
+    fun literalControlCharactersInGeneratedJsonStringsAreEscapedWithoutRetry() {
+        val body = """{"state":{"currentFocus":"第一行__NL__第二行"},"turnSignificance":"MINOR"}"""
+            .replace("__NL__", "\n")
+        val result = planner.parse(
+            body,
+            previous = ChatCharacterState(),
+            userMessage = "看一下",
+            assistantMessage = "好",
+        )!!
+        assertEquals("第一行\n第二行", result.state.currentFocus)
+    }
+
+    @Test
+    fun brokenJsonNeverAppliesAPartialPatch() {
+        val previous = ChatCharacterState(mood = "平静")
+        assertEquals(null, planner.parse("""{"state":{"mood":"开心","initiative":""", previous))
+        assertEquals("incomplete_json", ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
+            .parseFailureKind("""{"state":{"mood":"开心","initiative":"""))
+    }
+
+    @Test
+    fun mixedTypeArraysKeepValidHistoryItemsWithoutTreatingAllBadAsExplicitClear() {
+        val raw = Json.parseToJsonElement(
+            """{"state":{"unresolvedThreads":[false,"仍需回答",42],
+            "continuity":{"recentEvents":["旧事",null,"新事"],"decisions":[false]},
+            "dynamics":{"facts":["不能作为证据"]}}}""",
+        ).jsonObject
+        val state = normalizeChatPostTurnPatch(raw)["state"]!!.jsonObject
+        assertEquals("""["仍需回答"]""", state["unresolvedThreads"].toString())
+        val continuity = state["continuity"]!!.jsonObject
+        assertEquals("""["旧事","新事"]""", continuity["recentEvents"].toString())
+        assertEquals(null, continuity["decisions"])
+        assertEquals(null, state["dynamics"]!!.jsonObject["facts"])
+    }
+
+    @Test
+    fun quotedBooleanSuggestionIsNormalizedWithoutRejectingValidSuggestion() {
+        val suggestions = planner.parseSuggestions(
+            """{"suggestions":[{"label":"继续","text":"接着","bold":"true"}]}""",
+        )!!
+        assertEquals(1, suggestions.size)
+        assertTrue(suggestions.single().bold)
     }
 
     @Test

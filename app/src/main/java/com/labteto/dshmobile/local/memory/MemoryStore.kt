@@ -35,7 +35,8 @@ class MemoryStore internal constructor(
         pinned: Boolean = false,
         replaceIds: Set<String> = emptySet(),
     ): MemoryRecord {
-        val clean = content.trim().take(MAX_MEMORY_CONTENT_CHARS)
+        val clean = content.trim()
+        require(clean.length <= MAX_MEMORY_CONTENT_CHARS) { "记忆正文超过单条存储安全上限，请拆分保存；原始内容未被截断" }
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
         require(scope != MemoryScope.PROJECT || !projectId.isNullOrBlank()) { "项目记忆缺少项目编号" }
         require(scope != MemoryScope.LINEAGE || !lineageId.isNullOrBlank()) { "对话链记忆缺少对话链编号" }
@@ -141,7 +142,8 @@ class MemoryStore internal constructor(
         val index = records.indexOfFirst { it.id == id && it.active }
         require(index >= 0) { "长期记忆不存在或已停用：$id" }
         val current = records[index]
-        val clean = content?.trim()?.take(MAX_MEMORY_CONTENT_CHARS) ?: current.content
+        val clean = content?.trim() ?: current.content
+        require(clean.length <= MAX_MEMORY_CONTENT_CHARS) { "记忆正文超过单条存储安全上限，原记录已保留；请拆分保存" }
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
         val updated = current.copy(
             content = clean,
@@ -345,11 +347,25 @@ class MemoryStore internal constructor(
         var used = 0
         val selected = mutableListOf<MemoryRecord>()
         for (record in reranked) {
-            val cost = record.content.length + 32
-            if (selected.isNotEmpty() && used + cost > boundedChars) break
-            selected += record
-            used += cost
             if (selected.size >= boundedItems) break
+            val remaining = boundedChars - used - 32
+            if (remaining <= 0) break
+            // A long memory must not crowd out later relevant facts. The original record stays
+            // durable and unchanged; only this search result's prompt-facing copy is excerpted.
+            val projected = if (record.content.length <= remaining) record else {
+                val excerptLimit = minOf(remaining, maxOf(96, boundedChars / minOf(boundedItems, 3)))
+                if (excerptLimit < 48) continue
+                val phrase = queryTerms.asSequence().map { record.content.indexOf(it, ignoreCase = true) }
+                    .firstOrNull { it >= 0 } ?: 0
+                val length = excerptLimit - 2
+                val start = (phrase - length / 3).coerceIn(0, record.content.length - length)
+                val end = start + length
+                record.copy(content = (if (start > 0) "…" else "") +
+                    record.content.substring(start, end) +
+                    (if (end < record.content.length) "…" else ""))
+            }
+            selected += projected
+            used += projected.content.length + 32
         }
         return selected
     }
@@ -453,7 +469,7 @@ class MemoryStore internal constructor(
 
 
     private companion object {
-        const val MAX_MEMORY_CONTENT_CHARS = 2_000
+        const val MAX_MEMORY_CONTENT_CHARS = 32_000
         const val MAX_RECORDS = 2_000
         const val DEFAULT_MAX_ITEMS = 6
         const val DEFAULT_MAX_CHARS = 3_500

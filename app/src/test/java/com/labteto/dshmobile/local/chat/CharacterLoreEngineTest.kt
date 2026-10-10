@@ -89,6 +89,26 @@ class CharacterLoreEngineTest {
     }
 
     @Test
+    fun oversizedRelevantLoreDoesNotHideLaterMatchingEntriesOrOverflowBudget() {
+        val persona = PersonaProfile(
+            loreEntries = listOf(
+                PersonaLoreEntry(id = "very-long", title = "长背景",
+                    content = "开头。" + "旧资料。".repeat(300) + "目标线索，隐藏在长文本末尾。",
+                    keywords = listOf("目标"), priority = 100),
+                PersonaLoreEntry(id = "short", title = "当前线索",
+                    content = "目标已经回到故乡。", keywords = listOf("目标")),
+            ),
+        )
+
+        val active = engine.activated(persona, "目标", maxChars = 400)
+        assertEquals(listOf("very-long", "short"), active.map { it.id })
+        assertTrue(active.sumOf { it.title.length + it.content.length + 24 } <= 400)
+        assertTrue(active.first().content.contains("目标线索"))
+        assertTrue(active.last().content.contains("回到故乡"))
+        assertTrue(persona.loreEntries.first().content.contains("隐藏在长文本末尾"))
+    }
+
+    @Test
     fun promptUsesActualLoreTitle() {
         val persona = PersonaProfile(
             loreEntries = listOf(

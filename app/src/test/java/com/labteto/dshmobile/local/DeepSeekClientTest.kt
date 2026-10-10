@@ -14,6 +14,7 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -372,6 +373,48 @@ class DeepSeekClientTest {
         assertTrue(error?.message.orEmpty().contains("Responses API"))
     }
 
+
+    @Test
+    fun socketReadResetAfterValidDeltaDoesNotReplayOrLoseErrorClassification() = runBlocking {
+        var attempts = 0
+        val partial = """data: {"choices":[{"delta":{"content":"半截"}}]}""" + "\n\n"
+        val responseBody = object : okhttp3.ResponseBody() {
+            override fun contentType() = "text/event-stream".toMediaType()
+            override fun contentLength(): Long = -1L
+            override fun source(): okio.BufferedSource = object : okio.Source {
+                val unread = Buffer().writeUtf8(partial)
+                override fun read(sink: Buffer, byteCount: Long): Long =
+                    if (unread.size > 0L) unread.read(sink, byteCount)
+                    else throw java.io.IOException("simulated connection reset")
+                override fun timeout(): okio.Timeout = okio.Timeout.NONE
+                override fun close() {}
+            }.buffer()
+        }
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            attempts++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body(responseBody).build()
+        }.build()
+        val observed = mutableListOf<String>()
+        val error = runCatching {
+            DeepSeekClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                apiKey = "test",
+                baseUrl = "https://example.com",
+                model = "deepseek-chat",
+                messages = listOf(buildJsonObject {
+                    put("role", "user"); put("content", "test")
+                }),
+                tools = JsonArray(emptyList()),
+                onDelta = { observed += it.content },
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", error?.code)
+        assertFalse(error?.retryable ?: true)
+        assertTrue(error?.continuationEligible == true)
+        assertEquals(listOf("半截"), observed)
+        assertEquals(1, attempts)
+    }
 
     @Test
     fun truncatedSseAfterAdmissionIsNotBlindlyReplayed() = runBlocking {

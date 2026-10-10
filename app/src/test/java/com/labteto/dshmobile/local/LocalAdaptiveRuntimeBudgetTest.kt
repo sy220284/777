@@ -26,6 +26,28 @@ class LocalAdaptiveRuntimeBudgetTest {
     }
 
     @Test
+    fun configuredStepsAboveLegacy128RemainHonoredByInitialBudget() {
+        val limit = adaptiveAgentStepLimit(
+            configuredBase = 512,
+            task = "继续执行当前授权任务",
+            contextChars = 480_000,
+            contextBudgetChars = 500_000,
+            pressure = HarnessResourcePressure.HIGH,
+            kind = LocalAgentRunKind.FOREGROUND,
+        )
+        assertEquals(512, limit)
+        val mid = adaptiveAgentStepLimit(
+            configuredBase = 240,
+            task = "处理长任务",
+            contextChars = 0,
+            contextBudgetChars = 200_000,
+            pressure = HarnessResourcePressure.LOW,
+            kind = LocalAgentRunKind.SUBAGENT,
+        )
+        assertTrue(mid >= 240)
+    }
+
+    @Test
     fun neverShrinksBelowUserBaselineUnderPressure() {
         val limit = adaptiveAgentStepLimit(
             configuredBase = 32,

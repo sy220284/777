@@ -135,9 +135,24 @@ internal fun findChatContinuitySourceUserMessageId(
     }
 }
 
+/**
+ * Background state consolidation has no tool side effects. An interrupted admitted inference
+ * may be regenerated as a distinct, metered request using the still-pending transcript.
+ * The foreground model/tool retry gate stays unchanged; scheduleRetry bounds the attempts.
+ */
 internal fun shouldRetryChatPostTurnRequest(error: Throwable): Boolean =
     when (error) {
-        is LocalModelException -> error.retryable
+        is LocalModelException -> error.retryable || (
+            error.continuationEligible &&
+                error.admissionState in setOf(
+                    com.labteto.dshmobile.local.model.LocalModelAdmissionState.MAYBE_ADMITTED,
+                    com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED,
+                ) &&
+                (
+                    error.code in setOf("MODEL_NETWORK", "MODEL_TIMEOUT", "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION") ||
+                        error.code.endsWith("_STREAM_INTERRUPTED")
+                    )
+            )
         is IOException -> true
         else -> false
     }
@@ -417,6 +432,11 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 put("detail", error.message.orEmpty().take(1_000))
                 put("pending_count", pending.size)
                 put("retryable", retryable)
+                if (error is LocalModelException) {
+                    put("failure_code", error.code)
+                    put("admission_state", error.admissionState.name.lowercase())
+                    put("separate_regeneration", !error.retryable && retryable)
+                }
             })
             if (retryable) {
                 scheduleRetry(
@@ -447,7 +467,10 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         if (plan == null) {
             boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "parse-failed")
+                put("error_kind", chatTurnCoordinator.postTurnParseFailureKind(plannerReply.content.orEmpty()))
+                put("raw_content_chars", plannerReply.content.orEmpty().length)
                 put("content", plannerReply.content.orEmpty().take(2_000))
+                put("content_log_truncated", plannerReply.content.orEmpty().length > 2_000)
                 put("pending_count", pending.size)
             })
             scheduleRetry(

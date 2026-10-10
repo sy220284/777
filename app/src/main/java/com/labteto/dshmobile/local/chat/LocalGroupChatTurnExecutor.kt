@@ -37,12 +37,20 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+
+/** Only string IDs are valid; a drifting model field must not abort the other members. */
+internal fun validGroupGalleryId(item: JsonObject): String? =
+    (item["galleryId"] as? JsonPrimitive)
+        ?.takeIf { it.isString }
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
 
 /**
  * Owns multi-character group-chat turn execution.
@@ -346,6 +354,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                             .joinToString(" ")
                     },
                     generation = snapshot.chat.groupChat.context.generation,
+                    // Stable across pending-batch retries: the diary store deduplicates revisions
+                    // by projectionId before applying any new write.
+                    projectionId = buildString {
+                        append(snapshot.sessionId)
+                        append(":group:")
+                        append(member.galleryId)
+                        append(':')
+                        append(snapshot.chat.groupChat.context.generation)
+                        append(':')
+                        append(sharedPending.maxOfOrNull(ChatPendingTurn::sequence) ?: 0L)
+                    },
                 ),
             )
         }.onSuccess { diary ->
@@ -528,12 +547,13 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 taskLabel = userMessage,
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
             )
-            val root = json.parseToJsonElement(plannerReply.content.orEmpty()).jsonObject
-            val plans = root["plans"]?.jsonArray.orEmpty()
+            val root = chatTurnCoordinator.parsePostTurnEnvelope(plannerReply.content.orEmpty())
+                ?: error("群聊状态整理未返回完整 JSON 对象")
+            val plans = (root["plans"] as? JsonArray).orEmpty()
             val result = linkedMapOf<String, ChatCharacterState>()
             plans.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
-                val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val galleryId = validGroupGalleryId(item) ?: return@forEach
                 val source = replies.firstOrNull { it.member.galleryId == galleryId } ?: return@forEach
                 val plan = item["plan"] ?: return@forEach
                 val parsed = chatTurnCoordinator.parsePostTurn(
@@ -548,17 +568,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
                 result[galleryId] = parsed.state
             }
-            val observerDiaries = root["observerDiaries"]?.jsonArray.orEmpty()
+            val observerDiaries = (root["observerDiaries"] as? JsonArray).orEmpty()
             observerDiaries.forEach { element ->
                 val item = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
-                val galleryId = item["galleryId"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val galleryId = validGroupGalleryId(item) ?: return@forEach
                 val observer = observers.firstOrNull { (member, _) -> member.galleryId == galleryId }
                     ?: return@forEach
-                val significance = item["turnSignificance"]?.jsonPrimitive?.contentOrNull ?: "NONE"
+                val significance = (item["turnSignificance"] as? JsonPrimitive)?.contentOrNull ?: "NONE"
                 val diaryObject = item["diaryDelta"] as? JsonObject
                 val delta = diaryObject?.let {
                     runCatching {
-                        json.decodeFromJsonElement(ChatDiaryDelta.serializer(), it)
+                        json.decodeFromJsonElement(ChatDiaryDelta.serializer(), normalizeChatDiaryDelta(it))
                     }.getOrNull()
                 }
                 recordGroupDiaryDelta(

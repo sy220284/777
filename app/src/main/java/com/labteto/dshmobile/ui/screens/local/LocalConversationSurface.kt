@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -74,6 +75,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.presentation.LocalWorkTemperatureControls
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
@@ -184,6 +186,8 @@ internal fun LocalConversationSurface(
     val topSurfaceColor = colors.rootSurface()
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
+    // Global ceiling changes must also refresh the exact per-model persona/Work projection.
+    val performanceCeiling = LocalModelPerformanceControls.state.collectAsState().value.temperatureCeiling
     var reasoningMode by remember(state.sessionId, state.usageMode) {
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
@@ -191,7 +195,7 @@ internal fun LocalConversationSurface(
     val workTemperatureRange = activeModelProfile?.let {
         LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
     }
-    var workTemperatureLevel by remember(state.sessionId, activeModelProfile?.id, workTemperatureRange) {
+    var workTemperatureLevel by remember(state.sessionId, activeModelProfile?.id, workTemperatureRange, performanceCeiling) {
         LocalWorkTemperatureControls.attach(appContext)
         androidx.compose.runtime.mutableIntStateOf(
             LocalWorkTemperatureControls.level(state.sessionId, workTemperatureRange),

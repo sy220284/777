@@ -62,6 +62,26 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitlyDiscoveredToolTakesPrecedenceOverEarlierOptionalBudget() {
+        val registry = ToolRegistry().apply {
+            repeat(18) { index ->
+                register(tool(name = "background_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "后台扩展", keywords = setOf("background")) { ToolResult("ok") })
+            }
+            register(tool(name = "critical_lookup", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "精确发现", keywords = setOf("critical")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 18).map { "background_$it" })
+        assertFalse("critical_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        val response = coordinator.searchCapabilities("critical_lookup")
+        assertTrue(response.contains("critical_lookup"))
+        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).contains("critical_lookup"))
+    }
+
+    @Test
     fun disabledNetworkSearchBlocksDiscoverySchemasAndExecution() = runBlocking {
         var networkEnabled = false
         var executed = 0
@@ -295,6 +315,49 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals("MUTATION_SCOPE_BLOCKED", readonly.errorCode)
         assertEquals("PLAN_MODE_BLOCKED", planning.errorCode)
         assertEquals(0, executed)
+    }
+
+    @Test
+    fun readonlyToolExceptionsKeepActionableCodesAndSafeRetries() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.io.FileNotFoundException("不存在的文件")
+            })
+            register(tool("glob", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalArgumentException("目录错误")
+            })
+            register(tool("lsp_diagnostics", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalArgumentException("未检测到语言服务器")
+            })
+            register(tool("io_probe", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.io.IOException("临时读取中断")
+            })
+            register(tool("missing_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.NoSuchFileException("missing.txt")
+            })
+            register(tool("denied_file", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw java.nio.file.AccessDeniedException("private.txt")
+            })
+            register(tool("lsp_start_denied", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                throw IllegalStateException("用户拒绝启动代码智能进程")
+            })
+        }
+        val coordinator = coordinator(registry)
+        suspend fun result(name: String) = coordinator.execute(
+            LocalToolCall("c-" + name, name, JsonObject(emptyMap()), "{}"), allowMutation = true,
+        )
+        assertEquals("TOOL_NOT_FOUND", result("read").errorCode)
+        assertEquals("TOOL_INVALID_ARGUMENT", result("glob").errorCode)
+        assertEquals("TOOL_UNAVAILABLE", result("lsp_diagnostics").errorCode)
+        val io = result("io_probe")
+        assertEquals("TOOL_IO_ERROR", io.errorCode)
+        assertTrue(io.retryable)
+        assertEquals(AgentToolSideEffect.NONE, io.sideEffect)
+        assertEquals("TOOL_NOT_FOUND", result("missing_file").errorCode)
+        val denied = result("denied_file")
+        assertEquals("TOOL_PERMISSION_DENIED", denied.errorCode)
+        assertFalse(denied.retryable)
+        assertEquals("APPROVAL_DENIED", result("lsp_start_denied").errorCode)
     }
 
     @Test

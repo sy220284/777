@@ -48,8 +48,9 @@ internal class LocalPromptCacheContinuityStore {
         messages: List<JsonObject>,
         tools: JsonArray,
         nativeTools: JsonArray = JsonArray(emptyList()),
+        diagnosticSurface: String = "main",
     ): LocalPromptPrefixAssessment {
-        val key = seriesKey(sessionId, routeFingerprint)
+        val key = seriesKey(sessionId, routeFingerprint, diagnosticSurface)
         val previous = entries[key]
             ?: return LocalPromptPrefixAssessment(
                 continuity = LocalPromptPrefixContinuity.COLD,
@@ -86,8 +87,9 @@ internal class LocalPromptCacheContinuityStore {
         tools: JsonArray,
         generation: Int,
         nativeTools: JsonArray = JsonArray(emptyList()),
+        diagnosticSurface: String = "main",
     ) {
-        entries[seriesKey(sessionId, routeFingerprint)] = Entry(
+        entries[seriesKey(sessionId, routeFingerprint, diagnosticSurface)] = Entry(
             generation = generation.coerceAtLeast(1),
             messageCount = messages.size,
             messageFingerprint = fingerprintMessages(messages),
@@ -104,8 +106,8 @@ internal class LocalPromptCacheContinuityStore {
     @Synchronized
     internal fun trackedSeriesCount(): Int = entries.size
 
-    private fun seriesKey(sessionId: String, routeFingerprint: String): String =
-        sessionId + "\u0000" + routeFingerprint
+    private fun seriesKey(sessionId: String, routeFingerprint: String, diagnosticSurface: String): String =
+        sessionId + "\u0000" + routeFingerprint + "\u0000" + diagnosticSurface
 
     private fun fingerprintMessages(messages: List<JsonObject>): String =
         fingerprint(messages.joinToString("\u0000") { it.toString() })

@@ -20,15 +20,22 @@ internal object PersonaImmersionPolicy {
     fun findReplyViolations(persona: PersonaProfile, text: String): List<String> {
         if (text.isBlank()) return emptyList()
 
+        // Quoted source material and code examples are legitimate roleplay content. Only exempt
+        // explicitly introduced references; a character's own quoted dialogue remains enforceable.
+        val checkedText = EXPLICIT_REFERENCE_PATTERN.replace(
+            CODE_FENCE_PATTERN.replace(text, ""),
+            "（引用原文）",
+        )
+
         val always = RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS
-            .mapNotNull { pattern -> pattern.find(text)?.value?.trim() }
+            .mapNotNull { pattern -> pattern.find(checkedText)?.value?.trim() }
 
         val contextual = if (personaMayHaveNonEmbodiedForm(persona)) {
             emptyList()
         } else {
             RUNTIME_EMBODIED_CHARACTER_PATTERNS
-                .mapNotNull { pattern -> pattern.find(text)?.value?.trim() } +
-                findViolations(text)
+                .mapNotNull { pattern -> pattern.find(checkedText)?.value?.trim() } +
+                findViolations(checkedText)
         }
 
         return (always + contextual).distinct()
@@ -55,6 +62,9 @@ internal object PersonaImmersionPolicy {
             pattern.containsMatchIn(source)
         }
     }
+
+    private val CODE_FENCE_PATTERN = Regex("(?s)```.*?```")
+    private val EXPLICIT_REFERENCE_PATTERN = Regex("""(?:纸条|引用|原文|例子|举例|示例|台词|文档|信里写着|报道).{0,30}[“\"][^”\"]{1,300}[”\"]""")
 
     private val RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS = listOf(
         Regex("""(?i)(?:作为|身为|我是|我只是)\s*(?:一个|一名)?\s*(?:语言模型|大语言模型|ChatGPT|聊天机器人|虚拟助手|智能助手)"""),

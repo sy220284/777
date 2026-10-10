@@ -81,6 +81,8 @@ internal class ChatInteractionPromptBuilder {
                 "dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments,sharedObjects)；" +
                 "userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。",
         )
+        appendLine("输出补丁必须遵守 JSON 类型：state.initiative/shareDesire 与 dynamics.warmth/trust/reciprocity/tension/stability 为0到100整数；dynamics.unresolvedConflict 为字符串，无冲突写空字符串。")
+        appendLine("dynamics.facts/hypotheses 必须是对象数组，每项含 text(字符串)、confidence(整数)、source(字符串)；没有可核实的新证据就省略这些字段，禁止用字符串数组替代。")
         appendLine("规则：")
         appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构人物生活、心理或用户动机。")
         appendLine("- 角色台词的模糊或习惯性推辞不得单独触发关系降温、冲突或边界状态；结合人物表达、关系阶段和持续参与证据判断。针对当前行为的清晰明确停止、退出或拒绝继续，一次表达即生效，不要求重复。")

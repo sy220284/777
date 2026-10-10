@@ -139,6 +139,9 @@ internal class LocalWorkAgentTurnExecutor(
             check(runState.value.usageMode == LocalUsageMode.WORK) {
                 "Work Agent 回合只能处理 Work 模式"
             }
+            // A new user turn or checkpoint continuation starts a new request slice.
+            // When child requests remain in flight the shared budget stays intact.
+            binding.executionControl.budget.beginExecutionSlice()
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
             workTurnToolRuntime.clear(binding)
             workTurnToolRuntime.prepare(binding, input)
@@ -558,11 +561,17 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                             if (continuationEligible) {
                                 runEventLog.append("turn/end", buildJsonObject {
-                                    put("reason", "stream_interrupted_continuation")
+                                    put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
+                                        "budget_exhausted_continuation"
+                                    } else {
+                                        "stream_interrupted_continuation"
+                                    })
                                     put("detail", detail)
                                     put("messages", runState.value.transcriptIndex.totalMessageCount)
                                 })
-                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/stream-interrupted")
+                                workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
+                                    if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
+                                    else "turn/stream-interrupted")
                             } else {
                                 val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                                 val turnEnd = runEventLog.append("turn/end", buildJsonObject {

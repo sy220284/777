@@ -111,6 +111,65 @@ class LocalDocumentContentTest {
     }
 
     @Test
+    fun xlsxScansSheetsBeyondLegacyTwoHundredLimitWithoutClaimingCompletenessEarly() {
+        val entries = (1..205).associate { index ->
+            "xl/worksheets/sheet$index.xml" to
+                """<worksheet><sheetData><row><c r="A1"><v>§{index}</v></c></row></sheetData></worksheet>""".replace("§{index}", index.toString())
+        }
+        val file = zipFile("many-sheets.xlsx", entries)
+        try {
+            val result = LocalDocumentContent.extract(file, file.name,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            assertTrue(result.text.contains("[工作表 205]"))
+            assertTrue(result.text.contains("A1: 205"))
+            assertFalse(result.truncated)
+        } finally {
+            file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun pptxScansSlidesBeyondLegacyThreeHundredLimitWithoutClaimingCompletenessEarly() {
+        val entries = (1..305).associate { index ->
+            "ppt/slides/slide$index.xml" to
+                "<p:sld><a:p><a:r><a:t>第§{index}页</a:t></a:r></a:p></p:sld>".replace("§{index}", index.toString())
+        }
+        val file = zipFile("many-slides.pptx", entries)
+        try {
+            val result = LocalDocumentContent.extract(file, file.name,
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            assertTrue(result.text.contains("[幻灯片 305]"))
+            assertTrue(result.text.contains("第305页"))
+            assertFalse(result.truncated)
+        } finally {
+            file.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun archiveDiscoveryOverBudgetReportsIncompleteInsteadOfPretendingEverythingWasRead() {
+        val entries = (1..85).associate { index ->
+            "doc-" + index.toString().padStart(3, '0') + ".txt" to "entry-$index"
+        }
+        val zip = zipFile("overflow.zip", entries)
+        val epub = zipFile("overflow.epub", (1..85).associate { index ->
+            "OPS/page-" + index.toString().padStart(3, '0') + ".xhtml" to
+                "<html><body><p>正文 $index</p></body></html>"
+        })
+        try {
+            val zipResult = LocalDocumentContent.extract(zip, zip.name, "application/zip", maxChars = 50_000)
+            val epubResult = LocalDocumentContent.extract(epub, epub.name, "application/epub+zip", maxChars = 50_000)
+            assertTrue(zipResult.truncated)
+            assertTrue(epubResult.truncated)
+            assertTrue(zipResult.text.contains("doc-080"))
+            assertFalse(zipResult.text.contains("doc-081"))
+        } finally {
+            zip.parentFile?.deleteRecursively()
+            epub.parentFile?.deleteRecursively()
+        }
+    }
+
+    @Test
     fun readsOpenDocumentAndEpubText() {
         val odt = zipFile(
             "sample.odt",

@@ -171,7 +171,116 @@ class LocalWorkspaceTest {
 
         assertEquals(".dsh/fetches/large.json", path)
         assertEquals(content, workspace.readRaw(path))
+        assertTrue(workspace.read(path, 1, 1).contains(middleMarker))
         assertTrue(workspace.search(middleMarker, path).contains(middleMarker))
+    }
+
+    @Test
+    fun recursiveSearchCanResumeBeyondFiveThousandEntriesWithoutFalseNoMatch() {
+        val docs = root.resolve("docs")
+        docs.mkdirs()
+        repeat(5_050) { index ->
+            docs.resolve("entry-" + index.toString().padStart(5, '0') + ".txt").writeText(
+                if (index == 5_040) "needle-beyond-first-page" else "ordinary record",
+            )
+        }
+        val first = workspace.search("needle-beyond-first-page")
+        assertTrue(first.contains("搜索未完成"))
+        val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
+        val second = workspace.search("needle-beyond-first-page", cursor = cursor)
+        assertTrue(second.contains("entry-05040.txt:1: needle-beyond-first-page"))
+        assertFalse(second.contains("搜索未完成"))
+    }
+
+    @Test
+    fun globAndListCanPagePastLegacyFourHundredResultLimit() {
+        val directory = root.resolve("many")
+        directory.mkdirs()
+        repeat(415) { i ->
+            directory.resolve("item-" + i.toString().padStart(4, '0') + ".txt").writeText("record")
+        }
+        val firstList = workspace.list("many")
+        assertTrue(firstList.contains("目录扫描未完"))
+        val listCursor = Regex("""cursor=(\d+)""").find(firstList)!!.groupValues[1].toInt()
+        assertTrue(workspace.list("many", cursor = listCursor).contains("item-0414.txt"))
+        val firstGlob = workspace.glob("*.txt", "many")
+        assertTrue(firstGlob.contains("目录扫描未完"))
+        val globCursor = Regex("""cursor=(\d+)""").find(firstGlob)!!.groupValues[1].toInt()
+        assertTrue(workspace.glob("*.txt", "many", cursor = globCursor).contains("item-0414.txt"))
+    }
+
+    @Test
+    fun resumedDirectoryTraversalPreservesAllRowsAcrossThreePagesAndColdFallback() {
+        val directory = root.resolve("paged")
+        directory.mkdirs()
+        repeat(1_005) { i ->
+            directory.resolve("item-" + i.toString().padStart(4, '0') + ".txt").writeText("record")
+        }
+        val pages = mutableListOf<String>()
+        var cursor = 0
+        repeat(3) {
+            val result = workspace.list("paged", cursor = cursor)
+            pages += result
+            val next = Regex("""cursor=(\d+)""").find(result)
+            if (next != null) cursor = next.groupValues[1].toInt()
+        }
+        val observed = pages.flatMap { page ->
+            Regex("""paged/item-\d{4}\.txt""").findAll(page).map { it.value }.toList()
+        }
+        assertEquals(1_005, observed.size)
+        assertEquals(1_005, observed.toSet().size)
+        assertTrue(observed.last().contains("item-1004.txt"))
+        assertFalse(pages.last().contains("目录扫描未完"))
+
+        // Cursors remain valid after the process-local traversal cache disappears.
+        val coldWorkspace = LocalWorkspace(root)
+        assertTrue(coldWorkspace.list("paged", cursor = 801).contains("item-1004.txt"))
+    }
+
+    @Test
+    fun searchResultPageCarriesLineCursorInsteadOfSilentlyLosingMatches() {
+        val text = (1..250).joinToString("\n") { "needle row $it" }
+        root.resolve("rows.txt").writeText(text)
+        val first = workspace.search("needle")
+        assertTrue(first.contains("搜索未完成"))
+        val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
+        val second = workspace.search("needle", cursor = cursor)
+        assertTrue(second.contains("rows.txt:250: needle row 250"))
+        assertFalse(second.contains("rows.txt:1:"))
+    }
+
+    @Test
+    fun searchCanResumeAfterLargeLineAndDirectoryPrefixes() {
+        val docs = root.resolve("resume-docs")
+        docs.mkdirs()
+        repeat(1_200) { index ->
+            docs.resolve("entry-" + index.toString().padStart(5, '0') + ".txt")
+                .writeText(if (index == 1_199) "late-needle" else "ordinary record")
+        }
+        // Cursor counts the directory itself and preceding files. The resumed page
+        // must get its own time budget instead of repeatedly expiring on that prefix.
+        val page = workspace.search("late-needle", "resume-docs", cursor = "1100:0")
+        assertTrue(page.contains("entry-01199.txt:1: late-needle"))
+
+        val large = root.resolve("resume-lines.txt")
+        large.bufferedWriter().use { writer ->
+            repeat(5_500) { line ->
+                writer.append(if (line == 5_499) "late-line-needle\n" else "regular row\n")
+            }
+        }
+        val resumed = workspace.search("late-line-needle", "resume-lines.txt", cursor = "0:5000")
+        assertTrue(resumed.contains("resume-lines.txt:5500: late-line-needle"))
+    }
+
+    @Test
+    fun largeFileReadStreamsRequestedLinesWithoutSizeRejection() {
+        val big = root.resolve("large.txt")
+        big.bufferedWriter().use { writer ->
+            repeat(6_000) { writer.append("record " + it + " " + "x".repeat(1_000) + "\n") }
+        }
+        val excerpt = workspace.read("large.txt", 5_998, 6_000)
+        assertTrue(excerpt.contains("5999: record 5998"))
+        assertTrue(excerpt.contains("6000: record 5999"))
     }
 
     @Test
@@ -242,6 +351,37 @@ class LocalWorkspaceTest {
         assertThrows(IllegalArgumentException::class.java) {
             workspace.readModelSkill("private-notes")
         }
+    }
+
+    @Test
+    fun modelSkillCatalogFiltersBeforePagingAndCanReachSkillsAfter128Entries() {
+        val skills = root.resolve(".dsh/skills")
+        repeat(132) { i ->
+            val dir = skills.resolve("private-" + i.toString().padStart(3, '0'))
+            dir.mkdirs()
+            dir.resolve("SKILL.md").writeText("---\ndescription: private\ndisable-model-invocation: true\n---\n")
+        }
+        val public = skills.resolve("zz-public")
+        public.mkdirs()
+        public.resolve("SKILL.md").writeText("---\ndescription: Public review\nwhen-to-use: code review\n---\n")
+        val catalog = workspace.modelSkillCatalog()
+        assertTrue(catalog.contains("zz-public：Public review"))
+        assertFalse(catalog.contains("private-"))
+    }
+
+    @Test
+    fun modelSkillCatalogOffersExplicitContinuationForLongDirectory() {
+        val skills = root.resolve(".dsh/skills")
+        repeat(132) { i ->
+            val dir = skills.resolve("public-" + i.toString().padStart(3, '0'))
+            dir.mkdirs()
+            dir.resolve("SKILL.md").writeText("---\ndescription: review code\n---\n")
+        }
+        val first = workspace.modelSkillCatalog()
+        assertTrue(first.contains("skill(offset=128"))
+        assertTrue(workspace.modelSkillCatalog(offset = 128).contains("public-131"))
+        val compact = workspace.modelSkillCatalog(maxChars = 180)
+        assertTrue(compact.contains("目录未完"))
     }
 
     @Test

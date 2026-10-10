@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.chat
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 @Singleton
 class ChatInteractionPlanner @Inject constructor(json: Json) {
@@ -23,6 +24,10 @@ class ChatInteractionPlanner @Inject constructor(json: Json) {
     ): String = promptBuilder.suggestionsPrompt(persona, state, userMessage, assistantMessage, recentDialogue)
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? = parser.parseSuggestions(text)
+
+    fun postTurnParseFailureKind(text: String): String = parser.parseFailureKind(text)
+
+    fun parseJsonObjectEnvelope(text: String): JsonObject? = parser.parseJsonObjectEnvelope(text)
     fun parse(
         text: String,
         previous: ChatCharacterState,

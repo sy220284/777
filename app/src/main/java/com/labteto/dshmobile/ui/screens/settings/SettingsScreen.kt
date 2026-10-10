@@ -107,6 +107,7 @@ enum class SettingsDestination {
     APPEARANCE,
     CHAT,
     MODELS,
+    MODEL_PERFORMANCE,
     MODEL_USAGE,
     PRICING,
     USAGE,
@@ -127,6 +128,7 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.SESSION,
     SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
+    SettingsDestination.MODEL_PERFORMANCE,
     SettingsDestination.MODEL_USAGE,
     SettingsDestination.MEMORY,
     SettingsDestination.PERMISSIONS,
@@ -304,6 +306,7 @@ fun SettingsScreen(
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
+        SettingsDestination.MODEL_PERFORMANCE -> stringResource(R.string.settings_model_performance_title)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
@@ -389,6 +392,15 @@ fun SettingsScreen(
                                 icon = FeatherIcons.Globe,
                                 title = stringResource(R.string.settings_page_models),
                                 onClick = { page = SettingsDestination.MODELS },
+                                compact = true,
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                            AppSettingsRow(
+                                icon = FeatherIcons.Sliders,
+                                title = stringResource(R.string.settings_model_performance_title),
+                                subtitle = stringResource(R.string.settings_model_performance_subtitle),
+                                onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
                                 compact = true,
                             )
                             AppSettingsDivider()
@@ -640,6 +652,8 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    SettingsDestination.MODEL_PERFORMANCE -> ModelPerformanceSettingsPage()
 
                     SettingsDestination.MODELS -> {
                         var addModelRequested by remember { mutableStateOf(false) }

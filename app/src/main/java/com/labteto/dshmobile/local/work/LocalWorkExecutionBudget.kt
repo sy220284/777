@@ -31,6 +31,8 @@ internal class LocalWorkExecutionBudget(
     private var pendingExposureTokens: Long = 0L
     private var reservedRequests: Int = 0
     private var admittedRequests: Int = 0
+    private var currentSlice: Long = 0L
+    private var reservedInSlice: Int = 0
     private data class EstimateCalibration(
         var scale: Double = 1.0,
         var samples: Int = 0,
@@ -48,8 +50,11 @@ internal class LocalWorkExecutionBudget(
             ?: DEFAULT_CALIBRATION_KEY
         while (true) {
             var reservedEstimate = 0L
+            var reservedSlice = 0L
             val reserved = synchronized(this) {
-                if (admittedRequests + reservedRequests >= maxRequests) {
+                // Quotas apply to the executing slice. Previous-slice children retain their
+                // leases and token exposure but must not consume the new slice's slots.
+                if (admittedRequests + reservedInSlice >= maxRequests) {
                     throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
                 }
                 reservedEstimate = calibratedEstimate(rawEstimate, normalizedCalibrationKey)
@@ -59,16 +64,31 @@ internal class LocalWorkExecutionBudget(
                 ) {
                     pendingExposureTokens = saturatingAdd(pendingExposureTokens, reservedEstimate)
                     reservedRequests += 1
+                    reservedInSlice += 1
+                    reservedSlice = currentSlice
                     true
                 } else {
                     false
                 }
             }
             if (reserved) {
-                return Lease(this, rawEstimate, reservedEstimate, normalizedCalibrationKey)
+                return Lease(this, rawEstimate, reservedEstimate, normalizedCalibrationKey, reservedSlice)
             }
             delay(PENDING_RECHECK_MILLIS)
         }
+    }
+
+    /**
+     * Start a bounded Work execution slice without blocking on previous-slice subagents.
+     * Each outstanding lease remembers its own slice. Total pending token exposure remains
+     * shared across slices so parallel usage is still bounded.
+     */
+    @Synchronized
+    fun beginExecutionSlice(): Boolean {
+        currentSlice += 1
+        admittedRequests = 0
+        reservedInSlice = 0
+        return true
     }
 
     @Synchronized
@@ -93,10 +113,14 @@ internal class LocalWorkExecutionBudget(
         reservedEstimate: Long,
         reportedInputTokens: Long?,
         calibrationKey: String,
+        leaseSlice: Long,
     ) {
         pendingExposureTokens = (pendingExposureTokens - reservedEstimate).coerceAtLeast(0L)
         reservedRequests = (reservedRequests - 1).coerceAtLeast(0)
-        admittedRequests += 1
+        if (leaseSlice == currentSlice) {
+            reservedInSlice = (reservedInSlice - 1).coerceAtLeast(0)
+            admittedRequests += 1
+        }
         val reported = reportedInputTokens?.takeIf { it > 0L }
         if (reported != null) {
             reportedExposureTokens = saturatingAdd(reportedExposureTokens, reported)
@@ -107,9 +131,12 @@ internal class LocalWorkExecutionBudget(
     }
 
     @Synchronized
-    private fun release(reservedEstimate: Long) {
+    private fun release(reservedEstimate: Long, leaseSlice: Long) {
         pendingExposureTokens = (pendingExposureTokens - reservedEstimate).coerceAtLeast(0L)
         reservedRequests = (reservedRequests - 1).coerceAtLeast(0)
+        if (leaseSlice == currentSlice) {
+            reservedInSlice = (reservedInSlice - 1).coerceAtLeast(0)
+        }
     }
 
     @Synchronized
@@ -146,8 +173,10 @@ internal class LocalWorkExecutionBudget(
 
     private fun budgetExceeded(detail: String) = LocalModelException(
         code = "WORK_BUDGET_EXHAUSTED",
-        message = "$detail；已有进度会保留，请缩小任务范围或开始新的工作回合",
+        message = "$detail；当前执行片会保存已有进度；无排队用户输入时可安全续接未完成部分",
         retryable = false,
+        // This guard is per execution slice; resume from the durable checkpoint, never replay the request.
+        continuationEligible = true,
     )
 
     class Lease internal constructor(
@@ -155,17 +184,18 @@ internal class LocalWorkExecutionBudget(
         private val rawEstimate: Long,
         private val reservedEstimate: Long,
         private val calibrationKey: String,
+        private val leaseSlice: Long,
     ) {
         private val settled = AtomicBoolean(false)
 
         fun commit(reportedInputTokens: Long? = null) {
             if (settled.compareAndSet(false, true)) {
-                owner.commit(rawEstimate, reservedEstimate, reportedInputTokens, calibrationKey)
+                owner.commit(rawEstimate, reservedEstimate, reportedInputTokens, calibrationKey, leaseSlice)
             }
         }
 
         fun release() {
-            if (settled.compareAndSet(false, true)) owner.release(reservedEstimate)
+            if (settled.compareAndSet(false, true)) owner.release(reservedEstimate, leaseSlice)
         }
     }
 
