@@ -204,7 +204,6 @@ class PersonaInspectionService @Inject constructor(
             "coreValues",
             "coreTension",
             "stableTraits",
-            "mutableTraits",
             "initialUserImpression",
             "voiceSamples",
             "worldSetting",
@@ -228,7 +227,7 @@ class PersonaInspectionService @Inject constructor(
             4. suggestions 只提取明确、稳定、长期有用且人物资料未包含的新事实；同义项去重，一条只写一个事实。情绪推进、主动性、关系节奏、表达多样性、成长速度等属于运行时问题，只能写入诊断，不提出加入固定人设；不要从模型表演反推新特质。
             5. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
             6. field 只能使用 portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
-               limitations, coreValues, coreTension, stableTraits, mutableTraits,
+               limitations, coreValues, coreTension, stableTraits,
                initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
                knowledgeBoundary, hardConstraints, bannedPhrases, corrections；无结果返回空数组。
             7. 对话里如果出现“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为或实体动作”
