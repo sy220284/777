@@ -252,7 +252,9 @@ class ChatPersonaGalleryStore internal constructor(
             // The archive's user-edited story stage wins over a stale foreground snapshot.
             chatContext = chatContext.normalized().copy(
                 storyStage = baseStory?.chatContext?.storyStage ?: chatContext.storyStage,
-            ),
+                unlockedStoryStages =
+                    baseStory?.chatContext?.unlockedStoryStages ?: chatContext.unlockedStoryStages,
+            ).normalized(),
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
