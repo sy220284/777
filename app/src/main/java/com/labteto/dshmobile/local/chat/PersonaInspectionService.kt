@@ -41,6 +41,18 @@ data class PersonaInspectionResult(
  * Reviews a saved character against real dialogue. It never mutates a persona by itself:
  * conflicts are surfaced for the user, while additions must be explicitly selected in the UI.
  */
+/**
+ * All already visited stages are available to inspection, just as they are to live replies.
+ * Story stage labels are opaque; only the saved visit path grants additional knowledge.
+ */
+internal fun personaInspectionFactLines(
+    persona: PersonaProfile,
+    storyStage: String,
+    unlockedStages: Collection<String>,
+): List<String> = persona.visibleFacts(storyStage, unlockedStages)
+    .filter { it.content.isNotBlank() }
+    .map { fact -> "${fact.category}（${fact.provenance}；${fact.perspective}）：${fact.content.trim()}" }
+
 @Singleton
 class PersonaInspectionService @Inject constructor(
     private val modelGateway: LocalModelGateway,
@@ -54,6 +66,7 @@ class PersonaInspectionService @Inject constructor(
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
         storyStage: String = "",
+        unlockedStages: Collection<String> = emptyList(),
     ): PersonaInspectionResult {
         val dialogue = messages
             .filter { it.role == "user" || it.role == "assistant" }
@@ -72,9 +85,7 @@ class PersonaInspectionService @Inject constructor(
             appendField("coreIdentity", persona.coreIdentity)
             appendField("franchise", persona.franchise)
             appendLine("当前故事阶段：${storyStage.ifBlank { "未指定" }}")
-            persona.visibleFacts(storyStage).forEach { fact ->
-                appendField("${fact.category}（${fact.provenance}；${fact.perspective}）", fact.content)
-            }
+            personaInspectionFactLines(persona, storyStage, unlockedStages).forEach(::appendLine)
             appendLine()
             appendLine("【真实对话】")
             append(dialogue)

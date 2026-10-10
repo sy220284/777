@@ -266,6 +266,37 @@ class CharacterFactsV4Test {
         assertEquals(CharacterFactProvenance.UNVERIFIED, merged.single().provenance)
     }
 
+    @Test fun personaInspectionReadsAllVisitedStageFactsAndNotFutureStages() {
+        val persona = PersonaProfile(
+            name = "阿青", coreIdentity = "调查员",
+            facts = listOf(
+                CharacterFact("base", CharacterFactCategories.BIOGRAPHY, "经营旧书店"),
+                CharacterFact("early", CharacterFactCategories.RELATIONSHIPS,
+                    "第一幕与阿宁结识", temporalScope = "opening"),
+                CharacterFact("later", CharacterFactCategories.RELATIONSHIPS,
+                    "第二幕与阿宁交换密信", temporalScope = "later"),
+                CharacterFact("future", CharacterFactCategories.RELATIONSHIPS,
+                    "第三幕得知最后真相", temporalScope = "ending"),
+            ),
+        )
+        val progress = ChatContextState()
+            .withStoryStageSelection("opening")
+            .withStoryStageSelection("later")
+        val visible = personaInspectionFactLines(
+            persona, progress.storyStage, progress.visibleStoryStages(),
+        ).joinToString("\n")
+        assertTrue(visible.contains("经营旧书店"))
+        assertTrue(visible.contains("第一幕与阿宁结识"))
+        assertTrue(visible.contains("第二幕与阿宁交换密信"))
+        assertFalse(visible.contains("第三幕得知最后真相"))
+        val rewind = progress.withStoryStageSelection("opening")
+        val earlier = personaInspectionFactLines(
+            persona, rewind.storyStage, rewind.visibleStoryStages(),
+        ).joinToString("\n")
+        assertFalse(earlier.contains("交换密信"))
+        assertTrue(earlier.contains("第一幕与阿宁结识"))
+    }
+
     @Test fun explicitStoryVisitsPreserveEarlierKnowledgeAndRewindRevokesLaterKnowledge() {
         val profile = PersonaProfile(facts = listOf(
             CharacterFact("a", CharacterFactCategories.BIOGRAPHY, "第一幕的秘密", temporalScope = "act-1"),

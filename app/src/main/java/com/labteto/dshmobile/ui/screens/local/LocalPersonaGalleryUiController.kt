@@ -219,6 +219,7 @@ suspend fun inspectGalleryPersona(
             persona = entry.persona,
             messages = dialogue,
             storyStage = story?.chatContext?.storyStage.orEmpty(),
+            unlockedStages = story?.chatContext?.visibleStoryStages() ?: emptySet(),
         )
     }
 }
