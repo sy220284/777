@@ -767,7 +767,8 @@ internal fun ChatPersonaDialog(
                 PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
                 PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
                 PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
-                PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
+                // Legacy mutableTrait axes remain in storage for existing personas; evolution
+                // belongs to the runtime, so the persona editor does not offer growth scripts.
             }
             PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
                 PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
