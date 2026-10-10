@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
@@ -238,7 +239,9 @@ class LocalWorkCapabilitySheetRegressionTest {
         compose.runOnIdle { assertEquals(listOf("msg-1"), selected.value) }
         compose.onNodeWithTag("handoff_search").performTextReplacement("")
         compose.onNodeWithTag("handoff_message_msg-1").assertIsDisplayed()
-        compose.onNodeWithTag("handoff_load_older").performClick()
+        // The search field keeps the IME open. Explicitly scroll the real button into
+        // the visible bottom-sheet viewport before testing the user click.
+        compose.onNodeWithTag("handoff_load_older").performScrollTo().assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(1, loaded)
             assertEquals(0, entered)
