@@ -195,6 +195,26 @@ internal fun LocalRunCenterScreen(
                     if (activityRefreshFailed) {
                         Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.error)
                     }
+                    if (toolActivities.isNotEmpty() || artifacts.isNotEmpty() || state.todos.isNotEmpty()) {
+                        val evidence = localWorkDeliveryEvidenceCounts(state, artifacts, toolActivities)
+                        Text(
+                            stringResource(R.string.local_delivery_evidence_title),
+                            style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary,
+                        )
+                        Text(
+                            stringResource(
+                                R.string.local_delivery_evidence_counts,
+                                evidence.availableFiles, evidence.missingFiles, evidence.uncheckedFiles,
+                                evidence.completedTools, evidence.failedTools, evidence.unknownTools,
+                                evidence.openTasks,
+                            ),
+                            style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+                        )
+                        Text(
+                            stringResource(R.string.local_delivery_evidence_scope),
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
+                        )
+                    }
                     if (toolActivities.isNotEmpty()) {
                         Text(
                             stringResource(R.string.local_tool_activity_title),
@@ -251,9 +271,15 @@ internal fun LocalRunCenterScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                             ) {
+                                val detail = when {
+                                    artifact.category != "file" -> stringResource(R.string.local_delivery_source_not_verified)
+                                    artifact.currentlyAvailable == true -> stringResource(R.string.local_delivery_file_present)
+                                    artifact.currentlyAvailable == false -> stringResource(R.string.local_delivery_file_missing)
+                                    else -> stringResource(R.string.local_delivery_file_unknown)
+                                }
                                 DsSheetChoiceRow(
                                     title = artifact.reference,
-                                    subtitle = label,
+                                    subtitle = "$label · $detail",
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         artifactActionFailed = false
@@ -269,6 +295,16 @@ internal fun LocalRunCenterScreen(
                                         }
                                     },
                                 )
+                                artifact.sourceCallId?.let { callId ->
+                                    if (toolActivities.any { it.callId == callId }) {
+                                        DsButton(
+                                            text = stringResource(R.string.local_delivery_open_evidence),
+                                            onClick = { selectedToolCallId = callId },
+                                            variant = DsButtonVariant.Ghost,
+                                            size = DsButtonSize.Small,
+                                        )
+                                    }
+                                }
                                 if (artifact.category == "file" && artifact.currentlyAvailable != false) {
                                     DsButton(
                                         text = stringResource(R.string.local_artifact_continue),
@@ -479,4 +515,37 @@ internal fun LocalRunCenterScreen(
 
         }
     }
+}
+
+/**
+ * Local, bounded observation from the existing Session event projection. An observed tool
+ * completion is not proof of tests passing or a deliverable matching its requested version.
+ */
+internal data class LocalWorkDeliveryEvidenceCounts(
+    val availableFiles: Int,
+    val missingFiles: Int,
+    val uncheckedFiles: Int,
+    val completedTools: Int,
+    val failedTools: Int,
+    val unknownTools: Int,
+    val openTasks: Int,
+)
+
+internal fun localWorkDeliveryEvidenceCounts(
+    state: LocalWorkUiState,
+    artifacts: List<LocalArtifactUiItem>,
+    calls: List<LocalToolActivityUiItem>,
+): LocalWorkDeliveryEvidenceCounts {
+    val files = artifacts.filter { it.category == "file" }
+    return LocalWorkDeliveryEvidenceCounts(
+        availableFiles = files.count { it.currentlyAvailable == true },
+        missingFiles = files.count { it.currentlyAvailable == false },
+        uncheckedFiles = files.count { it.currentlyAvailable == null },
+        completedTools = calls.count { it.phase == LocalToolUiPhase.COMPLETED },
+        failedTools = calls.count { it.phase == LocalToolUiPhase.FAILED },
+        unknownTools = calls.count {
+            it.phase == LocalToolUiPhase.OUTCOME_UNKNOWN || it.phase == LocalToolUiPhase.CANCELLED
+        },
+        openTasks = state.todos.count { it.status == "pending" || it.status == "in_progress" },
+    )
 }
