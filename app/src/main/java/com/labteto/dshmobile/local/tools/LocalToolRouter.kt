@@ -196,9 +196,11 @@ internal object LocalToolRouter {
         enabledOptional: Set<String>,
         blocked: Set<String> = emptySet(),
     ): String = buildString {
-            val optional = tools.filter(::isOptional)
-            appendLine("当前注册的可选工具：${optional.size} 个，分 ${optional.map { it.metadata.family }.distinct().size} 类。")
-            optional.groupBy { it.metadata.family }
+            val listed = tools.filter { it.exposure != ToolExposure.INTERNAL }
+            val optionalCount = listed.count(::isOptional)
+            val coreCount = listed.size - optionalCount
+            appendLine("当前可供智能体发现的工具：${listed.size} 个（核心 ${coreCount}，扩展 ${optionalCount}），分 ${listed.map { it.metadata.family }.distinct().size} 类。")
+            listed.groupBy { it.metadata.family }
                 .toSortedMap(String.CASE_INSENSITIVE_ORDER)
                 .forEach { (family, members) ->
                     val selected = members.count { it.name in enabledOptional }
