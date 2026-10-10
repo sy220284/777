@@ -6,6 +6,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PersonaCanonicalV4Test {
+    @Test fun differentLegacyFactsKeepIndependentStableIdentityDuringMerge() {
+        val first = PersonaProfile(name = "角色", coreValues = listOf("保持选择权")).canonicalV4()
+        val second = PersonaProfile(name = "角色", coreValues = listOf("推动长期计划")).canonicalV4()
+        val merged = mergePersonaProfiles(first, second)
+        assertEquals(setOf("保持选择权", "推动长期计划"), merged.facts.map { it.content }.toSet())
+        assertEquals(2, merged.facts.map { it.id }.distinct().size)
+        assertEquals(first.facts, PersonaProfile(name = "角色", coreValues = listOf("保持选择权")).canonicalV4().facts)
+        assertEquals(merged.facts, mergePersonaProfiles(merged, second).facts)
+    }
+
     @Test fun legacyOnlyCharacterMigratesToFactsAndIndependentLoreExactlyOnce() {
         val old = PersonaProfile(
             name = "晴川", portrait = "少年时是制琴师", lifeContext = "每天修琴",

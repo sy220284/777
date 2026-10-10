@@ -32,9 +32,9 @@ class ChatDiaryStoreTest {
         val diary = store()
         val oldEvent = "两人约定周六上午十点在南门钟楼见面"
         val newEvent = "见面安排改为周日下午三点在白桦咖啡馆"
-        val old = diary.record(request(ChatDiaryDelta(event = oldEvent, importance = 4),
+        val old = diary.record(request(ChatDiaryDelta(event = oldEvent, feeling = "我记住了这次约定", importance = 4),
             userId = "u-old", assistantId = "a-old", evidence = oldEvent))!!
-        diary.record(request(ChatDiaryDelta(event = newEvent, importance = 5),
+        diary.record(request(ChatDiaryDelta(event = newEvent, feeling = "我按新安排准备", importance = 5),
             userId = "u-new", assistantId = "a-new", evidence = newEvent))!!
         assertEquals(1, diary.invalidateGeneratedFromMessage("s", "u-new"))
         assertTrue(store().search("我们最后约定什么时候见", "gallery:a", false, 6).isEmpty())
@@ -65,11 +65,11 @@ class ChatDiaryStoreTest {
         val oldEvent = "两人约定周六上午十点在南门钟楼见面"
         val newEvent = "见面安排改为周日下午三点在白桦咖啡馆"
         val old = diary.record(request(
-            ChatDiaryDelta(event = oldEvent, importance = 4),
+            ChatDiaryDelta(event = oldEvent, feeling = "我记住了这次约定", importance = 4),
             userId = "u-old", assistantId = "a-old", evidence = oldEvent,
         ))!!
         val replacement = diary.record(request(
-            ChatDiaryDelta(event = newEvent, importance = 5),
+            ChatDiaryDelta(event = newEvent, feeling = "我按新安排准备", importance = 5),
             userId = "u-new", assistantId = "a-new", evidence = newEvent,
         ))!!
         assertTrue(diary.deactivateEntry("gallery:a", replacement.id, replacement.updatedAt))

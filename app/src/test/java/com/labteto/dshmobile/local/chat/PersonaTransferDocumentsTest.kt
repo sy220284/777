@@ -498,7 +498,8 @@ class PersonaTransferDocumentsTest {
         )
 
         assertEquals("阿青", imported.persona.name)
-        assertTrue(imported.persona.portrait.contains("剑客"))
+        assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).contains("剑客"))
+        assertTrue(imported.persona.portrait.isEmpty())
         assertTrue(imported.stories.isEmpty())
     }
 

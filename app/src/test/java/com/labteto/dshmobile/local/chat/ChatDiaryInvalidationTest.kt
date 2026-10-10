@@ -15,7 +15,7 @@ class ChatDiaryInvalidationTest {
     private fun write(session: String, source: String, note: String): ChatDiaryEntry =
         store().record(ChatDiaryWriteRequest(
             subjectKey = "gallery:a", personaName = "阿白",
-            delta = ChatDiaryDelta(event = note, importance = 4),
+            delta = ChatDiaryDelta(event = note, feeling = "我记住了这件事", importance = 4),
             turnSignificance = "important", sourceMode = ChatDiarySourceMode.DIRECT,
             sourceSessionId = session, sourceUserMessageIds = listOf(source),
             sourceAssistantMessageIds = listOf("answer-$source"),
@@ -39,7 +39,7 @@ class ChatDiaryInvalidationTest {
         assertTrue(store().listActive("gallery:a").isEmpty())
         assertEquals(null, store().record(ChatDiaryWriteRequest(
             subjectKey = "gallery:a", personaName = "阿白",
-            delta = ChatDiaryDelta(event = "旧记忆：答应坐火车", importance = 4),
+            delta = ChatDiaryDelta(event = "旧记忆：答应坐火车", feeling = "我记住了这件事", importance = 4),
             turnSignificance = "important", sourceMode = ChatDiarySourceMode.DIRECT,
             sourceSessionId = "chat-a", sourceUserMessageIds = listOf("u-late"),
             sourceAssistantMessageIds = listOf("answer-u-late"),

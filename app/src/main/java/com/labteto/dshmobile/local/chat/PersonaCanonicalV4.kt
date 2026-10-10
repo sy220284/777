@@ -11,7 +11,9 @@ internal fun PersonaProfile.canonicalV4(): PersonaProfile {
         fun add(category: String, value: String, id: String) {
             if (value.isBlank()) return
             add(CharacterFact(
-                id = "legacy-v4-$id", category = category, content = value.trim(),
+                // Distinct old cards must not assign the same fact ID to different content.
+                id = "legacy-v4-$id-${java.util.UUID.nameUUIDFromBytes(value.trim().toByteArray(Charsets.UTF_8))}",
+                category = category, content = value.trim(),
                 provenance = CharacterFactProvenance.UNVERIFIED,
                 sourceReference = "旧版人物卡",
             ))

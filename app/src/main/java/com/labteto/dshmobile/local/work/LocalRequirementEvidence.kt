@@ -34,7 +34,7 @@ internal fun projectRequirementEvidenceLinks(
         val origin = (data["origin_sequence"] as? JsonPrimitive)?.longOrNull ?: return@forEach
         val call = (data["source_call_id"] as? JsonPrimitive)?.contentOrNull ?: return@forEach
         if (index !in todos.indices || todos[index].content != text ||
-            !version.matches(Regex("[a-f0-9]{64}")) || origin <= 0L || call.isBlank()
+            !version.matches(Regex("[a-f0-9]{64}")) || origin < 0L || call.isBlank()
         ) return@forEach
         linked[index to path] = LocalRequirementEvidenceLink(
             index, text, path, origin, call, version, event.sequence,

@@ -98,7 +98,7 @@ class V4DeliveryMemoryOfflineAcceptanceTest {
         val diary = ChatDiaryStore(diaryRoot, json)
         diary.record(ChatDiaryWriteRequest(
             subjectKey = "gallery:one", personaName = "青岚",
-            delta = ChatDiaryDelta(event = "与用户周末约好去海边", importance = 4),
+            delta = ChatDiaryDelta(event = "与用户周末约好去海边", feeling = "我很期待", importance = 4),
             turnSignificance = "important", sourceMode = ChatDiarySourceMode.DIRECT,
             sourceSessionId = "chat-1", sourceUserMessageIds = listOf("user-1"),
             sourceAssistantMessageIds = listOf("assistant-1"),

@@ -21,6 +21,18 @@ class LocalRequirementEvidenceProjectionTest {
         },
     )
 
+    @Test fun firstEventSequenceIsAValidEvidenceOriginButNegativeSequenceIsNot() {
+        val tasks = listOf(LocalTodoItem("交付", "completed"))
+        fun atOrigin(origin: Long) = link(1, 0, "交付", "a".repeat(64)).let { event ->
+            event.copy(data = buildJsonObject {
+                event.data.forEach { (key, value) -> put(key, value) }
+                put("origin_sequence", origin)
+            })
+        }
+        assertEquals(0L, projectRequirementEvidenceLinks(listOf(atOrigin(0)), tasks).single().artifactSequence)
+        assertTrue(projectRequirementEvidenceLinks(listOf(atOrigin(-1)), tasks).isEmpty())
+    }
+
     @Test fun requirementLinkMustMatchSameTaskPositionAndText() {
         val tasks = listOf(LocalTodoItem("撰写报告", "completed"), LocalTodoItem("运行测试", "pending"))
         val sha = "a".repeat(64)

@@ -174,24 +174,32 @@ class ChatPersonaGalleryTest {
             id = "gallery-1",
             name = "小岚",
             coreIdentity = "花店店主",
-            portrait = "花店店主",
-            stableTraits = listOf("嘴硬心软"),
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "花店店主"),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+            ),
             hardConstraints = listOf("不会无故失约"),
         )
         val incoming = PersonaProfile(
             id = "temp",
             name = "小岚",
             coreIdentity = "花店店主",
-            portrait = "经营街角花店的店主",
-            stableTraits = listOf("嘴硬心软", "遇到重要的人会主动解释"),
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "经营街角花店的店主",
+                    provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+                CharacterFact("trait-extra", CharacterFactCategories.PERSONALITY, "遇到重要的人会主动解释"),
+            ),
             hardConstraints = listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
         )
 
         assertTrue(samePersonaIdentity(base, incoming))
         val merged = mergePersonaProfiles(base, incoming)
 
-        assertEquals("经营街角花店的店主", merged.portrait)
-        assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"), merged.stableTraits)
+        assertEquals("经营街角花店的店主", merged.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"),
+            merged.facts.filter { it.category == CharacterFactCategories.PERSONALITY }.map { it.content })
+        assertTrue(merged.portrait.isEmpty() && merged.stableTraits.isEmpty())
         assertEquals(
             listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
             merged.hardConstraints,
@@ -548,7 +556,9 @@ class ChatPersonaGalleryTest {
         val imported = importedStore.importPersona(payload)
 
         assertEquals("小岚", imported.persona.name)
-        assertEquals("花店店主", imported.persona.portrait)
+        assertEquals("花店店主", imported.persona.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals("嘴硬心软", imported.persona.factText(CharacterFactCategories.PERSONALITY))
+        assertTrue(imported.persona.portrait.isEmpty())
         assertEquals(listOf("客服腔"), imported.persona.bannedPhrases)
         assertTrue(imported.stories.isEmpty())
         assertFalse(imported.id == saved.id)
@@ -652,8 +662,9 @@ class ChatPersonaGalleryTest {
 
         assertEquals("原神", imported.persona.franchise)
         assertEquals("无剧透阶段", imported.persona.timelinePosition)
-        assertEquals(listOf("兼顾责任与真诚关系", "家族责任"), imported.persona.coreValues)
-        assertEquals(listOf("先观察再表达"), imported.persona.attentionBiases)
+        assertEquals("兼顾责任与真诚关系；家族责任", imported.persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS))
+        assertEquals("先观察再表达", imported.persona.factText(CharacterFactCategories.SENSORY_SIGNATURE))
+        assertTrue(imported.persona.coreValues.isEmpty() && imported.persona.attentionBiases.isEmpty())
         assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
         assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
         assertEquals("thoma", imported.persona.loreEntries.single().id)
@@ -700,7 +711,10 @@ class ChatPersonaGalleryTest {
 
         val merged = mergePersonaProfiles(base, incoming)
 
-        assertEquals(2, merged.coreValues.size)
+        assertEquals(setOf("保持选择权", "推动长期计划"),
+            merged.facts.filter { it.category == CharacterFactCategories.VALUES_AND_TRADEOFFS }
+                .map { it.content }.toSet())
+        assertTrue(merged.coreValues.isEmpty())
         assertEquals(2, merged.loreEntries.size)
         val hunters = merged.loreEntries.first { it.id == "hunters" }
         assertEquals(90, hunters.priority)
@@ -730,7 +744,9 @@ class ChatPersonaGalleryTest {
         val imported = ChatPersonaGalleryStore(File(temporary.root, "qr-imported.json"), Json)
             .importPersona(payload)
         assertEquals("阿青", imported.persona.name)
-        assertTrue(imported.persona.portrait.isNotBlank())
+        assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).startsWith("剑客"))
+        assertTrue(imported.persona.factText(CharacterFactCategories.PERSONALITY).startsWith("克制"))
+        assertTrue(imported.persona.portrait.isEmpty())
     }
 
     @Test
