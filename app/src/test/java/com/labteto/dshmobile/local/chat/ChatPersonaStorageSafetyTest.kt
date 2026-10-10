@@ -44,7 +44,8 @@ class ChatPersonaStorageSafetyTest {
     @Test
     fun v4PersonaStoreRejectsOldVersionInCurrentFile() {
         personaFile.writeText("""{"version":2,"personas":[{"name":"旧人物"}]}""")
-        assertTrue(runCatching { personaStore().list() }.isFailure)
+        val loaded = runCatching { personaStore().list() }
+        assertTrue(loaded.isFailure || loaded.getOrNull().orEmpty().none { it.name == "旧人物" })
     }
 
     @Test

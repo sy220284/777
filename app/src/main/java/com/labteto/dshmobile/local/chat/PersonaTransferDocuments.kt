@@ -57,13 +57,7 @@ internal data class PersonaArchiveEnvelope(
 internal object PersonaTransferDocuments {
     private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V4_BASE64"
     private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V4_BASE64_END -->"
-    private const val LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V3_BASE64"
-    private const val LEGACY_V3_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V3_BASE64_END -->"
-    private const val LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V2_BASE64"
-    private const val LEGACY_V2_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V2_BASE64_END -->"
     private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V4_BASE64:"
-    private const val LEGACY_V3_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V3_BASE64:"
-    private const val LEGACY_V2_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V2_BASE64:"
     private const val CUSTOM_XML_ENTRY = "customXml/persona-transfer.xml"
 
     fun encode(
@@ -193,17 +187,10 @@ internal object PersonaTransferDocuments {
     }
 
     private fun extractMarkdownPayload(text: String): String {
-        val markers = listOf(
-            MARKDOWN_PAYLOAD_BEGIN to MARKDOWN_PAYLOAD_END,
-            LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V3_MARKDOWN_PAYLOAD_END,
-            LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V2_MARKDOWN_PAYLOAD_END,
-        )
-        val (begin, endMarker) = markers.firstOrNull { (candidate, _) ->
-            text.indexOf(candidate) >= 0
-        } ?: throw IllegalArgumentException("Markdown 中未找到 777 人物迁移数据")
-        val start = text.indexOf(begin)
-        val payloadStart = start + begin.length
-        val end = text.indexOf(endMarker, payloadStart)
+        val start = text.indexOf(MARKDOWN_PAYLOAD_BEGIN)
+        require(start >= 0) { "Markdown 中未找到 777 V4 人物档案" }
+        val payloadStart = start + MARKDOWN_PAYLOAD_BEGIN.length
+        val end = text.indexOf(MARKDOWN_PAYLOAD_END, payloadStart)
         require(end > payloadStart) { "Markdown 人物迁移数据不完整" }
         val encoded = text.substring(payloadStart, end).filterNot(Char::isWhitespace)
         return runCatching {
@@ -407,12 +394,6 @@ internal object PersonaTransferDocuments {
                     hiddenPayload = plain.substringAfter(WORD_PAYLOAD_PREFIX, "")
                         .takeIf(String::isNotBlank)
                         ?.filterNot(Char::isWhitespace)
-                        ?: plain.substringAfter(LEGACY_V3_WORD_PAYLOAD_PREFIX, "")
-                            .takeIf(String::isNotBlank)
-                            ?.filterNot(Char::isWhitespace)
-                        ?: plain.substringAfter(LEGACY_V2_WORD_PAYLOAD_PREFIX, "")
-                            .takeIf(String::isNotBlank)
-                            ?.filterNot(Char::isWhitespace)
                 }
             }
         }
