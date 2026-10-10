@@ -84,10 +84,22 @@ internal class LocalToolExecutionCoordinator(
         // must not reactivate it from a negated current input or an older GitHub request.
         val tools = registry.names().mapNotNull(registry::get).filterNot(::isGitHubConnectorTool)
             .filter { isNetworkSearchPermitted(it.name) }
-        enableOptionalTools(
-            LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
-            target,
-        )
+        val relevant = LocalToolRouter.relevantOptionalToolNames(tools, taskContext)
+            .filter { name ->
+                registry.get(name)?.takeIf { isNetworkSearchPermitted(it.name) }
+                    ?.let(LocalToolRouter::isOptional) == true
+            }
+        synchronized(target) {
+            val newlyRelevant = relevant.filterNot(target::contains)
+            if (newlyRelevant.isNotEmpty()) {
+                // A newly connected MCP service or newly installed plugin must win available
+                // schema-token budget on the next step; older unrelated tools may be displaced.
+                val previouslySelected = target.toList()
+                target.clear()
+                target.addAll(newlyRelevant)
+                target.addAll(previouslySelected)
+            }
+        }
     }
 
     suspend fun prepareWorkTurnCapabilities(
