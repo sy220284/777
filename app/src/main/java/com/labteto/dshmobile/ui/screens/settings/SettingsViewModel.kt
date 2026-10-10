@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
@@ -123,7 +124,14 @@ class SettingsViewModel @Inject constructor(
      */
     fun setBackgroundImage(uri: Uri) {
         viewModelScope.launch {
-            val stored = runCatching { importBackgroundImage(uri) }.getOrNull() ?: return@launch
+            val stored = try {
+                importBackgroundImage(uri)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "import_background_image", error)
+                return@launch
+            }
             hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
         }
     }
@@ -173,6 +181,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "connect_chatgpt", error)
                 onDone(error.message ?: "ChatGPT 登录失败")
             }
         }
@@ -186,6 +195,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "restart_chatgpt_authorization", error)
                 onDone(error.message ?: "重新开始 ChatGPT 授权失败")
             }
         }
@@ -207,6 +217,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "select_chatgpt_account", error)
                 onDone(error.message ?: "切换 ChatGPT 账户失败")
             }
         }
@@ -219,6 +230,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "disconnect_chatgpt_account", error)
                 onDone(error.message ?: "断开 ChatGPT 账户失败")
             }
         }
@@ -231,6 +243,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "remove_chatgpt_account", error)
                 onDone(error.message ?: "移除 ChatGPT 授权记录失败")
             }
         }
