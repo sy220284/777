@@ -352,9 +352,13 @@ class ChatPersonaStore internal constructor(
                 )
             }
             .filter { it.content.isNotBlank() }
-            .distinctBy { entry -> normalize(entry.id.ifBlank { entry.title + entry.content.take(80) }) }
+            .distinctBy { entry ->
+                normalize(entry.id.ifBlank { entry.title + entry.content.take(80) }) +
+                    "\u0000" + entry.temporalScope
+            }
             .take(MAX_LORE_ENTRIES)
             .toList()
+            .let(::uniqueLoreEntryIds)
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
