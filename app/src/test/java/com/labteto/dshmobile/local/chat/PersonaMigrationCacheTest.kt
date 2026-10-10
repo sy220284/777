@@ -13,11 +13,11 @@ class PersonaMigrationCacheTest {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test fun unchangedPersonaHotReadsDoNotDecodeButExternalReplacementInvalidates() {
-        val file = File(temporary.root, "personas-v2.json")
+        val file = File(temporary.root, "personas-v4.json")
         val marker = File(temporary.root, "personas.done").apply { writeText("v2") }
         val legacy = File(temporary.root, "legacy.json")
         var decodes = 0
-        val store = ChatPersonaStore(file, json, legacy, marker) { decodes++ }
+        val store = ChatPersonaStore(file, json, onDocumentDecode = { decodes++ })
         store.upsert(PersonaProfile(id = "a", name = "阿青"))
         val before = decodes
         repeat(20) { assertEquals("阿青", store.get("a").name); store.list() }
@@ -26,7 +26,7 @@ class PersonaMigrationCacheTest {
         assertTrue(file.setLastModified(file.lastModified() + 2000L))
         assertEquals("阿红", store.get("a").name)
         assertTrue(decodes > before)
-        assertEquals("阿红", ChatPersonaStore(file, json, legacy, marker).get("a").name)
+        assertEquals("阿红", ChatPersonaStore(file, json).get("a").name)
     }
 
     @Test fun galleryMigrationCachesVerifiedStateAndRechecksAfterSourceRemovalOrCorruption() {

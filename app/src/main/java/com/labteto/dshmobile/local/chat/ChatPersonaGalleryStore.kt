@@ -16,14 +16,13 @@ class ChatPersonaGalleryStore internal constructor(
     private val json: Json,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(File(context.filesDir, "local-harness/chat/persona-gallery-v5.json"), json)
+        this(File(context.filesDir, "local-harness/chat/persona-gallery-v6.json"), json)
 
     private val documentStore = PersonaGalleryDocumentStore(file, json)
     private val history = PersonaGalleryHistoryCoordinator(
-        File(requireNotNull(file.parentFile), "persona-history-v5"),
+        File(requireNotNull(file.parentFile), "persona-history-v6"),
         json,
     )
-    private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
     private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
 
     private var excludedHistoryReconciled = false
@@ -498,7 +497,6 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     private fun readNormalized(): GalleryDocument {
-        schemaMigration.migrateIfNeeded()
         val document = documentStore.read()
         require(document.version == 5) {
             "人物图集版本不受支持"

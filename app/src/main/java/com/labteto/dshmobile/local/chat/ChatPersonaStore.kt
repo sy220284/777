@@ -140,7 +140,7 @@ internal fun PersonaProfile.isUnboundChatPersona(): Boolean =
 
 @Serializable
 private data class PersonaDocument(
-    val version: Int = 2,
+    val version: Int = 4,
     val personas: List<PersonaProfile> = listOf(PersonaProfile()),
 )
 
@@ -193,7 +193,7 @@ class ChatPersonaStore internal constructor(
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(
-            file = File(context.filesDir, "local-harness/chat/personas-v2.json"),
+            file = File(context.filesDir, "local-harness/chat/personas-v4.json"),
             json = json,
             legacyFile = File(context.filesDir, "local-harness/chat/personas.json"),
             migrationMarker = File(context.filesDir, "local-harness/chat/personas-v1-to-v2.done"),
@@ -337,7 +337,6 @@ class ChatPersonaStore internal constructor(
     private fun read(): PersonaDocument {
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-        migrateLegacyIfNeeded()
         val document = durableFile.read(
             defaultValue = ::PersonaDocument,
             decode = ::decodeDocument,
@@ -345,67 +344,6 @@ class ChatPersonaStore internal constructor(
         cachedDocument = document
         cachedStamp = documentStamp()
         return document
-    }
-
-    private fun migrateLegacyIfNeeded() {
-        val legacy = legacyFile ?: return
-        val marker = migrationMarker ?: return
-        val currentReadable = listOf(file, backupFile)
-            .asSequence()
-            .filter(File::isFile)
-            .any { candidate ->
-                runCatching { decodeDocument(candidate.readText()) }.isSuccess
-            }
-        if (marker.isFile && currentReadable) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
-
-        var needsRecovery = false
-        val current = runCatching {
-            durableFile.read(
-                defaultValue = ::PersonaDocument,
-                decode = ::decodeDocument,
-            )
-        }.getOrElse {
-            // A retained legacy source is a valid recovery source. Fail closed only after both
-            // the current generation and the migration source are unavailable.
-            needsRecovery = true
-            PersonaDocument()
-        }
-        val legacyDocument = PersonaSchemaMigration.readLegacyPersonaDocument(legacy, json)
-        val merged = current.personas.toMutableList()
-        legacyDocument.personas.forEach { old ->
-            val migrated = sanitize(PersonaSchemaMigration.toCurrent(old))
-            val index = merged.indexOfFirst { it.id == migrated.id }
-            if (index >= 0) {
-                merged[index] = sanitize(
-                    PersonaSchemaMigration.mergeCurrentFirst(merged[index], migrated),
-                )
-            } else {
-                merged += migrated
-            }
-        }
-        val migrated = current.copy(version = 2, personas = merged)
-        if (needsRecovery) {
-            durableFile.restoreFromRecoverySource(json.encodeToString(PersonaDocument.serializer(), migrated)) {
-                runCatching { decodeDocument(it) }.isSuccess
-            }
-            cachedDocument = null
-        } else write(migrated)
-        markMigrationDone(marker)
-    }
-
-    private fun markMigrationDone(marker: File) {
-        marker.parentFile?.mkdirs()
-        val temporary = File(marker.parentFile, marker.name + ".tmp")
-        temporary.outputStream().use { output ->
-            output.write("v2\n".toByteArray())
-            output.flush()
-            output.fd.sync()
-        }
-        if (!temporary.renameTo(marker)) {
-            temporary.copyTo(marker, overwrite = true)
-            check(temporary.delete()) { "人物迁移标记临时文件无法清理" }
-        }
     }
 
     private fun write(document: PersonaDocument) {
@@ -420,7 +358,7 @@ class ChatPersonaStore internal constructor(
     private fun decodeDocument(encoded: String): PersonaDocument {
         onDocumentDecode()
         return json.decodeFromString(PersonaDocument.serializer(), encoded).also { document ->
-            require(document.version == 2) {
+            require(document.version == 4) {
                 "人物库版本不受支持；新版角色系统不读取旧人物数据"
             }
         }
@@ -429,7 +367,6 @@ class ChatPersonaStore internal constructor(
 
     private fun documentStamp(): DocumentFileStamp = DocumentFileStamp.of(
         file, backupFile, File(file.parentFile, "${file.name}.recovery-required"),
-        legacyFile, migrationMarker,
     )
 
     private companion object {
