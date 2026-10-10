@@ -965,6 +965,21 @@ internal fun PersonaGalleryScreen(
                             style = DsType.small13.withReadingWeight(),
                             color = DsTheme.colors.labelSecondary,
                         )
+                        val savedKnowledgePath = story.chatContext.unlockedStoryStages
+                            .ifEmpty {
+                                story.chatContext.storyStage.takeIf(String::isNotBlank)?.let(::listOf)
+                                    .orEmpty()
+                            }
+                        if (savedKnowledgePath.isNotEmpty()) {
+                            Text(
+                                stringResource(
+                                    R.string.persona_vnext_saved_stage_path,
+                                    savedKnowledgePath.joinToString(" → "),
+                                ),
+                                style = DsType.small13.withReadingWeight(),
+                                color = DsTheme.colors.labelSecondary,
+                            )
+                        }
                         // Let people reuse real stage IDs already present in facts and lore.
                         // Typing an unfamiliar technical identifier should not be required.
                         val stageChoices = (selected.persona.facts.map { it.temporalScope } +
