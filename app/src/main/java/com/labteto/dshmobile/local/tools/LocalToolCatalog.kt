@@ -105,8 +105,8 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "按需发现并启用当前回合的扩展工具；需要联网、下载、目标/待办、记忆管理、会话追踪、Android、视觉、GitHub、MCP、LSP、自动化或 Webhook 能力时先调用", properties(
-            "query" to string("能力关键词，例如 联网搜索、下载、记忆、会话轨迹、GitHub PR、Android 界面、视觉、MCP、LSP、自动化"),
+        add(tool("capability_search", "从实时注册表查看完整能力目录，或按自然语言、能力族、工具名发现并自动加载扩展。已连接 MCP 或新增插件的工具无需修改目录代码；如需总览可搜索『能力目录』。工具执行仍遵守连接、权限和审批要求", properties(
+            "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "更新当前任务计划", properties(
             "items" to buildJsonObject {
