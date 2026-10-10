@@ -33,7 +33,7 @@ internal class LocalChatWebContextProvider @Inject constructor(
             "联网检索失败：" + failure.message.orEmpty().take(200) +
                 "。无法确认最新信息，回答时需明确说明。"
         }
-        val personaBoundary = persona?.takeUnless(PersonaProfile::isUnboundChatPersona)?.let {
+        val personaBoundary = persona?.takeUnless { it.isUnboundChatPersona() }?.let {
             "\n当前角色所处阶段：${it.timelinePosition.ifBlank { "未指定" }}；" +
                 "检索到的后续剧情、隐藏身份和他人未告知的秘密不自动成为人物知识；用户明确改编优先。"
         }.orEmpty()
@@ -47,7 +47,7 @@ internal class LocalChatWebContextProvider @Inject constructor(
     private suspend fun searchCached(query: String): String {
         val now = System.nanoTime()
         synchronized(cacheLock) {
-            searchCache[query]?.takeIf { now - it.storedAtNanos in 0 until CACHE_LIFETIME_NANOS }
+            searchCache[query]?.takeIf { now - it.storedAtNanos in 0L until CACHE_LIFETIME_NANOS }
                 ?.let { return it.content }
         }
         val result = web.searchWithFallback(
