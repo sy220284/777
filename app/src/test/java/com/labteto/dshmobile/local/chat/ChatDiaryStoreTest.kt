@@ -91,6 +91,28 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun groupProjectionNeverExposesPrivateThoughtsFromPublicDiaryEvent() {
+        val entry = ChatDiaryEntry(
+            id = "public-event", subjectKey = "gallery:a", personaName = "阿青",
+            event = "大家公开决定去海边", feeling = "我其实很害怕",
+            innerThought = "我打算单独离开",
+            relationshipMeaning = "我开始不再信任朋友",
+            unresolvedEcho = "还没说出口的计划",
+            disclosure = ChatDiaryDisclosure.PUBLIC,
+            createdAt = 1L, updatedAt = 2L,
+        )
+        val group = renderRecalledChatDiary(entry, groupAudience = true)
+        val direct = renderRecalledChatDiary(entry, groupAudience = false)
+        assertTrue(group.contains("大家公开决定去海边"))
+        assertTrue(!group.contains("很害怕"))
+        assertTrue(!group.contains("单独离开"))
+        assertTrue(!group.contains("不再信任"))
+        assertTrue(!group.contains("没说出口"))
+        assertTrue(direct.contains("我其实很害怕"))
+        assertTrue(direct.contains("我打算单独离开"))
+    }
+
+    @Test
     fun groupRecallAcceptsOnlyPublicDiaryAndNeverPrivateOrShareable() {
         val memory = store()
         memory.record(request(

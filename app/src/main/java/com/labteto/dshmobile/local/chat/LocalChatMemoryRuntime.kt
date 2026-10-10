@@ -175,13 +175,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                         appendLine(diaryRecallUsageInstruction(groupAudience))
                         appendLine("当前输入和当前状态优先。")
                         diary.forEach { entry ->
-                            appendLine("- 事件：${entry.event}")
-                            entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
-                            entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
-                            entry.relationshipMeaning.takeIf(String::isNotBlank)?.let {
-                                appendLine("  关系意义：$it")
-                            }
-                            entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
+                            appendLine(renderRecalledChatDiary(entry, groupAudience))
                         }
                     }.trim(),
                     budget.diaryTokens,

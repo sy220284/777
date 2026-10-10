@@ -40,6 +40,7 @@ internal class CharacterRuntimeProjector(
                 takeWithinModelTokenBudget(momentPrompt(activePersona, runtimeState), MOMENT_TOKEN_BUDGET),
                 renderCharacterLifePrompt(lifeState),
                 takeWithinModelTokenBudget(renderCharacterModePrompt(mode), MODE_TOKEN_BUDGET),
+                takeWithinModelTokenBudget(renderCharacterDecisionPrompt(activePersona, runtimeState, userInput), 190),
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
                 relevantBackgroundPrompt(activePersona, userInput),
@@ -74,6 +75,9 @@ internal class CharacterRuntimeProjector(
             stableTraits = emptyList(),
             initialUserImpression = "",
             voiceSamples = emptyList(),
+            // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
+            timelinePosition = "",
+            worldSetting = "",
         )
     }
 

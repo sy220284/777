@@ -100,6 +100,23 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun enrichmentCannotOverwriteVerifiedCanonByReusingFactId() {
+        val canon = CharacterFact(
+            id = "identity-1", category = CharacterFactCategories.BIOGRAPHY,
+            content = "原作明确的经历", provenance = CharacterFactProvenance.CANON,
+        )
+        val incoming = canon.copy(
+            content = "导入中误写的设定", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        assertEquals(listOf(canon), mergeCharacterFacts(listOf(canon), listOf(incoming)))
+        val extra = CharacterFact(
+            id = "new", category = CharacterFactCategories.BIOGRAPHY,
+            content = "明确补充的另一件事", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        assertEquals(2, mergeCharacterFacts(listOf(canon), listOf(extra)).size)
+    }
+
+    @Test
     fun sameCharacterMergesIntoOneRicherProfileWithoutRepeatingShortVersion() {
         val base = PersonaProfile(
             id = "gallery-1",

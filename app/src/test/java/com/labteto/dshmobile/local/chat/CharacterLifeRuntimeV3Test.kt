@@ -90,6 +90,44 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun realResponsibilitiesAffectCharacterChoiceWithoutOverwritingIdentity() {
+        val committed = PersonaProfile(name = "叶澜", coreIdentity = "书店店主",
+            facts = listOf(
+                CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                    "答应员工的值班不能随便取消", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("duty", CharacterFactCategories.LIFE_GRAVITY,
+                    "周末负责书店开门", provenance = CharacterFactProvenance.CANON),
+            ))
+        val state = ChatCharacterState(currentAgenda = "今天还要安排书店值班")
+        val grounded = renderCharacterDecisionPrompt(committed, state, "周末陪我去远足可以吗？")
+        assertTrue(grounded.contains("值班"))
+        assertTrue(grounded.contains("书店开门"))
+        assertTrue(grounded.contains("接受、商量、拒绝或改变主意"))
+        assertTrue(renderCharacterDecisionPrompt(committed, state, "早安").isBlank())
+
+        val uncertain = committed.copy(facts = listOf(CharacterFact(
+            "speculation", CharacterFactCategories.LIMITS_AND_COSTS,
+            "可能永远不敢出门", provenance = CharacterFactProvenance.INFERRED,
+        )))
+        assertTrue(renderCharacterDecisionPrompt(uncertain, ChatCharacterState(), "陪我去远足可以吗？").isBlank())
+    }
+
+    @Test
+    fun v4UnscopedLegacyTimelineCannotBypassStoryKnowledge() {
+        val persona = PersonaProfile(name = "叶澜", coreIdentity = "书店店主",
+            facts = listOf(CharacterFact("opening", CharacterFactCategories.BIOGRAPHY,
+                "正在经营书店", provenance = CharacterFactProvenance.CANON)),
+            timelinePosition = "最终章揭秘：阿宁是卧底",
+            worldSetting = "未来结局：书店被毁",
+        )
+        val rendered = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(), "今天怎么样", null)
+        assertTrue((rendered.stablePrompt + rendered.dynamicPrompt).contains("书店"))
+        assertTrue(!(rendered.stablePrompt + rendered.dynamicPrompt).contains("阿宁是卧底"))
+        assertTrue(!(rendered.stablePrompt + rendered.dynamicPrompt).contains("书店被毁"))
+    }
+
+    @Test
     fun bundledPersonaRunsLifeAndModeWithoutScriptedGrowthGoals() {
         val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
         assertTrue(persona.mutableTraits.isEmpty())

@@ -213,6 +213,43 @@ internal fun resolveCharacterMode(
     )
 }
 
+
+/**
+ * Request-local decision grounding. Real priorities and conflicting commitments should affect
+ * what the character chooses, without turning values into a reply menu or a second state owner.
+ */
+internal fun renderCharacterDecisionPrompt(
+    persona: PersonaProfile,
+    state: ChatCharacterState,
+    userInput: String,
+): String {
+    val asksForChoice = Regex(
+        """(?:可不可以|能不能|能否|要不要|愿不愿意|答应|拒绝|一起|陪我|帮我|帮忙|约好|计划|打算|改时间|改期|怎么安排|你会怎么|你想怎么)"""
+    ).containsMatchIn(userInput)
+    val values = persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS)
+    val boundaries = persona.trustedFactText(CharacterFactCategories.LIMITS_AND_COSTS)
+    val responsibilities = persona.trustedFactText(CharacterFactCategories.LIFE_GRAVITY)
+    val goal = state.activeGoal.trim()
+    val agenda = state.currentAgenda.trim()
+    val conflict = state.internalConflict.trim()
+    val anchors = listOf(values, boundaries, responsibilities, goal, agenda, conflict)
+    if (!asksForChoice && anchors.none { it.isNotBlank() && relatedAttentionText(it, userInput) }) return ""
+    if (anchors.all(String::isBlank)) return ""
+
+    return buildString {
+        appendLine("【本轮人物的现实取舍】")
+        values.takeIf(String::isNotBlank)?.let { appendLine("在意的原则：${it.take(180)}") }
+        boundaries.takeIf(String::isNotBlank)?.let { appendLine("确有的限制或代价：${it.take(160)}") }
+        responsibilities.takeIf(String::isNotBlank)?.let { appendLine("长期责任：${it.take(150)}") }
+        goal.takeIf(String::isNotBlank)?.let { appendLine("自己的目标：${it.take(120)}") }
+        agenda.takeIf(String::isNotBlank)?.let { appendLine("已有安排：${it.take(120)}") }
+        conflict.takeIf(String::isNotBlank)?.let { appendLine("尚未解决的顾虑：${it.take(110)}") }
+        append("优先依据真实处境作出选择；可以接受、商量、拒绝或改变主意，" +
+            "但不可随口放弃已有责任、把未发生的行动说成已完成，或替用户作重大决定。" +
+            "这些依据只影响判断，无需逐条解释。")
+    }.trim()
+}
+
 internal fun renderCharacterModePrompt(projection: CharacterModeProjection): String {
     val mode = projection.vector
     return buildString {

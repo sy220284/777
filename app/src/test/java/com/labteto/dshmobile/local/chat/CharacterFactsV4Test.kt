@@ -267,6 +267,15 @@ class CharacterFactsV4Test {
         assertFalse((rewind.stablePrompt + rewind.dynamicPrompt).contains("雨夜找到线索"))
     }
 
+    @Test fun storyStageSelectionNeverDerivesOrderFromStageName() {
+        val context = ChatContextState().withStoryStageSelection("act-3")
+            .withStoryStageSelection("act-1")
+        assertEquals(listOf("act-3", "act-1"), context.unlockedStoryStages)
+        assertTrue(context.visibleStoryStages().contains("act-3"))
+        val rewind = context.withStoryStageSelection("act-3")
+        assertEquals(listOf("act-3"), rewind.unlockedStoryStages)
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),

@@ -67,8 +67,11 @@ internal fun mergeCharacterFacts(
     incoming.forEach { candidate ->
         val original = byId[candidate.id]
         if (original == null) byId[candidate.id] = candidate
-        else if (original.provenance != CharacterFactProvenance.USER_CREATED &&
-            candidate.provenance == CharacterFactProvenance.USER_CREATED) byId[candidate.id] = candidate
+        else if (
+            original.provenance != CharacterFactProvenance.USER_CREATED &&
+            original.provenance != CharacterFactProvenance.CANON &&
+            candidate.provenance == CharacterFactProvenance.USER_CREATED
+        ) byId[candidate.id] = candidate
     }
     return byId.values.toList()
 }
