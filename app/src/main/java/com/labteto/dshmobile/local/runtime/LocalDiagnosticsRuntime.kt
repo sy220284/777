@@ -60,12 +60,19 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
         val sessionId = runtimeStateStore.currentSessionId
         val appLogs = AppLog.exportSnapshot()
         val baseReport = DiagnosticReport.build(appLogs, environment.build(null))
-        appendLocalDiagnosticDetails(
-            baseReport = baseReport,
-            sessionId = sessionId,
-            eventLog = sessionStorage.eventLogs.get(sessionId),
-            usageTracker = usageTracker,
-            appLogs = appLogs,
-        )
+        try {
+            appendLocalDiagnosticDetails(
+                baseReport = baseReport,
+                sessionId = sessionId,
+                eventLog = sessionStorage.eventLogs.get(sessionId),
+                usageTracker = usageTracker,
+                appLogs = appLogs,
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            AppLog.failure("Diagnostics", "export_session_trace", error, sessionId = sessionId)
+            baseReport + "\n\n会话结构化追踪导出失败：${error.javaClass.simpleName}。基础进程异常日志已保留，可重试导出。\n"
+        }
     }
 }
