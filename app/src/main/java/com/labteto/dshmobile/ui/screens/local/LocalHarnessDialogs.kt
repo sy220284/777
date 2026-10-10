@@ -731,6 +731,21 @@ internal fun ChatPersonaDialog(
         if (advancedOpen) {
             bundledPreset?.let { preset ->
                 DsButton(
+                    text = stringResource(R.string.local_persona_refresh_preset_core),
+                    onClick = {
+                        // Explicit draft action. Keep relationship history, knowledge boundary,
+                        // corrections, world book, behavior tuning and user story stage intact.
+                        portrait = preset.persona.portrait
+                        lifeContext = preset.persona.lifeContext
+                        coreValues = preset.persona.coreValues.joinToString("\n")
+                        coreTension = preset.persona.coreTension
+                        stableTraits = preset.persona.stableTraits.joinToString("\n")
+                        worldSetting = preset.persona.worldSetting
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
                     text = stringResource(R.string.local_persona_restore_preset_canon),
                     onClick = {
                         val existingIds = loreEntries.map(PersonaLoreEntry::id).toSet()

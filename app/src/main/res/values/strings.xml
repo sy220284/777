@@ -1758,6 +1758,7 @@
     <string name="local_persona_lore_spoiler">剧透等级：%1$d（当前仅 0 级会被使用）</string>
     <string name="local_persona_lore_edit">编辑</string>
     <string name="local_persona_lore_collapse">收起</string>
+    <string name="local_persona_refresh_preset_core">载入新版人物内核（替换身份、经历与性格草稿；保存前可检查）</string>
     <string name="local_persona_restore_preset_canon">补充该角色的内置原作档案（保留已有内容）</string>
     <string name="local_persona_lore_add">新增世界书条目</string>
     <string name="local_persona_lore_remove">删除此条目</string>
