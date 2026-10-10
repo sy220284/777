@@ -8,6 +8,28 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class MemoryStoreTest {
+    @Test fun staleMessageLinkedMemoryEditCannotOverwriteNewerCorrectionOrDeactivateIt() {
+        val memory = store()
+        val original = memory.remember(
+            "周末原本约好去海边", MemoryScope.LINEAGE,
+            lineageId = "lineage", sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val corrected = memory.update(
+            original.id, content = "周末改去山上", expectedUpdatedAt = original.updatedAt,
+        )
+        assertTrue(corrected.updatedAt > original.updatedAt)
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.update(original.id, content = "旧视图覆盖错误", expectedUpdatedAt = original.updatedAt)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.forget(original.id, expectedUpdatedAt = original.updatedAt)
+        }
+        assertEquals("周末改去山上",
+            store().listActiveFromMessage("chat-a", "user-1").single().content)
+        assertTrue(memory.forget(original.id, expectedUpdatedAt = corrected.updatedAt))
+        assertTrue(store().listActiveFromMessage("chat-a", "user-1").isEmpty())
+    }
+
     @Test fun exactMessageSourceLookupSpansScopedMemoriesWithoutUnrelatedOrInactiveRows() {
         val memory = store()
         val relatedGlobal = memory.remember(
