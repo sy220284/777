@@ -34,6 +34,21 @@ class LocalWorkHandoffMaterialsTest {
     }
 
     @Test
+    fun olderLoadedMessagesRemainSelectableAndSearchableAfterLongConversation() {
+        val older = (1..80).map { index -> row("old-$index", "user", "历史事件-$index") }
+        val live = (1..20).map { index -> row("live-$index", "assistant", "新讨论-$index") }
+        val candidates = workHandoffDialogueCandidates(older, live)
+        assertEquals(100, candidates.size)
+        assertEquals(listOf("old-1"), visibleWorkHandoffMessages(candidates, "历史事件-1", emptyList())
+            .filter { it.id == "old-1" }.map { it.id })
+        assertTrue(visibleWorkHandoffMessages(candidates, "", listOf("old-1"))
+            .any { it.id == "old-1" })
+        val selected = workHandoffSummaryWithSelectedMessages("", "chat-older", candidates, listOf("old-1"))
+        assertTrue(selected.contains("历史事件-1"))
+        assertFalse(selected.contains("新讨论-20"))
+    }
+
+    @Test
     fun largeMessagesKeepSourceIdAndMarkExcerpt() {
         val result = workHandoffSummaryWithSelectedMessages(
             "", "chat-123", listOf(row("long", "user", "词".repeat(3000))), listOf("long"),

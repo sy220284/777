@@ -6,7 +6,7 @@ internal fun workHandoffDialogueCandidates(
     live: List<LocalHarnessMessage>,
 ): List<LocalHarnessMessage> {
     val recent = LinkedHashMap<String, LocalHarnessMessage>()
-    (older.takeLast(60) + live.takeLast(60)).forEach { message ->
+    (older + live).forEach { message ->
         if (message.id.isNotBlank() && message.content.isNotBlank() &&
             message.toolName == null && !message.proactive &&
             (message.role == "user" || message.role == "assistant")
@@ -14,8 +14,26 @@ internal fun workHandoffDialogueCandidates(
             recent[message.id] = message
         }
     }
-    return recent.values.toList().takeLast(20)
+    return recent.values.toList()
 }
+
+/** Search every loaded public message, show a small recent window without dropping selected older ones. */
+internal fun visibleWorkHandoffMessages(
+    messages: List<LocalHarnessMessage>,
+    query: String,
+    selectedIds: Collection<String>,
+): List<LocalHarnessMessage> {
+    val term = query.trim()
+    val selected = selectedIds.toSet()
+    return if (term.isBlank()) {
+        val recent = messages.takeLast(12).mapTo(hashSetOf(), LocalHarnessMessage::id)
+        messages.filter { it.id in selected || it.id in recent }
+    } else {
+        messages.asSequence().filter { it.content.contains(term, ignoreCase = true) }
+            .takeLast(30).toList()
+    }
+}
+
 
 /** Preserve the editable draft and carry traceable references to explicitly selected messages. */
 internal fun workHandoffSummaryWithSelectedMessages(

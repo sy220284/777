@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.visibleWorkHandoffMessages
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
@@ -36,6 +37,11 @@ internal fun LocalWorkCapabilitySheet(
     selectableMessages: List<LocalHarnessMessage> = emptyList(),
     selectedMessageIds: List<String> = emptyList(),
     onSelectedMessageIdsChange: (List<String>) -> Unit = {},
+    messageSearch: String = "",
+    onMessageSearchChange: (String) -> Unit = {},
+    hasEarlierMessages: Boolean = false,
+    loadingEarlierMessages: Boolean = false,
+    onLoadEarlierMessages: (() -> Unit)? = null,
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
     capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
@@ -82,10 +88,25 @@ internal fun LocalWorkCapabilitySheet(
             maxLines = 6,
         )
         Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        if (selectableMessages.isNotEmpty()) {
+        if (selectableMessages.isNotEmpty() || hasEarlierMessages) {
             Text(stringResource(R.string.work_handoff_select_messages),
                 style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
-            selectableMessages.forEach { message ->
+            if (selectableMessages.size > 12 || hasEarlierMessages) {
+                DsTextField(
+                    value = messageSearch, onValueChange = onMessageSearchChange,
+                    placeholder = { Text(stringResource(R.string.work_handoff_search_messages)) },
+                    modifier = Modifier.fillMaxWidth().testTag("handoff_search"),
+                    enabled = !switching, singleLine = true,
+                )
+            }
+            val visible = visibleWorkHandoffMessages(
+                selectableMessages, messageSearch, selectedMessageIds,
+            )
+            if (visible.isEmpty() && messageSearch.isNotBlank()) {
+                Text(stringResource(R.string.work_handoff_no_matches),
+                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+            }
+            visible.forEach { message ->
                 val checked = message.id in selectedMessageIds
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
@@ -104,6 +125,16 @@ internal fun LocalWorkCapabilitySheet(
                     Text("$speaker · ${message.content.trim().replace(Regex("\\s+"), " ").take(100)}",
                         style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                 }
+            }
+            if (hasEarlierMessages && onLoadEarlierMessages != null) {
+                DsButton(
+                    text = stringResource(R.string.work_handoff_load_older),
+                    onClick = onLoadEarlierMessages,
+                    modifier = Modifier.fillMaxWidth().testTag("handoff_load_older"),
+                    enabled = !switching && !loadingEarlierMessages,
+                    loading = loadingEarlierMessages,
+                    variant = DsButtonVariant.Ghost,
+                )
             }
         }
         if (capabilities.isNotEmpty()) {

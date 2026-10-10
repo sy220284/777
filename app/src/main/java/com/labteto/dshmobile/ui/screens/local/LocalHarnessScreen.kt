@@ -184,6 +184,7 @@ fun LocalHarnessScreen(
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workHandoffMessageIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var workHandoffSearch by rememberSaveable { mutableStateOf("") }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
@@ -270,6 +271,7 @@ fun LocalHarnessScreen(
             workHandoffSourceSessionId = shell.sessionId
             workHandoffSummary = viewModel.workHandoffSummary()
             workHandoffMessageIds = emptyList()
+            workHandoffSearch = ""
             workCapabilityConfirmed = false
             workCapabilityFailed = false
             workCapabilityConfiguring = false
@@ -679,6 +681,16 @@ fun LocalHarnessScreen(
             selectableMessages = handoffMessages,
             selectedMessageIds = workHandoffMessageIds,
             onSelectedMessageIdsChange = { workHandoffMessageIds = it },
+            messageSearch = workHandoffSearch,
+            onMessageSearchChange = { workHandoffSearch = it },
+            hasEarlierMessages = workHandoffSourceSessionId == shell.sessionId &&
+                transcriptHistory.sessionId == shell.sessionId && transcriptHistory.hasMore,
+            loadingEarlierMessages = transcriptHistory.loading,
+            onLoadEarlierMessages = {
+                if (workHandoffSourceSessionId == shell.sessionId) {
+                    scope.launch { viewModel.loadOlderTranscript(workHandoffSourceSessionId) }
+                }
+            },
             capabilities = viewModel.workHandoffCapabilityReadiness(
                 task = pendingWorkCapability.orEmpty(),
                 githubConfigured = githubConfiguredForHandoff,

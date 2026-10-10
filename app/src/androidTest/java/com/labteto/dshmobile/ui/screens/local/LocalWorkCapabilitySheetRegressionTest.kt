@@ -208,6 +208,45 @@ class LocalWorkCapabilitySheetRegressionTest {
     }
 
     @Test
+    fun searchAndLoadEarlierKeepExplicitHandoffSelection() {
+        val selected = mutableStateOf<List<String>>(emptyList())
+        val query = mutableStateOf("")
+        var loaded = 0
+        var entered = 0
+        val messages = (1..15).map { index ->
+            com.labteto.dshmobile.local.session.LocalHarnessMessage(
+                id = "msg-$index", role = "user", content = "第${index}条旧记录", createdAt = index.toLong(),
+            )
+        }
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { entered++ }, onDismiss = {},
+                    selectableMessages = messages,
+                    selectedMessageIds = selected.value,
+                    onSelectedMessageIdsChange = { selected.value = it },
+                    messageSearch = query.value,
+                    onMessageSearchChange = { query.value = it },
+                    hasEarlierMessages = true,
+                    onLoadEarlierMessages = { loaded++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("handoff_search").performTextReplacement("第1条旧记录")
+        compose.onNodeWithTag("handoff_message_msg-1").performClick()
+        compose.runOnIdle { assertEquals(listOf("msg-1"), selected.value) }
+        compose.onNodeWithTag("handoff_search").performTextReplacement("")
+        compose.onNodeWithTag("handoff_message_msg-1").assertIsDisplayed()
+        compose.onNodeWithTag("handoff_load_older").performClick()
+        compose.runOnIdle {
+            assertEquals(1, loaded)
+            assertEquals(0, entered)
+            assertEquals(listOf("msg-1"), selected.value)
+        }
+    }
+
+    @Test
     fun pendingModeTransitionCannotBeSubmittedAgainOrDismissed() {
         compose.setContent {
             DshTheme {
