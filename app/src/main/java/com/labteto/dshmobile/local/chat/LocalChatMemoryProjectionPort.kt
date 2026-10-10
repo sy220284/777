@@ -10,7 +10,7 @@ import javax.inject.Singleton
  * It never rewrites the original Session EventLog or attempts to infer missing source identities.
  */
 @Singleton
-internal class LocalChatMemoryProjectionPort @Inject constructor(
+class LocalChatMemoryProjectionPort @Inject constructor(
     private val persistence: LocalChatPersistence,
 ) {
     fun invalidateGeneratedDiaryForSources(sources: List<MemorySourceRef>): Int {
