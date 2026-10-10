@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.connection
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -9,6 +11,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.labteto.dshmobile.notify.DshNotifications
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.security.KeyStore
@@ -93,11 +96,22 @@ class RetiredRemoteUpgradeAndroidTest {
             prefs[booleanPreferencesKey("notify_goal")] = true
         }
         store.clearRetiredRemoteData()
-        store.setSetting { it.copy(themePreference = "matte_black", notifyLocalJobs = false) }
-        assertEquals("matte_black", store.settingsOnce().themePreference)
-        assertFalse(store.settingsOnce().notifyLocalJobs)
-        assertNull(dataStore.data.first()[stringPreferencesKey("harness_sessions_json")])
-        assertNull(dataStore.data.first()[booleanPreferencesKey("notify_goal")])
+        // setSetting also mirrors the theme to process-global SharedPreferences.
+        // Preserve that mirror so instrumented tests cannot change real app appearance.
+        val mirror = context.getSharedPreferences("ui_prefs", android.content.Context.MODE_PRIVATE)
+        val previousTheme = mirror.getString("theme_preference", null)
+        try {
+            store.setSetting { it.copy(themePreference = "matte_black", notifyLocalJobs = false) }
+            assertEquals("matte_black", store.settingsOnce().themePreference)
+            assertFalse(store.settingsOnce().notifyLocalJobs)
+            assertNull(dataStore.data.first()[stringPreferencesKey("harness_sessions_json")])
+            assertNull(dataStore.data.first()[booleanPreferencesKey("notify_goal")])
+        } finally {
+            val editor = mirror.edit()
+            if (previousTheme == null) editor.remove("theme_preference")
+            else editor.putString("theme_preference", previousTheme)
+            check(editor.commit())
+        }
     }
 
     @Test
@@ -118,6 +132,21 @@ class RetiredRemoteUpgradeAndroidTest {
         } finally {
             keystore.deleteEntry(retainedAlias)
         }
+    }
+
+    @Test
+    fun removesOldNotificationChannelsButKeepsLocalJobs() {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        listOf("completions", "needs_action", "connection").forEach { id ->
+            manager.createNotificationChannel(
+                NotificationChannel(id, "retired-$id", NotificationManager.IMPORTANCE_LOW),
+            )
+        }
+        DshNotifications(context).ensureChannels()
+        listOf("completions", "needs_action", "connection").forEach { id ->
+            assertNull("Retired channel still present: $id", manager.getNotificationChannel(id))
+        }
+        assertTrue(manager.getNotificationChannel(DshNotifications.CHANNEL_LOCAL_JOBS) != null)
     }
 
     private fun installAesKey(alias: String) {
