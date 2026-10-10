@@ -396,6 +396,29 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun readingAndExportingLegacyDiaryCorrectsMetadataOnlySupersession() {
+        val root = File(temporary.root, "older-diary")
+        val old = ChatDiaryEntry(
+            id = "old", subjectKey = "gallery:a", personaName = "阿青",
+            event = "我们曾经在河边讨论旅行",
+            feeling = "很开心",
+            disclosure = ChatDiaryDisclosure.SHAREABLE,
+            supersededBy = "new", createdAt = 1L, updatedAt = 1L,
+        )
+        val newer = old.copy(
+            id = "new", event = "我们在河边讨论过下一次旅行",
+            disclosure = ChatDiaryDisclosure.PUBLIC,
+            supersededBy = null, createdAt = 2L, updatedAt = 2L,
+        )
+        ChatDiaryDocumentStore(root, json)
+            .write(ChatDiaryDocument(entries = listOf(old, newer)))
+        val memory = ChatDiaryStore(root, json)
+        assertNull(memory.listActive("gallery:a").first { it.id == "old" }.supersededBy)
+        assertNull(memory.listForTransfer("gallery:a").first { it.id == "old" }.supersededBy)
+        assertEquals("new", memory.listActive("gallery:a").first().id)
+    }
+
+    @Test
     fun groupDiaryCanRecallLaterInDirectChat() {
         val memory = store()
         val saved = memory.record(request(

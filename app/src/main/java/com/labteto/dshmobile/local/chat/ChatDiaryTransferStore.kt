@@ -14,7 +14,7 @@ internal class ChatDiaryTransferStore(
     private val rollback: ChatDiaryRollbackRecovery,
 ) {
     fun list(subjectKey: String): List<ChatDiaryEntry> =
-        documents.read().entries.asSequence()
+        ChatDiarySupersessionPolicy.repairLinks(documents.read().entries).asSequence()
             .filter { it.subjectKey == subjectKey }
             .sortedWith(compareBy<ChatDiaryEntry>(ChatDiaryEntry::createdAt).thenBy(ChatDiaryEntry::id))
             .take(MAX_CHAT_DIARY_ENTRIES)
