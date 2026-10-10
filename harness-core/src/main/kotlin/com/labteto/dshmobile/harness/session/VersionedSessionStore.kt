@@ -154,7 +154,10 @@ class VersionedSessionStore(
                     file.name.startsWith("$id.corrupt-")
             }
             .forEach { file -> changed = file.delete() || changed }
-        // Unregister last: interrupted deletion never hides still-existing source files.
+        // Never hide the session if a failed filesystem deletion left either recoverable copy.
+        check(!fileFor(id).exists() && !backupFor(id).exists()) {
+            "会话文件未完全删除，保留登记以便重试：$id"
+        }
         catalog.unregister(id)
         return changed
     }
