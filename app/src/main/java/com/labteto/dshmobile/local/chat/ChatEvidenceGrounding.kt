@@ -20,13 +20,22 @@ internal fun evidenceGrounded(
         else -> return false
     }
     if (sourceText.length < 2) return false
-    if (sourceText.contains(evidenceText) || evidenceText.contains(sourceText)) return true
+    if (sourceText.contains(evidenceText)) return true
+
+    // Brief explicit denials must not support the opposite positive fact.
+    // Avoid comparing whole polarity of long multi-topic conversations.
+    val explicit = source == "user" || source == "explicit"
+    if (explicit && sourceText.length <= 100 && evidenceText.length >= 4 &&
+        CHAT_EVIDENCE_NEGATION.containsMatchIn(sourceText) !=
+            CHAT_EVIDENCE_NEGATION.containsMatchIn(evidenceText)
+    ) return false
 
     val evidenceBigrams = chatEvidenceBigrams(evidenceText)
     val sourceBigrams = chatEvidenceBigrams(sourceText)
     if (evidenceBigrams.isEmpty() || sourceBigrams.isEmpty()) return false
     val shared = evidenceBigrams.count(sourceBigrams::contains)
-    return shared >= 2 && shared.toDouble() / evidenceBigrams.size >= 0.25
+    // Two frequent bigrams with 25% overlap do not establish a personal fact.
+    return shared >= 2 && shared.toDouble() / evidenceBigrams.size >= 0.50
 }
 
 private fun normalizeChatEvidence(value: String): String =
@@ -37,3 +46,5 @@ private fun chatEvidenceBigrams(text: String): Set<String> =
     else (0 until text.length - 1).mapTo(linkedSetOf()) { index ->
         text.substring(index, index + 2)
     }
+
+private val CHAT_EVIDENCE_NEGATION = Regex("""(?:没有|没|不|未|拒绝|取消|撤销)""")
