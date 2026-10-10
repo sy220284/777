@@ -31,7 +31,7 @@ internal object ChatMemorySelector {
         val needsReferent = shouldRecall(query) && IMPLICIT_CONTINUITY_HINTS.any(text::contains)
         // Use public conversation evidence, never the character's private impressions or thoughts.
         val referent = if (needsReferent) {
-            context.pendingTurns.sortedBy(ChatPendingTurn::sequence)
+            context.pendingForRequest(limit = 8).sortedBy(ChatPendingTurn::sequence)
                 .lastOrNull { it.userMessage.isNotBlank() && it.userMessage.trim() != query.trim() }
                 ?.userMessage
                 ?: context.continuity.unfinished.lastOrNull()
