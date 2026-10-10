@@ -27,25 +27,30 @@ internal object LocalToolRouter {
     fun relevantOptionalToolNames(
         tools: List<HarnessTool>,
         taskContext: String,
-        limit: Int = MAX_TASK_PREACTIVATED_TOOLS,
     ): List<String> {
         val normalized = (if (taskContext.length <= MAX_TASK_CONTEXT_CHARS) taskContext
             else taskContext.take(MAX_TASK_CONTEXT_CHARS / 2) + "\n" +
                 taskContext.takeLast(MAX_TASK_CONTEXT_CHARS / 2)).lowercase()
         if (normalized.isBlank()) return emptyList()
 
+        // New plugin/MCP tools participate automatically through their registered metadata.
+        // Order by task relevance, never by an arbitrary fixed number of optional tools.
         return tools.asSequence()
             .filter(::isOptional)
-            .filter { tool ->
-                normalized.contains(tool.name.lowercase()) ||
-                    tool.metadata.discoveryKeywords.any { keyword ->
-                        normalized.contains(keyword.lowercase())
-                    }
+            .mapNotNull { tool ->
+                val exactName = normalized.contains(tool.name.lowercase())
+                val keywordHits = tool.metadata.discoveryKeywords.count { keyword ->
+                    normalized.contains(keyword.lowercase())
+                }
+                val familyHit = normalized.contains(tool.metadata.family.lowercase())
+                val score = (if (exactName) 100 else 0) + keywordHits * 10 +
+                    (if (familyHit) 3 else 0)
+                if (score > 0) tool to score else null
             }
-            .map(HarnessTool::name)
+            .sortedWith(compareByDescending<Pair<HarnessTool, Int>> { it.second }
+                .thenBy { it.first.name })
+            .map { it.first.name }
             .distinct()
-            .sorted()
-            .take(limit.coerceIn(1, MAX_TASK_PREACTIVATED_TOOLS))
             .toList()
     }
 
@@ -66,7 +71,7 @@ internal object LocalToolRouter {
             .coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
         val optional = ArrayList<HarnessTool>()
         for (name in enabledOptional) {
-            if (optional.size >= MAX_OPTIONAL_PROMPT_TOOLS || remainingTokens <= 0) break
+            if (remainingTokens <= 0) break
             val tool = optionalByName[name] ?: continue
             val schema = tool.schema
             val complexity = schemaComplexity(schema)
@@ -88,7 +93,7 @@ internal object LocalToolRouter {
     fun search(
         tools: List<HarnessTool>,
         query: String,
-        limit: Int = 16,
+        limit: Int = Int.MAX_VALUE,
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
@@ -99,7 +104,14 @@ internal object LocalToolRouter {
             .map { it.value }.take(12).toList()
         val tail = termPattern.findAll(normalized.takeLast(MAX_CAPABILITY_QUERY_EDGE_CHARS))
             .map { it.value }.toList().takeLast(12)
-        val terms = (front + tail).toSet()
+        // Java regex treats a continuous Chinese phrase as one word. Add bigrams so
+        // natural requests can match Chinese capability keywords without a hardcoded tool list.
+        val chunks = front + tail
+        val hanWords = Regex("[\\u4e00-\\u9fff]{2,}")
+        val chineseTerms = chunks.flatMap { chunk ->
+            hanWords.findAll(chunk).flatMap { it.value.windowed(2).asSequence() }.toList()
+        }
+        val terms = (chunks + chineseTerms).toSet()
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
         for (tool in tools) {
             if (!isOptional(tool)) continue
@@ -128,7 +140,7 @@ internal object LocalToolRouter {
                 .thenBy { pair -> pair.first.name },
         )
         return scored
-            .take(limit.coerceIn(1, 48))
+            .take(limit.coerceAtLeast(1))
             .map { pair -> pair.first }
     }
 
@@ -139,14 +151,14 @@ internal object LocalToolRouter {
         val optional = tools.filter(::isOptional)
         if (optional.isEmpty()) return "可选扩展能力：无"
         return buildString {
-            appendLine("可选扩展能力（注册表真实状态）：")
+            appendLine("可选扩展能力（已注册；以下为本轮选择状态，并非连接或授权状态）：")
             optional
                 .groupBy { it.metadata.family }
                 .toSortedMap(String.CASE_INSENSITIVE_ORDER)
                 .forEach { (family, familyTools) ->
                     val enabled = familyTools.count { it.name in enabledOptional }
                     append("- ").append(family).append("：")
-                    append(if (enabled == familyTools.size) "已启用" else if (enabled == 0) "未启用" else "部分启用")
+                    append(if (enabled == familyTools.size) "本轮已选用" else if (enabled == 0) "本轮未选用" else "本轮部分选用")
                     append(" ").append(enabled).append("/").append(familyTools.size)
                     val requirements = familyTools.flatMap { it.metadata.requirements }.distinct()
                     if (requirements.isNotEmpty()) {
@@ -158,9 +170,34 @@ internal object LocalToolRouter {
                     }
                     appendLine()
                 }
-            append("未启用能力可通过 capability_search 按能力名称、用途或关键词发现并启用。")
+            append("本轮未选用的能力仍已注册，可由智能体按需发现；是否能执行须以实际连接、授权和模型工具表为准。")
         }.trimEnd()
     }
+
+    /** Generic inventory requests must browse the live registry instead of failing fuzzy search. */
+    fun isInventoryRequest(query: String): Boolean {
+        val normalized = query.trim().lowercase().replace(Regex("\\s+"), "")
+        return normalized in setOf(
+            "工具与能力检测", "工具能力检测", "能力检测", "工具检测", "能力列表",
+            "工具列表", "有哪些工具", "有哪些能力", "所有工具", "全部工具",
+            "所有能力", "全部能力", "可用工具", "可用能力", "扩展能力",
+            "能力目录", "工具目录", "列出能力", "列出工具", "能力自检",
+        )
+    }
+
+    /** The directory is generated from currently registered tools, including dynamic MCP tools. */
+    fun capabilityDirectory(tools: List<HarnessTool>, enabledOptional: Set<String>): String =
+        buildString {
+            val optional = tools.filter(::isOptional)
+            appendLine("当前注册的可选工具：${optional.size} 个，分 ${optional.map { it.metadata.family }.distinct().size} 类。")
+            optional.groupBy { it.metadata.family }
+                .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+                .forEach { (family, members) ->
+                    val selected = members.count { it.name in enabledOptional }
+                    appendLine("- $family：已注册 ${members.size}，本轮已选 ${selected}；工具：${members.joinToString(", ") { it.name }}")
+                }
+            append("目录由实时注册表生成；本轮未选不代表无法使用。选择具体能力时再次调用 capability_search 加载工具定义；实际执行仍需满足连接与授权条件。")
+        }.trimEnd()
 
     fun description(tool: HarnessTool): String =
         tool.schema["function"]?.jsonObject
@@ -203,15 +240,13 @@ internal object LocalToolRouter {
         return visit(schema, 1)
     }
 
-    internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 8_000
-    private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 12_000
-    private const val MAX_OPTIONAL_PROMPT_TOOLS = 16
-    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 2_000
+    internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
+    private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
+    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 4_000
     private const val MAX_OPTIONAL_SCHEMA_DEPTH = 12
     private const val MAX_OPTIONAL_SCHEMA_PROPERTIES = 256
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
-    private const val MAX_TASK_PREACTIVATED_TOOLS = 16
     private const val MAX_TASK_CONTEXT_CHARS = 12_000
     private const val MAX_CAPABILITY_QUERY_EDGE_CHARS = 4_096
 }
