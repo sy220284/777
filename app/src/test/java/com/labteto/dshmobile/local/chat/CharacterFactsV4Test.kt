@@ -398,4 +398,28 @@ class CharacterFactsV4Test {
         assertEquals(CharacterFactProvenance.CANON, draft.facts.single().provenance)
         assertEquals("本人", draft.facts.single().perspective)
     }
+
+    @Test
+    fun v4IdentityWithoutFactsDoesNotReviveHiddenLegacyPersona() {
+        val profile = PersonaProfile(
+            name = "阿云", coreIdentity = "旧书店店主",
+            portrait = "过时背景：来自火星",
+            lifeContext = "过时生活：驾驶宇宙飞船",
+            stableTraits = listOf("过时特征：无所不知"),
+            mutableTraits = listOf("过时变化：预知未来"),
+            attentionKeywords = listOf("火星"),
+        )
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val v4 = projector.project(profile, ChatCharacterState(), ChatContextState(),
+            "你每天都做什么？", null)
+        val prompt = v4.stablePrompt + v4.dynamicPrompt
+        assertTrue(prompt.contains("旧书店店主"))
+        assertFalse(prompt.contains("来自火星"))
+        assertFalse(prompt.contains("驾驶宇宙飞船"))
+        assertFalse(prompt.contains("预知未来"))
+        // A genuinely legacy-only in-memory profile retains its fallback until converted.
+        val old = projector.project(profile.copy(coreIdentity = ""),
+            ChatCharacterState(), ChatContextState(), "你的背景？", null)
+        assertTrue(old.stablePrompt.contains("来自火星"))
+    }
 }
