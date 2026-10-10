@@ -209,7 +209,7 @@ class LocalToolRouterTest {
         val small = tool("small_remote", "小型远端工具", ToolExposure.OPTIONAL, "MCP")
         val huge = tool(
             "huge_remote",
-            "超大远端工具" + "x".repeat(12_000),
+            "超大远端工具" + "x".repeat(30_000),
             ToolExposure.OPTIONAL,
             "MCP",
         )
