@@ -77,7 +77,8 @@ class PersonaSchemaMigrationTest {
         assertTrue("常见习惯：用户自己补过：紧张时会先整理袖口" in migrated.quirks)
         assertTrue(migrated.quirks.size > 1)
         assertTrue(migrated.limitations.isNotEmpty())
-        assertTrue(migrated.mutableTraits.isNotEmpty())
+        // Runtime computes growth from observed events; importing a preset must not invent goals.
+        assertTrue(migrated.mutableTraits.isEmpty())
         assertTrue(migrated.stableTraits.isNotEmpty())
         assertTrue("用户自己补过：守住承诺" in migrated.coreValues)
         assertTrue("重要关系与现实责任" !in migrated.coreValues)

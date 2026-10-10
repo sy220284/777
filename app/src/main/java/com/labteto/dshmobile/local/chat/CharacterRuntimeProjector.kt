@@ -72,12 +72,21 @@ internal class CharacterRuntimeProjector(
             }.trim(),
             STABLE_CRITICAL_TOKEN_BUDGET,
         )
-        val remaining = (STABLE_PERSONA_TOKEN_BUDGET - estimateModelTokens(critical)).coerceAtLeast(0)
+        val separator = "\n\n"
+        val remaining = (
+            STABLE_PERSONA_TOKEN_BUDGET - estimateModelTokens(critical) -
+                estimateModelTokens(separator)
+            ).coerceAtLeast(0)
         val descriptive = if (remaining == 0) "" else takeWithinModelTokenBudget(
             descriptiveStablePrompt(persona),
             remaining,
         )
-        return listOf(critical, descriptive).filter(String::isNotBlank).joinToString("\n\n")
+        // Token estimates for separately clipped segments need not be exactly additive.
+        // The final cap covers the separator and any estimate-rounding difference.
+        return takeWithinModelTokenBudget(
+            listOf(critical, descriptive).filter(String::isNotBlank).joinToString(separator),
+            STABLE_PERSONA_TOKEN_BUDGET,
+        )
     }
 
     private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
