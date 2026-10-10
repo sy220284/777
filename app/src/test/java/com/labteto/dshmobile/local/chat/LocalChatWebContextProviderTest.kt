@@ -24,6 +24,8 @@ class LocalChatWebContextProviderTest {
         assertNull(chatWebLookup("我们今天讨论原作剧情", ayaka))
         assertNull(chatWebLookup("原作里托马和绫华具体是什么关系？"))
         assertNull(chatWebLookup("不要联网，原作里神里绫华和托马具体是什么关系？", ayaka))
+        assertNull(chatWebLookup("原作里人物结局是什么？", ayaka))
+        assertTrue(chatWebLookup("联网搜索原作里人物结局是什么？", ayaka) is ChatWebLookup.Search)
     }
 
     @Test
