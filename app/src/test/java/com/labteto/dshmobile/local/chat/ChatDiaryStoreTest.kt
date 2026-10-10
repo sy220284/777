@@ -368,6 +368,34 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun oldArchiveSharingOnlySupersessionLinkCannotHideCharactersPastExperience() {
+        // Older archives may still store a supersession link created solely because
+        // disclosure changed. A mode preference is not an actual correction of events.
+        val old = ChatDiaryEntry(
+            id = "old", subjectKey = "gallery:a", personaName = "阿青",
+            event = "我们在雨天散步谈起理想", feeling = "我觉得很安心",
+            disclosure = ChatDiaryDisclosure.SHAREABLE,
+            supersededBy = "new", createdAt = 1L, updatedAt = 1L,
+        )
+        val newer = old.copy(
+            id = "new", event = "我们在雨天散步聊过故事",
+            disclosure = ChatDiaryDisclosure.PUBLIC,
+            supersededBy = null, createdAt = 2L, updatedAt = 2L,
+        )
+        val group = ChatDiaryRecallEngine.search(
+            listOf(old, newer), "雨天散步", "gallery:a", true, 6,
+        )
+        val direct = ChatDiaryRecallEngine.search(
+            listOf(old, newer), "雨天散步", "gallery:a", false, 6,
+        )
+        assertEquals(setOf("old", "new"), group.map { it.id }.toSet())
+        assertEquals(direct.map { it.id }, group.map { it.id })
+        assertTrue(ChatDiaryRecallEngine.search(
+            listOf(old, newer), "雨天散步", "gallery:b", true, 6,
+        ).isEmpty())
+    }
+
+    @Test
     fun groupDiaryCanRecallLaterInDirectChat() {
         val memory = store()
         val saved = memory.record(request(

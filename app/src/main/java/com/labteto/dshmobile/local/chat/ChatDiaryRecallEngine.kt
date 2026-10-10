@@ -18,11 +18,21 @@ internal object ChatDiaryRecallEngine {
         val broad = isExplicitDiaryRecall(query)
         val historical = isHistoricalDiaryRecall(query)
 
+        val activeById = entries.asSequence()
+            .filter(ChatDiaryEntry::active)
+            .associateBy(ChatDiaryEntry::id)
+        fun supersededByValidUpdate(entry: ChatDiaryEntry): Boolean =
+            entry.supersededBy?.let(activeById::get)?.let { replacement ->
+                ChatDiarySupersessionPolicy.supersedes(
+                    entry.copy(supersededBy = null), replacement,
+                )
+            } == true
+
         val eligible = entries.asSequence()
             .filter { entry ->
                 entry.active &&
                     entry.subjectKey == cleanSubject &&
-                    (entry.supersededBy == null || historical)
+                    (!supersededByValidUpdate(entry) || historical)
             }
             .toList()
 
@@ -42,7 +52,7 @@ internal object ChatDiaryRecallEngine {
         return candidates.asSequence()
             .map { entry ->
                 val score = ChatDiaryEntryPolicy.matchScore(entry, queryCore, queryTerms, now)
-                entry to if (historical && entry.supersededBy != null) {
+                entry to if (historical && supersededByValidUpdate(entry)) {
                     score.copy(total = score.total + HISTORICAL_SUPERSEDED_BONUS)
                 } else {
                     score
