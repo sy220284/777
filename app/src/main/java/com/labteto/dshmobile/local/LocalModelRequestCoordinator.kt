@@ -488,8 +488,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         val localPreflight = providerError?.code in setOf(
                             "WORK_BUDGET_EXHAUSTED",
                             "MODEL_CONTEXT_BUDGET_EXCEEDED",
-                            "MODEL_ROUTE_CIRCUIT_OPEN",
-                            "MODEL_ROUTE_CIRCUIT_COOLDOWN",
                         )
                         AppLog.warn(
                             "LocalModelRequest",
