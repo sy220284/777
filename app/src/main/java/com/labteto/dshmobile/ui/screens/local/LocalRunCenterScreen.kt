@@ -83,6 +83,9 @@ internal fun LocalRunCenterScreen(
     onDismiss: () -> Unit,
     onOpenArtifact: (String) -> Unit = { onOpenResults() },
     onContinueArtifact: (String) -> Unit = {},
+    /** Null for ordinary Work sessions; absent source remains available only as historic summary. */
+    onOpenSourceSession: (() -> Unit)? = null,
+    sourceSessionMissing: Boolean = false,
     usageRevision: kotlinx.coroutines.flow.StateFlow<Long>? = null,
     sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
     taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
@@ -161,6 +164,22 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
+            if (onOpenSourceSession != null) {
+                DsButton(
+                    text = stringResource(R.string.local_work_handoff_return_source),
+                    onClick = onOpenSourceSession,
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                )
+            } else if (sourceSessionMissing) {
+                Text(
+                    stringResource(R.string.local_work_handoff_source_removed),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                )
+            }
             if (onHistoryPage != null) {
                 DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
                     variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
