@@ -3,8 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.routeFingerprint
-import com.labteto.dshmobile.local.work.LocalModelRouteCircuitBreaker
-import com.labteto.dshmobile.local.work.LocalModelRouteHealth
 import com.labteto.dshmobile.local.work.LocalWorkExecutionBudget
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.executeWithModelAdmission
@@ -17,15 +15,9 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 
 class LocalWorkExecutionBudgetTest {
-    @Before
-    fun resetRouteHealth() {
-        LocalModelRouteHealth.resetForTest()
-    }
-
     @Test
     fun nextSliceDoesNotWaitForPreviousSubagentAndKeepsCumulativeExposure() = runTest {
         val budget = LocalWorkExecutionBudget(maxRequests = 1)
@@ -343,94 +335,40 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
-    fun repeatedTransientFailuresOpenCooldownBeforeBudgetOrProviderCall() {
-        val breaker = LocalModelRouteCircuitBreaker()
-
-        repeat(3) {
-            breaker.acquire("route").failure(streamInterrupted())
-        }
-
-        assertTrue(breaker.isOpen("route"))
-        val error = runCatching { breaker.acquire("route") }.exceptionOrNull() as LocalModelException
-        assertEquals("MODEL_ROUTE_CIRCUIT_COOLDOWN", error.code)
-        assertEquals("route_circuit_cooldown", com.labteto.dshmobile.local.model.modelFailureKind(error))
-        assertFalse(error.retryable)
-    }
-
-    @Test
-    fun cooldownExpiryAllowsExactlyOneHalfOpenProbe() {
-        var now = 1_000L
-        LocalModelRouteHealth.resetForTest { now }
-        val breaker = LocalModelRouteCircuitBreaker()
-        repeat(3) { breaker.acquire("route").failure(streamInterrupted()) }
-
-        now += 91_000L
-        val probe = breaker.acquire("route")
-        val concurrent = runCatching { breaker.acquire("route") }.exceptionOrNull() as LocalModelException
-        assertEquals("MODEL_ROUTE_CIRCUIT_COOLDOWN", concurrent.code)
-
-        val first = LocalModelRouteHealth.activeCooldown("route")
-        probe.failure(streamInterrupted())
-        val second = LocalModelRouteHealth.activeCooldown("route")
-
-        assertTrue(first?.probeInFlight == true)
-        assertEquals(180_000L, second?.millis)
-        assertTrue(second?.probeInFlight == false)
-    }
-
-    @Test
-    fun successfulRequestClearsTransientHealthAcrossRuns() {
-        val firstRun = LocalModelRouteCircuitBreaker()
-        val inFlightSuccess = firstRun.acquire("route")
-        repeat(3) { firstRun.acquire("route").failure(streamInterrupted()) }
-        assertTrue(firstRun.isOpen("route"))
-
-        inFlightSuccess.success()
-
-        val nextRun = LocalModelRouteCircuitBreaker()
-        assertFalse(nextRun.isOpen("route"))
-        assertEquals(0, LocalModelRouteHealth.consecutiveFailures("route"))
-        nextRun.acquire("route").release()
-    }
-
-    @Test
-    fun releasingCancelledHalfOpenProbeDoesNotCountAnotherFailure() {
-        var now = 1_000L
-        LocalModelRouteHealth.resetForTest { now }
-        val breaker = LocalModelRouteCircuitBreaker()
-        repeat(3) { breaker.acquire("route").failure(streamInterrupted()) }
-        now += 91_000L
-
-        breaker.acquire("route").release()
-
-        assertEquals(3, LocalModelRouteHealth.consecutiveFailures("route"))
-        assertFalse(breaker.isOpen("route"))
-        breaker.acquire("route").release()
-    }
-
-    @Test
-    fun routeHealthRegistryStaysBoundedUnderRouteChurn() {
-        val breaker = LocalModelRouteCircuitBreaker()
-        repeat(400) { index ->
-            breaker.acquire("route-$index").failure(streamInterrupted())
-        }
-        assertTrue(LocalModelRouteHealth.trackedRoutesForTest() <= 256)
-    }
-
-    @Test
-    fun terminalPlanLimitOpensCircuitForSiblingRequests() {
-        val breaker = LocalModelRouteCircuitBreaker()
-        assertFalse(breaker.isOpen("route"))
-        breaker.acquire("route").failure(
-            LocalModelException(
-                code = "CHATGPT_PLAN_LIMIT_REACHED",
-                message = "limit",
-                retryable = false,
-            ),
+    fun repeatedStreamInterruptionsPreserveOriginalFailureAndAllowImmediateNextRequest() = runTest {
+        val control = LocalWorkExecutionControl()
+        val messages = listOf(
+            kotlinx.serialization.json.buildJsonObject {
+                put("role", "user")
+                put("content", "test")
+            },
         )
-        assertTrue(breaker.isOpen("route"))
-        val error = runCatching { breaker.requireClosed("route") }.exceptionOrNull() as LocalModelException
-        assertEquals("MODEL_ROUTE_CIRCUIT_OPEN", error.code)
+        var providerCalls = 0
+
+        repeat(4) {
+            val error = runCatching {
+                executeWithModelAdmission(
+                    control = control,
+                    routeFingerprint = "same-route",
+                    model = "unknown",
+                    baseUrl = "https://example.test",
+                    messages = messages,
+                    tools = kotlinx.serialization.json.JsonArray(emptyList()),
+                ) {
+                    providerCalls += 1
+                    throw streamInterrupted()
+                }
+            }.exceptionOrNull() as LocalModelException
+
+            assertEquals("CHATGPT_PLAN_STREAM_INTERRUPTED", error.code)
+            assertEquals(LocalModelAdmissionState.ADMITTED, error.admissionState)
+            assertEquals(it + 1, providerCalls)
+        }
+
+        val usage = control.budget.snapshot()
+        assertEquals(4, usage.admittedRequests)
+        assertTrue(usage.uncertainExposureTokens > 0L)
+        assertEquals(0, usage.reservedRequests)
     }
 
     private fun streamInterrupted() = LocalModelException(
