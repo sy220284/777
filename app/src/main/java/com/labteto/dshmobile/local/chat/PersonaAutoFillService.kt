@@ -508,7 +508,9 @@ class PersonaAutoFillService @Inject constructor(
             coreValues = draft.coreValues.ifEmpty { current.coreValues },
             coreTension = draft.coreTension.ifBlank { current.coreTension },
             stableTraits = draft.stableTraits.ifEmpty { current.stableTraits },
-            mutableTraits = draft.mutableTraits.ifEmpty { current.mutableTraits },
+            // Mutable-trait tracking belongs to runtime configuration, never to auto-generated
+            // character facts. Existing user-authored axes stay intact during regeneration.
+            mutableTraits = current.mutableTraits,
             initialUserImpression = draft.initialUserImpression.ifBlank { current.initialUserImpression },
             voiceSamples = draft.voiceSamples.ifEmpty { current.voiceSamples },
             worldSetting = draft.worldSetting.ifBlank { current.worldSetting },

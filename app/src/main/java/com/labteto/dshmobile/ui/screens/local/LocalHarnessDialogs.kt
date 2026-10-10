@@ -714,7 +714,6 @@ internal fun ChatPersonaDialog(
         }
         PersonaFormSection(stringResource(R.string.persona_form_expression)) {
             PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-            PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
         }
         PersonaFormSection(stringResource(R.string.persona_form_story)) {
             PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
@@ -779,6 +778,7 @@ internal fun ChatPersonaDialog(
                 PersonaTextField(stringResource(R.string.local_persona_attention_keywords), attentionKeywords, { attentionKeywords = it })
                 PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
                 PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
+                PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
                 PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
                 // Legacy mutableTrait axes remain in storage for existing personas; evolution
                 // belongs to the runtime, so the persona editor does not offer growth scripts.
