@@ -54,6 +54,18 @@ class PersonaPresetCatalogTest {
     }
 
     @Test
+    fun starterPresetsProvideRetrievableCanonBeyondLifeTraits() {
+        PersonaPresetCatalog.presets.forEach { preset ->
+            val lore = preset.persona.loreEntries
+            assertTrue("${preset.id} lacks canonical facts", lore.size >= 3)
+            assertTrue("${preset.id} has unsearchable world-book data", lore.all { it.keywords.isNotEmpty() })
+            assertTrue("${preset.id} lacks game-world supplements", lore.any { it.id.contains("canon") })
+            assertEquals("${preset.id} duplicate lore IDs", lore.size, lore.map { it.id }.distinct().size)
+            assertTrue(lore.all { it.spoilerLevel == 0 })
+        }
+    }
+
+    @Test
     fun starterPresetsContainLivingCharacterSignals() {
         PersonaPresetCatalog.presets.forEach { preset ->
             assertTrue(preset.persona.coreValues.isNotEmpty())

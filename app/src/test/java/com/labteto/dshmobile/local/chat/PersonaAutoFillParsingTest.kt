@@ -20,6 +20,10 @@ class PersonaAutoFillParsingTest {
               "name": "流萤",
               "portrait": "星核猎手成员",
               "coreValues": "活下去；守护珍视的人",
+              "attentionKeywords": "匹诺康尼；星核猎手；萨姆",
+              "franchise": "崩坏：星穹铁道",
+              "timelinePosition": "匹诺康尼主线初期",
+              "knowledgeBoundary": ["未知的后续剧情不能直接引用"],
               "hardConstraints": ["避免机械式解释", "保持角色视角"],
               "loreEntries": {
                 "title": "萨姆",
@@ -38,6 +42,10 @@ class PersonaAutoFillParsingTest {
 
         assertEquals("流萤", draft.name)
         assertEquals(listOf("活下去", "守护珍视的人"), draft.coreValues)
+        assertEquals(listOf("匹诺康尼", "星核猎手", "萨姆"), draft.attentionKeywords)
+        assertEquals("崩坏：星穹铁道", draft.franchise)
+        assertEquals("匹诺康尼主线初期", draft.timelinePosition)
+        assertEquals(listOf("未知的后续剧情不能直接引用"), draft.knowledgeBoundary)
         assertEquals(1, draft.loreEntries.size)
         assertEquals(listOf("星核猎手", "萨姆"), draft.loreEntries.single().keywords)
         assertEquals(80, draft.loreEntries.single().priority)

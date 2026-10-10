@@ -23,6 +23,8 @@ internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
         persona.coreValues.isNotEmpty() ||
         persona.stableTraits.isNotEmpty() ||
         persona.worldSetting.isNotBlank() ||
+        persona.franchise.isNotBlank() ||
+        persona.timelinePosition.isNotBlank() ||
         persona.knowledgeBoundary.isNotEmpty() ||
         persona.loreEntries.isNotEmpty() ||
         persona.hardConstraints.isNotEmpty() ||

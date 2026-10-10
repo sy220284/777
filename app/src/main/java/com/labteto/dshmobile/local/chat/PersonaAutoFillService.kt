@@ -24,6 +24,7 @@ internal data class PersonaDraft(
     val portrait: String = "",
     val lifeContext: String = "",
     val attentionBiases: List<String> = emptyList(),
+    val attentionKeywords: List<String> = emptyList(),
     val perceptionBlindSpots: List<String> = emptyList(),
     val quirks: List<String> = emptyList(),
     val limitations: List<String> = emptyList(),
@@ -52,6 +53,7 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
         portrait = root.text("portrait"),
         lifeContext = root.text("lifeContext"),
         attentionBiases = root.stringList("attentionBiases"),
+        attentionKeywords = root.stringList("attentionKeywords"),
         perceptionBlindSpots = root.stringList("perceptionBlindSpots"),
         quirks = root.stringList("quirks"),
         limitations = root.stringList("limitations"),
@@ -274,6 +276,7 @@ class PersonaAutoFillService @Inject constructor(
             if (current.portrait.isNotBlank()) appendLine("人物整体：${current.portrait}")
             if (current.lifeContext.isNotBlank()) appendLine("独立生活：${current.lifeContext}")
             if (current.attentionBiases.isNotEmpty()) appendLine("天然注意：${current.attentionBiases.joinToString("；")}")
+            if (current.attentionKeywords.isNotEmpty()) appendLine("注意关键词：${current.attentionKeywords.joinToString("；")}")
             if (current.perceptionBlindSpots.isNotEmpty()) appendLine("容易漏掉/误读：${current.perceptionBlindSpots.joinToString("；")}")
             if (current.quirks.isNotEmpty()) appendLine("小习惯：${current.quirks.joinToString("；")}")
             if (current.limitations.isNotEmpty()) appendLine("不擅长：${current.limitations.joinToString("；")}")
@@ -450,11 +453,12 @@ class PersonaAutoFillService @Inject constructor(
         }
 
         current.copy(
-            id = PersonaProfile.DEFAULT_PERSONA_ID,
+            id = current.id,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             portrait = draft.portrait.ifBlank { current.portrait },
             lifeContext = draft.lifeContext.ifBlank { current.lifeContext },
             attentionBiases = draft.attentionBiases.ifEmpty { current.attentionBiases },
+            attentionKeywords = draft.attentionKeywords.ifEmpty { current.attentionKeywords },
             perceptionBlindSpots = draft.perceptionBlindSpots.ifEmpty { current.perceptionBlindSpots },
             quirks = draft.quirks.ifEmpty { current.quirks },
             limitations = draft.limitations.ifEmpty { current.limitations },
@@ -484,21 +488,21 @@ class PersonaAutoFillService @Inject constructor(
         val SYSTEM_PROMPT = """
             你负责把角色需求整理成“人物生命资料”，只输出可解析 JSON，不解释。
 
-            字段：name, portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
+            字段：name, portrait, lifeContext, attentionBiases, attentionKeywords, perceptionBlindSpots, quirks,
             limitations, coreValues, coreTension, stableTraits, mutableTraits,
             initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
             knowledgeBoundary, loreEntries, hardConstraints, bannedPhrases。
 
             规则：
             1. 用户明确设定和已有资料优先；name 必填。没有明确证据的字段保持空白，禁止为了“完整”自动补满人物。
-            2. portrait 是主要人物锚点，用120～320字像熟人一样描述身份、处境、气质和长期选择逻辑；不要拆成人格测试、行为清单或反应规则。
+            2. portrait 是人物身份锚点。原创人物可以用120～320字自然描述身份、处境和长期选择逻辑；有原作的游戏人物先写清身份、出身、所属组织和客观经历，不让泛化的性格词盖过原作事实。
             3. lifeContext 只写真正稳定的独立生活背景：工作/学业、重要的人、持续责任、长期小计划。不要替人物预编每天会发生什么。
-            4. attentionBiases 最多2项、perceptionBlindSpots 最多1项；只有描述里有明显依据时才写。运行时会动态决定本轮注意力，不需要预设完整注意力表。
+            4. attentionBiases 最多2项、perceptionBlindSpots 最多1项；attentionKeywords 记录能触发角色注意的原作专有名词（关键人名、组织、地点、能力、物品）以及明确话题，确保有依据且不泛滥。
             5. quirks 最多3项、limitations 最多2项；只保留有辨识度且长期成立的内容，普通人类行为不要都写成人设。
             6. coreValues 最多2项；coreTension、stableTraits、mutableTraits 都是可选项，最多各2项。能由 portrait 自然表达清楚的内容不要重复拆字段。
             7. initialUserImpression 只有用户明确给出初始关系或看法时才写；不得伪造共同经历。
             8. voiceSamples 只有用户强调说话感觉时才生成3～6条，长短混合且至少一半平淡普通；只作节奏参考，禁止固定口头禅、频率规则、反应表或“用户说X就回Y”。
-            9. loreEntries 只保存稳定世界资料，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}，优先0～6条。
+            9. loreEntries 保存具体、可检索的原作事实和世界规则，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}。有原作的人物优先覆盖身份与势力、重要关系、技能与限制、关键经历、组织地点、世界规则等互补主题；依据充分可超过6条，避免同义复述。
             10. knowledgeBoundary / hardConstraints 只写真正影响一致性和知识边界的少量硬规则；不要把语气、动作、思维路线写成硬约束。
             11. 不生成“思维模式、行为模式、表达模式”的固定标签或权重。运行时会根据人物底色、当前状态、关系、记忆和话题自由组合模式。
             12. 目标是留下足够稳定的“这个人是谁”，把“这一轮怎么想、怎么接、怎么说”交给运行时，避免人物越写越死。
@@ -506,6 +510,9 @@ class PersonaAutoFillService @Inject constructor(
             14. 禁止生成任何类似“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为/实体动作”“没有感情/无法理解或体验情感”“只能通过文字或屏幕交流”“不能真实触碰、行动或陪伴”等脱离角色的元叙事限制；portrait、lifeContext、limitations、knowledgeBoundary、hardConstraints 等任何字段都不能承载这类内容。
             15. 如果角色原作本身是机器人、AI、幽灵、意识体或其他非人存在，只能记录作品世界内明确的形态、能力、限制与感受方式；不得把通用模型限制包装成角色设定，也不得因为角色非人就默认其“没有感情、不能理解、不能行动”。
             16. 人设要支持沉浸式扮演：描述角色会怎样生活、感受、判断和行动，不写“我做不到现实动作”一类面向用户的免责声明。
+            17. 对有原作的角色，优先还原原作身份、经历、能力体系、重要人际关系和世界规则；原作事实与用户明确指定的二创改编需有清楚的边界，允许用户指定不同故事路线。
+            18. 每条世界书要能独立检索：标题具体、关键词包含专有名词和自然问法，内容写确切事实；不确定的人名、能力、血缘、剧情与结局留空，禁止臆造。
+            19. 时间线与知识边界保持一致。未确认进度的隐藏身份、后续事件只按当前可公开事实处理；游戏玩家知道的秘密不自动成为人物知识。
         """.trimIndent()
 
         val REPAIR_PROMPT = """

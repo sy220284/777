@@ -55,6 +55,7 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
 import com.labteto.dshmobile.local.session.LocalConversationMode
@@ -493,6 +494,7 @@ internal fun ChatPersonaDialog(
     var portrait by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.portrait) }
     var lifeContext by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.lifeContext) }
     var attention by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionBiases.joinToString("\n")) }
+    var attentionKeywords by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionKeywords.joinToString("\n")) }
     var blindSpots by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.perceptionBlindSpots.joinToString("\n")) }
     var quirks by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.quirks.joinToString("\n")) }
     var limitations by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.limitations.joinToString("\n")) }
@@ -503,6 +505,10 @@ internal fun ChatPersonaDialog(
     var initialUserImpression by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.initialUserImpression) }
     var voiceSamples by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.voiceSamples.joinToString("\n")) }
     var worldSetting by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.worldSetting) }
+    var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
+    var timelinePosition by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.timelinePosition) }
+    var knowledgeBoundary by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.knowledgeBoundary.joinToString("\n")) }
+    var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
     var constraints by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.hardConstraints.joinToString("\n")) }
     var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
     var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
@@ -527,6 +533,7 @@ internal fun ChatPersonaDialog(
         portrait = generated.portrait
         lifeContext = generated.lifeContext
         attention = generated.attentionBiases.joinToString("\n")
+        attentionKeywords = generated.attentionKeywords.joinToString("\n")
         blindSpots = generated.perceptionBlindSpots.joinToString("\n")
         quirks = generated.quirks.joinToString("\n")
         limitations = generated.limitations.joinToString("\n")
@@ -537,6 +544,10 @@ internal fun ChatPersonaDialog(
         initialUserImpression = generated.initialUserImpression
         voiceSamples = generated.voiceSamples.joinToString("\n")
         worldSetting = generated.worldSetting
+        franchise = generated.franchise
+        timelinePosition = generated.timelinePosition
+        knowledgeBoundary = generated.knowledgeBoundary.joinToString("\n")
+        loreEntries = generated.loreEntries
         constraints = generated.hardConstraints.joinToString("\n")
         banned = generated.bannedPhrases.joinToString("\n")
         corrections = generated.corrections.joinToString("\n")
@@ -564,6 +575,7 @@ internal fun ChatPersonaDialog(
                                 portrait = portrait,
                                 lifeContext = lifeContext,
                                 attentionBiases = lines(attention),
+                                attentionKeywords = lines(attentionKeywords),
                                 perceptionBlindSpots = lines(blindSpots),
                                 quirks = lines(quirks),
                                 limitations = lines(limitations),
@@ -574,6 +586,10 @@ internal fun ChatPersonaDialog(
                                 initialUserImpression = initialUserImpression,
                                 voiceSamples = lines(voiceSamples),
                                 worldSetting = worldSetting,
+                                franchise = franchise,
+                                timelinePosition = timelinePosition,
+                                knowledgeBoundary = lines(knowledgeBoundary),
+                                loreEntries = loreEntries.filter { it.content.isNotBlank() },
                                 hardConstraints = lines(constraints),
                                 bannedPhrases = lines(banned),
                                 corrections = lines(corrections),
@@ -694,28 +710,36 @@ internal fun ChatPersonaDialog(
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
-        PersonaFormSection(stringResource(R.string.persona_form_life)) {
-            PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
-            PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
-            PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
-            PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
-            PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_character)) {
-            PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
-            PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
-            PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
-            PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_expression)) {
-            PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-            PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
-            PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
-            PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
-            PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
-            PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
+            PersonaFormSection(stringResource(R.string.persona_form_canon)) {
+                PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
+                PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
+                PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
+                PersonaTextField(stringResource(R.string.local_persona_knowledge_boundary), knowledgeBoundary, { knowledgeBoundary = it })
+                PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
+            }
+            PersonaFormSection(stringResource(R.string.persona_form_life)) {
+                PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
+                PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
+                PersonaTextField(stringResource(R.string.local_persona_attention_keywords), attentionKeywords, { attentionKeywords = it })
+                PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
+                PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
+                PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
+            }
+            PersonaFormSection(stringResource(R.string.persona_form_character)) {
+                PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
+                PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
+                PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
+                PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
+            }
+            PersonaFormSection(stringResource(R.string.persona_form_expression)) {
+                PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
+                PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
+            }
+            PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
+                PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
+                PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
+                PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
+            }
         }
         }
     }

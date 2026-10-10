@@ -22,6 +22,44 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun gameCanonFieldsAndWorldBookSurviveAllExportFormats() {
+        val original = PersonaProfile(
+            name = "神里绫华",
+            portrait = "社奉行神里家大小姐",
+            attentionKeywords = listOf("社奉行", "托马", "冰元素"),
+            franchise = "原神",
+            timelinePosition = "稻妻主线已相识阶段",
+            knowledgeBoundary = listOf("未经历的后续事件不知道"),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "yashiro",
+                    title = "社奉行",
+                    content = "社奉行的神里家负责相关事务。",
+                    keywords = listOf("社奉行", "神里家"),
+                    secondaryKeywords = listOf("家族"),
+                    priority = 85,
+                    alwaysOn = false,
+                    spoilerLevel = 0,
+                ),
+            ),
+        )
+        val entry = PersonaGalleryEntry(id = "canon-1", persona = original)
+        listOf(PersonaTransferFormat.JSON, PersonaTransferFormat.MARKDOWN, PersonaTransferFormat.WORD)
+            .forEach { format ->
+                val exported = PersonaTransferDocuments.encode(json, entry, format)
+                val canonical = PersonaTransferDocuments.decodeToCanonicalJson(
+                    exported.bytes, "角色.persona.${format.extension}",
+                )
+                val restored = PersonaTransferDocuments.decodeArchive(json, canonical).entry.persona
+                assertEquals(original.attentionKeywords, restored.attentionKeywords)
+                assertEquals(original.franchise, restored.franchise)
+                assertEquals(original.timelinePosition, restored.timelinePosition)
+                assertEquals(original.knowledgeBoundary, restored.knowledgeBoundary)
+                assertEquals(original.loreEntries, restored.loreEntries)
+            }
+    }
+
+    @Test
     fun markdownRoundTripKeepsProfileMemoryDiaryAndDialogue() {
         val document = PersonaTransferDocuments.encode(
             json = json,

@@ -271,7 +271,8 @@ private fun presetPersona(
         franchise = franchise,
         timelinePosition = timelinePosition,
         knowledgeBoundary = knowledgeBoundary,
-        loreEntries = loreEntries,
+        loreEntries = (loreEntries + supplementalPresetCanonLore(name, presetId))
+            .distinctBy { it.id.ifBlank { it.title } },
         hardConstraints = hardConstraints,
         bannedPhrases = bannedPhrases,
         presetId = presetId,
