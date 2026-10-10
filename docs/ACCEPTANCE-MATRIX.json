@@ -190,6 +190,14 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitWithoutCursorIgnoresHistoricalResultAndReturnsNextNewResult",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitForMessageReturnsEarliestResultAfterCursorWithoutSkippingLaterResult"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
       "state": "automated_partial",
       "evidence": [
