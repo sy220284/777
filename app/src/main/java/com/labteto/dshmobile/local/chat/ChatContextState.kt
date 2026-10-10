@@ -13,6 +13,8 @@ data class ChatContextState(
     val scene: ChatSceneState = ChatSceneState(),
     /** Explicit plot-stage identifier, independent of the clock or time of day. */
     val storyStage: String = "",
+    /** Plot stages explicitly visited in this story branch, in visit order. */
+    val unlockedStoryStages: List<String> = emptyList(),
     val continuity: ChatContinuityState = ChatContinuityState(),
     val processedThroughSequence: Long = -1L,
     val pendingTurns: List<ChatPendingTurn> = emptyList(),
@@ -33,6 +35,24 @@ data class ChatPendingTurn(
     val assistantMessage: String = "",
     val generation: Long = 0L,
 )
+
+/**
+ * Selecting a new stage keeps earlier knowledge. Re-selecting an earlier stage rewinds
+ * that branch's knowledge; clearing the stage returns to baseline. No ordering is
+ * inferred from arbitrary identifiers such as "act-2".
+ */
+internal fun ChatContextState.withStoryStageSelection(selected: String): ChatContextState {
+    val stage = selected.trim().take(160)
+    if (stage.isBlank()) return copy(storyStage = "", unlockedStoryStages = emptyList()).normalized()
+    val path = (unlockedStoryStages + storyStage)
+        .map(String::trim).filter(String::isNotBlank).distinct()
+    val index = path.indexOf(stage)
+    val visited = if (index >= 0) path.take(index + 1) else path + stage
+    return copy(storyStage = stage, unlockedStoryStages = visited).normalized()
+}
+
+internal fun ChatContextState.visibleStoryStages(): Set<String> =
+    (unlockedStoryStages + storyStage).map(String::trim).filter(String::isNotBlank).toSet()
 
 internal fun ChatContextState.normalized(): ChatContextState {
     val recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180)
@@ -62,6 +82,9 @@ internal fun ChatContextState.normalized(): ChatContextState {
 
     return copy(
         storyStage = storyStage.trim().take(160),
+        unlockedStoryStages = (unlockedStoryStages + storyStage)
+            .map { it.trim().take(160) }.filter(String::isNotBlank).distinct()
+            .let { stages -> if (storyStage.isBlank()) emptyList() else stages },
         scene = scene.copy(
             sceneTime = scene.sceneTime.trim().take(80),
             location = scene.location.trim().take(120),
@@ -191,6 +214,7 @@ internal fun ChatContextState.pendingForRequest(limit: Int = 6): List<ChatPendin
 
 internal fun ChatContextState.hasUsefulFacts(): Boolean =
     storyStage.isNotBlank() ||
+    unlockedStoryStages.isNotEmpty() ||
     scene.sceneTime.isNotBlank() ||
         scene.location.isNotBlank() ||
         continuity.recentEvents.isNotEmpty() ||
