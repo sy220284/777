@@ -34,7 +34,7 @@ internal object LocalChatHistorySummaryStrategy {
                 append("\n\n较早用户表达与事件及人物当时回应：")
                 dialogue.forEach { append("\n- ").append(it) }
             }
-            append("\n\n旧人物回应仅说明当时说过的话；当前事实、有效决定、人设、关系、长期记忆和近期原始对话优先。")
+            append("\n\n旧人物回应仅说明当时说过的话；当前有效事实和决定优先。当前人设、关系、长期记忆和近期原始对话优先。")
         }
         val summary = truncateWithoutSplittingSurrogatePair(text, summaryLimit)
         return com.labteto.dshmobile.local.model.LocalRenderedHistorySummary(summary,
