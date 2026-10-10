@@ -181,7 +181,11 @@ class LocalWorkRuntime @Inject internal constructor(
 
     internal fun setPlanMode(enabled: Boolean) =
         runtimeStateStore.performVisibleOperation("计划模式切换失败") {
-            planMode.setEnabled(enabled)
+            if (!planMode.setEnabled(enabled)) {
+                runtimeStateStore.projection.publishError(
+                    "计划模式暂未切换：当前会话正在加载、执行任务或等待审批；请在任务可修改时重试",
+                )
+            }
         }
 }
 

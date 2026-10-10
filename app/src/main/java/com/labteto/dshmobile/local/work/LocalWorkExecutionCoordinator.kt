@@ -372,10 +372,12 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         messageId: String,
         replacement: String,
     ): LocalUserMessageEditResult = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        var committed = false
         try {
             when (val edit = prepareEditedTurn(messageId, replacement)) {
                 is LocalWorkMessageEditPreparation.Rejected -> edit.reason
                 is LocalWorkMessageEditPreparation.Ready -> {
+                    committed = true
                     val sent = sendPrepared(edit.send, edit.reservedLease)
                     if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
                     else {
@@ -390,7 +392,8 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             runtimeStateStore.projection.publishError(
                 "Work 历史编辑失败：${error.message ?: error::class.java.simpleName}",
             )
-            LocalUserMessageEditResult.FAILED
+            if (committed) LocalUserMessageEditResult.COMMITTED_NOT_STARTED
+            else LocalUserMessageEditResult.FAILED
         }
     }
 
