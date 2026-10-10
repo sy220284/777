@@ -1,0 +1,61 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalTaskCapabilityReadinessTest {
+    @Test fun showsOnlyCapabilitiesRelevantToCurrentTask() {
+        assertEquals(
+            listOf(
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.GITHUB, LocalTaskCapabilityState.CONNECTION_REQUIRED),
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.WEB_SEARCH, LocalTaskCapabilityState.DISABLED),
+            ),
+            LocalTaskCapabilityReadinessProjector.project(
+                "检查 GitHub PR #608，再联网搜索相关资料",
+                githubConfigured = false,
+                networkSearchEnabled = false,
+            ),
+        )
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "仅调整本地页面，不联网", githubConfigured = true, networkSearchEnabled = true,
+        ).isEmpty())
+    }
+
+    @Test fun configurationIsNotMistakenForExecutionPermission() {
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.GITHUB, LocalTaskCapabilityState.CONFIGURED)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "处理 PR #608", githubConfigured = true, networkSearchEnabled = false,
+            ),
+        )
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.GITHUB, LocalTaskCapabilityState.UNKNOWN)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "处理 PR #608", githubConfigured = null, networkSearchEnabled = false,
+            ),
+        )
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "不涉及 GitHub，也不需要网页搜索", githubConfigured = true, networkSearchEnabled = true,
+        ).isEmpty())
+    }
+
+    @Test fun unrelatedTaskAndBlankHandoffHaveNoProjectedRequirements() {
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "", githubConfigured = null, networkSearchEnabled = false,
+        ).isEmpty())
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "整理本地文件内容", githubConfigured = null, networkSearchEnabled = false,
+        ).isEmpty())
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.WEB_SEARCH, LocalTaskCapabilityState.CONFIGURED)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "网页搜索最新文档", githubConfigured = null, networkSearchEnabled = true,
+            ),
+        )
+    }
+}
