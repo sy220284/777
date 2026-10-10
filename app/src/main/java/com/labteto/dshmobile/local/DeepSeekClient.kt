@@ -59,7 +59,9 @@ class DeepSeekClient @Inject constructor(
         .connectTimeout(MODEL_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(MODEL_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .callTimeout(MODEL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Long streaming responses must not hit an unrelated total-duration deadline.
+        // Idle reads, connections and cancellations remain bounded independently.
+        .callTimeout(0, TimeUnit.SECONDS)
         .build()
     /** Run one model step and preserve its raw assistant message for tool continuation. */
     suspend fun complete(
@@ -559,7 +561,6 @@ class DeepSeekClient @Inject constructor(
         const val MODEL_CONNECT_TIMEOUT_SECONDS = 15L
         const val MODEL_READ_TIMEOUT_SECONDS = 180L
         const val MODEL_WRITE_TIMEOUT_SECONDS = 60L
-        const val MODEL_CALL_TIMEOUT_SECONDS = 210L
         const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
         private const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
     }
