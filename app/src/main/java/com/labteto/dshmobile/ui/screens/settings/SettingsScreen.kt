@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -200,6 +201,8 @@ internal fun settingsInkColors(colors: DsColors): DsColors =
 fun SettingsScreen(
     onClose: () -> Unit,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
+    memorySourceSessionId: String? = null,
+    memorySourceMessageId: String? = null,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
     handleRootSystemBack: Boolean = true,
@@ -239,6 +242,12 @@ fun SettingsScreen(
         }
     }
     var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var showAllMemories by rememberSaveable(memorySourceSessionId, memorySourceMessageId) {
+        mutableStateOf(false)
+    }
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.focusMemorySourceMessage(null, null) }
+    }
     var usageDetailSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
         mutableStateOf<UsageDetailSelection?>(null)
     }
@@ -286,8 +295,14 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
-    LaunchedEffect(page) {
-        if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) viewModel.refreshMemories()
+    LaunchedEffect(page, memorySourceSessionId, memorySourceMessageId, showAllMemories) {
+        if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) {
+            val focus = page == SettingsDestination.MEMORY_MANAGEMENT && !showAllMemories
+            viewModel.focusMemorySourceMessage(
+                memorySourceSessionId.takeIf { focus },
+                memorySourceMessageId.takeIf { focus },
+            )
+        }
         if (page == SettingsDestination.SESSION_STORAGE) {
             localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
         }
@@ -767,7 +782,12 @@ fun SettingsScreen(
                         LocalMemorySettingsCard(localHarness, viewModel, toast.second)
                     }
                     SettingsDestination.MEMORY_MANAGEMENT -> {
-                        MemoryManagementCard(memories, viewModel, toast.second)
+                        MemoryManagementCard(
+                            memories, viewModel, toast.second,
+                            focusedSource = !showAllMemories && !memorySourceSessionId.isNullOrBlank() &&
+                                !memorySourceMessageId.isNullOrBlank(),
+                            onShowAll = { showAllMemories = true },
+                        )
                     }
 
                     SettingsDestination.PERMISSIONS -> {
