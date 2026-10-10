@@ -60,6 +60,7 @@ data class LocalHarnessTaskState(
 data class LocalHarnessShellState(
     val loading: Boolean = true,
     val sessionId: String = "",
+    val parentSessionId: String? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val running: Boolean = false,
@@ -95,6 +96,7 @@ internal fun LocalHarnessState.toShellUiState(): LocalHarnessShellState =
     LocalHarnessShellState(
         loading = loading,
         sessionId = sessionId,
+        parentSessionId = parentSessionId,
         sessions = sessions,
         usageMode = usageMode,
         running = kernel.running,
