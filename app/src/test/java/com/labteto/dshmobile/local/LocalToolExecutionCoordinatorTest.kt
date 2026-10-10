@@ -82,6 +82,26 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun newlyRegisteredTaskToolsTakePriorityOverOlderOptionalSchemas() {
+        val registry = ToolRegistry().apply {
+            repeat(300) { index ->
+                register(tool(name = "old_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "后台", keywords = setOf("旧任务")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 300).map { "old_$it" })
+        registry.register(tool(name = "new_capability", access = ToolAccess.READ_ONLY,
+            approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+            family = "扩展", keywords = setOf("当前任务")) { ToolResult("ok") })
+        coordinator.enableTaskRelevantOptionalTools("使用当前任务新能力")
+        val names = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("new_capability" in names)
+        assertEquals("new_capability", names.first())
+    }
+
+    @Test
     fun newlyRegisteredExtensionsAppearInDirectoryAndCanBeLoadedWithoutCodeChanges() {
         val registry = ToolRegistry().apply {
             register(tool(name = "local_core", access = ToolAccess.READ_ONLY,
