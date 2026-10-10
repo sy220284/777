@@ -78,6 +78,29 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun fourOrSixExplicitlyAddressedMembersAreAllHonored() {
+        val extras = listOf(
+            LocalGroupChatMember("other1", "other1", "云浅"),
+            LocalGroupChatMember("other2", "other2", "陆璃"),
+            LocalGroupChatMember("other3", "other3", "叶澜"),
+        )
+        val group = listOf(ayaka, kafka, zhao) + extras
+        val four = groupChatResponders(
+            "@神里绫华，@卡芙卡，@赵二，@云浅，四位都说说。",
+            group,
+        )
+        assertEquals(listOf("ayaka", "kafka", "zhao", "other1"),
+            four.map(LocalGroupChatMember::galleryId))
+        val six = groupChatResponders(
+            "@神里绫华，@卡芙卡，@赵二，@云浅，@陆璃，@叶澜，逐个回应。",
+            group,
+        )
+        assertEquals(group.map(LocalGroupChatMember::galleryId),
+            six.map(LocalGroupChatMember::galleryId))
+        assertEquals(2, groupChatResponders("大家随便聊聊", group).size)
+    }
+
+    @Test
     fun ordinaryMessageUsesOneRotatedPrimarySpeaker() {
         val responders = groupChatResponders(
             input = "今天怎么这么安静",

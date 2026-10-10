@@ -56,7 +56,7 @@ internal const val MAX_GROUP_CHAT_MEMBERS = 6
 internal const val MIN_GROUP_CHAT_MEMBERS = 2
 internal const val GROUP_CHAT_SILENT_TOKEN = "__GROUP_CHAT_SILENT__"
 internal const val MAX_GROUP_CHAT_RESPONDERS_PER_TURN = 2
-internal const val MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN = 3
+internal const val MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN = MAX_GROUP_CHAT_MEMBERS
 
 /** Only an explicit request to hear everybody expands past the normal reply budget. */
 private val GROUP_CHAT_EVERYONE_CUES = listOf(

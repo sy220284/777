@@ -19,6 +19,30 @@ class ChatDiaryLongHistoryRecallTest {
     )
 
     @Test
+    fun earlySubjectiveImpressionCanBeFoundWithoutRepeatingItsEventKeywords() {
+        val old = ChatDiaryEntry(
+            id = "nervous",
+            subjectKey = "gallery:a",
+            personaName = "叶澜",
+            event = "第一次整理老书店的货架",
+            feeling = "我当时紧张得心跳加速",
+            innerThought = "总怕打碎那盏玻璃灯",
+            importance = 3,
+            createdAt = 1L,
+            updatedAt = 1L,
+        )
+        val newer = (1..330).map { index ->
+            note("new-$index", "gallery:a", "在第${index}天整理火车站的杂志",
+                index.toLong() + 5L)
+        }
+        val recalled = ChatDiaryRecallEngine.search(
+            listOf(old) + newer, "那次紧张得心跳加速的感觉",
+            "gallery:a", groupAudience = false, maxItems = 3, now = 400L,
+        )
+        assertTrue(recalled.any { it.id == old.id })
+    }
+
+    @Test
     fun oldRelevantDiarySurvivesRecentCandidateWindowInBothChatModes() {
         val old = note("old", "gallery:a", "很久之前我们在湖边修好了蓝色风筝", 1L)
         val anotherPerson = note("other", "gallery:b", "湖边修好了蓝色风筝", 2L)

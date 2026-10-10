@@ -54,7 +54,8 @@ internal object ChatDiaryRecallEngine {
                 .filter { it.id !in selectedIds }
                 .mapNotNull { entry ->
                     val searchable = listOf(
-                        entry.event, entry.relationshipMeaning, entry.unresolvedEcho,
+                        entry.event, entry.feeling, entry.innerThought,
+                        entry.relationshipMeaning, entry.unresolvedEcho,
                     ).joinToString(" ")
                     if (ChatDiaryEntryPolicy.queryTerms(searchable).none(queryTerms::contains)) {
                         null
