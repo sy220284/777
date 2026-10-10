@@ -2,26 +2,26 @@ package com.labteto.dshmobile.local.chat
 
 internal fun StringBuilder.appendPostTurnPersonaContext(persona: PersonaProfile) {
     appendLine("人物=${persona.name}")
-    persona.portrait.takeIf(String::isNotBlank)?.let { appendLine("人物底色：${it.take(700)}") }
-    persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("独立生活：${it.take(500)}") }
-    if (persona.coreValues.isNotEmpty()) {
-        appendLine("真正重要：${persona.coreValues.take(3).joinToString("；")}")
-    }
-    persona.coreTension.takeIf(String::isNotBlank)?.let { appendLine("长期拉扯：${it.take(320)}") }
-    if (persona.stableTraits.isNotEmpty()) {
-        appendLine("稳定部分：${persona.stableTraits.take(4).joinToString("；")}")
-    }
-    if (persona.mutableTraits.isNotEmpty()) {
-        appendLine("可缓慢变化：${persona.mutableTraits.take(4).joinToString("；")}")
+    val identity = persona.coreIdentity.ifBlank { persona.portrait }
+    identity.takeIf(String::isNotBlank)?.let { appendLine("核心身份：${it.take(550)}") }
+    val relevant = listOf(
+        CharacterFactCategories.PERSONALITY,
+        CharacterFactCategories.VALUES_AND_TRADEOFFS,
+        CharacterFactCategories.LIFE_GRAVITY,
+        CharacterFactCategories.RELATIONSHIPS,
+    )
+    relevant.forEach { category ->
+        persona.factText(category).takeIf(String::isNotBlank)
+            ?.let { appendLine("$category：${it.take(280)}") }
     }
     appendPersonaExpressionContext(persona)
 }
 
 internal fun StringBuilder.appendReplySuggestionPersonaContext(persona: PersonaProfile) {
     appendLine("对方人物=${persona.name}")
-    persona.portrait.takeIf(String::isNotBlank)?.let { appendLine("人物理解：${it.take(420)}") }
-    persona.initialUserImpression.takeIf(String::isNotBlank)?.let {
-        appendLine("人物最初看用户的方式：${it.take(180)}")
-    }
+    val identity = persona.coreIdentity.ifBlank { persona.portrait }
+    identity.takeIf(String::isNotBlank)?.let { appendLine("人物身份：${it.take(420)}") }
+    persona.factText(CharacterFactCategories.RELATIONSHIPS).takeIf(String::isNotBlank)
+        ?.let { appendLine("既有关系：${it.take(240)}") }
     appendPersonaExpressionContext(persona)
 }

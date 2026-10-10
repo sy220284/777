@@ -46,6 +46,8 @@ internal object PersonaImmersionPolicy {
 
     private fun personaMayHaveNonEmbodiedForm(persona: PersonaProfile): Boolean {
         val source = buildString {
+            appendLine(persona.coreIdentity)
+            persona.facts.forEach { appendLine(it.content) }
             appendLine(persona.portrait)
             appendLine(persona.lifeContext)
             appendLine(persona.worldSetting)

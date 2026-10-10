@@ -66,27 +66,13 @@ class PersonaInspectionService @Inject constructor(
         }
 
         val prompt = buildString {
-            appendLine("【固定人物生命资料】")
-            appendLine("人物名称：${persona.name}")
-            appendField("人物整体", persona.portrait)
-            appendField("独立生活", persona.lifeContext)
-            appendList("天然注意", persona.attentionBiases)
-            appendList("容易漏掉/误读", persona.perceptionBlindSpots)
-            appendList("小习惯/小坚持", persona.quirks)
-            appendList("不擅长", persona.limitations)
-            appendList("真正重要", persona.coreValues)
-            appendField("长期内在拉扯", persona.coreTension)
-            appendList("稳定部分", persona.stableTraits)
-            appendList("可缓慢变化", persona.mutableTraits)
-            appendField("对用户初始印象", persona.initialUserImpression)
-            appendList("声音样本", persona.voiceSamples)
-            appendField("世界设定", persona.worldSetting)
-            appendField("作品来源", persona.franchise)
-            appendField("当前时间线", persona.timelinePosition)
-            appendList("知识边界", persona.knowledgeBoundary)
-            appendList("硬约束", persona.hardConstraints)
-            appendList("禁用表达", persona.bannedPhrases)
-            appendList("既有纠正", persona.corrections)
+            appendLine("【权威人物档案 V4】")
+            appendLine("name：${persona.name}")
+            appendField("coreIdentity", persona.coreIdentity)
+            appendField("franchise", persona.franchise)
+            persona.facts.forEach { fact ->
+                appendField(fact.category, fact.content)
+            }
             appendLine()
             appendLine("【真实对话】")
             append(dialogue)
@@ -194,45 +180,21 @@ class PersonaInspectionService @Inject constructor(
         const val MAX_CONFLICTS = 12
         const val MAX_SUGGESTIONS = 20
 
-        val ALLOWED_FIELDS = setOf(
-            "portrait",
-            "lifeContext",
-            "attentionBiases",
-            "perceptionBlindSpots",
-            "quirks",
-            "limitations",
-            "coreValues",
-            "coreTension",
-            "stableTraits",
-            "initialUserImpression",
-            "voiceSamples",
-            "worldSetting",
-            "franchise",
-            "timelinePosition",
-            "knowledgeBoundary",
-            "hardConstraints",
-            "bannedPhrases",
-            "corrections",
-        )
+        val ALLOWED_FIELDS = CharacterFactCategories.canonical.toSet() + "coreIdentity"
 
         val SYSTEM_PROMPT = """
-            审计人物长期一致性与运行时互动质量，只整理证据，不修改人物。只输出标准 JSON：
+            核查V4人物事实与最近的对话是否存在长期一致性问题。只输出JSON：
             {"conflicts":[{"field":"","fixedValue":"","observedValue":"","reason":""}],
              "suggestions":[{"field":"","value":"","evidence":""}]}
-
-            规则：
-            1. conflicts 只报有明确多轮证据的稳定冲突；单次玩笑、临时情绪、梦境、假设和用户猜测不算。
-            2. 同时检查：知识越界、关系突变、过度迎合、把推测当事实、人物成长过快，以及长期选择与稳定部分冲突。
-            3. 特别识别“设定表演”：频繁主动展示自身特点、重复固定句式/口头禅、所有回复都过度完整有用、人物生活完全围着用户、对用户理解得异常准确、连续多轮使用同一种互动节拍。此类问题有明确证据时写 conflicts，reason 说明具体表现。
-            4. suggestions 只提取明确、稳定、长期有用且人物资料未包含的新事实；同义项去重，一条只写一个事实。情绪推进、主动性、关系节奏、表达多样性、成长速度等属于运行时问题，只能写入诊断，不提出加入固定人设；不要从模型表演反推新特质。
-            5. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
-            6. field 只能使用 portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
-               limitations, coreValues, coreTension, stableTraits,
-               initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
-               knowledgeBoundary, hardConstraints, bannedPhrases, corrections；无结果返回空数组。
-            7. 对话里如果出现“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为或实体动作”
-               “没有感情/无法理解或体验情感”“只能通过文字交流”等模型或平台自我限制，只能视为脱离角色的表现；
-               禁止把它们提炼成 suggestions、hardConstraints、limitations 或任何新的固定人设。
+            field仅允许coreIdentity及以下资料类别：
+            personality,selfNarrative,identityGap,valuesAndTradeoffs,subjectiveBeliefs,biography,
+            definingChoices,emotionalImprints,lifeGravity,unfinishedBusiness,relationships,
+            limitsAndCosts,sensorySignature,preferencesAndHabits,voiceStyle,customFacts。
+            只能根据稳定且明确的证据提出事实补充。原作身份和能力要区分可靠事实与推断。
+            当前情绪、互动频率、关系进度、临时关注和未来成长属于运行时；
+            不可写入人物卡，也不应将模型限制描述成人物设定。
+            一次玩笑、假设或梦境不能判为人设冲突。没有可靠证据返回空数组。
+            只给建议，不自动更改人物资料。
         """.trimIndent()
     }
 }

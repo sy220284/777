@@ -110,6 +110,15 @@ internal fun applyPersonaSuggestions(
         val value = suggestion.value.trim()
         if (value.isBlank()) return@forEach
         result = when (suggestion.field) {
+            "coreIdentity" -> result.copy(
+                coreIdentity = mergePersonaText(result.coreIdentity, value, 4_000),
+            )
+            in CharacterFactCategories.canonical -> result.copy(facts = result.facts + CharacterFact(
+                id = java.util.UUID.randomUUID().toString(),
+                category = suggestion.field,
+                content = value,
+                provenance = CharacterFactProvenance.USER_CREATED,
+            ))
             "portrait" -> result.copy(portrait = mergePersonaText(result.portrait, value, 4_000))
             "lifeContext" -> result.copy(lifeContext = mergePersonaText(result.lifeContext, value, 4_000))
             "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))

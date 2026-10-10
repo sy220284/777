@@ -96,7 +96,9 @@ internal fun resolveCharacterMode(
     val lifeRelated = !criticalInput &&
         state.lifeState.currentBeat.isNotBlank() &&
         relatedAttentionText(state.lifeState.currentBeat, userInput)
-    val characterEngaged = persona.attentionBiases.any { bias ->
+    val stableAttention = persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
+        .takeIf(String::isNotBlank)?.let(::listOf) ?: persona.attentionBiases
+    val characterEngaged = stableAttention.any { bias ->
         attention.noticed.any { noticed -> attentionBiasMatches(bias, noticed) }
     }
     val repeatedRhythm = listOf(
