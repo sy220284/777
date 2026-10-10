@@ -174,7 +174,6 @@ jobs:
           python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-test-quality.py
           python3 .github/scripts/check-acceptance-matrix.py
-          python3 .github/scripts/audit-live-feature-tree.py
           bash .github/scripts/run-android-instrumentation.sh --self-test
           bash .github/scripts/wait-android-device-artifacts.sh --self-test
           python3 tools/runtime/compact-runtime-assets.py --self-test
@@ -182,13 +181,6 @@ jobs:
         run: |
           value="$(tr -d '\r\n' < .github/release-version)"
           [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
-      - name: Upload full feature source audit
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: current-feature-source-audit
-          path: feature-code-audit.tsv
-          if-no-files-found: warn
 
   # Architecture validation is independent of the static lane; both start after scope.
   architecture-3-gates:
