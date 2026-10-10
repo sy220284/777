@@ -84,12 +84,21 @@ class VersionedSessionStoreCorruptionTest {
             val projection = File(root, "$id.events.jsonl.projection-work.agent-team.json")
                 .apply { writeText("""{"version":1,"identity":"hash","throughSequence":2,"payload":"{}"}""") }
             File(root, "unrelated.json").writeText("""{"title":"其他资料","body":"文字"}""")
+            File(root, "with.backup.json").writeText(
+                """{"formatVersion":1,"id":"with.backup","updatedAt":1,"payload":{}}""",
+            )
+            File(root, "archived.backup.json").writeText(
+                """{"formatVersion":1,"id":"archived","updatedAt":1,"payload":{}}""",
+            )
             val store = VersionedSessionStore(root, Json)
-            assertEquals(setOf(id, "future"), store.ids().toSet())
+            assertEquals(setOf(id, "future", "with.backup", "archived"), store.ids().toSet())
             assertEquals("旧聊天", store.read(id)?.document?.payload?.get("title")?.toString()?.trim('"'))
             assertTrue(projection.isFile)
             assertTrue(File(root, ".session-catalog.v1").isFile)
-            assertEquals(setOf(id, "future"), VersionedSessionStore(root, Json).ids().toSet())
+            assertEquals(setOf(id, "future", "with.backup", "archived"),
+                VersionedSessionStore(root, Json).ids().toSet())
+            assertEquals("with.backup", store.read("with.backup")?.document?.id)
+            assertTrue(store.read("archived")!!.recovered)
         } finally {
             root.deleteRecursively()
         }
