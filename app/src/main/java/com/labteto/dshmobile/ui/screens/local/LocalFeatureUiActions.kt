@@ -59,7 +59,7 @@ internal data class LocalShellFeatureUiActions(
     val enableDeviceApprovalLease: (String) -> Unit,
     val disableDeviceApprovalLease: () -> Unit,
     val disableAutoApproval: () -> Unit,
-    val answerQuestion: (String, String) -> Unit,
+    val answerQuestion: (String, String) -> Boolean,
     val cancelQuestion: (String) -> Unit,
 )
 

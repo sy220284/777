@@ -40,6 +40,7 @@ internal data class LocalPlanReview(
     val plan: String,
     val approve: String,
     val decline: String?,
+    val regenerate: String,
 )
 
 internal fun localPlanReviewOf(question: LocalQuestion): LocalPlanReview? {
@@ -51,6 +52,8 @@ internal fun localPlanReviewOf(question: LocalQuestion): LocalPlanReview? {
         plan = plan,
         approve = approve,
         decline = question.options.getOrNull(1)?.takeIf(String::isNotBlank),
+        // Existing saved reviews may predate the explicit third option.
+        regenerate = question.options.getOrNull(2)?.takeIf(String::isNotBlank) ?: "重新生成方案",
     )
 }
 

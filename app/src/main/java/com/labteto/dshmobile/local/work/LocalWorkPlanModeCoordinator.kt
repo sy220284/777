@@ -115,9 +115,12 @@ internal suspend fun exitWorkPlanMode(
         LocalQuestion(
             callId = call.id,
             question = "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
-            options = listOf("批准并进入执行模式", "继续规划"),
+            options = listOf("批准并进入执行模式", "继续规划", "重新生成方案"),
         ),
     )
+    if (answer == "重新生成方案") {
+        return "用户要求重新生成方案。请保留原始目标、附件和当前只读分析，重新检查约束与可行性，形成一版完整的新方案，再次调用 exit_plan_mode 等待用户审阅。规划模式仍然生效，禁止执行修改类工具。"
+    }
     if (answer != "批准并进入执行模式") {
         return "用户要求继续规划。反馈：$answer"
     }
