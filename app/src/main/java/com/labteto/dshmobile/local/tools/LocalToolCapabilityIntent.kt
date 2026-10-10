@@ -46,7 +46,9 @@ internal data class LocalToolCapabilityIntent(
 
         private fun githubIntentSignal(text: String): Boolean? {
             val normalized = text.lowercase()
-            if (GITHUB_NEGATION_MARKERS.any(normalized::contains)) return false
+            // A natural-language negation may contain a space before the provider name.
+            val negationText = normalized.replace(Regex("\\s+"), "")
+            if (GITHUB_NEGATION_MARKERS.any(negationText::contains)) return false
             if (
                 GITHUB_INTENT_MARKERS.any(normalized::contains) ||
                 PR_INTENT_REGEX.containsMatchIn(normalized)
