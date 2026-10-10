@@ -67,6 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -181,11 +183,16 @@ fun LocalHarnessScreen(
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
+    var workCapabilityConfiguring by rememberSaveable { mutableStateOf(false) }
     var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(workCapabilityOpenVersion) {
-        if (pendingWorkCapability != null) {
+    LaunchedEffect(workCapabilityOpenVersion, pendingWorkCapability != null, workCapabilityConfiguring) {
+        if (pendingWorkCapability != null && !workCapabilityConfiguring) {
+            githubConfiguredForHandoff = null
             githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
         }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (pendingWorkCapability != null && !workCapabilityConfiguring) workCapabilityOpenVersion += 1
     }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
@@ -195,6 +202,11 @@ fun LocalHarnessScreen(
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
+    LaunchedEffect(featurePage, workCapabilityConfiguring) {
+        if (workCapabilityConfiguring && featurePage != LocalFeaturePage.TOOLS) {
+            workCapabilityConfiguring = false
+        }
+    }
     LaunchedEffect(featurePage, shell.sessionId) {
         if (featurePage == LocalFeaturePage.HOME) {
             installedSkillDisplayNames = runCatching { viewModel.installedSkillDisplayNames() }
@@ -249,6 +261,7 @@ fun LocalHarnessScreen(
             workHandoffSummary = viewModel.workHandoffSummary()
             workCapabilityConfirmed = false
             workCapabilityFailed = false
+            workCapabilityConfiguring = false
             githubConfiguredForHandoff = null
             workCapabilityOpenVersion += 1
         }
@@ -637,7 +650,7 @@ fun LocalHarnessScreen(
         }
     }
 
-    if (pendingWorkCapability != null) {
+    if (pendingWorkCapability != null && !workCapabilityConfiguring) {
         LocalWorkCapabilitySheet(
             switching = workCapabilityConfirmed,
             failed = workCapabilityFailed,
@@ -651,6 +664,13 @@ fun LocalHarnessScreen(
             ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
+            onConfigureCapabilities = {
+                workCapabilityConfiguring = true
+                toolsStartAtPlugins = false
+                toolsStartAtSkills = false
+                pushFeature(LocalFeaturePage.TOOLS)
+            },
+            onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
             onContinue = {
                 workCapabilityFailed = false
                 workCapabilityConfirmed = viewModel.createWorkContinuation(workHandoffSourceSessionId, workHandoffSummary)

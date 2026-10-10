@@ -1872,6 +1872,7 @@
     <string name="local_chat_turn_usage_title">本轮用量</string>
     <string name="local_chat_turn_usage_scope">包含本轮回复、重新生成和已关联的后台请求；仅展示保留期内已记录的用量。</string>
     <string name="work_capability_readiness_title">本次任务的能力配置</string>
+    <string name="work_capability_configure">前往能力中心配置</string>
     <string name="work_capability_readiness_github">GitHub</string>
     <string name="work_capability_readiness_web">联网搜索</string>
     <string name="work_capability_readiness_configured">配置已开启；实际调用仍需验证</string>
