@@ -57,7 +57,6 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.CharacterFact
 import com.labteto.dshmobile.local.chat.CharacterFactProvenance
-import com.labteto.dshmobile.local.chat.CharacterFactCategories
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
@@ -712,35 +711,35 @@ internal fun ChatPersonaDialog(
         }
 
         val essentialFields = listOf(
-            CharacterFactCategories.PERSONALITY to "稳定性格",
-            CharacterFactCategories.VALUES_AND_TRADEOFFS to "价值与取舍",
-            CharacterFactCategories.BIOGRAPHY to "人生经历",
-            CharacterFactCategories.RELATIONSHIPS to "重要人物关系",
+            "personality" to R.string.persona_v4_personality,
+            "valuesAndTradeoffs" to R.string.persona_v4_values_tradeoffs,
+            "biography" to R.string.persona_v4_biography,
+            "relationships" to R.string.persona_v4_relationships,
         )
         val extendedFields = listOf(
-            CharacterFactCategories.SELF_NARRATIVE to "自我叙事",
-            CharacterFactCategories.IDENTITY_GAP to "内外反差",
-            CharacterFactCategories.SUBJECTIVE_BELIEFS to "主观认知",
-            CharacterFactCategories.DEFINING_CHOICES to "命运选择",
-            CharacterFactCategories.EMOTIONAL_IMPRINTS to "情感烙印",
-            CharacterFactCategories.LIFE_GRAVITY to "人生引力",
-            CharacterFactCategories.UNFINISHED_BUSINESS to "未竟之事",
-            CharacterFactCategories.LIMITS_AND_COSTS to "能力与代价",
-            CharacterFactCategories.SENSORY_SIGNATURE to "感知视角",
-            CharacterFactCategories.PREFERENCES_AND_HABITS to "偏好与习惯",
-            CharacterFactCategories.VOICE_STYLE to "语言风格",
-            CharacterFactCategories.CUSTOM_FACTS to "自定义事实",
+            "selfNarrative" to R.string.persona_v4_self_narrative,
+            "identityGap" to R.string.persona_v4_identity_gap,
+            "subjectiveBeliefs" to R.string.persona_v4_subjective_beliefs,
+            "definingChoices" to R.string.persona_v4_defining_choices,
+            "emotionalImprints" to R.string.persona_v4_emotional_imprints,
+            "lifeGravity" to R.string.persona_v4_life_gravity,
+            "unfinishedBusiness" to R.string.persona_v4_unfinished_business,
+            "limitsAndCosts" to R.string.persona_v4_limits_costs,
+            "sensorySignature" to R.string.persona_v4_sensory_signature,
+            "preferencesAndHabits" to R.string.persona_v4_preferences_habits,
+            "voiceStyle" to R.string.persona_v4_voice_style,
+            "customFacts" to R.string.persona_v4_custom_facts,
         )
 
-        PersonaFormSection("人物核心 · V4") {
+        PersonaFormSection(stringResource(R.string.persona_v4_section_core)) {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
             PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
-            PersonaTextField("核心身份", coreIdentity, { coreIdentity = it })
+            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity, { coreIdentity = it })
         }
-        PersonaFormSection("人物深度 · 按需填写") {
+        PersonaFormSection(stringResource(R.string.persona_v4_section_depth)) {
             essentialFields.forEach { (category, title) ->
                 PersonaTextField(
-                    title,
+                    stringResource(title),
                     factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
                     { next ->
                         val existing = factDrafts.firstOrNull { it.category == category }
@@ -759,16 +758,16 @@ internal fun ChatPersonaDialog(
             }
         }
         DsButton(
-            text = if (advancedOpen) "收起深度档案" else "展开深度档案与人物知识",
+            text = stringResource(if (advancedOpen) R.string.persona_v4_hide_advanced else R.string.persona_v4_show_advanced),
             onClick = { advancedOpen = !advancedOpen },
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
-            PersonaFormSection("进阶人物档案") {
+            PersonaFormSection(stringResource(R.string.persona_v4_section_advanced)) {
                 extendedFields.forEach { (category, title) ->
                     PersonaTextField(
-                        title,
+                        stringResource(title),
                         factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
                         { next ->
                             val existing = factDrafts.firstOrNull { it.category == category }
@@ -786,9 +785,9 @@ internal fun ChatPersonaDialog(
                     )
                 }
                 factDrafts.map(CharacterFact::category).distinct()
-                    .filterNot(CharacterFactCategories.canonical::contains)
+                    .filterNot { category -> (essentialFields + extendedFields).any { it.first == category } }
                     .forEach { category ->
-                        PersonaTextField("扩展 · $category",
+                        PersonaTextField(stringResource(R.string.persona_v4_category_extra, category),
                             factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
                             { next ->
                                 val existing = factDrafts.firstOrNull { it.category == category }
@@ -797,10 +796,10 @@ internal fun ChatPersonaDialog(
                                         ?.takeIf { next.isNotBlank() })
                             })
                     }
-                PersonaTextField("新资料类别代码", customCategory, { customCategory = it }, singleLine = true)
-                PersonaTextField("新类别内容", customContent, { customContent = it })
+                PersonaTextField(stringResource(R.string.persona_v4_category_code), customCategory, { customCategory = it }, singleLine = true)
+                PersonaTextField(stringResource(R.string.persona_v4_category_content), customContent, { customContent = it })
                 DsButton(
-                    text = "添加自定义资料",
+                    text = stringResource(R.string.persona_v4_add_custom),
                     onClick = {
                         if (customCategory.isNotBlank() && customContent.isNotBlank()) {
                             factDrafts = factDrafts + CharacterFact(
@@ -820,7 +819,7 @@ internal fun ChatPersonaDialog(
             }
             bundledPreset?.let { preset ->
                 DsButton(
-                    text = "载入预设人物内核与事实",
+                    text = stringResource(R.string.persona_v4_load_preset),
                     onClick = {
                         coreIdentity = preset.persona.coreIdentity
                         factDrafts = preset.persona.facts
@@ -829,7 +828,7 @@ internal fun ChatPersonaDialog(
                     variant = DsButtonVariant.Ghost,
                 )
                 DsButton(
-                    text = "补充原作知识条目",
+                    text = stringResource(R.string.persona_v4_fill_lore),
                     onClick = {
                         val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
                         loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
@@ -838,7 +837,7 @@ internal fun ChatPersonaDialog(
                     variant = DsButtonVariant.Ghost,
                 )
             }
-            PersonaFormSection("人物专属知识库") {
+            PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
                 PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
             }
         }

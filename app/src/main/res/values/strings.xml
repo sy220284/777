@@ -1878,5 +1878,35 @@
     <string name="local_run_history_call">调用</string>
     <string name="local_run_history_started">开始执行</string>
     <string name="local_run_history_result">结果</string>
+    <!-- 人物档案 V4 · 字段类别与编辑界面 -->
+    <string name="persona_v4_personality">稳定性格</string>
+    <string name="persona_v4_values_tradeoffs">价值与取舍</string>
+    <string name="persona_v4_biography">人生经历</string>
+    <string name="persona_v4_relationships">重要人物关系</string>
+    <string name="persona_v4_self_narrative">自我叙事</string>
+    <string name="persona_v4_identity_gap">内外反差</string>
+    <string name="persona_v4_subjective_beliefs">主观认知</string>
+    <string name="persona_v4_defining_choices">命运选择</string>
+    <string name="persona_v4_emotional_imprints">情感烙印</string>
+    <string name="persona_v4_life_gravity">人生引力</string>
+    <string name="persona_v4_unfinished_business">未竟之事</string>
+    <string name="persona_v4_limits_costs">能力与代价</string>
+    <string name="persona_v4_sensory_signature">感知视角</string>
+    <string name="persona_v4_preferences_habits">偏好与习惯</string>
+    <string name="persona_v4_voice_style">语言风格</string>
+    <string name="persona_v4_custom_facts">自定义事实</string>
+    <string name="persona_v4_section_core">人物核心 · V4</string>
+    <string name="persona_v4_core_identity">核心身份</string>
+    <string name="persona_v4_section_depth">人物深度 · 按需填写</string>
+    <string name="persona_v4_section_advanced">进阶人物档案</string>
+    <string name="persona_v4_section_lore">人物专属知识库</string>
+    <string name="persona_v4_hide_advanced">收起深度档案</string>
+    <string name="persona_v4_show_advanced">展开深度档案与人物知识</string>
+    <string name="persona_v4_category_extra">扩展 · %1$s</string>
+    <string name="persona_v4_category_code">新资料类别代码</string>
+    <string name="persona_v4_category_content">新类别内容</string>
+    <string name="persona_v4_add_custom">添加自定义资料</string>
+    <string name="persona_v4_load_preset">载入预设人物内核与事实</string>
+    <string name="persona_v4_fill_lore">补充原作知识条目</string>
 </resources>
 
