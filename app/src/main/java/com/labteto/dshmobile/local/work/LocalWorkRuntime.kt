@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.LocalUsageMode
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.local.tools.LocalToolActivityPhase
@@ -76,6 +78,47 @@ class LocalWorkRuntime @Inject internal constructor(
         })
         return if (sessionId == runtimeStateStore.currentSessionId && !log.isClosed && generation == log.resetGeneration) projected
         else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)
+    }
+
+    /** Store an explicit user-chosen source for one requirement, never a synthetic pass. */
+    internal fun linkRequirementEvidenceForUi(
+        sessionId: String,
+        requirementIndex: Int,
+        artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
+    ): Boolean {
+        val snapshot = runtimeStateStore.state.value
+        if (sessionId != runtimeStateStore.currentSessionId ||
+            snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
+        ) return false
+        val requirement = snapshot.work.todos.getOrNull(requirementIndex)?.content ?: return false
+        val sourceCallId = artifact.sourceCallId?.takeIf(String::isNotBlank) ?: return false
+        val log = eventLogs.get(sessionId)
+        val origin = log.pageAfter(artifact.asOfSequence - 1, 1).singleOrNull()
+        if (!sourceArtifactMatchesEvidence(origin, artifact)) return false
+        val version = localWorkFileSha256(File(sessionFiles.workspace.path), artifact.reference)
+            ?: return false
+        log.append("work/requirement-evidence", buildJsonObject {
+            put("requirement_index", requirementIndex)
+            put("requirement", requirement)
+            put("artifact_path", artifact.reference)
+            put("origin_sequence", artifact.asOfSequence)
+            put("source_call_id", sourceCallId)
+            put("sha256", version)
+            put("assertion", "user_selected_reference_only")
+        })
+        return true
+    }
+
+    /** Same authoritative EventLog across app restarts; source version checked on display. */
+    internal fun requirementEvidenceForUi(sessionId: String): List<LocalRequirementEvidenceLink> {
+        val snapshot = runtimeStateStore.state.value
+        if (sessionId != runtimeStateStore.currentSessionId ||
+            snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
+        ) return emptyList()
+        return projectRequirementEvidenceLinks(
+            eventLogs.get(sessionId).pageBeforeChronological(limit = 8_192),
+            snapshot.work.todos,
+        )
     }
 
     /** Read the authoritative EventLog revision; no parallel persisted tool activity stream. */
