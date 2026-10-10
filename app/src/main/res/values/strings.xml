@@ -1908,5 +1908,7 @@
     <string name="persona_v4_add_custom">添加自定义资料</string>
     <string name="persona_v4_load_preset">载入预设人物内核与事实</string>
     <string name="persona_v4_fill_lore">补充原作知识条目</string>
+    <string name="persona_v4_add_fact">添加一条事实</string>
+    <string name="persona_v4_fact_number">%1$s · 第%2$d条</string>
 </resources>
 

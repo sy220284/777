@@ -738,22 +738,11 @@ internal fun ChatPersonaDialog(
         }
         PersonaFormSection(stringResource(R.string.persona_v4_section_depth)) {
             essentialFields.forEach { (category, title) ->
-                PersonaTextField(
-                    stringResource(title),
-                    factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
-                    { next ->
-                        val existing = factDrafts.firstOrNull { it.category == category }
-                        val others = factDrafts.filterNot { it.category == category }
-                        factDrafts = if (next.isBlank()) others else others + (
-                            existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
-                                ?: CharacterFact(
-                                    id = "v4-$category",
-                                    category = category,
-                                    content = next,
-                                    provenance = CharacterFactProvenance.USER_CREATED,
-                                )
-                        )
-                    },
+                PersonaFactCategoryEditor(
+                    category = category,
+                    title = stringResource(title),
+                    facts = factDrafts,
+                    onChange = { factDrafts = it },
                 )
             }
         }
@@ -766,35 +755,22 @@ internal fun ChatPersonaDialog(
         if (advancedOpen) {
             PersonaFormSection(stringResource(R.string.persona_v4_section_advanced)) {
                 extendedFields.forEach { (category, title) ->
-                    PersonaTextField(
-                        stringResource(title),
-                        factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
-                        { next ->
-                            val existing = factDrafts.firstOrNull { it.category == category }
-                            val others = factDrafts.filterNot { it.category == category }
-                            factDrafts = if (next.isBlank()) others else others + (
-                                existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
-                                    ?: CharacterFact(
-                                        id = "v4-$category",
-                                        category = category,
-                                        content = next,
-                                        provenance = CharacterFactProvenance.USER_CREATED,
-                                    )
-                            )
-                        },
+                    PersonaFactCategoryEditor(
+                        category = category,
+                        title = stringResource(title),
+                        facts = factDrafts,
+                        onChange = { factDrafts = it },
                     )
                 }
                 factDrafts.map(CharacterFact::category).distinct()
                     .filterNot { category -> (essentialFields + extendedFields).any { it.first == category } }
                     .forEach { category ->
-                        PersonaTextField(stringResource(R.string.persona_v4_category_extra, category),
-                            factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
-                            { next ->
-                                val existing = factDrafts.firstOrNull { it.category == category }
-                                factDrafts = factDrafts.filterNot { it.category == category } +
-                                    listOfNotNull(existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
-                                        ?.takeIf { next.isNotBlank() })
-                            })
+                        PersonaFactCategoryEditor(
+                            category = category,
+                            title = stringResource(R.string.persona_v4_category_extra, category),
+                            facts = factDrafts,
+                            onChange = { factDrafts = it },
+                        )
                     }
                 PersonaTextField(stringResource(R.string.persona_v4_category_code), customCategory, { customCategory = it }, singleLine = true)
                 PersonaTextField(stringResource(R.string.persona_v4_category_content), customContent, { customContent = it })
@@ -842,6 +818,54 @@ internal fun ChatPersonaDialog(
             }
         }
 
+    }
+}
+
+@Composable
+private fun PersonaFactCategoryEditor(
+    category: String,
+    title: String,
+    facts: List<CharacterFact>,
+    onChange: (List<CharacterFact>) -> Unit,
+) {
+    val entries = facts.filter { it.category == category }
+    if (entries.isEmpty()) {
+        PersonaTextField(title, "", { content ->
+            if (content.isNotBlank()) onChange(facts + CharacterFact(
+                id = UUID.randomUUID().toString(),
+                category = category,
+                content = content,
+                provenance = CharacterFactProvenance.USER_CREATED,
+            ))
+        })
+    } else {
+        entries.forEachIndexed { index, entry ->
+            val label = if (index == 0) title
+                else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+            PersonaTextField(label, entry.content, { content ->
+                onChange(if (content.isBlank()) facts.filterNot { it.id == entry.id }
+                    else facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(
+                            content = content,
+                            provenance = CharacterFactProvenance.USER_CREATED,
+                            sourceReference = "",
+                        ) else fact
+                    })
+            })
+        }
+        DsButton(
+            text = stringResource(R.string.persona_v4_add_fact),
+            onClick = {
+                onChange(facts + CharacterFact(
+                    id = UUID.randomUUID().toString(),
+                    category = category,
+                    content = "",
+                    provenance = CharacterFactProvenance.USER_CREATED,
+                ))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
     }
 }
 
