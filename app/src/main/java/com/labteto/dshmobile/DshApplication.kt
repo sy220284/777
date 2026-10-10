@@ -13,6 +13,7 @@ import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
 import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,12 +26,17 @@ class DshApplication : Application() {
     @Inject lateinit var hostsStore: HostsStore
     @Inject lateinit var localRuntimeKernel: LocalRuntimeKernel
 
-    private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val maintenanceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
+            AppLog.failure("AppMaintenance", "startup_maintenance", error)
+        },
+    )
 
     override fun onCreate() {
         super.onCreate()
-        clearRetiredApplicationLocale()
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
+        AppLog.installUnhandledExceptionLogger()
+        clearRetiredApplicationLocale()
         val uiModeManager = getSystemService(UiModeManager::class.java)
         uiModeManager.setApplicationNightMode(
             applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),

@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.observability.AppLog
 
 /** Available in environment_info after recent app process exits. */
 internal object LocalProcessExitStatus {
@@ -13,7 +14,10 @@ internal object LocalProcessExitStatus {
             context.getSystemService(ActivityManager::class.java)
                 ?.getHistoricalProcessExitReasons(context.packageName, 0, MAX_EXIT_RECORDS)
                 .orEmpty()
-        }.getOrDefault(emptyList())
+        }.getOrElse { error ->
+            AppLog.failure("LocalProcessExitStatus", "read_process_exit_history", error)
+            return "进程退出记录：读取失败（${error.javaClass.simpleName}），请在诊断报告中查看原因"
+        }
         if (records.isEmpty()) return "进程退出记录：暂无可用记录"
 
         val abnormal = records.count { !isExpectedProcessExit(it.getReason()) }
