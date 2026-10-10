@@ -979,7 +979,9 @@ internal fun PersonaGalleryScreen(
                                     DsButton(
                                         text = availableStage,
                                         onClick = { storyStage = availableStage },
-                                        variant = DsButtonVariant.Ghost,
+                                        variant = if (storyStage.trim() == availableStage) {
+                                            DsButtonVariant.Primary
+                                        } else DsButtonVariant.Ghost,
                                         enabled = !busy && !inspecting,
                                     )
                                 }
