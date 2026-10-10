@@ -58,7 +58,9 @@ internal class CharacterRuntimeProjector(
     }
 
     private fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
-        if (facts.isEmpty()) return this
+        // A new V4 identity is authoritative even before the first fact is filled in.
+        // Legacy-only profiles still retain their old runtime fallback until converted.
+        if (facts.isEmpty() && coreIdentity.isBlank()) return this
         // A request-local projection preserves the stored sources and stage IDs. Even if
         // all facts are future-gated, obsolete legacy prose must not be restored.
         return copy(
@@ -67,12 +69,14 @@ internal class CharacterRuntimeProjector(
             portrait = "",
             lifeContext = "",
             attentionBiases = emptyList(),
+            attentionKeywords = emptyList(),
             perceptionBlindSpots = emptyList(),
             quirks = emptyList(),
             limitations = emptyList(),
             coreValues = emptyList(),
             coreTension = "",
             stableTraits = emptyList(),
+            mutableTraits = emptyList(),
             initialUserImpression = "",
             voiceSamples = emptyList(),
             // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
