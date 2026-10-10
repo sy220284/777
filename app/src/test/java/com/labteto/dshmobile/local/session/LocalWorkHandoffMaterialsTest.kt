@@ -49,6 +49,51 @@ class LocalWorkHandoffMaterialsTest {
     }
 
     @Test
+    fun selectedMediaOnlyMessageKeepsVerifiedWorkspaceReferenceWithoutCopyingBytes() {
+        val hash = "a".repeat(64)
+        val media = LocalHarnessMessage(
+            id = "media-1", role = "user", content = "", createdAt = 1L,
+            blocks = listOf(LocalMessageBlock.Image(
+                relativePath = ".dsh/attachments/$hash.jpg", mediaType = "image/jpeg",
+                name = "草图.jpg", bytes = 123L, attachmentId = hash,
+            )),
+        )
+        val selected = workHandoffDialogueCandidates(listOf(media), emptyList())
+        assertEquals(listOf("media-1"), selected.map { it.id })
+        assertTrue(visibleWorkHandoffMessages(selected, "草图", emptyList()).isNotEmpty())
+        val summary = workHandoffSummaryWithSelectedMessages("", "chat-source", selected, listOf("media-1"))
+        assertTrue(summary.contains("消息ID: media-1"))
+        assertTrue(summary.contains(".dsh/attachments/$hash.jpg"))
+        assertTrue(summary.contains("读取时重新校验"))
+    }
+
+    @Test
+    fun untrustedAndToolMediaCannotEscapeThroughHandoff() {
+        val hash = "b".repeat(64)
+        val forged = LocalHarnessMessage(
+            id = "untrusted", role = "user", content = "资料", createdAt = 2L,
+            blocks = listOf(
+                LocalMessageBlock.File(
+                    relativePath = "../private.txt", mediaType = "text/plain",
+                    name = "内部文件", bytes = 42L, attachmentId = hash,
+                ),
+                LocalMessageBlock.Image(
+                    relativePath = ".dsh/attachments/$hash.png", mediaType = "image/png",
+                    name = "模型生成.jpg", bytes = 42L, attachmentId = hash,
+                    source = LocalMessageMediaSource.MODEL,
+                ),
+            ),
+        )
+        val output = workHandoffSummaryWithSelectedMessages("", "source",
+            listOf(forged), listOf("untrusted"))
+        assertFalse(output.contains("../private.txt"))
+        assertFalse(output.contains(".dsh/attachments/$hash.png"))
+        assertTrue(output.contains("缺少可验证的本地引用"))
+        val tool = forged.copy(id = "tool", role = "tool", toolName = "read")
+        assertTrue(workHandoffDialogueCandidates(listOf(tool), emptyList()).isEmpty())
+    }
+
+    @Test
     fun largeMessagesKeepSourceIdAndMarkExcerpt() {
         val result = workHandoffSummaryWithSelectedMessages(
             "", "chat-123", listOf(row("long", "user", "词".repeat(3000))), listOf("long"),

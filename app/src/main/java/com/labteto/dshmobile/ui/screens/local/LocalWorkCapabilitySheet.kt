@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.handoffAttachmentNames
 import com.labteto.dshmobile.local.session.visibleWorkHandoffMessages
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
@@ -122,7 +123,11 @@ internal fun LocalWorkCapabilitySheet(
                     )
                     val speaker = if (message.role == "user")
                         stringResource(R.string.work_handoff_user) else stringResource(R.string.work_handoff_assistant)
-                    Text("$speaker · ${message.content.trim().replace(Regex("\\s+"), " ").take(100)}",
+                    val itemPreview = message.content.trim().replace(Regex("\\s+"), " ")
+                        .take(100).ifBlank {
+                            message.handoffAttachmentNames().joinToString("、").take(100)
+                        }
+                    Text("$speaker · $itemPreview",
                         style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
