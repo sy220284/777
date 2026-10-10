@@ -60,6 +60,14 @@ internal fun localChatFeatureUiContribution(
                 currentPersona = surface.chatPersona,
                 currentGalleryId = surface.galleryId,
                 loadEntries = actions.diaryEntries,
+                onCorrectEntry = actions.correctDiaryEntry,
+                onDeactivateEntry = actions.deactivateDiaryEntry,
+                onOpenSourceSession = { sessionId ->
+                    if (onSwitchSession(sessionId)) {
+                        onResetNavigation()
+                        true
+                    } else false
+                },
                 onDismiss = onPopFeature,
             )
             LocalFeaturePage.PERSONA_GALLERY -> PersonaGalleryScreen(

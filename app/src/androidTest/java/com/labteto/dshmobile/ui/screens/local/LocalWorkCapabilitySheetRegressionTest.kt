@@ -8,8 +8,10 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
@@ -123,6 +125,127 @@ class LocalWorkCapabilitySheetRegressionTest {
         compose.runOnIdle {
             assertEquals(0, entered)
             assertEquals(1, refreshed)
+        }
+    }
+
+    @Test
+    fun selectedHistoryRequiresUserClickAndNeverStartsWorkAutomatically() {
+        val selected = mutableStateOf<List<String>>(emptyList())
+        var started = 0
+        val old = com.labteto.dshmobile.local.session.LocalHarnessMessage(
+            id = "prior-1", role = "user", content = "此前已确认的要求", createdAt = 1L,
+        )
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    summary = "用户手写摘要",
+                    selectableMessages = listOf(old),
+                    selectedMessageIds = selected.value,
+                    onSelectedMessageIdsChange = { selected.value = it },
+                )
+            }
+        }
+        compose.runOnIdle {
+            assertEquals(emptyList<String>(), selected.value)
+            assertEquals(0, started)
+        }
+        compose.onNodeWithTag("handoff_message_prior-1").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("prior-1"), selected.value)
+            assertEquals(0, started)
+        }
+        compose.onNodeWithTag("handoff_message_prior-1").performClick()
+        compose.runOnIdle { assertEquals(emptyList<String>(), selected.value) }
+    }
+
+    @Test
+    fun unconfiguredModelCanOpenSettingsWithoutStartingWork() {
+        var configured = 0
+        var started = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        LocalTaskCapabilityKind.MODEL, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureModel = { configured++ },
+                )
+            }
+        }
+        compose.onNodeWithText("当前模型 · 尚未配置模型，可前往模型设置").assertIsDisplayed()
+        compose.onNodeWithText("前往模型设置").performClick()
+        compose.runOnIdle {
+            assertEquals(1, configured)
+            assertEquals(0, started)
+        }
+    }
+
+    @Test
+    fun missingDevicePermissionOpensSettingsAndDoesNotStartWork() {
+        var openedSettings = 0
+        var started = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        LocalTaskCapabilityKind.ACCESSIBILITY, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureDevice = { openedSettings++ },
+                )
+            }
+        }
+        compose.onNodeWithText("设备无障碍服务 · 当前未激活，请检查系统授权").assertIsDisplayed()
+        compose.onNodeWithText("前往设备权限设置").performClick()
+        compose.runOnIdle {
+            assertEquals(1, openedSettings)
+            assertEquals(0, started)
+        }
+    }
+
+    @Test
+    fun searchAndLoadEarlierKeepExplicitHandoffSelection() {
+        val selected = mutableStateOf<List<String>>(emptyList())
+        val query = mutableStateOf("")
+        var loaded = 0
+        var entered = 0
+        val messages = (1..15).map { index ->
+            com.labteto.dshmobile.local.session.LocalHarnessMessage(
+                id = "msg-$index", role = "user", content = "第${index}条旧记录", createdAt = index.toLong(),
+            )
+        }
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { entered++ }, onDismiss = {},
+                    selectableMessages = messages,
+                    selectedMessageIds = selected.value,
+                    onSelectedMessageIdsChange = { selected.value = it },
+                    messageSearch = query.value,
+                    onMessageSearchChange = { query.value = it },
+                    hasEarlierMessages = true,
+                    onLoadEarlierMessages = { loaded++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("handoff_search").performTextReplacement("第1条旧记录")
+        compose.onNodeWithTag("handoff_message_msg-1").performClick()
+        compose.runOnIdle { assertEquals(listOf("msg-1"), selected.value) }
+        compose.onNodeWithTag("handoff_search").performTextReplacement("")
+        compose.onNodeWithTag("handoff_message_msg-1").assertIsDisplayed()
+        // The search field keeps the IME open. Explicitly scroll the real button into
+        // the visible bottom-sheet viewport before testing the user click.
+        compose.onNodeWithTag("handoff_load_older").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertEquals(1, loaded)
+            assertEquals(0, entered)
+            assertEquals(listOf("msg-1"), selected.value)
         }
     }
 

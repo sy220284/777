@@ -404,6 +404,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     state = plannerState,
                     userMessage = userMessage,
                     assistantMessage = assistantMessage,
+                    context = sharedContext,
                 ),
             )
             appendLine()
@@ -505,6 +506,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     ),
                     userMessage = userMessage,
                     assistantMessage = reply.content,
+                    context = snapshot.chat.groupChat.context,
                 ).replace(
                     "不要继续扮演角色，不要解释过程，不要使用 Markdown，只输出一个 JSON 对象。",
                     "不要继续扮演角色，不要解释过程。",

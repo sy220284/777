@@ -5,6 +5,19 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocalModelPerformanceLimitsTest {
+    @Test fun fineTemperatureDetentAttainsCapWithoutChangingSavedSelection() {
+        val range = LocalModelTemperatureRange(0.0, 1.3, 1.3, defaultPosition = 100)
+        val low = ModelPerformanceLimits(temperatureCeiling = 1.0)
+        val savedPosition = 100
+        val visiblePosition = savedPosition.coerceAtMost(low.temperaturePositionLimit(range))
+        assertEquals(77, visiblePosition)
+        assertEquals(1.0, low.constrainTemperature(range.at(visiblePosition))!!, 0.000001)
+        assertEquals(100, savedPosition.coerceAtMost(ModelPerformanceLimits().temperaturePositionLimit(range)))
+        val gemini = LocalModelTemperatureRange(0.0, 2.0, 1.0, omitAtChatDefault = true)
+        assertEquals(50, low.temperaturePositionLimit(gemini))
+        assertEquals(65, ModelPerformanceLimits().temperaturePositionLimit(gemini))
+    }
+
     @Test fun customLeavesConversationAndProviderSelectionsUntouched() {
         val limits = ModelPerformanceLimits()
         assertNull(limits.constrainEffort(null))

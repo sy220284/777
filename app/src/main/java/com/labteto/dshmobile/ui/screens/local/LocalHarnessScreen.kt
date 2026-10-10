@@ -87,6 +87,8 @@ import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.workHandoffDialogueCandidates
+import com.labteto.dshmobile.local.session.workHandoffSummaryWithSelectedMessages
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.DsButton
@@ -153,6 +155,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val chatSurface by viewModel.chatSurfaceState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
@@ -174,21 +177,30 @@ fun LocalHarnessScreen(
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
+    var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
+    var workHandoffMessageIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var workHandoffSearch by rememberSaveable { mutableStateOf("") }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
     var workCapabilityConfiguring by rememberSaveable { mutableStateOf(false) }
     var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
+    var externalReadinessForHandoff by remember { mutableStateOf<Pair<Boolean?, Boolean?>>(null to null) }
+    var deviceReadinessForHandoff by remember { mutableStateOf<Pair<Boolean?, Boolean?>>(null to null) }
     LaunchedEffect(workCapabilityOpenVersion, pendingWorkCapability != null, workCapabilityConfiguring) {
         if (pendingWorkCapability != null && !workCapabilityConfiguring) {
             githubConfiguredForHandoff = null
+            externalReadinessForHandoff = null to null
+            deviceReadinessForHandoff = viewModel.deviceReadinessForHandoff()
             githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
+            externalReadinessForHandoff = viewModel.externalReadinessForHandoff()
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -203,7 +215,8 @@ fun LocalHarnessScreen(
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
     LaunchedEffect(featurePage, workCapabilityConfiguring) {
-        if (workCapabilityConfiguring && featurePage != LocalFeaturePage.TOOLS) {
+        if (workCapabilityConfiguring &&
+            featurePage != LocalFeaturePage.TOOLS && featurePage != LocalFeaturePage.SETTINGS) {
             workCapabilityConfiguring = false
         }
     }
@@ -259,6 +272,8 @@ fun LocalHarnessScreen(
             pendingWorkCapability = prompt
             workHandoffSourceSessionId = shell.sessionId
             workHandoffSummary = viewModel.workHandoffSummary()
+            workHandoffMessageIds = emptyList()
+            workHandoffSearch = ""
             workCapabilityConfirmed = false
             workCapabilityFailed = false
             workCapabilityConfiguring = false
@@ -314,6 +329,8 @@ fun LocalHarnessScreen(
     val chatActions = LocalChatFeatureUiActions(
         personaPresets = viewModel.personaPresets,
         diaryEntries = viewModel::diaryEntries,
+        correctDiaryEntry = viewModel::correctDiaryEntry,
+        deactivateDiaryEntry = viewModel::deactivateDiaryEntry,
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
         saveCurrentToGallery = viewModel::saveCurrentToGallery,
@@ -343,6 +360,8 @@ fun LocalHarnessScreen(
         toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         toolEvidenceForUi = viewModel::toolEvidenceForUi,
+        requirementEvidenceForUi = viewModel::requirementEvidenceForUi,
+        linkRequirementEvidenceForUi = viewModel::linkRequirementEvidenceForUi,
         stopBackgroundJob = viewModel::stopBackgroundJob,
         startBackgroundAgent = viewModel::startBackgroundAgent,
         startResearchAgent = viewModel::startResearchAgent,
@@ -389,6 +408,12 @@ fun LocalHarnessScreen(
             onNewSession = { showNewSessionMode = true },
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onUseWorkCapability = ::useWorkCapability,
+            onLocateMemoryForMessage = { messageId ->
+                memorySourceSessionId = shell.sessionId
+                memorySourceMessageId = messageId
+                settingsDestination = SettingsDestination.MEMORY_MANAGEMENT
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
             composerHandoff = composerHandoff,
             skillDisplayNames = installedSkillDisplayNames,
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
@@ -412,13 +437,22 @@ fun LocalHarnessScreen(
             onContinueArtifact = { path ->
                 handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
+            onOpenSourceSession = { sourceSessionId ->
+                if (viewModel.switchSession(sourceSessionId)) {
+                    resetFeatureNavigation()
+                }
+            },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
             shell = shell,
             actions = workActions,
             onFilesModeChange = { filesMode = it },
             onPushFeature = ::pushFeature,
-            onPopFeature = ::popFeature,
+            onPopFeature = {
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                popFeature()
+            },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
@@ -450,6 +484,8 @@ fun LocalHarnessScreen(
         ),
         localSettingsFeatureUiContribution(
             settingsDestination = settingsDestination,
+            memorySourceSessionId = memorySourceSessionId,
+            memorySourceMessageId = memorySourceMessageId,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
             onSettingsDestinationChange = { settingsDestination = it },
@@ -651,16 +687,40 @@ fun LocalHarnessScreen(
     }
 
     if (pendingWorkCapability != null && !workCapabilityConfiguring) {
+        val handoffMessages = if (workHandoffSourceSessionId == shell.sessionId &&
+            transcriptHistory.sessionId == shell.sessionId
+        ) workHandoffDialogueCandidates(transcriptHistory.olderMessages, chatSurface.messages)
+        else if (workHandoffSourceSessionId == shell.sessionId)
+            workHandoffDialogueCandidates(emptyList(), chatSurface.messages)
+        else emptyList()
         LocalWorkCapabilitySheet(
             switching = workCapabilityConfirmed,
             failed = workCapabilityFailed,
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
             prompt = pendingWorkCapability.orEmpty(),
             summary = workHandoffSummary,
+            selectableMessages = handoffMessages,
+            selectedMessageIds = workHandoffMessageIds,
+            onSelectedMessageIdsChange = { workHandoffMessageIds = it },
+            messageSearch = workHandoffSearch,
+            onMessageSearchChange = { workHandoffSearch = it },
+            hasEarlierMessages = workHandoffSourceSessionId == shell.sessionId &&
+                transcriptHistory.sessionId == shell.sessionId && transcriptHistory.hasMore,
+            loadingEarlierMessages = transcriptHistory.loading,
+            onLoadEarlierMessages = {
+                if (workHandoffSourceSessionId == shell.sessionId) {
+                    scope.launch { viewModel.loadOlderTranscript(workHandoffSourceSessionId) }
+                }
+            },
             capabilities = viewModel.workHandoffCapabilityReadiness(
                 task = pendingWorkCapability.orEmpty(),
                 githubConfigured = githubConfiguredForHandoff,
                 networkSearchEnabled = networkSearchEnabled,
+                modelConfigured = chatSurface.configured,
+                mcpToolsAvailable = externalReadinessForHandoff.first,
+                pluginsInstalled = externalReadinessForHandoff.second,
+                accessibilityActive = deviceReadinessForHandoff.first,
+                notificationAccessActive = deviceReadinessForHandoff.second,
             ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
@@ -671,9 +731,24 @@ fun LocalHarnessScreen(
                 pushFeature(LocalFeaturePage.TOOLS)
             },
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
+            onConfigureModel = {
+                workCapabilityConfiguring = true
+                settingsDestination = SettingsDestination.MODELS
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
+            onConfigureDevice = {
+                workCapabilityConfiguring = true
+                settingsDestination = SettingsDestination.PERMISSIONS
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
             onContinue = {
                 workCapabilityFailed = false
-                workCapabilityConfirmed = viewModel.createWorkContinuation(workHandoffSourceSessionId, workHandoffSummary)
+                workCapabilityConfirmed = viewModel.createWorkContinuation(
+                    workHandoffSourceSessionId,
+                    workHandoffSummaryWithSelectedMessages(
+                        workHandoffSummary, workHandoffSourceSessionId, handoffMessages, workHandoffMessageIds,
+                    ),
+                )
                 if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
                 else workCapabilityFailed = true
             },

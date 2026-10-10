@@ -495,6 +495,9 @@ internal class LocalWorkAgentTurnExecutor(
                                 toolIsError = event.isError,
                                 toolErrorCode = event.errorCode,
                             )
+                            val artifactVersion = if (!event.isError) localWorkArtifactFileVersion(
+                                java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
+                            ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
                                 put("step", event.step)
                                 put("id", event.call.id)
@@ -507,6 +510,11 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                                 put("model_content", durableToolResultContent(modelOutput, event.retention))
                                 put("is_error", event.isError)
+                                artifactVersion?.let {
+                                    put("artifact_path", it.path)
+                                    put("artifact_sha256", it.sha256)
+                                    put("artifact_bytes", it.bytes)
+                                }
                                 put("retention", event.retention.name.lowercase())
                                 event.errorCode?.let { put("error_code", it) }
                                 put("retryable", event.retryable)

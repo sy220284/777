@@ -125,11 +125,13 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         state: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        context: ChatContextState = ChatContextState(),
     ): String = interactionPlanner.prompt(
         persona = persona,
         state = state,
         userMessage = userMessage,
         assistantMessage = assistantMessage,
+        context = context,
     )
 
     internal fun postTurnParseFailureKind(text: String): String =
@@ -167,6 +169,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         state: ChatCharacterState,
         messages: List<LocalHarnessMessage>,
         latestAssistantMessageId: String,
+        context: ChatContextState = ChatContextState(),
     ): String {
         val recentDialogue = recentReplySuggestionDialogue(
             messages = messages,
@@ -180,6 +183,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
             recentDialogue = recentDialogue,
+            context = context,
         )
     }
 

@@ -71,11 +71,19 @@ internal class LocalWorkBackgroundToolExecutor(
                 error.message ?: error::class.java.simpleName,
             )
         }
+        val artifactVersion = if (!result.isError) localWorkArtifactFileVersion(
+            java.io.File(sessionStorage.files.workspace.path), normalized.name, result.content,
+        ) else null
         log.append("tool/result", buildJsonObject {
             put("id", normalized.id)
             put("name", normalized.name)
             put("content", com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
             put("is_error", result.isError)
+            artifactVersion?.let {
+                put("artifact_path", it.path)
+                put("artifact_sha256", it.sha256)
+                put("artifact_bytes", it.bytes)
+            }
             result.errorCode?.let { put("error_code", it) }
             put("retryable", result.retryable)
             put("side_effect", result.sideEffect.name.lowercase())

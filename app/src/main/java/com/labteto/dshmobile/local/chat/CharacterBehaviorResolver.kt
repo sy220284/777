@@ -98,7 +98,7 @@ internal fun resolveCharacterMode(
         relatedAttentionText(state.lifeState.currentBeat, userInput)
     val stableAttention = persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
         .takeIf(String::isNotBlank)?.let(::listOf)
-        ?: if (persona.facts.isEmpty()) persona.attentionBiases else emptyList()
+        ?: if (persona.facts.isEmpty() && persona.coreIdentity.isBlank()) persona.attentionBiases else emptyList()
     val characterEngaged = stableAttention.any { bias ->
         attention.noticed.any { noticed -> attentionBiasMatches(bias, noticed) }
     }
@@ -147,7 +147,7 @@ internal fun resolveCharacterMode(
     }
     if (lifeRelated && (
             persona.factText(CharacterFactCategories.LIFE_GRAVITY).isNotBlank() ||
-                (persona.facts.isEmpty() && persona.lifeContext.isNotBlank())
+                (persona.facts.isEmpty() && persona.coreIdentity.isBlank() && persona.lifeContext.isNotBlank())
         )
     ) {
         disclosure += 18
@@ -162,7 +162,7 @@ internal fun resolveCharacterMode(
     if (state.currentUserImpression.isNotBlank()) subtext += 5
 
     val cues = buildList {
-        if (persona.facts.isNotEmpty()) {
+        if (persona.facts.isNotEmpty() || persona.coreIdentity.isNotBlank()) {
             listOf(
                 CharacterFactCategories.IDENTITY_GAP,
                 CharacterFactCategories.VALUES_AND_TRADEOFFS,

@@ -143,6 +143,7 @@ internal fun LocalMessageRow(
     onRegenerate: (String) -> Boolean,
     streaming: Boolean = false,
     skillDisplayNames: Map<String, String> = emptyMap(),
+    onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -221,6 +222,15 @@ internal fun LocalMessageRow(
                                         text = stringResource(R.string.local_edit_user_message),
                                         icon = FeatherIcons.Edit3,
                                         onClick = { onEdit(message) },
+                                    ),
+                                )
+                            }
+                            if (chatMode && onLocateSourceMemory != null) {
+                                add(
+                                    MenuItem(
+                                        text = stringResource(R.string.chat_locate_message_memory),
+                                        icon = FeatherIcons.BookOpen,
+                                        onClick = { onLocateSourceMemory(message) },
                                     ),
                                 )
                             }

@@ -9,6 +9,8 @@ import java.nio.file.StandardCopyOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -73,6 +75,8 @@ class VersionedSessionStore(
     private val clock: () -> Long = System::currentTimeMillis,
     private val onCorruptSkipped: (String, Exception) -> Unit = { _, _ -> },
 ) {
+    private val catalog = DurableSessionCatalog(root, json)
+
     init {
         root.mkdirs()
     }
@@ -81,13 +85,12 @@ class VersionedSessionStore(
     fun read(id: String): SessionLoadResult? {
         val file = fileFor(id)
         val backup = backupFor(id)
-        if (!file.isFile) {
+        val loaded = if (!file.isFile) {
             if (!backup.isFile) return null
             val recovered = readFromFile(id, backup)
             atomicWrite(file, backup.readText())
-            return recovered.copy(recovered = true)
-        }
-        return try {
+            recovered.copy(recovered = true)
+        } else try {
             readFromFile(id, file)
         } catch (future: FutureSessionVersionException) {
             throw future
@@ -104,6 +107,10 @@ class VersionedSessionStore(
             atomicWrite(file, backup.readText())
             recovered.copy(recovered = true)
         }
+        // Explicit legacy-session migration may copy an old snapshot after the catalog was
+        // initialized. A successful direct read adopts that known identity without rescanning.
+        catalog.adopt(id)
+        return loaded
     }
 
     @Synchronized
@@ -112,6 +119,10 @@ class VersionedSessionStore(
     @Synchronized
     fun write(id: String, payload: JsonObject, updatedAt: Long = clock()): SessionDocument {
         validateId(id)
+        validatePayloadIdentity(id, payload)
+        // Publish the identity before the atomic session snapshot. An interrupted write cannot
+        // leave a valid durable session invisible to the catalog.
+        catalog.register(id)
         val source = fileFor(id)
         val existing = read(id)
         if (existing?.legacy == true) {
@@ -146,17 +157,26 @@ class VersionedSessionStore(
                     file.name.startsWith("$id.corrupt-")
             }
             .forEach { file -> changed = file.delete() || changed }
+        // Never hide the session if a failed filesystem deletion left either recoverable copy.
+        check(!fileFor(id).exists() && !backupFor(id).exists()) {
+            "会话文件未完全删除，保留登记以便重试：$id"
+        }
+        catalog.unregister(id)
         return changed
     }
 
     @Synchronized
-    fun ids(): List<String> = sessionFiles()
-        .map { file -> file.name.removeSuffix(SESSION_SUFFIX) }
+    fun ids(): List<String> = catalog.ids()
+        .filter { id -> fileFor(id).isFile || backupFor(id).isFile }
 
     @Synchronized
     fun lastModified(id: String): Long? {
         validateId(id)
-        return fileFor(id).takeIf(File::isFile)?.lastModified()?.takeIf { it > 0L }
+        val primary = fileFor(id)
+        // Recovery of a rotated snapshot is rare. Rebuild the primary only in this case so
+        // summary-cache provenance always points to the authoritative file generation.
+        if (!primary.isFile && backupFor(id).isFile) read(id)
+        return primary.takeIf(File::isFile)?.lastModified()?.takeIf { it > 0L }
     }
 
     @Synchronized
@@ -202,9 +222,15 @@ class VersionedSessionStore(
 
     private fun readFromFile(id: String, file: File): SessionLoadResult {
         val element = json.parseToJsonElement(file.readText()).jsonObject
-        val wrappedVersion = element["formatVersion"]?.jsonPrimitive?.intOrNull
-        val legacy = wrappedVersion == null
+        val wrappedVersion = (element["formatVersion"] as? JsonPrimitive)?.intOrNull
+        val legacy = "formatVersion" !in element
+        require(legacy || wrappedVersion != null) { "会话格式版本无效：$id" }
         val version = wrappedVersion ?: 0
+        if (!legacy) {
+            require(element["id"]?.jsonPrimitive?.content == id) {
+                "会话快照身份不一致：请求 $id"
+            }
+        }
         if (version > migrations.currentVersion) {
             throw FutureSessionVersionException(version, migrations.currentVersion)
         }
@@ -213,7 +239,9 @@ class VersionedSessionStore(
         } else {
             element["payload"]?.jsonObject ?: error("会话文档缺少 payload：$id")
         }
+        validatePayloadIdentity(id, payload)
         val migratedPayload = migrations.migrate(version, payload)
+        validatePayloadIdentity(id, migratedPayload)
         val updatedAt = if (legacy) {
             file.lastModified().takeIf { it > 0L } ?: clock()
         } else {
@@ -231,16 +259,6 @@ class VersionedSessionStore(
         )
     }
 
-    private fun sessionFiles(): List<File> = root.listFiles().orEmpty()
-        .filter { file ->
-            file.isFile &&
-                file.name.endsWith(SESSION_SUFFIX) &&
-                !file.name.endsWith(TEMP_SUFFIX) &&
-                !file.name.endsWith(BACKUP_SUFFIX) &&
-                !file.name.contains(CHECKPOINT_MARKER) &&
-                !file.name.contains(CORRUPT_MARKER)
-        }
-
     private fun fileFor(id: String): File {
         validateId(id)
         return File(root, "$id$SESSION_SUFFIX")
@@ -256,7 +274,16 @@ class VersionedSessionStore(
         File(root, "$id.corrupt-${clock()}.json")
 
     private fun validateId(id: String) {
-        require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：$id" }
+        require(id.matches(SESSION_ID_PATTERN)) { "非法会话编号：$id" }
+    }
+
+    /** The application consumes payload.id; validating only the envelope leaves a second identity. */
+    private fun validatePayloadIdentity(id: String, payload: JsonObject) {
+        if ("id" !in payload) return // Generic and pre-ID legacy payloads remain supported.
+        val embeddedId = (payload["id"] as? JsonPrimitive)?.contentOrNull
+        require(embeddedId != null && (embeddedId.isEmpty() || embeddedId == id)) {
+            "会话正文身份不一致：请求 $id"
+        }
     }
 
     private fun rotatePrimaryToBackup(source: File, backup: File) {
@@ -306,9 +333,7 @@ class VersionedSessionStore(
 
     private companion object {
         const val SESSION_SUFFIX = ".json"
-        const val TEMP_SUFFIX = ".json.tmp"
         const val BACKUP_SUFFIX = ".backup.json"
-        const val CHECKPOINT_MARKER = ".checkpoint-v"
-        const val CORRUPT_MARKER = ".corrupt-"
+        val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }

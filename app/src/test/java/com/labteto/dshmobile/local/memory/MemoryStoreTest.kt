@@ -8,6 +8,87 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class MemoryStoreTest {
+    @Test fun metadataEditDoesNotQueueInvalidationAndCleanupCannotAcknowledgeANewerCorrection() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.update(original.id, pinned = true)
+        assertTrue(memory.pendingSourceInvalidations().isEmpty())
+        val corrected = memory.update(original.id, content = "周末去山上")
+        assertEquals(listOf(MemorySourceRef("s", "u")), store().pendingSourceInvalidations().single().pendingSourceInvalidations)
+        memory.update(original.id, content = "周末去书店")
+        assertFalse(memory.acknowledgeSourceInvalidation(corrected))
+        val latest = memory.pendingSourceInvalidations().single()
+        assertTrue(memory.acknowledgeSourceInvalidation(latest))
+        assertTrue(store().pendingSourceInvalidations().isEmpty())
+        assertEquals("周末去书店", all(store()).single().content)
+    }
+
+    @Test fun disabledPendingCleanupSurvivesCompactionAndConsolidation() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.forget(original.id)
+        val pending = memory.pendingSourceInvalidations().single()
+        val another = pending.copy(id = "another", active = true, pendingSourceInvalidations = emptyList())
+        assertTrue(compactMemoryRecords(listOf(pending, another), 1).any { it.id == pending.id })
+        assertEquals(setOf(pending.id, another.id),
+            compactMemoryRecords(listOf(pending, another), 1, setOf(another.id)).map { it.id }.toSet())
+        val duplicate = pending.copy(id = "duplicate", active = true)
+        val combined = consolidateMemoryRecords(listOf(duplicate, another))
+        assertEquals(0, combined.mergedCount)
+        assertTrue(combined.records.any { it.pendingSourceInvalidations.isNotEmpty() })
+    }
+
+    @Test fun staleMessageLinkedMemoryEditCannotOverwriteNewerCorrectionOrDeactivateIt() {
+        val memory = store()
+        val original = memory.remember(
+            "周末原本约好去海边", MemoryScope.LINEAGE,
+            lineageId = "lineage", sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val corrected = memory.update(
+            original.id, content = "周末改去山上", expectedUpdatedAt = original.updatedAt,
+        )
+        assertTrue(corrected.updatedAt > original.updatedAt)
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.update(original.id, content = "旧视图覆盖错误", expectedUpdatedAt = original.updatedAt)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            memory.forget(original.id, expectedUpdatedAt = original.updatedAt)
+        }
+        assertEquals("周末改去山上",
+            store().listActiveFromMessage("chat-a", "user-1").single().content)
+        assertTrue(memory.forget(original.id, expectedUpdatedAt = corrected.updatedAt))
+        assertTrue(store().listActiveFromMessage("chat-a", "user-1").isEmpty())
+    }
+
+    @Test fun exactMessageSourceLookupSpansScopedMemoriesWithoutUnrelatedOrInactiveRows() {
+        val memory = store()
+        val relatedGlobal = memory.remember(
+            "用户记得周末看海", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val relatedLineage = memory.remember(
+            "人物与用户约好去海边", MemoryScope.LINEAGE, lineageId = "lineage",
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        memory.remember("其他会话", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-b", sourceMessageId = "user-1")
+        memory.remember("无法确认具体消息的旧记忆", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a")
+        assertEquals(
+            setOf(relatedGlobal.id, relatedLineage.id),
+            memory.listActiveFromMessage("chat-a", "user-1").map { it.id }.toSet(),
+        )
+        assertTrue(memory.listActiveFromMessage("chat-a", "unknown").isEmpty())
+        assertTrue(memory.listActiveFromMessage("", "user-1").isEmpty())
+        assertTrue(memory.forget(relatedLineage.id))
+        assertEquals(
+            listOf(relatedGlobal.id),
+            store().listActiveFromMessage("chat-a", "user-1").map { it.id },
+        )
+    }
+
     @get:Rule val temporary = TemporaryFolder()
     private fun store() = MemoryStore(temporary.root, Json)
     private fun all(store: MemoryStore) = store.listActive(

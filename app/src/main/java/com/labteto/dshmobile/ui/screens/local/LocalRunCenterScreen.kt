@@ -32,6 +32,7 @@ import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
+import com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -72,6 +73,8 @@ internal fun LocalRunCenterScreen(
     onToolActivities: (String) -> List<LocalToolActivityUiItem> = { emptyList() },
     onEventSequence: (String) -> Long = { 0L },
     onToolEvidence: (String, String, Long) -> String? = { _, _, _ -> null },
+    onRequirementEvidence: (String) -> List<LocalRequirementEvidenceLink> = { emptyList() },
+    onLinkRequirementEvidence: (String, Int, LocalArtifactUiItem) -> Boolean = { _, _, _ -> false },
     onStopJob: (String) -> String,
     onStartBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     onStartResearchAgent: suspend (String) -> LocalWorkUiActionResult = onStartBackgroundAgent,
@@ -80,6 +83,9 @@ internal fun LocalRunCenterScreen(
     onDismiss: () -> Unit,
     onOpenArtifact: (String) -> Unit = { onOpenResults() },
     onContinueArtifact: (String) -> Unit = {},
+    /** Null for ordinary Work sessions; absent source remains available only as historic summary. */
+    onOpenSourceSession: (() -> Unit)? = null,
+    sourceSessionMissing: Boolean = false,
     usageRevision: kotlinx.coroutines.flow.StateFlow<Long>? = null,
     sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
     taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
@@ -96,6 +102,11 @@ internal fun LocalRunCenterScreen(
     var agentFeedback by remember(state.sessionId) { mutableStateOf("") }
     var startingAgent by remember(state.sessionId) { mutableStateOf(false) }
     var artifacts by remember(state.sessionId) { mutableStateOf(emptyList<LocalArtifactUiItem>()) }
+    var requirementLinks by remember(state.sessionId) { mutableStateOf(emptyList<LocalRequirementEvidenceLink>()) }
+    var pendingRequirementArtifact by remember(state.sessionId) { mutableStateOf<LocalArtifactUiItem?>(null) }
+    var requirementLinkFeedback by remember(state.sessionId) { mutableStateOf("") }
+    var linkingRequirement by remember(state.sessionId) { mutableStateOf(false) }
+    val requirementLinkFailureText = stringResource(R.string.local_delivery_link_save_failed)
     var selectedToolCallId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
     var artifactScanLimit by remember(state.sessionId) { mutableStateOf(384) }
@@ -110,13 +121,18 @@ internal fun LocalRunCenterScreen(
                 val (sequence, recent) = withContext(Dispatchers.IO) {
                     val seq = onEventSequence(state.sessionId)
                     seq to if (seq != lastSequence) {
-                        (if (artifactScanLimit == 384) onArtifacts(state.sessionId)
-                        else onArtifactHistory(state.sessionId, artifactScanLimit)) to onToolActivities(state.sessionId)
+                        Triple(
+                            if (artifactScanLimit == 384) onArtifacts(state.sessionId)
+                            else onArtifactHistory(state.sessionId, artifactScanLimit),
+                            onToolActivities(state.sessionId),
+                            onRequirementEvidence(state.sessionId),
+                        )
                     } else null
                 }
                 if (recent != null) {
                     artifacts = recent.first
                     toolActivities = recent.second
+                    requirementLinks = recent.third
                     lastSequence = sequence
                 }
                 activityRefreshFailed = false
@@ -150,6 +166,22 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
+            if (onOpenSourceSession != null) {
+                DsButton(
+                    text = stringResource(R.string.local_work_handoff_return_source),
+                    onClick = onOpenSourceSession,
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                )
+            } else if (sourceSessionMissing) {
+                Text(
+                    stringResource(R.string.local_work_handoff_source_removed),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                )
+            }
             if (onHistoryPage != null) {
                 DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
                     variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
@@ -194,6 +226,26 @@ internal fun LocalRunCenterScreen(
                     )
                     if (activityRefreshFailed) {
                         Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.error)
+                    }
+                    if (toolActivities.isNotEmpty() || artifacts.isNotEmpty() || state.todos.isNotEmpty()) {
+                        val evidence = localWorkDeliveryEvidenceCounts(state, artifacts, toolActivities)
+                        Text(
+                            stringResource(R.string.local_delivery_evidence_title),
+                            style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary,
+                        )
+                        Text(
+                            stringResource(
+                                R.string.local_delivery_evidence_counts,
+                                evidence.availableFiles, evidence.missingFiles, evidence.uncheckedFiles,
+                                evidence.completedTools, evidence.failedTools, evidence.unknownTools,
+                                evidence.openTasks,
+                            ),
+                            style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+                        )
+                        Text(
+                            stringResource(R.string.local_delivery_evidence_scope),
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
+                        )
                     }
                     if (toolActivities.isNotEmpty()) {
                         Text(
@@ -251,9 +303,23 @@ internal fun LocalRunCenterScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                             ) {
+                                val detail = when {
+                                    artifact.category != "file" -> stringResource(R.string.local_delivery_source_not_verified)
+                                    artifact.currentlyAvailable == true &&
+                                        artifact.versionAtCreation != null && artifact.versionNow != null &&
+                                        artifact.versionAtCreation != artifact.versionNow ->
+                                        stringResource(R.string.local_delivery_file_revision_changed)
+                                    artifact.currentlyAvailable == true &&
+                                        artifact.versionAtCreation != null &&
+                                        artifact.versionAtCreation == artifact.versionNow ->
+                                        stringResource(R.string.local_delivery_file_revision_matches)
+                                    artifact.currentlyAvailable == true -> stringResource(R.string.local_delivery_file_present)
+                                    artifact.currentlyAvailable == false -> stringResource(R.string.local_delivery_file_missing)
+                                    else -> stringResource(R.string.local_delivery_file_unknown)
+                                }
                                 DsSheetChoiceRow(
                                     title = artifact.reference,
-                                    subtitle = label,
+                                    subtitle = "$label · $detail",
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         artifactActionFailed = false
@@ -269,6 +335,28 @@ internal fun LocalRunCenterScreen(
                                         }
                                     },
                                 )
+                                artifact.sourceCallId?.let { callId ->
+                                    if (toolActivities.any { it.callId == callId }) {
+                                        DsButton(
+                                            text = stringResource(R.string.local_delivery_open_evidence),
+                                            onClick = { selectedToolCallId = callId },
+                                            variant = DsButtonVariant.Ghost,
+                                            size = DsButtonSize.Small,
+                                        )
+                                    }
+                                }
+                                if (artifact.category == "file" && artifact.currentlyAvailable == true &&
+                                    state.todos.isNotEmpty()) {
+                                    DsButton(
+                                        text = stringResource(R.string.local_delivery_link_action),
+                                        onClick = {
+                                            pendingRequirementArtifact = artifact
+                                            requirementLinkFeedback = ""
+                                        },
+                                        variant = DsButtonVariant.Ghost,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
                                 if (artifact.category == "file" && artifact.currentlyAvailable != false) {
                                     DsButton(
                                         text = stringResource(R.string.local_artifact_continue),
@@ -282,6 +370,24 @@ internal fun LocalRunCenterScreen(
                                     onClick = { clipboard.setText(AnnotatedString(artifact.reference)) },
                                     variant = DsButtonVariant.Ghost,
                                     size = DsButtonSize.Small,
+                                )
+                            }
+                        }
+                        if (requirementLinks.isNotEmpty()) {
+                            Text(stringResource(R.string.local_delivery_linked_title),
+                                style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                            requirementLinks.forEach { link ->
+                                val current = link.versionNow
+                                Text(
+                                    stringResource(
+                                        R.string.local_delivery_linked_line,
+                                        link.requirementIndex + 1,
+                                        link.artifactPath,
+                                        if (current == link.versionAtLink)
+                                            stringResource(R.string.local_delivery_link_current)
+                                        else stringResource(R.string.local_delivery_link_stale),
+                                    ),
+                                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
                                 )
                             }
                         }
@@ -302,6 +408,48 @@ internal fun LocalRunCenterScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    pendingRequirementArtifact?.let { artifact ->
+        DsBottomSheet(
+            title = stringResource(R.string.local_delivery_link_title),
+            subtitle = stringResource(R.string.local_delivery_link_hint),
+            onDismiss = { if (!linkingRequirement) pendingRequirementArtifact = null },
+            dismissEnabled = !linkingRequirement,
+            scrollable = true,
+        ) {
+            if (requirementLinkFeedback.isNotBlank()) {
+                Text(requirementLinkFeedback, style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary)
+            }
+            state.todos.forEachIndexed { index, todo ->
+                DsButton(
+                    text = "${index + 1}. ${todo.content.take(100)}",
+                    enabled = !linkingRequirement,
+                    onClick = {
+                        linkingRequirement = true
+                        scope.launch {
+                            val success = try {
+                                withContext(Dispatchers.IO) {
+                                    onLinkRequirementEvidence(state.sessionId, index, artifact)
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            } finally {
+                                linkingRequirement = false
+                            }
+                            requirementLinkFeedback = if (success) {
+                                pendingRequirementArtifact = null
+                                ""
+                            } else requirementLinkFailureText
+                        }
+                    },
+                    variant = DsButtonVariant.Ghost, modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -479,4 +627,37 @@ internal fun LocalRunCenterScreen(
 
         }
     }
+}
+
+/**
+ * Local, bounded observation from the existing Session event projection. An observed tool
+ * completion is not proof of tests passing or a deliverable matching its requested version.
+ */
+internal data class LocalWorkDeliveryEvidenceCounts(
+    val availableFiles: Int,
+    val missingFiles: Int,
+    val uncheckedFiles: Int,
+    val completedTools: Int,
+    val failedTools: Int,
+    val unknownTools: Int,
+    val openTasks: Int,
+)
+
+internal fun localWorkDeliveryEvidenceCounts(
+    state: LocalWorkUiState,
+    artifacts: List<LocalArtifactUiItem>,
+    calls: List<LocalToolActivityUiItem>,
+): LocalWorkDeliveryEvidenceCounts {
+    val files = artifacts.filter { it.category == "file" }
+    return LocalWorkDeliveryEvidenceCounts(
+        availableFiles = files.count { it.currentlyAvailable == true },
+        missingFiles = files.count { it.currentlyAvailable == false },
+        uncheckedFiles = files.count { it.currentlyAvailable == null },
+        completedTools = calls.count { it.phase == LocalToolUiPhase.COMPLETED },
+        failedTools = calls.count { it.phase == LocalToolUiPhase.FAILED },
+        unknownTools = calls.count {
+            it.phase == LocalToolUiPhase.OUTCOME_UNKNOWN || it.phase == LocalToolUiPhase.CANCELLED
+        },
+        openTasks = state.todos.count { it.status == "pending" || it.status == "in_progress" },
+    )
 }

@@ -105,6 +105,10 @@ class LocalChatRuntime @Inject internal constructor(
         groupMembership.remove(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = replySuggestions.generate()
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
+    internal fun correctDiaryEntry(subjectKey: String, id: String, revision: Long, correction: ChatDiaryDelta) =
+        persistence.diaryStore.correctEntry(subjectKey, id, revision, correction)
+    internal fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long) =
+        persistence.diaryStore.deactivateEntry(subjectKey, id, revision)
     internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
     internal fun <T> importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T = persistence.diaryStore.importForTransfer(subjectKey, personaName, entries, commit)
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = execution.send(text, attachments)

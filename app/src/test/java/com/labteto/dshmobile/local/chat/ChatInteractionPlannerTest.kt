@@ -6,11 +6,51 @@ import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatInteractionPlannerTest {
+
+    @Test
+    fun postTurnAndSuggestionPromptsRespectCurrentStoryStage() {
+        val persona = PersonaProfile(
+            name = "青岚",
+            coreIdentity = "小镇的书店店员",
+            // Retired fields must not leak into V4 auxiliary model requests.
+            portrait = "旧版预告：结局变成了猎人",
+            facts = listOf(
+                CharacterFact("known", CharacterFactCategories.PERSONALITY,
+                    "性格沉稳", provenance = CharacterFactProvenance.CANON),
+                CharacterFact("future", CharacterFactCategories.PERSONALITY,
+                    "第二幕掌握钟楼密钥", temporalScope = "act-2",
+                    provenance = CharacterFactProvenance.CANON),
+                CharacterFact("future-relationship", CharacterFactCategories.RELATIONSHIPS,
+                    "结局时揭开阿宁的秘密", temporalScope = "act-2"),
+            ),
+        )
+        val before = ChatContextState()
+        val after = ChatContextState(storyStage = "act-2")
+        val state = ChatCharacterState()
+        val earlyPlanner = planner.prompt(persona, state, "你好", "你好", context = before)
+        val latePlanner = planner.prompt(persona, state, "你好", "你好", context = after)
+        val earlySuggestion = planner.suggestionsPrompt(
+            persona, state, "你好", "你好", context = before,
+        )
+        val lateSuggestion = planner.suggestionsPrompt(
+            persona, state, "你好", "你好", context = after,
+        )
+        assertTrue(earlyPlanner.contains("性格沉稳"))
+        assertFalse(earlyPlanner.contains("钟楼密钥"))
+        assertFalse(earlySuggestion.contains("钟楼密钥"))
+        assertFalse(earlySuggestion.contains("阿宁的秘密"))
+        assertFalse(earlyPlanner.contains("旧版预告"))
+        assertFalse(earlySuggestion.contains("旧版预告"))
+        assertTrue(latePlanner.contains("钟楼密钥"))
+        assertTrue(lateSuggestion.contains("阿宁的秘密"))
+    }
+
 
     @Test
     fun confirmedDatingExpressionsAdvanceRelationshipWithoutRigidKeywordRejection() {

@@ -31,6 +31,8 @@ import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.presentation.personaMemberSearchText
+import com.labteto.dshmobile.local.presentation.personaMemberDescription
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -59,9 +61,7 @@ internal fun GroupChatMemberPickerSheet(
             entries
         } else {
             entries.filter { entry ->
-                entry.persona.name.contains(needle, ignoreCase = true) ||
-                    entry.persona.portrait.contains(needle, ignoreCase = true) ||
-                    entry.persona.lifeContext.contains(needle, ignoreCase = true)
+                personaMemberSearchText(entry.persona).contains(needle, ignoreCase = true)
             }
         }
     }
@@ -187,7 +187,7 @@ internal fun GroupChatMemberPickerSheet(
                                         style = DsType.std14Strong.withReadingWeight(),
                                         color = DsTheme.colors.labelPrimary,
                                     )
-                                    entry.persona.portrait.takeIf(String::isNotBlank)?.let {
+                                    personaMemberDescription(entry.persona).takeIf(String::isNotBlank)?.let {
                                         Text(
                                             it,
                                             style = DsType.caption11.withReadingWeight(),

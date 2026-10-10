@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,6 +67,20 @@ class LocalGroupChatTest {
         assertTrue(groupMemberMayStaySilent("大家聊聊今天的事", kafka, 1))
         assertTrue(!groupMemberMayStaySilent("每个人都回答：你们怎么看？", kafka, 1))
         assertTrue(!groupMemberMayStaySilent("卡芙卡，你怎么看？", kafka, 1))
+    }
+
+    @Test
+    fun referencedCharacterCanRemainSilentButDirectedSpeakerMustReply() {
+        val prompt = "大家觉得卡芙卡昨天的决定怎么样？"
+        assertEquals(
+            listOf("ayaka", "kafka"),
+            groupChatResponders(prompt, listOf(ayaka, kafka, zhao))
+                .map(LocalGroupChatMember::galleryId),
+        )
+        assertTrue(groupMemberMayStaySilent(prompt, kafka, 1))
+        assertFalse(groupMemberMayStaySilent("@神里绫华，@卡芙卡，分别回答", kafka, 1))
+        assertFalse(groupMemberMayStaySilent("卡芙卡，你怎么看？", kafka, 1))
+        assertFalse(groupMemberMayStaySilent("每个人都回答", kafka, 1))
     }
 
     @Test

@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,7 @@ import com.labteto.dshmobile.local.chat.CharacterEvolutionState
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalModelTemperatureRange
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -111,6 +113,8 @@ internal fun CharacterBehaviorTuningDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val performanceLimits by LocalModelPerformanceControls.state.collectAsState()
+    val temperaturePositionLimit = temperatureRange?.let(performanceLimits::temperaturePositionLimit) ?: 100
     var draft by remember(initial) { mutableStateOf(initial.normalized()) }
     var advanced by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -436,8 +440,9 @@ internal fun CharacterBehaviorTuningDialog(
                         high = stringResource(R.string.local_character_tuning_expression_variation_high),
                         value = temperatureRange?.let(draft::temperaturePosition)
                             ?: draft.samplingTemperaturePosition ?: draft.expressionVariation,
+                        maxValue = temperaturePositionLimit,
                         displayValue = temperatureRange?.let { range ->
-                            val position = draft.temperaturePosition(range)
+                            val position = draft.temperaturePosition(range).coerceAtMost(temperaturePositionLimit)
                             val label = if (range.omitAtChatDefault && position == range.defaultPosition) {
                                 R.string.local_character_tuning_temperature_provider_default
                             } else {
@@ -445,7 +450,7 @@ internal fun CharacterBehaviorTuningDialog(
                             }
                             stringResource(
                                 label,
-                                range.at(position),
+                                performanceLimits.constrainTemperature(range.at(position))!!,
                                 position,
                             )
                         },
@@ -517,9 +522,11 @@ private fun BehaviorSlider(
     onValueChange: (Int) -> Unit,
     enabled: Boolean = true,
     displayValue: String? = null,
+    maxValue: Int = 100,
 ) {
     val colors = DsTheme.colors
-    val clean = value.coerceIn(0, 100)
+    val maximum = maxValue.coerceIn(1, 100)
+    val clean = value.coerceIn(0, maximum)
     val valueLabel = when {
         clean <= 25 -> low
         clean >= 75 -> high
@@ -544,10 +551,10 @@ private fun BehaviorSlider(
         }
         DsSlider(
             value = clean.toFloat(),
-            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 100)) },
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maximum)) },
             enabled = enabled,
-            valueRange = 0f..100f,
-            steps = 99,
+            valueRange = 0f..maximum.toFloat(),
+            steps = maximum - 1,
             hapticSegments = 10,
             modifier = Modifier
                 .fillMaxWidth()

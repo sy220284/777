@@ -6,6 +6,8 @@ import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
 
 internal fun localSettingsFeatureUiContribution(
     settingsDestination: SettingsDestination,
+    memorySourceSessionId: String? = null,
+    memorySourceMessageId: String? = null,
     updateStatus: String?,
     onCheckUpdate: () -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
@@ -31,6 +33,8 @@ internal fun localSettingsFeatureUiContribution(
             onPopFeature()
         },
         initialDestination = settingsDestination,
+        memorySourceSessionId = memorySourceSessionId,
+        memorySourceMessageId = memorySourceMessageId,
         onCheckUpdate = onCheckUpdate,
         updateStatus = updateStatus,
         handleRootSystemBack = false,

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import android.net.Uri
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
@@ -71,6 +72,8 @@ internal data class LocalShellFeatureUiActions(
 internal data class LocalChatFeatureUiActions(
     val personaPresets: List<PersonaPreset>,
     val diaryEntries: suspend (String) -> List<ChatDiaryEntry>,
+    val correctDiaryEntry: suspend (String, String, Long, ChatDiaryDelta) -> Boolean,
+    val deactivateDiaryEntry: suspend (String, String, Long) -> Boolean,
     val hasUnsavedCurrentPersona: () -> Boolean,
     val currentGalleryHasUnsavedChanges: () -> Boolean,
     val saveCurrentToGallery: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
@@ -106,6 +109,8 @@ internal data class LocalWorkFeatureUiActions(
     val toolActivitiesForUi: (String) -> List<LocalToolActivityUiItem>,
     val eventSequenceForUi: (String) -> Long,
     val toolEvidenceForUi: (String, String, Long) -> String? = { _, _, _ -> null },
+    val requirementEvidenceForUi: (String) -> List<com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink> = { emptyList() },
+    val linkRequirementEvidenceForUi: (String, Int, LocalArtifactUiItem) -> Boolean = { _, _, _ -> false },
     val stopBackgroundJob: (String) -> String,
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,

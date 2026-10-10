@@ -22,6 +22,14 @@ internal class ChatDiaryStore(
         val delta = ChatDiaryEntryPolicy.sanitizeDelta(request) ?: return null
         val now = System.currentTimeMillis()
         val document = documents.read()
+        // Late asynchronous background consolidation must not regenerate a stale diary
+        // using a message whose durable fact was already explicitly corrected.
+        if (request.sourceUserMessageIds.any { id ->
+                document.invalidatedSourceRefs.any { source ->
+                    source.sessionId == request.sourceSessionId && source.userMessageId == id
+                }
+            }
+        ) return null
         request.projectionId?.let { id ->
             document.entries.firstOrNull { entry -> entry.revisions.any { it.projectionId == id } }
                 ?.let { return it }
@@ -82,7 +90,7 @@ internal class ChatDiaryStore(
         }
 
         documents.write(
-            ChatDiaryDocument(
+            document.copy(
                 entries = ChatDiaryEntryPolicy.compact(
                     entries = entries,
                     maxEntries = MAX_CHAT_DIARY_ENTRIES,
@@ -91,6 +99,114 @@ internal class ChatDiaryStore(
             ),
         )
         return saved
+    }
+
+
+    /**
+     * Explicit author correction of a derived diary event. Original conversation and previous
+     * revisions remain untouched; the user revision takes precedence in active recall.
+     *
+     * The expected revision prevents an old screen editing a newer fact and the subject key
+     * prevents actions on one character from mutating another character's diary.
+     */
+    @Synchronized
+    fun correctEntry(
+        subjectKey: String,
+        id: String,
+        expectedUpdatedAt: Long,
+        correction: ChatDiaryDelta,
+    ): Boolean {
+        val event = correction.event.trim().take(ChatDiaryBounds.MAX_EVENT_CHARS)
+        if (subjectKey.isBlank() || event.isBlank()) return false
+        val existing = documents.read()
+        val index = existing.entries.indexOfFirst {
+            it.id == id && it.subjectKey == subjectKey && it.active &&
+                it.updatedAt == expectedUpdatedAt
+        }
+        if (index < 0) return false
+        val previous = existing.entries[index]
+        val now = maxOf(System.currentTimeMillis(), previous.updatedAt + 1)
+        val revision = ChatDiaryRevision(
+            event = event,
+            feeling = correction.feeling.trim().take(ChatDiaryBounds.MAX_FEELING_CHARS),
+            innerThought = correction.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
+            relationshipMeaning = correction.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
+            unresolvedEcho = correction.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            importance = previous.importance,
+            disclosure = previous.disclosure,
+            sources = previous.sources,
+            updatedAt = now,
+            userCorrected = true,
+        )
+        val revised = ChatDiaryEntryPolicy.rebuild(
+            previous.copy(supersededBy = null, supersessionRetained = false),
+            ChatDiaryEntryPolicy.revisionsOf(previous) + revision,
+            now,
+        )
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            existing.entries, setOf(id), now,
+        ).toMutableList().apply { this[index] = revised }
+        documents.write(existing.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        return true
+    }
+
+    /** A disabled diary entry is no longer eligible for active or historical recall. */
+    @Synchronized
+    fun deactivateEntry(subjectKey: String, id: String, expectedUpdatedAt: Long): Boolean {
+        if (subjectKey.isBlank()) return false
+        val existing = documents.read()
+        val index = existing.entries.indexOfFirst {
+            it.id == id && it.subjectKey == subjectKey && it.active &&
+                it.updatedAt == expectedUpdatedAt
+        }
+        if (index < 0) return false
+        val previous = existing.entries[index]
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            existing.entries, setOf(id), System.currentTimeMillis(),
+        ).toMutableList().apply {
+            this[index] = previous.copy(
+                active = false,
+                updatedAt = maxOf(System.currentTimeMillis(), previous.updatedAt + 1),
+            )
+        }
+        documents.write(existing.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        return true
+    }
+
+    /**
+     * Invalidate only machine-derived diary projections proven to depend on an explicitly
+     * corrected long-term fact's source message. Keep archived revisions and all raw dialogue.
+     * User-authored diary corrections retain priority over this automatic invalidation.
+     */
+    @Synchronized
+    fun invalidateGeneratedFromMessage(sessionId: String, userMessageId: String): Int {
+        if (sessionId.isBlank() || userMessageId.isBlank()) return 0
+        val document = documents.read()
+        val affectedIds = document.entries.filter { entry ->
+            entry.active && entry.revisions.lastOrNull()?.userCorrected != true &&
+                entry.sources.any { it.sessionId == sessionId && it.userMessageId == userMessageId }
+        }.mapTo(hashSetOf(), ChatDiaryEntry::id)
+        var affected = 0
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            document.entries, affectedIds, System.currentTimeMillis(),
+        ).map { entry ->
+            if (entry.id in affectedIds) {
+                affected++
+                entry.copy(active = false, supersededBy = null,
+                    updatedAt = maxOf(System.currentTimeMillis(), entry.updatedAt + 1))
+            } else entry
+        }
+        val ref = ChatDiarySourceRef(sessionId = sessionId, userMessageId = userMessageId)
+        val sources = if (document.invalidatedSourceRefs.any {
+                it.sessionId == sessionId && it.userMessageId == userMessageId
+            }) document.invalidatedSourceRefs else document.invalidatedSourceRefs + ref
+        if (affected > 0 || sources != document.invalidatedSourceRefs) {
+            documents.write(document.copy(
+                entries = ChatDiarySupersessionPolicy.repairLinks(entries),
+                invalidatedSourceRefs = sources,
+            ))
+        }
+        return affected
     }
 
     @Synchronized
@@ -147,7 +263,7 @@ internal class ChatDiaryStore(
             }
         }
         if (changed > 0) {
-            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+            documents.write(documents.read().copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
         }
         return changed
     }
@@ -180,7 +296,7 @@ internal class ChatDiaryStore(
             }
         }
         if (changed > 0) {
-            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+            documents.write(documents.read().copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
         }
         return changed
     }

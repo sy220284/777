@@ -67,6 +67,58 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun savedCharacterFactsAndWorldBookControlRuntimeAfterReloadAndStoryRewind() {
+        val file = File(temporary.newFolder("runtime-journey"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val person = PersonaProfile(
+            name = "叶澜", coreIdentity = "旧书店店主",
+            facts = listOf(
+                CharacterFact("early", CharacterFactCategories.BIOGRAPHY,
+                    "第一幕在旧书店认识阿宁", temporalScope = "opening",
+                    provenance = CharacterFactProvenance.CANON),
+                CharacterFact("later", CharacterFactCategories.LIFE_GRAVITY,
+                    "第二幕需要看守红伞中的密信", temporalScope = "reveal",
+                    provenance = CharacterFactProvenance.CANON),
+            ),
+            loreEntries = listOf(PersonaLoreEntry(
+                id = "secret", title = "密信背景", content = "密信藏在红伞底部",
+                temporalScope = "reveal", alwaysOn = true,
+            )),
+            portrait = "旧字段称她已经知道全部密信秘密",
+        )
+        val created = gallery.save(
+            persona = person, sourceSessionId = "journey",
+            history = listOf(LocalHarnessMessage("m1", "user", "故事开始", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "旧书店的故事",
+            chatContext = ChatContextState().withStoryStageSelection("opening"),
+        )
+        val storyId = requireNotNull(created.storyId)
+        fun prompt(): String {
+            val loaded = ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            val context = loaded.story(storyId)!!.chatContext
+            val projected = CharacterRuntimeProjector(
+                ChatRelationshipEngine(), CharacterLoreEngine(),
+            ).project(loaded.persona, ChatCharacterState(), context,
+                "阿宁和密信的事情，你能不能告诉我？", null)
+            return projected.stablePrompt + projected.dynamicPrompt
+        }
+        val early = prompt()
+        assertTrue(early.contains("第一幕在旧书店认识阿宁"))
+        assertFalse(early.contains("第二幕需要看守红伞中的密信"))
+        assertFalse(early.contains("密信藏在红伞底部"))
+        assertFalse(early.contains("旧字段称她已经知道全部密信秘密"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "reveal"))
+        val later = prompt()
+        assertTrue(later.contains("第一幕在旧书店认识阿宁"))
+        assertTrue(later.contains("第二幕需要看守红伞中的密信"))
+        assertTrue(later.contains("密信藏在红伞底部"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "opening"))
+        assertFalse(prompt().contains("密信藏在红伞底部"))
+        assertEquals(2, ChatPersonaGalleryStore(file, json)
+            .findEntry(created.entry.id)!!.persona.facts.size)
+    }
+
+    @Test
     fun archivedStoryStageRemainsAuthoritativeOverStaleSessionSnapshots() {
         val file = File(temporary.newFolder("stage-owner"), "gallery.json")
         val store = ChatPersonaGalleryStore(file, json)
@@ -122,24 +174,32 @@ class ChatPersonaGalleryTest {
             id = "gallery-1",
             name = "小岚",
             coreIdentity = "花店店主",
-            portrait = "花店店主",
-            stableTraits = listOf("嘴硬心软"),
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "花店店主"),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+            ),
             hardConstraints = listOf("不会无故失约"),
         )
         val incoming = PersonaProfile(
             id = "temp",
             name = "小岚",
             coreIdentity = "花店店主",
-            portrait = "经营街角花店的店主",
-            stableTraits = listOf("嘴硬心软", "遇到重要的人会主动解释"),
+            facts = listOf(
+                CharacterFact("portrait", CharacterFactCategories.BIOGRAPHY, "经营街角花店的店主",
+                    provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("trait", CharacterFactCategories.PERSONALITY, "嘴硬心软"),
+                CharacterFact("trait-extra", CharacterFactCategories.PERSONALITY, "遇到重要的人会主动解释"),
+            ),
             hardConstraints = listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
         )
 
         assertTrue(samePersonaIdentity(base, incoming))
         val merged = mergePersonaProfiles(base, incoming)
 
-        assertEquals("经营街角花店的店主", merged.portrait)
-        assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"), merged.stableTraits)
+        assertEquals("经营街角花店的店主", merged.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals(listOf("嘴硬心软", "遇到重要的人会主动解释"),
+            merged.facts.filter { it.category == CharacterFactCategories.PERSONALITY }.map { it.content })
+        assertTrue(merged.portrait.isEmpty() && merged.stableTraits.isEmpty())
         assertEquals(
             listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
             merged.hardConstraints,
@@ -443,8 +503,36 @@ class ChatPersonaGalleryTest {
 
         val merged = applyPersonaSuggestions(profile, listOf(suggestion, phrase, phrase))
 
-        assertEquals("和用户是多年好友；私下会叫用户小名", merged.initialUserImpression)
-        assertEquals(listOf("少来"), merged.voiceSamples)
+        assertEquals("", merged.initialUserImpression)
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("和用户是多年好友"))
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("私下会叫用户小名"))
+        assertEquals("少来", merged.factText(CharacterFactCategories.VOICE_STYLE))
+        assertEquals(1, merged.facts.count {
+            it.category == CharacterFactCategories.VOICE_STYLE && it.content == "少来"
+        })
+    }
+
+    @Test
+    fun legacySuggestionNamesAppendToV4FactsWithoutOverwritingExistingUserFacts() {
+        val current = PersonaProfile(name = "小岚", coreIdentity = "设计师",
+            facts = listOf(CharacterFact("authored", CharacterFactCategories.PERSONALITY,
+                "平日沉稳", provenance = CharacterFactProvenance.USER_CREATED)))
+        val suggestions = listOf(
+            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "用户直接修正"),
+            PersonaAppendSuggestion("attentionBiases", "很在意钟表声音", "人物自己的观察"),
+            PersonaAppendSuggestion("lifeContext", "在独立工作室上班", "用户补充"),
+            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "重复建议"),
+        )
+        val result = applyPersonaSuggestions(current, suggestions)
+        assertEquals(current.facts.first(), result.facts.first())
+        assertTrue(result.factText(CharacterFactCategories.PERSONALITY).contains("遇到朋友时会开玩笑"))
+        assertTrue(result.factText(CharacterFactCategories.SENSORY_SIGNATURE).contains("钟表声音"))
+        assertTrue(result.factText(CharacterFactCategories.LIFE_GRAVITY).contains("独立工作室"))
+        assertEquals(1, result.facts.count { it.content == "遇到朋友时会开玩笑" })
+        assertEquals("", result.lifeContext)
+        assertEquals("", result.attentionBiases.joinToString())
     }
 
     @Test
@@ -468,7 +556,9 @@ class ChatPersonaGalleryTest {
         val imported = importedStore.importPersona(payload)
 
         assertEquals("小岚", imported.persona.name)
-        assertEquals("花店店主", imported.persona.portrait)
+        assertEquals("花店店主", imported.persona.factText(CharacterFactCategories.BIOGRAPHY))
+        assertEquals("嘴硬心软", imported.persona.factText(CharacterFactCategories.PERSONALITY))
+        assertTrue(imported.persona.portrait.isEmpty())
         assertEquals(listOf("客服腔"), imported.persona.bannedPhrases)
         assertTrue(imported.stories.isEmpty())
         assertFalse(imported.id == saved.id)
@@ -572,8 +662,9 @@ class ChatPersonaGalleryTest {
 
         assertEquals("原神", imported.persona.franchise)
         assertEquals("无剧透阶段", imported.persona.timelinePosition)
-        assertEquals(listOf("兼顾责任与真诚关系", "家族责任"), imported.persona.coreValues)
-        assertEquals(listOf("先观察再表达"), imported.persona.attentionBiases)
+        assertEquals("兼顾责任与真诚关系；家族责任", imported.persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS))
+        assertEquals("先观察再表达", imported.persona.factText(CharacterFactCategories.SENSORY_SIGNATURE))
+        assertTrue(imported.persona.coreValues.isEmpty() && imported.persona.attentionBiases.isEmpty())
         assertEquals(listOf("不知道未经历的后续剧情"), imported.persona.knowledgeBoundary)
         assertEquals("genshin-kamisato-ayaka", imported.persona.presetId)
         assertEquals("thoma", imported.persona.loreEntries.single().id)
@@ -620,7 +711,10 @@ class ChatPersonaGalleryTest {
 
         val merged = mergePersonaProfiles(base, incoming)
 
-        assertEquals(2, merged.coreValues.size)
+        assertEquals(setOf("保持选择权", "推动长期计划"),
+            merged.facts.filter { it.category == CharacterFactCategories.VALUES_AND_TRADEOFFS }
+                .map { it.content }.toSet())
+        assertTrue(merged.coreValues.isEmpty())
         assertEquals(2, merged.loreEntries.size)
         val hunters = merged.loreEntries.first { it.id == "hunters" }
         assertEquals(90, hunters.priority)
@@ -650,7 +744,9 @@ class ChatPersonaGalleryTest {
         val imported = ChatPersonaGalleryStore(File(temporary.root, "qr-imported.json"), Json)
             .importPersona(payload)
         assertEquals("阿青", imported.persona.name)
-        assertTrue(imported.persona.portrait.isNotBlank())
+        assertTrue(imported.persona.factText(CharacterFactCategories.BIOGRAPHY).startsWith("剑客"))
+        assertTrue(imported.persona.factText(CharacterFactCategories.PERSONALITY).startsWith("克制"))
+        assertTrue(imported.persona.portrait.isEmpty())
     }
 
     @Test

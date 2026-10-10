@@ -296,7 +296,7 @@ class ChatPersonaStore internal constructor(
         return upsert(current.copy(corrections = next))
     }
 
-    private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.copy(
+    private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.canonicalV4().let { profile -> profile.copy(
         id = profile.id.trim().take(80).ifBlank { PersonaProfile.DEFAULT_PERSONA_ID },
         name = profile.name.trim().take(80).ifBlank { "默认角色" },
         coreIdentity = profile.coreIdentity.trim().take(MAX_LONG_FIELD_CHARS),
@@ -335,7 +335,7 @@ class ChatPersonaStore internal constructor(
         bannedPhrases = cleanLines(profile.bannedPhrases, 30),
         corrections = cleanLines(profile.corrections, MAX_CORRECTIONS),
         behaviorTuning = profile.behaviorTuning.normalized(),
-    )
+    ) }
 
     private fun cleanLoreEntries(values: List<PersonaLoreEntry>): List<PersonaLoreEntry> =
         values.asSequence()
@@ -375,10 +375,12 @@ class ChatPersonaStore internal constructor(
     private fun read(): PersonaDocument {
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-        val document = durableFile.read(
+        val original = durableFile.read(
             defaultValue = ::PersonaDocument,
             decode = ::decodeDocument,
         )
+        val document = original.copy(personas = original.personas.map(PersonaProfile::canonicalV4))
+        if (document != original) write(document)
         cachedDocument = document
         cachedStamp = documentStamp()
         return document

@@ -286,7 +286,9 @@ internal fun prepareLocalModelAdapterRequest(
     val providerRequiresDisabledThinking = LocalModelPresets.chatTemperatureRangeFor(
         route.model, route.baseUrl,
     )?.requiresDisabledThinking == true
-    val routedTemperature = LocalModelPerformanceStore.current().constrainTemperature(temperature)
+    // The coordinator already froze the effective temperature with the request identity.
+    // Admission waits and retries must not re-read a newly changed global ceiling.
+    val routedTemperature = temperature
         ?.takeIf {
             route.capabilities.temperature &&
                 (reasoningEffort == null || reasoningEffort == "none") &&

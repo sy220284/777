@@ -8,6 +8,35 @@ import com.labteto.dshmobile.local.model.estimateModelTokens
  * Durable facts stay rich. The model sees a compact identity anchor plus a per-turn mode vector,
  * so character traits influence the reply without becoming a fixed performance checklist.
  */
+internal fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
+    // A new V4 identity is authoritative even before the first fact is filled in.
+    // Legacy-only profiles still retain their old runtime fallback until converted.
+    if (facts.isEmpty() && coreIdentity.isBlank()) return this
+    // A request-local projection preserves the stored sources and stage IDs. Even if
+    // all facts are future-gated, obsolete legacy prose must not be restored.
+    return copy(
+        facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
+            .map { it.copy(temporalScope = "") },
+        portrait = "",
+        lifeContext = "",
+        attentionBiases = emptyList(),
+        attentionKeywords = emptyList(),
+        perceptionBlindSpots = emptyList(),
+        quirks = emptyList(),
+        limitations = emptyList(),
+        coreValues = emptyList(),
+        coreTension = "",
+        stableTraits = emptyList(),
+        mutableTraits = emptyList(),
+        initialUserImpression = "",
+        voiceSamples = emptyList(),
+        // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
+        timelinePosition = "",
+        worldSetting = "",
+    )
+}
+
+
 internal class CharacterRuntimeProjector(
     private val relationshipEngine: ChatRelationshipEngine,
     private val loreEngine: CharacterLoreEngine,
@@ -54,34 +83,6 @@ internal class CharacterRuntimeProjector(
                 ),
                 relationshipEngine.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
-        )
-    }
-
-    private fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
-        // A new V4 identity is authoritative even before the first fact is filled in.
-        // Legacy-only profiles still retain their old runtime fallback until converted.
-        if (facts.isEmpty() && coreIdentity.isBlank()) return this
-        // A request-local projection preserves the stored sources and stage IDs. Even if
-        // all facts are future-gated, obsolete legacy prose must not be restored.
-        return copy(
-            facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
-                .map { it.copy(temporalScope = "") },
-            portrait = "",
-            lifeContext = "",
-            attentionBiases = emptyList(),
-            attentionKeywords = emptyList(),
-            perceptionBlindSpots = emptyList(),
-            quirks = emptyList(),
-            limitations = emptyList(),
-            coreValues = emptyList(),
-            coreTension = "",
-            stableTraits = emptyList(),
-            mutableTraits = emptyList(),
-            initialUserImpression = "",
-            voiceSamples = emptyList(),
-            // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
-            timelinePosition = "",
-            worldSetting = "",
         )
     }
 

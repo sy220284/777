@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.chat.LocalChatMemoryProjectionPort
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -17,9 +18,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** Settings-facing data facade for memory and DeepSeek accounting. */
 @Singleton
-class LocalSettingsDataFacade @Inject constructor(
+class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
+    private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
     private val usage: DeepSeekUsageTracker,
 ) {
@@ -32,7 +34,24 @@ class LocalSettingsDataFacade @Inject constructor(
 
     internal fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
-    internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord =
-        memoryManager.update(existing = existing, content = content, pinned = pinned)
-    internal fun forgetMemory(id: String): Boolean = memoryStore.forget(id)
+    internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
+        val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
+        recoverDiaryAfterMemorySave("记忆已保存")
+        return updated
+    }
+
+    internal fun forgetMemory(existing: MemoryRecord): Boolean {
+        val removed = memoryStore.forget(existing.id, existing.updatedAt)
+        if (removed) recoverDiaryAfterMemorySave("记忆已停用")
+        return removed
+    }
+    private fun recoverDiaryAfterMemorySave(savedMessage: String) {
+        try {
+            chatMemoryProjection.recoverPendingDiaryInvalidations()
+        } catch (error: Exception) {
+            throw IllegalStateException("$savedMessage，关联日记清理待恢复；重开或下次召回时会重试", error)
+        }
+    }
+    internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
+        memoryStore.listActiveFromMessage(sessionId, messageId)
 }

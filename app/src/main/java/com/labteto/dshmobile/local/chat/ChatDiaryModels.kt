@@ -47,6 +47,8 @@ data class ChatDiaryRevision(
     val sources: List<ChatDiarySourceRef> = emptyList(),
     val updatedAt: Long,
     val projectionId: String? = null,
+    /** A user-authored revision supersedes the generated summary without rewriting its source. */
+    val userCorrected: Boolean = false,
 )
 
 @Serializable
@@ -67,6 +69,9 @@ data class ChatDiaryEntry(
     val generation: Long = 0L,
     /** Newer active diary entry that replaced this entry's current meaning. Historical recall may still use it. */
     val supersededBy: String? = null,
+    /** User correction/disable of the replacement does not revive this obsolete meaning.
+     * Independent of the replacement row so pruning and persona transfer preserve the decision. */
+    val supersessionRetained: Boolean = false,
     val active: Boolean = true,
     val createdAt: Long,
     val updatedAt: Long,
@@ -76,6 +81,8 @@ data class ChatDiaryEntry(
 internal data class ChatDiaryDocument(
     val formatVersion: Int = 4,
     val entries: List<ChatDiaryEntry> = emptyList(),
+    /** Raw user-message sources explicitly invalidated by a later durable memory correction. */
+    val invalidatedSourceRefs: List<ChatDiarySourceRef> = emptyList(),
 )
 
 @Serializable

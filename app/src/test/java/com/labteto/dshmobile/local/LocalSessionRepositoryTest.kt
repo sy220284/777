@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +28,20 @@ import org.junit.rules.TemporaryFolder
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalSessionRepositoryTest {
     @get:Rule val temporary = TemporaryFolder()
+
+    @Test fun legacyMissingAndBlankIdsUseTheValidatedSessionIdentity() = runTest {
+        val missing = java.io.File(temporary.root, "legacy-missing.json")
+        missing.writeText("""{"title":"旧聊天","usageMode":"CHAT","messages":[]}""")
+        java.io.File(temporary.root, "legacy-blank.json").writeText(
+            """{"id":"","title":"空编号旧聊天","usageMode":"CHAT","messages":[]}""",
+        )
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        assertEquals(setOf("legacy-missing", "legacy-blank"), repository.summaries().map { it.id }.toSet())
+        assertEquals("legacy-missing", repository.read("legacy-missing")!!.id)
+        assertEquals("legacy-blank", repository.read("legacy-blank")!!.id)
+        repository.writeNow(repository.read("legacy-missing")!!)
+        assertEquals("legacy-missing", repository.read("legacy-missing")!!.id)
+    }
     @Test fun deletionCannotBeUndoneByQueuedSnapshots() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(LocalHarnessSession(id = "gone", title = "old"))
@@ -292,4 +307,116 @@ class LocalSessionRepositoryTest {
         assertTrue(failures.isEmpty())
     }
 
+
+    @Test fun reopenedSessionAndHistoryAuthorizationIgnoreNestedAgentTeamProjectionFiles() = runTest {
+        val id = "83b4f37f-fe6d-4213-97b6-8ca2251f825a"
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = id, title = "保留的聊天", updatedAt = 123L))
+        val sidecar = java.io.File(temporary.root, "$id.events.jsonl.projection-work.agent-team.json")
+            .apply { writeText("{}") }
+        val nested = java.io.File(
+            temporary.root,
+            "$id" + ".events.jsonl.projection-work.agent-team".repeat(4) + ".json",
+        ).apply { writeText("{}") }
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        assertEquals(listOf(id), reopened.summaries().map { it.id })
+        assertEquals("保留的聊天", reopened.read(id)?.title)
+
+        // History authorization calls summaries() before granting the current session's log.
+        // An unrelated derived checkpoint must not poison that access path.
+        val log = com.labteto.dshmobile.local.session.LocalSessionEventLog(
+            java.io.File(temporary.root, "$id.events.jsonl"), Json,
+        )
+        val access = com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator(
+            summaries = reopened::summaries,
+            currentSessionId = { id },
+            currentScope = { com.labteto.dshmobile.local.session.LocalSessionAccessScope(null, id) },
+            activeScope = { null },
+            eventLogFor = { log },
+        )
+        assertSame(log, access.authorizedLog(id))
+        log.append("user/message", kotlinx.serialization.json.buildJsonObject {
+            put("transcript", com.labteto.dshmobile.local.session.encodeTranscriptMessages(
+                listOf(LocalHarnessMessage("history-1", "user", "恢复出来的历史消息", createdAt = 1L)),
+            ))
+        })
+        val page = com.labteto.dshmobile.local.session.LocalSessionTranscriptPager(
+            access.authorizedLog(id),
+        ).page(limit = 10)
+        assertEquals("恢复出来的历史消息", page.messages.single().content)
+        assertTrue(failures.isEmpty())
+        assertTrue(sidecar.isFile)
+        assertTrue(nested.isFile)
+    }
+
+    @Test fun agentTeamProjectionInWorkSessionDoesNotHideOtherChatGroupOrWorkSessions() = runTest {
+        val cases = listOf(
+            LocalHarnessSession(id = "ordinary-chat", title = "单聊", updatedAt = 101L, usageMode = LocalUsageMode.CHAT,
+                projectId = "shared", lineageId = "lineage-chat"),
+            LocalHarnessSession(id = "work-with-team", title = "工作", updatedAt = 102L, usageMode = LocalUsageMode.WORK,
+                projectId = "shared", lineageId = "lineage-work"),
+            LocalHarnessSession(id = "group-chat", title = "群聊", updatedAt = 103L, usageMode = LocalUsageMode.CHAT,
+                projectId = "shared", lineageId = "lineage-group").withChatSessionDomain(
+                groupChat = LocalGroupChatState(mode = LocalChatMode.GROUP),
+            ),
+        )
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {},
+            domainCodecs = listOf(LocalChatSessionDomainCodec))
+        cases.forEach { repository.writeNow(it) }
+        val projection = java.io.File(
+            temporary.root, "work-with-team.events.jsonl.projection-work.agent-team.json",
+        ).apply { writeText("{}") }
+        val nested = java.io.File(
+            temporary.root,
+            "work-with-team.events.jsonl.projection-work.agent-team.events.jsonl.projection-work.agent-team.json",
+        ).apply { writeText("{}") }
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add,
+            domainCodecs = listOf(LocalChatSessionDomainCodec))
+        val sessions = reopened.summaries()
+        assertEquals(cases.map { it.id }.toSet(), sessions.map { it.id }.toSet())
+        assertEquals(2, sessions.count { it.usageMode == LocalUsageMode.CHAT })
+        assertEquals(1, sessions.count { it.usageMode == LocalUsageMode.WORK })
+        assertEquals(LocalChatMode.GROUP.name, sessions.single { it.id == "group-chat" }.chatMode)
+        cases.forEach { session -> assertEquals(session.title, reopened.read(session.id)?.title) }
+
+        val access = com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator(
+            summaries = reopened::summaries,
+            currentSessionId = { "ordinary-chat" },
+            currentScope = { com.labteto.dshmobile.local.session.LocalSessionAccessScope("shared", "lineage-chat") },
+            activeScope = { null },
+            eventLogFor = { id -> com.labteto.dshmobile.local.session.LocalSessionEventLog(
+                java.io.File(temporary.root, "$id.events.jsonl"), Json,
+            ) },
+        )
+        val workLog = access.authorizedLog("work-with-team")
+        workLog.append("user/message", kotlinx.serialization.json.buildJsonObject {
+            put("transcript", com.labteto.dshmobile.local.session.encodeTranscriptMessages(
+                listOf(LocalHarnessMessage("work-message", "user", "独立工作历史", createdAt = 1L)),
+            ))
+        })
+        val history = com.labteto.dshmobile.local.session.LocalSessionTranscriptPager(
+            access.authorizedLog("work-with-team"),
+        ).page(limit = 5)
+        assertEquals("独立工作历史", history.messages.single().content)
+        assertTrue(projection.isFile)
+        assertTrue(nested.isFile)
+        assertTrue(failures.isEmpty())
+    }
+
+    @Test fun corruptBackupForOneSessionDoesNotBlockHealthyConversationList() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "healthy", title = "正常会话", updatedAt = 100L))
+        repository.writeNow(LocalHarnessSession(id = "broken", title = "损坏会话", updatedAt = 101L))
+        assertTrue(java.io.File(temporary.root, "broken.json").delete())
+        java.io.File(temporary.root, "broken.backup.json").writeText("{broken")
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        val summaries = reopened.summaries()
+        assertEquals(listOf("healthy"), summaries.map { it.id })
+        assertEquals("正常会话", reopened.read("healthy")?.title)
+        assertEquals(1, failures.size)
+        assertTrue(java.io.File(temporary.root, "broken.backup.json").isFile)
+    }
 }

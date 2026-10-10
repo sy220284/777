@@ -12,6 +12,139 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class ChatDiaryStoreTest {
+
+    @Test
+    fun userDecisionDoesNotPreserveAnInvalidLegacySupersessionLink() {
+        val old = ChatDiaryEntry(id = "old", subjectKey = "gallery:a", personaName = "阿青",
+            event = "用户喜欢在雨天散步", supersededBy = "unrelated", createdAt = 1, updatedAt = 1)
+        val unrelated = old.copy(id = "unrelated", event = "用户喜欢在雨天散步",
+            disclosure = ChatDiaryDisclosure.PRIVATE, supersededBy = null)
+        val normalized = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            listOf(old, unrelated), setOf(unrelated.id), 2,
+        ).first()
+        assertNull(normalized.supersededBy)
+        assertTrue(!normalized.supersessionRetained)
+        assertTrue(ChatDiaryRecallEngine.search(listOf(normalized), "用户喜欢雨天散步", "gallery:a", false, 6).isNotEmpty())
+    }
+
+    @Test
+    fun invalidatingReplacementSourceDoesNotRestoreTheObsoleteAppointment() {
+        val diary = store()
+        val oldEvent = "两人约定周六上午十点在南门钟楼见面"
+        val newEvent = "见面安排改为周日下午三点在白桦咖啡馆"
+        val old = diary.record(request(ChatDiaryDelta(event = oldEvent, feeling = "我记住了这次约定", importance = 4),
+            userId = "u-old", assistantId = "a-old", evidence = oldEvent))!!
+        diary.record(request(ChatDiaryDelta(event = newEvent, feeling = "我按新安排准备", importance = 5),
+            userId = "u-new", assistantId = "a-new", evidence = newEvent))!!
+        assertEquals(1, diary.invalidateGeneratedFromMessage("s", "u-new"))
+        assertTrue(store().search("我们最后约定什么时候见", "gallery:a", false, 6).isEmpty())
+        assertTrue(store().search("最开始我们原来约的什么时候见", "gallery:a", false, 6).any { it.id == old.id })
+    }
+
+    @Test
+    fun disablingLatestReplacementRetainsTheWholePredecessorChain() {
+        val entries = listOf(
+            ChatDiaryEntry(id = "a", subjectKey = "gallery:a", personaName = "阿青",
+                event = "约定周六见面", supersededBy = "b", createdAt = 1, updatedAt = 1),
+            ChatDiaryEntry(id = "b", subjectKey = "gallery:a", personaName = "阿青",
+                event = "见面改为周日", supersededBy = "c", createdAt = 2, updatedAt = 2),
+            ChatDiaryEntry(id = "c", subjectKey = "gallery:a", personaName = "阿青",
+                event = "见面改为周一", createdAt = 3, updatedAt = 3),
+        )
+        val decided = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(entries, setOf("c"), 4)
+        val firstOnly = decided.filter { it.id == "a" }
+        assertTrue(firstOnly.single().supersessionRetained)
+        assertTrue(ChatDiaryRecallEngine.search(firstOnly, "最后约定什么时候见", "gallery:a", false, 6).isEmpty())
+        assertTrue(ChatDiaryRecallEngine.search(firstOnly, "最开始我们原来约的什么时候见", "gallery:a", false, 6).isNotEmpty())
+        assertTrue(decided.filter { it.id != "c" }.all { it.updatedAt == 4L })
+    }
+
+    @Test
+    fun disablingReplacementKeepsOldAppointmentHistoricalAcrossReloadPruningAndTransfer() {
+        val diary = store()
+        val oldEvent = "两人约定周六上午十点在南门钟楼见面"
+        val newEvent = "见面安排改为周日下午三点在白桦咖啡馆"
+        val old = diary.record(request(
+            ChatDiaryDelta(event = oldEvent, feeling = "我记住了这次约定", importance = 4),
+            userId = "u-old", assistantId = "a-old", evidence = oldEvent,
+        ))!!
+        val replacement = diary.record(request(
+            ChatDiaryDelta(event = newEvent, feeling = "我按新安排准备", importance = 5),
+            userId = "u-new", assistantId = "a-new", evidence = newEvent,
+        ))!!
+        assertTrue(diary.deactivateEntry("gallery:a", replacement.id, replacement.updatedAt))
+        val reloaded = store()
+        assertTrue(reloaded.search("我们最后约定什么时候见", "gallery:a", false, 6).isEmpty())
+        assertTrue(reloaded.search("最开始我们原来约的什么时候见", "gallery:a", false, 6).any { it.id == old.id })
+        val compacted = ChatDiaryEntryPolicy.compact(reloaded.listForTransfer("gallery:a"), 1, old.id)
+        assertEquals(listOf(old.id), compacted.map { it.id })
+        val target = ChatDiaryStore(File(temporary.root, "imported"), json)
+        target.importForTransfer("gallery:b", "新人物", compacted) { Unit }
+        assertTrue(target.search("我们最后约定什么时候见", "gallery:b", true, 6).isEmpty())
+        assertTrue(target.search("最开始我们原来约的什么时候见", "gallery:b", true, 6).isNotEmpty())
+        // Only an explicit correction of the predecessor makes it current again.
+        val predecessor = reloaded.listActive("gallery:a").single()
+        assertTrue(reloaded.correctEntry("gallery:a", predecessor.id, predecessor.updatedAt,
+            ChatDiaryDelta(event = "我们重新约好周六在南门钟楼见面")))
+        assertTrue(store().search("最后约定见面", "gallery:a", false, 6).any { it.id == old.id })
+    }
+
+    @Test
+    fun userCorrectionIsDurableTraceableAndVisibleInNextRecall() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "我们约好周末去海边", feeling = "非常期待", importance = 4),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val correction = ChatDiaryDelta(event = "我们约好周末去山上", feeling = "想早点出发")
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt, correction))
+        val reloaded = store().listActive("gallery:a").single()
+        assertEquals("我们约好周末去山上", reloaded.event)
+        assertEquals("想早点出发", reloaded.feeling)
+        assertTrue(reloaded.revisions.last().userCorrected)
+        assertEquals(saved.event, reloaded.revisions.first().event)
+        assertEquals(saved.sources, reloaded.sources)
+        assertTrue(store().search("周末去山上", "gallery:a", false, 4).any { it.id == saved.id })
+        assertTrue(store().search("周末去海边", "gallery:a", false, 4).none { it.event.contains("海边") })
+    }
+
+    @Test
+    fun staleRevisionOrOtherCharacterCannotModifyOrDisableDiary() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "用户说好下周看海", feeling = "记住了", importance = 4),
+            evidence = "用户说好下周看海",
+        ))!!
+        assertTrue(!diary.correctEntry("gallery:b", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "错误的另一人物事实")))
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "用户改约下周爬山")))
+        assertTrue(!diary.deactivateEntry("gallery:a", saved.id, saved.updatedAt))
+        val current = diary.listActive("gallery:a").single()
+        assertTrue(!diary.deactivateEntry("gallery:b", saved.id, current.updatedAt))
+        assertTrue(diary.deactivateEntry("gallery:a", saved.id, current.updatedAt))
+        assertTrue(store().listActive("gallery:a").isEmpty())
+        assertTrue(store().search("用户改约下周爬山", "gallery:a", false, 6).isEmpty())
+        assertTrue(!store().deactivateEntry("gallery:a", saved.id, current.updatedAt))
+    }
+
+    @Test
+    fun newGeneratedDiaryDoesNotSilentlyRefineUserCorrectedRevision() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "我们答应周末去公园", feeling = "很开心", importance = 4),
+            evidence = "我们答应周末去公园",
+        ))!!
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "我们答应周末去图书馆")))
+        diary.record(request(
+            delta = ChatDiaryDelta(event = "我们答应周末去公园", feeling = "很开心", importance = 4),
+            evidence = "我们答应周末去公园",
+            userId = "u-new", assistantId = "a-new",
+        ))
+        assertEquals("我们答应周末去图书馆",
+            diary.listActive("gallery:a").first { it.id == saved.id }.event)
+    }
     @get:Rule val temporary = TemporaryFolder()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private fun store() = ChatDiaryStore(File(temporary.root, "diary"), json)
@@ -993,6 +1126,33 @@ class ChatDiaryStoreTest {
         File(targetRoot, "diary.json").writeText("{broken")
         val recovered = ChatDiaryStore(targetRoot, json)
         assertTrue(recovered.listForTransfer("gallery:target").isEmpty())
+    }
+
+    @Test
+    fun cancellingOneCompanionsMeetingKeepsTheOthersMemoryAcrossModesAndReload() {
+        val memory = store()
+        val anNing = "用户约定和阿宁周六在南门钟楼见面"
+        val aZi = "用户约定和阿紫周日在西桥书店见面"
+        val cancel = "用户取消和阿紫周日在西桥书店见面"
+        val original = memory.record(request(
+            delta = ChatDiaryDelta(event = anNing, feeling = "我记住了阿宁的安排", importance = 4),
+            userId = "u-ning", assistantId = "a-ning", evidence = anNing,
+        ))!!
+        memory.record(request(
+            delta = ChatDiaryDelta(event = aZi, feeling = "我记住了阿紫的安排", importance = 4),
+            userId = "u-zi", assistantId = "a-zi", evidence = aZi,
+        ))!!
+        memory.record(request(
+            delta = ChatDiaryDelta(event = cancel, feeling = "阿紫这次取消了", importance = 4),
+            userId = "u-cancel", assistantId = "a-cancel", evidence = cancel,
+        ))!!
+        val recovered = store()
+        assertEquals(null, recovered.listActive("gallery:a")
+            .first { it.id == original.id }.supersededBy)
+        val direct = recovered.search("阿宁周六南门钟楼见面", "gallery:a", false, 6)
+        val group = recovered.search("阿宁周六南门钟楼见面", "gallery:a", true, 6)
+        assertTrue(direct.any { it.id == original.id })
+        assertEquals(direct.map { it.id }, group.map { it.id })
     }
 
     private fun request(

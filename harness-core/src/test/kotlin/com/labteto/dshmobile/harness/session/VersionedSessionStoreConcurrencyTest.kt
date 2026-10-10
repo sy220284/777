@@ -62,4 +62,35 @@ class VersionedSessionStoreConcurrencyTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun separateStoresRegisterConcurrentlyWithoutLosingSessionIdentities() {
+        val root = Files.createTempDirectory("session-catalog-concurrent").toFile()
+        val pool = Executors.newFixedThreadPool(4)
+        val start = CountDownLatch(1)
+        try {
+            val stores = List(4) { VersionedSessionStore(root, Json) }
+            val tasks = stores.mapIndexed { worker, store ->
+                pool.submit {
+                    check(start.await(5, TimeUnit.SECONDS))
+                    repeat(20) { index ->
+                        store.write("session-$worker-$index", buildJsonObject { put("worker", worker) })
+                    }
+                }
+            }
+            start.countDown()
+            tasks.forEach { it.get(20, TimeUnit.SECONDS) }
+            val expected = (0 until 4).flatMap { worker ->
+                (0 until 20).map { index -> "session-$worker-$index" }
+            }.toSet()
+            val reopened = VersionedSessionStore(root, Json)
+            assertEquals(expected, reopened.ids().toSet())
+            assertTrue(expected.all { reopened.read(it) != null })
+        } finally {
+            start.countDown()
+            pool.shutdownNow()
+            pool.awaitTermination(5, TimeUnit.SECONDS)
+            root.deleteRecursively()
+        }
+    }
 }

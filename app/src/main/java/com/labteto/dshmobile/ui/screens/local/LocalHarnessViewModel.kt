@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
@@ -29,6 +30,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -61,11 +63,32 @@ class LocalHarnessViewModel @Inject constructor(
         null
     }
 
+    internal fun deviceReadinessForHandoff(): Pair<Boolean, Boolean> =
+        readDeviceCapabilityState().let { it.accessibility to it.notifications }
+
+    internal suspend fun externalReadinessForHandoff(): Pair<Boolean?, Boolean?> = try {
+        toolsUi.handoffExternalReadiness()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null to null
+    }
+
     internal fun workHandoffCapabilityReadiness(
         task: String,
         githubConfigured: Boolean?,
         networkSearchEnabled: Boolean,
-    ) = toolsUi.workHandoffCapabilityReadiness(task, githubConfigured, networkSearchEnabled)
+        modelConfigured: Boolean?,
+        mcpToolsAvailable: Boolean?,
+        pluginsInstalled: Boolean?,
+        accessibilityActive: Boolean?,
+        notificationAccessActive: Boolean?,
+    ) = toolsUi.workHandoffCapabilityReadiness(
+        task, githubConfigured, networkSearchEnabled,
+        showModelStatus = true, modelConfigured = modelConfigured,
+        mcpToolsAvailable = mcpToolsAvailable, pluginsInstalled = pluginsInstalled,
+        accessibilityActive = accessibilityActive, notificationAccessActive = notificationAccessActive,
+    )
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
@@ -195,6 +218,13 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
+    internal suspend fun correctDiaryEntry(
+        subjectKey: String, id: String, revision: Long, correction: ChatDiaryDelta,
+    ): Boolean = withContext(Dispatchers.IO) {
+        runtime.chat.correctDiaryEntry(subjectKey, id, revision, correction)
+    }
+    internal suspend fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long): Boolean =
+        withContext(Dispatchers.IO) { runtime.chat.deactivateDiaryEntry(subjectKey, id, revision) }
     fun createGroupChatSession(ids: List<String>): Boolean {
         val distinctIds = ids.distinct()
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
@@ -261,6 +291,11 @@ class LocalHarnessViewModel @Inject constructor(
     fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
         runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
+    internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
+    fun linkRequirementEvidenceForUi(
+        sessionId: String, index: Int,
+        artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
+    ) = runtime.work.linkRequirementEvidenceForUi(sessionId, index, artifact)
     fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
     fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)

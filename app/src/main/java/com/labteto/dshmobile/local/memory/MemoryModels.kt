@@ -55,6 +55,8 @@ data class MemoryRecord(
      * full provenance is no longer available.
      */
     val hasUnboundSource: Boolean = true,
+    /** Durable outbox: committed with a correction/disable; cleared only after the derived-source consumer commits invalidation. */
+    val pendingSourceInvalidations: List<MemorySourceRef> = emptyList(),
     /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
     val subjectKey: String? = null,
     /** Disclosure metadata. Exact facts for their owning character remain recallable in group chat; this must not gate factual recall. */

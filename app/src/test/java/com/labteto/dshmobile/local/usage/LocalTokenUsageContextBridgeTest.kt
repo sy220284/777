@@ -59,6 +59,32 @@ class LocalTokenUsageContextBridgeTest {
     }
 
     @Test
+    fun duplicateCallIdsStayBoundToCapturedSessionAfterForegroundSwitch() {
+        val root = Files.createTempDirectory("usage-cross-session").toFile()
+        try {
+            val first = LocalSessionEventLog(File(root, "a.jsonl"), json)
+            val second = LocalSessionEventLog(File(root, "b.jsonl"), json)
+            checkpoint(first, "task-a", null, "shared-call")
+            checkpoint(second, "task-b", null, "shared-call")
+            val bridge = LocalTokenUsageContextBridge(
+                sessionFacts = { LocalTokenUsageSessionFacts(LocalUsageMode.WORK, it) },
+                eventLogFor = { if (it == "session-a") first else second },
+                currentSessionId = { "session-b" },
+            )
+            assertEquals("task-a", bridge.resolve(
+                "session-a", "shared-call", TokenUsageAction.WORK_MAIN,
+            ).taskRunId)
+            assertEquals("task-b", bridge.resolve(
+                "session-b", "shared-call", TokenUsageAction.WORK_MAIN,
+            ).taskRunId)
+            first.close()
+            second.close()
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun oldAccountingPayloadRemainsReadableWithoutTaskRoot() {
         val context = json.decodeFromString(TokenUsageContext.serializer(), """{"mode":"WORK","runId":"child","parentRunId":"root"}""")
         assertNull(context.taskRunId)

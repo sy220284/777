@@ -196,7 +196,8 @@ class ChatPersonaGalleryStore internal constructor(
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
     ): PersonaGallerySaveOutcome {
-        val savedPersona = persona.copy(loreEntries = uniqueLoreEntryIds(persona.loreEntries))
+        val canonical = persona.canonicalV4()
+        val savedPersona = canonical.copy(loreEntries = uniqueLoreEntryIds(canonical.loreEntries))
         val doc = readNormalized()
         val explicit = existingId?.let { id -> doc.entries.firstOrNull { it.id == id } }
         val compatible = if (explicit == null) {
@@ -517,7 +518,9 @@ class ChatPersonaGalleryStore internal constructor(
         require(document.version == 5) {
             "人物图集版本不受支持"
         }
-        val entries = document.entries.map(history::migrate)
+        val entries = document.entries.map(history::migrate).map { entry ->
+            entry.copy(persona = entry.persona.canonicalV4())
+        }
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         val recovered = recoverDurableHistoryExclusions(normalized)

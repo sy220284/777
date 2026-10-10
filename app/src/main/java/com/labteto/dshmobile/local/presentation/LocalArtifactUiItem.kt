@@ -7,4 +7,6 @@ data class LocalArtifactUiItem(
     val sourceCallId: String?,
     val asOfSequence: Long,
     val currentlyAvailable: Boolean? = null,
+    val versionAtCreation: String? = null,
+    val versionNow: String? = null,
 )

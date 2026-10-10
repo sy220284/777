@@ -137,20 +137,27 @@ class MemoryStore internal constructor(
         kind: MemoryKind? = null,
         importance: Int? = null,
         pinned: Boolean? = null,
+        expectedUpdatedAt: Long? = null,
     ): MemoryRecord {
         val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         require(index >= 0) { "长期记忆不存在或已停用：$id" }
         val current = records[index]
+        require(expectedUpdatedAt == null || current.updatedAt == expectedUpdatedAt) {
+            "记忆已被其他操作更新，请刷新后重试"
+        }
         val clean = content?.trim() ?: current.content
         require(clean.length <= MAX_MEMORY_CONTENT_CHARS) { "记忆正文超过单条存储安全上限，原记录已保留；请拆分保存" }
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
         val updated = current.copy(
             content = clean,
+            pendingSourceInvalidations = if (clean != current.content) {
+                (current.pendingSourceInvalidations + current.sourceMessages).distinct()
+            } else current.pendingSourceInvalidations,
             kind = kind ?: current.kind,
             importance = (importance ?: current.importance).coerceIn(0, 100),
             pinned = pinned ?: current.pinned,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
         )
         records[index] = updated
         documents.write(MemoryDocument(records = records))
@@ -158,16 +165,42 @@ class MemoryStore internal constructor(
     }
 
     @Synchronized
-    fun forget(id: String): Boolean {
+    fun forget(id: String, expectedUpdatedAt: Long? = null): Boolean {
         val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         if (index < 0) return false
-        records[index] = records[index].copy(
+        val current = records[index]
+        require(expectedUpdatedAt == null || current.updatedAt == expectedUpdatedAt) {
+            "记忆已被其他操作更新，请刷新后重试"
+        }
+        records[index] = current.copy(
             active = false,
+            pendingSourceInvalidations =
+                (current.pendingSourceInvalidations + current.sourceMessages).distinct(),
             supersededBy = null,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
         )
         documents.write(MemoryDocument(records = records))
+        return true
+    }
+
+    @Synchronized
+    internal fun pendingSourceInvalidations(): List<MemoryRecord> =
+        documents.read().records.filter { it.pendingSourceInvalidations.isNotEmpty() }
+
+    /** A concurrent correction must keep its newer cleanup obligation. */
+    @Synchronized
+    internal fun acknowledgeSourceInvalidation(expected: MemoryRecord): Boolean {
+        val document = documents.read()
+        val index = document.records.indexOfFirst { it.id == expected.id }
+        if (index < 0) return false
+        val current = document.records[index]
+        if (current.updatedAt != expected.updatedAt ||
+            current.pendingSourceInvalidations != expected.pendingSourceInvalidations
+        ) return false
+        val records = document.records.toMutableList()
+        records[index] = current.copy(pendingSourceInvalidations = emptyList())
+        documents.write(document.copy(records = records))
         return true
     }
 
@@ -411,6 +444,27 @@ class MemoryStore internal constructor(
         .sortedByDescending(MemoryRecord::updatedAt)
         .take(limit.coerceIn(1, MAX_RECORDS))
         .toList()
+
+    /**
+     * Source lookup for an explicitly selected user message. This exact identity can cross
+     * scopes without exposing another session's or character's unrelated memories.
+     * Older unbound records must not be guessed as originating from this message.
+     */
+    @Synchronized
+    fun listActiveFromMessage(
+        sourceSessionId: String,
+        sourceMessageId: String,
+        limit: Int = 100,
+    ): List<MemoryRecord> {
+        if (sourceSessionId.isBlank() || sourceMessageId.isBlank()) return emptyList()
+        return documents.read().records.asSequence()
+            .filter { it.active && it.sourceMessages.any { source ->
+                source.sessionId == sourceSessionId && source.messageId == sourceMessageId
+            } }
+            .sortedByDescending(MemoryRecord::updatedAt)
+            .take(limit.coerceIn(1, MAX_RECORDS))
+            .toList()
+    }
 
     private fun lexicalScore(record: MemoryRecord, queryTerms: Set<String>): Int {
         if (queryTerms.isEmpty()) return 0
