@@ -225,6 +225,48 @@ class CharacterFactsV4Test {
         assertEquals(CharacterFactProvenance.UNVERIFIED, merged.single().provenance)
     }
 
+    @Test fun explicitStoryVisitsPreserveEarlierKnowledgeAndRewindRevokesLaterKnowledge() {
+        val profile = PersonaProfile(facts = listOf(
+            CharacterFact("a", CharacterFactCategories.BIOGRAPHY, "第一幕的秘密", temporalScope = "act-1"),
+            CharacterFact("b", CharacterFactCategories.BIOGRAPHY, "第二幕的秘密", temporalScope = "act-2"),
+            CharacterFact("c", CharacterFactCategories.BIOGRAPHY, "第三幕的秘密", temporalScope = "act-3"),
+        ))
+        val first = ChatContextState().withStoryStageSelection("act-1")
+        val second = first.withStoryStageSelection("act-2")
+        assertEquals(listOf("act-1", "act-2"), second.unlockedStoryStages)
+        assertEquals(listOf("a", "b"),
+            profile.visibleFacts(second.storyStage, second.visibleStoryStages()).map(CharacterFact::id))
+        val restored = json.decodeFromString(ChatContextState.serializer(),
+            json.encodeToString(ChatContextState.serializer(), second))
+        assertEquals(second, restored)
+        val third = restored.withStoryStageSelection("act-3")
+        assertEquals(3, profile.visibleFacts(third.storyStage, third.visibleStoryStages()).size)
+        val rewind = third.withStoryStageSelection("act-1")
+        assertEquals(listOf("act-1"), rewind.unlockedStoryStages)
+        assertEquals(listOf("a"),
+            profile.visibleFacts(rewind.storyStage, rewind.visibleStoryStages()).map(CharacterFact::id))
+        val reset = rewind.withStoryStageSelection("")
+        assertTrue(reset.visibleStoryStages().isEmpty())
+        assertTrue(profile.visibleFacts(reset.storyStage, reset.visibleStoryStages()).isEmpty())
+    }
+
+    @Test fun runtimeProjectionUsesOnlyExplicitVisitedStagePath() {
+        val profile = PersonaProfile(name = "叶澜", coreIdentity = "旅行者", facts = listOf(
+            CharacterFact("a", CharacterFactCategories.BIOGRAPHY,
+                "第一幕在旧桥见过阿宁", temporalScope = "opening", provenance = CharacterFactProvenance.CANON),
+            CharacterFact("b", CharacterFactCategories.BIOGRAPHY,
+                "第二幕在雨夜找到线索", temporalScope = "later", provenance = CharacterFactProvenance.CANON),
+        ))
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val second = ChatContextState().withStoryStageSelection("opening").withStoryStageSelection("later")
+        val output = projector.project(profile, ChatCharacterState(), second, "阿宁与你有哪些共同经历？", null)
+        assertTrue(output.stablePrompt.contains("旧桥见过阿宁"))
+        assertTrue(output.stablePrompt.contains("雨夜找到线索"))
+        val rewind = projector.project(profile, ChatCharacterState(),
+            second.withStoryStageSelection("opening"), "阿宁与你有哪些共同经历？", null)
+        assertFalse((rewind.stablePrompt + rewind.dynamicPrompt).contains("雨夜找到线索"))
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),
