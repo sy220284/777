@@ -62,7 +62,8 @@ internal object ChatMemorySelector {
         "前任", "暧昧", "关系", "在一起", "分手", "复合",
     )
     private val IMPLICIT_CONTINUITY_HINTS = listOf(
-        "那件事", "那后来", "后来怎么样", "最后怎么样", "最后怎么", "答应过", "说好了",
+        "那件事", "那后来", "那以后", "那之后", "从那次起", "后来怎么样",
+        "最后怎么样", "最后怎么", "答应过", "说好了",
         "原来的安排", "照原来", "照旧", "按原来", "还是原来", "别像上次",
     )
     private val RESET_HINTS = listOf(
