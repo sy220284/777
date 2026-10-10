@@ -18,7 +18,8 @@ internal object LocalTaskCapabilityReadinessProjector {
     )
     private val webNegations = listOf(
         "不联网", "不用联网", "无需联网", "不要联网", "离线处理", "不要网页搜索",
-        "不用网页搜索", "禁止网络搜索", "不用web_search", "no web search",
+        "不用网页搜索", "不需要网页搜索", "无需网页搜索", "不需要网络搜索",
+        "禁止网络搜索", "不用web_search", "no web search",
     )
 
     /**
