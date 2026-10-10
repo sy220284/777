@@ -335,4 +335,59 @@ class LocalSessionRepositoryTest {
         assertTrue(sidecar.isFile)
         assertTrue(nested.isFile)
     }
+
+    @Test fun agentTeamProjectionInWorkSessionDoesNotHideOtherChatGroupOrWorkSessions() = runTest {
+        val cases = listOf(
+            LocalHarnessSession(id = "ordinary-chat", title = "单聊", updatedAt = 101L, usageMode = LocalUsageMode.CHAT,
+                projectId = "shared", lineageId = "lineage-chat"),
+            LocalHarnessSession(id = "work-with-team", title = "工作", updatedAt = 102L, usageMode = LocalUsageMode.WORK,
+                projectId = "shared", lineageId = "lineage-work"),
+            LocalHarnessSession(id = "group-chat", title = "群聊", updatedAt = 103L, usageMode = LocalUsageMode.CHAT,
+                projectId = "shared", lineageId = "lineage-group").withChatSessionDomain(
+                groupChat = LocalGroupChatState(mode = LocalChatMode.GROUP),
+            ),
+        )
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {},
+            domainCodecs = listOf(LocalChatSessionDomainCodec))
+        cases.forEach { repository.writeNow(it) }
+        val projection = java.io.File(
+            temporary.root, "work-with-team.events.jsonl.projection-work.agent-team.json",
+        ).apply { writeText("{}") }
+        val nested = java.io.File(
+            temporary.root,
+            "work-with-team.events.jsonl.projection-work.agent-team.events.jsonl.projection-work.agent-team.json",
+        ).apply { writeText("{}") }
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add,
+            domainCodecs = listOf(LocalChatSessionDomainCodec))
+        val sessions = reopened.summaries()
+        assertEquals(cases.map { it.id }.toSet(), sessions.map { it.id }.toSet())
+        assertEquals(2, sessions.count { it.usageMode == LocalUsageMode.CHAT })
+        assertEquals(1, sessions.count { it.usageMode == LocalUsageMode.WORK })
+        assertEquals(LocalChatMode.GROUP.name, sessions.single { it.id == "group-chat" }.chatMode)
+        cases.forEach { session -> assertEquals(session.title, reopened.read(session.id)?.title) }
+
+        val access = com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator(
+            summaries = reopened::summaries,
+            currentSessionId = { "ordinary-chat" },
+            currentScope = { com.labteto.dshmobile.local.session.LocalSessionAccessScope("shared", "lineage-chat") },
+            activeScope = { null },
+            eventLogFor = { id -> com.labteto.dshmobile.local.session.LocalSessionEventLog(
+                java.io.File(temporary.root, "$id.events.jsonl"), Json,
+            ) },
+        )
+        val workLog = access.authorizedLog("work-with-team")
+        workLog.append("user/message", kotlinx.serialization.json.buildJsonObject {
+            put("transcript", com.labteto.dshmobile.local.session.encodeTranscriptMessages(
+                listOf(LocalHarnessMessage("work-message", "user", "独立工作历史", createdAt = 1L)),
+            ))
+        })
+        val history = com.labteto.dshmobile.local.session.LocalSessionTranscriptPager(
+            access.authorizedLog("work-with-team"),
+        ).page(limit = 5)
+        assertEquals("独立工作历史", history.messages.single().content)
+        assertTrue(projection.isFile)
+        assertTrue(nested.isFile)
+        assertTrue(failures.isEmpty())
+    }
 }
