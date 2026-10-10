@@ -502,13 +502,13 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
                     color = DsTheme.colors.labelPrimary,
                 )
                 Text(
-                    persona.portrait.ifBlank { subtitle },
+                    persona.coreIdentity.ifBlank { subtitle },
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (persona.portrait.isNotBlank()) {
+                if (persona.coreIdentity.isNotBlank()) {
                     Text(subtitle, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
                 }
             }
@@ -553,42 +553,47 @@ internal fun GalleryPill(text: String) {
 
 @Composable
 internal fun PersonaDetails(persona: PersonaProfile) {
-    val scalarSections = listOf(
-        stringResource(R.string.persona_field_portrait) to persona.portrait,
-        stringResource(R.string.persona_field_life_context) to persona.lifeContext,
-        stringResource(R.string.persona_field_core_tension) to persona.coreTension,
-        stringResource(R.string.persona_field_user_impression) to persona.initialUserImpression,
-        stringResource(R.string.persona_field_world_setting) to persona.worldSetting,
+    val scalars = listOf(
+        stringResource(R.string.persona_v4_core_identity) to persona.coreIdentity,
         stringResource(R.string.persona_field_franchise) to persona.franchise,
-        stringResource(R.string.persona_field_timeline) to persona.timelinePosition,
     ).filter { it.second.isNotBlank() }
-    val listSections = listOf(
-        stringResource(R.string.persona_field_attention) to persona.attentionBiases,
-        stringResource(R.string.persona_field_blind_spots) to persona.perceptionBlindSpots,
-        stringResource(R.string.persona_field_quirks) to persona.quirks,
-        stringResource(R.string.persona_field_limitations) to persona.limitations,
-        stringResource(R.string.persona_field_core_values) to persona.coreValues,
-        stringResource(R.string.persona_field_stable_traits) to persona.stableTraits,
-        stringResource(R.string.persona_field_mutable_traits) to persona.mutableTraits,
-        stringResource(R.string.persona_field_voice_samples) to persona.voiceSamples,
-        stringResource(R.string.persona_field_knowledge_boundary) to persona.knowledgeBoundary,
-        stringResource(R.string.persona_field_lore) to persona.loreEntries.map { entry ->
-            entry.title.ifBlank { entry.content.take(80) }
-        },
-        stringResource(R.string.persona_field_constraints) to persona.hardConstraints,
-        stringResource(R.string.persona_field_banned) to persona.bannedPhrases,
-        stringResource(R.string.persona_field_corrections) to persona.corrections,
-    ).filter { it.second.isNotEmpty() }
-
-    if (scalarSections.isEmpty() && listSections.isEmpty()) return
+    val details = persona.facts.filter { it.content.isNotBlank() }
+    if (scalars.isEmpty() && details.isEmpty() && persona.loreEntries.isEmpty()) return
     DsCard {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
             style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
-        scalarSections.forEach { (title, value) -> PersonaDetailRow(title, value) }
-        listSections.forEach { (title, values) -> PersonaDetailRow(title, values.joinToString("；")) }
+        scalars.forEach { (title, value) -> PersonaDetailRow(title, value) }
+        details.forEach { fact ->
+            val labelRes = when (fact.category) {
+                "personality" -> R.string.persona_v4_personality
+                "selfNarrative" -> R.string.persona_v4_self_narrative
+                "identityGap" -> R.string.persona_v4_identity_gap
+                "valuesAndTradeoffs" -> R.string.persona_v4_values_tradeoffs
+                "subjectiveBeliefs" -> R.string.persona_v4_subjective_beliefs
+                "biography" -> R.string.persona_v4_biography
+                "definingChoices" -> R.string.persona_v4_defining_choices
+                "emotionalImprints" -> R.string.persona_v4_emotional_imprints
+                "lifeGravity" -> R.string.persona_v4_life_gravity
+                "unfinishedBusiness" -> R.string.persona_v4_unfinished_business
+                "relationships" -> R.string.persona_v4_relationships
+                "limitsAndCosts" -> R.string.persona_v4_limits_costs
+                "sensorySignature" -> R.string.persona_v4_sensory_signature
+                "preferencesAndHabits" -> R.string.persona_v4_preferences_habits
+                "voiceStyle" -> R.string.persona_v4_voice_style
+                "customFacts" -> R.string.persona_v4_custom_facts
+                else -> null
+            }
+            PersonaDetailRow(labelRes?.let { stringResource(it) } ?: fact.category, fact.content)
+        }
+        if (persona.loreEntries.isNotEmpty()) {
+            PersonaDetailRow(
+                stringResource(R.string.persona_field_lore),
+                persona.loreEntries.joinToString("；") { it.title.ifBlank { it.content.take(80) } },
+            )
+        }
     }
 }
 

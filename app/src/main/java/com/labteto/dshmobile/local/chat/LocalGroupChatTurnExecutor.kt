@@ -516,9 +516,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             observers.forEach { (member, persona) ->
                 appendLine()
                 appendLine("===== 在场旁观人物 ${member.galleryId} / ${persona.name} =====")
-                appendLine("人物底色：${persona.portrait.take(320)}")
-                if (persona.coreValues.isNotEmpty()) appendLine("真正重要：${persona.coreValues.take(3).joinToString("；")}")
-                persona.initialUserImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户初始印象：${it.take(180)}") }
+                appendLine("人物身份：${persona.coreIdentity.take(320)}")
+                persona.factText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
+                    ?.let { appendLine("稳定性格：${it.take(180)}") }
+                persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
+                    ?.let { appendLine("价值取舍：${it.take(180)}") }
                 appendLine(
                     "当前心理：情绪=${member.chatState.mood}｜关系=${member.chatState.relationshipState}｜" +
                         "关注=${member.chatState.currentFocus.take(120).ifBlank { "无" }}｜" +
