@@ -130,7 +130,6 @@ def is_test_tooling(path: str) -> bool:
     return path.startswith(
         (
             "tools/reference-validation/",
-            "tools/capture/",
             "reference-validation/",
             "upstream/",
         )

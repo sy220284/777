@@ -40,6 +40,7 @@ class HostsStore @Inject constructor(
     private val retiredStringKeys = listOf(
         "hosts_json", "hosts_json_backup", "desired_host_id",
         "last_sessions_json", "last_sessions_json_backup",
+        "harness_sessions_json", "harness_sessions_json_backup",
         "relay_tokens_json", "relay_tokens_json_backup",
     ).map(::stringPreferencesKey)
 

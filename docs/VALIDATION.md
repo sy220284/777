@@ -224,6 +224,12 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - model history 无缓存重复计数。
 - 已知高频路径的阻塞 / 重算模式。
 
+## 旧远程版本升级清理验收
+
+- Android 仪器化测试使用旧版本的 DataStore 键名构造主机、远程会话、Harness Cookie、配对 token 及旧通知配置，执行当前迁移清理，核实主副本与旧开关均消失。
+- 同一测试保留本机通知、主题、头像、背景、阅读设置、会话排序以及独立的本机 Webhook 凭据数据，重复清理仍保持一致；Keystore 专项验证旧中继密钥被删除且无关密钥保留。
+- CI 覆盖迁移逻辑与 Android 16/17 仪器化验证；真实旧版 APK 安装后覆盖升级属于另行设备验收，不能仅用数据夹具测试冒充已做 APK 原地升级。
+
 ## 功能专项验证
 
 新增能力必须在通用 CI 外补自己的专项测试。
@@ -266,7 +272,6 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 并发 pending reservation 只按当前在途估算量做有界等待；已有累计 exposure 不得阻塞后续请求。单个请求仍必须遵守当前路由上下文窗口 / operational limit，pending 释放语义与请求次数护栏保持有效。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
 - Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
-- 远程会话异步请求必须绑定发起时的 host/session scope：快速切换会话或主机后，旧请求的成功结果、失败结果、loading 结算和错误横幅都不得写入当前界面；host-scoped plugin/preset/catalog 同样必须拒绝旧 host 结果。
 - “上次打开会话”持久化必须 latest-wins：并发 A→B 快速切换时，即使 A 的持久化更慢，最终落盘也必须是 B；不得依赖协程调度顺序。
 
 当前高风险领域：
