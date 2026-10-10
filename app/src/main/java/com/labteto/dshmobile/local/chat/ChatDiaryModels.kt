@@ -78,6 +78,8 @@ data class ChatDiaryEntry(
 internal data class ChatDiaryDocument(
     val formatVersion: Int = 4,
     val entries: List<ChatDiaryEntry> = emptyList(),
+    /** Raw user-message sources explicitly invalidated by a later durable memory correction. */
+    val invalidatedSourceRefs: List<ChatDiarySourceRef> = emptyList(),
 )
 
 @Serializable

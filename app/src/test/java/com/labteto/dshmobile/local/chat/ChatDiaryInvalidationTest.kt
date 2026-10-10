@@ -32,6 +32,23 @@ class ChatDiaryInvalidationTest {
         assertEquals(0, store().invalidateGeneratedFromMessage("chat-a", "u-one"))
     }
 
+
+    @Test fun cancelledOldSummaryCannotReappearAfterDelayedAsynchronousConsolidation() {
+        val original = write("chat-a", "u-late", "旧记忆：答应坐火车")
+        assertEquals(1, store().invalidateGeneratedFromMessage("chat-a", "u-late"))
+        assertTrue(store().listActive("gallery:a").isEmpty())
+        assertEquals(null, store().record(ChatDiaryWriteRequest(
+            subjectKey = "gallery:a", personaName = "阿白",
+            delta = ChatDiaryDelta(event = "旧记忆：答应坐火车", importance = 4),
+            turnSignificance = "important", sourceMode = ChatDiarySourceMode.DIRECT,
+            sourceSessionId = "chat-a", sourceUserMessageIds = listOf("u-late"),
+            sourceAssistantMessageIds = listOf("answer-u-late"),
+            evidenceText = "旧记忆：答应坐火车", generation = 0L,
+        )))
+        assertTrue(store().listActive("gallery:a").isEmpty())
+        assertTrue(original.id.isNotBlank())
+    }
+
     @Test fun explicitAuthorCorrectionOfDiarySurvivesLaterMemoryInvalidation() {
         val current = write("chat-b", "u-three", "用户会参加晚会")
         assertTrue(store().correctEntry("gallery:a", current.id, current.updatedAt,

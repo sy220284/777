@@ -22,6 +22,14 @@ internal class ChatDiaryStore(
         val delta = ChatDiaryEntryPolicy.sanitizeDelta(request) ?: return null
         val now = System.currentTimeMillis()
         val document = documents.read()
+        // Late asynchronous background consolidation must not regenerate a stale diary
+        // using a message whose durable fact was already explicitly corrected.
+        if (request.sourceUserMessageIds.any { id ->
+                document.invalidatedSourceRefs.any { source ->
+                    source.sessionId == request.sourceSessionId && source.userMessageId == id
+                }
+            }
+        ) return null
         request.projectionId?.let { id ->
             document.entries.firstOrNull { entry -> entry.revisions.any { it.projectionId == id } }
                 ?.let { return it }
@@ -82,7 +90,7 @@ internal class ChatDiaryStore(
         }
 
         documents.write(
-            ChatDiaryDocument(
+            document.copy(
                 entries = ChatDiaryEntryPolicy.compact(
                     entries = entries,
                     maxEntries = MAX_CHAT_DIARY_ENTRIES,
@@ -180,8 +188,15 @@ internal class ChatDiaryStore(
                     updatedAt = maxOf(System.currentTimeMillis(), entry.updatedAt + 1))
             } else entry
         }
-        if (affected > 0) {
-            documents.write(document.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        val ref = ChatDiarySourceRef(sessionId = sessionId, userMessageId = userMessageId)
+        val sources = if (document.invalidatedSourceRefs.any {
+                it.sessionId == sessionId && it.userMessageId == userMessageId
+            }) document.invalidatedSourceRefs else document.invalidatedSourceRefs + ref
+        if (affected > 0 || sources != document.invalidatedSourceRefs) {
+            documents.write(document.copy(
+                entries = ChatDiarySupersessionPolicy.repairLinks(entries),
+                invalidatedSourceRefs = sources,
+            ))
         }
         return affected
     }
@@ -240,7 +255,7 @@ internal class ChatDiaryStore(
             }
         }
         if (changed > 0) {
-            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+            documents.write(documents.read().copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
         }
         return changed
     }
@@ -273,7 +288,7 @@ internal class ChatDiaryStore(
             }
         }
         if (changed > 0) {
-            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+            documents.write(documents.read().copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
         }
         return changed
     }
