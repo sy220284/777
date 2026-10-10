@@ -43,8 +43,8 @@ internal fun samePersonaIdentity(left: PersonaProfile, right: PersonaProfile): B
     val rightName = normalizePersonaText(right.name)
     if (leftName.isBlank() || rightName.isBlank() || leftName != rightName) return false
     if (leftName in DEFAULT_PERSONA_NAMES || rightName in DEFAULT_PERSONA_NAMES) return false
-    return compatibleIdentityField(left.worldSetting, right.worldSetting) &&
-        compatibleIdentityField(left.franchise, right.franchise)
+    return compatibleIdentityField(left.franchise, right.franchise) &&
+        compatibleIdentityField(left.coreIdentity, right.coreIdentity)
 }
 
 private fun compatibleIdentityField(left: String, right: String): Boolean {

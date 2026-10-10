@@ -213,26 +213,19 @@ internal object PersonaTransferDocuments {
 
             add(DocLine("人物生命资料", 2))
             addField("姓名", persona.name)
-            addField("人物整体", persona.portrait)
-            addField("独立生活", persona.lifeContext)
-            addList("天然注意", persona.attentionBiases)
-            addList("关注关键词", persona.attentionKeywords)
-            addList("容易漏掉或误读", persona.perceptionBlindSpots)
-            addList("小习惯和小坚持", persona.quirks)
-            addList("不擅长", persona.limitations)
-            addList("真正重要", persona.coreValues)
-            addField("长期内在拉扯", persona.coreTension)
-            addList("稳定部分", persona.stableTraits)
-            addList("可缓慢变化", persona.mutableTraits)
-            addField("对用户初始印象", persona.initialUserImpression)
-            addList("自然声音样本", persona.voiceSamples)
-            addField("世界设定", persona.worldSetting)
-            addField("作品/世界来源", persona.franchise)
-            addField("时间线位置", persona.timelinePosition)
-            addList("知识边界", persona.knowledgeBoundary)
-            addList("硬约束", persona.hardConstraints)
-            addList("禁用表达", persona.bannedPhrases)
-            addList("用户纠正", persona.corrections)
+            addField("原作或世界来源", persona.franchise)
+            addField("核心身份", persona.coreIdentity)
+            if (persona.facts.isNotEmpty()) {
+                add(DocLine("人物深度事实", 3))
+                persona.facts.forEachIndexed { index, fact ->
+                    add(DocLine("${index + 1}. ${fact.category}"))
+                    add(DocLine(fact.content))
+                    fact.perspective.takeIf(String::isNotBlank)?.let { add(DocLine("观点主体：$it")) }
+                    fact.temporalScope.takeIf(String::isNotBlank)?.let { add(DocLine("故事阶段：$it")) }
+                    add(DocLine("事实来源：${fact.provenance}"))
+                    fact.sourceReference.takeIf(String::isNotBlank)?.let { add(DocLine("来源依据：$it")) }
+                }
+            }
             if (persona.loreEntries.isNotEmpty()) {
                 add(DocLine("世界书", 3))
                 persona.loreEntries.forEachIndexed { index, lore ->

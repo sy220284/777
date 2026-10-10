@@ -60,7 +60,7 @@ internal object PersonaGalleryImportPlanner {
         }
         return PersonaGalleryPreparedImport.Archive(
             baseDocument = current,
-            entry = migrateLegacyPersonaGalleryEntry(mergedEntry),
+            entry = mergedEntry,
             diaryEntries = diaryEntries,
         )
     }
