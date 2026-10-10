@@ -34,7 +34,8 @@ class LocalSettingsDataFacade @Inject constructor(
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord =
         memoryManager.update(existing = existing, content = content, pinned = pinned)
-    internal fun forgetMemory(id: String): Boolean = memoryStore.forget(id)
+    internal fun forgetMemory(id: String, expectedUpdatedAt: Long): Boolean =
+        memoryStore.forget(id, expectedUpdatedAt)
     internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
         memoryStore.listActiveFromMessage(sessionId, messageId)
 }
