@@ -200,6 +200,31 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun gamePersonaKeepsSourceTimelineAndWorldInStablePrompt() {
+        val persona = PersonaProfile(
+            name = "神里绫华",
+            portrait = "神里家的大小姐，负责社奉行事务。",
+            franchise = "原神",
+            timelinePosition = "稻妻已与旅行者相识",
+            worldSetting = "提瓦特大陆的稻妻，社奉行承担文化礼仪事务。",
+        )
+        val projection = CharacterRuntimeProjector(
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        ).project(
+            persona = persona,
+            state = ChatCharacterState(),
+            context = ChatContextState(),
+            userInput = "早上好",
+            storyContext = null,
+        )
+        assertTrue(projection.stablePrompt.contains("原作来源：原神"))
+        assertTrue(projection.stablePrompt.contains("当前剧情阶段：稻妻已与旅行者相识"))
+        assertTrue(projection.stablePrompt.contains("原作世界：提瓦特大陆的稻妻"))
+        assertTrue(estimateModelTokens(projection.stablePrompt) <= 520)
+    }
+
+    @Test
     fun stablePersonaPrefixHasHardTokenBudget() {
         val persona = PersonaProfile(
             name = "阿青",
