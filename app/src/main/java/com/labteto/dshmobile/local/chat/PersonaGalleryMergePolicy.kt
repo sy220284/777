@@ -16,7 +16,9 @@ import kotlinx.serialization.json.jsonPrimitive
 internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
     val name = normalizePersonaText(persona.name)
     if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
-    return persona.portrait.isNotBlank() ||
+    return persona.coreIdentity.isNotBlank() ||
+        persona.facts.isNotEmpty() ||
+        persona.portrait.isNotBlank() ||
         persona.lifeContext.isNotBlank() ||
         persona.attentionBiases.isNotEmpty() ||
         persona.attentionKeywords.isNotEmpty() ||
@@ -52,9 +54,27 @@ private fun compatibleIdentityField(left: String, right: String): Boolean {
     return a == b || a.contains(b) || b.contains(a)
 }
 
+/** Preserve distinct facts; an existing user-authored fact always wins against automatic enrichment. */
+internal fun mergeCharacterFacts(
+    base: List<CharacterFact>,
+    incoming: List<CharacterFact>,
+): List<CharacterFact> {
+    val byId = linkedMapOf<String, CharacterFact>()
+    base.forEach { byId[it.id] = it }
+    incoming.forEach { candidate ->
+        val original = byId[candidate.id]
+        if (original == null) byId[candidate.id] = candidate
+        else if (original.provenance != CharacterFactProvenance.USER_CREATED &&
+            candidate.provenance == CharacterFactProvenance.USER_CREATED) byId[candidate.id] = candidate
+    }
+    return byId.values.toList()
+}
+
 internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
     base.copy(
         name = chooseDisplayName(base.name, incoming.name),
+        coreIdentity = mergePersonaText(base.coreIdentity, incoming.coreIdentity, 4_000),
+        facts = mergeCharacterFacts(base.facts, incoming.facts),
         portrait = mergePersonaText(base.portrait, incoming.portrait, 4_000),
         lifeContext = mergePersonaText(base.lifeContext, incoming.lifeContext, 4_000),
         attentionBiases = mergePersonaLines(base.attentionBiases, incoming.attentionBiases, 8),

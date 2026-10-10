@@ -239,7 +239,6 @@ private fun presetPersona(
             add(CharacterFactCategories.PERSONALITY, stableTraitsText)
             add(CharacterFactCategories.VALUES_AND_TRADEOFFS,
                 (coreValues + secondaryValues + coreTensionCandidates).joinToString("；"))
-            add(CharacterFactCategories.LIFE_GRAVITY, lifeContext)
             add(CharacterFactCategories.SENSORY_SIGNATURE, life.attentionBiases.joinToString("；"))
             add(CharacterFactCategories.SUBJECTIVE_BELIEFS, life.perceptionBlindSpots.joinToString("；"))
             add(CharacterFactCategories.PREFERENCES_AND_HABITS, life.quirks.joinToString("；"))
