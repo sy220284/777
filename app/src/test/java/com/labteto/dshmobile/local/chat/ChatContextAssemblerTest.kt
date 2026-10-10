@@ -18,6 +18,18 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun naturalFollowUpFindsRelatedPublicEventWithoutInjectingPrivateThoughts() {
+        val state = ChatContextState(
+            continuity = ChatContinuityState(unfinished = listOf("我们在大雨中约好见面")),
+        )
+        assertTrue(ChatMemorySelector.shouldRecall("那之后我一直很在意"))
+        val query = ChatMemorySelector.semanticQuery("那之后我一直很在意", "", state)
+        assertTrue(query.contains("大雨中约好见面"))
+        assertFalse(ChatMemorySelector.shouldRecall("继续"))
+        assertFalse(ChatMemorySelector.shouldRecall("先不聊这个了"))
+    }
+
+    @Test
     fun explicitTopicAndResetDoNotBorrowPreviousTopic() {
         val context = ChatContextState(continuity = ChatContinuityState(unfinished = listOf("修手表")))
         assertFalse(ChatMemorySelector.semanticQuery("你记得我喜欢什么花吗", "小宁", context).contains("修手表"))
