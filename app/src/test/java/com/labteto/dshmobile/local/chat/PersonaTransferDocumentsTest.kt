@@ -589,6 +589,7 @@ class PersonaTransferDocumentsTest {
         persona = PersonaProfile(
             id = "gallery-lan",
             name = "小岚",
+            coreIdentity = "旅行摄影师",
             portrait = "旅行摄影师，爽快、细心，说话简短自然。",
             lifeContext = "常年在沿海城市旅行。",
             initialUserImpression = "和用户是多年朋友",
