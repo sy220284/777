@@ -35,6 +35,7 @@ internal fun localShellFeatureUiContribution(
     composerHandoff: List<String>,
     skillDisplayNames: Map<String, String>,
     onUseWorkCapability: (String) -> Unit,
+    onLocateMemoryForMessage: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
     onOpenDrawer: () -> Unit,
 ): LocalFeatureUiContribution {
@@ -74,6 +75,7 @@ internal fun localShellFeatureUiContribution(
             onStopTeamMember = actions.stopTeamMember,
             onStopTeam = actions.stopTeam,
             onEditAndResend = actions.editAndResend,
+            onLocateMemoryForMessage = onLocateMemoryForMessage,
             onSelectMessageVariant = actions.selectMessageVariant,
             onRegenerate = actions.regenerate,
             onGenerateReplySuggestions = actions.generateReplySuggestions,
