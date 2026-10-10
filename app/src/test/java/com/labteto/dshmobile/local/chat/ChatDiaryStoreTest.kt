@@ -995,6 +995,33 @@ class ChatDiaryStoreTest {
         assertTrue(recovered.listForTransfer("gallery:target").isEmpty())
     }
 
+    @Test
+    fun cancellingOneCompanionsMeetingKeepsTheOthersMemoryAcrossModesAndReload() {
+        val memory = store()
+        val anNing = "用户约定和阿宁周六在南门钟楼见面"
+        val aZi = "用户约定和阿紫周日在西桥书店见面"
+        val cancel = "用户取消和阿紫周日在西桥书店见面"
+        val original = memory.record(request(
+            delta = ChatDiaryDelta(event = anNing, feeling = "我记住了阿宁的安排", importance = 4),
+            userId = "u-ning", assistantId = "a-ning", evidence = anNing,
+        ))!!
+        memory.record(request(
+            delta = ChatDiaryDelta(event = aZi, feeling = "我记住了阿紫的安排", importance = 4),
+            userId = "u-zi", assistantId = "a-zi", evidence = aZi,
+        ))!!
+        memory.record(request(
+            delta = ChatDiaryDelta(event = cancel, feeling = "阿紫这次取消了", importance = 4),
+            userId = "u-cancel", assistantId = "a-cancel", evidence = cancel,
+        ))!!
+        val recovered = store()
+        assertEquals(null, recovered.listActive("gallery:a")
+            .first { it.id == original.id }.supersededBy)
+        val direct = recovered.search("阿宁周六南门钟楼见面", "gallery:a", false, 6)
+        val group = recovered.search("阿宁周六南门钟楼见面", "gallery:a", true, 6)
+        assertTrue(direct.any { it.id == original.id })
+        assertEquals(direct.map { it.id }, group.map { it.id })
+    }
+
     private fun request(
         delta: ChatDiaryDelta,
         sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,

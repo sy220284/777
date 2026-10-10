@@ -67,6 +67,58 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun savedCharacterFactsAndWorldBookControlRuntimeAfterReloadAndStoryRewind() {
+        val file = File(temporary.newFolder("runtime-journey"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val person = PersonaProfile(
+            name = "叶澜", coreIdentity = "旧书店店主",
+            facts = listOf(
+                CharacterFact("early", CharacterFactCategories.BIOGRAPHY,
+                    "第一幕在旧书店认识阿宁", temporalScope = "opening",
+                    provenance = CharacterFactProvenance.CANON),
+                CharacterFact("later", CharacterFactCategories.LIFE_GRAVITY,
+                    "第二幕需要看守红伞中的密信", temporalScope = "reveal",
+                    provenance = CharacterFactProvenance.CANON),
+            ),
+            loreEntries = listOf(PersonaLoreEntry(
+                id = "secret", title = "密信背景", content = "密信藏在红伞底部",
+                temporalScope = "reveal", alwaysOn = true,
+            )),
+            portrait = "旧字段称她已经知道全部密信秘密",
+        )
+        val created = gallery.save(
+            persona = person, sourceSessionId = "journey",
+            history = listOf(LocalHarnessMessage("m1", "user", "故事开始", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "旧书店的故事",
+            chatContext = ChatContextState().withStoryStageSelection("opening"),
+        )
+        val storyId = requireNotNull(created.storyId)
+        fun prompt(): String {
+            val loaded = ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            val context = loaded.story(storyId)!!.chatContext
+            val projected = CharacterRuntimeProjector(
+                ChatRelationshipEngine(), CharacterLoreEngine(),
+            ).project(loaded.persona, ChatCharacterState(), context,
+                "阿宁和密信的事情，你能不能告诉我？", null)
+            return projected.stablePrompt + projected.dynamicPrompt
+        }
+        val early = prompt()
+        assertTrue(early.contains("第一幕在旧书店认识阿宁"))
+        assertFalse(early.contains("第二幕需要看守红伞中的密信"))
+        assertFalse(early.contains("密信藏在红伞底部"))
+        assertFalse(early.contains("旧字段称她已经知道全部密信秘密"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "reveal"))
+        val later = prompt()
+        assertTrue(later.contains("第一幕在旧书店认识阿宁"))
+        assertTrue(later.contains("第二幕需要看守红伞中的密信"))
+        assertTrue(later.contains("密信藏在红伞底部"))
+        assertTrue(gallery.updateStoryDetails(created.entry.id, storyId, "旧书店的故事", "opening"))
+        assertFalse(prompt().contains("密信藏在红伞底部"))
+        assertEquals(2, ChatPersonaGalleryStore(file, json)
+            .findEntry(created.entry.id)!!.persona.facts.size)
+    }
+
+    @Test
     fun archivedStoryStageRemainsAuthoritativeOverStaleSessionSnapshots() {
         val file = File(temporary.newFolder("stage-owner"), "gallery.json")
         val store = ChatPersonaGalleryStore(file, json)

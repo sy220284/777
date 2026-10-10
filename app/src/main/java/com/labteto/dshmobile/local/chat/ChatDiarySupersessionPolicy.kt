@@ -8,6 +8,9 @@ internal object ChatDiarySupersessionPolicy {
         if (!existing.active || existing.id == candidate.id) return false
         if (existing.subjectKey != candidate.subjectKey) return false
         if (existing.supersededBy != null) return false
+        // Two different named companions may have independent appointments of the
+        // same kind. A new "见面" cancellation alone must not erase the other plan.
+        if (differentExplicitCompanions(existing.event, candidate.event)) return false
         // Disclosure metadata cannot retract what this character remembers across modes.
         // A newer event must explicitly update, cancel or replace the earlier event.
         if (!STATE_CHANGE_SIGNAL.containsMatchIn(candidate.event)) return false
@@ -30,6 +33,14 @@ internal object ChatDiarySupersessionPolicy {
                 entry
             }
         }
+    }
+
+    private fun differentExplicitCompanions(left: String, right: String): Boolean {
+        val earlier = EXPLICIT_COMPANION.findAll(left).map { it.groupValues[1] }.toSet()
+        val current = EXPLICIT_COMPANION.findAll(right).map { it.groupValues[1] }.toSet()
+        // A correction naming the earlier person can still replace that meeting.
+        // Missing names are not evidence that the appointments differ.
+        return earlier.isNotEmpty() && current.isNotEmpty() && earlier.intersect(current).isEmpty()
     }
 
     private fun samePlanningTopic(left: String, right: String): Boolean =
@@ -65,6 +76,9 @@ internal object ChatDiarySupersessionPolicy {
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
 
     private const val SUPERSEDE_TOPIC_SIMILARITY = 0.46
+    private val EXPLICIT_COMPANION = Regex(
+        """(?:与|和|跟)([\p{IsHan}]{2,4})(?=(?:在|于|去|周[一二三四五六日天]|星期[一二三四五六日天]|见面|碰面|会合|约定|约好|说好|一起))""",
+    )
     private val REPEATED_CONFIRMATION_NOISE = Regex("""(?:再次|再一次|又一次|重新)""")
     private val AGREEMENT_VARIANTS = Regex("""(?:答应|确认|确定|说定|约定)""")
     private val PLANNING_TOPIC = Regex("""(?:约定|安排|见面|碰面|会合|出发|行程|计划)""")
