@@ -159,7 +159,7 @@ class LocalToolRouterTest {
     }
 
     @Test
-    fun capabilitySearchHardCapsLargeOptionalCatalogDeterministically() {
+    fun capabilitySearchDoesNotHardCapLargeOptionalCatalog() {
         val tools = (0 until 1_000).map { index ->
             tool(
                 "remote_" + index.toString().padStart(4, '0'),
@@ -173,9 +173,34 @@ class LocalToolRouterTest {
         val first = LocalToolRouter.search(tools, "MCP 外部工具", limit = Int.MAX_VALUE)
         val second = LocalToolRouter.search(tools.reversed(), "MCP 外部工具", limit = Int.MAX_VALUE)
 
-        assertEquals(48, first.size)
+        assertEquals(1_000, first.size)
         assertEquals(first.map(HarnessTool::name), second.map(HarnessTool::name))
         assertEquals("remote_0000", first.first().name)
+    }
+
+    @Test
+    fun activatedOptionalToolCountIsNotArtificiallyLimited() {
+        val tools = (0 until 80).map { index ->
+            tool("new_plugin_$index", "插件新能力", ToolExposure.OPTIONAL, "自动扩展", setOf("自动扩展"))
+        }
+        val selected = tools.map(HarnessTool::name).toSet()
+        val schemas = LocalToolRouter.visibleSchemas(tools, selected, maxOptionalDefinitionTokens = 24_000)
+        assertEquals(80, names(schemas).size)
+        assertEquals(80, LocalToolRouter.relevantOptionalToolNames(tools, "使用自动扩展").size)
+    }
+
+    @Test
+    fun chineseNaturalLanguageFindsCapabilityAndInventoryUsesLiveRegistry() {
+        val tools = listOf(
+            tool("android_screen", "检查手机屏幕", ToolExposure.OPTIONAL, "Android", setOf("屏幕")),
+            tool("mcp_newly_connected", "新服务工具", ToolExposure.OPTIONAL, "MCP", setOf("外部服务")),
+        )
+        assertTrue(LocalToolRouter.search(tools, "请检查手机当前屏幕").any { it.name == "android_screen" })
+        assertTrue(LocalToolRouter.isInventoryRequest("工具与能力检测"))
+        val directory = LocalToolRouter.capabilityDirectory(tools, emptySet())
+        assertTrue(directory.contains("android_screen"))
+        assertTrue(directory.contains("mcp_newly_connected"))
+        assertTrue(directory.contains("本轮已选 0"))
     }
 
     @Test
@@ -246,9 +271,9 @@ class LocalToolRouterTest {
 
         val summary = LocalToolRouter.capabilitySummary(tools, setOf("repo_reader"))
 
-        assertTrue(summary.contains("Android：未启用 0/1"))
+        assertTrue(summary.contains("Android：本轮未选用 0/1"))
         assertTrue(summary.contains("需要无障碍授权"))
-        assertTrue(summary.contains("GitHub：已启用 1/1"))
+        assertTrue(summary.contains("GitHub：本轮已选用 1/1"))
     }
 
     @Test
