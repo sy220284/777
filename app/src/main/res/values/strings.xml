@@ -1871,5 +1871,13 @@
     <string name="local_chat_turn_usage_incomplete">本轮已知用量 · %1$d Token（数据不完整）</string>
     <string name="local_chat_turn_usage_title">本轮用量</string>
     <string name="local_chat_turn_usage_scope">包含本轮回复、重新生成和已关联的后台请求；仅展示保留期内已记录的用量。</string>
+    <string name="work_capability_readiness_title">本次任务的能力配置</string>
+    <string name="work_capability_readiness_github">GitHub</string>
+    <string name="work_capability_readiness_web">联网搜索</string>
+    <string name="work_capability_readiness_configured">配置已开启；实际调用仍需验证</string>
+    <string name="work_capability_readiness_needs_connection">尚未配置连接，可在能力中心设置</string>
+    <string name="work_capability_readiness_disabled">当前已关闭，可在能力中心开启</string>
+    <string name="work_capability_readiness_unknown">配置状态暂时无法确认，执行时仍会检查</string>
+    <string name="work_capability_readiness_row">%1$s · %2$s</string>
 </resources>
 
