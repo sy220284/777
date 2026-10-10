@@ -20,7 +20,7 @@ internal class CharacterRuntimeProjector(
         storyContext: String?,
     ): CharacterRuntimeProjection {
         // Only facts visible at the current plot stage may influence replies or behavior.
-        val activePersona = persona.forRuntimeStoryStage(context.storyStage)
+        val activePersona = persona.forRuntimeStoryStage(context)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val lifeState = advanceCharacterLife(activePersona, privateState, storyTime = context.scene.sceneTime)
         val runtimeState = privateState.copy(lifeState = lifeState)
@@ -43,22 +43,26 @@ internal class CharacterRuntimeProjector(
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
                 relevantBackgroundPrompt(activePersona, userInput),
-                relevantCharacterFactPrompt(persona, context.storyStage, userInput, storyContext),
+                relevantCharacterFactPrompt(persona, context, userInput, storyContext),
                 context.storyStage.takeIf(String::isNotBlank)
                     ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
-                loreEngine.prompt(activePersona, userInput, storyStage = context.storyStage),
+                loreEngine.prompt(
+                    activePersona, userInput, storyStage = context.storyStage,
+                    unlockedStages = context.visibleStoryStages(),
+                ),
                 relationshipEngine.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }
 
-    private fun PersonaProfile.forRuntimeStoryStage(storyStage: String): PersonaProfile {
+    private fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
         if (facts.isEmpty()) return this
         // A request-local projection preserves the stored sources and stage IDs. Even if
         // all facts are future-gated, obsolete legacy prose must not be restored.
         return copy(
-            facts = visibleFacts(storyStage).map { it.copy(temporalScope = "") },
+            facts = visibleFacts(context.storyStage, context.visibleStoryStages())
+                .map { it.copy(temporalScope = "") },
             portrait = "",
             lifeContext = "",
             attentionBiases = emptyList(),
@@ -210,7 +214,7 @@ internal class CharacterRuntimeProjector(
     /** Select factual depth on demand; never use the character's current feelings as stored facts. */
     private fun relevantCharacterFactPrompt(
         persona: PersonaProfile,
-        storyStage: String,
+        context: ChatContextState,
         userInput: String,
         storyContext: String?,
     ): String {
@@ -220,7 +224,7 @@ internal class CharacterRuntimeProjector(
             CharacterFactCategories.PERSONALITY,
             CharacterFactCategories.VALUES_AND_TRADEOFFS,
         )
-        val visible = persona.visibleFacts(storyStage)
+        val visible = persona.visibleFacts(context.storyStage, context.visibleStoryStages())
             .filter { it.content.isNotBlank() &&
                 (it.category !in core || it.provenance == CharacterFactProvenance.INFERRED ||
                     it.provenance == CharacterFactProvenance.UNVERIFIED) }
