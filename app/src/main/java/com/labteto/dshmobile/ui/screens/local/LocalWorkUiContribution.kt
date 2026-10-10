@@ -13,6 +13,7 @@ internal fun localWorkFeatureUiContribution(
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
     onContinueArtifact: (String) -> Unit = {},
+    onOpenSourceSession: (String) -> Unit = {},
     requestedFilePath: String? = null,
     onRequestedFilePathChange: (String?) -> Unit = {},
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(
@@ -61,6 +62,11 @@ internal fun localWorkFeatureUiContribution(
                 onStartResearchAgent = actions.startResearchAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onContinueArtifact = onContinueArtifact,
+                onOpenSourceSession = shell.parentSessionId
+                    ?.takeIf { id -> shell.sessions.any { it.id == id } }
+                    ?.let { sourceId -> { onOpenSourceSession(sourceId) } },
+                sourceSessionMissing = shell.parentSessionId != null &&
+                    shell.sessions.none { it.id == shell.parentSessionId },
                 usageRevision = actions.usageRevision,
                 sessionUsage = actions.sessionUsage,
                 taskUsage = actions.taskUsage,
