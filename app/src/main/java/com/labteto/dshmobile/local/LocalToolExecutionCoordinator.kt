@@ -187,7 +187,9 @@ internal class LocalToolExecutionCoordinator(
         }
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
-            return "未找到匹配的扩展能力；可换用联网、下载、记忆、会话、GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
+            // Don't bounce the user back to guess an internal capability name.
+            return "未精确匹配本次描述，以下是实际已注册的能力目录，可据此选择具体工具：\n" +
+                LocalToolRouter.capabilityDirectory(tools, synchronized(target) { target.toSet() })
         }
         val currentEnabled = synchronized(target) {
             // Explicitly discovered capabilities outrank speculative pre-activation. This changes
