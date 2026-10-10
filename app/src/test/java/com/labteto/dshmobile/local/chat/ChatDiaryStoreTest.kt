@@ -293,8 +293,36 @@ class ChatDiaryStoreTest {
             all.map(ChatDiaryEntry::disclosure).toSet(),
         )
         val groupRecall = memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 6)
+        val directRecall = memory.search("雨天散步", "gallery:a", groupAudience = false, maxItems = 6)
+        // Older revisions stay in the archive, but ordinary recall chooses current facts.
+        assertEquals(directRecall.map(ChatDiaryEntry::id), groupRecall.map(ChatDiaryEntry::id))
         assertTrue(groupRecall.any { it.disclosure == ChatDiaryDisclosure.PUBLIC })
-        assertTrue(groupRecall.any { it.disclosure == ChatDiaryDisclosure.SHAREABLE })
+        assertTrue(groupRecall.none { it.supersededBy != null })
+    }
+
+    @Test
+    fun synonymRecallFindsRelevantMemoryWithoutCopyingOtherCharacterNotes() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(event = "周末我们一起去河边散步",
+                feeling = "我很放松", importance = 4),
+            evidence = "周末我们一起去河边散步",
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(event = "阿紫在河边散步时听见鸟叫",
+                feeling = "有趣", importance = 4),
+            userId = "u-other-synonym", assistantId = "a-other-synonym",
+            evidence = "阿紫在河边散步时听见鸟叫",
+        ).copy(subjectKey = "gallery:b", personaName = "阿紫"))
+        val group = memory.search("之前去河边遛弯", "gallery:a",
+            groupAudience = true, maxItems = 3)
+        val direct = memory.search("之前去河边遛弯", "gallery:a",
+            groupAudience = false, maxItems = 3)
+        assertTrue(group.any { it.event.contains("河边散步") })
+        assertTrue(group.none { it.subjectKey == "gallery:b" })
+        assertEquals(direct.map(ChatDiaryEntry::id), group.map(ChatDiaryEntry::id))
+        assertTrue(memory.search("修理单车", "gallery:a",
+            groupAudience = true, maxItems = 3).isEmpty())
     }
 
     @Test

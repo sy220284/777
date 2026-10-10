@@ -233,6 +233,12 @@ internal object ChatDiaryEntryPolicy {
     private fun normalizeRecallText(text: String): String =
         normalizeText(text)
             .replace(RECALL_PLAN_VARIANTS, "约定")
+            // True lexical equivalents only. Avoid expanding broad words like "喜欢",
+            // which would retrieve unrelated memories and reduce user relevance.
+            .replace("遛弯", "散步")
+            .replace("走走", "散步")
+            .replace("碰面", "见面")
+            .replace("改天", "另一天")
 
     private fun normalizeText(text: String): String =
         text.lowercase()
