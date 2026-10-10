@@ -105,6 +105,27 @@ class LocalWorkCompletionClaimGuardTest {
     }
 
     @Test
+    fun failedTeamMemberAndGlobalMailboxPreventFalseCompletionWithoutBlockingPartialWork() {
+        val team = LocalAgentTeamUiState(
+            members = listOf(LocalAgentTeamMemberUiState(
+                id = "member-fail", jobId = "job-fail", name = "tester",
+                description = "执行测试", phase = "failed", activity = "failed",
+            )),
+            pendingMessageCount = 2,
+        )
+        val state = LocalWorkState(team = team)
+        val claimed = LocalWorkCompletionClaimGuard.inspect("任务完成，可以交付。", state)
+        assertTrue(claimed.changed)
+        assertTrue(claimed.findings.contains("完成声明与失败的 Agent Team 成员冲突"))
+        assertTrue(claimed.findings.contains("完成声明与待投递 Agent Team 消息冲突"))
+        assertTrue(claimed.text.contains("仍有 1 个 Agent Team 成员失败"))
+        assertTrue(claimed.text.contains("仍有 2 条 Team 消息待投递"))
+        // Partial code results remain reportable even when an independent member failed.
+        val partial = LocalWorkCompletionClaimGuard.inspect("代码修改已完成，测试失败待重跑。", state)
+        assertFalse(partial.changed)
+    }
+
+    @Test
     fun teamProjectionFailureBlocksGlobalCompletionClaimEvenWithoutOpenTasks() {
         val state = LocalWorkState(
             team = LocalAgentTeamUiState(

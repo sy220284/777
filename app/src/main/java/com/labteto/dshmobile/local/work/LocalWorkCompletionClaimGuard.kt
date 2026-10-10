@@ -28,12 +28,17 @@ internal object LocalWorkCompletionClaimGuard {
         val activeTeamMembers = workState.team.members.count {
             it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
         }
-        val pendingTeamMessages = workState.team.members.sumOf { it.pendingMessageCount }
+        val pendingTeamMessages = maxOf(
+            workState.team.pendingMessageCount,
+            workState.team.members.sumOf { it.pendingMessageCount },
+        )
+        val failedTeamMembers = workState.team.failedMemberCount
         val teamFailure = !workState.team.failure.isNullOrBlank()
         if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
         if (openTeamTasks > 0) findings += "完成声明与未完成 Agent Team 任务冲突"
         if (activeTeamMembers > 0) findings += "完成声明与仍在运行的 Agent Team 成员冲突"
         if (pendingTeamMessages > 0) findings += "完成声明与待投递 Agent Team 消息冲突"
+        if (failedTeamMembers > 0) findings += "完成声明与失败的 Agent Team 成员冲突"
         if (teamFailure) findings += "完成声明与 Agent Team 异常状态冲突"
         if (workState.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
         if (findings.isEmpty()) return LocalOutputQualityResult(text)
@@ -44,6 +49,7 @@ internal object LocalWorkCompletionClaimGuard {
                 openTeamTasks = openTeamTasks,
                 activeTeamMembers = activeTeamMembers,
                 pendingTeamMessages = pendingTeamMessages,
+                failedTeamMembers = failedTeamMembers,
                 teamFailure = teamFailure,
             ) + "\n\n" + corrected,
             findings = findings,
@@ -100,7 +106,11 @@ internal fun guardWorkCompletionDelivery(
         put("active_team_members", state.work.team.members.count {
             it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
         })
-        put("pending_team_messages", state.work.team.members.sumOf { it.pendingMessageCount })
+        put("pending_team_messages", maxOf(
+            state.work.team.pendingMessageCount,
+            state.work.team.members.sumOf { it.pendingMessageCount },
+        ))
+        put("failed_team_members", state.work.team.failedMemberCount)
         state.work.team.failure?.let { put("team_failure", it) }
         state.work.goal?.status?.let { put("goal_status", it) }
     })
@@ -123,6 +133,7 @@ private fun truthfulIncompleteDeliveryText(
     openTeamTasks: Int,
     activeTeamMembers: Int,
     pendingTeamMessages: Int,
+    failedTeamMembers: Int,
     teamFailure: Boolean,
 ): String {
     val reasons = buildList {
@@ -130,6 +141,7 @@ private fun truthfulIncompleteDeliveryText(
         if (openTeamTasks > 0) add("Agent Team 仍有 " + openTeamTasks + " 项任务未完成")
         if (activeTeamMembers > 0) add("仍有 " + activeTeamMembers + " 个智能体在执行")
         if (pendingTeamMessages > 0) add("仍有 " + pendingTeamMessages + " 条 Team 消息待投递")
+        if (failedTeamMembers > 0) add("仍有 " + failedTeamMembers + " 个 Agent Team 成员失败")
         if (teamFailure) add("Agent Team 当前存在异常状态")
         if (blockedGoal) add("目标仍处于阻塞状态")
     }
@@ -153,7 +165,11 @@ internal fun recordWorkCompletionQuality(
         put("active_team_members", state.work.team.members.count {
             it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
         })
-        put("pending_team_messages", state.work.team.members.sumOf { it.pendingMessageCount })
+        put("pending_team_messages", maxOf(
+            state.work.team.pendingMessageCount,
+            state.work.team.members.sumOf { it.pendingMessageCount },
+        ))
+        put("failed_team_members", state.work.team.failedMemberCount)
         state.work.team.failure?.let { put("team_failure", it) }
         state.work.goal?.status?.let { put("goal_status", it) }
     })
