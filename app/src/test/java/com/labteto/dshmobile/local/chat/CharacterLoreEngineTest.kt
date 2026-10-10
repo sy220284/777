@@ -109,6 +109,20 @@ class CharacterLoreEngineTest {
     }
 
     @Test
+    fun laterWorldBookEntriesStayHiddenUntilMatchingStageEvenWhenAlwaysOn() {
+        val persona = PersonaProfile(loreEntries = listOf(
+            PersonaLoreEntry(id = "present", title = "日常", content = "今天仍在书店工作",
+                keywords = listOf("书店")),
+            PersonaLoreEntry(id = "future", title = "第二幕", content = "第二幕才发现的秘密",
+                keywords = listOf("书店"), temporalScope = "act-2", alwaysOn = true),
+        ))
+        assertEquals(listOf("present"), engine.activated(persona, "书店").map { it.id })
+        assertTrue(engine.activated(persona, "书店", storyStage = "act-2").any { it.id == "future" })
+        assertFalse(engine.prompt(persona, "书店").contains("第二幕才发现"))
+        assertTrue(engine.prompt(persona, "书店", storyStage = "act-2").contains("第二幕才发现"))
+    }
+
+    @Test
     fun promptUsesActualLoreTitle() {
         val persona = PersonaProfile(
             loreEntries = listOf(

@@ -216,6 +216,7 @@ private fun JsonObject.loreEntries(): List<PersonaLoreEntry> {
             priority = entry.intValue("priority", 50).coerceIn(0, 100),
             alwaysOn = entry.booleanValue("alwaysOn", false),
             spoilerLevel = entry.intValue("spoilerLevel", 0).coerceAtLeast(0),
+            temporalScope = entry.text("temporalScope").take(160),
         )
     }.take(MAX_LORE_ENTRIES)
 }
@@ -580,7 +581,7 @@ class PersonaAutoFillService @Inject constructor(
             5. 人物资料只描写已有的人生事实、固有认知与偏好；当前情绪、成长、主动性、亲密度、
                回复节奏、行为频率和日常行动安排完全交给运行时。
             6. temporalScope填写明确的故事阶段ID时才需要；未来剧情、他人秘密不写成此刻已知事实。
-            7. loreEntries为可选数组，每条可包括id,title,content,keywords,secondaryKeywords,priority,alwaysOn,spoilerLevel。
+            7. loreEntries为可选数组，每条可包括id,title,content,keywords,secondaryKeywords,priority,alwaysOn,spoilerLevel,temporalScope。
                复杂原作背景保留在可检索资料中；只有确切需要的资料才生成，不设置固定三条上限。
             8. 用户明确编辑过的资料保留；不得擅自覆盖已存在的USER_CREATED事实。
             9. 所有资料只从人物世界内部陈述，禁止添加通用模型限制或聊天平台元叙事。

@@ -47,7 +47,7 @@ internal class CharacterRuntimeProjector(
                 context.storyStage.takeIf(String::isNotBlank)
                     ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
-                loreEngine.prompt(activePersona, userInput),
+                loreEngine.prompt(activePersona, userInput, storyStage = context.storyStage),
                 relationshipEngine.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )

@@ -249,7 +249,10 @@ class ChatPersonaGalleryStore internal constructor(
             historyTotalCount = archivedHistory.totalCount,
             historyArchived = true,
             chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
-            chatContext = chatContext.normalized(),
+            // The archive's user-edited story stage wins over a stale foreground snapshot.
+            chatContext = chatContext.normalized().copy(
+                storyStage = baseStory?.chatContext?.storyStage ?: chatContext.storyStage,
+            ),
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,

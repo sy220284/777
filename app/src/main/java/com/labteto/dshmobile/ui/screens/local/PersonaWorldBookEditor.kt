@@ -116,6 +116,13 @@ internal fun PersonaWorldBookEditor(
                     maxLines = 4,
                 )
                 DsTextField(
+                    value = entry.temporalScope,
+                    onValueChange = { change(entry.copy(temporalScope = it.take(160))) },
+                    label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                DsTextField(
                     value = entry.secondaryKeywords.joinToString("\n"),
                     onValueChange = { change(entry.copy(secondaryKeywords = splitLoreEditorLines(it))) },
                     label = { Text(stringResource(R.string.local_persona_lore_entry_secondary_keywords)) },

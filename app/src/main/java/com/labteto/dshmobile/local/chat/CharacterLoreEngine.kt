@@ -19,12 +19,14 @@ class CharacterLoreEngine @Inject constructor() {
         maxSpoilerLevel: Int = 0,
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
+        storyStage: String = "",
     ): List<PersonaLoreEntry> {
         if (persona.loreEntries.isEmpty()) return emptyList()
         val normalizedQuery = normalize(query)
         val terms = terms(query)
         val candidates = persona.loreEntries.asSequence()
             .filter { it.content.isNotBlank() && it.spoilerLevel <= maxSpoilerLevel.coerceIn(0, 3) }
+            .filter { it.temporalScope.isBlank() || (storyStage.isNotBlank() && it.temporalScope == storyStage) }
             .map { entry -> entry to score(entry, normalizedQuery, terms) }
             .filter { (entry, score) -> entry.alwaysOn || score > 0 }
             .sortedWith(
@@ -76,8 +78,9 @@ class CharacterLoreEngine @Inject constructor() {
         persona: PersonaProfile,
         query: String,
         maxSpoilerLevel: Int = 0,
+        storyStage: String = "",
     ): String {
-        val active = activated(persona, query, maxSpoilerLevel)
+        val active = activated(persona, query, maxSpoilerLevel, storyStage = storyStage)
         if (active.isEmpty()) return ""
         return buildString {
             appendLine("【相关世界信息】仅使用以下已激活背景，不补写未提供内容。")

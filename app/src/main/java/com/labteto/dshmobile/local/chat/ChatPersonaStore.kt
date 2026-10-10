@@ -21,6 +21,8 @@ data class PersonaLoreEntry(
     val priority: Int = 50,
     val alwaysOn: Boolean = false,
     val spoilerLevel: Int = 0,
+    /** Exact story stage; a blank scope is independent of plot progress. */
+    val temporalScope: String = "",
 )
 
 /** A single canonical person fact; categories are extensible without adding schema fields. */
@@ -320,6 +322,7 @@ class ChatPersonaStore internal constructor(
                     secondaryKeywords = cleanLines(entry.secondaryKeywords, 16),
                     priority = entry.priority.coerceIn(0, 100),
                     spoilerLevel = entry.spoilerLevel.coerceIn(0, 3),
+                    temporalScope = entry.temporalScope.trim().take(160),
                 )
             }
             .filter { it.content.isNotBlank() }

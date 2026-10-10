@@ -99,7 +99,8 @@ class PersonaPresetCatalogTest {
             assertTrue("${preset.id} lost formative life context", card.lifeContext.isNotBlank())
             assertTrue("${preset.id} lost inner motivation", card.coreTension.isNotBlank())
             assertTrue("${preset.id} lost current story boundary", card.knowledgeBoundary.isNotEmpty())
-            assertTrue("${preset.id} contains duplicated encyclopedia items", card.loreEntries.size <= 3)
+            assertEquals("${preset.id} repeats a lore source", card.loreEntries.size,
+                card.loreEntries.map(PersonaLoreEntry::id).distinct().size)
         }
     }
 

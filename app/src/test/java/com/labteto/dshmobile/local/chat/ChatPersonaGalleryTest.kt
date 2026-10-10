@@ -67,6 +67,39 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun archivedStoryStageRemainsAuthoritativeOverStaleSessionSnapshots() {
+        val file = File(temporary.newFolder("stage-owner"), "gallery.json")
+        val store = ChatPersonaGalleryStore(file, json)
+        val person = PersonaProfile(name = "阿青", coreIdentity = "学徒")
+        val created = store.save(
+            persona = person, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("first", "user", "开始", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+        )
+        val storyId = requireNotNull(created.storyId)
+        assertTrue(store.updateStoryDetails(created.entry.id, storyId, "", ""))
+        store.save(
+            persona = person, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("second", "user", "继续", createdAt = 2L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+            existingId = created.entry.id, existingStoryId = storyId,
+        )
+        assertEquals("", ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            .stories.single().chatContext.storyStage)
+        assertTrue(store.updateStoryDetails(created.entry.id, storyId, "", "act-2"))
+        store.save(
+            persona = person, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "act-1"),
+            existingId = created.entry.id, existingStoryId = storyId,
+        )
+        assertEquals("act-2", ChatPersonaGalleryStore(file, json).findEntry(created.entry.id)!!
+            .stories.single().chatContext.storyStage)
+    }
+
+    @Test
     fun sameCharacterMergesIntoOneRicherProfileWithoutRepeatingShortVersion() {
         val base = PersonaProfile(
             id = "gallery-1",

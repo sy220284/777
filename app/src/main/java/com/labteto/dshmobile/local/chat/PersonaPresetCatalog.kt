@@ -263,9 +263,8 @@ private fun presetPersona(
         franchise = franchise,
         timelinePosition = timelinePosition,
         knowledgeBoundary = knowledgeBoundary,
-        // Keep the most relevant built-in anchor plus two searchable facts. The complete
-        // life history stays in the core card; existing installed/user-edited books are untouched.
-        loreEntries = (loreEntries.take(1) + supplementalPresetCanonLore(name, presetId))
+        // Retain all original-world entries, then add references without discarding detail.
+        loreEntries = (loreEntries + supplementalPresetCanonLore(name, presetId))
             .distinctBy { it.id.ifBlank { it.title } },
         hardConstraints = hardConstraints,
         presetId = presetId,

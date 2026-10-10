@@ -7,7 +7,7 @@
 - 核心身份：`name`、`franchise`、`coreIdentity`。
 - 人物事实：`facts: List<CharacterFact>`；每项包含稳定ID、category、content、关联事实ID、主观视角、剧情阶段、来源类型与可选出处。
 - 标准分类：personality, selfNarrative, identityGap, valuesAndTradeoffs, subjectiveBeliefs, biography, definingChoices, emotionalImprints, lifeGravity, unfinishedBusiness, relationships, limitsAndCosts, sensorySignature, preferencesAndHabits, voiceStyle, customFacts。
-- 人物背景与原作：已有 `PersonaLoreEntry`，继续按需召回。人物事实的 `temporalScope` 仅使用故事显式 `storyStage` 匹配，绝不借用场景钟点。图集中按故事编辑剧情阶段 ID，保存后重新进入该故事时从归档上下文装载。未设阶段时隐藏阶段限定事实；世界书继续按剧透等级和关键词检索。完整设备回归仍以CI和真实执行记录为准。
+- 人物背景与原作：已有 `PersonaLoreEntry`，继续按需召回。人物事实的 `temporalScope` 仅使用故事显式 `storyStage` 匹配，绝不借用场景钟点。图集中按故事编辑剧情阶段 ID，保存后重新进入该故事时从归档上下文装载。未设阶段时隐藏阶段限定事实；世界书继续按剧透等级、关键词及显式剧情阶段联合检索，常驻条目也不得绕过阶段限制。完整设备回归仍以CI和真实执行记录为准。
 - 当前情绪、主动性、注意、关系、记忆、人物成长：由独立 Chat 运行时持有，禁止写成预设回复脚本。
 - 保存、编辑、AI与预设在新 V4 路径消费人物事实。关键运行时的人物底色、生活、注意力和行为提示已改为优先读取 V4 事实，避免已存在事实时从旧描述恢复冲突内容。仓库仍保留部分旧结构和非关键链路引用，尚需审计并最终移除，不能宣称V4结构已完全纯化。
 
@@ -30,3 +30,10 @@
 ## UI设计交付状态
 
 Figma工作文件：https://www.figma.com/design/Paa3Wl36qSt6jcrn2Ppv1V 。已创建文件，但由于Figma Starter MCP限额，画布设计尚未完成。当前以Compose人物编辑器实现为UI基线，Figma后续需在额度可用时同步。
+
+## 本次收敛与待办
+
+- 每条世界书可指定剧情阶段，预设原有世界书完整保留；新补充按条目ID去重，不截取首条替代原始资料。
+- 故事的剧情阶段由图集用户编辑结果持有；再次归档不得把旧会话快照中的阶段覆盖回来。
+- 即时联网结果不读六小时缓存；仅原作设定考据继续使用短期缓存。
+- 旧人物字段涉及独立行为调节、关系纠正、预设断言和历史会话等路径；字段删除必须先完成消费者替换与测试。此处尚未宣称全量单源化。

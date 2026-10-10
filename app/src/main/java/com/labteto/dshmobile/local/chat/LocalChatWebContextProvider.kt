@@ -25,7 +25,11 @@ internal class LocalChatWebContextProvider @Inject constructor(
                     val fetched = web.fetch(lookup.url, maxBytes = 16 * 1024)
                     "网页：" + fetched.url + "\n" + fetched.content.take(6_000)
                 }
-                is ChatWebLookup.Search -> searchCached(lookup.query)
+                is ChatWebLookup.Search -> if (lookup.cacheable) searchCached(lookup.query)
+                    else web.searchWithFallback(
+                        queries = listOf(lookup.query),
+                        fallbackKey = configuration::resolveDeepSeekSearchCredential,
+                    ).take(6_000)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -71,7 +75,7 @@ internal class LocalChatWebContextProvider @Inject constructor(
 
 internal sealed interface ChatWebLookup {
     data class Page(val url: String) : ChatWebLookup
-    data class Search(val query: String) : ChatWebLookup
+    data class Search(val query: String, val cacheable: Boolean = false) : ChatWebLookup
 }
 
 /** Always available, but only contacts external services for explicit online or fresh-data intent. */
@@ -116,5 +120,6 @@ internal fun chatWebLookup(input: String, persona: PersonaProfile? = null): Chat
             .containsMatchIn(normalized)) return null
     return ChatWebLookup.Search(
         "${character.franchise} ${character.name} ${normalized.take(170)} 官方角色设定剧情".take(300),
+        cacheable = true,
     )
 }
