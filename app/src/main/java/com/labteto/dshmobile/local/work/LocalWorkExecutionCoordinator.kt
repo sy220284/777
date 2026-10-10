@@ -390,7 +390,8 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             }
         } catch (error: Exception) {
             runtimeStateStore.projection.publishError(
-                "Work 历史编辑失败：${error.message ?: error::class.java.simpleName}",
+                (if (committed) "历史修改已保存，但新任务启动失败" else "Work 历史编辑失败") +
+                    "：${error.message ?: error::class.java.simpleName}",
             )
             if (committed) LocalUserMessageEditResult.COMMITTED_NOT_STARTED
             else LocalUserMessageEditResult.FAILED

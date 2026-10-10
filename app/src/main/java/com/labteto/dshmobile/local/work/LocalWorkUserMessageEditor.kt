@@ -42,8 +42,9 @@ internal sealed interface LocalWorkMessageEditPreparation {
 private const val LEGACY_ATTACHMENT_MARKER = "本次附件已导入本机工作区："
 
 /**
- * Work-owned historical editing transaction. The caller holds the foreground lock through
- * rewriting and starting the replacement, so no other send can enter between the two.
+ * Work-owned historical editing transaction. The caller holds the foreground lock while this
+ * editor transfers its reserved Session lease directly to the replacement Work turn. The
+ * lease is never released between the durable rewrite and the new run admission.
  *
  * Never replay tool calls from discarded history; the new Work run starts with one newly
  * admitted user instruction. Physical file changes and external tool side effects are not undone.

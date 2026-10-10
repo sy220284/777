@@ -131,7 +131,12 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
                     put("reason", "session-busy")
                 })
             }
-            updateError(snapshot, expectedAssistantMessageId, "回复建议已生成，但会话正在处理其他操作；请稍后重试")
+            // The ordinary error projection intentionally rejects busy sessions. Report this
+            // specific rejected user action only if it still belongs to the visible session.
+            val current = runtimeStateStore.state.value
+            if (current.sessionId == expectedSessionId && current.usageMode == LocalUsageMode.CHAT) {
+                runtimeStateStore.projection.publishError("回复建议已生成，但会话正在处理其他操作；请稍后重试")
+            }
             return false
         }
         try {

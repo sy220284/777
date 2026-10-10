@@ -319,7 +319,8 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                 if (committed) {
                     chatState.update { current ->
                         if (current.sessionId != before.sessionId) current else current.copy(
-                            error = "历史编辑已提交，后续投影失败：${error.message ?: error::class.java.simpleName}",
+                            error = (if (started == null) "历史编辑已提交，但新回复未启动" else "历史编辑已提交，后续投影失败") +
+                                "：${error.message ?: error::class.java.simpleName}",
                         )
                     }
                     if (started != null) LocalChatUserEditResult.SENT
