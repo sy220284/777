@@ -83,13 +83,12 @@ class VersionedSessionStore(
     fun read(id: String): SessionLoadResult? {
         val file = fileFor(id)
         val backup = backupFor(id)
-        if (!file.isFile) {
+        val loaded = if (!file.isFile) {
             if (!backup.isFile) return null
             val recovered = readFromFile(id, backup)
             atomicWrite(file, backup.readText())
-            return recovered.copy(recovered = true)
-        }
-        return try {
+            recovered.copy(recovered = true)
+        } else try {
             readFromFile(id, file)
         } catch (future: FutureSessionVersionException) {
             throw future
@@ -106,6 +105,10 @@ class VersionedSessionStore(
             atomicWrite(file, backup.readText())
             recovered.copy(recovered = true)
         }
+        // Explicit legacy-session migration may copy an old snapshot after the catalog was
+        // initialized. A successful direct read adopts that known identity without rescanning.
+        catalog.register(id)
+        return loaded
     }
 
     @Synchronized
