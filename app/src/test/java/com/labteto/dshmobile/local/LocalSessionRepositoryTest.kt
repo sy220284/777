@@ -292,4 +292,37 @@ class LocalSessionRepositoryTest {
         assertTrue(failures.isEmpty())
     }
 
+
+    @Test fun reopenedSessionAndHistoryAuthorizationIgnoreNestedAgentTeamProjectionFiles() = runTest {
+        val id = "83b4f37f-fe6d-4213-97b6-8ca2251f825a"
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = id, title = "保留的聊天", updatedAt = 123L))
+        val sidecar = java.io.File(temporary.root, "$id.events.jsonl.projection-work.agent-team.json")
+            .apply { writeText("{}") }
+        val nested = java.io.File(
+            temporary.root,
+            "$id" + ".events.jsonl.projection-work.agent-team".repeat(4) + ".json",
+        ).apply { writeText("{}") }
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        assertEquals(listOf(id), reopened.summaries().map { it.id })
+        assertEquals("保留的聊天", reopened.read(id)?.title)
+
+        // History authorization calls summaries() before granting the current session's log.
+        // An unrelated derived checkpoint must not poison that access path.
+        val log = com.labteto.dshmobile.local.session.LocalSessionEventLog(
+            java.io.File(temporary.root, "$id.events.jsonl"), Json,
+        )
+        val access = com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator(
+            summaries = reopened::summaries,
+            currentSessionId = { id },
+            currentScope = { com.labteto.dshmobile.local.session.LocalSessionAccessScope(null, id) },
+            activeScope = { null },
+            eventLogFor = { log },
+        )
+        assertSame(log, access.authorizedLog(id))
+        assertTrue(failures.isEmpty())
+        assertTrue(sidecar.isFile)
+        assertTrue(nested.isFile)
+    }
 }
