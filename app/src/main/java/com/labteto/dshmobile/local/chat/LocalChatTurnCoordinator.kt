@@ -127,10 +127,11 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         assistantMessage: String,
         context: ChatContextState = ChatContextState(),
     ): String = interactionPlanner.prompt(
-        persona = persona.forRuntimeStoryStage(context),
+        persona = persona,
         state = state,
         userMessage = userMessage,
         assistantMessage = assistantMessage,
+        context = context,
     )
 
     internal fun postTurnParseFailureKind(text: String): String =
@@ -177,11 +178,12 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         val userMessage = recentDialogue.lastOrNull { it.first == "user" }?.second.orEmpty()
         val assistantMessage = recentDialogue.lastOrNull { it.first == "assistant" }?.second.orEmpty()
         return interactionPlanner.suggestionsPrompt(
-            persona = persona.forRuntimeStoryStage(context),
+            persona = persona,
             state = state,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
             recentDialogue = recentDialogue,
+            context = context,
         )
     }
 
