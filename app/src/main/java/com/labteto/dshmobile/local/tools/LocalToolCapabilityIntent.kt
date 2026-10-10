@@ -15,12 +15,7 @@ internal data class LocalToolCapabilityIntent(
             input: String,
             history: List<JsonObject>,
         ): LocalToolCapabilityIntent {
-            val recentUserInputs = history.asReversed().asSequence()
-                .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
-                .mapNotNull { message -> (message["content"] as? JsonPrimitive)?.contentOrNull }
-                .filterNot(::isSyntheticCheckpoint)
-                .take(4)
-                .toList()
+            val recentUserInputs = meaningfulUserInputs(history).take(4).toList()
             val context = buildString {
                 append(input.takeLast(4_000))
                 recentUserInputs.forEach { content ->
@@ -38,6 +33,16 @@ internal data class LocalToolCapabilityIntent(
                 requestsGitHub = githubIntent,
             )
         }
+
+        // Only real user messages may trigger newly registered tools after a resumed run.
+        fun latestUserInput(history: List<JsonObject>): String? =
+            meaningfulUserInputs(history).firstOrNull()
+
+        private fun meaningfulUserInputs(history: List<JsonObject>): Sequence<String> =
+            history.asReversed().asSequence()
+                .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
+                .mapNotNull { message -> (message["content"] as? JsonPrimitive)?.contentOrNull }
+                .filterNot(::isSyntheticCheckpoint)
 
         private fun isSyntheticCheckpoint(content: String): Boolean =
             "<work-checkpoint>" in content ||
