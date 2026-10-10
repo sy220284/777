@@ -44,12 +44,14 @@ internal class LocalPersistentJobStore(
         try {
             readFrom(file)
         } catch (primaryError: Exception) {
-            AppLog.failure("LocalPersistentJobStore", "read_primary_job_snapshot", primaryError)
+            AppLog.error("LocalPersistentJobStore", "operation=read_primary_job_snapshot " +
+                "cause_type=${primaryError.javaClass.simpleName} status=corrupt_primary")
             if (!backup.isFile) throw primaryError
             val recovered = try {
                 readFrom(backup)
             } catch (backupError: Exception) {
-                AppLog.failure("LocalPersistentJobStore", "read_backup_job_snapshot", backupError)
+                AppLog.error("LocalPersistentJobStore", "operation=read_backup_job_snapshot " +
+                    "cause_type=${backupError.javaClass.simpleName} status=corrupt_backup")
                 throw primaryError
             }
             runCatching {
