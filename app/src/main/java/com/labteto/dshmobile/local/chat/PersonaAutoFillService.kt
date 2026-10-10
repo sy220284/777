@@ -43,6 +43,43 @@ internal data class PersonaDraft(
     val bannedPhrases: List<String> = emptyList(),
 )
 
+/**
+ * AI-assisted edits are incremental. Preserve existing canonical facts and explicit user edits;
+ * generated lore can enrich a matching entry or append a new one, never erase unrelated entries.
+ */
+internal fun mergeGeneratedLoreEntries(
+    previous: List<PersonaLoreEntry>,
+    incoming: List<PersonaLoreEntry>,
+): List<PersonaLoreEntry> {
+    val merged = previous.toMutableList()
+    incoming.filter { it.content.isNotBlank() }.forEach { next ->
+        val key = next.title.trim().lowercase().replace(Regex("\\s+"), "")
+        val index = merged.indexOfFirst { old ->
+            (next.id.isNotBlank() && next.id == old.id) ||
+                (key.isNotBlank() && old.title.trim().lowercase().replace(Regex("\\s+"), "") == key)
+        }
+        if (index >= 0) {
+            val old = merged[index]
+            merged[index] = old.copy(
+                title = next.title.ifBlank { old.title },
+                content = next.content,
+                keywords = (old.keywords + next.keywords).distinct(),
+                secondaryKeywords = (old.secondaryKeywords + next.secondaryKeywords).distinct(),
+                priority = if (next.priority == 50) old.priority else next.priority,
+                alwaysOn = old.alwaysOn || next.alwaysOn,
+                spoilerLevel = maxOf(old.spoilerLevel, next.spoilerLevel),
+            )
+        } else {
+            merged += next.copy(
+                id = next.id.ifBlank {
+                    "ai-lore-${(next.title.ifBlank { next.content.take(80) }).hashCode().toUInt().toString(16)}"
+                },
+            )
+        }
+    }
+    return merged.take(80)
+}
+
 internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
     val objectText = stripTrailingJsonCommas(extractFirstJsonObject(raw))
     val root = json.parseToJsonElement(objectText) as? JsonObject
@@ -292,6 +329,12 @@ class PersonaAutoFillService @Inject constructor(
             if (current.knowledgeBoundary.isNotEmpty()) appendLine("知识边界：${current.knowledgeBoundary.joinToString("；")}")
             if (current.hardConstraints.isNotEmpty()) appendLine("不可违反：${current.hardConstraints.joinToString("；")}")
             if (current.bannedPhrases.isNotEmpty()) appendLine("禁用表达：${current.bannedPhrases.joinToString("；")}")
+            if (current.loreEntries.isNotEmpty()) {
+                appendLine("已有原作世界书（请保留这些独立条目；只输出新增或实质修订的条目）：")
+                current.loreEntries.take(16).forEach { entry ->
+                    appendLine("编号=${entry.id}｜${entry.title}：${entry.content.take(240)}｜触发=${entry.keywords.take(8).joinToString("、")}")
+                }
+            }
         }.trim()
 
         val userPrompt = buildString {
@@ -458,7 +501,7 @@ class PersonaAutoFillService @Inject constructor(
             portrait = draft.portrait.ifBlank { current.portrait },
             lifeContext = draft.lifeContext.ifBlank { current.lifeContext },
             attentionBiases = draft.attentionBiases.ifEmpty { current.attentionBiases },
-            attentionKeywords = draft.attentionKeywords.ifEmpty { current.attentionKeywords },
+            attentionKeywords = (current.attentionKeywords + draft.attentionKeywords).distinct(),
             perceptionBlindSpots = draft.perceptionBlindSpots.ifEmpty { current.perceptionBlindSpots },
             quirks = draft.quirks.ifEmpty { current.quirks },
             limitations = draft.limitations.ifEmpty { current.limitations },
@@ -471,8 +514,8 @@ class PersonaAutoFillService @Inject constructor(
             worldSetting = draft.worldSetting.ifBlank { current.worldSetting },
             franchise = draft.franchise.ifBlank { current.franchise },
             timelinePosition = draft.timelinePosition.ifBlank { current.timelinePosition },
-            knowledgeBoundary = draft.knowledgeBoundary.ifEmpty { current.knowledgeBoundary },
-            loreEntries = draft.loreEntries.ifEmpty { current.loreEntries },
+            knowledgeBoundary = (current.knowledgeBoundary + draft.knowledgeBoundary).distinct(),
+            loreEntries = mergeGeneratedLoreEntries(current.loreEntries, draft.loreEntries),
             hardConstraints = draft.hardConstraints.ifEmpty { current.hardConstraints },
             bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
         )
