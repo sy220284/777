@@ -15,4 +15,6 @@
     <string name="local_persona_ai_stale">刚才切换了对话或人物，为避免覆盖你的修改，请重新生成。</string>
     <string name="local_persona_ai_failed">这次没能生成人设。请再试一次，如果一直失败，可以检查 AI 模型是否能正常使用。</string>
     <string name="local_persona_ai_example">例如：神里绫人，保留原作气质，和我更亲近一点，说话自然，别有客服腔。</string>
+    <string name="persona_v4_story_stage_label">剧情阶段 ID</string>
+    <string name="persona_v4_story_stage_hint">填写与人物事实“适用剧情阶段”一致的标识。留空只使用基础事实；保存后重新进入故事生效。</string>
 </resources>

@@ -403,14 +403,18 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
-    fun updateStoryNotes(id: String, storyId: String, notes: String): Boolean {
+    fun updateStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Boolean {
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         if (current.stories.none { it.id == storyId }) return false
         val now = System.currentTimeMillis()
         val updated = current.copy(
             stories = current.stories.map { story ->
-                if (story.id == storyId) story.copy(notes = notes.trim().take(4_000), updatedAt = now) else story
+                if (story.id == storyId) story.copy(
+                    notes = notes.trim().take(4_000),
+                    chatContext = story.chatContext.copy(storyStage = storyStage.trim().take(160)).normalized(),
+                    updatedAt = now,
+                ) else story
             },
             updatedAt = now,
         )

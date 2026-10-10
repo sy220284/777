@@ -48,7 +48,8 @@ class LocalChatUiFacade @Inject constructor(
     internal fun applyGallerySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>) =
         gallery.applySuggestions(id, suggestions)
     internal fun updateGalleryPortrait(id: String, path: String) = gallery.updatePortraitPath(id, path)
-    internal fun updateStoryNotes(id: String, storyId: String, notes: String) = gallery.updateStoryNotes(id, storyId, notes)
+    internal fun updateStoryDetails(id: String, storyId: String, notes: String, storyStage: String) =
+        gallery.updateStoryDetails(id, storyId, notes, storyStage)
     internal fun renameStory(id: String, storyId: String, title: String) = gallery.renameStory(id, storyId, title)
     internal fun deleteGallery(id: String) = gallery.delete(id)
     internal fun deleteStory(id: String, storyId: String) = gallery.deleteStory(id, storyId)

@@ -72,7 +72,7 @@ internal fun localChatFeatureUiContribution(
                 currentSessionId = surface.sessionId,
                 canSave = !surface.loading && !surface.running,
                 onSaveCurrent = actions.saveCurrentToGallery,
-                onEditNotes = actions.editGalleryNotes,
+                onEditStoryDetails = actions.editGalleryStoryDetails,
                 onRenameStory = actions.renameGalleryStory,
                 onInspect = actions.inspectGalleryPersona,
                 onApplySuggestions = actions.applyGallerySuggestions,

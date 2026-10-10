@@ -306,9 +306,9 @@ private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
     }
 }
 
-suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
+suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(chatUi.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
+        check(chatUi.updateStoryDetails(id, storyId, notes, storyStage)) { "图集故事已不存在" }
         _gallery.value = chatUi.galleryEntries()
     }
 }

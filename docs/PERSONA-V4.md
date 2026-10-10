@@ -7,9 +7,9 @@
 - 核心身份：`name`、`franchise`、`coreIdentity`。
 - 人物事实：`facts: List<CharacterFact>`；每项包含稳定ID、category、content、关联事实ID、主观视角、剧情阶段、来源类型与可选出处。
 - 标准分类：personality, selfNarrative, identityGap, valuesAndTradeoffs, subjectiveBeliefs, biography, definingChoices, emotionalImprints, lifeGravity, unfinishedBusiness, relationships, limitsAndCosts, sensorySignature, preferencesAndHabits, voiceStyle, customFacts。
-- 人物背景与原作：已有 `PersonaLoreEntry`，继续按需召回。阶段范围已在事实模型中提供，完整剧情阶段权限仍需要专项验证。
+- 人物背景与原作：已有 `PersonaLoreEntry`，继续按需召回。人物事实的 `temporalScope` 仅使用故事显式 `storyStage` 匹配，绝不借用场景钟点。图集中按故事编辑剧情阶段 ID，保存后重新进入该故事时从归档上下文装载。未设阶段时隐藏阶段限定事实；世界书继续按剧透等级和关键词检索。完整设备回归仍以CI和真实执行记录为准。
 - 当前情绪、主动性、注意、关系、记忆、人物成长：由独立 Chat 运行时持有，禁止写成预设回复脚本。
-- 保存、编辑、AI与预设在新 V4 路径消费人物事实；对于已有仍引用旧字段的运行时调用点，需在本PR后续审计收敛。此段只描述当前进度，不代表已经完成移除。
+- 保存、编辑、AI与预设在新 V4 路径消费人物事实。关键运行时的人物底色、生活、注意力和行为提示已改为优先读取 V4 事实，避免已存在事实时从旧描述恢复冲突内容。仓库仍保留部分旧结构和非关键链路引用，尚需审计并最终移除，不能宣称V4结构已完全纯化。
 
 ## 写入和检索
 

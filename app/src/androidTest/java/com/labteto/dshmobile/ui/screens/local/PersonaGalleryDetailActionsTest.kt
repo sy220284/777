@@ -47,7 +47,7 @@ class PersonaGalleryDetailActionsTest {
                     currentSessionId = "detail-actions-session",
                     canSave = true,
                     onSaveCurrent = { _, _, _, _ -> saves++; Result.success(entry) },
-                    onEditNotes = { _, _, _ -> Result.success(Unit) },
+                    onEditStoryDetails = { _, _, _, _ -> Result.success(Unit) },
                     onRenameStory = { _, _, _ -> Result.success(Unit) },
                     onInspect = { _, _ -> Result.success(PersonaInspectionResult()) },
                     onApplySuggestions = { _, _ -> Result.success(entry) },

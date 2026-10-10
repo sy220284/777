@@ -178,7 +178,7 @@ internal fun PersonaGalleryScreen(
     currentSessionId: String,
     canSave: Boolean,
     onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
-    onEditNotes: suspend (String, String, String) -> Result<Unit>,
+    onEditStoryDetails: suspend (String, String, String, String) -> Result<Unit>,
     onRenameStory: suspend (String, String, String) -> Result<Unit>,
     onInspect: suspend (String, String?) -> Result<PersonaInspectionResult>,
     onApplySuggestions: suspend (String, List<PersonaAppendSuggestion>) -> Result<PersonaGalleryEntry>,
@@ -214,6 +214,9 @@ internal fun PersonaGalleryScreen(
     var notes by rememberSaveable(selectedId, selectedStoryId, selectedStory?.notes) {
         mutableStateOf(selectedStory?.notes.orEmpty())
     }
+    var storyStage by rememberSaveable(selectedId, selectedStoryId, selectedStory?.chatContext?.storyStage) {
+        mutableStateOf(selectedStory?.chatContext?.storyStage.orEmpty())
+    }
     var storyTitle by rememberSaveable(selectedId, selectedStoryId, selectedStory?.title) {
         mutableStateOf(selectedStory?.title.orEmpty())
     }
@@ -237,7 +240,8 @@ internal fun PersonaGalleryScreen(
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
-        notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
+        notes != story.notes || storyStage.trim() != story.chatContext.storyStage ||
+            (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
     val selectedSuggestionKeys = remember(selectedId, selectedStoryId) { mutableStateListOf<String>() }
 
@@ -947,13 +951,27 @@ internal fun PersonaGalleryScreen(
                             },
                         )
 
-                        if (notes != story.notes) {
+                        DsTextField(
+                            value = storyStage,
+                            onValueChange = { storyStage = it.take(160) },
+                            label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !busy && !inspecting,
+                        )
+                        Text(
+                            stringResource(R.string.persona_v4_story_stage_hint),
+                            style = DsType.small13.withReadingWeight(),
+                            color = DsTheme.colors.labelSecondary,
+                        )
+
+                        if (notes != story.notes || storyStage.trim() != story.chatContext.storyStage) {
                             DsButton(
                                 text = stringResource(R.string.persona_gallery_save_story),
                                 onClick = {
                                     busy = true
                                     scope.launch {
-                                        onEditNotes(selected.id, story.id, notes)
+                                        onEditStoryDetails(selected.id, story.id, notes, storyStage)
                                             .onSuccess { notice = storySavedText }
                                             .onFailure { error = it.message ?: saveFailedText }
                                         busy = false
