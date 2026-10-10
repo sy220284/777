@@ -2,6 +2,7 @@ package com.labteto.dshmobile.observability
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -13,6 +14,7 @@ class AppLogStressTest {
         val executor = createAppLogPersistenceExecutor(maxQueued = 2)
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)
+        val persisted = AtomicInteger()
         try {
             executor.execute {
                 started.countDown()
@@ -21,14 +23,15 @@ class AppLogStressTest {
             assertTrue(started.await(5, TimeUnit.SECONDS))
 
             repeat(1_000) {
-                executor.execute { /* tail persistence work */ }
+                executor.execute { persisted.incrementAndGet() }
             }
 
             assertTrue(executor.queue.size <= 2)
         } finally {
             release.countDown()
-            executor.shutdownNow()
-            executor.awaitTermination(5, TimeUnit.SECONDS)
+            executor.shutdown()
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS))
+            assertEquals(1_000, persisted.get())
         }
     }
 
@@ -47,6 +50,24 @@ class AppLogStressTest {
         assertEquals("IllegalStateException", entry.throwableType)
         assertTrue(entry.throwableMessage.orEmpty().contains("<redacted>"))
         assertTrue(!entry.throwableMessage.orEmpty().contains("hidden"))
+    }
+
+    @Test
+    fun caughtExceptionKeepsOperationIdentityAndSanitizedNestedCause() {
+        AppLog.clear()
+        AppLog.failure(
+            "Model", "request_model",
+            IllegalStateException("request failed", IllegalArgumentException("access_token=super-secret")),
+            sessionId = "session-12", requestId = "req-12", runId = "run-12",
+        )
+        val entry = AppLog.snapshot().last()
+        assertTrue(entry.message.contains("operation=request_model"))
+        assertTrue(entry.message.contains("session_id=session-12"))
+        assertTrue(entry.message.contains("request_id=req-12"))
+        assertTrue(entry.message.contains("run_id=run-12"))
+        assertTrue(entry.throwableCauseChain.orEmpty().contains("IllegalArgumentException"))
+        assertTrue(entry.throwableCauseChain.orEmpty().contains("<redacted>"))
+        assertTrue(!entry.throwableCauseChain.orEmpty().contains("super-secret"))
     }
 
     @Test
