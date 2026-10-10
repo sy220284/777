@@ -67,6 +67,48 @@ class LocalRunCenterAgentActionsTest {
     }
 
     @Test
+    fun sourceChatButtonOnlyExistsWhenParentIsAvailable() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                LocalRunCenterScreen(
+                    state = LocalWorkUiState(sessionId = "work-child"),
+                    onJobOutput = { "" }, onArtifacts = { emptyList() },
+                    onStopJob = { "" },
+                    onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
+                    onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
+                    onOpenResults = {}, onDismiss = {},
+                    onOpenSourceSession = { opened++ },
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_work_handoff_return_source))
+            .assertIsDisplayed().performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(1, opened) }
+    }
+
+    @Test
+    fun removedSourceExplainsLossWithoutHidingCurrentWork() {
+        compose.setContent {
+            DshTheme {
+                LocalRunCenterScreen(
+                    state = LocalWorkUiState(sessionId = "work-child"),
+                    onJobOutput = { "" }, onArtifacts = { emptyList() },
+                    onStopJob = { "" },
+                    onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
+                    onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
+                    onOpenResults = {}, onDismiss = {},
+                    sourceSessionMissing = true,
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_work_handoff_source_removed))
+            .assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.local_work_handoff_return_source))
+            .assertDoesNotExist()
+    }
+
+    @Test
     fun idleRunCenterStillExposesDirectAgentLaunch() {
         compose.setContent {
             DshTheme {
