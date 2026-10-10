@@ -136,11 +136,27 @@ internal object ChatContextAssembler {
     private fun sameStructuredFactSlot(left: String, right: String): Boolean {
         val a = left.trim()
         val b = right.trim()
-        if (hasField(a, "时间") && hasField(b, "时间")) return true
-        if (hasField(a, "地点") && hasField(b, "地点")) return true
-        if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) return true
+        // Bare time/location fields describe the current scene. Named events with their
+        // own time/location must coexist even when they use identical field labels.
+        if (isCurrentSceneField(a) && isCurrentSceneField(b)) {
+            if (hasField(a, "时间") && hasField(b, "时间")) return true
+            if (hasField(a, "地点") && hasField(b, "地点")) return true
+        }
+        if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) {
+            // Different people are not conflicting relationship states.
+            return relationshipSubject(a) == relationshipSubject(b)
+        }
         return false
     }
+
+    private fun isCurrentSceneField(text: String): Boolean =
+        text.startsWith("当前硬场景：") ||
+            text.startsWith("当前硬场景:") ||
+            Regex("""^(?:时间|地点)\s*[=:：]""").containsMatchIn(text)
+
+    private fun relationshipSubject(text: String): String? =
+        Regex("""关系状态：我和([^｜|:：\n]{1,80})""").find(text)?.groupValues?.get(1)?.trim()
+
 
     private fun hasField(text: String, label: String): Boolean =
         Regex("""(?:^|[｜|])\s*$label\s*[=:：]""").containsMatchIn(text) ||

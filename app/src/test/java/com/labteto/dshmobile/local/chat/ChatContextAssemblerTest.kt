@@ -186,6 +186,35 @@ class ChatContextAssemblerTest {
 
 
     @Test
+    fun independentEventsWithTheirOwnTimeAndPlaceBothSurviveContextAssembly() {
+        val rendered = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【当前状态】
+                时间=今晚｜地点=家里
+            """.trimIndent(),
+            relationshipMemory = """
+                【人物长期经历】
+                聚会｜时间=周六晚上｜地点=阿青家
+                旅行｜时间=下周二早上｜地点=车站
+            """.trimIndent(),
+            userInput = "我们后来去了哪些地方？",
+        )
+        assertTrue(rendered.contains("时间=今晚｜地点=家里"))
+        assertTrue(rendered.contains("聚会｜时间=周六晚上｜地点=阿青家"))
+        assertTrue(rendered.contains("旅行｜时间=下周二早上｜地点=车站"))
+    }
+
+    @Test
+    fun differentCharacterRelationshipStatesAreNotMergedTogether() {
+        assertFalse(ChatContextAssembler.factConflicts(
+            "关系状态：我和阿青｜熟悉", "关系状态：我和阿紫｜稳定关系",
+        ))
+        assertTrue(ChatContextAssembler.factConflicts(
+            "关系状态：我和阿青｜熟悉", "关系状态：我和阿青｜稳定关系",
+        ))
+    }
+
+    @Test
     fun userQuestionDoesNotSuppressCurrentCommittedSchedule() {
         val context = ChatContextAssembler.assemble(
             dynamicPrompt = """
