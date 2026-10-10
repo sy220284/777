@@ -17,11 +17,10 @@ import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
 import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.localToolFailure
+import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -65,11 +64,7 @@ internal class LocalWorkTurnToolRuntime(
         // A connection or plugin install can register new tools during this run.
         // Re-evaluate only the active user's task before each model step; newly registered
         // capabilities become available automatically without restarting or editing tool maps.
-        val activeTask = history.asReversed().firstNotNullOfOrNull { message ->
-            if ((message["role"] as? JsonPrimitive)?.contentOrNull == "user") {
-                (message["content"] as? JsonPrimitive)?.contentOrNull
-            } else null
-        }
+        val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
         if (!activeTask.isNullOrBlank()) {
             execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
         }
