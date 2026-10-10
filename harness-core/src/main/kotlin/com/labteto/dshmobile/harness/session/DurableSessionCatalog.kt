@@ -45,6 +45,19 @@ internal class DurableSessionCatalog(
         shared.ids = next
     }
 
+    /**
+     * Adopt a known legacy file copied after initial migration, but only when its contents
+     * genuinely identify a session. A projection file must never register itself by being read.
+     */
+    fun adopt(id: String) {
+        require(SESSION_ID_PATTERN.matches(id)) { "非法会话编号：$id" }
+        val primarySnapshot = File(root, "$id.json")
+        val backupSnapshot = File(root, "$id.backup.json")
+        if (documentHasIdentity(primarySnapshot, id) || documentHasIdentity(backupSnapshot, id)) {
+            register(id)
+        }
+    }
+
     /** Unregister only AFTER primary/backup deletion; interrupted deletion never hides live data. */
     fun unregister(id: String) = synchronized(shared) {
         ensureLoaded()
@@ -108,6 +121,7 @@ internal class DurableSessionCatalog(
     }
 
     private fun documentHasIdentity(file: File, id: String): Boolean {
+        if (!file.isFile) return false
         val rootObject = runCatching { json.parseToJsonElement(file.readText()).jsonObject }
             .getOrNull() ?: return false
         val wrappedVersion = (rootObject["formatVersion"] as? JsonPrimitive)?.intOrNull
