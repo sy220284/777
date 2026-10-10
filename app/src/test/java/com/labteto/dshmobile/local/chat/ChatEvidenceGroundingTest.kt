@@ -23,6 +23,10 @@ class ChatEvidenceGroundingTest {
             RelationshipEvidence(text = "我喜欢阿青", source = "user"),
             userMessage = "我不喜欢阿青", assistantMessage = "",
         ))
+        assertFalse(evidenceGrounded(
+            RelationshipEvidence(text = "喜欢阿青", source = "user"),
+            userMessage = "我不喜欢阿青", assistantMessage = "",
+        ))
         assertTrue(evidenceGrounded(
             RelationshipEvidence(text = "我不喜欢阿青", source = "user"),
             userMessage = "我不喜欢阿青", assistantMessage = "",
