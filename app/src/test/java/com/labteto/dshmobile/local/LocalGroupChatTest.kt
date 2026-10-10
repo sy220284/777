@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_RESPONDERS_PER_TURN
 import com.labteto.dshmobile.local.chat.groupChatResponders
+import com.labteto.dshmobile.local.chat.groupMemberMayStaySilent
 import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
 import com.labteto.dshmobile.local.chat.groupTranscriptLine
 import com.labteto.dshmobile.local.chat.migrateLegacyConversationContext
@@ -37,6 +38,14 @@ class LocalGroupChatTest {
         displayName = "赵二",
         chatState = ChatCharacterState(),
     )
+
+    @Test
+    fun optionalGroupSilenceNeverOverridesExplicitlyRequestedSpeakers() {
+        assertTrue(!groupMemberMayStaySilent("大家聊聊今天的事", ayaka, 0))
+        assertTrue(groupMemberMayStaySilent("大家聊聊今天的事", kafka, 1))
+        assertTrue(!groupMemberMayStaySilent("每个人都回答：你们怎么看？", kafka, 1))
+        assertTrue(!groupMemberMayStaySilent("卡芙卡，你怎么看？", kafka, 1))
+    }
 
     @Test
     fun explicitMentionRoutesOnlyToNamedCharacter() {

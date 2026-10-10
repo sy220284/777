@@ -215,6 +215,21 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun independentEventRelationshipsAreNotDeletedAsCurrentRelationshipConflicts() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = "【当前状态】情绪=平稳｜关系=信任",
+            relationshipMemory = """
+                【经历】
+                聚会｜关系=朋友｜地点=街角书店
+                工作｜关系=同事｜地点=摄影棚
+            """.trimIndent(),
+            userInput = "后来和朋友同事怎么样了？",
+        )
+        assertTrue(context.contains("聚会｜关系=朋友"))
+        assertTrue(context.contains("工作｜关系=同事"))
+    }
+
+    @Test
     fun userQuestionDoesNotSuppressCurrentCommittedSchedule() {
         val context = ChatContextAssembler.assemble(
             dynamicPrompt = """

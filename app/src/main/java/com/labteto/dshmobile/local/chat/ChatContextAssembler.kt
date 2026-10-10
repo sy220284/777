@@ -143,8 +143,13 @@ internal object ChatContextAssembler {
             if (hasField(a, "地点") && hasField(b, "地点")) return true
         }
         if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) {
-            // Different people are not conflicting relationship states.
-            return relationshipSubject(a) == relationshipSubject(b)
+            val leftPerson = relationshipSubject(a)
+            val rightPerson = relationshipSubject(b)
+            if (leftPerson != null || rightPerson != null) {
+                return leftPerson != null && leftPerson == rightPerson
+            }
+            // An event's relation attribute does not replace current relationship state.
+            return isCurrentRelationshipField(a) && isCurrentRelationshipField(b)
         }
         return false
     }
@@ -153,6 +158,12 @@ internal object ChatContextAssembler {
         text.startsWith("当前硬场景：") ||
             text.startsWith("当前硬场景:") ||
             Regex("""^(?:时间|地点)\s*[=:：]""").containsMatchIn(text)
+
+    private fun isCurrentRelationshipField(text: String): Boolean =
+        text.startsWith("关系状态：") ||
+            text.startsWith("保存时的关系：") ||
+            text.startsWith("【当前状态】") ||
+            Regex("""^关系\s*[=:：]""").containsMatchIn(text)
 
     private fun relationshipSubject(text: String): String? =
         Regex("""关系状态：我和([^｜|:：\n]{1,80})""").find(text)?.groupValues?.get(1)?.trim()

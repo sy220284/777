@@ -123,6 +123,12 @@ internal fun groupChatMentionedMembers(
         .toList()
 }
 
+/** Secondary speakers may listen naturally; direct or explicitly all-member requests still expect replies. */
+internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMember, index: Int): Boolean =
+    index > 0 &&
+        GROUP_CHAT_EVERYONE_CUES.none(input::contains) &&
+        (member.displayName.isBlank() || !input.contains(member.displayName))
+
 internal fun groupChatResponders(
     input: String,
     members: List<LocalGroupChatMember>,

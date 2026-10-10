@@ -149,6 +149,38 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun v4HabitsEvolveAcrossSeveralRelevantEventsWithoutModifyingCanonFacts() {
+        val habit = CharacterFact(
+            id = "habit", category = CharacterFactCategories.PREFERENCES_AND_HABITS,
+            content = "愿意求助", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        val future = CharacterFact("future", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "相信密探", temporalScope = "act-3", provenance = CharacterFactProvenance.CANON)
+        val unverified = CharacterFact("guess", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "渴望离开", provenance = CharacterFactProvenance.UNVERIFIED)
+        val persona = PersonaProfile(name = "阿青", facts = listOf(habit, future, unverified))
+        assertTrue(persona.mutableTraits.isEmpty())
+        var state = ChatCharacterState()
+        listOf(
+            "这回我愿意求助，你能帮我看看吗？",
+            "遇到麻烦时，我愿意求助并一起想办法。",
+            "我逐渐发现愿意求助也是自己的选择。",
+        ).forEach { reply ->
+            val evolved = evolveCharacterEvolution(
+                persona = persona, previous = state, current = state,
+                significance = "MINOR", userMessage = "需要帮忙就说。", assistantMessage = reply,
+            )
+            state = state.copy(evolution = evolved)
+        }
+        val trace = state.evolution.traitStates.getValue("愿意求助")
+        assertEquals(3, trace.evidenceCount)
+        assertTrue(trace.currentWeight > trace.baseline)
+        assertTrue("相信密探" !in state.evolution.traitStates)
+        assertTrue("渴望离开" !in state.evolution.traitStates)
+        assertEquals(habit, persona.facts.first())
+    }
+
+    @Test
     fun mutableTraitsChangeSlowlyAndRemainBoundedAcrossLongRuns() {
         val persona = PersonaProfile(
             name = "陈拾",

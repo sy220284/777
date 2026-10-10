@@ -202,7 +202,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 sharedContext = snapshot.chat.groupChat.context,
                 memoryContext = memoryContext,
                 announcement = snapshot.chat.groupChat.announcement,
-                mayStaySilent = false,
+                mayStaySilent = groupMemberMayStaySilent(input, member, index),
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
             val groupRequestHistory = withChatTurnContext(
@@ -753,6 +753,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     }
 
                     val content = generated.content
+                    if (content == GROUP_CHAT_SILENT_TOKEN &&
+                        groupMemberMayStaySilent(input, generated.member, index)
+                    ) {
+                        // Listening is an intentional choice, never a failed delivery or
+                        // a fabricated public utterance.
+                        eventLog.append("group/agent-silent", buildJsonObject {
+                            put("gallery_id", generated.member.galleryId)
+                            put("persona_id", generated.member.personaId)
+                        })
+                        return@forEachIndexed
+                    }
                     if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
                         currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-empty", buildJsonObject {
