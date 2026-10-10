@@ -84,8 +84,7 @@ object AppLog {
                     synchronous = true,
                 )
             }
-            if (previous != null) previous.uncaughtException(thread, throwable)
-            else thread.threadGroup?.uncaughtException(thread, throwable)
+            previous?.uncaughtException(thread, throwable)
         }
         crashHandlerInstalled = true
     }
