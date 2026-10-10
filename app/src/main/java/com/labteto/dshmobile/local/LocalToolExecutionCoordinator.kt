@@ -210,11 +210,11 @@ internal class LocalToolExecutionCoordinator(
         }.toSet()
         val omitted = matches.count { it.name !in projected }
         return buildString {
-            appendLine("发现 ${matches.size} 个已注册的候选扩展工具；按本次预算预计 ${matches.size - omitted} 个可在下一步使用：")
+            appendLine("发现 ${matches.size} 个已注册的候选扩展工具；按默认工具定义预算估算 ${matches.size - omitted} 个可在下一步使用：")
             // A large live MCP catalog is discoverable, but should not flood a model turn.
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
-                if (tool.name !in projected) append(" [未装入工具表：定义预算、复杂度或数量限制]")
+                if (tool.name !in projected) append(" [按默认预算暂未装入：定义预算或复杂度]")
                 LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
                     append("：").append(it)
                 }
@@ -223,7 +223,7 @@ internal class LocalToolExecutionCoordinator(
             if (matches.size > MAX_SEARCH_RESULT_PREVIEW) {
                 appendLine("另有 ${matches.size - MAX_SEARCH_RESULT_PREVIEW} 个匹配工具未在此展开；可按类别或精确名称进一步搜索。")
             }
-            if (omitted > 0) appendLine("有 $omitted 个候选受本轮工具定义 Token 预算或参数复杂度影响未装入；请按精确工具名搜索，将当前所需能力优先装入。")
+            if (omitted > 0) appendLine("有 $omitted 个候选在默认工具定义 Token 预算下未装入；请按精确工具名搜索，将当前所需能力优先装入。")
             append("实际调用仍以下一次模型请求真实提供的工具表及代理权限为准。")
         }.trimEnd()
     }
