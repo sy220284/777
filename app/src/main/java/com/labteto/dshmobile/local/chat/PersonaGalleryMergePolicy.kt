@@ -77,6 +77,9 @@ internal fun mergeCharacterFacts(
 }
 
 internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
+    mergeCanonicalPersonaProfiles(base.canonicalV4(), incoming.canonicalV4()).canonicalV4()
+
+private fun mergeCanonicalPersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
     base.copy(
         name = chooseDisplayName(base.name, incoming.name),
         coreIdentity = mergePersonaText(base.coreIdentity, incoming.coreIdentity, 4_000),
@@ -111,7 +114,7 @@ internal fun applyPersonaSuggestions(
     profile: PersonaProfile,
     suggestions: List<PersonaAppendSuggestion>,
 ): PersonaProfile {
-    var result = profile
+    var result = profile.canonicalV4()
     suggestions.forEach { suggestion ->
         val value = suggestion.value.trim()
         if (value.isBlank()) return@forEach
@@ -125,8 +128,12 @@ internal fun applyPersonaSuggestions(
                 content = value,
                 provenance = CharacterFactProvenance.USER_CREATED,
             ))
-            "portrait" -> result.copy(portrait = mergePersonaText(result.portrait, value, 4_000))
-            "lifeContext" -> result.copy(lifeContext = mergePersonaText(result.lifeContext, value, 4_000))
+            "portrait" -> result.withFact(
+                CharacterFactCategories.BIOGRAPHY,
+                mergePersonaText(result.factText(CharacterFactCategories.BIOGRAPHY), value, 4_000))
+            "lifeContext" -> result.withFact(
+                CharacterFactCategories.LIFE_GRAVITY,
+                mergePersonaText(result.factText(CharacterFactCategories.LIFE_GRAVITY), value, 4_000))
             "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))
             "attentionKeywords" -> result.copy(attentionKeywords = mergePersonaLines(result.attentionKeywords, listOf(value), 12))
             "perceptionBlindSpots" -> result.copy(perceptionBlindSpots = mergePersonaLines(result.perceptionBlindSpots, listOf(value), 8))
@@ -138,7 +145,10 @@ internal fun applyPersonaSuggestions(
             "mutableTraits" -> result.copy(mutableTraits = mergePersonaLines(result.mutableTraits, listOf(value), 8))
             "initialUserImpression" -> result.copy(initialUserImpression = mergePersonaText(result.initialUserImpression, value, 2_000))
             "voiceSamples" -> result.copy(voiceSamples = mergePersonaLines(result.voiceSamples, listOf(value), 20))
-            "worldSetting" -> result.copy(worldSetting = mergePersonaText(result.worldSetting, value, 4_000))
+            "worldSetting" -> result.copy(loreEntries = mergeLoreEntries(
+                result.loreEntries,
+                listOf(PersonaLoreEntry(id = "v4-world-suggestion", title = "世界背景",
+                    content = value, alwaysOn = true)), 80))
             "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
             "timelinePosition" -> result.copy(timelinePosition = mergePersonaText(result.timelinePosition, value, 2_000))
             "knowledgeBoundary" -> result.copy(knowledgeBoundary = mergePersonaLines(result.knowledgeBoundary, listOf(value), 20))
@@ -148,7 +158,7 @@ internal fun applyPersonaSuggestions(
             else -> result
         }
     }
-    return result
+    return result.canonicalV4()
 }
 
 internal fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterState): ChatCharacterState {

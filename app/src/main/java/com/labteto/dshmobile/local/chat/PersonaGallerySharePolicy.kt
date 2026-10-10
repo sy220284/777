@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-internal fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
+internal fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile.canonicalV4().copy(
     id = PersonaProfile.DEFAULT_PERSONA_ID,
     name = profile.name.trim().take(80).ifBlank { "默认角色" },
     coreIdentity = profile.coreIdentity.trim().take(4_000),
@@ -28,9 +28,9 @@ internal fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile
     bannedPhrases = sharePersonaLines(profile.bannedPhrases, 30, 240),
     corrections = sharePersonaLines(profile.corrections, 20, 240),
     updatedAt = 0L,
-)
+).canonicalV4()
 
-internal fun compactSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
+internal fun compactSharePersona(profile: PersonaProfile): PersonaProfile = profile.canonicalV4().copy(
     id = PersonaProfile.DEFAULT_PERSONA_ID,
     name = profile.name.trim().take(80).ifBlank { "默认角色" },
     coreIdentity = profile.coreIdentity.trim().take(420),
@@ -65,7 +65,7 @@ internal fun compactSharePersona(profile: PersonaProfile): PersonaProfile = prof
     bannedPhrases = sharePersonaLines(profile.bannedPhrases, 6, 40),
     corrections = emptyList(),
     updatedAt = 0L,
-)
+).canonicalV4()
 
 private fun shareLoreEntries(values: List<PersonaLoreEntry>, limit: Int): List<PersonaLoreEntry> =
     values.asSequence()
