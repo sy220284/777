@@ -34,9 +34,9 @@ class DshApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        clearRetiredApplicationLocale()
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         AppLog.installUnhandledExceptionLogger()
+        clearRetiredApplicationLocale()
         val uiModeManager = getSystemService(UiModeManager::class.java)
         uiModeManager.setApplicationNightMode(
             applicationNightModeFor(storedThemePreference(this), uiModeManager.nightMode),
