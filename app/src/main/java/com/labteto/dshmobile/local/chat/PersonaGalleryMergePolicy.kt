@@ -312,6 +312,7 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
             entry.id, entry.title, entry.content,
             entry.keywords.joinToString("|"), entry.secondaryKeywords.joinToString("|"),
             entry.priority.toString(), entry.alwaysOn.toString(), entry.spoilerLevel.toString(),
+            entry.temporalScope,
         ).joinToString("~")
     },
     persona.presetId + "|" + persona.behaviorTuning.signature(),
@@ -399,31 +400,55 @@ private fun mergePersonaText(base: String, incoming: String, limit: Int): String
     return (existingClauses + additions).joinToString("；").take(limit)
 }
 
+/**
+ * Same canonical lore ID can exist in several explicitly gated stages. The stage is part of
+ * the merge key; storage still needs distinct physical IDs for editing and round trips.
+ */
+private fun loreMergeIdentity(entry: PersonaLoreEntry): String {
+    val originalId = entry.id.substringBefore("#stage-").take(48)
+    return normalizePersonaText(originalId.ifBlank { entry.title.ifBlank { entry.content.take(80) } })
+}
+
+internal fun uniqueLoreEntryIds(entries: List<PersonaLoreEntry>): List<PersonaLoreEntry> {
+    val used = mutableSetOf<String>()
+    return entries.map { entry ->
+        val normalizedId = normalizePersonaText(entry.id)
+        if (normalizedId.isNotBlank() && used.add(normalizedId)) entry else {
+            val stem = entry.id.substringBefore("#stage-").take(48).ifBlank { "lore" }
+            val stageKey = entry.temporalScope.hashCode().toUInt().toString(16)
+            var suffix = 0
+            var nextId: String
+            do {
+                nextId = "$"+"{stem}#stage-$"+"{stageKey}" +
+                    (if (suffix == 0) "" else "-$"+"{suffix}")
+                suffix++
+            } while (!used.add(normalizePersonaText(nextId)))
+            entry.copy(id = nextId.take(80))
+        }
+    }
+}
+
 private fun mergeLoreEntries(
     base: List<PersonaLoreEntry>,
     incoming: List<PersonaLoreEntry>,
     limit: Int,
 ): List<PersonaLoreEntry> {
-    val merged = linkedMapOf<String, PersonaLoreEntry>()
+    val merged = linkedMapOf<Pair<String, String>, PersonaLoreEntry>()
     (base + incoming).forEach { entry ->
-        val key = normalizePersonaText(entry.id.ifBlank { entry.title.ifBlank { entry.content.take(80) } })
-        if (key.isBlank() || entry.content.isBlank()) return@forEach
+        val key = loreMergeIdentity(entry) to entry.temporalScope.trim()
+        if (key.first.isBlank() || entry.content.isBlank()) return@forEach
         val existing = merged[key]
-        merged[key] = if (existing == null) {
-            entry
-        } else {
-            existing.copy(
-                title = mergePersonaText(existing.title, entry.title, 120),
-                content = mergePersonaText(existing.content, entry.content, 4_000),
-                keywords = mergePersonaLines(existing.keywords, entry.keywords, 16),
-                secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
-                priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
-                alwaysOn = existing.alwaysOn || entry.alwaysOn,
-                spoilerLevel = maxOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
-            )
-        }
+        merged[key] = if (existing == null) entry else existing.copy(
+            title = mergePersonaText(existing.title, entry.title, 120),
+            content = mergePersonaText(existing.content, entry.content, 4_000),
+            keywords = mergePersonaLines(existing.keywords, entry.keywords, 16),
+            secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
+            priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
+            alwaysOn = existing.alwaysOn || entry.alwaysOn,
+            spoilerLevel = maxOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
+        )
     }
-    return merged.values.toList().takeLast(limit)
+    return uniqueLoreEntryIds(merged.values.toList().takeLast(limit))
 }
 
 internal fun mergePersonaLines(base: List<String>, incoming: List<String>, limit: Int): List<String> {
