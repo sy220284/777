@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_RESPONDERS_PER_TURN
 import com.labteto.dshmobile.local.chat.groupChatResponders
+import com.labteto.dshmobile.local.chat.groupMemberMemoryQuery
 import com.labteto.dshmobile.local.chat.groupMemberMayStaySilent
 import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
 import com.labteto.dshmobile.local.chat.groupTranscriptLine
@@ -38,6 +39,26 @@ class LocalGroupChatTest {
         displayName = "赵二",
         chatState = ChatCharacterState(),
     )
+
+    @Test
+    fun groupFollowUpMemoryUsesOnlyDeliveredSpeechAndKeepsItBounded() {
+        val first = groupMemberMemoryQuery("你们觉得怎么样？", emptyList())
+        assertEquals("你们觉得怎么样？", first)
+        val expanded = groupMemberMemoryQuery(
+            "你们觉得怎么样？",
+            listOf("阿青：我想起一起去海边的那次约定", "卡芙卡：那天我们还见过灯塔"),
+        )
+        assertTrue(expanded.contains("一起去海边的那次约定"))
+        assertTrue(expanded.contains("那天我们还见过灯塔"))
+        val many = groupMemberMemoryQuery(
+            "新问题",
+            listOf("旧发言不应保留", "第二位：车站见面", "第三位：失而复得的地图"),
+        )
+        assertTrue(!many.contains("旧发言不应保留"))
+        assertTrue(many.contains("车站见面"))
+        assertTrue(many.contains("地图"))
+        assertTrue(groupMemberMemoryQuery("x".repeat(900), listOf("话".repeat(900))).length <= 640)
+    }
 
     @Test
     fun optionalGroupSilenceNeverOverridesExplicitlyRequestedSpeakers() {

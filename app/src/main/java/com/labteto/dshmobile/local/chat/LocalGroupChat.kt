@@ -124,6 +124,25 @@ internal fun groupChatMentionedMembers(
 }
 
 /** Secondary speakers may listen naturally; direct or explicitly all-member requests still expect replies. */
+/**
+ * Only speech actually delivered to the group can expand another member's memory query.
+ * Every member still searches under their own subject key. This is request-local and
+ * bounded; it neither persists memories under a different character nor broadcasts them.
+ */
+internal fun groupMemberMemoryQuery(
+    userInput: String,
+    deliveredPublicSpeech: List<String>,
+): String = buildString {
+    append(userInput.trim().take(380))
+    deliveredPublicSpeech.takeLast(2).forEach { spoken ->
+        val excerpt = spoken.trim().take(240)
+        if (excerpt.isNotEmpty()) {
+            append("\n群聊前一位成员说：")
+            append(excerpt)
+        }
+    }
+}.trim()
+
 internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMember, index: Int): Boolean =
     index > 0 &&
         GROUP_CHAT_EVERYONE_CUES.none(input::contains) &&

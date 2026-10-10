@@ -717,6 +717,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 // Sequential generation also avoids showing a conversation whose participants
                 // responded to stale parallel snapshots. Only delivered messages are shared.
                 val speakingHistory = baseHistory.toMutableList()
+                val deliveredPublicSpeech = mutableListOf<String>()
                 responders.forEachIndexed { index, initialMember ->
                     val member = currentGroup.members.firstOrNull {
                         it.galleryId == initialMember.galleryId
@@ -727,6 +728,23 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         )
                     }
 
+                    // Re-evaluate only this member's own relevant memories when an
+                    // earlier speaker has introduced new public facts this turn.
+                    val memoryForMember = if (deliveredPublicSpeech.isEmpty()) {
+                        groupMemoryContexts[member.galleryId].orEmpty()
+                    } else {
+                        val persona = chatPersonaStore.get(member.personaId)
+                        val subjectKey = chatRelationshipSubjectKey(member.galleryId, member.personaId)
+                        val related = subjectKey?.let {
+                            chatMemory.relationshipContext(
+                                query = groupMemberMemoryQuery(input, deliveredPublicSpeech),
+                                viewerSubjectKey = it,
+                                viewerName = persona.name,
+                                groupAudience = true,
+                            )
+                        }.orEmpty()
+                        related + sharedWebContext
+                    }
                     val generated = generateGroupReply(
                         key = key,
                         snapshot = snapshot,
@@ -734,7 +752,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         input = input,
                         allMembers = members,
                         member = member,
-                        memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
+                        memoryContext = memoryForMember,
                         index = index,
                         turnId = turnId,
                     )
@@ -795,6 +813,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     }
                     modelHistory.append(publicReply)
                     speakingHistory += publicReply
+                    deliveredPublicSpeech += groupTranscriptLine(transcript)
                     updateContextMetrics()
                     val beforeAssistant = runtimeStateStore.state.value
                     transcriptRuntime.applyMessages(
