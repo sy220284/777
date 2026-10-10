@@ -96,6 +96,23 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun explicitlyAskingEveryoneInvitesEveryMemberInRosterOrder() {
+        val extra = LocalGroupChatMember(
+            galleryId = "extra", personaId = "extra",
+            displayName = "黎深", chatState = ChatCharacterState(),
+        )
+        val responders = groupChatResponders(
+            input = "每个人都回答：你们各自怎么看这件事？",
+            members = listOf(ayaka, kafka, zhao, extra),
+        )
+        assertEquals(listOf("ayaka", "kafka", "zhao", "extra"),
+            responders.map { it.galleryId })
+        assertEquals(listOf("ayaka", "kafka"), groupChatResponders(
+            "大家随便聊聊", listOf(ayaka, kafka, zhao, extra),
+        ).map { it.galleryId })
+    }
+
+    @Test
     fun referentialNameMentionDoesNotForceThatCharacterToReply() {
         val responders = groupChatResponders(
             input = "刚才卡芙卡说得那句挺有意思",
