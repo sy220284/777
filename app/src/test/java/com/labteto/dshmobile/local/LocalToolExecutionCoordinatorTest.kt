@@ -154,7 +154,6 @@ class LocalToolExecutionCoordinatorTest {
         val fallback = coordinator.searchCapabilities("完全不在关键词中的陌生描述")
         assertTrue(fallback.contains("mcp_newly_added"))
         assertFalse("mcp_newly_added" in coordinator.enabledOptionalSnapshot())
-        assertFalse("mcp_newly_added" in coordinator.enabledOptionalSnapshot())
         val result = coordinator.searchCapabilities("mcp_newly_added")
         assertTrue(result.contains("mcp_newly_added"))
         assertTrue("mcp_newly_added" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
