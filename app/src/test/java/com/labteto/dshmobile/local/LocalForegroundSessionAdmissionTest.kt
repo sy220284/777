@@ -126,6 +126,49 @@ class LocalForegroundSessionAdmissionTest {
     }
 
     @Test
+    fun anEditedWorkTurnHandsOffItsExistingSessionLeaseWithoutAnAdmissionGap() {
+        val sessionId = "edit-handoff-" + UUID.randomUUID()
+        val originalLease = requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+            sessionId, LocalSessionRuntimeKind.FOREGROUND,
+        ))
+        var received: LocalSessionRuntimeLease? = null
+        val result = coordinateOwnedLocalSend(
+            usageMode = LocalUsageMode.WORK, sessionId = sessionId,
+            workBindingActive = false, visibleJobActive = false,
+            configured = true, loading = false, sessionTransitioning = false,
+            pendingCount = 0, pendingLimit = 8,
+            onRejected = { error("edited send should start") }, onAccepted = {},
+            enqueue = { error("edited send must not queue behind its own lease") },
+            onQueued = { error("must not queue") },
+            onStart = { received = it }, preownedLease = originalLease,
+        )
+        assertTrue(result.disposition == LocalSendDisposition.STARTED)
+        assertTrue(received === originalLease)
+        assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+        assertNull(LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK))
+        originalLease.close()
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+    }
+
+    @Test
+    fun rejectedEditedWorkTurnClosesItsTransferredLease() {
+        val sessionId = "edit-rejected-" + UUID.randomUUID()
+        val originalLease = requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+            sessionId, LocalSessionRuntimeKind.FOREGROUND,
+        ))
+        val result = coordinateOwnedLocalSend(
+            usageMode = LocalUsageMode.WORK, sessionId = sessionId,
+            workBindingActive = false, visibleJobActive = false,
+            configured = false, loading = false, sessionTransitioning = false,
+            pendingCount = 0, pendingLimit = 8,
+            onRejected = {}, onAccepted = {}, enqueue = { error("must not enqueue") },
+            onQueued = {}, onStart = { error("must not start") }, preownedLease = originalLease,
+        )
+        assertTrue(result.disposition == LocalSendDisposition.REJECTED)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+    }
+
+    @Test
     fun maintenanceOwnerRejectsInputInsteadOfLeavingAnUnconsumedQueue() {
         for (mode in LocalUsageMode.entries) {
             val sessionId = "maintenance-$mode-" + UUID.randomUUID()

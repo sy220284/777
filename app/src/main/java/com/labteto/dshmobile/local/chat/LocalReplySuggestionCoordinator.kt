@@ -32,17 +32,22 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     suspend fun generate(): Boolean {
         val aggregateSnapshot = runtimeStateStore.state.value
         val snapshot = aggregateSnapshot.toLocalChatProjectionState()
-        if (
-            snapshot.loading ||
-            !snapshot.modelState.configured ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.chat.groupChat.enabled
-        ) return false
+        if (snapshot.usageMode != LocalUsageMode.CHAT || snapshot.chat.groupChat.enabled) return false
+        if (snapshot.loading || snapshot.kernel.running) {
+            runtimeStateStore.projection.publishError("当前聊天正在加载或生成回复，请稍后使用回复建议")
+            return false
+        }
+        if (!snapshot.modelState.configured) {
+            runtimeStateStore.projection.publishError("请先配置可用模型，再生成回复建议")
+            return false
+        }
 
         val assistantMessage = snapshot.messages.lastOrNull { message ->
             message.role == "assistant" && message.content.isNotBlank()
-        } ?: return false
+        } ?: run {
+            runtimeStateStore.projection.publishError("当前会话尚无可供生成建议的助手回复")
+            return false
+        }
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = sessionStorage.eventLogs.get(expectedSessionId)
@@ -125,6 +130,12 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
                     put("assistant_message_id", expectedAssistantMessageId)
                     put("reason", "session-busy")
                 })
+            }
+            // The ordinary error projection intentionally rejects busy sessions. Report this
+            // specific rejected user action only if it still belongs to the visible session.
+            val current = runtimeStateStore.state.value
+            if (current.sessionId == expectedSessionId && current.usageMode == LocalUsageMode.CHAT) {
+                runtimeStateStore.projection.publishError("回复建议已生成，但会话正在处理其他操作；请稍后重试")
             }
             return false
         }

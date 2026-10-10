@@ -167,11 +167,7 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun sendWithTeam(
         text: String,
         attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult = if (state.value.usageMode == LocalUsageMode.WORK) {
-        runtime.work.sendWithTeam(text, attachments)
-    } else {
-        runtime.chat.send(text, attachments)
-    }
+    ): LocalSendResult = runtime.work.sendWithTeam(text, attachments)
 
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
@@ -203,7 +199,10 @@ class LocalHarnessViewModel @Inject constructor(
                 LocalUsageMode.CHAT -> runtime.chat.editAndResendUserMessage(messageId, text)
             }
         }
-        if (result == LocalChatUserEditResult.SENT) {
+        if (result == LocalChatUserEditResult.SENT ||
+            result == LocalChatUserEditResult.COMMITTED_NOT_STARTED
+        ) {
+            // Both outcomes already changed the durable active timeline.
             refreshTranscriptHistoryAfterTimelineRewrite()
         }
         return result

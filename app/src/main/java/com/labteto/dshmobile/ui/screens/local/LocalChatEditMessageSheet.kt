@@ -119,6 +119,9 @@ internal fun LocalChatEditMessageSheet(
                         try {
                             when (onEditAndResend(message.id, text)) {
                                 LocalChatUserEditResult.SENT -> onDismiss()
+                                // A durable edit cannot be retried from this old message ID.
+                                // The owning Feature reports the recovery situation in the conversation.
+                                LocalChatUserEditResult.COMMITTED_NOT_STARTED -> onDismiss()
                                 LocalChatUserEditResult.BUSY -> error = busyMessage
                                 LocalChatUserEditResult.MESSAGE_MISSING -> error = missingMessage
                                 LocalChatUserEditResult.UNAVAILABLE -> error = unavailableMessage

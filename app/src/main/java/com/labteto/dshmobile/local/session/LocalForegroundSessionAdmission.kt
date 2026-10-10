@@ -70,8 +70,11 @@ internal fun coordinateOwnedLocalSend(
     enqueue: () -> Boolean,
     onQueued: () -> Unit,
     onStart: (LocalSessionRuntimeLease?) -> Unit,
+    preownedLease: LocalSessionRuntimeLease? = null,
 ): LocalSendResult {
-    val ownership = reserveForegroundSendOwnership(
+    val ownership = if (preownedLease != null) {
+        LocalForegroundSendOwnership(activeRun = visibleJobActive || workBindingActive, reservedLease = preownedLease)
+    } else reserveForegroundSendOwnership(
         usageMode = usageMode,
         sessionId = sessionId,
         workBindingActive = workBindingActive,

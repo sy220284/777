@@ -147,9 +147,9 @@ internal fun LocalConversationComposer(
         if (temperatureWritePending) return
         // Sending is a conversation action, even when the model is not configured.
         // Let the send coordinator reject it with visible feedback and keep the draft.
-        val result = if (
-            state.usageMode == LocalUsageMode.WORK && teamDispatchSelected
-        ) {
+        val result = if (teamDispatchSelected) {
+            // Preserve the requested team action even if the visible mode changed.
+            // The Work owner reports an explicit rejection rather than sending it as Chat.
             onSendTeam(input, attachments.toList())
         } else {
             onSend(input, attachments.toList())

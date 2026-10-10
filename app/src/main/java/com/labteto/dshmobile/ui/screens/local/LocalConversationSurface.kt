@@ -171,7 +171,7 @@ internal fun LocalConversationSurface(
     onAutoApprovePending: (String) -> Unit,
     onApproveDeviceTurn: (String) -> Unit,
     onDisableDeviceTurn: () -> Unit,
-    onAnswerQuestion: (String, String) -> Unit,
+    onAnswerQuestion: (String, String) -> Boolean,
     onCancelQuestion: (String) -> Unit,
     composerHandoff: List<String> = emptyList(),
     skillDisplayNames: Map<String, String> = emptyMap(),
@@ -684,26 +684,22 @@ internal fun LocalConversationSurface(
                             busy = planReviewBusy,
                             onApprove = {
                                 if (!planReviewBusy) {
-                                    planReviewBusy = true
-                                    onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), review.approve)
+                                    val callId = state.pendingQuestion?.callId
+                                    if (callId != null && onAnswerQuestion(callId, review.approve)) planReviewBusy = true
                                 }
                             },
                             onDecline = {
                                 review.decline?.let { decline ->
                                     if (!planReviewBusy) {
-                                        planReviewBusy = true
-                                        onAnswerQuestion(state.pendingQuestion?.callId.orEmpty(), decline)
+                                        val callId = state.pendingQuestion?.callId
+                                        if (callId != null && onAnswerQuestion(callId, decline)) planReviewBusy = true
                                     }
                                 }
                             },
                             onRegenerate = {
-                                val prompt = state.messages.lastOrNull { it.role == "user" }?.content
-                                    ?.takeIf(String::isNotBlank)
                                 val callId = state.pendingQuestion?.callId
-                                if (!planReviewBusy && prompt != null && callId != null) {
+                                if (!planReviewBusy && callId != null && onAnswerQuestion(callId, review.regenerate)) {
                                     planReviewBusy = true
-                                    onCancelQuestion(callId)
-                                    onSend(prompt, emptyList())
                                 }
                             },
                         )
