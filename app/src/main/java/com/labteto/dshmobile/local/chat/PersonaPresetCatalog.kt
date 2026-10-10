@@ -225,6 +225,26 @@ private fun presetPersona(
     val life = presetLifeDetails(name)
     return PersonaProfile(
         name = name,
+        coreIdentity = portrait,
+        facts = buildList {
+            fun add(category: String, text: String) {
+                if (text.isNotBlank()) this.add(CharacterFact(
+                    id = "builtin-$presetId-$category",
+                    category = category,
+                    content = text,
+                    provenance = CharacterFactProvenance.CANON,
+                ))
+            }
+            add(CharacterFactCategories.BIOGRAPHY, lifeContext)
+            add(CharacterFactCategories.PERSONALITY, stableTraitsText)
+            add(CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                (coreValues + secondaryValues + coreTensionCandidates).joinToString("；"))
+            add(CharacterFactCategories.LIFE_GRAVITY, lifeContext)
+            add(CharacterFactCategories.SENSORY_SIGNATURE, life.attentionBiases.joinToString("；"))
+            add(CharacterFactCategories.SUBJECTIVE_BELIEFS, life.perceptionBlindSpots.joinToString("；"))
+            add(CharacterFactCategories.PREFERENCES_AND_HABITS, life.quirks.joinToString("；"))
+            add(CharacterFactCategories.LIMITS_AND_COSTS, life.limitations.joinToString("；"))
+        },
         portrait = portrait,
         lifeContext = lifeContext,
         attentionBiases = life.attentionBiases,

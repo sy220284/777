@@ -23,10 +23,75 @@ data class PersonaLoreEntry(
     val spoilerLevel: Int = 0,
 )
 
+/** A single canonical person fact; categories are extensible without adding schema fields. */
+@Serializable
+data class CharacterFact(
+    val id: String,
+    val category: String,
+    val content: String,
+    val relatedFactIds: List<String> = emptyList(),
+    /** Named viewpoint for subjective beliefs; empty means the character's own account. */
+    val perspective: String = "",
+    /** Optional explicit story-stage identifier; stage-gated facts require an exact match. */
+    val temporalScope: String = "",
+    val provenance: CharacterFactProvenance = CharacterFactProvenance.UNVERIFIED,
+    val sourceReference: String = "",
+)
+
+@Serializable
+enum class CharacterFactProvenance { CANON, INFERRED, USER_CREATED, UNVERIFIED }
+
+/** Default editor categories. Additional category codes remain valid for original characters. */
+object CharacterFactCategories {
+    const val PERSONALITY = "personality"
+    const val SELF_NARRATIVE = "selfNarrative"
+    const val IDENTITY_GAP = "identityGap"
+    const val VALUES_AND_TRADEOFFS = "valuesAndTradeoffs"
+    const val SUBJECTIVE_BELIEFS = "subjectiveBeliefs"
+    const val BIOGRAPHY = "biography"
+    const val DEFINING_CHOICES = "definingChoices"
+    const val EMOTIONAL_IMPRINTS = "emotionalImprints"
+    const val LIFE_GRAVITY = "lifeGravity"
+    const val UNFINISHED_BUSINESS = "unfinishedBusiness"
+    const val RELATIONSHIPS = "relationships"
+    const val LIMITS_AND_COSTS = "limitsAndCosts"
+    const val SENSORY_SIGNATURE = "sensorySignature"
+    const val PREFERENCES_AND_HABITS = "preferencesAndHabits"
+    const val VOICE_STYLE = "voiceStyle"
+    const val CUSTOM_FACTS = "customFacts"
+    val canonical = listOf(
+        PERSONALITY, SELF_NARRATIVE, IDENTITY_GAP, VALUES_AND_TRADEOFFS,
+        SUBJECTIVE_BELIEFS, BIOGRAPHY, DEFINING_CHOICES, EMOTIONAL_IMPRINTS,
+        LIFE_GRAVITY, UNFINISHED_BUSINESS, RELATIONSHIPS, LIMITS_AND_COSTS,
+        SENSORY_SIGNATURE, PREFERENCES_AND_HABITS, VOICE_STYLE, CUSTOM_FACTS,
+    )
+}
+
+/** Actual source of character facts; unrelated chat state is owned by its runtime. */
+fun PersonaProfile.factText(category: String): String =
+    facts.asSequence().filter { it.category == category && it.temporalScope.isBlank() }
+        .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")
+
+fun PersonaProfile.withFact(category: String, content: String): PersonaProfile {
+    val id = "v4-$category"
+    val others = facts.filterNot { it.id == id }
+    val updated = content.trim().takeIf(String::isNotBlank)?.let {
+        CharacterFact(id = id, category = category, content = it, provenance = CharacterFactProvenance.USER_CREATED)
+    }
+    return copy(facts = if (updated == null) others else others + updated)
+}
+
+fun PersonaProfile.visibleFacts(storyStage: String = ""): List<CharacterFact> =
+    facts.filter { it.temporalScope.isBlank() || (storyStage.isNotBlank() && it.temporalScope == storyStage) }
+
 @Serializable
 data class PersonaProfile(
     val id: String = DEFAULT_PERSONA_ID,
     val name: String = "默认角色",
+    /** V4 canonical identity: factual identity and public role, not a behavioral script. */
+    val coreIdentity: String = "",
+    /** V4 facts are the single editable source; legacy shape is retired in the V4 path. */
+    val facts: List<CharacterFact> = emptyList(),
     /** Friend-like whole-person description. This is the stable identity anchor, not a trait checklist. */
     val portrait: String = "",
     /** Independent daily life, work, responsibilities and ongoing concerns outside the user. */
@@ -201,6 +266,19 @@ class ChatPersonaStore internal constructor(
     private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.copy(
         id = profile.id.trim().take(80).ifBlank { PersonaProfile.DEFAULT_PERSONA_ID },
         name = profile.name.trim().take(80).ifBlank { "默认角色" },
+        coreIdentity = profile.coreIdentity.trim().take(MAX_LONG_FIELD_CHARS),
+        facts = profile.facts.mapNotNull { fact ->
+            val content = fact.content.trim()
+            if (content.isEmpty()) null else fact.copy(
+                id = fact.id.trim().ifEmpty { "fact-${fact.category}-${content.hashCode()}" }.take(120),
+                category = fact.category.trim().take(80),
+                content = content.take(MAX_LONG_FIELD_CHARS),
+                relatedFactIds = fact.relatedFactIds.map(String::trim).filter(String::isNotBlank).distinct(),
+                perspective = fact.perspective.trim().take(160),
+                temporalScope = fact.temporalScope.trim().take(160),
+                sourceReference = fact.sourceReference.trim().take(500),
+            )
+        }.distinctBy(CharacterFact::id),
         portrait = profile.portrait.trim().take(MAX_LONG_FIELD_CHARS),
         lifeContext = profile.lifeContext.trim().take(MAX_LONG_FIELD_CHARS),
         attentionBiases = cleanLines(profile.attentionBiases, 8),

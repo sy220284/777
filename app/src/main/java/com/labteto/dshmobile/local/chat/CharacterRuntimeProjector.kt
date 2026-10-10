@@ -41,6 +41,7 @@ internal class CharacterRuntimeProjector(
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
                 relevantBackgroundPrompt(persona, userInput),
+                relevantCharacterFactPrompt(persona, context.scene.sceneTime, userInput, storyContext),
                 storyPrompt,
                 loreEngine.prompt(persona, userInput),
                 relationshipEngine.prompt(userInput, runtimeState),
@@ -52,6 +53,11 @@ internal class CharacterRuntimeProjector(
         val critical = takeWithinModelTokenBudget(
             buildString {
                 appendLine("【人物】${persona.name}")
+                persona.coreIdentity.takeIf(String::isNotBlank)?.let { appendLine("稳定身份：${it.take(300)}") }
+                persona.factText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
+                    ?.let { appendLine("稳定性格：${it.take(180)}") }
+                persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
+                    ?.let { appendLine("价值与取舍：${it.take(180)}") }
                 persona.franchise.takeIf(String::isNotBlank)?.let { appendLine("原作来源：${it.take(90)}") }
                 persona.timelinePosition.takeIf(String::isNotBlank)?.let { appendLine("当前剧情阶段：${it.take(120)}") }
                 appendLine(COMMON_CHARACTER_BOUNDARY)
@@ -155,6 +161,34 @@ internal class CharacterRuntimeProjector(
             appendLine("【本轮相关背景】只在当前话题自然需要时使用，不主动扩写。")
             anchors.forEach { (label, value) -> appendLine("$label：${value.take(800)}") }
         }.trim()
+    }
+
+    /** Select factual depth on demand; never use the character's current feelings as stored facts. */
+    private fun relevantCharacterFactPrompt(
+        persona: PersonaProfile,
+        storyStage: String,
+        userInput: String,
+        storyContext: String?,
+    ): String {
+        val query = listOf(userInput, storyContext.orEmpty().takeLast(450)).joinToString(" ")
+        if (query.isBlank()) return ""
+        val core = setOf(
+            CharacterFactCategories.PERSONALITY,
+            CharacterFactCategories.VALUES_AND_TRADEOFFS,
+        )
+        val relevant = persona.visibleFacts(storyStage).asSequence()
+            .filter { it.category !in core && it.content.isNotBlank() }
+            .filter { fact ->
+                relevantTo(fact.content, query) ||
+                    relevantTo(fact.category, query) ||
+                    (fact.relatedFactIds.isNotEmpty() && fact.relatedFactIds.any { query.contains(it) })
+            }
+            .take(4).toList()
+        if (relevant.isEmpty()) return ""
+        return takeWithinModelTokenBudget(buildString {
+            appendLine("【本轮相关人物事实】")
+            relevant.forEach { appendLine("${it.category}：${it.content.take(650)}") }
+        }.trim(), 500)
     }
 
     private fun relevantTo(source: String, query: String): Boolean {

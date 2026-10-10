@@ -21,7 +21,10 @@ internal fun resolveCharacterAttention(
         var score = if (index == 0) 1 else 0
         if (isHighPriorityUserClause(clause)) score += 8
         score += persona.attentionKeywords.count { attentionKeywordMatches(it, clause) } * 6
-        score += persona.attentionBiases.count { attentionBiasMatches(it, clause) } * 3
+        val intrinsicAttention = persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
+            .ifBlank { persona.attentionBiases.joinToString("；") }
+        score += listOf(intrinsicAttention).filter(String::isNotBlank)
+            .count { attentionBiasMatches(it, clause) } * 3
         if (relatedAttentionText(state.currentFocus, clause)) score += 3
         if (relatedAttentionText(state.immediateConcern, clause)) score += 2
         if (relatedAttentionText(state.currentAgenda, clause)) score += 1
@@ -37,9 +40,9 @@ internal fun resolveCharacterAttention(
         .distinct()
         .take(2)
 
-    val directBlindSpot = persona.perceptionBlindSpots.firstOrNull {
-        relatedAttentionText(it, userInput)
-    }
+    val knownBlindSpots = persona.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+        .takeIf(String::isNotBlank)?.let(::listOf) ?: persona.perceptionBlindSpots
+    val directBlindSpot = knownBlindSpots.firstOrNull { relatedAttentionText(it, userInput) }
 
     return CharacterAttentionProjection(
         noticed = noticed,
