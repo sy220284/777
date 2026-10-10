@@ -322,7 +322,8 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                             error = "历史编辑已提交，后续投影失败：${error.message ?: error::class.java.simpleName}",
                         )
                     }
-                    LocalChatUserEditResult.SENT
+                    if (started != null) LocalChatUserEditResult.SENT
+                    else LocalChatUserEditResult.COMMITTED_NOT_STARTED
                 } else {
                     throw error
                 }

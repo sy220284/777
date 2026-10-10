@@ -270,12 +270,15 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         return sendPrepared(prepared)
     }
 
-    private fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult {
-        workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return it }
-
+    private fun sendPrepared(
+        prepared: LocalPreparedSend,
+        reservedLease: com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease? = null,
+    ): LocalSendResult {
         var started: Job? = null
-        val result = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-            workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return@synchronized it }
+        try {
+            if (reservedLease == null) workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return it }
+            val result = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                if (reservedLease == null) workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return@synchronized it }
 
             val snapshot = runtimeStateStore.state.value
             if ((runtimeStateStore.foregroundRunHandle.cancellationRequested && runtimeStateStore.foregroundRunHandle.hasLiveJob()) || snapshot.usageMode != LocalUsageMode.WORK) {
@@ -304,6 +307,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 pendingCount = pending.size(),
                 pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected -> reject(sessionId, rejected) },
+                preownedLease = reservedLease,
                 onAccepted = runtimeStateStore::clearSendFeedback,
                 enqueue = {
                     pending.offer(queuedInput) {
@@ -356,8 +360,12 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 },
             )
         }
-        started?.start()
-        return result
+            started?.start()
+            return result
+        } finally {
+            // A failed admission must not strand the editing transaction's ownership.
+            if (started == null) reservedLease?.close()
+        }
     }
 
     override fun editAndResendUserMessage(
@@ -368,13 +376,13 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             when (val edit = prepareEditedTurn(messageId, replacement)) {
                 is LocalWorkMessageEditPreparation.Rejected -> edit.reason
                 is LocalWorkMessageEditPreparation.Ready -> {
-                    val sent = sendPrepared(edit.send)
+                    val sent = sendPrepared(edit.send, edit.reservedLease)
                     if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
                     else {
                         runtimeStateStore.projection.publishError(
-                            "历史修改已保存，但新任务未能启动（${sent.rejectReason ?: sent.disposition}）；请从输入框重新发送修改后的内容",
+                            "历史修改已保存，但新任务未接单（${sent.rejectReason ?: sent.disposition}）。请重新打开会话检查当前历史，避免重复编辑", 
                         )
-                        LocalUserMessageEditResult.FAILED
+                        LocalUserMessageEditResult.COMMITTED_NOT_STARTED
                     }
                 }
             }
