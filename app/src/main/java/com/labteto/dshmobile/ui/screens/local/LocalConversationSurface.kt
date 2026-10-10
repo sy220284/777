@@ -524,25 +524,7 @@ internal fun LocalConversationSurface(
             }
         }
 
-        modeIntro?.usageMode?.let { mode ->
-            Surface(
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = DsShapes.block,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
-            ) {
-                Text(
-                    stringResource(
-                        if (mode == LocalUsageMode.CHAT) R.string.local_mode_intro_chat
-                        else R.string.local_mode_intro_work,
-                    ),
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                )
-            }
-        }
+        LocalModeIntroBanner(modeIntro)
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
             GroupAnnouncementCard(
