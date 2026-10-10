@@ -156,7 +156,8 @@ class CharacterFactsV4Test {
             facts = listOf(
                 CharacterFact("early", CharacterFactCategories.BIOGRAPHY, "在小镇经营书店"),
                 CharacterFact("later", CharacterFactCategories.PERSONALITY,
-                    "得知真相后变得格外谨慎", temporalScope = "act-2"),
+                    "得知真相后变得格外谨慎", temporalScope = "act-2",
+                    provenance = CharacterFactProvenance.CANON),
                 CharacterFact("later-life", CharacterFactCategories.LIFE_GRAVITY,
                     "夜里会整理那封密信", temporalScope = "act-2"),
             ),
