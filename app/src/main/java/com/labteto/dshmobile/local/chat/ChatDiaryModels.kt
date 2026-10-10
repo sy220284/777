@@ -47,6 +47,8 @@ data class ChatDiaryRevision(
     val sources: List<ChatDiarySourceRef> = emptyList(),
     val updatedAt: Long,
     val projectionId: String? = null,
+    /** A user-authored revision supersedes the generated summary without rewriting its source. */
+    val userCorrected: Boolean = false,
 )
 
 @Serializable

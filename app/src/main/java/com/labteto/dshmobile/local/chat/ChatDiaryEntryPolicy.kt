@@ -129,6 +129,7 @@ internal object ChatDiaryEntryPolicy {
         now: Long,
     ): Boolean =
         existing.active &&
+            existing.revisions.lastOrNull()?.userCorrected != true &&
             existing.subjectKey == candidate.subjectKey &&
             existing.sourceMode == candidate.sourceMode &&
             existing.disclosure == candidate.disclosure &&

@@ -12,6 +12,63 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class ChatDiaryStoreTest {
+
+    @Test
+    fun userCorrectionIsDurableTraceableAndVisibleInNextRecall() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "我们约好周末去海边", feeling = "非常期待", importance = 4),
+            evidence = "我们约好周末去海边",
+        ))!!
+        val correction = ChatDiaryDelta(event = "我们约好周末去山上", feeling = "想早点出发")
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt, correction))
+        val reloaded = store().listActive("gallery:a").single()
+        assertEquals("我们约好周末去山上", reloaded.event)
+        assertEquals("想早点出发", reloaded.feeling)
+        assertTrue(reloaded.revisions.last().userCorrected)
+        assertEquals(saved.event, reloaded.revisions.first().event)
+        assertEquals(saved.sources, reloaded.sources)
+        assertTrue(store().search("周末去山上", "gallery:a", false, 4).any { it.id == saved.id })
+        assertTrue(store().search("周末去海边", "gallery:a", false, 4).none { it.event.contains("海边") })
+    }
+
+    @Test
+    fun staleRevisionOrOtherCharacterCannotModifyOrDisableDiary() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "用户说好下周看海", feeling = "记住了", importance = 4),
+            evidence = "用户说好下周看海",
+        ))!!
+        assertTrue(!diary.correctEntry("gallery:b", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "错误的另一人物事实")))
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "用户改约下周爬山")))
+        assertTrue(!diary.deactivateEntry("gallery:a", saved.id, saved.updatedAt))
+        val current = diary.listActive("gallery:a").single()
+        assertTrue(!diary.deactivateEntry("gallery:b", saved.id, current.updatedAt))
+        assertTrue(diary.deactivateEntry("gallery:a", saved.id, current.updatedAt))
+        assertTrue(store().listActive("gallery:a").isEmpty())
+        assertTrue(store().search("用户改约下周爬山", "gallery:a", false, 6).isEmpty())
+        assertTrue(!store().deactivateEntry("gallery:a", saved.id, current.updatedAt))
+    }
+
+    @Test
+    fun newGeneratedDiaryDoesNotSilentlyRefineUserCorrectedRevision() {
+        val diary = store()
+        val saved = diary.record(request(
+            delta = ChatDiaryDelta(event = "我们答应周末去公园", feeling = "很开心", importance = 4),
+            evidence = "我们答应周末去公园",
+        ))!!
+        assertTrue(diary.correctEntry("gallery:a", saved.id, saved.updatedAt,
+            ChatDiaryDelta(event = "我们答应周末去图书馆")))
+        diary.record(request(
+            delta = ChatDiaryDelta(event = "我们答应周末去公园", feeling = "很开心", importance = 4),
+            evidence = "我们答应周末去公园",
+            userId = "u-new", assistantId = "a-new",
+        ))
+        assertEquals("我们答应周末去图书馆",
+            diary.listActive("gallery:a").first { it.id == saved.id }.event)
+    }
     @get:Rule val temporary = TemporaryFolder()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private fun store() = ChatDiaryStore(File(temporary.root, "diary"), json)

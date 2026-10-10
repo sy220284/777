@@ -93,6 +93,74 @@ internal class ChatDiaryStore(
         return saved
     }
 
+
+    /**
+     * Explicit author correction of a derived diary event. Original conversation and previous
+     * revisions remain untouched; the user revision takes precedence in active recall.
+     *
+     * The expected revision prevents an old screen editing a newer fact and the subject key
+     * prevents actions on one character from mutating another character's diary.
+     */
+    @Synchronized
+    fun correctEntry(
+        subjectKey: String,
+        id: String,
+        expectedUpdatedAt: Long,
+        correction: ChatDiaryDelta,
+    ): Boolean {
+        val event = correction.event.trim().take(ChatDiaryBounds.MAX_EVENT_CHARS)
+        if (subjectKey.isBlank() || event.isBlank()) return false
+        val existing = documents.read()
+        val index = existing.entries.indexOfFirst {
+            it.id == id && it.subjectKey == subjectKey && it.active &&
+                it.updatedAt == expectedUpdatedAt
+        }
+        if (index < 0) return false
+        val previous = existing.entries[index]
+        val now = maxOf(System.currentTimeMillis(), previous.updatedAt + 1)
+        val revision = ChatDiaryRevision(
+            event = event,
+            feeling = correction.feeling.trim().take(ChatDiaryBounds.MAX_FEELING_CHARS),
+            innerThought = correction.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
+            relationshipMeaning = correction.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
+            unresolvedEcho = correction.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            importance = previous.importance,
+            disclosure = previous.disclosure,
+            sources = previous.sources,
+            updatedAt = now,
+            userCorrected = true,
+        )
+        val revised = ChatDiaryEntryPolicy.rebuild(
+            previous.copy(supersededBy = null),
+            ChatDiaryEntryPolicy.revisionsOf(previous) + revision,
+            now,
+        )
+        val entries = existing.entries.toMutableList().apply { this[index] = revised }
+        documents.write(existing.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        return true
+    }
+
+    /** A disabled diary entry is no longer eligible for active or historical recall. */
+    @Synchronized
+    fun deactivateEntry(subjectKey: String, id: String, expectedUpdatedAt: Long): Boolean {
+        if (subjectKey.isBlank()) return false
+        val existing = documents.read()
+        val index = existing.entries.indexOfFirst {
+            it.id == id && it.subjectKey == subjectKey && it.active &&
+                it.updatedAt == expectedUpdatedAt
+        }
+        if (index < 0) return false
+        val previous = existing.entries[index]
+        val entries = existing.entries.toMutableList().apply {
+            this[index] = previous.copy(
+                active = false,
+                updatedAt = maxOf(System.currentTimeMillis(), previous.updatedAt + 1),
+            )
+        }
+        documents.write(existing.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        return true
+    }
+
     @Synchronized
     fun search(
         query: String,
