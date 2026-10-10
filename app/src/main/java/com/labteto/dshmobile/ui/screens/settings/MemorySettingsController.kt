@@ -69,7 +69,7 @@ internal class MemorySettingsController(
             refresh()
             return
         }
-        runCatching { settingsData.forgetMemory(id, current.updatedAt) }
+        runCatching { settingsData.forgetMemory(current) }
             .onSuccess { removed ->
                 refresh()
                 onDone(if (removed) null else "这条记忆已被停用或不存在")
