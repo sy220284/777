@@ -147,6 +147,7 @@ internal object LocalToolRouter {
     fun capabilitySummary(
         tools: List<HarnessTool>,
         enabledOptional: Set<String>,
+        blocked: Set<String> = emptySet(),
     ): String {
         val optional = tools.filter(::isOptional)
         if (optional.isEmpty()) return "可选扩展能力：无"
@@ -168,6 +169,10 @@ internal object LocalToolRouter {
                             append("；另有 ").append(requirements.size - shown.size).append(" 项")
                         }
                     }
+                    val blockedTools = familyTools.filter { it.name in blocked }
+                    if (blockedTools.isNotEmpty()) {
+                        append("；运行策略关闭：").append(blockedTools.joinToString(", ") { it.name })
+                    }
                     appendLine()
                 }
             append("本轮未选用的能力仍已注册，可由智能体按需发现；是否能执行须以实际连接、授权和模型工具表为准。")
@@ -186,15 +191,21 @@ internal object LocalToolRouter {
     }
 
     /** The directory is generated from currently registered tools, including dynamic MCP tools. */
-    fun capabilityDirectory(tools: List<HarnessTool>, enabledOptional: Set<String>): String =
-        buildString {
+    fun capabilityDirectory(
+        tools: List<HarnessTool>,
+        enabledOptional: Set<String>,
+        blocked: Set<String> = emptySet(),
+    ): String = buildString {
             val optional = tools.filter(::isOptional)
             appendLine("当前注册的可选工具：${optional.size} 个，分 ${optional.map { it.metadata.family }.distinct().size} 类。")
             optional.groupBy { it.metadata.family }
                 .toSortedMap(String.CASE_INSENSITIVE_ORDER)
                 .forEach { (family, members) ->
                     val selected = members.count { it.name in enabledOptional }
-                    appendLine("- $family：已注册 ${members.size}，本轮已选 ${selected}；工具：${members.joinToString(", ") { it.name }}")
+                    appendLine("- $family：已注册 ${members.size}，本轮已选 ${selected}；工具：" +
+                        members.joinToString(", ") { tool ->
+                            tool.name + if (tool.name in blocked) "（当前设置已关闭）" else ""
+                        })
                 }
             append("目录由实时注册表生成；本轮未选不代表无法使用。选择具体能力时再次调用 capability_search 加载工具定义；实际执行仍需满足连接与授权条件。")
         }.trimEnd()
