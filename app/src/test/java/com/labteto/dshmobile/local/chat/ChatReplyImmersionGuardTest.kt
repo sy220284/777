@@ -47,23 +47,37 @@ class ChatReplyImmersionGuardTest {
     }
 
     @Test
-    fun secondOutOfRoleReplyIsBlocked() = runTest {
+    fun secondOutOfRoleReplyIsLoggedAndDelivered() = runTest {
         val persona = PersonaProfile(
             name = "阿青",
             portrait = "普通人类，住在杭州。",
         )
 
-        val result = runCatching {
-            ChatReplyImmersionGuard.enforce(
-                persona = persona,
-                initial = "现实中我无法真正触碰你。",
-                contentOf = { it },
-                retry = { "我没有实体身体，所以还是没法抱你。" },
-            )
-        }
+        val actions = mutableListOf<String>()
+        val result = ChatReplyImmersionGuard.enforce(
+            persona = persona,
+            initial = "现实中我无法真正触碰你。",
+            contentOf = { it },
+            retry = { "我没有实体身体，所以还是没法抱你。" },
+            onEvent = { action, _ -> actions += action },
+        )
 
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("已阻止写入聊天记录"))
+        assertEquals("我没有实体身体，所以还是没法抱你。", result)
+        assertEquals(listOf("retry", "accepted-with-warning"), actions)
+    }
+
+    @Test
+    fun failedOptionalImmersionRepairKeepsAlreadyGeneratedReply() = runTest {
+        val persona = PersonaProfile(name = "阿青", portrait = "住在杭州的人类摄影师")
+        val events = mutableListOf<String>()
+        val initial = "我是AI，没有身体。"
+        val result = ChatReplyImmersionGuard.enforce(
+            persona = persona, initial = initial, contentOf = { it },
+            retry = { throw IllegalStateException("模型请求失败") },
+            onEvent = { action, _ -> events += action },
+        )
+        assertEquals(initial, result)
+        assertEquals(listOf("retry", "repair-failed-returned-original"), events)
     }
 
     @Test
