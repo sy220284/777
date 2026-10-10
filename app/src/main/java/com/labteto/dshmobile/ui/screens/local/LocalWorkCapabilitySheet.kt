@@ -1,11 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
+import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
@@ -28,6 +32,9 @@ internal fun LocalWorkCapabilitySheet(
     onDismiss: () -> Unit,
     prompt: String = "",
     summary: String = "",
+    selectableMessages: List<LocalHarnessMessage> = emptyList(),
+    selectedMessageIds: List<String> = emptyList(),
+    onSelectedMessageIdsChange: (List<String>) -> Unit = {},
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
     capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
@@ -72,6 +79,29 @@ internal fun LocalWorkCapabilitySheet(
             maxLines = 6,
         )
         Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        if (selectableMessages.isNotEmpty()) {
+            Text(stringResource(R.string.work_handoff_select_messages),
+                style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+            selectableMessages.forEach { message ->
+                val checked = message.id in selectedMessageIds
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = checked,
+                        enabled = !switching,
+                        onCheckedChange = { isChecked ->
+                            onSelectedMessageIdsChange(
+                                if (isChecked) (selectedMessageIds + message.id).distinct()
+                                else selectedMessageIds - message.id,
+                            )
+                        },
+                    )
+                    val speaker = if (message.role == "user")
+                        stringResource(R.string.work_handoff_user) else stringResource(R.string.work_handoff_assistant)
+                    Text("$speaker · ${message.content.trim().replace(Regex("\\\\s+"), " ").take(100)}",
+                        style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+                }
+            }
+        }
         if (capabilities.isNotEmpty()) {
             Text(stringResource(R.string.work_capability_readiness_title),
                 style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)

@@ -87,6 +87,8 @@ import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.workHandoffDialogueCandidates
+import com.labteto.dshmobile.local.session.workHandoffSummaryWithSelectedMessages
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.DsButton
@@ -153,6 +155,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val chatSurface by viewModel.chatSurfaceState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
@@ -180,6 +183,7 @@ fun LocalHarnessScreen(
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
     var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
+    var workHandoffMessageIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
@@ -259,6 +263,7 @@ fun LocalHarnessScreen(
             pendingWorkCapability = prompt
             workHandoffSourceSessionId = shell.sessionId
             workHandoffSummary = viewModel.workHandoffSummary()
+            workHandoffMessageIds = emptyList()
             workCapabilityConfirmed = false
             workCapabilityFailed = false
             workCapabilityConfiguring = false
@@ -651,12 +656,21 @@ fun LocalHarnessScreen(
     }
 
     if (pendingWorkCapability != null && !workCapabilityConfiguring) {
+        val handoffMessages = if (workHandoffSourceSessionId == shell.sessionId &&
+            transcriptHistory.sessionId == shell.sessionId
+        ) workHandoffDialogueCandidates(transcriptHistory.olderMessages, chatSurface.messages)
+        else if (workHandoffSourceSessionId == shell.sessionId)
+            workHandoffDialogueCandidates(emptyList(), chatSurface.messages)
+        else emptyList()
         LocalWorkCapabilitySheet(
             switching = workCapabilityConfirmed,
             failed = workCapabilityFailed,
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
             prompt = pendingWorkCapability.orEmpty(),
             summary = workHandoffSummary,
+            selectableMessages = handoffMessages,
+            selectedMessageIds = workHandoffMessageIds,
+            onSelectedMessageIdsChange = { workHandoffMessageIds = it },
             capabilities = viewModel.workHandoffCapabilityReadiness(
                 task = pendingWorkCapability.orEmpty(),
                 githubConfigured = githubConfiguredForHandoff,
@@ -673,7 +687,12 @@ fun LocalHarnessScreen(
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
             onContinue = {
                 workCapabilityFailed = false
-                workCapabilityConfirmed = viewModel.createWorkContinuation(workHandoffSourceSessionId, workHandoffSummary)
+                workCapabilityConfirmed = viewModel.createWorkContinuation(
+                    workHandoffSourceSessionId,
+                    workHandoffSummaryWithSelectedMessages(
+                        workHandoffSummary, workHandoffSourceSessionId, handoffMessages, workHandoffMessageIds,
+                    ),
+                )
                 if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
                 else workCapabilityFailed = true
             },

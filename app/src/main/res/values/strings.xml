@@ -1940,5 +1940,8 @@
     <string name="persona_v4_provenance_inferred">推断</string>
     <string name="persona_v4_provenance_unverified">待核实</string>
     <string name="persona_v4_provenance_user">作者设定</string>
+    <string name="work_handoff_select_messages">补充引用对话（自选；不会自动复制角色私有记忆）</string>
+    <string name="work_handoff_user">用户</string>
+    <string name="work_handoff_assistant">助手</string>
 </resources>
 
