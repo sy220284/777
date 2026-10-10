@@ -75,6 +75,7 @@ class MemoryManager @Inject constructor(
         require(!policy.containsSensitiveData(clean)) { "敏感信息禁止写入长期记忆" }
         return store.update(
             id = existing.id,
+            expectedUpdatedAt = existing.updatedAt,
             content = clean,
             kind = kind,
             importance = importance,
