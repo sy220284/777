@@ -396,7 +396,6 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                            AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_model_performance_title),
                                 subtitle = stringResource(R.string.settings_model_performance_subtitle),
