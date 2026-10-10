@@ -55,6 +55,7 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
@@ -512,6 +513,7 @@ internal fun ChatPersonaDialog(
     var constraints by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.hardConstraints.joinToString("\n")) }
     var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
     var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
+    val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
     var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(!creatingNew) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
@@ -710,6 +712,19 @@ internal fun ChatPersonaDialog(
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
+            bundledPreset?.let { preset ->
+                DsButton(
+                    text = stringResource(R.string.local_persona_restore_preset_canon),
+                    onClick = {
+                        val existingIds = loreEntries.map(PersonaLoreEntry::id).toSet()
+                        loreEntries = loreEntries + preset.persona.loreEntries.filterNot { it.id in existingIds }
+                        attentionKeywords = (lines(attentionKeywords) + preset.persona.attentionKeywords)
+                            .distinct().joinToString("\\n")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
             PersonaFormSection(stringResource(R.string.persona_form_canon)) {
                 PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
                 PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
