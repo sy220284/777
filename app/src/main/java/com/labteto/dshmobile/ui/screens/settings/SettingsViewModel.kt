@@ -248,6 +248,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshMemories() = memorySettingsController.refresh()
+    fun focusMemorySourceMessage(sessionId: String?, messageId: String?) =
+        memorySettingsController.focusSourceMessage(sessionId, messageId)
 
     fun updateMemory(
         id: String,

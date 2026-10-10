@@ -35,4 +35,6 @@ class LocalSettingsDataFacade @Inject constructor(
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord =
         memoryManager.update(existing = existing, content = content, pinned = pinned)
     internal fun forgetMemory(id: String): Boolean = memoryStore.forget(id)
+    internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
+        memoryStore.listActiveFromMessage(sessionId, messageId)
 }

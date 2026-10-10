@@ -15,9 +15,21 @@ internal class MemorySettingsController(
     private val settingsData: LocalSettingsDataFacade,
 ) {
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
+    private var selectedMessageSource: Pair<String, String>? = null
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
 
+    fun focusSourceMessage(sessionId: String?, messageId: String?) {
+        selectedMessageSource = if (!sessionId.isNullOrBlank() && !messageId.isNullOrBlank()) {
+            sessionId to messageId
+        } else null
+        refresh()
+    }
+
     fun refresh() {
+        selectedMessageSource?.let { (sessionId, messageId) ->
+            _memories.value = settingsData.memoriesFromSourceMessage(sessionId, messageId)
+            return
+        }
         val local = localHarness.memoryContext()
         val scopes = when (local.conversationMode) {
             LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)

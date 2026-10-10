@@ -412,6 +412,27 @@ class MemoryStore internal constructor(
         .take(limit.coerceIn(1, MAX_RECORDS))
         .toList()
 
+    /**
+     * Source lookup for an explicitly selected user message. This exact identity can cross
+     * scopes without exposing another session's or character's unrelated memories.
+     * Older unbound records must not be guessed as originating from this message.
+     */
+    @Synchronized
+    fun listActiveFromMessage(
+        sourceSessionId: String,
+        sourceMessageId: String,
+        limit: Int = 100,
+    ): List<MemoryRecord> {
+        if (sourceSessionId.isBlank() || sourceMessageId.isBlank()) return emptyList()
+        return documents.read().records.asSequence()
+            .filter { it.active && it.sourceMessages.any { source ->
+                source.sessionId == sourceSessionId && source.messageId == sourceMessageId
+            } }
+            .sortedByDescending(MemoryRecord::updatedAt)
+            .take(limit.coerceIn(1, MAX_RECORDS))
+            .toList()
+    }
+
     private fun lexicalScore(record: MemoryRecord, queryTerms: Set<String>): Int {
         if (queryTerms.isEmpty()) return 0
         val contentTerms = terms(record.content)

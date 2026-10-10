@@ -8,6 +8,33 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class MemoryStoreTest {
+    @Test fun exactMessageSourceLookupSpansScopedMemoriesWithoutUnrelatedOrInactiveRows() {
+        val memory = store()
+        val relatedGlobal = memory.remember(
+            "用户记得周末看海", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        val relatedLineage = memory.remember(
+            "人物与用户约好去海边", MemoryScope.LINEAGE, lineageId = "lineage",
+            sourceSessionId = "chat-a", sourceMessageId = "user-1",
+        )
+        memory.remember("其他会话", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-b", sourceMessageId = "user-1")
+        memory.remember("无法确认具体消息的旧记忆", MemoryScope.GLOBAL,
+            sourceSessionId = "chat-a")
+        assertEquals(
+            setOf(relatedGlobal.id, relatedLineage.id),
+            memory.listActiveFromMessage("chat-a", "user-1").map { it.id }.toSet(),
+        )
+        assertTrue(memory.listActiveFromMessage("chat-a", "unknown").isEmpty())
+        assertTrue(memory.listActiveFromMessage("", "user-1").isEmpty())
+        assertTrue(memory.forget(relatedLineage.id))
+        assertEquals(
+            listOf(relatedGlobal.id),
+            store().listActiveFromMessage("chat-a", "user-1").map { it.id },
+        )
+    }
+
     @get:Rule val temporary = TemporaryFolder()
     private fun store() = MemoryStore(temporary.root, Json)
     private fun all(store: MemoryStore) = store.listActive(
