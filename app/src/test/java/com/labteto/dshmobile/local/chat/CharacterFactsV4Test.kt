@@ -199,7 +199,10 @@ class CharacterFactsV4Test {
             provenance = CharacterFactProvenance.USER_CREATED)
         val generated = CharacterFact("b", CharacterFactCategories.PERSONALITY, "十分活泼",
             provenance = CharacterFactProvenance.INFERRED)
-        assertEquals(listOf(user), mergeGeneratedCharacterFacts(listOf(user), listOf(generated)))
+        val merged = mergeGeneratedCharacterFacts(listOf(user), listOf(generated))
+        assertEquals(user, merged.first())
+        assertEquals(CharacterFactProvenance.INFERRED, merged.last().provenance)
+        assertEquals(2, merged.size)
     }
 
     @Test fun allBundledCharactersHaveCanonicalV4FactsAndNoPresetGrowthScript() {

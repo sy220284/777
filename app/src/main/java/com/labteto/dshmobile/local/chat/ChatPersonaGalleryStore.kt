@@ -202,6 +202,9 @@ class ChatPersonaGalleryStore internal constructor(
         val matched = explicit ?: compatible
         val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
+        // An explicitly bound gallery card is an authoritative edited snapshot.
+        // Import/name-based matching still uses enrichment merge semantics below.
+        val explicitlyEdited = explicit != null
         val baseEntry = matched ?: PersonaGalleryEntry(
             id = entryId,
             persona = persona.copy(id = entryId),
@@ -227,7 +230,7 @@ class ChatPersonaGalleryStore internal constructor(
             chatContext.hasUsefulFacts()
         if (!shouldSaveStory) {
             val entry = baseEntry.copy(
-                persona = mergePersonaProfiles(baseEntry.persona, persona)
+                persona = (if (explicitlyEdited) persona else mergePersonaProfiles(baseEntry.persona, persona))
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
@@ -258,7 +261,8 @@ class ChatPersonaGalleryStore internal constructor(
                 historyArchived = true,
             )
         val entry = baseEntry.copy(
-            persona = mergePersonaProfiles(baseEntry.persona, persona).copy(id = entryId, updatedAt = now),
+            persona = (if (explicitlyEdited) persona else mergePersonaProfiles(baseEntry.persona, persona))
+                .copy(id = entryId, updatedAt = now),
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
         )

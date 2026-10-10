@@ -45,6 +45,28 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun explicitlyEditedPersonaDeletionSurvivesGallerySaveAndReload() {
+        val file = File(temporary.newFolder("edited-persona"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val old = PersonaProfile(name = "阿青", coreIdentity = "画师", facts = listOf(
+            CharacterFact("keep", CharacterFactCategories.BIOGRAPHY, "曾在杭州求学"),
+            CharacterFact("remove", CharacterFactCategories.RELATIONSHIPS, "旧的关系设定"),
+        ))
+        val initial = gallery.save(
+            persona = old, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+        ).entry
+        val changed = old.copy(facts = old.facts.filterNot { it.id == "remove" })
+        val updated = gallery.save(
+            persona = changed, sourceSessionId = "", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "", existingId = initial.id,
+        ).entry
+        assertEquals(listOf("keep"), updated.persona.facts.map(CharacterFact::id))
+        assertEquals(listOf("keep"),
+            ChatPersonaGalleryStore(file, json).findEntry(initial.id)!!.persona.facts.map(CharacterFact::id))
+    }
+
+    @Test
     fun sameCharacterMergesIntoOneRicherProfileWithoutRepeatingShortVersion() {
         val base = PersonaProfile(
             id = "gallery-1",
