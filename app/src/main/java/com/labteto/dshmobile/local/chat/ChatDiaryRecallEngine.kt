@@ -46,7 +46,35 @@ internal object ChatDiaryRecallEngine {
                 .sortedByDescending(ChatDiaryEntry::updatedAt)
                 .take(MAX_IMPORTANT_RECALL_CANDIDATES)
                 .toList()
-            (recent + important).distinctBy(ChatDiaryEntry::id)
+            // Keep old, strongly related experiences findable after hundreds of turns.
+            // The bounded reserve is query-driven and never widens the final prompt budget.
+            val selected = (recent + important).distinctBy(ChatDiaryEntry::id)
+            val selectedIds = selected.mapTo(hashSetOf(), ChatDiaryEntry::id)
+            val relatedOlder = if (queryTerms.isEmpty()) emptyList() else eligible.asSequence()
+                .filter { it.id !in selectedIds }
+                .mapNotNull { entry ->
+                    val searchable = listOf(
+                        entry.event, entry.relationshipMeaning, entry.unresolvedEcho,
+                    ).joinToString(" ")
+                    if (ChatDiaryEntryPolicy.queryTerms(searchable).none(queryTerms::contains)) {
+                        null
+                    } else {
+                        val score = ChatDiaryEntryPolicy.matchScore(
+                            entry, queryCore, queryTerms, now,
+                        )
+                        entry.takeIf {
+                            ChatDiaryRecallMatchPolicy.isRecallMatch(score, broad, query)
+                        }?.let { it to score.semantic }
+                    }
+                }
+                .sortedWith(
+                    compareByDescending<Pair<ChatDiaryEntry, Int>> { it.second }
+                        .thenByDescending { it.first.updatedAt },
+                )
+                .take(MAX_RELATED_OLD_CANDIDATES)
+                .map(Pair<ChatDiaryEntry, Int>::first)
+                .toList()
+            selected + relatedOlder
         }
 
         return candidates.asSequence()
@@ -70,6 +98,7 @@ internal object ChatDiaryRecallEngine {
 
     private const val MAX_NORMAL_RECALL_CANDIDATES = 256
     private const val MAX_IMPORTANT_RECALL_CANDIDATES = 64
+    private const val MAX_RELATED_OLD_CANDIDATES = 48
     private const val IMPORTANT_RECALL_THRESHOLD = 4
     private const val HISTORICAL_SUPERSEDED_BONUS = 36
 }
