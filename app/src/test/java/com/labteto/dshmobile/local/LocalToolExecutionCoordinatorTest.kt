@@ -64,7 +64,7 @@ class LocalToolExecutionCoordinatorTest {
     @Test
     fun explicitlyDiscoveredToolTakesPrecedenceOverEarlierOptionalBudget() {
         val registry = ToolRegistry().apply {
-            repeat(18) { index ->
+            repeat(300) { index ->
                 register(tool(name = "background_$index", access = ToolAccess.READ_ONLY,
                     approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
                     family = "后台扩展", keywords = setOf("background")) { ToolResult("ok") })
@@ -74,11 +74,32 @@ class LocalToolExecutionCoordinatorTest {
                 family = "精确发现", keywords = setOf("critical")) { ToolResult("ok") })
         }
         val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 18).map { "background_$it" })
+        coordinator.enableOptionalTools((0 until 300).map { "background_$it" })
         assertFalse("critical_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         val response = coordinator.searchCapabilities("critical_lookup")
         assertTrue(response.contains("critical_lookup"))
         assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).contains("critical_lookup"))
+    }
+
+    @Test
+    fun newlyRegisteredExtensionsAppearInDirectoryAndCanBeLoadedWithoutCodeChanges() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "local_core", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.CORE,
+                family = "文件") { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val initial = coordinator.searchCapabilities("能力目录")
+        assertFalse(initial.contains("mcp_newly_added"))
+        registry.register(tool(name = "mcp_newly_added", access = ToolAccess.PRIVILEGED,
+            approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
+            family = "MCP", keywords = setOf("新服务", "MCP")) { ToolResult("ok") })
+        val directory = coordinator.searchCapabilities("工具与能力检测")
+        assertTrue(directory.contains("mcp_newly_added"))
+        assertFalse("mcp_newly_added" in coordinator.enabledOptionalSnapshot())
+        val result = coordinator.searchCapabilities("mcp_newly_added")
+        assertTrue(result.contains("mcp_newly_added"))
+        assertTrue("mcp_newly_added" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
     }
 
     @Test
