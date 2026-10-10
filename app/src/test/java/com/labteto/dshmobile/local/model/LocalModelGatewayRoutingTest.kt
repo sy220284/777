@@ -14,6 +14,27 @@ import org.junit.Test
 
 class LocalModelGatewayRoutingTest {
     @Test
+    fun admissionWaitAndRetryKeepTheFrozenTemperatureAfterGlobalCeilingChanges() {
+        val originalCeiling = LocalModelPerformanceStore.current().temperatureCeiling
+        try {
+            LocalModelPerformanceStore.setTemperatureCeiling(2.0)
+            val frozen = LocalModelPerformanceStore.current().constrainTemperature(1.8)
+            LocalModelPerformanceStore.setTemperatureCeiling(1.0)
+            repeat(2) { attempt ->
+                val prepared = prepareLocalModelAdapterRequest(
+                    route = route(LocalModelRuntimeCapabilities()),
+                    messages = listOf(buildJsonObject { put("role", "user"); put("content", "继续") }),
+                    tools = JsonArray(emptyList()), temperature = frozen, streaming = attempt == 0,
+                )
+                assertEquals(1.8, prepared.request.temperature!!, 0.000001)
+            }
+            assertEquals(1.0, LocalModelPerformanceStore.current().constrainTemperature(1.8)!!, 0.000001)
+        } finally {
+            LocalModelPerformanceStore.setTemperatureCeiling(originalCeiling)
+        }
+    }
+
+    @Test
     fun deepSeekChatSendsCappedTemperatureRangeOnlyWithoutThinking() {
         val profile = LocalModelProfile("ds-range", "deepseek-flash", "https://api.deepseek.com")
         val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)!!

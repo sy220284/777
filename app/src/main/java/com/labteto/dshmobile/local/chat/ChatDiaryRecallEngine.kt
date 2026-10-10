@@ -22,7 +22,7 @@ internal object ChatDiaryRecallEngine {
             .filter(ChatDiaryEntry::active)
             .associateBy(ChatDiaryEntry::id)
         fun supersededByValidUpdate(entry: ChatDiaryEntry): Boolean =
-            entry.supersededBy?.let(activeById::get)?.let { replacement ->
+            entry.supersessionRetained || entry.supersededBy?.let(activeById::get)?.let { replacement ->
                 ChatDiarySupersessionPolicy.supersedes(
                     entry.copy(supersededBy = null), replacement,
                 )

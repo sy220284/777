@@ -44,6 +44,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
+    private val chatMemoryProjection: com.labteto.dshmobile.local.chat.LocalChatMemoryProjectionPort,
 ) : LocalRuntimeBootstrapPort {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
@@ -72,6 +73,11 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
 
     override suspend fun prepareAndRestore(scope: CoroutineScope, initialSessionId: String) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { skillManager.initializeDefaults() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { chatMemoryProjection.recoverPendingDiaryInvalidations() }.onFailure {
+                com.labteto.dshmobile.observability.AppLog.warn("MemoryDiaryRecovery", "关联日记清理待恢复：${it.message}")
+            }
+        }
         migrateLegacySessionFiles(root, sessionsRoot, initialSessionId)
         prepareLocalHarnessStartup(
             prepareRuntime = bundledRuntimeManager::prepare,

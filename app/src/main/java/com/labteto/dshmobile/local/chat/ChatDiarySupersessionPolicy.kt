@@ -7,7 +7,7 @@ internal object ChatDiarySupersessionPolicy {
     ): Boolean {
         if (!existing.active || existing.id == candidate.id) return false
         if (existing.subjectKey != candidate.subjectKey) return false
-        if (existing.supersededBy != null) return false
+        if (existing.supersededBy != null || existing.supersessionRetained) return false
         // Two different named companions may have independent appointments of the
         // same kind. A new "见面" cancellation alone must not erase the other plan.
         if (differentExplicitCompanions(existing.event, candidate.event)) return false
@@ -18,11 +18,33 @@ internal object ChatDiarySupersessionPolicy {
         return topicSimilarity(existing.event, candidate.event) >= SUPERSEDE_TOPIC_SIMILARITY
     }
 
+    /** Retain the whole predecessor chain, including rows whose immediate target is later pruned. */
+    fun retainHistoryBeforeUserDecision(
+        entries: List<ChatDiaryEntry>,
+        replacementIds: Set<String>,
+        now: Long,
+    ): List<ChatDiaryEntry> {
+        val predecessors = entries.filter { it.supersededBy != null }.groupBy { it.supersededBy }
+        val retained = hashSetOf<String>()
+        val pending = ArrayDeque<String>().apply { addAll(replacementIds) }
+        while (pending.isNotEmpty()) {
+            predecessors[pending.removeFirst()].orEmpty().forEach { entry ->
+                if (retained.add(entry.id)) pending.add(entry.id)
+            }
+        }
+        return entries.map { entry ->
+            if (entry.id in retained && !entry.supersessionRetained) {
+                entry.copy(supersessionRetained = true, updatedAt = maxOf(now, entry.updatedAt + 1))
+            } else entry
+        }
+    }
+
     fun repairLinks(entries: List<ChatDiaryEntry>): List<ChatDiaryEntry> {
         val activeById = entries.asSequence()
             .filter(ChatDiaryEntry::active)
             .associateBy(ChatDiaryEntry::id)
         return entries.map { entry ->
+            if (entry.supersessionRetained) return@map entry
             val target = entry.supersededBy?.let(activeById::get)
             if (
                 target == null ||

@@ -58,6 +58,7 @@ internal class MemorySettingsController(
             refresh()
             onDone(null)
         }.onFailure { error ->
+            refresh()
             onDone(error.message ?: "更新记忆失败")
         }
     }
@@ -74,6 +75,9 @@ internal class MemorySettingsController(
                 refresh()
                 onDone(if (removed) null else "这条记忆已被停用或不存在")
             }
-            .onFailure { error -> onDone(error.message ?: "停用记忆失败") }
+            .onFailure { error ->
+                refresh()
+                onDone(error.message ?: "停用记忆失败")
+            }
     }
 }

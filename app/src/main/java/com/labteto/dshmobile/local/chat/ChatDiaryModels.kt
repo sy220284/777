@@ -69,6 +69,9 @@ data class ChatDiaryEntry(
     val generation: Long = 0L,
     /** Newer active diary entry that replaced this entry's current meaning. Historical recall may still use it. */
     val supersededBy: String? = null,
+    /** User correction/disable of the replacement does not revive this obsolete meaning.
+     * Independent of the replacement row so pruning and persona transfer preserve the decision. */
+    val supersessionRetained: Boolean = false,
     val active: Boolean = true,
     val createdAt: Long,
     val updatedAt: Long,

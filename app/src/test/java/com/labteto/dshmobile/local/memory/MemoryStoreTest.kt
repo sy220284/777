@@ -8,6 +8,38 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class MemoryStoreTest {
+    @Test fun metadataEditDoesNotQueueInvalidationAndCleanupCannotAcknowledgeANewerCorrection() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.update(original.id, pinned = true)
+        assertTrue(memory.pendingSourceInvalidations().isEmpty())
+        val corrected = memory.update(original.id, content = "周末去山上")
+        assertEquals(listOf(MemorySourceRef("s", "u")), store().pendingSourceInvalidations().single().pendingSourceInvalidations)
+        memory.update(original.id, content = "周末去书店")
+        assertFalse(memory.acknowledgeSourceInvalidation(corrected))
+        val latest = memory.pendingSourceInvalidations().single()
+        assertTrue(memory.acknowledgeSourceInvalidation(latest))
+        assertTrue(store().pendingSourceInvalidations().isEmpty())
+        assertEquals("周末去书店", all(store()).single().content)
+    }
+
+    @Test fun disabledPendingCleanupSurvivesCompactionAndConsolidation() {
+        val memory = store()
+        val original = memory.remember("周末去海边", MemoryScope.GLOBAL,
+            sourceSessionId = "s", sourceMessageId = "u")
+        memory.forget(original.id)
+        val pending = memory.pendingSourceInvalidations().single()
+        val another = pending.copy(id = "another", active = true, pendingSourceInvalidations = emptyList())
+        assertTrue(compactMemoryRecords(listOf(pending, another), 1).any { it.id == pending.id })
+        assertEquals(setOf(pending.id, another.id),
+            compactMemoryRecords(listOf(pending, another), 1, setOf(another.id)).map { it.id }.toSet())
+        val duplicate = pending.copy(id = "duplicate", active = true)
+        val combined = consolidateMemoryRecords(listOf(duplicate, another))
+        assertEquals(0, combined.mergedCount)
+        assertTrue(combined.records.any { it.pendingSourceInvalidations.isNotEmpty() })
+    }
+
     @Test fun staleMessageLinkedMemoryEditCannotOverwriteNewerCorrectionOrDeactivateIt() {
         val memory = store()
         val original = memory.remember(

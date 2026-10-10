@@ -22,11 +22,13 @@ internal fun compactMemoryRecords(
                 .thenByDescending(MemoryRecord::updatedAt),
         )
 
-    val selected = linkedSetOf<String>()
+    // Pending cleanup survives pruning even when the fact itself has been disabled.
+    val selected = records.filter { it.pendingSourceInvalidations.isNotEmpty() || it.id in protectedIds }
+        .mapTo(linkedSetOf(), MemoryRecord::id)
     val selectedRoots = mutableListOf<String>()
     activeRoots.forEach { root ->
         val nearestPredecessor = predecessors[root.id].orEmpty().firstOrNull()
-        val required = 1 + if (nearestPredecessor != null && nearestPredecessor.id !in selected) 1 else 0
+        val required = (if (root.id in selected) 0 else 1) + if (nearestPredecessor != null && nearestPredecessor.id !in selected) 1 else 0
         if (selected.size + required > maxRecords) return@forEach
         selected += root.id
         selectedRoots += root.id
@@ -77,7 +79,7 @@ internal fun consolidateMemoryRecords(
     )
 
     val duplicateGroups = records.asSequence()
-        .filter(MemoryRecord::active)
+        .filter { it.active && it.pendingSourceInvalidations.isEmpty() }
         .groupBy { record ->
             Key(
                 scope = record.scope,

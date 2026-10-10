@@ -34,6 +34,10 @@ internal data class ModelPerformanceLimits(
     fun constrainTemperature(requested: Double?): Double? =
         requested?.let { minOf(it, temperatureCeiling.coerceIn(1.0, 2.0)) }
 
+    /** Fine tuning keeps a final detent attaining the cap; the visible/send value is clipped. */
+    fun temperaturePositionLimit(range: LocalModelTemperatureRange): Int =
+        (0..100).firstOrNull { range.at(it) >= temperatureCeiling.coerceIn(1.0, 2.0) } ?: 100
+
     /** Last selectable one of the existing five stops, with the last stop attaining the cap. */
     fun temperatureStopLimit(range: LocalModelTemperatureRange): Int =
         (0..4).firstOrNull { range.at(it * 25) >= temperatureCeiling } ?: 4

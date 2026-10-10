@@ -151,6 +151,9 @@ class MemoryStore internal constructor(
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
         val updated = current.copy(
             content = clean,
+            pendingSourceInvalidations = if (clean != current.content) {
+                (current.pendingSourceInvalidations + current.sourceMessages).distinct()
+            } else current.pendingSourceInvalidations,
             kind = kind ?: current.kind,
             importance = (importance ?: current.importance).coerceIn(0, 100),
             pinned = pinned ?: current.pinned,
@@ -172,10 +175,32 @@ class MemoryStore internal constructor(
         }
         records[index] = current.copy(
             active = false,
+            pendingSourceInvalidations =
+                (current.pendingSourceInvalidations + current.sourceMessages).distinct(),
             supersededBy = null,
             updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
         )
         documents.write(MemoryDocument(records = records))
+        return true
+    }
+
+    @Synchronized
+    internal fun pendingSourceInvalidations(): List<MemoryRecord> =
+        documents.read().records.filter { it.pendingSourceInvalidations.isNotEmpty() }
+
+    /** A concurrent correction must keep its newer cleanup obligation. */
+    @Synchronized
+    internal fun acknowledgeSourceInvalidation(expected: MemoryRecord): Boolean {
+        val document = documents.read()
+        val index = document.records.indexOfFirst { it.id == expected.id }
+        if (index < 0) return false
+        val current = document.records[index]
+        if (current.updatedAt != expected.updatedAt ||
+            current.pendingSourceInvalidations != expected.pendingSourceInvalidations
+        ) return false
+        val records = document.records.toMutableList()
+        records[index] = current.copy(pendingSourceInvalidations = emptyList())
+        documents.write(document.copy(records = records))
         return true
     }
 

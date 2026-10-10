@@ -36,16 +36,21 @@ class LocalSettingsDataFacade @Inject internal constructor(
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
         val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
-        if (existing.content != updated.content) {
-            chatMemoryProjection.invalidateGeneratedDiaryForSources(existing.sourceMessages)
-        }
+        recoverDiaryAfterMemorySave("记忆已保存")
         return updated
     }
 
     internal fun forgetMemory(existing: MemoryRecord): Boolean {
         val removed = memoryStore.forget(existing.id, existing.updatedAt)
-        if (removed) chatMemoryProjection.invalidateGeneratedDiaryForSources(existing.sourceMessages)
+        if (removed) recoverDiaryAfterMemorySave("记忆已停用")
         return removed
+    }
+    private fun recoverDiaryAfterMemorySave(savedMessage: String) {
+        try {
+            chatMemoryProjection.recoverPendingDiaryInvalidations()
+        } catch (error: Exception) {
+            throw IllegalStateException("$savedMessage，关联日记清理待恢复；重开或下次召回时会重试", error)
+        }
     }
     internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
         memoryStore.listActiveFromMessage(sessionId, messageId)

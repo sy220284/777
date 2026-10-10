@@ -138,6 +138,11 @@ ChatFeature
 
 人物、图集、日记、关系、生活状态和群聊属于 Chat 领域。其他 Feature 只能通过 Chat 暴露的能力契约使用这些行为。
 
+长期记忆正文修正/停用与来源失效待办在 Memory 的同一持久提交中写入；Chat 的 `LocalChatMemoryProjectionPort` 在设置保存后、启动及日记召回前幂等处理派生日记失效，再按记录版本确认待办。清理中断保留待办，后续恢复；召回时若仍无法完成清理，本轮保留精确事实但不使用未完成清理的日记，并显示错误。仅元数据编辑不新增来源失效，压缩和合并不能丢弃未确认待办。Memory 不解释 Chat 日记语义。
+
+用户修正或停用替代日记时，前驱的历史状态与操作一起持久化；替代记录被清理或人物转移后，旧约定仍仅供明确历史查询使用。用户直接修正前驱可将其重新确认为当前内容，普通时间线回滚仍沿原有来源恢复规则执行。
+
+
 ### 4.2 WorkFeature
 
 目标聚合：
@@ -514,7 +519,7 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 - `LocalSessionRuntimeRegistry` 的 Session owner 单一所有权；
 - Automation `scheduleGeneration` 的提交权；
 - `LocalAgentRunCoordinator` 的迟到结果栅栏；
-- 模型 Run 冻结 profile / route identity；
+- 模型 Run 冻结 profile / route identity；全局温度上限在请求配置冻结时应用，等待和重试不再次读取实时上限；人物精细滑杆与发送值使用同一上限，降低上限不覆盖原保存选择。
 - Tool side-effect 不明时禁止盲目重放；
 - EventLog 继续作为持久事实流，模型历史缓存 / Checkpoint 只能作为带水位的派生物；
 - 每次模型请求必须留下可校验的 request evidence；工具与模型可见 Context Surface 变化必须可追踪；

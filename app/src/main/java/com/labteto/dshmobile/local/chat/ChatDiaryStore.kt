@@ -139,11 +139,13 @@ internal class ChatDiaryStore(
             userCorrected = true,
         )
         val revised = ChatDiaryEntryPolicy.rebuild(
-            previous.copy(supersededBy = null),
+            previous.copy(supersededBy = null, supersessionRetained = false),
             ChatDiaryEntryPolicy.revisionsOf(previous) + revision,
             now,
         )
-        val entries = existing.entries.toMutableList().apply { this[index] = revised }
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            existing.entries, setOf(id), now,
+        ).toMutableList().apply { this[index] = revised }
         documents.write(existing.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
         return true
     }
@@ -159,7 +161,9 @@ internal class ChatDiaryStore(
         }
         if (index < 0) return false
         val previous = existing.entries[index]
-        val entries = existing.entries.toMutableList().apply {
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            existing.entries, setOf(id), System.currentTimeMillis(),
+        ).toMutableList().apply {
             this[index] = previous.copy(
                 active = false,
                 updatedAt = maxOf(System.currentTimeMillis(), previous.updatedAt + 1),
@@ -178,11 +182,15 @@ internal class ChatDiaryStore(
     fun invalidateGeneratedFromMessage(sessionId: String, userMessageId: String): Int {
         if (sessionId.isBlank() || userMessageId.isBlank()) return 0
         val document = documents.read()
-        var affected = 0
-        val entries = document.entries.map { entry ->
-            if (entry.active && entry.revisions.lastOrNull()?.userCorrected != true &&
+        val affectedIds = document.entries.filter { entry ->
+            entry.active && entry.revisions.lastOrNull()?.userCorrected != true &&
                 entry.sources.any { it.sessionId == sessionId && it.userMessageId == userMessageId }
-            ) {
+        }.mapTo(hashSetOf(), ChatDiaryEntry::id)
+        var affected = 0
+        val entries = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            document.entries, affectedIds, System.currentTimeMillis(),
+        ).map { entry ->
+            if (entry.id in affectedIds) {
                 affected++
                 entry.copy(active = false, supersededBy = null,
                     updatedAt = maxOf(System.currentTimeMillis(), entry.updatedAt + 1))

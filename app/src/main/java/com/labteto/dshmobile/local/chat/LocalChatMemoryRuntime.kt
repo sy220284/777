@@ -25,6 +25,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val persistence: LocalChatPersistence,
+    private val memoryProjection: LocalChatMemoryProjectionPort,
     private val sessionStorage: LocalSessionStorageRuntime,
 ) {
     internal suspend fun captureAutoMemoryDirective(
@@ -155,7 +156,12 @@ internal class LocalChatMemoryRuntime @Inject constructor(
             }
         }
 
-        if (searchDiary) {
+        val diaryReady = !searchDiary || runCatching {
+            memoryProjection.recoverPendingDiaryInvalidations()
+        }.onFailure { error ->
+            runtimeStateStore.projection.publishError("关联日记清理待恢复，本轮暂不使用日记：${error.message}")
+        }.isSuccess
+        if (searchDiary && diaryReady) {
             val diary = persistence.diaryStore.search(
                 // Use only recent public user evidence to resolve demonstratives such as
                 // "after that"; private thoughts never become search terms.

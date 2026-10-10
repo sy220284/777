@@ -4,6 +4,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -12,6 +15,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.CharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.CharacterEvolutionState
 import com.labteto.dshmobile.local.model.LocalModelTemperatureRange
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.pressDeviceBack
 import java.util.concurrent.atomic.AtomicInteger
@@ -24,6 +28,74 @@ class CharacterBehaviorTuningDialogTest {
     @get:Rule val compose = createComposeRule()
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun globalCeilingUpdatesFineTuningDisplayAndRestoresSavedSelection() {
+        val previousCeiling = LocalModelPerformanceControls.state.value.temperatureCeiling
+        var saved: CharacterBehaviorTuning? = null
+        try {
+            LocalModelPerformanceControls.setTemperatureCeiling(1.0)
+            compose.setContent {
+                DshTheme {
+                    CharacterBehaviorTuningDialog(
+                        personaName = "角色", portraitPath = "", relationshipState = "熟悉", mood = "平静",
+                        evolution = CharacterEvolutionState(),
+                        initial = CharacterBehaviorTuning(samplingTemperaturePosition = 100),
+                        temperatureRange = LocalModelTemperatureRange(0.0, 1.3, 1.3, defaultPosition = 100),
+                        onSave = { saved = it; Result.success(Unit) }, onDismiss = {},
+                    )
+                }
+            }
+            compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
+                .performScrollTo().performClick()
+            compose.onNodeWithText(context.getString(
+                R.string.local_character_tuning_temperature_value, 1.0, 77,
+            )).assertExists()
+            compose.runOnIdle { LocalModelPerformanceControls.setTemperatureCeiling(1.3) }
+            compose.onNodeWithText(context.getString(
+                R.string.local_character_tuning_temperature_value, 1.3, 100,
+            )).assertExists()
+            compose.runOnIdle { LocalModelPerformanceControls.setTemperatureCeiling(1.0) }
+            compose.onNodeWithText(context.getString(R.string.local_character_tuning_done)).performClick()
+            compose.waitForIdle()
+            assertEquals(100, saved!!.samplingTemperaturePosition)
+        } finally {
+            LocalModelPerformanceControls.setTemperatureCeiling(previousCeiling)
+        }
+    }
+
+    @Test
+    fun fineTuningSliderCannotSelectBeyondGlobalCeilingDetent() {
+        val previousCeiling = LocalModelPerformanceControls.state.value.temperatureCeiling
+        var saved: CharacterBehaviorTuning? = null
+        try {
+            LocalModelPerformanceControls.setTemperatureCeiling(1.0)
+            compose.setContent {
+                DshTheme {
+                    CharacterBehaviorTuningDialog(
+                        personaName = "角色", portraitPath = "", relationshipState = "熟悉", mood = "平静",
+                        evolution = CharacterEvolutionState(),
+                        initial = CharacterBehaviorTuning(samplingTemperaturePosition = 25),
+                        temperatureRange = LocalModelTemperatureRange(0.0, 1.3, 1.3, defaultPosition = 100),
+                        onSave = { saved = it; Result.success(Unit) }, onDismiss = {},
+                    )
+                }
+            }
+            compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
+                .performScrollTo().performClick()
+            compose.onNodeWithContentDescription(context.getString(R.string.local_character_tuning_expression_variation))
+                .performScrollTo()
+                .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(100f) }
+            compose.onNodeWithText(context.getString(
+                R.string.local_character_tuning_temperature_value, 1.0, 77,
+            )).assertExists()
+            compose.onNodeWithText(context.getString(R.string.local_character_tuning_done)).performClick()
+            compose.waitForIdle()
+            assertEquals(77, saved!!.samplingTemperaturePosition)
+        } finally {
+            LocalModelPerformanceControls.setTemperatureCeiling(previousCeiling)
+        }
+    }
 
     @Test
     fun saveKeepsDialogOpenAndLocksEditingUntilPersistenceCompletes() {
