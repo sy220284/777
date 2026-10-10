@@ -184,6 +184,30 @@ class LocalWorkCapabilitySheetRegressionTest {
     }
 
     @Test
+    fun missingDevicePermissionOpensSettingsAndDoesNotStartWork() {
+        var openedSettings = 0
+        var started = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        LocalTaskCapabilityKind.ACCESSIBILITY, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureDevice = { openedSettings++ },
+                )
+            }
+        }
+        compose.onNodeWithText("设备无障碍服务 · 当前未激活，请检查系统授权").assertIsDisplayed()
+        compose.onNodeWithText("前往设备权限设置").performClick()
+        compose.runOnIdle {
+            assertEquals(1, openedSettings)
+            assertEquals(0, started)
+        }
+    }
+
+    @Test
     fun pendingModeTransitionCannotBeSubmittedAgainOrDismissed() {
         compose.setContent {
             DshTheme {

@@ -12,7 +12,8 @@
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#configurationReturnAndRefreshPreserveDraftWithoutStartingWork",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#selectedHistoryRequiresUserClickAndNeverStartsWorkAutomatically",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#unconfiguredModelCanOpenSettingsWithoutStartingWork"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#unconfiguredModelCanOpenSettingsWithoutStartingWork",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#missingDevicePermissionOpensSettingsAndDoesNotStartWork"
       ]
     },
     {
