@@ -6,6 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
@@ -27,6 +30,7 @@ internal fun LocalWorkCapabilitySheet(
     summary: String = "",
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
+    capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
 ) {
     val colors = DsTheme.colors
     DsBottomSheet(
@@ -66,6 +70,25 @@ internal fun LocalWorkCapabilitySheet(
             maxLines = 6,
         )
         Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+        if (capabilities.isNotEmpty()) {
+            Text(stringResource(R.string.work_capability_readiness_title),
+                style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
+            capabilities.forEach { item ->
+                val name = when (item.kind) {
+                    LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
+                    LocalTaskCapabilityKind.WEB_SEARCH -> R.string.work_capability_readiness_web
+                }
+                val status = when (item.state) {
+                    LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
+                    LocalTaskCapabilityState.CONNECTION_REQUIRED -> R.string.work_capability_readiness_needs_connection
+                    LocalTaskCapabilityState.DISABLED -> R.string.work_capability_readiness_disabled
+                    LocalTaskCapabilityState.UNKNOWN -> R.string.work_capability_readiness_unknown
+                }
+                Text(stringResource(R.string.work_capability_readiness_row,
+                    stringResource(name), stringResource(status)),
+                    style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+            }
+        }
         if (failed) Text(stringResource(R.string.work_capability_failed), style = DsType.small13.withReadingWeight(), color = colors.error)
     }
 }
