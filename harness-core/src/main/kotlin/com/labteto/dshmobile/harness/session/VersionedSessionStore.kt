@@ -233,12 +233,18 @@ class VersionedSessionStore(
 
     private fun sessionFiles(): List<File> = root.listFiles().orEmpty()
         .filter { file ->
+            val name = file.name
+            val id = name.removeSuffix(SESSION_SUFFIX)
             file.isFile &&
-                file.name.endsWith(SESSION_SUFFIX) &&
-                !file.name.endsWith(TEMP_SUFFIX) &&
-                !file.name.endsWith(BACKUP_SUFFIX) &&
-                !file.name.contains(CHECKPOINT_MARKER) &&
-                !file.name.contains(CORRUPT_MARKER)
+                name.endsWith(SESSION_SUFFIX) &&
+                !name.endsWith(TEMP_SUFFIX) &&
+                !name.endsWith(BACKUP_SUFFIX) &&
+                !name.contains(CHECKPOINT_MARKER) &&
+                !name.contains(CORRUPT_MARKER) &&
+                // EventLog projections are JSON files too. Never treat them as Session snapshots:
+                // reading one as a session can recursively create more projection paths.
+                !name.contains(EVENT_LOG_MARKER) &&
+                id.matches(SESSION_ID_PATTERN)
         }
 
     private fun fileFor(id: String): File {
@@ -310,5 +316,7 @@ class VersionedSessionStore(
         const val BACKUP_SUFFIX = ".backup.json"
         const val CHECKPOINT_MARKER = ".checkpoint-v"
         const val CORRUPT_MARKER = ".corrupt-"
+        const val EVENT_LOG_MARKER = ".events.jsonl"
+        val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }
