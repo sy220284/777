@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
@@ -217,6 +218,13 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
+    internal suspend fun correctDiaryEntry(
+        subjectKey: String, id: String, revision: Long, correction: ChatDiaryDelta,
+    ): Boolean = withContext(Dispatchers.IO) {
+        runtime.chat.correctDiaryEntry(subjectKey, id, revision, correction)
+    }
+    internal suspend fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long): Boolean =
+        withContext(Dispatchers.IO) { runtime.chat.deactivateDiaryEntry(subjectKey, id, revision) }
     fun createGroupChatSession(ids: List<String>): Boolean {
         val distinctIds = ids.distinct()
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)

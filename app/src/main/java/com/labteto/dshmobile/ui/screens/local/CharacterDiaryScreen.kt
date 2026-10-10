@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,12 +36,15 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.chat.ChatDiaryDisclosure
+import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatRelationshipSubjectKey
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
@@ -54,6 +58,8 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 internal data class CharacterDiarySubject(
     val key: String,
@@ -127,9 +133,13 @@ internal fun CharacterDiaryScreen(
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
     loadEntries: suspend (String) -> List<ChatDiaryEntry>,
+    onCorrectEntry: suspend (String, String, Long, ChatDiaryDelta) -> Boolean,
+    onDeactivateEntry: suspend (String, String, Long) -> Boolean,
+    onOpenSourceSession: (String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val scope = rememberCoroutineScope()
     val subjects = remember(gallery, currentPersona, currentGalleryId) {
         characterDiarySubjects(gallery, currentPersona, currentGalleryId)
     }
@@ -143,6 +153,17 @@ internal fun CharacterDiaryScreen(
     var loading by remember { mutableStateOf(false) }
     var loadFailed by remember { mutableStateOf(false) }
     var reloadNonce by remember { mutableIntStateOf(0) }
+    var editingEntry by remember { mutableStateOf<ChatDiaryEntry?>(null) }
+    var deactivatingEntry by remember { mutableStateOf<ChatDiaryEntry?>(null) }
+    var editDraft by remember { mutableStateOf(ChatDiaryDelta()) }
+    var mutating by remember { mutableStateOf(false) }
+    var mutationError by remember { mutableStateOf(false) }
+    var sourceError by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedSubjectKey) {
+        editingEntry = null
+        deactivatingEntry = null
+        sourceError = false
+    }
 
     LaunchedEffect(subjects, preferredKey) {
         if (selectedSubjectKey == null || subjects.none { it.key == selectedSubjectKey }) {
@@ -238,6 +259,12 @@ internal fun CharacterDiaryScreen(
                         shape = DsShapes.block,
                     )
                 }
+                if (sourceError) {
+                    item(key = "diary-source-error") {
+                        Text(stringResource(R.string.chat_diary_source_unavailable),
+                            color = colors.error, style = DsType.small13.withReadingWeight())
+                    }
+                }
                 item(key = "diary-filters") {
                     DsSegmentedTabs(
                         labels = listOf(
@@ -284,16 +311,160 @@ internal fun CharacterDiaryScreen(
                         )
                     }
                     else -> items(visibleEntries, key = ChatDiaryEntry::id) { entry ->
-                        CharacterDiaryEntryCard(entry)
+                        CharacterDiaryEntryCard(
+                            entry = entry,
+                            onEdit = {
+                                editingEntry = entry
+                                editDraft = ChatDiaryDelta(
+                                    event = entry.event, feeling = entry.feeling,
+                                    innerThought = entry.innerThought,
+                                    relationshipMeaning = entry.relationshipMeaning,
+                                    unresolvedEcho = entry.unresolvedEcho,
+                                    importance = entry.importance,
+                                )
+                                mutationError = false
+                            },
+                            onDeactivate = {
+                                deactivatingEntry = entry
+                                mutationError = false
+                            },
+                            onOpenSource = { sessionId ->
+                                if (onOpenSourceSession(sessionId)) {
+                                    sourceError = false
+                                } else {
+                                    sourceError = true
+                                }
+                            },
+                        )
                     }
                 }
             }
+
+        }
+    }
+    editingEntry?.let { entry ->
+        DsBottomSheet(
+            title = stringResource(R.string.chat_diary_edit_title),
+            subtitle = stringResource(R.string.chat_diary_edit_hint),
+            onDismiss = { if (!mutating) editingEntry = null },
+            dismissEnabled = !mutating,
+            scrollable = true,
+            footer = {
+                DsButton(
+                    text = stringResource(R.string.common_save),
+                    onClick = {
+                        mutating = true
+                        mutationError = false
+                        scope.launch {
+                            val success = try {
+                                onCorrectEntry(entry.subjectKey, entry.id, entry.updatedAt, editDraft)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            }
+                            mutating = false
+                            if (success) editingEntry = null else mutationError = true
+                            reloadNonce++
+                        }
+                    },
+                    enabled = editDraft.event.trim().isNotBlank() && !mutating,
+                    modifier = Modifier.fillMaxWidth(),
+                    loading = mutating,
+                )
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { editingEntry = null },
+                    enabled = !mutating,
+                    variant = DsButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+        ) {
+            DsTextField(
+                value = editDraft.event, onValueChange = { editDraft = editDraft.copy(event = it) },
+                label = { Text(stringResource(R.string.chat_diary_edit_event)) },
+                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 5,
+            )
+            DsTextField(
+                value = editDraft.feeling, onValueChange = { editDraft = editDraft.copy(feeling = it) },
+                label = { Text(stringResource(R.string.chat_diary_feeling)) },
+                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
+            )
+            DsTextField(
+                value = editDraft.innerThought, onValueChange = { editDraft = editDraft.copy(innerThought = it) },
+                label = { Text(stringResource(R.string.chat_diary_inner_thought)) },
+                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
+            )
+            DsTextField(
+                value = editDraft.relationshipMeaning,
+                onValueChange = { editDraft = editDraft.copy(relationshipMeaning = it) },
+                label = { Text(stringResource(R.string.chat_diary_relationship_meaning)) },
+                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
+            )
+            DsTextField(
+                value = editDraft.unresolvedEcho,
+                onValueChange = { editDraft = editDraft.copy(unresolvedEcho = it) },
+                label = { Text(stringResource(R.string.chat_diary_unresolved_echo)) },
+                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
+            )
+            if (mutationError) Text(
+                stringResource(R.string.chat_diary_save_failed),
+                style = DsType.small13.withReadingWeight(), color = colors.error,
+            )
+        }
+    }
+    deactivatingEntry?.let { entry ->
+        DsBottomSheet(
+            title = stringResource(R.string.chat_diary_deactivate),
+            onDismiss = { if (!mutating) deactivatingEntry = null },
+            dismissEnabled = !mutating,
+            footer = {
+                DsButton(
+                    text = stringResource(R.string.chat_diary_deactivate),
+                    onClick = {
+                        mutating = true
+                        mutationError = false
+                        scope.launch {
+                            val success = try {
+                                onDeactivateEntry(entry.subjectKey, entry.id, entry.updatedAt)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            }
+                            mutating = false
+                            if (success) deactivatingEntry = null else mutationError = true
+                            reloadNonce++
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !mutating,
+                    loading = mutating,
+                )
+                DsButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { deactivatingEntry = null },
+                    enabled = !mutating, variant = DsButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+        ) {
+            Text(stringResource(R.string.chat_diary_deactivate_hint),
+                style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
+            if (mutationError) Text(stringResource(R.string.chat_diary_save_failed),
+                style = DsType.small13.withReadingWeight(), color = colors.error)
         }
     }
 }
 
 @Composable
-private fun CharacterDiaryEntryCard(entry: ChatDiaryEntry) {
+private fun CharacterDiaryEntryCard(
+    entry: ChatDiaryEntry,
+    onEdit: () -> Unit,
+    onDeactivate: () -> Unit,
+    onOpenSource: (String) -> Unit,
+) {
     val colors = DsTheme.colors
     val dateText = remember(entry.updatedAt) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(entry.updatedAt)
@@ -345,6 +516,31 @@ private fun CharacterDiaryEntryCard(entry: ChatDiaryEntry) {
             text = entry.unresolvedEcho,
         )
 
+        if (entry.revisions.lastOrNull()?.userCorrected == true) {
+            DsPill(text = stringResource(R.string.chat_diary_user_corrected))
+        }
+        entry.sources.lastOrNull()?.takeIf { it.sessionId.isNotBlank() }?.let { source ->
+            Text(
+                stringResource(
+                    R.string.chat_diary_source_ref,
+                    source.sessionId.take(12),
+                    source.userMessageId.ifBlank { source.assistantMessageId }.take(12),
+                ),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+            )
+            DsButton(
+                text = stringResource(R.string.chat_diary_open_source),
+                onClick = { onOpenSource(source.sessionId) },
+                variant = DsButtonVariant.Ghost,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            DsButton(text = stringResource(R.string.chat_diary_edit_title),
+                onClick = onEdit, variant = DsButtonVariant.Ghost)
+            DsButton(text = stringResource(R.string.chat_diary_deactivate),
+                onClick = onDeactivate, variant = DsButtonVariant.Ghost)
+        }
         Text(
             stringResource(R.string.chat_diary_importance, entry.importance),
             style = DsType.caption11.withReadingWeight(),

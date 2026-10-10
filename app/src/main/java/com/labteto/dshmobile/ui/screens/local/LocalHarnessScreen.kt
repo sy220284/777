@@ -325,6 +325,8 @@ fun LocalHarnessScreen(
     val chatActions = LocalChatFeatureUiActions(
         personaPresets = viewModel.personaPresets,
         diaryEntries = viewModel::diaryEntries,
+        correctDiaryEntry = viewModel::correctDiaryEntry,
+        deactivateDiaryEntry = viewModel::deactivateDiaryEntry,
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
         saveCurrentToGallery = viewModel::saveCurrentToGallery,
