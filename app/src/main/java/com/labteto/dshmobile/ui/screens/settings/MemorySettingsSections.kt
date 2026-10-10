@@ -206,6 +206,8 @@ internal fun MemoryManagementCard(
     records: List<MemoryRecord>,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
+    focusedSource: Boolean = false,
+    onShowAll: () -> Unit = {},
 ) {
     val memoryUpdatedMessage = stringResource(R.string.advanced_memory_updated)
     val memoryDeactivatedMessage = stringResource(R.string.advanced_memory_deactivated)
@@ -232,9 +234,24 @@ internal fun MemoryManagementCard(
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        if (focusedSource) {
+            Text(
+                stringResource(R.string.advanced_memory_from_message),
+                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.advanced_memory_show_all),
+                onClick = onShowAll,
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (records.isEmpty()) {
             Text(
-                stringResource(R.string.advanced_memory_empty),
+                stringResource(
+                    if (focusedSource) R.string.advanced_memory_no_message_source
+                    else R.string.advanced_memory_empty,
+                ),
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelTertiary,
             )
