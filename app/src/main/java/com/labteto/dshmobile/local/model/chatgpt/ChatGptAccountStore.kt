@@ -36,7 +36,12 @@ class ChatGptAccountStore @Inject constructor(
         return ids.mapNotNull { id ->
             secret(id).get()?.let { raw ->
                 runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
-                    .onFailure { AppLog.failure("ChatGptAccountStore", "decode_account_record", it, requestId = id.takeLast(8)) }
+                    .onFailure { error ->
+                        // Never log raw deserialization text from encrypted account records.
+                        AppLog.error("ChatGptAccountStore",
+                            "operation=decode_account_record account_tail=${id.takeLast(8)} " +
+                                "cause_type=${error.javaClass.simpleName} status=invalid_private_record")
+                    }
                     .getOrNull()
             }
         }
@@ -45,7 +50,12 @@ class ChatGptAccountStore @Inject constructor(
     suspend fun get(id: String): ChatGptAccountRecord? =
         secret(id).get()?.let { raw ->
             runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
-                    .onFailure { AppLog.failure("ChatGptAccountStore", "decode_account_record", it, requestId = id.takeLast(8)) }
+                    .onFailure { error ->
+                        // Never log raw deserialization text from encrypted account records.
+                        AppLog.error("ChatGptAccountStore",
+                            "operation=decode_account_record account_tail=${id.takeLast(8)} " +
+                                "cause_type=${error.javaClass.simpleName} status=invalid_private_record")
+                    }
                     .getOrNull()
         }
 
