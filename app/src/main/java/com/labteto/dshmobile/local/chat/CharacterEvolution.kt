@@ -231,7 +231,9 @@ private fun PersonaProfile.evolvingTraitAnchors(): List<String> =
         mutableTraits.asSequence().map(String::trim)
             .filter(String::isNotBlank).distinct().take(8).toList()
     } else {
-        facts.asSequence()
+        // Growth must use the same character-knowledge view as reply projection.
+        // Another observer's subjective belief is not this character's tendency.
+        characterKnownFacts().asSequence()
             .filter { it.temporalScope.isBlank() }
             .filter {
                 it.category == CharacterFactCategories.PREFERENCES_AND_HABITS ||

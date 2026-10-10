@@ -158,7 +158,10 @@ class CharacterLifeRuntimeV3Test {
             "相信密探", temporalScope = "act-3", provenance = CharacterFactProvenance.CANON)
         val unverified = CharacterFact("guess", CharacterFactCategories.SUBJECTIVE_BELIEFS,
             "渴望离开", provenance = CharacterFactProvenance.UNVERIFIED)
-        val persona = PersonaProfile(name = "阿青", facts = listOf(habit, future, unverified))
+        val anotherPersonsBelief = CharacterFact("observer", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "怀疑所有同事", perspective = "阿紫", provenance = CharacterFactProvenance.CANON)
+        val persona = PersonaProfile(name = "阿青",
+            facts = listOf(habit, future, unverified, anotherPersonsBelief))
         assertTrue(persona.mutableTraits.isEmpty())
         var state = ChatCharacterState()
         listOf(
@@ -177,6 +180,7 @@ class CharacterLifeRuntimeV3Test {
         assertTrue(trace.currentWeight > trace.baseline)
         assertTrue("相信密探" !in state.evolution.traitStates)
         assertTrue("渴望离开" !in state.evolution.traitStates)
+        assertTrue("怀疑所有同事" !in state.evolution.traitStates)
         assertEquals(habit, persona.facts.first())
     }
 
