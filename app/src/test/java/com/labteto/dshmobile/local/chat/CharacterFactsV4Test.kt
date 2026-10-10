@@ -188,6 +188,43 @@ class CharacterFactsV4Test {
         assertEquals(CharacterFactProvenance.INFERRED, merged.last().provenance)
     }
 
+    @Test fun aiEnrichmentCannotPromoteItsOwnFactProvenanceOnInsertOrIdReplacement() {
+        val inferred = CharacterFact("inferred", CharacterFactCategories.BIOGRAPHY, "早年行医",
+            provenance = CharacterFactProvenance.INFERRED)
+        val canon = CharacterFact("canon", CharacterFactCategories.BIOGRAPHY, "在故乡开诊所",
+            provenance = CharacterFactProvenance.CANON)
+        val user = CharacterFact("user", CharacterFactCategories.BIOGRAPHY, "用户补写经历",
+            provenance = CharacterFactProvenance.USER_CREATED)
+        val incoming = listOf(
+            inferred.copy(content = "模型建议的新经历", provenance = CharacterFactProvenance.USER_CREATED),
+            canon.copy(content = "模型误改原作", provenance = CharacterFactProvenance.CANON),
+            user.copy(content = "模型误改用户编辑", provenance = CharacterFactProvenance.INFERRED),
+            CharacterFact("new-canon", CharacterFactCategories.BIOGRAPHY, "声称是原作的事实",
+                provenance = CharacterFactProvenance.CANON),
+            CharacterFact("new-author", CharacterFactCategories.RELATIONSHIPS, "声称是用户创作",
+                provenance = CharacterFactProvenance.USER_CREATED),
+        )
+        val merged = mergeGeneratedCharacterFacts(listOf(inferred, canon, user), incoming)
+        assertEquals("模型建议的新经历", merged.first { it.id == "inferred" }.content)
+        assertEquals(CharacterFactProvenance.INFERRED,
+            merged.first { it.id == "inferred" }.provenance)
+        assertEquals(canon, merged.first { it.id == "canon" })
+        assertEquals(user, merged.first { it.id == "user" })
+        assertEquals(CharacterFactProvenance.UNVERIFIED,
+            merged.first { it.id == "new-canon" }.provenance)
+        assertEquals(CharacterFactProvenance.INFERRED,
+            merged.first { it.id == "new-author" }.provenance)
+    }
+
+    @Test fun aiEnrichmentPreservesUnverifiedReplacementState() {
+        val previous = CharacterFact("same", CharacterFactCategories.PERSONALITY, "旧推测",
+            provenance = CharacterFactProvenance.UNVERIFIED)
+        val suggested = previous.copy(content = "新候选", provenance = CharacterFactProvenance.CANON)
+        val merged = mergeGeneratedCharacterFacts(listOf(previous), listOf(suggested))
+        assertEquals("新候选", merged.single().content)
+        assertEquals(CharacterFactProvenance.UNVERIFIED, merged.single().provenance)
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),

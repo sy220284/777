@@ -31,24 +31,37 @@ internal data class PersonaDraft(
  * AI-assisted edits are incremental. Preserve existing canonical facts and explicit user edits;
  * generated lore can enrich a matching entry or append a new one, never erase unrelated entries.
  */
+/** Model suggestions cannot grant themselves author-edit or verified-canon authority. */
+private fun CharacterFact.asModelSuggestion(): CharacterFact = copy(
+    provenance = when (provenance) {
+        CharacterFactProvenance.USER_CREATED -> CharacterFactProvenance.INFERRED
+        CharacterFactProvenance.CANON -> CharacterFactProvenance.UNVERIFIED
+        CharacterFactProvenance.INFERRED, CharacterFactProvenance.UNVERIFIED -> provenance
+    },
+)
+
 internal fun mergeGeneratedCharacterFacts(
     previous: List<CharacterFact>,
     incoming: List<CharacterFact>,
 ): List<CharacterFact> {
     val result = previous.toMutableList()
     incoming.filter { it.category.isNotBlank() && it.content.isNotBlank() }.forEach { fact ->
-        // An edited fact owns only its own ID; another distinct fact may use the same category.
-        val index = result.indexOfFirst { it.id == fact.id }
+        val suggestion = fact.asModelSuggestion()
+        // Stable IDs identify individual facts, not authority to rewrite their provenance.
+        val index = result.indexOfFirst { it.id == suggestion.id }
         if (index >= 0) {
-            if (result[index].provenance != CharacterFactProvenance.USER_CREATED) result[index] = fact
+            val original = result[index]
+            // A model cannot replace either an explicit author edit or verified canon.
+            if (original.provenance != CharacterFactProvenance.USER_CREATED &&
+                original.provenance != CharacterFactProvenance.CANON
+            ) {
+                result[index] = suggestion
+            }
         } else if (result.none {
-                it.category == fact.category && it.content.trim() == fact.content.trim()
+                it.category == suggestion.category && it.content.trim() == suggestion.content.trim()
             }) {
-            // Distinct facts in the same category carry independent events and sources.
-            // Model-generated text is not a manually authored user correction.
-            result += if (fact.provenance == CharacterFactProvenance.USER_CREATED) {
-                fact.copy(provenance = CharacterFactProvenance.INFERRED)
-            } else fact
+            // A different event can be added within the same category without elevation.
+            result += suggestion
         }
     }
     return result
