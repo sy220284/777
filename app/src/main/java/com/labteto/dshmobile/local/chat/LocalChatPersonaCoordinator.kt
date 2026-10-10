@@ -148,6 +148,43 @@ internal class LocalChatPersonaCoordinator internal constructor(
         }
     }
 
+    /** Apply a saved gallery story-stage to the currently bound, idle chat session. */
+    internal fun updateBoundStoryStage(galleryId: String, storyId: String, stage: String): Boolean {
+        val snapshot = state.value
+        if (snapshot.usageMode != LocalUsageMode.CHAT || snapshot.loading ||
+            snapshot.kernel.running || snapshot.chat.groupChat.enabled ||
+            snapshot.chat.galleryId != galleryId || snapshot.chat.galleryStoryId != storyId
+        ) return false
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            snapshot.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return false
+        return try {
+            val current = state.value
+            if (current.sessionId != snapshot.sessionId ||
+                current.usageMode != LocalUsageMode.CHAT || current.loading ||
+                current.kernel.running || current.chat.galleryId != galleryId ||
+                current.chat.galleryStoryId != storyId ||
+                current.chat.chatContext.generation != snapshot.chat.chatContext.generation
+            ) return false
+            val target = current.copy(
+                chat = current.chat.copy(
+                    chatContext = current.chat.chatContext.copy(
+                        storyStage = stage.trim().take(160),
+                    ).normalized(),
+                ),
+            )
+            commitDomainState(target, "gallery-story-stage-updated")
+            publishCommitted(target)
+            enqueueSnapshot(snapshot.sessionId)
+            true
+        } catch (error: Exception) {
+            publishError(snapshot.sessionId, error.message ?: "当前会话剧情阶段同步失败")
+            false
+        } finally {
+            lease.close()
+        }
+    }
+
     internal fun clearGalleryBinding(
         expectedGalleryId: String,
         expectedStoryId: String? = null,

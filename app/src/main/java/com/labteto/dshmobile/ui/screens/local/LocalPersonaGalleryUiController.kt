@@ -312,6 +312,9 @@ suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, 
         check(chatUi.updateStoryDetails(id, storyId, notes, storyStage)) { "图集故事已不存在" }
         _gallery.value = chatUi.galleryEntries()
     }
+    // The gallery owns persisted stage data. Update the active copy through Chat's
+    // session owner only when this very story is bound and the turn is idle.
+    runtime.chat.updateBoundStoryStage(id, storyId, storyStage)
 }
 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {

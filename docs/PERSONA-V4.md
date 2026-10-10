@@ -50,3 +50,5 @@ Figma工作文件：https://www.figma.com/design/Paa3Wl36qSt6jcrn2Ppv1V 。已�
 
 - AI解析器已去掉旧角色描述字段的输入对象和沉浸修复遍历，V4自动补全只接受name/franchise/coreIdentity/facts/loreEntries五类字段；原单测同步改为真实V4样本。
 - 同一持久人物ID的行为调节保存不会因尚未填写核心身份而意外断开图集绑定，避免“谨慎合并”影响正常设置修改。
+
+- 图集中编辑当前绑定故事阶段时，在同一Chat领域维护租约与事件提交下同步活跃会话；增加同故事、不同故事、忙碌占用的行为测试。

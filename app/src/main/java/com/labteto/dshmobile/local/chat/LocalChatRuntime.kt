@@ -29,6 +29,8 @@ class LocalChatRuntime @Inject internal constructor(
         personaCoordinator.select(profile, galleryId)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
         personaCoordinator.bindGallery(galleryId, galleryStoryId)
+    internal fun updateBoundStoryStage(galleryId: String, storyId: String, stage: String): Boolean =
+        personaCoordinator.updateBoundStoryStage(galleryId, storyId, stage)
     internal fun clearChatGalleryBinding(
         expectedGalleryId: String,
         expectedStoryId: String? = null,
