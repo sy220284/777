@@ -1950,6 +1950,8 @@
     <string name="work_capability_configure_model">前往模型设置</string>
     <string name="work_capability_readiness_accessibility">设备无障碍服务</string>
     <string name="work_capability_readiness_notification_access">通知访问服务</string>
+    <string name="work_capability_readiness_screen_capture">屏幕录制或共享</string>
+    <string name="work_capability_readiness_screen_capture_prompt">执行时由系统逐次授权；当前无法预先确认</string>
     <string name="work_capability_readiness_device_missing">当前未激活，请检查系统授权</string>
     <string name="work_capability_configure_device">前往设备权限设置</string>
     <string name="chat_diary_edit_title">纠正日记</string>

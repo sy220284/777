@@ -85,6 +85,20 @@ class LocalTaskCapabilityReadinessTest {
         ).isEmpty())
     }
 
+    @Test fun screenCaptureIsShownOnlyForRequestedTasksAndRequiresPerSessionApproval() {
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(
+                LocalTaskCapabilityKind.SCREEN_CAPTURE, LocalTaskCapabilityState.UNKNOWN,
+            )),
+            LocalTaskCapabilityReadinessProjector.project(
+                "帮我共享屏幕录制操作过程", githubConfigured = null, networkSearchEnabled = false,
+            ),
+        )
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "不要共享屏幕，只总结文档", githubConfigured = null, networkSearchEnabled = false,
+        ).isEmpty())
+    }
+
     @Test fun unrelatedTaskAndBlankHandoffHaveNoProjectedRequirements() {
         assertTrue(LocalTaskCapabilityReadinessProjector.project(
             "", githubConfigured = null, networkSearchEnabled = false,

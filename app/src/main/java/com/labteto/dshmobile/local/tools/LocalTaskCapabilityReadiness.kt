@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 /** Only observed configuration is projected; actual execution still enforces permissions. */
-internal enum class LocalTaskCapabilityKind { GITHUB, WEB_SEARCH, MODEL, MCP, PLUGINS, ACCESSIBILITY, NOTIFICATION_ACCESS }
+internal enum class LocalTaskCapabilityKind { GITHUB, WEB_SEARCH, MODEL, MCP, PLUGINS, ACCESSIBILITY, NOTIFICATION_ACCESS, SCREEN_CAPTURE }
 
 internal enum class LocalTaskCapabilityState {
     CONFIGURED, CONNECTION_REQUIRED, DISABLED, UNKNOWN,
@@ -48,6 +48,11 @@ internal object LocalTaskCapabilityReadinessProjector {
             .any(normalized::contains) &&
             listOf("不要自动点击", "不需要无障碍", "不要操作设备", "禁止操控手机")
                 .none(normalized::contains)
+        val asksScreenCapture =
+            listOf("共享屏幕", "分享屏幕", "屏幕共享", "屏幕录制", "录制屏幕", "录屏", "捕获屏幕")
+                .any(normalized::contains) &&
+                listOf("不用共享屏幕", "无需共享屏幕", "不要共享屏幕", "不录屏", "无需录屏")
+                    .none(normalized::contains)
         val asksNotificationAccess = listOf("读取通知", "监听通知", "通知监听", "通知访问")
             .any(normalized::contains) &&
             listOf("不读取通知", "不要读取通知", "不需要通知访问").none(normalized::contains)
@@ -101,6 +106,13 @@ internal object LocalTaskCapabilityReadinessProjector {
                         false -> LocalTaskCapabilityState.CONNECTION_REQUIRED
                         null -> LocalTaskCapabilityState.UNKNOWN
                     },
+                ))
+            }
+            // MediaProjection grants are per-session and cannot be inferred from a
+            // previous task or an installed API. The OS prompt remains the authority.
+            if (asksScreenCapture) {
+                add(LocalTaskCapabilityReadiness(
+                    LocalTaskCapabilityKind.SCREEN_CAPTURE, LocalTaskCapabilityState.UNKNOWN,
                 ))
             }
             if (asksGitHub) {

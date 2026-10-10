@@ -154,6 +154,7 @@ internal fun LocalWorkCapabilitySheet(
                     LocalTaskCapabilityKind.PLUGINS -> R.string.work_capability_readiness_plugins
                     LocalTaskCapabilityKind.ACCESSIBILITY -> R.string.work_capability_readiness_accessibility
                     LocalTaskCapabilityKind.NOTIFICATION_ACCESS -> R.string.work_capability_readiness_notification_access
+                    LocalTaskCapabilityKind.SCREEN_CAPTURE -> R.string.work_capability_readiness_screen_capture
                 }
                 val status = when (item.state) {
                     LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
@@ -165,6 +166,8 @@ internal fun LocalWorkCapabilitySheet(
                     item.kind == LocalTaskCapabilityKind.MODEL &&
                         item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
                         stringResource(R.string.work_capability_readiness_model_missing)
+                    item.kind == LocalTaskCapabilityKind.SCREEN_CAPTURE ->
+                        stringResource(R.string.work_capability_readiness_screen_capture_prompt)
                     (item.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
                         item.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
                         item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
@@ -179,6 +182,7 @@ internal fun LocalWorkCapabilitySheet(
                     it.kind != LocalTaskCapabilityKind.MODEL &&
                         it.kind != LocalTaskCapabilityKind.ACCESSIBILITY &&
                         it.kind != LocalTaskCapabilityKind.NOTIFICATION_ACCESS &&
+                        it.kind != LocalTaskCapabilityKind.SCREEN_CAPTURE &&
                         it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
                 DsButton(
