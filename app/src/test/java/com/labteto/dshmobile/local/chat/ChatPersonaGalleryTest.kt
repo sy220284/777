@@ -706,4 +706,70 @@ class ChatPersonaGalleryTest {
         assertEquals("新状态", resaved.chatState.mood)
     }
 
+
+    @Test
+    fun editingOnlyWorldBookStageMarksCharacterAsUnsaved() {
+        val lore = PersonaLoreEntry(
+            id = "one", title = "旧书店", content = "只在开篇出现",
+            temporalScope = "opening",
+        )
+        val saved = PersonaProfile(name = "阿青", coreIdentity = "店员", loreEntries = listOf(lore))
+        val entry = PersonaGalleryEntry(
+            id = "gallery", persona = saved,
+            stories = listOf(PersonaGalleryStory(id = "story")),
+        )
+        assertFalse(galleryEntryHasUnsavedChanges(
+            entry, "story", saved, emptyList(), ChatCharacterState(),
+        ))
+        assertTrue(galleryEntryHasUnsavedChanges(
+            entry, "story", saved.copy(loreEntries = listOf(lore.copy(temporalScope = "later"))),
+            emptyList(), ChatCharacterState(),
+        ))
+    }
+
+    @Test
+    fun sameLoreIdAcrossStagesSurvivesMergeSaveReloadAndRepeatedEnrichment() {
+        val opening = PersonaLoreEntry(
+            id = "shared", title = "档案", content = "开篇的公开记录",
+            temporalScope = "opening", keywords = listOf("档案"), spoilerLevel = 2,
+        )
+        val later = opening.copy(content = "后来的调查真相", temporalScope = "later",
+            spoilerLevel = 3)
+        val initial = PersonaProfile(id = "staged", name = "阿青", coreIdentity = "调查员",
+            loreEntries = listOf(opening))
+        val incoming = initial.copy(loreEntries = listOf(later))
+        val once = mergePersonaProfiles(initial, incoming)
+        val twice = mergePersonaProfiles(once, incoming)
+        assertEquals(2, twice.loreEntries.size)
+        assertEquals(setOf("opening", "later"),
+            twice.loreEntries.map(PersonaLoreEntry::temporalScope).toSet())
+        assertEquals(2, twice.loreEntries.map(PersonaLoreEntry::id).distinct().size)
+
+        val file = File(temporary.root, "staged-lore-personas.json")
+        ChatPersonaStore(file, json).upsert(twice)
+        val restored = ChatPersonaStore(file, json).get("staged")
+        assertEquals(2, restored.loreEntries.size)
+        assertEquals(2, restored.loreEntries.map(PersonaLoreEntry::id).distinct().size)
+        val engine = CharacterLoreEngine()
+        val early = engine.activated(restored, "档案", storyStage = "opening")
+        assertEquals(listOf("opening"), early.map(PersonaLoreEntry::temporalScope))
+        val late = engine.activated(restored, "档案", storyStage = "later")
+        assertEquals(listOf("later"), late.map(PersonaLoreEntry::temporalScope))
+    }
+
+    @Test
+    fun directPersonStoreDoesNotDropSameIdDifferentStages() {
+        val file = File(temporary.root, "raw-staged-lore.json")
+        val initial = PersonaProfile(id = "raw-lore", name = "阿青",
+            loreEntries = listOf(
+                PersonaLoreEntry(id = "same", content = "第一幕", temporalScope = "act-1"),
+                PersonaLoreEntry(id = "same", content = "第二幕", temporalScope = "act-2"),
+            ))
+        ChatPersonaStore(file, json).upsert(initial)
+        val loaded = ChatPersonaStore(file, json).get("raw-lore").loreEntries
+        assertEquals(2, loaded.size)
+        assertEquals(2, loaded.map(PersonaLoreEntry::id).toSet().size)
+        assertEquals(setOf("act-1", "act-2"),
+            loaded.map(PersonaLoreEntry::temporalScope).toSet())
+    }
 }
