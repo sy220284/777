@@ -157,7 +157,13 @@ internal class LocalChatMemoryRuntime @Inject constructor(
 
         if (searchDiary) {
             val diary = persistence.diaryStore.search(
-                query = query,
+                // Use only recent public user evidence to resolve demonstratives such as
+                // "after that"; private thoughts never become search terms.
+                query = ChatMemorySelector.semanticQuery(
+                    query, "",
+                    if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
+                    else snapshot.chat.chatContext,
+                ),
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
                 maxItems = diaryRecallItemLimit(query),
