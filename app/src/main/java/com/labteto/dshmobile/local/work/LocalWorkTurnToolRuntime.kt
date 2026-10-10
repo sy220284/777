@@ -20,6 +20,8 @@ import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -60,6 +62,17 @@ internal class LocalWorkTurnToolRuntime(
         // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
+        // A connection or plugin install can register new tools during this run.
+        // Re-evaluate only the active user's task before each model step; newly registered
+        // capabilities become available automatically without restarting or editing tool maps.
+        val activeTask = history.asReversed().firstNotNullOfOrNull { message ->
+            if ((message["role"] as? JsonPrimitive)?.contentOrNull == "user") {
+                (message["content"] as? JsonPrimitive)?.contentOrNull
+            } else null
+        }
+        if (!activeTask.isNullOrBlank()) {
+            execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
+        }
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {
                 val priority = listOf(
