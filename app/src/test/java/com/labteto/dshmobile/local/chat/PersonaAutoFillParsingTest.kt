@@ -53,6 +53,40 @@ class PersonaAutoFillParsingTest {
     }
 
     @Test
+    fun generatedWorldBookUpdatesAreIncrementalAndKeepExistingSpoilerBoundary() {
+        val original = listOf(
+            PersonaLoreEntry(
+                id = "first", title = "社奉行", content = "原作旧设定",
+                keywords = listOf("社奉行"), priority = 85, alwaysOn = true, spoilerLevel = 2,
+            ),
+            PersonaLoreEntry(
+                id = "second", title = "托马", content = "和神里家关系密切",
+                keywords = listOf("托马"), priority = 80,
+            ),
+        )
+        val generated = listOf(
+            PersonaLoreEntry(
+                title = "社奉行", content = "原作更新设定",
+                keywords = listOf("神里家"), spoilerLevel = 0,
+            ),
+            PersonaLoreEntry(
+                title = "冰元素", content = "绫华使用冰元素",
+                keywords = listOf("冰元素"),
+            ),
+        )
+        val merged = mergeGeneratedLoreEntries(original, generated)
+        assertEquals(3, merged.size)
+        assertEquals("原作更新设定", merged[0].content)
+        assertEquals("first", merged[0].id)
+        assertEquals(listOf("社奉行", "神里家"), merged[0].keywords)
+        assertTrue(merged[0].alwaysOn)
+        assertEquals(85, merged[0].priority)
+        assertEquals(2, merged[0].spoilerLevel)
+        assertEquals(original[1], merged[1])
+        assertTrue(merged[2].id.isNotBlank())
+    }
+
+    @Test
     fun extractsFirstBalancedObjectWithoutBeingConfusedByBracesInStrings() {
         val raw = """
             前置说明
