@@ -713,34 +713,31 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
             coroutineScope {
-                val generatedReplies = responders.mapIndexed { index, initialMember ->
+                // Later speakers must actually hear the previous public reply in this turn.
+                // Sequential generation also avoids showing a conversation whose participants
+                // responded to stale parallel snapshots. Only delivered messages are shared.
+                val speakingHistory = baseHistory.toMutableList()
+                responders.forEachIndexed { index, initialMember ->
                     val member = currentGroup.members.firstOrNull {
                         it.galleryId == initialMember.galleryId
                     } ?: initialMember
-                    async {
-                        generateGroupReply(
-                            key = key,
-                            snapshot = snapshot,
-                            baseHistory = baseHistory,
-                            input = input,
-                            allMembers = members,
-                            member = member,
-                            memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
-                            index = index,
-                            turnId = turnId,
-                        )
-                    }
-                }
-
-                generatedReplies.forEachIndexed { index, deferred ->
-                    val initialMember = responders[index]
                     chatState.update { current ->
                         current.copy(
                             chat = current.chat.copy(groupActiveSpeakerName = initialMember.displayName),
                         )
                     }
 
-                    val generated = deferred.await()
+                    val generated = generateGroupReply(
+                        key = key,
+                        snapshot = snapshot,
+                        baseHistory = speakingHistory.toList(),
+                        input = input,
+                        allMembers = members,
+                        member = member,
+                        memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
+                        index = index,
+                        turnId = turnId,
+                    )
                     generated.failure?.let { failure ->
                         currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-failed", buildJsonObject {
@@ -781,12 +778,12 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         listOf(transcript),
                     )
                     val assistantEvent = eventLog.append("assistant/message", eventData)
-                    modelHistory.append(
-                        buildJsonObject {
-                            put("role", "assistant")
-                            put("content", groupTranscriptLine(transcript))
-                        },
-                    )
+                    val publicReply = buildJsonObject {
+                        put("role", "assistant")
+                        put("content", groupTranscriptLine(transcript))
+                    }
+                    modelHistory.append(publicReply)
+                    speakingHistory += publicReply
                     updateContextMetrics()
                     val beforeAssistant = runtimeStateStore.state.value
                     transcriptRuntime.applyMessages(
