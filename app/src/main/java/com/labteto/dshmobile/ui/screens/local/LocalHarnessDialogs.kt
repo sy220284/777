@@ -745,6 +745,19 @@ internal fun ChatPersonaDialog(
                     modifier = Modifier.fillMaxWidth(),
                     variant = DsButtonVariant.Ghost,
                 )
+                if (mutableTraits.isNotBlank() || voiceSamples.isNotBlank()) {
+                    DsButton(
+                        text = stringResource(R.string.local_persona_clear_legacy_scripts),
+                        onClick = {
+                            // Explicit draft-only cleanup; user-authored memories, knowledge, original
+                            // biography, identity and story state are never changed by this action.
+                            mutableTraits = ""
+                            voiceSamples = ""
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
                 DsButton(
                     text = stringResource(R.string.local_persona_restore_preset_canon),
                     onClick = {
