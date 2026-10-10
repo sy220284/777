@@ -21,6 +21,7 @@ data class AppLogEntry(
     val appVersionCode: Int? = null,
     val processInstanceId: String? = null,
     val processStartedAtMillis: Long? = null,
+    val throwableCauseChain: String? = null,
 )
 
 /**
@@ -40,15 +41,16 @@ internal fun createAppLogPersistenceExecutor(maxQueued: Int = 1_024): ThreadPool
         TimeUnit.MILLISECONDS,
         ArrayBlockingQueue(maxQueued),
         { runnable -> Thread(runnable, "777-app-log").apply { isDaemon = true } },
-        ThreadPoolExecutor.DiscardOldestPolicy(),
+        // Never silently discard diagnostics under load: the caller drains overflow work.
+        ThreadPoolExecutor.CallerRunsPolicy(),
     )
 }
 
 object AppLog {
     private const val MAX_ENTRIES = 200
-    private const val MAX_EXPORT_ENTRIES = 800
-    private const val MAX_PERSISTED_BYTES = 2L * 1024L * 1024L
-    private const val ROTATED_ENTRIES = 400
+    private const val MAX_EXPORT_ENTRIES = 2_000
+    private const val MAX_PERSISTED_BYTES = 8L * 1024L * 1024L
+    private const val ROTATED_ENTRIES = 1_500
     private val lock = Any()
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
@@ -59,9 +61,53 @@ object AppLog {
     @Volatile
     private var persistentFile: File? = null
 
+    @Volatile
+    private var crashHandlerInstalled = false
+
+    @Volatile
+    private var lastPersistenceFailure: String? = null
+
     fun configurePersistence(file: File) {
         persistentFile = file
         runCatching { file.parentFile?.mkdirs() }
+    }
+
+    /** Preserve fatal failures before Android terminates the process. Delegate to its original handler. */
+    @Synchronized
+    fun installUnhandledExceptionLogger() {
+        if (crashHandlerInstalled) return
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            runCatching {
+                record(
+                    "E",
+                    "UncaughtException",
+                    "operation=uncaught_exception thread=${sanitizeDiagnosticText(thread.name).take(80)}",
+                    throwable,
+                    synchronous = true,
+                )
+            }
+            previous?.uncaughtException(thread, throwable)
+        }
+        crashHandlerInstalled = true
+    }
+
+    /** A stable operation marker connects caught errors to the user action that triggered them. */
+    fun failure(
+        tag: String,
+        operation: String,
+        throwable: Throwable,
+        sessionId: String? = null,
+        requestId: String? = null,
+        runId: String? = null,
+    ) {
+        val identity = buildString {
+            append("operation=").append(operation.take(100))
+            sessionId?.let { append(" session_id=").append(it.take(128)) }
+            requestId?.let { append(" request_id=").append(it.take(128)) }
+            runId?.let { append(" run_id=").append(it.take(128)) }
+        }
+        error(tag, identity, throwable)
     }
 
     fun debug(tag: String, message: String) {
@@ -112,6 +158,7 @@ object AppLog {
                     it.appVersionCode?.toString().orEmpty(),
                     it.processInstanceId.orEmpty(),
                     it.processStartedAtMillis?.toString().orEmpty(),
+                    it.throwableCauseChain.orEmpty(),
                 ).joinToString("\u0000")
             }
             .sortedBy(AppLogEntry::timestampMillis)
@@ -128,7 +175,13 @@ object AppLog {
         }
     }
 
-    private fun record(level: String, tag: String, message: String, throwable: Throwable?) {
+    private fun record(
+        level: String,
+        tag: String,
+        message: String,
+        throwable: Throwable?,
+        synchronous: Boolean = false,
+    ) {
         val entry = AppLogEntry(
             timestampMillis = System.currentTimeMillis(),
             level = level,
@@ -140,25 +193,55 @@ object AppLog {
             appVersionCode = BuildConfig.VERSION_CODE,
             processInstanceId = processInstanceId,
             processStartedAtMillis = processStartedAtMillis,
+            throwableCauseChain = throwable?.let(::summarizeCauseChain),
         )
         synchronized(lock) {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
             entries.addLast(entry)
         }
-        persistAsync(entry)
+        if (synchronous) persistNow(entry) else persistAsync(entry)
+    }
+
+    private fun summarizeCauseChain(error: Throwable): String =
+        generateSequence(error) { it.cause }.take(5).joinToString(" <- ") { current ->
+            val kind = current.javaClass.simpleName.take(80)
+            val reason = current.message?.let(::sanitizeDiagnosticText)?.replace("\n", " ")?.take(200)
+            if (reason.isNullOrBlank()) kind else "$kind: $reason"
+        }.take(1_000)
+
+    private fun persistNow(entry: AppLogEntry) {
+        val file = persistentFile ?: return
+        synchronized(persistenceLock) {
+            runCatching {
+                file.parentFile?.mkdirs()
+                rotateIfNeeded(file)
+                file.appendText(encodeEntry(entry) + "\n")
+            }.onFailure { failure ->
+                // The storage path itself failed; report through memory/logcat without recursively writing.
+                val reason = failure.javaClass.simpleName
+                synchronized(lock) {
+                    if (lastPersistenceFailure != reason) {
+                        lastPersistenceFailure = reason
+                        val warning = AppLogEntry(
+                            timestampMillis = System.currentTimeMillis(),
+                            level = "E",
+                            tag = "AppLog",
+                            message = "operation=persist_diagnostic_log status=failed cause_type=$reason",
+                            throwableType = reason,
+                            throwableMessage = failure.message?.let(::sanitizeDiagnosticText)?.take(200),
+                        )
+                        while (entries.size >= MAX_ENTRIES) entries.removeFirst()
+                        entries.addLast(warning)
+                    }
+                }
+                runCatching { Log.e("AppLog", "Diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
+            }.onSuccess { lastPersistenceFailure = null }
+        }
     }
 
     private fun persistAsync(entry: AppLogEntry) {
         val file = persistentFile ?: return
-        persistenceExecutor.execute {
-            synchronized(persistenceLock) {
-                runCatching {
-                    file.parentFile?.mkdirs()
-                    rotateIfNeeded(file)
-                    file.appendText(encodeEntry(entry) + "\n")
-                }
-            }
-        }
+        persistenceExecutor.execute { persistNow(entry) }
     }
 
     private fun rotateIfNeeded(file: File) {
@@ -190,11 +273,12 @@ object AppLog {
         entry.appVersionCode?.toString().orEmpty(),
         encode(entry.processInstanceId.orEmpty()),
         entry.processStartedAtMillis?.toString().orEmpty(),
+        encode(entry.throwableCauseChain.orEmpty()),
     ).joinToString("\t")
 
     private fun decodeEntry(line: String): AppLogEntry? {
         val parts = line.split('\t')
-        if (parts.size != 6 && parts.size != 10) return null
+        if (parts.size != 6 && parts.size != 10 && parts.size != 11) return null
         return runCatching {
             AppLogEntry(
                 timestampMillis = parts[0].toLong(),
@@ -207,6 +291,7 @@ object AppLog {
                 appVersionCode = parts.getOrNull(7)?.toIntOrNull(),
                 processInstanceId = parts.getOrNull(8)?.let(::decode)?.takeIf(String::isNotBlank),
                 processStartedAtMillis = parts.getOrNull(9)?.toLongOrNull(),
+                throwableCauseChain = parts.getOrNull(10)?.let(::decode)?.takeIf(String::isNotBlank),
             )
         }.getOrNull()
     }

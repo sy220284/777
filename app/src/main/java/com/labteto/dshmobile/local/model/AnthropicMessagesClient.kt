@@ -42,7 +42,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Keep idle read timeout, but do not cut off a healthy long-lived model stream.
+        .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
     suspend fun complete(
@@ -694,7 +695,6 @@ internal class AnthropicMessagesClient @Inject constructor(
         const val CONNECT_TIMEOUT_SECONDS = 20L
         const val READ_TIMEOUT_SECONDS = 300L
         const val WRITE_TIMEOUT_SECONDS = 60L
-        const val CALL_TIMEOUT_SECONDS = 360L
         const val MAX_STREAM_BYTES = 32 * 1024 * 1024
         private const val MAX_SSE_LINE_CHARS = 4 * 1024 * 1024
         const val ERROR_BODY_LIMIT = 8_000

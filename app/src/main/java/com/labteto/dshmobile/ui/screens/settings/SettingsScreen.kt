@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
@@ -234,6 +235,7 @@ fun SettingsScreen(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "export_diagnostic_report", error)
                 toast.second(exportFailed)
             }
         }
@@ -263,7 +265,8 @@ fun SettingsScreen(
                 toast.second(storageExported)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "export_session_archive", error)
                 toast.second(storageExportFailed)
             } finally {
                 localSessionStorageBusy = false
@@ -842,7 +845,8 @@ fun SettingsScreen(
                                     try {
                                         localSessionStorageStatus = viewModel.compactLocalSessionStorage()
                                         toast.second(storageCompacted)
-                                    } catch (_: Exception) {
+                                    } catch (error: Exception) {
+                                        AppLog.failure("Settings", "compact_session_archive", error)
                                         toast.second(storageCompactFailed)
                                     } finally {
                                         localSessionStorageBusy = false
