@@ -64,9 +64,9 @@ internal class MemorySettingsController(
 
     fun forget(id: String, onDone: (String?) -> Unit = {}) {
         runCatching { settingsData.forgetMemory(id) }
-            .onSuccess {
+            .onSuccess { removed ->
                 refresh()
-                onDone(null)
+                onDone(if (removed) null else "这条记忆已被停用或不存在")
             }
             .onFailure { error -> onDone(error.message ?: "停用记忆失败") }
     }
