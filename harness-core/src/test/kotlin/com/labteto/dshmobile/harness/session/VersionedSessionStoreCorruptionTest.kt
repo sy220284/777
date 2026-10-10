@@ -21,8 +21,9 @@ class VersionedSessionStoreCorruptionTest {
                 onCorruptSkipped = { id, _ -> failures += id },
             )
             store.write("good", buildJsonObject { put("title", "ok") })
+            store.write("bad", buildJsonObject { put("title", "before-corruption") })
             File(root, "bad.json").writeText("{broken")
-            File(root, "bad.json.bak").writeText("{also-broken")
+            File(root, "bad.backup.json").writeText("{also-broken")
 
             val listed = store.list()
 
@@ -66,6 +67,72 @@ class VersionedSessionStoreCorruptionTest {
             assertTrue(sidecar.isFile)
             assertTrue(nested.isFile)
             assertTrue(excessivelyNested.isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun coldMigrationUsesDocumentIdentityAndDoesNotAdoptProjectionFiles() {
+        val root = Files.createTempDirectory("session-catalog-migrate").toFile()
+        try {
+            val id = "legacy-chat"
+            File(root, "$id.json").writeText("""{"id":"legacy-chat","title":"旧聊天","usageMode":"CHAT"}""")
+            File(root, "future.json").writeText(
+                """{"formatVersion":99,"id":"future","updatedAt":1,"payload":{}}""",
+            )
+            val projection = File(root, "$id.events.jsonl.projection-work.agent-team.json")
+                .apply { writeText("""{"version":1,"identity":"hash","throughSequence":2,"payload":"{}"}""") }
+            File(root, "unrelated.json").writeText("""{"title":"其他资料","body":"文字"}""")
+            val store = VersionedSessionStore(root, Json)
+            assertEquals(setOf(id, "future"), store.ids().toSet())
+            assertEquals("旧聊天", store.read(id)?.document?.payload?.get("title")?.toString()?.trim('"'))
+            assertTrue(projection.isFile)
+            assertTrue(File(root, ".session-catalog.v1").isFile)
+            assertEquals(setOf(id, "future"), VersionedSessionStore(root, Json).ids().toSet())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun registrySurvivesDeletionAndCanRecoverFromCorruptionWithoutLosingSessions() {
+        val root = Files.createTempDirectory("session-catalog-recover").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("one", buildJsonObject { put("title", "one") })
+            store.write("two", buildJsonObject { put("title", "two") })
+            assertEquals(setOf("one", "two"), store.ids().toSet())
+            assertTrue(store.delete("one"))
+            assertEquals(listOf("two"), store.ids())
+            val backup = File(root, ".session-catalog.backup.v1")
+            assertTrue(backup.isFile)
+            File(root, ".session-catalog.v1").writeText("{broken")
+            val reopenedDirectory = Files.createTempDirectory("session-catalog-reload").toFile()
+            try {
+                // A separate root simulates a fresh process, including persisted catalog damage.
+                root.copyRecursively(reopenedDirectory, overwrite = true)
+                val recovered = VersionedSessionStore(reopenedDirectory, Json)
+                assertEquals(listOf("two"), recovered.ids())
+                assertTrue(recovered.read("two") != null)
+            } finally {
+                reopenedDirectory.deleteRecursively()
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun backupOnlySessionRestoresAndRemainsVisibleAfterColdMigration() {
+        val root = Files.createTempDirectory("session-backup-only").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("recover", buildJsonObject { put("title", "备份") })
+            assertTrue(File(root, "recover.json").delete())
+            assertEquals(listOf("recover"), VersionedSessionStore(root, Json).ids())
+            assertTrue(VersionedSessionStore(root, Json).read("recover")!!.recovered)
+            assertTrue(File(root, "recover.json").isFile)
         } finally {
             root.deleteRecursively()
         }
