@@ -20,6 +20,7 @@ class LocalPlanReviewCardTest {
         assertEquals("1. 检查状态\n2. 执行变更", review.plan)
         assertEquals("批准并进入执行模式", review.approve)
         assertEquals("继续规划", review.decline)
+        assertEquals("重新生成方案", review.regenerate)
     }
 
     @Test

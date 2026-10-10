@@ -155,10 +155,15 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     internal fun disableAutoApproval() =
         runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.disableAutoApproval() }
-    internal fun answerQuestion(callId: String, answer: String) {
-        val binding = workRunRegistry[runtimeStateStore.currentSessionId]
-        if (binding?.interactions?.answerQuestion(callId, answer) == true) return
-        runtimeStateStore.foregroundInteractions.answerQuestion(callId, answer)
+    internal fun answerQuestion(callId: String, answer: String): Boolean {
+        val binding = workRunRegistry.live(runtimeStateStore.currentSessionId)
+        val accepted = if (binding != null) {
+            binding.interactions.answerQuestion(callId, answer)
+        } else {
+            runtimeStateStore.foregroundInteractions.answerQuestion(callId, answer)
+        }
+        if (!accepted) runtimeStateStore.projection.publishError("当前问题已结束或会话已变化，请查看最新任务状态")
+        return accepted
     }
     internal fun cancelQuestion(callId: String) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
