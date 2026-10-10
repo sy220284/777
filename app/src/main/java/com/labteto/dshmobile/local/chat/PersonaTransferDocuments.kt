@@ -8,6 +8,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
 internal const val PERSONA_WORD_MIME =
@@ -45,8 +47,10 @@ internal data class PersonaTransferMemorySummary(
     val activeGoal: String = "",
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class PersonaArchiveEnvelope(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val schema: Int = 4,
     val source: String = "神言神语",
     val entry: PersonaGalleryEntry,

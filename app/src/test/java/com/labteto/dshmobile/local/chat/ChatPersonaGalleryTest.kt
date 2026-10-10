@@ -185,7 +185,7 @@ class ChatPersonaGalleryTest {
             chatState = ChatCharacterState(), notes = "",
         )
         val storyId = checkNotNull(saved.storyId)
-        val archive = File(File(File(root, "persona-history-v5"), saved.entry.id), storyId + ".jsonl")
+        val archive = File(File(File(root, "persona-history-v6"), saved.entry.id), storyId + ".jsonl")
         assertTrue(archive.isFile)
         val pending = PersonaGalleryArchiveDeletionJournal(file, json)
         pending.queue(saved.entry.id, storyId)
