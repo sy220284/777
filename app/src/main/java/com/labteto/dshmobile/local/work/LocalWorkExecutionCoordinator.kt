@@ -266,127 +266,148 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         text: String,
         attachments: List<LocalImportedAttachment>,
     ): LocalSendResult {
+        val snapshot = runtimeStateStore.state.value
+        if (snapshot.usageMode != LocalUsageMode.WORK) {
+            runtimeStateStore.projection.publishError("团队请求只支持工作模式，请切换回原工作会话后发送；草稿与附件已保留")
+            return reject(snapshot.sessionId, LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION))
+        }
         val prepared = prepareLocalAgentTeamSend(text, attachments) ?: return LocalSendResult.Empty
         return sendPrepared(prepared)
     }
 
-    private fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult {
-        workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return it }
-
+    private fun sendPrepared(
+        prepared: LocalPreparedSend,
+        reservedLease: com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease? = null,
+    ): LocalSendResult {
         var started: Job? = null
-        val result = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-            workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return@synchronized it }
+        try {
+            if (reservedLease == null) workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return it }
+            val result = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+                if (reservedLease == null) workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return@synchronized it }
 
-            val snapshot = runtimeStateStore.state.value
-            if ((runtimeStateStore.foregroundRunHandle.cancellationRequested && runtimeStateStore.foregroundRunHandle.hasLiveJob()) || snapshot.usageMode != LocalUsageMode.WORK) {
-                return@synchronized reject(
-                    snapshot.sessionId,
-                    LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION),
+                val snapshot = runtimeStateStore.state.value
+                if ((runtimeStateStore.foregroundRunHandle.cancellationRequested && runtimeStateStore.foregroundRunHandle.hasLiveJob()) || snapshot.usageMode != LocalUsageMode.WORK) {
+                    return@synchronized reject(
+                        snapshot.sessionId,
+                        LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION),
+                    )
+                }
+
+                val sessionId = snapshot.sessionId
+                val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
+                val queuedInput = QueuedAgentInput(
+                    prepared.content,
+                    prepared.memoryInput,
+                    prepared.modelMessage,
+                    UUID.randomUUID().toString(),
+                )
+                coordinateOwnedLocalSend(
+                    usageMode = LocalUsageMode.WORK,
+                    sessionId = sessionId,
+                    workBindingActive = false,
+                    visibleJobActive = runtimeStateStore.foregroundRunHandle.hasLiveJob(),
+                    configured = snapshot.modelState.configured,
+                    loading = snapshot.loading,
+                    sessionTransitioning = runtimeStateStore.sessionTransitioning,
+                    pendingCount = pending.size(),
+                    pendingLimit = MAX_PENDING_INPUTS,
+                    onRejected = { rejected -> reject(sessionId, rejected) },
+                    preownedLease = reservedLease,
+                    onAccepted = runtimeStateStore::clearSendFeedback,
+                    enqueue = {
+                        pending.offer(queuedInput) {
+                            val transcript = LocalHarnessMessage(
+                                id = queuedInput.id,
+                                role = "user",
+                                content = prepared.visibleContent,
+                                createdAt = System.currentTimeMillis(),
+                                blocks = prepared.blocks,
+                            )
+                            val event = eventLogFor(sessionId).append(
+                                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                                encodeLocalAgentInboxEvent(
+                                    action = "queued",
+                                    pending = pending.snapshot(),
+                                    affected = listOf(queuedInput),
+                                    transcript = listOf(transcript),
+                                ),
+                            )
+                            runtimeStateStore.projection.appendForegroundTranscript(
+                                sessionId = sessionId,
+                                messages = listOf(transcript),
+                            )
+                            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
+                                maxOf(
+                                    runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
+                                    event.sequence,
+                                )
+                        }
+                    },
+                    onQueued = {
+                        runtimeStateStore.projection.setForegroundQueuedInputCount(
+                            sessionId = sessionId,
+                            count = pending.size(),
+                        )
+                        check(enqueueSnapshot(sessionId)) {
+                            "Work 排队保存时前台会话已切换"
+                        }
+                    },
+                    onStart = { reservedLease ->
+                        if (runtimeStateStore.foregroundRunHandle.cancellationRequested) {
+                            runtimeStateStore.prepareForegroundRestart(eventLogFor(sessionId))
+                        }
+                        started = startPreparedTurn(
+                            prepared,
+                            requireNotNull(reservedLease) {
+                                "Work 首轮启动前必须持有前台 Session 租约"
+                            },
+                        )
+                    },
                 )
             }
-
-            val sessionId = snapshot.sessionId
-            val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
-            val queuedInput = QueuedAgentInput(
-                prepared.content,
-                prepared.memoryInput,
-                prepared.modelMessage,
-                UUID.randomUUID().toString(),
-            )
-            coordinateOwnedLocalSend(
-                usageMode = LocalUsageMode.WORK,
-                sessionId = sessionId,
-                workBindingActive = false,
-                visibleJobActive = runtimeStateStore.foregroundRunHandle.hasLiveJob(),
-                configured = snapshot.modelState.configured,
-                loading = snapshot.loading,
-                sessionTransitioning = runtimeStateStore.sessionTransitioning,
-                pendingCount = pending.size(),
-                pendingLimit = MAX_PENDING_INPUTS,
-                onRejected = { rejected -> reject(sessionId, rejected) },
-                onAccepted = runtimeStateStore::clearSendFeedback,
-                enqueue = {
-                    pending.offer(queuedInput) {
-                        val transcript = LocalHarnessMessage(
-                            id = queuedInput.id,
-                            role = "user",
-                            content = prepared.visibleContent,
-                            createdAt = System.currentTimeMillis(),
-                            blocks = prepared.blocks,
-                        )
-                        val event = eventLogFor(sessionId).append(
-                            LOCAL_AGENT_INBOX_EVENT_TYPE,
-                            encodeLocalAgentInboxEvent(
-                                action = "queued",
-                                pending = pending.snapshot(),
-                                affected = listOf(queuedInput),
-                                transcript = listOf(transcript),
-                            ),
-                        )
-                        runtimeStateStore.projection.appendForegroundTranscript(
-                            sessionId = sessionId,
-                            messages = listOf(transcript),
-                        )
-                        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
-                            maxOf(
-                                runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
-                                event.sequence,
-                            )
-                    }
-                },
-                onQueued = {
-                    runtimeStateStore.projection.setForegroundQueuedInputCount(
-                        sessionId = sessionId,
-                        count = pending.size(),
-                    )
-                    check(enqueueSnapshot(sessionId)) {
-                        "Work 排队保存时前台会话已切换"
-                    }
-                },
-                onStart = { reservedLease ->
-                    if (runtimeStateStore.foregroundRunHandle.cancellationRequested) {
-                        runtimeStateStore.prepareForegroundRestart(eventLogFor(sessionId))
-                    }
-                    started = startPreparedTurn(
-                        prepared,
-                        requireNotNull(reservedLease) {
-                            "Work 首轮启动前必须持有前台 Session 租约"
-                        },
-                    )
-                },
-            )
+            started?.start()
+            return result
+        } finally {
+            // A failed admission must not strand the editing transaction's ownership.
+            if (started == null) reservedLease?.close()
         }
-        started?.start()
-        return result
     }
 
     override fun editAndResendUserMessage(
         messageId: String,
         replacement: String,
     ): LocalUserMessageEditResult = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        var committed = false
         try {
             when (val edit = prepareEditedTurn(messageId, replacement)) {
                 is LocalWorkMessageEditPreparation.Rejected -> edit.reason
                 is LocalWorkMessageEditPreparation.Ready -> {
-                    val sent = sendPrepared(edit.send)
+                    committed = true
+                    val sent = sendPrepared(edit.send, edit.reservedLease)
                     if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
                     else {
                         runtimeStateStore.projection.publishError(
-                            "历史修改已保存，但新任务未能启动（${sent.rejectReason ?: sent.disposition}）；请从输入框重新发送修改后的内容",
+                            "历史修改已保存，但新任务未接单（${sent.rejectReason ?: sent.disposition}）。请重新打开会话检查当前历史，避免重复编辑",
                         )
-                        LocalUserMessageEditResult.FAILED
+                        LocalUserMessageEditResult.COMMITTED_NOT_STARTED
                     }
                 }
             }
         } catch (error: Exception) {
             runtimeStateStore.projection.publishError(
-                "Work 历史编辑失败：${error.message ?: error::class.java.simpleName}",
+                (if (committed) "历史修改已保存，但新任务启动失败" else "Work 历史编辑失败") +
+                    "：${error.message ?: error::class.java.simpleName}",
             )
-            LocalUserMessageEditResult.FAILED
+            if (committed) LocalUserMessageEditResult.COMMITTED_NOT_STARTED
+            else LocalUserMessageEditResult.FAILED
         }
     }
 
     override fun regenerateReply(messageId: String): Boolean {
+        fun rejectRegeneration(reason: String): Boolean {
+            runtimeStateStore.projection.publishError(reason)
+            return false
+        }
         var started: Job? = null
         val handle = runtimeStateStore.foregroundRunHandle
         val accepted = synchronized(handle.lock) {
@@ -400,17 +421,25 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 runtimeStateStore.sessionTransitioning ||
                 handle.hasLiveJob() ||
                 handle.pendingInputs.size() != 0
-            ) return@synchronized false
+            ) return@synchronized rejectRegeneration(
+                if (!state.modelState.configured) "请先配置可用模型，再重新生成最终回复"
+                else "工作会话正忙或正在切换，请等待执行结束后重试",
+            )
 
-            val last = state.messages.lastOrNull() ?: return@synchronized false
-            if (last.id != messageId || last.role != "assistant") return@synchronized false
-            if (state.messages.dropLast(1).none { it.role == "user" }) return@synchronized false
+            val last = state.messages.lastOrNull()
+                ?: return@synchronized rejectRegeneration("当前会话没有可重新生成的最终回复")
+            if (last.id != messageId || last.role != "assistant") {
+                return@synchronized rejectRegeneration("只能重新生成当前会话的最后一条助手回复")
+            }
+            if (state.messages.dropLast(1).none { it.role == "user" }) {
+                return@synchronized rejectRegeneration("无法定位最终回复所对应的原始任务")
+            }
             if (
                 handle.modelHistory.lastOrNull()
                     ?.get("role")
                     ?.jsonPrimitive
                     ?.contentOrNull != "assistant"
-            ) return@synchronized false
+            ) return@synchronized rejectRegeneration("模型历史尚未恢复完整，不能安全重新生成最终回复")
 
             started = startRegeneration(messageId).also { handle.job = it }
             true

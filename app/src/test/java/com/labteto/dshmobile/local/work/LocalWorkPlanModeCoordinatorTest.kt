@@ -4,18 +4,24 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.io.File
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -27,6 +33,47 @@ class LocalWorkPlanModeCoordinatorTest {
     val temporary = TemporaryFolder()
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun regeneratingAPlanContinuesTheSameWorkQuestionWithoutApprovingOrStartingNewTask() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            sessionId = "plan-rewrite", loading = false, usageMode = LocalUsageMode.WORK,
+        ))
+        val logs = LocalSessionEventLogRegistry(
+            File(temporary.root, "plan-regenerate").apply { mkdirs() }, json,
+        )
+        var work = LocalWorkState(planMode = true)
+        val port = object : LocalWorkStatePort {
+            override fun snapshot(): LocalWorkState = work
+            override fun update(transform: (LocalWorkState) -> LocalWorkState) {
+                work = transform(work)
+            }
+        }
+        val call = LocalToolCall("replan-call", "exit_plan_mode", buildJsonObject { }, "{}")
+        val awaiting = async {
+            exitWorkPlanMode(
+                call = call,
+                plan = "第一版方案",
+                state = port,
+                interactions = runtime.foregroundInteractions,
+                aggregateSnapshot = { runtime.state.value },
+                history = LocalModelHistoryBuffer(),
+                eventLog = logs.get("plan-rewrite"),
+                persist = { error("重新规划不得提交已批准计划") },
+                updateContextMetrics = { error("重新规划不得改变执行模式") },
+            )
+        }
+        runCurrent()
+        val question = requireNotNull(runtime.state.value.work.pendingQuestion)
+        assertEquals("replan-call", question.callId)
+        assertTrue(question.options.contains("重新生成方案"))
+        assertTrue(runtime.foregroundInteractions.answerQuestion(question.callId, "重新生成方案"))
+        assertTrue(awaiting.await().contains("再次调用 exit_plan_mode"))
+        assertTrue(work.planMode)
+        assertEquals(null, logs.get("plan-rewrite").latest("plan/approved"))
+        logs.clearAndEvict(setOf("plan-rewrite"))
+    }
 
     @Test
     fun planModeCommitsInWorkBoundaryAndUpdatesForegroundPrompt() {

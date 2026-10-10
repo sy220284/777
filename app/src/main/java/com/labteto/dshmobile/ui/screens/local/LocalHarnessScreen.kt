@@ -319,6 +319,10 @@ fun LocalHarnessScreen(
         startBackgroundAgent = viewModel::startBackgroundAgent,
         startResearchAgent = viewModel::startResearchAgent,
         sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
+        usageRevision = viewModel.usageRevision,
+        sessionUsage = viewModel::sessionUsage,
+        taskUsage = viewModel::taskUsage,
+        requestUsage = viewModel::requestUsage,
     )
     val projectActions = LocalProjectUiActions(
         catalog = viewModel.projectCatalog,

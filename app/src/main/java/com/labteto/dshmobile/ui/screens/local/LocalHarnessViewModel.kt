@@ -43,6 +43,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     private val projects: LocalProjectUiFacade,
     private val toolsUi: LocalToolsUiFacade,
+    private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
@@ -60,6 +61,10 @@ class LocalHarnessViewModel @Inject constructor(
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
+    internal val usageRevision = usageUi.revision
+    internal fun sessionUsage(sessionId: String) = usageUi.sessionSnapshot(sessionId)
+    internal fun taskUsage(runId: String) = usageUi.taskDetail(runId)
+    internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
     internal val projectCatalog = projects.catalog
     internal val projectRecoveryNotice = projects.recoveryNotice
     internal fun backupAndResetProjectCatalog() = projects.backupAndResetCatalog()
@@ -167,11 +172,7 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun sendWithTeam(
         text: String,
         attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult = if (state.value.usageMode == LocalUsageMode.WORK) {
-        runtime.work.sendWithTeam(text, attachments)
-    } else {
-        runtime.chat.send(text, attachments)
-    }
+    ): LocalSendResult = runtime.work.sendWithTeam(text, attachments)
 
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
@@ -203,7 +204,10 @@ class LocalHarnessViewModel @Inject constructor(
                 LocalUsageMode.CHAT -> runtime.chat.editAndResendUserMessage(messageId, text)
             }
         }
-        if (result == LocalChatUserEditResult.SENT) {
+        if (result == LocalChatUserEditResult.SENT ||
+            result == LocalChatUserEditResult.COMMITTED_NOT_STARTED
+        ) {
+            // Both outcomes already changed the durable active timeline.
             refreshTranscriptHistoryAfterTimelineRewrite()
         }
         return result

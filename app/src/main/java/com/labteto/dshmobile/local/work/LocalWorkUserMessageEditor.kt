@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.restoreLocalModelHistory
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.send.LocalPreparedSend
@@ -34,15 +35,16 @@ import kotlinx.serialization.json.put
 
 /** A Work edit rewrites the logical timeline; previously performed external side effects remain auditable. */
 internal sealed interface LocalWorkMessageEditPreparation {
-    data class Ready(val send: LocalPreparedSend) : LocalWorkMessageEditPreparation
+    data class Ready(val send: LocalPreparedSend, val reservedLease: LocalSessionRuntimeLease) : LocalWorkMessageEditPreparation
     data class Rejected(val reason: LocalUserMessageEditResult) : LocalWorkMessageEditPreparation
 }
 
 private const val LEGACY_ATTACHMENT_MARKER = "本次附件已导入本机工作区："
 
 /**
- * Work-owned historical editing transaction. The caller holds the foreground lock through
- * rewriting and starting the replacement, so no other send can enter between the two.
+ * Work-owned historical editing transaction. The caller holds the foreground lock while this
+ * editor transfers its reserved Session lease directly to the replacement Work turn. The
+ * lease is never released between the durable rewrite and the new run admission.
  *
  * Never replay tool calls from discarded history; the new Work run starts with one newly
  * admitted user instruction. Physical file changes and external tool side effects are not undone.
@@ -69,8 +71,10 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
         ) return rejected(LocalUserMessageEditResult.BUSY)
 
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
-            state.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+            state.sessionId, LocalSessionRuntimeKind.FOREGROUND,
         ) ?: return rejected(LocalUserMessageEditResult.BUSY)
+        var handedOff = false
+        var committed = false
         try {
             val now = runtime.state.value
             if (now.sessionId != state.sessionId || now.usageMode != LocalUsageMode.WORK ||
@@ -167,6 +171,7 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 } ?: JsonNull)
                 put("plan_mode", controls.planMode)
             })
+            committed = true
             handle.modelHistory.reset(history)
             val resources = runtime.resourceSnapshot()
             runtime.projection.update { current ->
@@ -203,9 +208,16 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
             if (!storage.enqueueCurrentSnapshot(now.sessionId)) {
                 runtime.projection.publishError("工作历史已重写，快照保存排队失败；将继续从持久事件恢复")
             }
-            return LocalWorkMessageEditPreparation.Ready(prepared)
+            handedOff = true
+            return LocalWorkMessageEditPreparation.Ready(prepared, lease)
+        } catch (error: Exception) {
+            if (!committed) throw error
+            runtime.projection.publishError(
+                "历史修改已保存，但后续恢复或任务准备失败：${error.message ?: error::class.java.simpleName}；请重新打开会话检查当前状态",
+            )
+            return rejected(LocalUserMessageEditResult.COMMITTED_NOT_STARTED)
         } finally {
-            lease.close()
+            if (!handedOff) lease.close()
         }
     }
 }

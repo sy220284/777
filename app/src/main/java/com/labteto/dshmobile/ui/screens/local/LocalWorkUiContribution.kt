@@ -59,6 +59,10 @@ internal fun localWorkFeatureUiContribution(
                 onStartResearchAgent = actions.startResearchAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onContinueArtifact = onContinueArtifact,
+                usageRevision = actions.usageRevision,
+                sessionUsage = actions.sessionUsage,
+                taskUsage = actions.taskUsage,
+                requestUsage = actions.requestUsage,
                 onOpenArtifact = { path ->
                     onRequestedFilePathChange(path)
                     onFilesModeChange(LocalFilesMode.CONVERSATION)

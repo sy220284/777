@@ -417,6 +417,8 @@ class DeepSeekUsageTracker @Inject constructor(
 
     fun analyticsSnapshot(): TokenUsageAnalyticsSnapshot = analyticsStore.snapshot()
 
+    fun analyticsSessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot = analyticsStore.sessionSnapshot(sessionId)
+
     fun analyticsGroupDetail(
         kind: TokenUsageGroupKind,
         key: String,

@@ -209,6 +209,7 @@ internal class LocalWorkAgentTurnExecutor(
                 parentRunId = continuationParentRunId,
             )
             var lastModelError: LocalModelException? = null
+            val taskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(runEventLog, runContext.runId)
             val progressTracker = LocalAgentProgressTracker()
             var activeStep: Int? = null
             var activeToolCalls = emptyList<AgentToolCall>()
@@ -367,6 +368,7 @@ internal class LocalWorkAgentTurnExecutor(
                             action = TokenUsageAction.WORK_MAIN,
                             turnId = sourceMessageId ?: runContext.runId,
                             runId = runContext.runId,
+                            taskRunId = taskRunId,
                             taskLabel = input,
                             step = modelStep + 1,
                         )

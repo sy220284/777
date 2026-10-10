@@ -70,7 +70,7 @@
     <string name="local_drawer_recent">最近</string>
     <string name="local_drawer_running">运行中</string>
     <string name="local_regenerate_reply">重新生成回复</string>
-    <string name="local_regenerate_reply_failed">当前状态无法重新生成这条回复。</string>
+    <string name="local_regenerate_reply_failed">重新生成未启动，请查看会话中的具体原因。</string>
     <string name="local_select_variant_failed">暂时无法切换回复版本，请等待当前回复结束后重试。</string>
     <string name="local_edit_user_message">修改消息</string>
     <string name="local_edit_user_message_hint">修改后会从这条消息重新继续；这条消息之后的对话记录会被清除，并由新的回复重新开始。</string>
@@ -1858,5 +1858,14 @@
     <string name="work_handoff_scope">将创建关联的新工作会话；请保留目标、约束和材料引用，删去不适用的聊天内容。</string>
     <string name="local_artifact_continue">继续修改</string>
     <string name="local_artifact_continue_prompt">请基于已有文件 `%1$s` 继续修改。修改要求：</string>
+    <string name="local_run_usage_title">任务用量</string>
+    <string name="local_run_usage_known">本对话已知用量：%1$d Token</string>
+    <string name="local_run_usage_incomplete">本对话已知用量：%1$d Token（数据不完整）</string>
+    <string name="local_run_usage_loading">正在读取用量…</string>
+    <string name="local_run_usage_unavailable">用量暂时无法读取</string>
+    <string name="local_run_usage_retained">来自保留期内的实际请求记录；未返回用量的请求不计为零消耗。</string>
+    <string name="local_run_usage_missing">有 %1$d 次请求未返回用量，总量尚不完整。</string>
+    <string name="local_run_usage_task">%1$s · 已知 %2$d Token</string>
+    <string name="local_run_usage_no_tasks">暂无任务用量记录</string>
 </resources>
 

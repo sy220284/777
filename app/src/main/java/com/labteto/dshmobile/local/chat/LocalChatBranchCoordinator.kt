@@ -109,7 +109,16 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 ),
             )
 
-            if (!modelHistoryRuntime.reset(state.sessionId, selectedHistory)) return true
+            if (!modelHistoryRuntime.reset(state.sessionId, selectedHistory)) {
+                // EventLog already committed the branch selection; avoid reporting an in-memory
+                // success before the correct Session projection has been restored.
+                if (runtimeStateStore.state.value.sessionId == state.sessionId) {
+                    runtimeStateStore.projection.publishError(
+                        "回复版本已保存，但模型历史未同步；请重新打开会话恢复后再继续发送",
+                    )
+                }
+                return false
+            }
             chatState.update { current ->
                 if (current.sessionId != state.sessionId) current else current.copy(
                     messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),

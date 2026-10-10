@@ -792,7 +792,10 @@
       "state": "automated_partial",
       "evidence": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens",
-        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives"
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives",
+        "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#nestedAndResumedRunsKeepDirectParentAndAggregateUnderOriginalTaskAfterRestart",
+        "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#oldAccountingPayloadRemainsReadableWithoutTaskRoot",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterUsageTest.kt#missingUsageIsExplicitAndTaskDetailsRefreshWithoutCrossingSessions"
       ]
     },
     {

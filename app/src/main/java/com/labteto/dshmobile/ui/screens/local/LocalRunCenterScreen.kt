@@ -80,6 +80,10 @@ internal fun LocalRunCenterScreen(
     onDismiss: () -> Unit,
     onOpenArtifact: (String) -> Unit = { onOpenResults() },
     onContinueArtifact: (String) -> Unit = {},
+    usageRevision: kotlinx.coroutines.flow.StateFlow<Long>? = null,
+    sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
+    taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
+    requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -150,6 +154,9 @@ internal fun LocalRunCenterScreen(
                 DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
                     variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium))
+            }
+            if (usageRevision != null && sessionUsage != null) {
+                LocalRunCenterUsageSection(state.sessionId, usageRevision, sessionUsage, taskUsage, requestUsage)
             }
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 Column(Modifier.fillMaxSize()) {

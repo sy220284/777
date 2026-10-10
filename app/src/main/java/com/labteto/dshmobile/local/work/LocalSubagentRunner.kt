@@ -329,6 +329,7 @@ internal class LocalSubagentRunner(
                 data["call_id"]?.jsonPrimitive?.contentOrNull == callId
             }?.data?.get("run_id")?.jsonPrimitive?.contentOrNull
         }
+        val taskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(eventLog(), parentRunId)
         val runContext = runCoordinator?.start(
             sessionId = runSessionId(),
             usageMode = LocalUsageMode.WORK,
@@ -563,6 +564,7 @@ internal class LocalSubagentRunner(
                         turnId = runContext?.runId ?: subagentId,
                         runId = runContext?.runId ?: subagentId,
                         parentRunId = parentRunId,
+                        taskRunId = taskRunId ?: runContext?.runId ?: subagentId,
                         runKind = runKind,
                         agentId = subagentId,
                         taskLabel = task,

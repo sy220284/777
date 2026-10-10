@@ -117,6 +117,7 @@ data class TokenUsageContext(
     val taskLabel: String? = null,
     val step: Int? = null,
     val action: TokenUsageAction = TokenUsageAction.OTHER,
+    val taskRunId: String? = null,
 )
 
 data class ForegroundTokenUsageSeed(
@@ -245,6 +246,7 @@ internal fun buildTokenUsageContext(
     agentId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ): TokenUsageContext = TokenUsageContext(
     mode = snapshot.usageMode,
     sessionId = snapshot.sessionId.takeIf(String::isNotBlank),
@@ -258,6 +260,7 @@ internal fun buildTokenUsageContext(
     taskLabel = taskLabel?.trim()?.takeIf(String::isNotBlank)?.take(120),
     step = step,
     action = action,
+    taskRunId = taskRunId?.takeIf(String::isNotBlank),
 )
 
 internal fun DeepSeekUsageTracker.record(
@@ -307,6 +310,7 @@ internal fun DeepSeekUsageTracker.record(
     agentId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ) {
     record(
         snapshot = snapshot,
@@ -321,6 +325,7 @@ internal fun DeepSeekUsageTracker.record(
             agentId = agentId,
             taskLabel = taskLabel,
             step = step,
+            taskRunId = taskRunId,
         ),
     )
 }
@@ -350,6 +355,7 @@ internal fun DeepSeekUsageTracker.recordForeground(
     runId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ) = record(
     snapshot = snapshot,
     reply = reply,
@@ -359,6 +365,7 @@ internal fun DeepSeekUsageTracker.recordForeground(
     runKind = LocalAgentRunKind.FOREGROUND,
     taskLabel = taskLabel,
     step = step,
+    taskRunId = taskRunId,
 )
 
 internal fun DeepSeekUsageTracker.recordAutomation(
@@ -497,7 +504,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
             when (kind) {
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
                 TokenUsageGroupKind.TASK ->
-                    record.context.parentRunId == key || record.context.runId == key
+                    record.context.taskRunId == key || record.context.parentRunId == key || record.context.runId == key
             }
         }.toList()
         if (records.isEmpty()) return null
@@ -558,6 +565,9 @@ class TokenUsageAnalyticsStore @Inject constructor(
         ensureLoaded()
         database.recordById(requestId)
     }
+
+    fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot =
+        aggregateTokenUsageRecords(allRecords().filter { it.context.sessionId == sessionId })
 
     private fun allRecords(): Sequence<TokenUsageRecord> = synchronized(lock) {
         ensureLoaded()
@@ -646,7 +656,8 @@ internal class TokenUsageAccumulator(private val zone: ZoneId) {
                 work.add(record)
                 day.work.add(record)
                 workActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-                val taskRunId = record.context.parentRunId?.takeIf(String::isNotBlank)
+                val taskRunId = record.context.taskRunId?.takeIf(String::isNotBlank)
+                    ?: record.context.parentRunId?.takeIf(String::isNotBlank)
                     ?: record.context.runId?.takeIf(String::isNotBlank)
                 taskRunId?.let { runId ->
                     workRuns += runId

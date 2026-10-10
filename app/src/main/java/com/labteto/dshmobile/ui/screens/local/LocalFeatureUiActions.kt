@@ -59,7 +59,7 @@ internal data class LocalShellFeatureUiActions(
     val enableDeviceApprovalLease: (String) -> Unit,
     val disableDeviceApprovalLease: () -> Unit,
     val disableAutoApproval: () -> Unit,
-    val answerQuestion: (String, String) -> Unit,
+    val answerQuestion: (String, String) -> Boolean,
     val cancelQuestion: (String) -> Unit,
 )
 
@@ -106,6 +106,10 @@ internal data class LocalWorkFeatureUiActions(
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
     val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,
     val sendBackgroundAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
+    val usageRevision: StateFlow<Long>? = null,
+    val sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
+    val taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
+    val requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 )
 
 internal data class LocalAutomationFeatureUiActions(

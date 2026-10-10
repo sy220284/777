@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -29,6 +31,21 @@ class LocalWorkExecutionCoordinatorTest {
 
         assertEquals(LocalSendResult.Empty, result)
         assertEquals(0, fake.startCalls)
+    }
+
+    @Test
+    fun teamRequestNeverFallsBackToOrdinaryChatAfterModeSwitch() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            sessionId = "chat-mode", loading = false, usageMode = LocalUsageMode.CHAT,
+            modelState = LocalModelState(configured = true),
+        ))
+        val fake = RecordingTurnPort()
+        val result = coordinator(fake, runtime).sendWithTeam("执行团队任务", emptyList())
+        assertFalse(result.accepted)
+        assertEquals(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION, result.rejectReason)
+        assertEquals(0, fake.startCalls)
+        assertTrue(runtime.state.value.error.orEmpty().contains("工作模式"))
     }
 
     @Test
@@ -107,12 +124,16 @@ class LocalWorkExecutionCoordinatorTest {
     @Test
     fun workEditUsesItsOwnExecutionPortAndStartsOneNewWorkTurn() {
         val fake = RecordingTurnPort()
+        val runtime = defaultRuntime()
         val coordinator = coordinator(
-            fake,
+            fake, runtime,
             prepareEditedTurn = { messageId, text ->
                 assertEquals("old-user-message", messageId)
                 LocalWorkMessageEditPreparation.Ready(
                     requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+                    requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+                        runtime.state.value.sessionId, LocalSessionRuntimeKind.FOREGROUND,
+                    )),
                 )
             },
         )
@@ -120,6 +141,25 @@ class LocalWorkExecutionCoordinatorTest {
         assertEquals(com.labteto.dshmobile.local.session.LocalUserMessageEditResult.SENT, result)
         assertEquals(1, fake.startCalls)
         assertEquals("更新任务", fake.lastPrepared?.content)
+    }
+
+    @Test
+    fun workEditReportsCommittedButNotStartedWhenRunAdmissionThrows() {
+        val fake = RecordingTurnPort()
+        fake.failNextStart = true
+        val runtime = defaultRuntime()
+        val coordinator = coordinator(fake, runtime, prepareEditedTurn = { _, text ->
+            LocalWorkMessageEditPreparation.Ready(
+                requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+                requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+                    runtime.state.value.sessionId, LocalSessionRuntimeKind.FOREGROUND,
+                )),
+            )
+        })
+        assertEquals(
+            com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED,
+            coordinator.editAndResendUserMessage("user", "revised"),
+        )
     }
 
     @Test
@@ -209,6 +249,7 @@ class LocalWorkExecutionCoordinatorTest {
 
     private class RecordingTurnPort : LocalWorkTurnPort {
         var startCalls: Int = 0
+        var failNextStart = false
         var regenerateStartCalls: Int = 0
         var lastPrepared: LocalPreparedSend? = null
         var lastRegenerateId: String? = null
@@ -217,6 +258,10 @@ class LocalWorkExecutionCoordinatorTest {
             prepared: LocalPreparedSend,
             sessionLease: LocalSessionRuntimeLease,
         ): Job {
+            if (failNextStart) {
+                sessionLease.close()
+                throw IllegalStateException("run failed to start")
+            }
             startCalls += 1
             lastPrepared = prepared
             sessionLease.close()
