@@ -360,6 +360,8 @@ fun LocalHarnessScreen(
         toolActivitiesForUi = viewModel::toolActivitiesForUi,
         eventSequenceForUi = viewModel::eventSequenceForUi,
         toolEvidenceForUi = viewModel::toolEvidenceForUi,
+        requirementEvidenceForUi = viewModel::requirementEvidenceForUi,
+        linkRequirementEvidenceForUi = viewModel::linkRequirementEvidenceForUi,
         stopBackgroundJob = viewModel::stopBackgroundJob,
         startBackgroundAgent = viewModel::startBackgroundAgent,
         startResearchAgent = viewModel::startResearchAgent,

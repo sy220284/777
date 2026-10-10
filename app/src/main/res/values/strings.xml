@@ -1981,5 +1981,12 @@
     <string name="chat_locate_message_memory">定位并纠正相关记忆</string>
     <string name="local_delivery_file_revision_changed">当前内容与成果生成时不同；旧验证不再适用</string>
     <string name="local_delivery_file_revision_matches">当前内容指纹与生成时一致；功能验收需另行证明</string>
+    <string name="local_delivery_link_action">关联要求</string>
+    <string name="local_delivery_link_title">选择交付要求</string>
+    <string name="local_delivery_link_hint">将文件当前版本和来源工具事件关联到一条要求。关联只记录证据来源，不代表已通过测试或完成验收。</string>
+    <string name="local_delivery_linked_title">已关联的要求与成果</string>
+    <string name="local_delivery_linked_line">第 %1$d 项 · %2$s · %3$s</string>
+    <string name="local_delivery_link_current">版本一致，待逐项验证</string>
+    <string name="local_delivery_link_stale">文件版本变化或无法核实，需重新检查</string>
 </resources>
 

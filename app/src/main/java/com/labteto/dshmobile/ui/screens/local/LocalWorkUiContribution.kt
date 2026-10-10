@@ -54,6 +54,8 @@ internal fun localWorkFeatureUiContribution(
                 onToolActivities = actions.toolActivitiesForUi,
                 onEventSequence = actions.eventSequenceForUi,
                 onToolEvidence = actions.toolEvidenceForUi,
+                onRequirementEvidence = actions.requirementEvidenceForUi,
+                onLinkRequirementEvidence = actions.linkRequirementEvidenceForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
                 onStartResearchAgent = actions.startResearchAgent,
