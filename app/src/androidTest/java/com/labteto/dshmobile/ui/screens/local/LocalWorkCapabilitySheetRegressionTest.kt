@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
@@ -123,6 +124,62 @@ class LocalWorkCapabilitySheetRegressionTest {
         compose.runOnIdle {
             assertEquals(0, entered)
             assertEquals(1, refreshed)
+        }
+    }
+
+    @Test
+    fun selectedHistoryRequiresUserClickAndNeverStartsWorkAutomatically() {
+        val selected = mutableStateOf<List<String>>(emptyList())
+        var started = 0
+        val old = com.labteto.dshmobile.local.session.LocalHarnessMessage(
+            id = "prior-1", role = "user", content = "此前已确认的要求", createdAt = 1L,
+        )
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    summary = "用户手写摘要",
+                    selectableMessages = listOf(old),
+                    selectedMessageIds = selected.value,
+                    onSelectedMessageIdsChange = { selected.value = it },
+                )
+            }
+        }
+        compose.runOnIdle {
+            assertEquals(emptyList<String>(), selected.value)
+            assertEquals(0, started)
+        }
+        compose.onNodeWithTag("handoff_message_prior-1").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("prior-1"), selected.value)
+            assertEquals(0, started)
+        }
+        compose.onNodeWithTag("handoff_message_prior-1").performClick()
+        compose.runOnIdle { assertEquals(emptyList<String>(), selected.value) }
+    }
+
+    @Test
+    fun unconfiguredModelCanOpenSettingsWithoutStartingWork() {
+        var configured = 0
+        var started = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { started++ }, onDismiss = {},
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        LocalTaskCapabilityKind.MODEL, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureModel = { configured++ },
+                )
+            }
+        }
+        compose.onNodeWithText("当前模型 · 尚未配置模型，可前往模型设置").assertIsDisplayed()
+        compose.onNodeWithText("前往模型设置").performClick()
+        compose.runOnIdle {
+            assertEquals(1, configured)
+            assertEquals(0, started)
         }
     }
 

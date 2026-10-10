@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
@@ -88,6 +89,7 @@ internal fun LocalWorkCapabilitySheet(
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = checked,
+                        modifier = Modifier.testTag("handoff_message_${message.id}"),
                         enabled = !switching,
                         onCheckedChange = { isChecked ->
                             onSelectedMessageIdsChange(
