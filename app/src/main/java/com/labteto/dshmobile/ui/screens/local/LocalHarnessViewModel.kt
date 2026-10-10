@@ -61,11 +61,26 @@ class LocalHarnessViewModel @Inject constructor(
         null
     }
 
+    internal suspend fun externalReadinessForHandoff(): Pair<Boolean?, Boolean?> = try {
+        toolsUi.handoffExternalReadiness()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null to null
+    }
+
     internal fun workHandoffCapabilityReadiness(
         task: String,
         githubConfigured: Boolean?,
         networkSearchEnabled: Boolean,
-    ) = toolsUi.workHandoffCapabilityReadiness(task, githubConfigured, networkSearchEnabled)
+        modelConfigured: Boolean?,
+        mcpToolsAvailable: Boolean?,
+        pluginsInstalled: Boolean?,
+    ) = toolsUi.workHandoffCapabilityReadiness(
+        task, githubConfigured, networkSearchEnabled,
+        showModelStatus = true, modelConfigured = modelConfigured,
+        mcpToolsAvailable = mcpToolsAvailable, pluginsInstalled = pluginsInstalled,
+    )
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled

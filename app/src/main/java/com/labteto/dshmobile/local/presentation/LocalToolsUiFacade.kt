@@ -21,10 +21,23 @@ class LocalToolsUiFacade @Inject constructor(
         task: String,
         githubConfigured: Boolean?,
         networkSearchEnabled: Boolean,
-    ) = LocalTaskCapabilityReadinessProjector.project(task, githubConfigured, networkSearchEnabled)
+        showModelStatus: Boolean = false,
+        modelConfigured: Boolean? = null,
+        mcpToolsAvailable: Boolean? = null,
+        pluginsInstalled: Boolean? = null,
+    ) = LocalTaskCapabilityReadinessProjector.project(
+        task, githubConfigured, networkSearchEnabled,
+        showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
+    )
     internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
     internal suspend fun clearGitHub() = tools.clearGitHub()
     internal fun installedPluginIds() = tools.installedPluginIds()
+    /** Registry presence is a configuration hint, not an execution grant. */
+    internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
+        val hasMcpTools = tools.servers().any { it.tools.isNotEmpty() }
+        val hasThirdPartyPlugin = tools.installedPluginIds().any { it != "local-builtin" }
+        return hasMcpTools to hasThirdPartyPlugin
+    }
     internal suspend fun installedSkills() = tools.installedSkills().map {
         LocalSkillUiEntry(it.name, it.description, it.modelInvocable, it.displayName)
     }

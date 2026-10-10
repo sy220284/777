@@ -1943,5 +1943,10 @@
     <string name="work_handoff_select_messages">补充引用对话（自选；不会自动复制角色私有记忆）</string>
     <string name="work_handoff_user">用户</string>
     <string name="work_handoff_assistant">助手</string>
+    <string name="work_capability_readiness_model">当前模型</string>
+    <string name="work_capability_readiness_mcp">MCP 工具</string>
+    <string name="work_capability_readiness_plugins">已安装插件</string>
+    <string name="work_capability_readiness_model_missing">尚未配置模型，可前往模型设置</string>
+    <string name="work_capability_configure_model">前往模型设置</string>
 </resources>
 

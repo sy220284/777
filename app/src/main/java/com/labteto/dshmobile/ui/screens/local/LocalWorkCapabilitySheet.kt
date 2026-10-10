@@ -40,6 +40,7 @@ internal fun LocalWorkCapabilitySheet(
     capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
     onConfigureCapabilities: (() -> Unit)? = null,
     onRefreshCapabilities: (() -> Unit)? = null,
+    onConfigureModel: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     DsBottomSheet(
@@ -109,6 +110,9 @@ internal fun LocalWorkCapabilitySheet(
                 val name = when (item.kind) {
                     LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
                     LocalTaskCapabilityKind.WEB_SEARCH -> R.string.work_capability_readiness_web
+                    LocalTaskCapabilityKind.MODEL -> R.string.work_capability_readiness_model
+                    LocalTaskCapabilityKind.MCP -> R.string.work_capability_readiness_mcp
+                    LocalTaskCapabilityKind.PLUGINS -> R.string.work_capability_readiness_plugins
                 }
                 val status = when (item.state) {
                     LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
@@ -116,16 +120,33 @@ internal fun LocalWorkCapabilitySheet(
                     LocalTaskCapabilityState.DISABLED -> R.string.work_capability_readiness_disabled
                     LocalTaskCapabilityState.UNKNOWN -> R.string.work_capability_readiness_unknown
                 }
+                val statusLabel = if (item.kind == LocalTaskCapabilityKind.MODEL &&
+                    item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED
+                ) stringResource(R.string.work_capability_readiness_model_missing)
+                else stringResource(status)
                 Text(stringResource(R.string.work_capability_readiness_row,
-                    stringResource(name), stringResource(status)),
+                    stringResource(name), statusLabel),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             }
             if (onConfigureCapabilities != null && capabilities.any {
-                    it.state != LocalTaskCapabilityState.CONFIGURED
+                    it.kind != LocalTaskCapabilityKind.MODEL &&
+                        it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
                 DsButton(
                     text = stringResource(R.string.work_capability_configure),
                     onClick = onConfigureCapabilities,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+            if (onConfigureModel != null && capabilities.any {
+                    it.kind == LocalTaskCapabilityKind.MODEL &&
+                        it.state != LocalTaskCapabilityState.CONFIGURED
+                }) {
+                DsButton(
+                    text = stringResource(R.string.work_capability_configure_model),
+                    onClick = onConfigureModel,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
                     variant = DsButtonVariant.Ghost,

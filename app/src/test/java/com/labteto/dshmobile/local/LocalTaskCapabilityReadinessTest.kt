@@ -44,6 +44,28 @@ class LocalTaskCapabilityReadinessTest {
         ).isEmpty())
     }
 
+    @Test fun modelAndPluginReadinessAreCurrentTaskHintsNotExecutionGrants() {
+        assertEquals(
+            listOf(
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.MODEL, LocalTaskCapabilityState.CONNECTION_REQUIRED),
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.MCP, LocalTaskCapabilityState.CONFIGURED),
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.PLUGINS, LocalTaskCapabilityState.UNKNOWN),
+            ),
+            LocalTaskCapabilityReadinessProjector.project(
+                "调用 MCP 插件", githubConfigured = null, networkSearchEnabled = false,
+                showModelStatus = true, modelConfigured = false, mcpToolsAvailable = true,
+                pluginsInstalled = null,
+            ),
+        )
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.MODEL, LocalTaskCapabilityState.CONFIGURED)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "整理本地文件", githubConfigured = null, networkSearchEnabled = false,
+                showModelStatus = true, modelConfigured = true,
+            ),
+        )
+    }
+
     @Test fun unrelatedTaskAndBlankHandoffHaveNoProjectedRequirements() {
         assertTrue(LocalTaskCapabilityReadinessProjector.project(
             "", githubConfigured = null, networkSearchEnabled = false,

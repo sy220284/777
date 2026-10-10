@@ -189,10 +189,13 @@ fun LocalHarnessScreen(
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
     var workCapabilityConfiguring by rememberSaveable { mutableStateOf(false) }
     var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
+    var externalReadinessForHandoff by remember { mutableStateOf<Pair<Boolean?, Boolean?>>(null to null) }
     LaunchedEffect(workCapabilityOpenVersion, pendingWorkCapability != null, workCapabilityConfiguring) {
         if (pendingWorkCapability != null && !workCapabilityConfiguring) {
             githubConfiguredForHandoff = null
+            externalReadinessForHandoff = null to null
             githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
+            externalReadinessForHandoff = viewModel.externalReadinessForHandoff()
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -207,7 +210,8 @@ fun LocalHarnessScreen(
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
     LaunchedEffect(featurePage, workCapabilityConfiguring) {
-        if (workCapabilityConfiguring && featurePage != LocalFeaturePage.TOOLS) {
+        if (workCapabilityConfiguring &&
+            featurePage != LocalFeaturePage.TOOLS && featurePage != LocalFeaturePage.SETTINGS) {
             workCapabilityConfiguring = false
         }
     }
@@ -675,6 +679,9 @@ fun LocalHarnessScreen(
                 task = pendingWorkCapability.orEmpty(),
                 githubConfigured = githubConfiguredForHandoff,
                 networkSearchEnabled = networkSearchEnabled,
+                modelConfigured = chatSurface.configured,
+                mcpToolsAvailable = externalReadinessForHandoff.first,
+                pluginsInstalled = externalReadinessForHandoff.second,
             ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
@@ -685,6 +692,11 @@ fun LocalHarnessScreen(
                 pushFeature(LocalFeaturePage.TOOLS)
             },
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },
+            onConfigureModel = {
+                workCapabilityConfiguring = true
+                settingsDestination = SettingsDestination.MODELS
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
             onContinue = {
                 workCapabilityFailed = false
                 workCapabilityConfirmed = viewModel.createWorkContinuation(
