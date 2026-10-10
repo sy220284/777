@@ -3,8 +3,6 @@ package com.labteto.dshmobile.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
-import com.labteto.dshmobile.connection.ConnectionManager
-import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.update.UpdateChecker
 import com.labteto.dshmobile.update.UpdateInstaller
@@ -22,8 +20,6 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AppViewModel @Inject constructor(
     hostsStore: HostsStore,
-    private val connectionManager: ConnectionManager,
-    private val sessionStore: com.labteto.dshmobile.data.SessionStore,
     private val updateChecker: UpdateChecker,
     private val updateInstaller: UpdateInstaller,
 ) : ViewModel() {
@@ -33,8 +29,6 @@ class AppViewModel @Inject constructor(
         SharingStarted.Eagerly,
         AppSettings(),
     )
-
-    val connectionState: StateFlow<ConnectionUiState> = connectionManager.state
 
     private val _updateInstallStatus = MutableStateFlow<String?>(null)
     val updateInstallStatus: StateFlow<String?> = _updateInstallStatus.asStateFlow()
@@ -83,17 +77,5 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    suspend fun prepareNotificationNavigation() {
-        connectionManager.restoreDesiredConnectionIfNeeded()
-    }
 
-    suspend fun openNotificationSession(id: String): Boolean {
-        if (id.isBlank()) return false
-        sessionStore.openSession(id)
-        return sessionStore.currentSessionId.value == id
-    }
-
-    fun disconnectRemote() {
-        connectionManager.disconnect()
-    }
 }

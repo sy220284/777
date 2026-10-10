@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.web
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalWebException
 import com.labteto.dshmobile.local.TokenUsageAction

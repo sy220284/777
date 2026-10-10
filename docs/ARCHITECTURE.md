@@ -86,12 +86,11 @@ Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery �
 | 模块 | 职责 |
 |---|---|
 | `app/` | Android 组合根、产品 Feature、UI、运行内核装配 |
-| `core/` | 远程 Harness Web 协议链 |
+| `core/` | 本机组件仍在复用的 DTO、JSON 编解码与可取消 HTTP 工具；不装配远程会话或中继连接 |
 | `harness-core/` | 平台无关 Agent、工具、资源与会话核心契约 |
 | `harness-runtime-android/` | Android 进程运行时与持久终端 |
 | `harness-interop/` | MCP / LSP / GitHub 等互通能力 |
 | `harness-device-android/` | Android 设备能力 |
-| `mock-harness/` | 协议与行为测试服务端 |
 | `reference-validation/` | 官方语义与差分验证 |
 
 只有当某个能力拥有明显更小且稳定的依赖集合、独立测试/发布价值，并且不会制造循环依赖时，才升级为新的 Gradle module。

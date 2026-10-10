@@ -46,27 +46,5 @@ class SidebarSystemBackRegressionTest {
         assertEquals(1, backCount.get())
     }
 
-    @Test
-    fun remoteRelayStatusConsumesSystemBackAndReturnsToLocalAction() {
-        val backCount = AtomicInteger(0)
 
-        compose.setContent {
-            DshTheme {
-                RemoteRelayStatus(
-                    failed = true,
-                    onRetryPairing = {},
-                    onBack = { backCount.incrementAndGet() },
-                )
-            }
-        }
-
-        compose.onNodeWithText(InstrumentationRegistry.getInstrumentation().targetContext.getString(
-            R.string.relay_status_failed_title,
-        )).assertIsDisplayed()
-        pressDeviceBack()
-        compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
-        compose.waitForIdle()
-
-        assertEquals(1, backCount.get())
-    }
 }

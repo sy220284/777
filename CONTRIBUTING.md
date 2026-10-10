@@ -26,12 +26,11 @@
 
 ```text
 app/                      Android UI、组合根、本机 Harness 产品能力
-core/                     远程 Harness Web 协议
+core/                     本机复用的序列化 DTO、JSON 编解码及 HTTP 通用工具
 harness-core/             平台无关 Agent 核心
 harness-runtime-android/  Android 进程 / 持久终端
 harness-interop/          MCP / LSP
 harness-device-android/   Android 设备能力
-mock-harness/             测试 Harness
 reference-validation/     官方 Harness 差分验证
 ```
 
@@ -84,7 +83,7 @@ app 内采用架构 3.0 的模块化单体：产品业务归所属 Feature，跨
 
 ### 协议与数据
 
-- 远程 wire layer 对未知 JSON 字段保持宽松。
+- 共用 JSON 解码契约对未知字段保持兼容，不能为了清退远程入口破坏本机使用的 DTO。
 - 不依赖猜测的 Harness 版本分支行为。
 - 本机 Session Event Log 是主要事实源。
 - 运行恢复不能盲目重放结果未知的副作用。
@@ -108,7 +107,7 @@ app 内采用架构 3.0 的模块化单体：产品业务归所属 Feature，跨
 本地常用：
 
 ```sh
-./gradlew :core:test   :harness-core:test   :harness-runtime-android:test   :harness-interop:test   :harness-device-android:testDebugUnitTest   :mock-harness:test   :app:testDebugUnitTest
+./gradlew :core:test   :harness-core:test   :harness-runtime-android:test   :harness-interop:test   :harness-device-android:testDebugUnitTest      :app:testDebugUnitTest
 
 ./gradlew :reference-validation:test
 ./gradlew :app:lintDebug

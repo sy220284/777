@@ -12,7 +12,6 @@ MODULE_OUTPUTS = (
     "harness-core/build/classes/kotlin/main",
     "harness-runtime-android/build/classes/kotlin/main",
     "harness-interop/build/classes/kotlin/main",
-    "mock-harness/build/classes/kotlin/main",
     "reference-validation/build/classes/kotlin/main",
 )
 

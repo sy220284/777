@@ -21,7 +21,7 @@
 > [`sorsama/deepseek-harness-mobile@e5f8c2f`](https://github.com/sorsama/deepseek-harness-mobile/commit/e5f8c2f)
 > （DSH Mobile 时代），现以独立应用标识 `com.sy220284.dshmobile` 发行，可与上游同时安装。
 > 上游 MIT 许可证与第三方声明完整保留。本机原生 Harness 的官方语义参考由
-> `upstream/deepseek-harness.lock.json` 钉定；远程 Web 协议基线独立维护，避免把两条运行链混为一套版本。
+> `upstream/deepseek-harness.lock.json` 钉定；当前发行版只提供 Android 本机模式。
 
 ---
 
@@ -29,13 +29,12 @@
 
 神言神语把 **聊天、长期角色互动和真正能执行任务的 Agent** 放进同一个 Android 应用。
 
-你可以把它当普通 AI 聊天工具，也可以让它直接读写文件、运行命令、使用 Git、搜索网页、调用 MCP / LSP、看图片、操作 Android 设备；需要电脑环境时，还能通过 HTTPS 中继连接桌面端 DeepSeek Harness。
+你可以把它当普通 AI 聊天工具，也可以让它直接读写文件、运行命令、使用 Git、搜索网页、调用 MCP / LSP、看图片、操作 Android 设备。
 
-它主要有三种使用方式：
+它主要有两种使用方式：
 
 1. **聊天模式**：围绕人物设定、关系、共同经历、故事线和长期记忆持续对话，支持群聊、人物调节和定时互动。
 2. **工作模式**：Agent 会理解目标、规划步骤、调用真实工具、继续判断并完成任务，也能把工作拆给子代理。
-3. **远程模式**：手机作为控制端连接电脑上的 Harness，处理任务、审批、提问和完成通知。
 
 本机模式不要求电脑在线。APK 自带 Node / Python / Git 等执行环境；模型是否联网取决于你配置的模型服务。
 
@@ -170,7 +169,7 @@ Agent 开始思考
 
 所以会话分支、重新生成、修改重发、长历史分页和中断恢复，都建立在同一份事实记录上。界面快照只是为了显示更快，不是另一套独立历史。
 
-### 本机与远程：两条运行链互不混用
+### 本机运行链
 
 **本机模式**：
 
@@ -182,18 +181,6 @@ Android 界面
 ```
 
 核心 Agent 和执行环境都在手机里，模型服务是否联网取决于你的配置。
-
-**远程模式**：
-
-```text
-Android 界面
-→ HTTPS 中继
-→ 电脑上的 DeepSeek Harness
-→ 执行
-→ 事件返回手机
-```
-
-手机负责查看、控制、审批和接收结果；电脑上的 Harness 负责实际远程执行。本机 Agent 与远程协议链保持独立。
 
 ### 一句话理解
 
@@ -303,9 +290,9 @@ Shared Runtime / Feature 初始化与恢复
 本机内核不是“照着文档抄”，而是**对着官方实现逐项比对**：
 
 1. **钉版**——`upstream/deepseek-harness.lock.json` 锁定官方 commit，避免语义基准漂移。
-2. **黄金结果**——`tools/capture/` 对锁定版本运行真实行为并录制一致性夹具。
+2. **黄金结果**——`tools/reference-validation/` 基于锁定的官方源码生成和校验本机语义黄金夹具。
 3. **原生比对**——`reference-validation` 用同一输入驱动 Android 本机实现，与黄金结果比对。
-4. **模拟对手**——`mock-harness` 提供常驻 Ktor 测试服务端。
+4. **本机语义验证**——`reference-validation` 对照锁定的官方基线检验本机 Agent 语义。
 5. **CI 门禁**——先按改动性质分配验证范围；产品 / 构建 / Runtime 变更执行架构、性能、UI、Kotlin、单元测试、Harness、Lint、optimized APK 与 Android 16 / 17 完整验证，文档、自动化和测试-only 改动只运行对应检查，最终统一由 merge-gate 放行。
 
 除了“测试通过”，仓库还对热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。
@@ -318,28 +305,16 @@ Shared Runtime / Feature 初始化与恢复
 - Android 16+（minSdk 36，targetSdk 36，compileSdk 37）。
 - 默认内置运行时按 `arm64-v8a` 打包。
 - 模拟器 / x86_64 设备可用 `DSH_RUNTIME_ABIS=x86_64` 自行构建。
-- 远程模式需运行 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)，协议基线与兼容说明见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
 
 ## 快速开始
 
 1. 从 [Releases](https://github.com/sy220284/777/releases/latest) 安装 APK。
 2. **本机模式**：进入模型设置后，可配置 API Key，或通过 **Continue with ChatGPT** 连接 ChatGPT 账户并使用符合条件的套餐模型；选择模型后即可开始。API Key 使用 Android Keystore 加密存储。
-3. **远程模式**：在电脑上安装 [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay)：
-
-   ```sh
-   dsh plugin --profile web add dsh-relay
-   dsh web
-   ```
-
-   打开打印的 URL 设置密码，进入 `/relay/pair`；在应用里 **中继 → 配对中继** 扫码。
-   远程访问只支持配对后的 HTTPS 中继。
-
 ## 安全与边界
 
 - API 密钥由 Android Keystore 加密。
 - 写文件、编辑文件、执行高风险命令受审批和能力边界约束。
 - 本机文件工具受规范化路径边界约束：包含应用私有工作区与获准的用户共享存储根目录。Shell 以工作区作为默认目录，可执行应用权限允许的命令；Webhook 只监听回环地址。
-- 远程访问要求配对 HTTPS 中继，详见 [docs/SECURITY.md](docs/SECURITY.md)。
 - Agent 可以实际执行文件、命令与设备操作；请只启用你理解并信任的能力。
 
 ## 构建

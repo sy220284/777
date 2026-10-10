@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.update
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import java.io.EOFException
 import java.io.File
 import java.io.IOException

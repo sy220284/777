@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.model.chatgpt
 
 import com.labteto.dshmobile.local.io.readBoundedBody
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton

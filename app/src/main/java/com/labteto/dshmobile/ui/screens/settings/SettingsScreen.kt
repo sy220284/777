@@ -60,8 +60,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
-import com.labteto.dshmobile.connection.ConnectionPhase
-import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
@@ -76,8 +74,6 @@ import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.StateDot
-import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.rememberDsToast
@@ -123,7 +119,6 @@ enum class SettingsDestination {
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
-    PROJECT_SETTINGS,
     SESSION_STORAGE,
     DIAGNOSTICS,
 }
@@ -146,7 +141,6 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
-    SettingsDestination.PROJECT_SETTINGS,
     SettingsDestination.SESSION_STORAGE,
     SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
 }
@@ -205,8 +199,6 @@ internal fun settingsInkColors(colors: DsColors): DsColors =
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
-    onRemoteControl: () -> Unit,
-    remoteControlActive: Boolean = false,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
@@ -214,10 +206,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
-    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
-    val projectSettings by viewModel.projectSettings.collectAsStateWithLifecycle()
-    val modelServices by viewModel.modelServices.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
@@ -257,7 +246,6 @@ fun SettingsScreen(
         mutableStateOf<UsageDetailSelection?>(null)
     }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
-    var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
@@ -298,9 +286,6 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
-    LaunchedEffect(connectionState.phase) {
-        viewModel.refreshRemoteSettings()
-    }
     LaunchedEffect(page) {
         if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) viewModel.refreshMemories()
         if (page == SettingsDestination.SESSION_STORAGE) {
@@ -336,7 +321,6 @@ fun SettingsScreen(
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
-        SettingsDestination.PROJECT_SETTINGS -> stringResource(R.string.advanced_project_config)
         SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
     }
@@ -444,16 +428,6 @@ fun SettingsScreen(
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
                                 onClick = { page = SettingsDestination.PERMISSIONS },
-                                compact = true,
-                            )
-                            AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = FeatherIcons.RemoteControl,
-                                title = stringResource(
-                                    if (remoteControlActive) R.string.chatlist_exit_remote_control
-                                    else R.string.local_remote_control,
-                                ),
-                                onClick = onRemoteControl,
                                 compact = true,
                             )
                             AppSettingsDivider()
@@ -697,7 +671,6 @@ fun SettingsScreen(
                             requestAddModel = addModelRequested,
                             onAddModelRequestHandled = { addModelRequested = false },
                         )
-                        ModelServicesCard(modelServices, viewModel)
                     }
 
                     SettingsDestination.MODEL_USAGE -> {
@@ -830,36 +803,10 @@ fun SettingsScreen(
                                 color = colors.labelSecondary,
                             )
                         }
-                        SettingsCard(stringResource(R.string.settings_connection)) {
-                            ConnectionSection(connectionState, onDisconnect = { showDisconnectDialog = true })
-                            ToggleRow(
-                                stringResource(R.string.settings_background),
-                                settings.keepConnectedInBackground,
-                                stringResource(R.string.settings_background_hint),
-                            ) { viewModel.set { it.copy(keepConnectedInBackground = !it.keepConnectedInBackground) } }
-                        }
                         DeviceCapabilitiesCard(deviceCapabilities, viewModel)
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
-                        // 两类通知的打扰逻辑不同：智能体反馈 vs 后台任务，分组呈现
-                        SettingsCard(stringResource(R.string.settings_notifications_group_agent)) {
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_turn),
-                                settings.notifyTurnComplete,
-                                stringResource(R.string.settings_notifications_turn_hint),
-                            ) { viewModel.set { it.copy(notifyTurnComplete = !it.notifyTurnComplete) } }
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_goal),
-                                settings.notifyGoal,
-                                stringResource(R.string.settings_notifications_goal_hint),
-                            ) { viewModel.set { it.copy(notifyGoal = !it.notifyGoal) } }
-                            ToggleRow(
-                                stringResource(R.string.settings_notifications_action),
-                                settings.notifyNeedsAction,
-                                stringResource(R.string.settings_notifications_action_hint),
-                            ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
-                        }
                         SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
@@ -867,28 +814,10 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
                         }
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = DsShapes.row,
-                            color = colors.warnTertiary,
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_notifications_usage_hint),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.warnLabel,
-                                modifier = Modifier.padding(DsSpacing.medium),
-                            )
-                        }
                     }
 
                     SettingsDestination.ADVANCED -> {
                         AppSettingsSection {
-                            AppSettingsRow(
-                                icon = FeatherIcons.GitBranch,
-                                title = stringResource(R.string.advanced_project_config),
-                                onClick = { page = SettingsDestination.PROJECT_SETTINGS },
-                            )
-                            AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_local_session_storage),
@@ -901,10 +830,6 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.DIAGNOSTICS },
                             )
                         }
-                    }
-
-                    SettingsDestination.PROJECT_SETTINGS -> {
-                        ProjectSettingsCard(projectSettings, viewModel, toast.second)
                     }
 
                     SettingsDestination.SESSION_STORAGE -> {
@@ -978,35 +903,7 @@ fun SettingsScreen(
         )
     }
 
-    if (showDisconnectDialog) {
-        DsDialog(
-            title = stringResource(R.string.settings_connection_disconnect_confirm),
-            onDismiss = { showDisconnectDialog = false },
-        ) {
-            Text(
-                stringResource(R.string.settings_connection_disconnect_message),
-                style = DsType.std14.withReadingWeight(),
-                color = colors.labelSecondary,
-                modifier = Modifier.padding(bottom = DsSpacing.medium),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(
-                    text = stringResource(R.string.settings_connection_disconnect),
-                    onClick = {
-                        viewModel.disconnect()
-                        showDisconnectDialog = false
-                        onClose()
-                    },
-                    variant = DsButtonVariant.Danger,
-                )
-                DsButton(
-                    text = stringResource(R.string.common_cancel),
-                    onClick = { showDisconnectDialog = false },
-                    variant = DsButtonVariant.Ghost,
-                )
-            }
-        }
-    }
+
 }
 
 /** One settings group as a raised card, so groups read as blocks rather than a running list. */
@@ -1060,88 +957,6 @@ internal fun SettingsCard(
                 content()
             }
         }
-    }
-}
-
-@Composable
-private fun LabelledValue(label: String, value: String) {
-    val colors = DsTheme.colors
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = DsType.navigationSupporting.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
-        Text(
-            value,
-            style = DsType.navigationSupporting.withReadingWeight(),
-            color = colors.labelSecondary,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1.4f),
-        )
-    }
-}
-
-@Composable
-private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: () -> Unit) {
-    val colors = DsTheme.colors
-    val isConnected = connectionState.phase == ConnectionPhase.CONNECTED ||
-        connectionState.phase == ConnectionPhase.RECONNECTING
-    val statusText = when (connectionState.phase) {
-        ConnectionPhase.CONNECTED -> stringResource(R.string.common_connected)
-        ConnectionPhase.RECONNECTING -> stringResource(R.string.common_reconnecting)
-        ConnectionPhase.CONNECTING -> stringResource(R.string.common_loading)
-        ConnectionPhase.DISCONNECTED -> stringResource(R.string.common_offline)
-    }
-    val statusState = when (connectionState.phase) {
-        ConnectionPhase.CONNECTED -> StateDotState.Done
-        ConnectionPhase.RECONNECTING, ConnectionPhase.CONNECTING -> StateDotState.Running
-        ConnectionPhase.DISCONNECTED -> StateDotState.Idle
-    }
-    val heroColor = when (connectionState.phase) {
-        ConnectionPhase.CONNECTED -> colors.successTertiary
-        ConnectionPhase.RECONNECTING -> colors.warnTertiary
-        ConnectionPhase.CONNECTING -> colors.accentTertiary
-        ConnectionPhase.DISCONNECTED -> colors.hoverSolid
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = heroColor,
-    ) {
-        Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StateDot(statusState)
-                Spacer(Modifier.width(DsSpacing.small))
-                Text(statusText, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
-            }
-            connectionState.host?.let { host ->
-                LabelledValue(
-                    stringResource(R.string.settings_connection_host),
-                    host.displayAddress,
-                )
-                LabelledValue(
-                    stringResource(R.string.settings_connection_protocol),
-                    if (host.useTls) "HTTPS" else "HTTP",
-                )
-            }
-            if (connectionState.phase == ConnectionPhase.RECONNECTING && connectionState.attempts > 0) {
-                LabelledValue(
-                    stringResource(R.string.settings_connection_attempts),
-                    connectionState.attempts.toString(),
-                )
-            }
-        }
-    }
-
-    if (isConnected && connectionState.host != null) {
-        DsButton(
-            text = stringResource(R.string.settings_connection_disconnect),
-            onClick = onDisconnect,
-            variant = DsButtonVariant.Outline,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 

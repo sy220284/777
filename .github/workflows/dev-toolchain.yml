@@ -114,7 +114,6 @@ jobs:
             :harness-runtime-android:test \
             :harness-interop:test \
             :harness-device-android:testDebugUnitTest \
-            :mock-harness:test \
             :reference-validation:test \
             --stacktrace --console=plain
 

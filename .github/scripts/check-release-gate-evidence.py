@@ -32,7 +32,7 @@ if not match:
 predicate = match.group("filter")
 LANES = (
     "scope", "static-gates", "architecture-3-gates",
-    "unit-tests", "relay-conformance", "build-arm64", "device-artifacts-x86",
+    "unit-tests", "build-arm64", "device-artifacts-x86",
     "android-16-instrumented", "android-17-instrumented", "merge-gate",
 )
 

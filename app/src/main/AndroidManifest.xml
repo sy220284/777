@@ -6,17 +6,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!--
-        Only ever used to scan a relay's pairing QR, and requested at the moment Scan is tapped.
-        Declared `required="false"` so a device without a camera can still install: typing the
-        pairing code is a complete alternative, not a degraded one.
-    -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!--
@@ -54,12 +48,6 @@
             and scroll state without a fresh launch-window hand-off.
         -->
         <activity
-            android:name=".ui.screens.pair.PortraitCaptureActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/zxing_CaptureTheme" />
-
-        <activity
             android:name=".MainActivity"
             android:configChanges="uiMode"
             android:exported="true"
@@ -70,21 +58,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="host"
-                    android:pathPrefix="/"
-                    android:scheme="dshmobile" />
-            </intent-filter>
         </activity>
-
-        <service
-            android:name=".connection.ConnectionService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
 
         <service
             android:name=".local.runtime.LocalExecutionService"

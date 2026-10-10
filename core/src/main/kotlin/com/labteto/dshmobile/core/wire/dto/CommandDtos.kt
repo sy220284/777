@@ -69,7 +69,7 @@ data class EncodedImageAttachment(
  * One attachment submitted with a slash command — `CommandSubmitAttachment` upstream.
  *
  * Images travel as bytes, exactly as a prompt carries them. A file travels as the receipt a
- * preceding upload on the same session returned (see `DshApiClient.uploadFileBinary`); the
+ * preceding upload on the same session returned (see `historical remote client.uploadFileBinary`); the
  * executor resolves it back to the stored file, and refuses a receipt it did not mint for this
  * session.
  */

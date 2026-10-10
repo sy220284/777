@@ -1,6 +1,6 @@
 # Security
 
-777 能在 Android 本机执行 Agent，也能通过配对 HTTPS 中继控制远程 Harness。
+777 在 Android 本机执行 Agent；远程 Harness 控制与中继配对入口已退役。
 
 完整信任模型见 [docs/SECURITY.md](docs/SECURITY.md)。
 
@@ -13,7 +13,7 @@
 建议提供：
 
 - 应用版本。
-- 本机 / 远程模式。
+- 本机 Chat / Work 模式。
 - 复现步骤。
 - 受影响能力。
 - 是否涉及凭据、数据、文件、网络、设备权限或外部命令。
@@ -21,8 +21,7 @@
 
 ## 当前安全边界
 
-- 远程控制只支持配对后的 HTTPS 中继；旧 LAN 扫描和明文直连路径已经移除。
-- 模型密钥和中继凭据使用 Android Keystore 加密。
+- 模型密钥使用 Android Keystore 加密。
 - 本机文件与命令执行受应用私有工作区、审批和能力边界约束。
 - Web 工具执行 SSRF / DNS / 重定向目标校验，并限制请求和响应大小。
 - Agent 恢复不会盲目重放结果未知的外部副作用。

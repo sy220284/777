@@ -19,7 +19,6 @@ SOURCES = [
 
 RUN_BLOCKING_ALLOW = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/main/WorkspacePanels.kt",
-    "mock-harness/src/main/kotlin/com/labteto/dshmobile/mockharness/Main.kt",
 }
 THREAD_SLEEP_ALLOW = {
     "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt",

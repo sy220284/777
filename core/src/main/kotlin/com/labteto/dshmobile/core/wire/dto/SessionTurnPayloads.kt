@@ -106,7 +106,7 @@ data class StepEndData(
 data class AssistantAttemptData(
     @SerialName("turn") val turn: Int,
     @SerialName("step") val step: Int,
-    /** Compact `AssistantStreamRecord[]`; see `core/session/AssistantStream.kt`. */
+    /** Compact `AssistantStreamRecord[]`; historical live assistant stream format. */
     @SerialName("stream") val stream: JsonElement = kotlinx.serialization.json.JsonArray(emptyList()),
 )
 

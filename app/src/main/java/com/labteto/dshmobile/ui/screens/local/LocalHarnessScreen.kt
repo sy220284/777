@@ -102,7 +102,6 @@ import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
-import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -140,12 +139,11 @@ internal fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?):
     LocalSendRejectReason.QUEUE_UNAVAILABLE -> stringResource(R.string.local_send_rejected_queue_unavailable)
 }
 
-/** Default Android 16 home: local Harness first, remote transports live in the left drawer. */
+/** Local Android home and feature host. */
 @Composable
 fun LocalHarnessScreen(
     requestedSessionId: String? = null,
     onSessionRequestConsumed: () -> Unit = {},
-    onOpenRemote: () -> Unit,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
@@ -410,10 +408,6 @@ fun LocalHarnessScreen(
             settingsDestination = settingsDestination,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
-            onOpenRemote = {
-                resetFeatureNavigation()
-                onOpenRemote()
-            },
             onSettingsDestinationChange = { settingsDestination = it },
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,

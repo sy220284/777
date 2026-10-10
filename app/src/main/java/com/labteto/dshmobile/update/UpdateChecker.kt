@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.update
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit

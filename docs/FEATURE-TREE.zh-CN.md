@@ -349,15 +349,11 @@
 │     │  ├─ 子代理模型与能力设置
 │     │  ├─ 工具审批策略
 │     │  └─ Android 设备权限
-│     ├─ 存储与诊断
-│     │  ├─ 本地会话存储设置
-│     │  ├─ 日志和故障诊断
-│     │  ├─ 运行环境信息
-│     │  └─ 诊断报告导出
-│     └─ 远程连接设置
-│        ├─ 远程主机列表和配置
-│        ├─ 配对与登录凭据
-│        └─ 连接测试和错误诊断
+│     └─ 存储与诊断
+│        ├─ 本地会话存储设置
+│        ├─ 日志和故障诊断
+│        ├─ 运行环境信息
+│        └─ 诊断报告导出
 ├─ 第二层｜共享运行能力
 │  ├─ 共享会话与事件
 │  │  ├─ 会话事实源
@@ -472,36 +468,17 @@
 │     ├─ 启动初始化及恢复触发
 │     ├─ 初始化失败状态投影
 │     └─ 功能及服务的组合根装配
-└─ 第三层｜平台、远程与工程保障
+└─ 第三层｜平台与工程保障
    ├─ Android 本机运行时
    │  ├─ 持久终端与进程管理
    │  ├─ Node／Python／Git 工具运行环境
    │  ├─ 运行时文件安装、校验与修复
    │  ├─ 前台服务和 Android 后台执行
    │  └─ 原生设备能力及虚拟显示
-   ├─ 远程 Harness 控制
-   │  ├─ 主机配对与连接
-   │  │  ├─ TLS、安全配对和中继凭据
-   │  │  ├─ 远程主机列表与选择
-   │  │  └─ 连接保持及状态探测
-   │  ├─ 远程会话
-   │  │  ├─ 会话新建、切换、历史同步
-   │  │  ├─ 远程事件流和消息渲染
-   │  │  ├─ 远程消息发送与交互审批
-   │  │  ├─ 远程文件和附件传输
-   │  │  ├─ 远程目标、子代理和工具展示
-   │  │  └─ 远程会话分页归属隔离
-   │  └─ 远程工作界面
-   │     ├─ 远程执行轨迹与工具面板
-   │     ├─ 远程工作区浏览
-   │     ├─ 远程终端与任务控制
-   │     └─ 远程问题与审批面板
    ├─ 底层协议与兼容
-   │  ├─ 远程协议数据结构
    │  ├─ JSON 请求与响应
-   │  ├─ 流式帧组装和断线重连
-   │  ├─ 中继配对与认证
-   │  └─ 状态同步和错误分类
+   │  ├─ 流式响应和断流处理
+   │  └─ 请求状态和错误分类
    ├─ 外部互通适配
    │  ├─ GitHub 接口工具
    │  ├─ MCP HTTP／标准输入输出适配
@@ -566,11 +543,10 @@
 - **共享存储与安全**：`app/src/main/java/com/labteto/dshmobile/local/persistence/`、`app/src/main/java/com/labteto/dshmobile/local/security/`
 - **轻量进程内核**：`app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt`
 - **Android 本机运行时**：`harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/`、`harness-device-android/src/main/java/com/labteto/dshmobile/device/`
-- **远程 Harness 控制**：`core/src/main/kotlin/com/labteto/dshmobile/core/`、`app/src/main/java/com/labteto/dshmobile/connection/`、`app/src/main/java/com/labteto/dshmobile/data/`
-- **底层协议与兼容**：`core/src/main/kotlin/com/labteto/dshmobile/core/wire/`
+- **底层协议与兼容**：`app/src/main/java/com/labteto/dshmobile/local/model/`（本机模型协议）；`core/` 保留的旧远程协议代码不属于当前产品入口
 - **外部互通适配**：`harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/`
 - **构建与持续集成**：`.github/workflows/ci.yml`、`.github/scripts/`、`docs/VALIDATION.md`
-- **测试与语义验证**：`reference-validation/src/`、`mock-harness/src/`、`app/src/test/`
+- **测试与语义验证**：`reference-validation/src/`、`harness-core/src/test/`、`app/src/test/`
 - **发布与升级**：`app/src/main/java/com/labteto/dshmobile/update/`、`.github/workflows/`
 ## 本轮实现定位与验证边界
 

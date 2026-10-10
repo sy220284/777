@@ -26,7 +26,6 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var chatGptAccounts: ChatGptSettingsController
     @Inject lateinit var notifications: DshNotifications
 
-    private val requestedSession = mutableStateOf<String?>(null)
     private val requestedLocalSession = mutableStateOf<String?>(null)
     private var appliedApplicationNightMode: Int? = null
     private var requestedNotificationPermission = false
@@ -42,8 +41,6 @@ class MainActivity : AppCompatActivity() {
         val uiModeManager = getSystemService(UiModeManager::class.java)
         appliedApplicationNightMode =
             DshApplication.applicationNightModeFor(storedTheme, uiModeManager.nightMode)
-        requestedSession.value = savedInstanceState?.getString("pending_session")
-            ?: notificationSession(intent)
         requestedLocalSession.value = savedInstanceState?.getString("pending_local_session")
             ?: notificationLocalSession(intent)
         applyWindowBackground(storedTheme)
@@ -60,13 +57,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             AppRoot(
-                requestedSessionId = requestedSession.value,
                 requestedLocalSessionId = requestedLocalSession.value,
-                onSessionRequestConsumed = {
-                    requestedSession.value = null
-                    intent.removeExtra(DshNotifications.EXTRA_SESSION_ID)
-                    intent.data = null
-                },
                 onLocalSessionRequestConsumed = {
                     requestedLocalSession.value = null
                     intent.removeExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
@@ -87,14 +78,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch { chatGptAccounts.refresh() }
     }
 
-    private fun notificationSession(intent: Intent): String? {
-        val uri = intent.data
-        val fromUri = uri?.takeIf { it.scheme == "dshmobile" && it.host == "host" }
-            ?.pathSegments?.takeIf { it.size == 3 && it[0] == "current" && it[1] == "session" }?.get(2)
-        return (intent.getStringExtra(DshNotifications.EXTRA_SESSION_ID) ?: fromUri)
-            ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
-    }
-
     private fun notificationLocalSession(intent: Intent): String? =
         intent.getStringExtra(DshNotifications.EXTRA_LOCAL_SESSION_ID)
             ?.takeIf { it.isNotBlank() && it.length <= 256 && it.none(Char::isISOControl) }
@@ -102,12 +85,10 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        requestedSession.value = notificationSession(intent)
         requestedLocalSession.value = notificationLocalSession(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putString("pending_session", requestedSession.value)
         outState.putString("pending_local_session", requestedLocalSession.value)
         super.onSaveInstanceState(outState)
     }

@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import kotlinx.coroutines.CancellationException
 import okhttp3.Call
 import okhttp3.Response
