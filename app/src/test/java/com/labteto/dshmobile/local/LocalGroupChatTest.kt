@@ -69,6 +69,20 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun referencedCharacterCanRemainSilentButDirectedSpeakerMustReply() {
+        val prompt = "大家觉得卡芙卡昨天的决定怎么样？"
+        assertEquals(
+            listOf("ayaka", "kafka"),
+            groupChatResponders(prompt, listOf(ayaka, kafka, zhao))
+                .map(LocalGroupChatMember::galleryId),
+        )
+        assertTrue(groupMemberMayStaySilent(prompt, kafka, 1))
+        assertFalse(groupMemberMayStaySilent("@神里绫华，@卡芙卡，分别回答", kafka, 1))
+        assertFalse(groupMemberMayStaySilent("卡芙卡，你怎么看？", kafka, 1))
+        assertFalse(groupMemberMayStaySilent("每个人都回答", kafka, 1))
+    }
+
+    @Test
     fun explicitMentionRoutesOnlyToNamedCharacter() {
         val responders = groupChatResponders(
             input = "@卡芙卡 你怎么看？",

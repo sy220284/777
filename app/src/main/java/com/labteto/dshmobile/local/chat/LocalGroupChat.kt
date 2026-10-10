@@ -146,7 +146,7 @@ internal fun groupMemberMemoryQuery(
 internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMember, index: Int): Boolean =
     index > 0 &&
         GROUP_CHAT_EVERYONE_CUES.none(input::contains) &&
-        (member.displayName.isBlank() || !input.contains(member.displayName))
+        groupChatMentionedMembers(input, listOf(member)).isEmpty()
 
 internal fun groupChatResponders(
     input: String,
