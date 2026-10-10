@@ -98,8 +98,13 @@ fun PersonaProfile.withFact(category: String, content: String): PersonaProfile {
     return copy(facts = if (updated == null) others else others + updated)
 }
 
-fun PersonaProfile.visibleFacts(storyStage: String = ""): List<CharacterFact> =
-    facts.filter { it.temporalScope.isBlank() || (storyStage.isNotBlank() && it.temporalScope == storyStage) }
+fun PersonaProfile.visibleFacts(
+    storyStage: String = "",
+    unlockedStages: Collection<String> = emptyList(),
+): List<CharacterFact> {
+    val stages = (unlockedStages + storyStage).filter(String::isNotBlank).toSet()
+    return facts.filter { it.temporalScope.isBlank() || it.temporalScope in stages }
+}
 
 @Serializable
 data class PersonaProfile(
