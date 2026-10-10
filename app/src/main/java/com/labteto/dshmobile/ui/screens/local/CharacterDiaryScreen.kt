@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
@@ -369,7 +370,7 @@ internal fun CharacterDiaryScreen(
                         }
                     },
                     enabled = editDraft.event.trim().isNotBlank() && !mutating,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("diary_save"),
                     loading = mutating,
                 )
                 DsButton(
@@ -384,7 +385,7 @@ internal fun CharacterDiaryScreen(
             DsTextField(
                 value = editDraft.event, onValueChange = { editDraft = editDraft.copy(event = it) },
                 label = { Text(stringResource(R.string.chat_diary_edit_event)) },
-                modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 5,
+                modifier = Modifier.fillMaxWidth().testTag("diary_edit_event"), enabled = !mutating, maxLines = 5,
             )
             DsTextField(
                 value = editDraft.feeling, onValueChange = { editDraft = editDraft.copy(feeling = it) },
@@ -438,7 +439,7 @@ internal fun CharacterDiaryScreen(
                             reloadNonce++
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("diary_confirm_deactivate"),
                     enabled = !mutating,
                     loading = mutating,
                 )
@@ -533,13 +534,16 @@ private fun CharacterDiaryEntryCard(
                 text = stringResource(R.string.chat_diary_open_source),
                 onClick = { onOpenSource(source.sessionId) },
                 variant = DsButtonVariant.Ghost,
+                modifier = Modifier.testTag("diary_source_${entry.id}"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(text = stringResource(R.string.chat_diary_edit_title),
-                onClick = onEdit, variant = DsButtonVariant.Ghost)
+                onClick = onEdit, variant = DsButtonVariant.Ghost,
+                modifier = Modifier.testTag("diary_edit_${entry.id}"))
             DsButton(text = stringResource(R.string.chat_diary_deactivate),
-                onClick = onDeactivate, variant = DsButtonVariant.Ghost)
+                onClick = onDeactivate, variant = DsButtonVariant.Ghost,
+                modifier = Modifier.testTag("diary_deactivate_${entry.id}"))
         }
         Text(
             stringResource(R.string.chat_diary_importance, entry.importance),

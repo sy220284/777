@@ -111,7 +111,11 @@
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#galleryIdentityWinsOverPersonaIdentity"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#galleryIdentityWinsOverPersonaIdentity",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt#userCorrectionIsDurableTraceableAndVisibleInNextRecall",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt#staleRevisionOrOtherCharacterCannotModifyOrDisableDiary",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt#deactivationNeedsConfirmationAndSourceNavigationHasExplicitAction"
       ]
     },
     {

@@ -573,3 +573,5 @@
 - 2026-10-10 叠加 PR #610（尚未合并）：接续已合并的 #604 人物 V4。聊天转工作可手动选取已经加载的公共历史消息，携带来源会话、消息编号和明确节选，同时保留原有目标与摘要；交接界面增加模型、MCP 与插件配置提示及模型设置入口，均不能视为执行成功。定位：LocalWorkHandoffMaterials.kt、LocalWorkCapabilitySheet.kt、LocalHarnessScreen.kt、LocalTaskCapabilityReadiness.kt。文件附件、权限、记忆纠正、交付证据及真实模型回归继续待办。
 
 - 2026-10-10 PR #610 增量：交接任务涉及无障碍、操作设备或读取通知时，复用既有设备服务状态判断是否激活，并提供设备权限设置入口。该状态仅是当前环境提示，实际操作仍受原有授权与执行边界控制。定位：DeviceCapabilitiesController.kt、LocalTaskCapabilityReadiness.kt、LocalWorkCapabilitySheet.kt；设备运行及撤权回归仍待 #610 HEAD CI 与真实设备检查。
+
+- 2026-10-10 #610 人物日记交互增量（未合并）：在日记页面可显式纠正或停用错误条目，显示原会话/消息标识并打开来源会话。只更改 Chat Diary 投影，保留原始对话和修订历史；旧页面不能覆盖后来的用户修改，不会跨人物写入。已补存储行为与界面测试代码，当前 Head 的设备验收仍待完成。聊天消息内直接修改长期记忆与派生摘要同步失效暂未实现。
