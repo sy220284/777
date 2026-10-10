@@ -125,8 +125,9 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         state: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        context: ChatContextState = ChatContextState(),
     ): String = interactionPlanner.prompt(
-        persona = persona,
+        persona = persona.forRuntimeStoryStage(context),
         state = state,
         userMessage = userMessage,
         assistantMessage = assistantMessage,
@@ -167,6 +168,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         state: ChatCharacterState,
         messages: List<LocalHarnessMessage>,
         latestAssistantMessageId: String,
+        context: ChatContextState = ChatContextState(),
     ): String {
         val recentDialogue = recentReplySuggestionDialogue(
             messages = messages,
@@ -175,7 +177,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         val userMessage = recentDialogue.lastOrNull { it.first == "user" }?.second.orEmpty()
         val assistantMessage = recentDialogue.lastOrNull { it.first == "assistant" }?.second.orEmpty()
         return interactionPlanner.suggestionsPrompt(
-            persona = persona,
+            persona = persona.forRuntimeStoryStage(context),
             state = state,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
