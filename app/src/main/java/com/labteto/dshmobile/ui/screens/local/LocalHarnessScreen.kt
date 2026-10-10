@@ -177,6 +177,8 @@ fun LocalHarnessScreen(
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
+    var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -404,6 +406,12 @@ fun LocalHarnessScreen(
             onNewSession = { showNewSessionMode = true },
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onUseWorkCapability = ::useWorkCapability,
+            onLocateMemoryForMessage = { messageId ->
+                memorySourceSessionId = shell.sessionId
+                memorySourceMessageId = messageId
+                settingsDestination = SettingsDestination.MEMORY_MANAGEMENT
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
             composerHandoff = composerHandoff,
             skillDisplayNames = installedSkillDisplayNames,
             onConsumeComposerHandoff = { composerHandoff = emptyList() },
@@ -433,7 +441,11 @@ fun LocalHarnessScreen(
             actions = workActions,
             onFilesModeChange = { filesMode = it },
             onPushFeature = ::pushFeature,
-            onPopFeature = ::popFeature,
+            onPopFeature = {
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                popFeature()
+            },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
@@ -465,6 +477,8 @@ fun LocalHarnessScreen(
         ),
         localSettingsFeatureUiContribution(
             settingsDestination = settingsDestination,
+            memorySourceSessionId = memorySourceSessionId,
+            memorySourceMessageId = memorySourceMessageId,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
             onSettingsDestinationChange = { settingsDestination = it },
