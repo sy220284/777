@@ -398,6 +398,10 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     }
 
     override fun regenerateReply(messageId: String): Boolean {
+        fun rejectRegeneration(reason: String): Boolean {
+            runtimeStateStore.projection.publishError(reason)
+            return false
+        }
         var started: Job? = null
         val handle = runtimeStateStore.foregroundRunHandle
         val accepted = synchronized(handle.lock) {
@@ -411,17 +415,25 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 runtimeStateStore.sessionTransitioning ||
                 handle.hasLiveJob() ||
                 handle.pendingInputs.size() != 0
-            ) return@synchronized false
+            ) return@synchronized rejectRegeneration(
+                if (!state.modelState.configured) "请先配置可用模型，再重新生成最终回复"
+                else "工作会话正忙或正在切换，请等待执行结束后重试",
+            )
 
-            val last = state.messages.lastOrNull() ?: return@synchronized false
-            if (last.id != messageId || last.role != "assistant") return@synchronized false
-            if (state.messages.dropLast(1).none { it.role == "user" }) return@synchronized false
+            val last = state.messages.lastOrNull()
+                ?: return@synchronized rejectRegeneration("当前会话没有可重新生成的最终回复")
+            if (last.id != messageId || last.role != "assistant") {
+                return@synchronized rejectRegeneration("只能重新生成当前会话的最后一条助手回复")
+            }
+            if (state.messages.dropLast(1).none { it.role == "user" }) {
+                return@synchronized rejectRegeneration("无法定位最终回复所对应的原始任务")
+            }
             if (
                 handle.modelHistory.lastOrNull()
                     ?.get("role")
                     ?.jsonPrimitive
                     ?.contentOrNull != "assistant"
-            ) return@synchronized false
+            ) return@synchronized rejectRegeneration("模型历史尚未恢复完整，不能安全重新生成最终回复")
 
             started = startRegeneration(messageId).also { handle.job = it }
             true

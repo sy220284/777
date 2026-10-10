@@ -123,6 +123,21 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
+    fun workEditReportsCommittedButNotStartedWhenRunAdmissionThrows() {
+        val fake = RecordingTurnPort()
+        fake.failNextStart = true
+        val coordinator = coordinator(fake, prepareEditedTurn = { _, text ->
+            LocalWorkMessageEditPreparation.Ready(
+                requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+            )
+        })
+        assertEquals(
+            com.labteto.dshmobile.local.session.LocalUserMessageEditResult.COMMITTED_NOT_STARTED,
+            coordinator.editAndResendUserMessage("user", "revised"),
+        )
+    }
+
+    @Test
     fun workEditReturnsPreciseHistoryFailureWithoutStartingAnotherRun() {
         val fake = RecordingTurnPort()
         val coordinator = coordinator(fake)
@@ -209,6 +224,7 @@ class LocalWorkExecutionCoordinatorTest {
 
     private class RecordingTurnPort : LocalWorkTurnPort {
         var startCalls: Int = 0
+        var failNextStart = false
         var regenerateStartCalls: Int = 0
         var lastPrepared: LocalPreparedSend? = null
         var lastRegenerateId: String? = null
@@ -217,6 +233,10 @@ class LocalWorkExecutionCoordinatorTest {
             prepared: LocalPreparedSend,
             sessionLease: LocalSessionRuntimeLease,
         ): Job {
+            if (failNextStart) {
+                sessionLease.close()
+                throw IllegalStateException("run failed to start")
+            }
             startCalls += 1
             lastPrepared = prepared
             sessionLease.close()

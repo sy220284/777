@@ -337,6 +337,10 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
     }
 
     internal fun regenerateReply(messageId: String): Boolean {
+        fun rejectRegeneration(reason: String): Boolean {
+            runtimeStateStore.projection.publishError(reason)
+            return false
+        }
         var started: Job? = null
         val handle = runtimeStateStore.foregroundRunHandle
         val accepted = synchronized(handle.lock) {
@@ -350,12 +354,15 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                 runtimeStateStore.sessionTransitioning ||
                 handle.hasLiveJob() ||
                 handle.pendingInputs.size() != 0
-            ) return@synchronized false
+            ) return@synchronized rejectRegeneration(
+                if (!before.modelState.configured) "请先配置可用模型，再重新生成回复"
+                else "当前会话正在处理其他操作，请等待结束后重新生成",
+            )
 
             val lease = LocalSessionRuntimeRegistry.tryAcquire(
                 before.sessionId,
                 LocalSessionRuntimeKind.MAINTENANCE,
-            ) ?: return@synchronized false
+            ) ?: return@synchronized rejectRegeneration("当前会话正在执行其他任务，无法安全切换回复历史")
             try {
                 val state = runtimeStateStore.state.value
                 if (
@@ -368,18 +375,21 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     runtimeStateStore.sessionTransitioning ||
                     handle.hasLiveJob() ||
                     handle.pendingInputs.size() != 0
-                ) return@synchronized false
+                ) return@synchronized rejectRegeneration("会话状态已变化，请等待当前任务结束后重试")
 
-                val last = state.messages.lastOrNull() ?: return@synchronized false
-                if (last.id != messageId || last.role != "assistant") return@synchronized false
+                val last = state.messages.lastOrNull()
+                    ?: return@synchronized rejectRegeneration("当前会话没有可重新生成的回复")
+                if (last.id != messageId || last.role != "assistant") {
+                    return@synchronized rejectRegeneration("只能重新生成当前会话的最后一条助手回复")
+                }
                 val promptMessage = state.messages.dropLast(1).lastOrNull { it.role == "user" }
-                    ?: return@synchronized false
+                    ?: return@synchronized rejectRegeneration("无法定位这条回复的用户请求")
                 if (
                     modelHistory.history.lastOrNull()
                         ?.get("role")
                         ?.jsonPrimitive
                         ?.contentOrNull != "assistant"
-                ) return@synchronized false
+                ) return@synchronized rejectRegeneration("模型历史尚未完整恢复，无法安全重新生成这条回复")
 
                 LocalChatPostTurnJobOwner.cancel()
                 if (state.transcriptIndex.branchingEligible) {
