@@ -160,7 +160,9 @@ class ChatPersonaGalleryStore internal constructor(
         val decodedPersona = PersonaDocumentCodec.decodeShare(json, cleanPayload)
 
         val now = System.currentTimeMillis()
-        val imported = fullSharePersona(decodedPersona).copy(updatedAt = now)
+        val imported = fullSharePersona(decodedPersona).let { it.copy(
+            loreEntries = uniqueLoreEntryIds(it.loreEntries), updatedAt = now,
+        ) }
         require(isMeaningfulGalleryPersona(imported)) { "人物设定内容不足，无法导入" }
 
         val doc = readNormalized()
@@ -194,10 +196,11 @@ class ChatPersonaGalleryStore internal constructor(
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
     ): PersonaGallerySaveOutcome {
+        val savedPersona = persona.copy(loreEntries = uniqueLoreEntryIds(persona.loreEntries))
         val doc = readNormalized()
         val explicit = existingId?.let { id -> doc.entries.firstOrNull { it.id == id } }
         val compatible = if (explicit == null) {
-            doc.entries.filter { samePersonaIdentity(it.persona, persona) }.singleOrNull()
+            doc.entries.filter { samePersonaIdentity(it.persona, savedPersona) }.singleOrNull()
         } else null
         val matched = explicit ?: compatible
         val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
@@ -207,7 +210,7 @@ class ChatPersonaGalleryStore internal constructor(
         val explicitlyEdited = explicit != null
         val baseEntry = matched ?: PersonaGalleryEntry(
             id = entryId,
-            persona = persona.copy(id = entryId),
+            persona = savedPersona.copy(id = entryId),
             updatedAt = now,
         )
 
@@ -230,7 +233,7 @@ class ChatPersonaGalleryStore internal constructor(
             chatContext.hasUsefulFacts()
         if (!shouldSaveStory) {
             val entry = baseEntry.copy(
-                persona = (if (explicitlyEdited) persona else mergePersonaProfiles(baseEntry.persona, persona))
+                persona = (if (explicitlyEdited) savedPersona else mergePersonaProfiles(baseEntry.persona, savedPersona))
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
@@ -266,7 +269,7 @@ class ChatPersonaGalleryStore internal constructor(
                 historyArchived = true,
             )
         val entry = baseEntry.copy(
-            persona = (if (explicitlyEdited) persona else mergePersonaProfiles(baseEntry.persona, persona))
+            persona = (if (explicitlyEdited) savedPersona else mergePersonaProfiles(baseEntry.persona, savedPersona))
                 .copy(id = entryId, updatedAt = now),
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
