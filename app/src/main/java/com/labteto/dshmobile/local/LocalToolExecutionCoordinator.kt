@@ -79,6 +79,7 @@ internal class LocalToolExecutionCoordinator(
     fun enableTaskRelevantOptionalTools(
         taskContext: String,
         target: MutableSet<String> = enabledOptionalTools,
+        prioritize: Boolean = true,
     ) {
         // GitHub pre-activation has its own intent and credential gate. Generic keyword matches
         // must not reactivate it from a negated current input or an older GitHub request.
@@ -90,14 +91,15 @@ internal class LocalToolExecutionCoordinator(
                     ?.let(LocalToolRouter::isOptional) == true
             }
         synchronized(target) {
-            val newlyRelevant = relevant.filterNot(target::contains)
-            if (newlyRelevant.isNotEmpty()) {
-                // A newly connected MCP service or newly installed plugin must win available
-                // schema-token budget on the next step; older unrelated tools may be displaced.
+            if (prioritize && relevant.isNotEmpty()) {
+                // Re-rank the current task even when its tools were selected in an earlier step.
+                // This prevents previous-turn/history tools from occupying the entire budget.
                 val previouslySelected = target.toList()
                 target.clear()
-                target.addAll(newlyRelevant)
+                target.addAll(relevant)
                 target.addAll(previouslySelected)
+            } else {
+                target.addAll(relevant)
             }
         }
     }
@@ -123,18 +125,19 @@ internal class LocalToolExecutionCoordinator(
         // Registered tools are looked up on every run, so newly installed MCP tools need no catalog patch.
         if (enableGitHub) enableGitHubConnectorTools(selected)
         enableTaskRelevantOptionalTools(input, selected)
-        prepareWorkTurnCapabilities(intent.context, enableGitHub, selected)
+        prepareWorkTurnCapabilities(intent.context, enableGitHub, selected, prioritizeTask = false)
     }
 
     fun prepareWorkTurnCapabilities(
         taskContext: String,
         enableGitHub: Boolean,
         target: MutableSet<String>? = null,
+        prioritizeTask: Boolean = true,
     ) {
         val resolvedTarget = target ?: enabledOptionalTools
         // User-requested provider tools outrank background defaults under the schema-token budget.
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
-        enableTaskRelevantOptionalTools(taskContext, resolvedTarget)
+        enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
         if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
     }
 
@@ -151,9 +154,10 @@ internal class LocalToolExecutionCoordinator(
         tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
-        val tools = registry.names().mapNotNull(registry::get)
-            .filter { isNetworkSearchPermitted(it.name) }
-        return LocalToolRouter.capabilitySummary(tools, enabledOptional)
+        val registered = registry.names().mapNotNull(registry::get)
+        val blocked = registered.filterNot { isNetworkSearchPermitted(it.name) }
+            .map(HarnessTool::name).toSet()
+        return LocalToolRouter.capabilitySummary(registered, enabledOptional, blocked)
     }
 
     fun visibleSchemas(
@@ -180,16 +184,20 @@ internal class LocalToolExecutionCoordinator(
         query: String,
         target: MutableSet<String> = enabledOptionalTools,
     ): String {
-        val tools = registry.names().mapNotNull(registry::get)
-            .filter { isNetworkSearchPermitted(it.name) }
+        val registered = registry.names().mapNotNull(registry::get)
+        val blocked = registered.filterNot { isNetworkSearchPermitted(it.name) }
+            .map(HarnessTool::name).toSet()
+        val tools = registered.filter { it.name !in blocked }
         if (LocalToolRouter.isInventoryRequest(query)) {
-            return LocalToolRouter.capabilityDirectory(tools, synchronized(target) { target.toSet() })
+            return LocalToolRouter.capabilityDirectory(registered,
+                synchronized(target) { target.toSet() }, blocked)
         }
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
             // Don't bounce the user back to guess an internal capability name.
             return "未精确匹配本次描述，以下是实际已注册的能力目录，可据此选择具体工具：\n" +
-                LocalToolRouter.capabilityDirectory(tools, synchronized(target) { target.toSet() })
+                LocalToolRouter.capabilityDirectory(registered,
+                    synchronized(target) { target.toSet() }, blocked)
         }
         val currentEnabled = synchronized(target) {
             // Explicitly discovered capabilities outrank speculative pre-activation. This changes
