@@ -163,7 +163,7 @@ internal class CharacterRuntimeProjector(
         if (userInput.isBlank()) return ""
         val anchors = (if (persona.facts.isNotEmpty()) {
             listOf(
-                "人物经历" to persona.factText(CharacterFactCategories.BIOGRAPHY),
+                "人物身份与经历" to persona.factText(CharacterFactCategories.BIOGRAPHY),
                 "生活牵引" to persona.factText(CharacterFactCategories.LIFE_GRAVITY),
                 "世界" to persona.worldSetting,
                 "来源" to persona.franchise,

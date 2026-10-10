@@ -88,6 +88,29 @@ class CharacterFactsV4Test {
         assertFalse(runtime.dynamicPrompt.contains("宇宙飞船"))
     }
 
+    @Test fun onlyCurrentStoryStageCanReleasePlotScopedFactsToModel() {
+        val persona = PersonaProfile(
+            name = "阿云", coreIdentity = "档案管理员",
+            facts = listOf(
+                CharacterFact("early", CharacterFactCategories.RELATIONSHIPS, "认识阿宁"),
+                CharacterFact("future", CharacterFactCategories.RELATIONSHIPS,
+                    "第二幕里阿宁透露了遗失的秘密", temporalScope = "act-2"),
+            ),
+        )
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val early = projector.project(
+            persona, ChatCharacterState(), ChatContextState(scene = ChatSceneState(sceneTime = "第二幕")),
+            "阿宁透露的秘密是什么？", null,
+        )
+        val late = projector.project(
+            persona, ChatCharacterState(), ChatContextState(storyStage = "act-2"),
+            "阿宁透露的秘密是什么？", null,
+        )
+        assertFalse(early.dynamicPrompt.contains("遗失的秘密"))
+        assertTrue(late.dynamicPrompt.contains("遗失的秘密"))
+        assertTrue(late.dynamicPrompt.contains("【当前剧情阶段】act-2"))
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),

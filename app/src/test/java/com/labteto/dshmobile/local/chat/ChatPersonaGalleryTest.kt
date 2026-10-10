@@ -97,6 +97,37 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun storyStageSurvivesGallerySaveReloadAndResave() {
+        val file = File(temporary.newFolder("stage-roundtrip"), "gallery.json")
+        val gallery = ChatPersonaGalleryStore(file, json)
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "江湖游侠")
+        val first = gallery.save(
+            persona = persona,
+            sourceSessionId = "session-a",
+            history = listOf(LocalHarnessMessage("m1", "user", "开场", createdAt = 1L)),
+            chatState = ChatCharacterState(),
+            notes = "",
+        )
+        val storyId = requireNotNull(first.storyId)
+        assertTrue(gallery.updateStoryDetails(first.entry.id, storyId, "新的故事提要", "act-2"))
+        val restored = ChatPersonaGalleryStore(file, json).findEntry(first.entry.id)
+        assertEquals("act-2", restored?.story(storyId)?.chatContext?.storyStage)
+        assertEquals("新的故事提要", restored?.story(storyId)?.notes)
+
+        val savedAgain = gallery.save(
+            persona = persona,
+            sourceSessionId = "session-a",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "新的故事提要",
+            chatContext = ChatContextState(),
+            existingId = first.entry.id,
+            existingStoryId = storyId,
+        )
+        assertEquals("act-2", savedAgain.entry.story(storyId)?.chatContext?.storyStage)
+    }
+
+    @Test
     fun repeatedSaveDoesNotDuplicateArchivedMessagesInsideOneStory() {
         val base = PersonaGalleryStory(
             id = "story-1",
