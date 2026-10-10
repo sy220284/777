@@ -21,6 +21,8 @@ import kotlinx.serialization.json.put
 
 internal data class PersonaDraft(
     val name: String = "",
+    val coreIdentity: String = "",
+    val facts: List<CharacterFact> = emptyList(),
     val portrait: String = "",
     val lifeContext: String = "",
     val attentionBiases: List<String> = emptyList(),
@@ -47,6 +49,23 @@ internal data class PersonaDraft(
  * AI-assisted edits are incremental. Preserve existing canonical facts and explicit user edits;
  * generated lore can enrich a matching entry or append a new one, never erase unrelated entries.
  */
+internal fun mergeGeneratedCharacterFacts(
+    previous: List<CharacterFact>,
+    incoming: List<CharacterFact>,
+): List<CharacterFact> {
+    val result = previous.toMutableList()
+    incoming.filter { it.category.isNotBlank() && it.content.isNotBlank() }.forEach { fact ->
+        // User-authored facts win over new AI drafts. No accidental replacement of explicit edits.
+        if (result.any { it.category == fact.category && it.provenance == CharacterFactProvenance.USER_CREATED }) {
+            return@forEach
+        }
+        val index = result.indexOfFirst { it.id == fact.id ||
+            (it.category == fact.category && it.provenance != CharacterFactProvenance.USER_CREATED) }
+        if (index >= 0) result[index] = fact else result += fact
+    }
+    return result
+}
+
 internal fun mergeGeneratedLoreEntries(
     previous: List<PersonaLoreEntry>,
     incoming: List<PersonaLoreEntry>,
@@ -87,6 +106,8 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
 
     return PersonaDraft(
         name = root.text("name"),
+        coreIdentity = root.text("coreIdentity"),
+        facts = root.characterFacts(),
         portrait = root.text("portrait"),
         lifeContext = root.text("lifeContext"),
         attentionBiases = root.stringList("attentionBiases"),
@@ -142,6 +163,29 @@ private fun splitLooseList(value: String): List<String> {
         .split(Regex("""[\r\n；;]+"""))
         .map(String::trim)
         .filter(String::isNotBlank)
+}
+
+private fun JsonObject.characterFacts(): List<CharacterFact> {
+    val items = this["facts"] as? JsonArray ?: return emptyList()
+    return items.mapIndexedNotNull { index, item ->
+        val data = item as? JsonObject ?: return@mapIndexedNotNull null
+        val category = data.text("category")
+        val content = data.text("content")
+        if (category.isBlank() || content.isBlank()) return@mapIndexedNotNull null
+        val provenance = runCatching {
+            CharacterFactProvenance.valueOf(data.text("provenance"))
+        }.getOrDefault(CharacterFactProvenance.UNVERIFIED)
+        CharacterFact(
+            id = data.text("id").ifBlank { "generated-$category-$index" },
+            category = category,
+            content = content,
+            relatedFactIds = data.stringList("relatedFactIds"),
+            perspective = data.text("perspective"),
+            temporalScope = data.text("temporalScope"),
+            provenance = provenance,
+            sourceReference = data.text("sourceReference"),
+        )
+    }
 }
 
 private fun JsonObject.loreEntries(): List<PersonaLoreEntry> {
@@ -308,32 +352,15 @@ class PersonaAutoFillService @Inject constructor(
         }
 
         val currentContext = buildString {
-            appendLine("当前人物生命资料中已填写的内容：")
-            appendLine("名称：${current.name}")
-            if (current.portrait.isNotBlank()) appendLine("人物整体：${current.portrait}")
-            if (current.lifeContext.isNotBlank()) appendLine("独立生活：${current.lifeContext}")
-            if (current.attentionBiases.isNotEmpty()) appendLine("天然注意：${current.attentionBiases.joinToString("；")}")
-            if (current.attentionKeywords.isNotEmpty()) appendLine("注意关键词：${current.attentionKeywords.joinToString("；")}")
-            if (current.perceptionBlindSpots.isNotEmpty()) appendLine("容易漏掉/误读：${current.perceptionBlindSpots.joinToString("；")}")
-            if (current.quirks.isNotEmpty()) appendLine("小习惯：${current.quirks.joinToString("；")}")
-            if (current.limitations.isNotEmpty()) appendLine("不擅长：${current.limitations.joinToString("；")}")
-            if (current.coreValues.isNotEmpty()) appendLine("真正重要：${current.coreValues.joinToString("；")}")
-            if (current.coreTension.isNotBlank()) appendLine("长期拉扯：${current.coreTension}")
-            if (current.stableTraits.isNotEmpty()) appendLine("稳定部分：${current.stableTraits.joinToString("；")}")
-            if (current.mutableTraits.isNotEmpty()) appendLine("可缓慢变化：${current.mutableTraits.joinToString("；")}")
-            if (current.initialUserImpression.isNotBlank()) appendLine("对用户初始印象：${current.initialUserImpression}")
-            if (current.voiceSamples.isNotEmpty()) appendLine("自然声音样本：${current.voiceSamples.joinToString("；")}")
-            if (current.worldSetting.isNotBlank()) appendLine("世界设定：${current.worldSetting}")
-            if (current.franchise.isNotBlank()) appendLine("作品来源：${current.franchise}")
-            if (current.timelinePosition.isNotBlank()) appendLine("时间线：${current.timelinePosition}")
-            if (current.knowledgeBoundary.isNotEmpty()) appendLine("知识边界：${current.knowledgeBoundary.joinToString("；")}")
-            if (current.hardConstraints.isNotEmpty()) appendLine("不可违反：${current.hardConstraints.joinToString("；")}")
-            if (current.bannedPhrases.isNotEmpty()) appendLine("禁用表达：${current.bannedPhrases.joinToString("；")}")
-            if (current.loreEntries.isNotEmpty()) {
-                appendLine("已有原作世界书（请保留这些独立条目；只输出新增或实质修订的条目）：")
-                current.loreEntries.take(16).forEach { entry ->
-                    appendLine("编号=${entry.id}｜${entry.title}：${entry.content.take(240)}｜触发=${entry.keywords.take(8).joinToString("、")}")
-                }
+            appendLine("已有的人物事实（用户编辑优先，勿重写未被请求修改的内容）：")
+            appendLine("name：${current.name}")
+            appendLine("franchise：${current.franchise}")
+            appendLine("coreIdentity：${current.coreIdentity}")
+            current.facts.forEach { fact ->
+                appendLine("facts[${fact.category}]：${fact.content}（${fact.provenance}）")
+            }
+            current.loreEntries.forEach { entry ->
+                appendLine("lore[${entry.id}] ${entry.title}：${entry.content.take(240)}")
             }
         }.trim()
 
@@ -498,6 +525,8 @@ class PersonaAutoFillService @Inject constructor(
         current.copy(
             id = current.id,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
+            coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
+            facts = mergeGeneratedCharacterFacts(current.facts, draft.facts),
             portrait = draft.portrait.ifBlank { current.portrait },
             lifeContext = draft.lifeContext.ifBlank { current.lifeContext },
             attentionBiases = draft.attentionBiases.ifEmpty { current.attentionBiases },
@@ -531,33 +560,25 @@ class PersonaAutoFillService @Inject constructor(
         const val MAX_REPAIR_CHARS = 24_000
 
         val SYSTEM_PROMPT = """
-            你负责把角色需求整理成“人物事实与性格档案”，只输出可解析 JSON，不解释。
-
-            字段：name, portrait, lifeContext, attentionBiases, attentionKeywords, perceptionBlindSpots, quirks,
-            limitations, coreValues, coreTension, stableTraits, mutableTraits,
-            initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
-            knowledgeBoundary, loreEntries, hardConstraints, bannedPhrases。
-
-            规则：
-            1. 用户明确设定和已有资料优先；name 必填。没有明确证据的字段保持空白，禁止为了“完整”自动补满人物。
-            2. portrait 是人物身份与经历锚点，优先清楚说明身份、出身、职责、塑造人物的关键经历、重要关系及其影响。原创人物也要有具体处境；避免重复堆砌形容词。一般人物可写约200～450字，复杂人物按实际需要增加，不为凑字数编造。
-            3. lifeContext 记录塑造人物的生活经历、长期责任、重要的人与关系，以及现实处境；避免将整部原作的事件流水账塞进生活字段。不要预编每天会发生什么。
-            4. attentionBiases 最多2项、perceptionBlindSpots 最多1项；attentionKeywords 只列真正容易唤起人物独特反应的关键人物、关系或事件，不做完整百科目录。
-            5. quirks 最多3项、limitations 最多2项；只保留有辨识度且长期成立的内容，普通人类行为不要都写成人设。
-            6. coreValues 最多3项；coreTension 和 stableTraits 记录已有依据的人物价值取向、稳定性格及内在矛盾，各最多2项。mutableTraits 默认留空，只有用户明确指定需要追踪的长期个性变化维度才记录，禁止预设成长目标或改变方向。
-            7. initialUserImpression 只有用户明确给出对话对象的身份、既有关系或初始看法时才写；禁止预设亲密度、互动节奏或未来共同经历。
-            8. voiceSamples 只在原作台词风格或用户明确要求时补充最多3～5条自然表达样本；取说话节奏与性格气质，避免造作的固定口头禅、频率规则和回应模板。
-            9. worldSetting 仅用约50～150字说明角色必须依赖的世界规则与环境，不复述整部作品。loreEntries 为可选的专属知识锚点，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}。默认0～3条；只有模型容易混淆且确切影响角色身份、特殊能力、关系或剧情边界的事实才保留。已有世界书必须保留，不因精简建议删改。
-            10. franchise、timelinePosition、knowledgeBoundary 必须互相一致；未到达的时间线与他人秘密不自动成为角色知识。hardConstraints 仅保留会影响人物一致性的少量硬约束。
-            11. 人物卡仅记录人物既有的事实、性格、偏好。情绪变化、主动性、关系发展、行为选择、重复控制、成长速度和表达节奏属于运行机制，禁止写成 stableTraits、mutableTraits、quirks、hardConstraints、voiceSamples 或世界书脚本。
-            12. 目标是完整且精炼地写明“这个人是谁、什么经历塑造了他、他为什么做出这样的选择”，将各轮具体思维、行动、表达交给运行时；人物常规原作知识可由模型已有知识及必要时联网核实补充，不能凭猜测改写持久资料。
-            13. 所有内容都必须从角色所在世界内部陈述，把角色当作在其世界真实生活和行动的存在。禁止把模型、平台、助手或聊天产品的能力边界写成人物设定。
-            14. 禁止生成任何类似“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为/实体动作”“没有感情/无法理解或体验情感”“只能通过文字或屏幕交流”“不能真实触碰、行动或陪伴”等脱离角色的元叙事限制；portrait、lifeContext、limitations、knowledgeBoundary、hardConstraints 等任何字段都不能承载这类内容。
-            15. 如果角色原作本身是机器人、AI、幽灵、意识体或其他非人存在，只能记录作品世界内明确的形态、能力、限制与感受方式；不得把通用模型限制包装成角色设定，也不得因为角色非人就默认其“没有感情、不能理解、不能行动”。
-            16. 人物卡可记录原作中的职业、经历、能力、语言风格和真实习惯，不编排日常回应、行动频率或情感发展计划。运行时根据当前场景与记忆决定怎样表达和行动，不写模型能力免责声明。
-            17. 对有原作的角色，优先保证身份、核心经历、能力边界、重要关系与成长动机。复杂组织历史、技能细则和完整剧情留给按需知识补足；原作事实与用户二创改编需有明确边界。
-            18. 生成的每条世界书要能独立检索、内容确切且不重复人物主卡；没有可靠依据的人名、血缘、能力、剧情与结局留空。关键未知信息优先留待用户确认或检索核实。
-            19. 时间线与知识边界保持一致。未确认进度的隐藏身份、后续事件只按当前可公开事实处理；游戏玩家知道的秘密不自动成为人物知识。
+            你要生成777人物卡V4。仅输出完整可解析JSON对象，字段：
+            name, franchise, coreIdentity, facts, loreEntries。
+            facts是数组，每项含id、category、content，可选perspective、temporalScope、provenance、sourceReference、relatedFactIds。
+            category推荐使用 personality、selfNarrative、identityGap、valuesAndTradeoffs、subjectiveBeliefs、
+            biography、definingChoices、emotionalImprints、lifeGravity、unfinishedBusiness、
+            relationships、limitsAndCosts、sensorySignature、preferencesAndHabits、voiceStyle、customFacts。
+            provenance只允许 CANON、INFERRED、USER_CREATED、UNVERIFIED。
+            1. name与核心身份尽可能明确；身份、稳定性格、经历、重要关系、能力边界、核心价值优先。
+            2. 其它类别仅当有可靠信息才生成，禁止为了凑满16类编造秘密、创伤、未来成长和关系进度。
+            3. 同一事实存一次；历史事件可以通过relatedFactIds关联其选择和影响，不重复复制长段落。
+            4. 原作事实与推断、用户二创明确区分；不确定的设定可留空或标记UNVERIFIED。
+            5. 人物资料只描写已有的人生事实、固有认知与偏好；当前情绪、成长、主动性、亲密度、
+               回复节奏、行为频率和日常行动安排完全交给运行时。
+            6. temporalScope填写明确的故事阶段ID时才需要；未来剧情、他人秘密不写成此刻已知事实。
+            7. loreEntries为可选数组，每条可包括id,title,content,keywords,secondaryKeywords,priority,alwaysOn,spoilerLevel。
+               复杂原作背景保留在可检索资料中；只有确切需要的资料才生成，不设置固定三条上限。
+            8. 用户明确编辑过的资料保留；不得擅自覆盖已存在的USER_CREATED事实。
+            9. 所有资料只从人物世界内部陈述，禁止添加通用模型限制或聊天平台元叙事。
+            10. 语言风格可以记录固有表达特征，不预设固定台词与表演脚本。
         """.trimIndent()
 
         val REPAIR_PROMPT = """
@@ -582,6 +603,8 @@ class PersonaAutoFillService @Inject constructor(
 
 private fun personaDraftImmersionViolations(draft: PersonaDraft): List<String> {
     val fragments = buildList {
+        add(draft.coreIdentity)
+        draft.facts.forEach { add(it.content); add(it.perspective) }
         add(draft.portrait)
         add(draft.lifeContext)
         addAll(draft.attentionBiases)

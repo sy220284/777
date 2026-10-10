@@ -55,6 +55,9 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.CharacterFact
+import com.labteto.dshmobile.local.chat.CharacterFactProvenance
+import com.labteto.dshmobile.local.chat.CharacterFactCategories
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
@@ -74,6 +77,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
 internal fun NewSessionModeDialog(
@@ -493,6 +497,10 @@ internal fun ChatPersonaDialog(
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
     var portrait by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.portrait) }
+    var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
+    var factDrafts by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.facts) }
+    var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
+    var customContent by rememberSaveable(profile.id) { mutableStateOf("") }
     var lifeContext by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.lifeContext) }
     var attention by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionBiases.joinToString("\n")) }
     var attentionKeywords by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionKeywords.joinToString("\n")) }
@@ -533,6 +541,8 @@ internal fun ChatPersonaDialog(
         runtimeProfile = generated
         name = generated.name
         portrait = generated.portrait
+        coreIdentity = generated.coreIdentity
+        factDrafts = generated.facts
         lifeContext = generated.lifeContext
         attention = generated.attentionBiases.joinToString("\n")
         attentionKeywords = generated.attentionKeywords.joinToString("\n")
@@ -574,6 +584,8 @@ internal fun ChatPersonaDialog(
                         onSave(
                             runtimeProfile.copy(
                                 name = name,
+                                coreIdentity = coreIdentity,
+                                facts = factDrafts,
                                 portrait = portrait,
                                 lifeContext = lifeContext,
                                 attentionBiases = lines(attention),
@@ -699,96 +711,138 @@ internal fun ChatPersonaDialog(
             }
         }
 
-        PersonaFormSection(stringResource(R.string.persona_form_basics)) {
+        val essentialFields = listOf(
+            CharacterFactCategories.PERSONALITY to "稳定性格",
+            CharacterFactCategories.VALUES_AND_TRADEOFFS to "价值与取舍",
+            CharacterFactCategories.BIOGRAPHY to "人生经历",
+            CharacterFactCategories.RELATIONSHIPS to "重要人物关系",
+        )
+        val extendedFields = listOf(
+            CharacterFactCategories.SELF_NARRATIVE to "自我叙事",
+            CharacterFactCategories.IDENTITY_GAP to "内外反差",
+            CharacterFactCategories.SUBJECTIVE_BELIEFS to "主观认知",
+            CharacterFactCategories.DEFINING_CHOICES to "命运选择",
+            CharacterFactCategories.EMOTIONAL_IMPRINTS to "情感烙印",
+            CharacterFactCategories.LIFE_GRAVITY to "人生引力",
+            CharacterFactCategories.UNFINISHED_BUSINESS to "未竟之事",
+            CharacterFactCategories.LIMITS_AND_COSTS to "能力与代价",
+            CharacterFactCategories.SENSORY_SIGNATURE to "感知视角",
+            CharacterFactCategories.PREFERENCES_AND_HABITS to "偏好与习惯",
+            CharacterFactCategories.VOICE_STYLE to "语言风格",
+            CharacterFactCategories.CUSTOM_FACTS to "自定义事实",
+        )
+
+        PersonaFormSection("人物核心 · V4") {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
             PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
-            PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+            PersonaTextField("核心身份", coreIdentity, { coreIdentity = it })
         }
-        PersonaFormSection(stringResource(R.string.persona_form_character)) {
-            PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
-            PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
-            PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_life)) {
-            PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_expression)) {
-            PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_story)) {
-            PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
-            PersonaTextField(stringResource(R.string.local_persona_knowledge_boundary), knowledgeBoundary, { knowledgeBoundary = it })
+        PersonaFormSection("人物深度 · 按需填写") {
+            essentialFields.forEach { (category, title) ->
+                PersonaTextField(
+                    title,
+                    factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
+                    { next ->
+                        val existing = factDrafts.firstOrNull { it.category == category }
+                        val others = factDrafts.filterNot { it.category == category }
+                        factDrafts = if (next.isBlank()) others else others + (
+                            existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
+                                ?: CharacterFact(
+                                    id = "v4-$category",
+                                    category = category,
+                                    content = next,
+                                    provenance = CharacterFactProvenance.USER_CREATED,
+                                )
+                        )
+                    },
+                )
+            }
         }
         DsButton(
-            text = stringResource(
-                if (advancedOpen) R.string.local_persona_hide_more else R.string.local_persona_show_more
-            ),
+            text = if (advancedOpen) "收起深度档案" else "展开深度档案与人物知识",
             onClick = { advancedOpen = !advancedOpen },
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
-            bundledPreset?.let { preset ->
-                DsButton(
-                    text = stringResource(R.string.local_persona_refresh_preset_core),
-                    onClick = {
-                        // Explicit draft action. Keep relationship history, knowledge boundary,
-                        // corrections, world book, behavior tuning and user story stage intact.
-                        portrait = preset.persona.portrait
-                        lifeContext = preset.persona.lifeContext
-                        coreValues = preset.persona.coreValues.joinToString("\n")
-                        coreTension = preset.persona.coreTension
-                        stableTraits = preset.persona.stableTraits.joinToString("\n")
-                        worldSetting = preset.persona.worldSetting
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
-                )
-                if (mutableTraits.isNotBlank() || voiceSamples.isNotBlank()) {
-                    DsButton(
-                        text = stringResource(R.string.local_persona_clear_legacy_scripts),
-                        onClick = {
-                            // Explicit draft-only cleanup; user-authored memories, knowledge, original
-                            // biography, identity and story state are never changed by this action.
-                            mutableTraits = ""
-                            voiceSamples = ""
+            PersonaFormSection("进阶人物档案") {
+                extendedFields.forEach { (category, title) ->
+                    PersonaTextField(
+                        title,
+                        factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
+                        { next ->
+                            val existing = factDrafts.firstOrNull { it.category == category }
+                            val others = factDrafts.filterNot { it.category == category }
+                            factDrafts = if (next.isBlank()) others else others + (
+                                existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
+                                    ?: CharacterFact(
+                                        id = "v4-$category",
+                                        category = category,
+                                        content = next,
+                                        provenance = CharacterFactProvenance.USER_CREATED,
+                                    )
+                            )
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = DsButtonVariant.Ghost,
                     )
                 }
+                factDrafts.map(CharacterFact::category).distinct()
+                    .filterNot(CharacterFactCategories.canonical::contains)
+                    .forEach { category ->
+                        PersonaTextField("扩展 · $category",
+                            factDrafts.filter { it.category == category }.joinToString("\n") { it.content },
+                            { next ->
+                                val existing = factDrafts.firstOrNull { it.category == category }
+                                factDrafts = factDrafts.filterNot { it.category == category } +
+                                    listOfNotNull(existing?.copy(content = next, provenance = CharacterFactProvenance.USER_CREATED)
+                                        ?.takeIf { next.isNotBlank() })
+                            })
+                    }
+                PersonaTextField("新资料类别代码", customCategory, { customCategory = it }, singleLine = true)
+                PersonaTextField("新类别内容", customContent, { customContent = it })
                 DsButton(
-                    text = stringResource(R.string.local_persona_restore_preset_canon),
+                    text = "添加自定义资料",
                     onClick = {
-                        val existingIds = loreEntries.map(PersonaLoreEntry::id).toSet()
-                        loreEntries = loreEntries + preset.persona.loreEntries.filterNot { it.id in existingIds }
-                        attentionKeywords = (lines(attentionKeywords) + preset.persona.attentionKeywords)
-                            .distinct().joinToString("\n")
+                        if (customCategory.isNotBlank() && customContent.isNotBlank()) {
+                            factDrafts = factDrafts + CharacterFact(
+                                id = UUID.randomUUID().toString(),
+                                category = customCategory.trim(),
+                                content = customContent.trim(),
+                                provenance = CharacterFactProvenance.USER_CREATED,
+                            )
+                            customCategory = ""
+                            customContent = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                    enabled = customCategory.isNotBlank() && customContent.isNotBlank(),
+                )
+            }
+            bundledPreset?.let { preset ->
+                DsButton(
+                    text = "载入预设人物内核与事实",
+                    onClick = {
+                        coreIdentity = preset.persona.coreIdentity
+                        factDrafts = preset.persona.facts
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = "补充原作知识条目",
+                    onClick = {
+                        val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
+                        loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     variant = DsButtonVariant.Ghost,
                 )
             }
-            PersonaFormSection(stringResource(R.string.persona_form_canon)) {
-                PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
+            PersonaFormSection("人物专属知识库") {
                 PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
             }
-            PersonaFormSection(stringResource(R.string.persona_form_life_extra)) {
-                PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
-                PersonaTextField(stringResource(R.string.local_persona_attention_keywords), attentionKeywords, { attentionKeywords = it })
-                PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
-                PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
-                PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
-                PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
-                // Legacy mutableTrait axes remain in storage for existing personas; evolution
-                // belongs to the runtime, so the persona editor does not offer growth scripts.
-            }
-            PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
-                PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
-                PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
-                PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
-            }
         }
+
     }
 }
 
