@@ -119,7 +119,10 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 MemoryKind.RELATIONSHIP_PREFERENCE,
             )
             val recalled = memoryStore.search(
-                query = ChatMemorySelector.semanticQuery(query, subjectLabel),
+                query = ChatMemorySelector.semanticQuery(
+                    query, subjectLabel,
+                    if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context else snapshot.chat.chatContext,
+                ),
                 allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
                 projectId = null,
                 lineageId = snapshot.lineageId,

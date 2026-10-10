@@ -15,6 +15,28 @@ import org.junit.Test
 
 class TokenUsageAnalyticsTest {
     @Test
+    fun turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession() {
+        val context = TokenUsageContext(mode = LocalUsageMode.CHAT, sessionId = "source", turnId = "user-1", action = TokenUsageAction.CHAT_REPLY)
+        val reply = record("reply", 1, 10, 2, context = context)
+        val background = record("background", 3, 20, 3, context = context.copy(action = TokenUsageAction.CHAT_STATE_REFRESH))
+        val missing = record("missing", 4, 99, 99, context = context).copy(reported = false, inputTokens = 0, outputTokens = 0, cacheMissTokens = 0)
+        val records = sequenceOf(
+            reply, reply, background, missing,
+            record("regenerated", 5, 5, 1, context = context),
+            record("other-session", 6, 100, 100, context = context.copy(sessionId = "other")),
+            record("next-turn", 7, 7, 1, context = context.copy(turnId = "user-2")),
+            record("unassociated", 8, 100, 100, context = context.copy(turnId = null)),
+            record("work", 9, 100, 100, context = context.copy(mode = LocalUsageMode.WORK)),
+        )
+        val turns = aggregateChatTurnUsage(records, "source")
+        assertEquals(setOf("user-1", "user-2"), turns.keys)
+        assertEquals(41L, turns.getValue("user-1").totalTokens)
+        assertEquals(3L, turns.getValue("user-1").requestCount)
+        assertEquals(1L, turns.getValue("user-1").unreportedRequestCount)
+        assertEquals(8L, turns.getValue("user-2").totalTokens)
+    }
+
+    @Test
     fun aggregatesModesDaysTurnsAndParentTaskWithoutDoubleCountingSubfields() {
         val zone = ZoneId.of("UTC")
         val day = Instant.parse("2026-09-29T08:00:00Z").toEpochMilli()

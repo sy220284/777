@@ -435,6 +435,7 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
 
                 started = directTurn.start(
                     input = promptMessage.content,
+                    sourceMessageId = promptMessage.id,
                     replacingMessageId = messageId,
                 ).also { handle.job = it }
                 true

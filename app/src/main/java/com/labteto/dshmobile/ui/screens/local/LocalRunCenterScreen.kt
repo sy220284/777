@@ -78,6 +78,12 @@ internal fun LocalRunCenterScreen(
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onOpenResults: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenArtifact: (String) -> Unit = { onOpenResults() },
+    onContinueArtifact: (String) -> Unit = {},
+    usageRevision: kotlinx.coroutines.flow.StateFlow<Long>? = null,
+    sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,
+    taskUsage: (String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { null },
+    requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -148,6 +154,9 @@ internal fun LocalRunCenterScreen(
                 DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
                     variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium))
+            }
+            if (usageRevision != null && sessionUsage != null) {
+                LocalRunCenterUsageSection(state.sessionId, usageRevision, sessionUsage, taskUsage, requestUsage)
             }
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 Column(Modifier.fillMaxSize()) {
@@ -252,7 +261,7 @@ internal fun LocalRunCenterScreen(
                                             "file" -> {
                                                 if (artifact.currentlyAvailable == false) {
                                                     artifactActionFailed = true
-                                                } else onOpenResults()
+                                                } else onOpenArtifact(artifact.reference)
                                             }
                                             "link" -> runCatching { uriHandler.openUri(artifact.reference) }
                                                 .onFailure { artifactActionFailed = true }
@@ -260,6 +269,14 @@ internal fun LocalRunCenterScreen(
                                         }
                                     },
                                 )
+                                if (artifact.category == "file" && artifact.currentlyAvailable != false) {
+                                    DsButton(
+                                        text = stringResource(R.string.local_artifact_continue),
+                                        onClick = { onContinueArtifact(artifact.reference) },
+                                        variant = DsButtonVariant.Ghost,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
                                 DsButton(
                                     text = stringResource(R.string.common_copy),
                                     onClick = { clipboard.setText(AnnotatedString(artifact.reference)) },
@@ -345,7 +362,13 @@ internal fun LocalRunCenterScreen(
     }
 
     if (showFullHistory && onHistoryPage != null) {
-        LocalWorkHistorySheet(state.sessionId, onHistoryPage, onToolEvidence, onOpenResults) { showFullHistory = false }
+        LocalWorkHistorySheet(
+            sessionId = state.sessionId,
+            readPage = onHistoryPage,
+            readEvidence = onToolEvidence,
+            onOpenArtifact = onOpenArtifact,
+            onDismiss = { showFullHistory = false },
+        )
     }
 
     if (showAgentLauncher) {

@@ -42,6 +42,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -82,6 +84,7 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -150,6 +153,7 @@ fun LocalHarnessScreen(
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
+    val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
@@ -159,6 +163,7 @@ fun LocalHarnessScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val drawerFocusManager = LocalFocusManager.current
     val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
@@ -166,13 +171,23 @@ fun LocalHarnessScreen(
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
+    var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
+    var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
+    var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
+    var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
+    var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(workCapabilityOpenVersion) {
+        if (pendingWorkCapability != null) {
+            githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
+        }
+    }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
@@ -231,8 +246,12 @@ fun LocalHarnessScreen(
             handoffWorkCapability(prompt)
         } else {
             pendingWorkCapability = prompt
+            workHandoffSourceSessionId = shell.sessionId
+            workHandoffSummary = viewModel.workHandoffSummary()
             workCapabilityConfirmed = false
             workCapabilityFailed = false
+            githubConfiguredForHandoff = null
+            workCapabilityOpenVersion += 1
         }
     }
 
@@ -275,6 +294,10 @@ fun LocalHarnessScreen(
         disableAutoApproval = viewModel::disableAutoApproval,
         answerQuestion = viewModel::answerQuestion,
         cancelQuestion = viewModel::cancelQuestion,
+        usageRevision = viewModel.usageRevision,
+        turnUsageSummaries = viewModel::turnUsageSummaries,
+        turnUsage = viewModel::turnUsage,
+        requestUsage = viewModel::requestUsage,
     )
     val chatActions = LocalChatFeatureUiActions(
         personaPresets = viewModel.personaPresets,
@@ -312,6 +335,10 @@ fun LocalHarnessScreen(
         startBackgroundAgent = viewModel::startBackgroundAgent,
         startResearchAgent = viewModel::startResearchAgent,
         sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
+        usageRevision = viewModel.usageRevision,
+        sessionUsage = viewModel::sessionUsage,
+        taskUsage = viewModel::taskUsage,
+        requestUsage = viewModel::requestUsage,
     )
     val projectActions = LocalProjectUiActions(
         catalog = viewModel.projectCatalog,
@@ -370,6 +397,11 @@ fun LocalHarnessScreen(
         ),
         localWorkFeatureUiContribution(
             filesMode = filesMode,
+            onContinueArtifact = { path ->
+                handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
+            },
+            requestedFilePath = requestedFilePath,
+            onRequestedFilePathChange = { requestedFilePath = it },
             shell = shell,
             actions = workActions,
             onFilesModeChange = { filesMode = it },
@@ -611,10 +643,20 @@ fun LocalHarnessScreen(
             switching = workCapabilityConfirmed,
             failed = workCapabilityFailed,
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+            prompt = pendingWorkCapability.orEmpty(),
+            summary = workHandoffSummary,
+            capabilities = LocalTaskCapabilityReadinessProjector.project(
+                task = pendingWorkCapability.orEmpty(),
+                githubConfigured = githubConfiguredForHandoff,
+                networkSearchEnabled = networkSearchEnabled,
+            ),
+            onPromptChange = { pendingWorkCapability = it },
+            onSummaryChange = { workHandoffSummary = it },
             onContinue = {
-                workCapabilityConfirmed = true
                 workCapabilityFailed = false
-                switchUsageMode(LocalUsageMode.WORK)
+                workCapabilityConfirmed = viewModel.createWorkContinuation(workHandoffSourceSessionId, workHandoffSummary)
+                if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
+                else workCapabilityFailed = true
             },
             onDismiss = {
                 pendingWorkCapability = null

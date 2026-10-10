@@ -417,11 +417,18 @@ class DeepSeekUsageTracker @Inject constructor(
 
     fun analyticsSnapshot(): TokenUsageAnalyticsSnapshot = analyticsStore.snapshot()
 
+    fun analyticsSessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot = analyticsStore.sessionSnapshot(sessionId)
+
     fun analyticsGroupDetail(
         kind: TokenUsageGroupKind,
         key: String,
         recordLimit: Int = 300,
     ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key, recordLimit)
+
+    fun analyticsTurnSummaries(sessionId: String) = analyticsStore.turnSummaries(sessionId)
+
+    fun analyticsTurnDetail(sessionId: String, turnId: String): TokenUsageGroupDetail? =
+        analyticsStore.groupDetail(TokenUsageGroupKind.TURN, turnId, sessionId = sessionId)
 
     fun analyticsRecord(requestId: String): TokenUsageRecord? =
         analyticsStore.recordById(requestId)

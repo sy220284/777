@@ -117,6 +117,7 @@ data class TokenUsageContext(
     val taskLabel: String? = null,
     val step: Int? = null,
     val action: TokenUsageAction = TokenUsageAction.OTHER,
+    val taskRunId: String? = null,
 )
 
 data class ForegroundTokenUsageSeed(
@@ -216,6 +217,7 @@ data class TokenUsageAnalyticsSnapshot(
 enum class TokenUsageGroupKind {
     SESSION,
     TASK,
+    TURN,
 }
 
 data class TokenUsageAgentSummary(
@@ -245,6 +247,7 @@ internal fun buildTokenUsageContext(
     agentId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ): TokenUsageContext = TokenUsageContext(
     mode = snapshot.usageMode,
     sessionId = snapshot.sessionId.takeIf(String::isNotBlank),
@@ -258,6 +261,7 @@ internal fun buildTokenUsageContext(
     taskLabel = taskLabel?.trim()?.takeIf(String::isNotBlank)?.take(120),
     step = step,
     action = action,
+    taskRunId = taskRunId?.takeIf(String::isNotBlank),
 )
 
 internal fun DeepSeekUsageTracker.record(
@@ -307,6 +311,7 @@ internal fun DeepSeekUsageTracker.record(
     agentId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ) {
     record(
         snapshot = snapshot,
@@ -321,6 +326,7 @@ internal fun DeepSeekUsageTracker.record(
             agentId = agentId,
             taskLabel = taskLabel,
             step = step,
+            taskRunId = taskRunId,
         ),
     )
 }
@@ -350,6 +356,7 @@ internal fun DeepSeekUsageTracker.recordForeground(
     runId: String? = null,
     taskLabel: String? = null,
     step: Int? = null,
+    taskRunId: String? = null,
 ) = record(
     snapshot = snapshot,
     reply = reply,
@@ -359,6 +366,7 @@ internal fun DeepSeekUsageTracker.recordForeground(
     runKind = LocalAgentRunKind.FOREGROUND,
     taskLabel = taskLabel,
     step = step,
+    taskRunId = taskRunId,
 )
 
 internal fun DeepSeekUsageTracker.recordAutomation(
@@ -491,13 +499,19 @@ class TokenUsageAnalyticsStore @Inject constructor(
         kind: TokenUsageGroupKind,
         key: String,
         recordLimit: Int = DETAIL_RECORDS,
+        sessionId: String? = null,
     ): TokenUsageGroupDetail? {
+        require(kind != TokenUsageGroupKind.TURN || !sessionId.isNullOrBlank()) {
+            "Turn usage requires a source session"
+        }
         val detailLimit = recordLimit.coerceIn(1, MAX_DETAIL_RECORDS)
         val records = allRecords().distinctForAccounting().filter { record ->
             when (kind) {
+                TokenUsageGroupKind.TURN -> record.context.mode == LocalUsageMode.CHAT &&
+                    record.context.sessionId == sessionId && record.context.turnId == key
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
                 TokenUsageGroupKind.TASK ->
-                    record.context.parentRunId == key || record.context.runId == key
+                    record.context.taskRunId == key || record.context.parentRunId == key || record.context.runId == key
             }
         }.toList()
         if (records.isEmpty()) return null
@@ -531,6 +545,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
             .filter { !it.context.taskLabel.isNullOrBlank() }
             .maxByOrNull(TokenUsageRecord::timestamp)
         val title = when (kind) {
+            TokenUsageGroupKind.TURN -> "本轮用量"
             TokenUsageGroupKind.SESSION -> latest.context.sessionTitle?.takeIf(String::isNotBlank) ?: "对话"
             TokenUsageGroupKind.TASK -> mainTaskRecord?.context?.taskLabel
                 ?: latest.context.taskLabel?.takeIf(String::isNotBlank)
@@ -558,6 +573,12 @@ class TokenUsageAnalyticsStore @Inject constructor(
         ensureLoaded()
         database.recordById(requestId)
     }
+
+    fun turnSummaries(sessionId: String): Map<String, TokenUsageAggregate> =
+        aggregateChatTurnUsage(allRecords(), sessionId)
+
+    fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot =
+        aggregateTokenUsageRecords(allRecords().filter { it.context.sessionId == sessionId })
 
     private fun allRecords(): Sequence<TokenUsageRecord> = synchronized(lock) {
         ensureLoaded()
@@ -646,7 +667,8 @@ internal class TokenUsageAccumulator(private val zone: ZoneId) {
                 work.add(record)
                 day.work.add(record)
                 workActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-                val taskRunId = record.context.parentRunId?.takeIf(String::isNotBlank)
+                val taskRunId = record.context.taskRunId?.takeIf(String::isNotBlank)
+                    ?: record.context.parentRunId?.takeIf(String::isNotBlank)
                     ?: record.context.runId?.takeIf(String::isNotBlank)
                 taskRunId?.let { runId ->
                     workRuns += runId
@@ -849,3 +871,16 @@ private val PERSONA_MARKERS = listOf(
     "【本轮相关背景】",
     "【群聊身份】",
 )
+
+/** A turn is identified by both its source session and user message, including late background usage. */
+internal fun aggregateChatTurnUsage(records: Sequence<TokenUsageRecord>, sessionId: String): Map<String, TokenUsageAggregate> {
+    val turns = linkedMapOf<String, MutableTokenAggregate>()
+    records.distinctForAccounting().filter {
+        it.context.sessionId == sessionId && it.context.mode == LocalUsageMode.CHAT
+    }.forEach { record ->
+        record.context.turnId?.takeIf(String::isNotBlank)?.let { turn ->
+            turns.getOrPut(turn, ::MutableTokenAggregate).add(record)
+        }
+    }
+    return turns.mapValues { it.value.freeze() }
+}

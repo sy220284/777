@@ -23,7 +23,7 @@ internal fun LocalWorkHistorySheet(
     sessionId: String,
     readPage: (String, LocalWorkHistoryCursor?) -> LocalWorkHistoryPageUi,
     readEvidence: (String, String, Long) -> String?,
-    onOpenResults: () -> Unit,
+    onOpenArtifact: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -94,7 +94,7 @@ internal fun LocalWorkHistorySheet(
                                     onClick = {
                                         artifactFailed = false
                                         when (artifact.category) {
-                                            "file" -> if (artifact.currentlyAvailable == false) artifactFailed = true else { onDismiss(); onOpenResults() }
+                                            "file" -> if (artifact.currentlyAvailable == false) artifactFailed = true else { onDismiss(); onOpenArtifact(artifact.reference) }
                                             "link" -> runCatching { uriHandler.openUri(artifact.reference) }.onFailure { artifactFailed = true }
                                             else -> clipboard.setText(androidx.compose.ui.text.AnnotatedString(artifact.reference))
                                         }

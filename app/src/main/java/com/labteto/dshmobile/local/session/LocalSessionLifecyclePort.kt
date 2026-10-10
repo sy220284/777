@@ -13,7 +13,10 @@ internal interface LocalSessionLifecyclePort {
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec? = null,
+        handoffSummaryOverride: String? = null,
     ): Boolean
+
+    fun currentHandoffSummary(): String
 
     fun switchDomainMode(command: LocalSessionDomainModeCommand)
 
