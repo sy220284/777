@@ -124,6 +124,7 @@ class LocalSessionEventLog(
     fun <T> withEvents(block: (Sequence<Event>) -> T): T {
         val snapshots = delegate.openDurableFileSnapshot()
         var activeReader: java.io.BufferedReader? = null
+        var malformedRows = 0
         try {
             return block(sequence {
                 for (source in snapshots) {
@@ -135,7 +136,19 @@ class LocalSessionEventLog(
                         val line = readBoundedLine(reader, MAX_DURABLE_EVENT_LINE_CHARS) ?: break
                         val event = runCatching {
                             json.decodeFromString(Event.serializer(), line)
-                        }.getOrNull() ?: continue
+                        }.getOrElse { error ->
+                            malformedRows += 1
+                            if (malformedRows <= MAX_DECODE_FAILURE_SAMPLES) {
+                                // Event bodies may contain private prompts and credentials: never export parser snippets.
+                                AppLog.warn(
+                                    "SessionEventLog",
+                                    "operation=decode_durable_event session_id=${sessionId.orEmpty().take(80)} " +
+                                        "source=${source.name.take(100)} row_failure=$malformedRows " +
+                                        "cause_type=${error.javaClass.simpleName}",
+                                )
+                            }
+                            null
+                        } ?: continue
                         yield(event)
                     }
                     reader.close()
@@ -143,6 +156,11 @@ class LocalSessionEventLog(
                 }
             })
         } finally {
+            if (malformedRows > MAX_DECODE_FAILURE_SAMPLES) {
+                AppLog.warn("SessionEventLog", "operation=decode_durable_event " +
+                    "session_id=${sessionId.orEmpty().take(80)} malformed_rows=$malformedRows " +
+                    "logged_samples=$MAX_DECODE_FAILURE_SAMPLES")
+            }
             runCatching { activeReader?.close() }
             snapshots.forEach { runCatching { it.close() } }
         }
@@ -229,5 +247,6 @@ class LocalSessionEventLog(
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         private const val MAX_DURABLE_EVENT_LINE_CHARS = 16 * 1024 * 1024
+        private const val MAX_DECODE_FAILURE_SAMPLES = 3
     }
 }
