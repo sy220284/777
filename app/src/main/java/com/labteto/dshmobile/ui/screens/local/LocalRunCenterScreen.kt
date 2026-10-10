@@ -273,6 +273,14 @@ internal fun LocalRunCenterScreen(
                             ) {
                                 val detail = when {
                                     artifact.category != "file" -> stringResource(R.string.local_delivery_source_not_verified)
+                                    artifact.currentlyAvailable == true &&
+                                        artifact.versionAtCreation != null && artifact.versionNow != null &&
+                                        artifact.versionAtCreation != artifact.versionNow ->
+                                        stringResource(R.string.local_delivery_file_revision_changed)
+                                    artifact.currentlyAvailable == true &&
+                                        artifact.versionAtCreation != null &&
+                                        artifact.versionAtCreation == artifact.versionNow ->
+                                        stringResource(R.string.local_delivery_file_revision_matches)
                                     artifact.currentlyAvailable == true -> stringResource(R.string.local_delivery_file_present)
                                     artifact.currentlyAvailable == false -> stringResource(R.string.local_delivery_file_missing)
                                     else -> stringResource(R.string.local_delivery_file_unknown)

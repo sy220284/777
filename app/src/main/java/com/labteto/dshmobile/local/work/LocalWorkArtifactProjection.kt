@@ -33,6 +33,9 @@ internal fun projectLocalWorkArtifacts(
                 category = kind,
                 sourceCallId = callId,
                 asOfSequence = event.sequence,
+                versionAtCreation = (data["artifact_sha256"] as? JsonPrimitive)?.contentOrNull
+                    ?.takeIf { sha -> sha.matches(Regex("[a-fA-F0-9]{64}")) &&
+                        (data["artifact_path"] as? JsonPrimitive)?.contentOrNull == raw },
             )
         }
     }
@@ -44,6 +47,10 @@ internal fun projectLocalWorkArtifacts(
 private fun verifiedLocalWorkspaceResultPath(data: JsonObject): String? {
     val name = (data["name"] as? JsonPrimitive)?.contentOrNull ?: return null
     val content = (data["content"] as? JsonPrimitive)?.contentOrNull ?: return null
+    return workToolResultFilePath(name, content)
+}
+
+internal fun workToolResultFilePath(name: String, content: String): String? {
     val path = when (name) {
         "write", "write_file" ->
             Regex("""^已写入 (.+)（[0-9]+ 字节）$""").matchEntire(content)?.groupValues?.get(1)

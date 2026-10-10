@@ -58,6 +58,7 @@ class LocalWorkRuntime @Inject internal constructor(
         ).map { item ->
             if (item.category == "file") item.copy(
                 currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference),
+                versionNow = localWorkFileSha256(root, item.reference),
             ) else item
         }
     }
@@ -70,7 +71,8 @@ class LocalWorkRuntime @Inject internal constructor(
         val page = projectLocalWorkHistoryPage(log, cursor)
         val projected = page.copy(records = page.records.map { record ->
             record.copy(artifacts = record.artifacts.map { item -> if (item.category == "file") item.copy(
-                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference)) else item })
+                currentlyAvailable = localWorkArtifactFileAvailable(root, item.reference),
+                versionNow = localWorkFileSha256(root, item.reference)) else item })
         })
         return if (sessionId == runtimeStateStore.currentSessionId && !log.isClosed && generation == log.resetGeneration) projected
         else com.labteto.dshmobile.local.presentation.LocalWorkHistoryPageUi(emptyList(), null, true)

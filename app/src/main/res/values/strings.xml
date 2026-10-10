@@ -1979,5 +1979,7 @@
     <string name="advanced_memory_no_message_source">尚未找到与这条消息明确关联的长期记忆。可查看全部记忆或返回聊天。</string>
     <string name="advanced_memory_show_all">查看全部长期记忆</string>
     <string name="chat_locate_message_memory">定位并纠正相关记忆</string>
+    <string name="local_delivery_file_revision_changed">当前内容与成果生成时不同；旧验证不再适用</string>
+    <string name="local_delivery_file_revision_matches">当前内容指纹与生成时一致；功能验收需另行证明</string>
 </resources>
 
