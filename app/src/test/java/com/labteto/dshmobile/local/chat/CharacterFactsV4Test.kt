@@ -299,6 +299,30 @@ class CharacterFactsV4Test {
         assertEquals(listOf("act-3"), rewind.unlockedStoryStages)
     }
 
+    @Test fun threeHundredTurnContextKeepsPendingWindowAndKnowledgePathBounded() {
+        var context = ChatContextState().withStoryStageSelection("opening")
+        repeat(300) { index ->
+            if (index == 120) context = context.withStoryStageSelection("middle")
+            if (index == 240) context = context.withStoryStageSelection("late")
+            context = context.enqueuePending(ChatPendingTurn(
+                sequence = index + 1L,
+                userMessage = "第${index + 1}轮的问题",
+                assistantMessage = "第${index + 1}轮的回答",
+                generation = context.generation,
+            ))
+        }
+        assertTrue(context.pendingTurns.size <= MAX_PENDING_CONTEXT_TURNS)
+        assertEquals(8, context.pendingForRequest(limit = 8).size)
+        val recovered = json.decodeFromString(ChatContextState.serializer(),
+            json.encodeToString(ChatContextState.serializer(), context))
+        assertEquals(listOf("opening", "middle", "late"), recovered.unlockedStoryStages)
+        val processed = recovered.commitProcessed(recovered.scene, recovered.continuity, 295L)
+        assertEquals(5, processed.pendingTurns.size)
+        assertEquals(300L, processed.pendingThroughSequence)
+        assertEquals(listOf("opening"),
+            processed.withStoryStageSelection("opening").unlockedStoryStages)
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),
