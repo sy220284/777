@@ -107,7 +107,7 @@ class VersionedSessionStore(
         }
         // Explicit legacy-session migration may copy an old snapshot after the catalog was
         // initialized. A successful direct read adopts that known identity without rescanning.
-        catalog.register(id)
+        catalog.adopt(id)
         return loaded
     }
 
