@@ -64,6 +64,9 @@ object AppLog {
     @Volatile
     private var crashHandlerInstalled = false
 
+    @Volatile
+    private var lastPersistenceFailure: String? = null
+
     fun configurePersistence(file: File) {
         persistentFile = file
         runCatching { file.parentFile?.mkdirs() }
@@ -213,7 +216,26 @@ object AppLog {
                 file.parentFile?.mkdirs()
                 rotateIfNeeded(file)
                 file.appendText(encodeEntry(entry) + "\n")
-            }
+            }.onFailure { failure ->
+                // The storage path itself failed; report through memory/logcat without recursively writing.
+                val reason = failure.javaClass.simpleName
+                synchronized(lock) {
+                    if (lastPersistenceFailure != reason) {
+                        lastPersistenceFailure = reason
+                        val warning = AppLogEntry(
+                            timestampMillis = System.currentTimeMillis(),
+                            level = "E",
+                            tag = "AppLog",
+                            message = "operation=persist_diagnostic_log status=failed cause_type=$reason",
+                            throwableType = reason,
+                            throwableMessage = failure.message?.let(::sanitizeDiagnosticText)?.take(200),
+                        )
+                        while (entries.size >= MAX_ENTRIES) entries.removeFirst()
+                        entries.addLast(warning)
+                    }
+                }
+                runCatching { Log.e("AppLog", "Diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
+            }.onSuccess { lastPersistenceFailure = null }
         }
     }
 
