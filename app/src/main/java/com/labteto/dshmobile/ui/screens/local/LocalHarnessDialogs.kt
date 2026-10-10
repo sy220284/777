@@ -719,7 +719,7 @@ internal fun ChatPersonaDialog(
                         val existingIds = loreEntries.map(PersonaLoreEntry::id).toSet()
                         loreEntries = loreEntries + preset.persona.loreEntries.filterNot { it.id in existingIds }
                         attentionKeywords = (lines(attentionKeywords) + preset.persona.attentionKeywords)
-                            .distinct().joinToString("\\n")
+                            .distinct().joinToString("\n")
                     },
                     modifier = Modifier.fillMaxWidth(),
                     variant = DsButtonVariant.Ghost,
