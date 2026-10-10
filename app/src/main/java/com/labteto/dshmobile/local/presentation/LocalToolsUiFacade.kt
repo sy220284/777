@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.tools.LocalToolsRuntime
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +16,12 @@ class LocalToolsUiFacade @Inject constructor(
 ) {
     internal suspend fun servers() = tools.servers()
     internal suspend fun githubConfigured() = tools.githubConfigured()
+    /** Work handoff UI projection; capability hints do not grant execution permissions. */
+    internal fun workHandoffCapabilityReadiness(
+        task: String,
+        githubConfigured: Boolean?,
+        networkSearchEnabled: Boolean,
+    ) = LocalTaskCapabilityReadinessProjector.project(task, githubConfigured, networkSearchEnabled)
     internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
     internal suspend fun clearGitHub() = tools.clearGitHub()
     internal fun installedPluginIds() = tools.installedPluginIds()
