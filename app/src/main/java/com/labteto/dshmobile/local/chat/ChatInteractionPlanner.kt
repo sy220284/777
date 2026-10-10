@@ -16,12 +16,16 @@ class ChatInteractionPlanner @Inject constructor(json: Json) {
         state: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
-    ): String = promptBuilder.prompt(persona, state, userMessage, assistantMessage)
+        context: ChatContextState = ChatContextState(),
+    ): String = promptBuilder.prompt(persona.forRuntimeStoryStage(context), state, userMessage, assistantMessage)
 
     fun suggestionsPrompt(
         persona: PersonaProfile, state: ChatCharacterState, userMessage: String,
         assistantMessage: String, recentDialogue: List<Pair<String, String>> = emptyList(),
-    ): String = promptBuilder.suggestionsPrompt(persona, state, userMessage, assistantMessage, recentDialogue)
+        context: ChatContextState = ChatContextState(),
+    ): String = promptBuilder.suggestionsPrompt(
+        persona.forRuntimeStoryStage(context), state, userMessage, assistantMessage, recentDialogue,
+    )
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? = parser.parseSuggestions(text)
 
