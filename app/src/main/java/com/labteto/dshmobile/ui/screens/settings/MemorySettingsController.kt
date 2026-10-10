@@ -63,7 +63,13 @@ internal class MemorySettingsController(
     }
 
     fun forget(id: String, onDone: (String?) -> Unit = {}) {
-        runCatching { settingsData.forgetMemory(id) }
+        val current = _memories.value.firstOrNull { it.id == id }
+        if (current == null) {
+            onDone("记忆已经不存在或已停用")
+            refresh()
+            return
+        }
+        runCatching { settingsData.forgetMemory(id, current.updatedAt) }
             .onSuccess { removed ->
                 refresh()
                 onDone(if (removed) null else "这条记忆已被停用或不存在")
