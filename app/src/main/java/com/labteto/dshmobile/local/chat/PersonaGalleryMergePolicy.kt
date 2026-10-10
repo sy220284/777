@@ -419,8 +419,8 @@ internal fun uniqueLoreEntryIds(entries: List<PersonaLoreEntry>): List<PersonaLo
             var suffix = 0
             var nextId: String
             do {
-                nextId = "$"+"{stem}#stage-$"+"{stageKey}" +
-                    (if (suffix == 0) "" else "-$"+"{suffix}")
+                nextId = "${stem}#stage-${stageKey}" +
+                    (if (suffix == 0) "" else "-${suffix}")
                 suffix++
             } while (!used.add(normalizePersonaText(nextId)))
             entry.copy(id = nextId.take(80))
