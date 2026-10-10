@@ -106,11 +106,13 @@ internal fun proactiveConversationFocus(
 ): String {
     val recent = messages
         .asReversed()
+        .asSequence()
         .filter { it.role == "user" || (it.role == "assistant" && !it.proactive) }
-        .take(4)
-        .asReversed()
         .map { it.content.trim() }
         .filter(String::isNotBlank)
+        .take(4)
+        .toList()
+        .asReversed()
 
     return recent.joinToString("\n")
         .takeIf(String::isNotBlank)
@@ -122,12 +124,14 @@ internal fun recentProactiveAvoidanceContext(
     messages: List<LocalHarnessMessage>,
 ): String {
     val recent = messages
+        .asReversed()
         .asSequence()
         .filter { it.role == "assistant" && it.proactive }
         .map { it.content.trim().replace("\n", " ") }
         .filter(String::isNotBlank)
+        .take(MAX_RECENT_PROACTIVE_FOR_CONTEXT)
         .toList()
-        .takeLast(MAX_RECENT_PROACTIVE_FOR_CONTEXT)
+        .asReversed()
 
     if (recent.isEmpty()) return ""
     return buildString {
@@ -149,12 +153,12 @@ internal fun isNearDuplicateProactive(
     if (normalizedCandidate.length < 8) return false
 
     return messages
+        .asReversed()
         .asSequence()
         .filter { it.role == "assistant" && it.proactive }
         .map { normalizeProactiveText(it.content) }
         .filter { it.length >= 8 }
-        .toList()
-        .takeLast(MAX_RECENT_PROACTIVE_FOR_CONTEXT)
+        .take(MAX_RECENT_PROACTIVE_FOR_CONTEXT)
         .any { previous ->
             if (
                 normalizedCandidate.contains(previous) ||

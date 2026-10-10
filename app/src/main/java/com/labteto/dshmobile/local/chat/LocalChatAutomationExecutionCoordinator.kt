@@ -321,7 +321,9 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 }
                 val conversationFocus = proactiveConversationFocus(
                     messages = recentTranscript,
-                    fallback = session.handoffSummary?.takeIf(String::isNotBlank) ?: trigger,
+                    // Scheduled trigger text is an automation instruction, not a user utterance.
+                    // Feed the character only actual dialogue or a real session summary.
+                    fallback = session.handoffSummary.orEmpty(),
                 )
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
