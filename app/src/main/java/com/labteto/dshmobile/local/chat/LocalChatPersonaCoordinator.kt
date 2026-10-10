@@ -168,9 +168,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
             ) return false
             val target = current.copy(
                 chat = current.chat.copy(
-                    chatContext = current.chat.chatContext.copy(
-                        storyStage = stage.trim().take(160),
-                    ).normalized(),
+                    chatContext = current.chat.chatContext.withStoryStageSelection(stage),
                 ),
             )
             commitDomainState(target, "gallery-story-stage-updated")
