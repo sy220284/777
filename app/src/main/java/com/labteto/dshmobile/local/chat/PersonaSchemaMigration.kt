@@ -258,7 +258,7 @@ internal object PersonaSchemaMigration {
             attentionBiases = profile.attentionBiases.ifEmpty { latest.attentionBiases },
             attentionKeywords = profile.attentionKeywords.ifEmpty { latest.attentionKeywords },
             perceptionBlindSpots = profile.perceptionBlindSpots.ifEmpty { latest.perceptionBlindSpots },
-            quirks = profile.quirks.ifEmpty { latest.quirks },
+            quirks = mergeLines(profile.quirks, latest.quirks, 12),
             limitations = profile.limitations.ifEmpty { latest.limitations },
             coreValues = mergeLines(userValues, latest.coreValues, 6),
             coreTension = userTension.ifBlank { latest.coreTension },
