@@ -32,7 +32,10 @@ internal object LocalWorkCompletionClaimGuard {
             workState.team.pendingMessageCount,
             workState.team.members.sumOf { it.pendingMessageCount },
         )
-        val failedTeamMembers = workState.team.failedMemberCount
+        val failedTeamMembers = workState.team.failedMemberCount.takeIf { count ->
+            count > 0 && (workState.team.tasks.isEmpty() ||
+                workState.team.tasks.any { it.status !in setOf("completed", "deleted") })
+        } ?: 0
         val teamFailure = !workState.team.failure.isNullOrBlank()
         if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
         if (openTeamTasks > 0) findings += "完成声明与未完成 Agent Team 任务冲突"

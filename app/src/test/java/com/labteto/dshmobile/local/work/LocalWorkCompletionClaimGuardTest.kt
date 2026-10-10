@@ -126,6 +126,22 @@ class LocalWorkCompletionClaimGuardTest {
     }
 
     @Test
+    fun reassignedTaskCompletionDoesNotBecomeBlockedByOldFailedTeamMember() {
+        val state = LocalWorkState(team = LocalAgentTeamUiState(
+            members = listOf(LocalAgentTeamMemberUiState(
+                id = "old", jobId = "job-old", name = "former",
+                description = "成员", phase = "failed", activity = "failed",
+            )),
+            tasks = listOf(LocalAgentTeamTaskUiState(
+                id = "task", subject = "完成的任务", description = "", status = "completed",
+            )),
+        ))
+        val result = LocalWorkCompletionClaimGuard.inspect("任务完成，可以交付。", state)
+        assertFalse(result.changed)
+        assertTrue(result.findings.isEmpty())
+    }
+
+    @Test
     fun teamProjectionFailureBlocksGlobalCompletionClaimEvenWithoutOpenTasks() {
         val state = LocalWorkState(
             team = LocalAgentTeamUiState(
