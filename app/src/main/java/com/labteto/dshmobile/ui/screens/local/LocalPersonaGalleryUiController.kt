@@ -315,6 +315,7 @@ suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, 
     // The gallery owns persisted stage data. Update the active copy through Chat's
     // session owner only when this very story is bound and the turn is idle.
     runtime.chat.updateBoundStoryStage(id, storyId, storyStage)
+    Unit
 }
 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
