@@ -199,7 +199,10 @@ class LocalHarnessViewModel @Inject constructor(
                 LocalUsageMode.CHAT -> runtime.chat.editAndResendUserMessage(messageId, text)
             }
         }
-        if (result == LocalChatUserEditResult.SENT) {
+        if (result == LocalChatUserEditResult.SENT ||
+            result == LocalChatUserEditResult.COMMITTED_NOT_STARTED
+        ) {
+            // Both outcomes already changed the durable active timeline.
             refreshTranscriptHistoryAfterTimelineRewrite()
         }
         return result

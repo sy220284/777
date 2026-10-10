@@ -382,7 +382,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     if (sent.disposition == LocalSendDisposition.STARTED) LocalUserMessageEditResult.SENT
                     else {
                         runtimeStateStore.projection.publishError(
-                            "历史修改已保存，但新任务未接单（${sent.rejectReason ?: sent.disposition}）。请重新打开会话检查当前历史，避免重复编辑", 
+                            "历史修改已保存，但新任务未接单（${sent.rejectReason ?: sent.disposition}）。请重新打开会话检查当前历史，避免重复编辑",
                         )
                         LocalUserMessageEditResult.COMMITTED_NOT_STARTED
                     }
