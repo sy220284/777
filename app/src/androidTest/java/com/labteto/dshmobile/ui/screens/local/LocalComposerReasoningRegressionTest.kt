@@ -20,6 +20,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -91,54 +92,66 @@ class LocalComposerReasoningRegressionTest {
 
 
     @Test fun workTemperatureHasFiveStopsWithThreeLabels() {
-        val current = mutableStateOf(2)
-        val activeProfile = mutableStateOf(deepSeek)
-        compose.setContent {
-            DshTheme {
-                LocalComposerCapabilityPanel(
-                    panel = "reasoning", profile = activeProfile.value,
-                    usageMode = LocalUsageMode.WORK,
-                    reasoningMode = LocalReasoningUiMode.FAST,
-                    temperatureLevel = current.value,
-                    onReasoningModeChange = {},
-                    onTemperatureLevelChange = { current.value = it },
+        val previousCeiling = LocalModelPerformanceControls.state.value.temperatureCeiling
+        LocalModelPerformanceControls.setTemperatureCeiling(1.3)
+        try {
+            val current = mutableStateOf(2)
+            val activeProfile = mutableStateOf(deepSeek)
+            compose.setContent {
+                DshTheme {
+                    LocalComposerCapabilityPanel(
+                        panel = "reasoning", profile = activeProfile.value,
+                        usageMode = LocalUsageMode.WORK,
+                        reasoningMode = LocalReasoningUiMode.FAST,
+                        temperatureLevel = current.value,
+                        onReasoningModeChange = {},
+                        onTemperatureLevelChange = { current.value = it },
+                    )
+                }
+            }
+            val slider = compose.onNodeWithContentDescription(
+                context.getString(R.string.local_composer_temperature_title),
+            )
+            slider.assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(2f, 0f..4f, 3),
+            ))
+            compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_low))
+                .assertIsDisplayed()
+            compose.onNodeWithText(context.getString(R.string.local_composer_temperature_natural))
+                .assertIsDisplayed()
+            compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_high))
+                .assertIsDisplayed()
+            slider.assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.local_composer_temperature_value, 0.65),
+            ))
+            slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(4f) }
+            compose.runOnIdle { assertEquals(4, current.value) }
+            slider.assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.local_composer_temperature_value, 1.3),
+            ))
+            // The whole-app default cap remains active when switching providers.
+            compose.runOnIdle {
+                activeProfile.value = LocalModelProfile(
+                    "composer-gemini", "gemini-3.8-flash",
+                    "https://generativelanguage.googleapis.com/v1beta/openai",
                 )
             }
+            slider.assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.local_composer_temperature_value, 1.3),
+            ))
+            // The shared Model Performance setting can raise this ceiling to 2.0.
+            compose.runOnIdle { LocalModelPerformanceControls.setTemperatureCeiling(2.0) }
+            slider.assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.local_composer_temperature_value, 2.0),
+            ))
+        } finally {
+            LocalModelPerformanceControls.setTemperatureCeiling(previousCeiling)
         }
-        val slider = compose.onNodeWithContentDescription(
-            context.getString(R.string.local_composer_temperature_title),
-        )
-        slider.assert(SemanticsMatcher.expectValue(
-            SemanticsProperties.ProgressBarRangeInfo,
-            ProgressBarRangeInfo(2f, 0f..4f, 3),
-        ))
-        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_low))
-            .assertIsDisplayed()
-        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_natural))
-            .assertIsDisplayed()
-        compose.onNodeWithText(context.getString(R.string.local_composer_temperature_work_high))
-            .assertIsDisplayed()
-        slider.assert(SemanticsMatcher.expectValue(
-            SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 0.65),
-        ))
-        slider.performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(4f) }
-        compose.runOnIdle { assertEquals(4, current.value) }
-        slider.assert(SemanticsMatcher.expectValue(
-            SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 1.3),
-        ))
-        // The DeepSeek-specific product cap must not carry over to another provider.
-        compose.runOnIdle {
-            activeProfile.value = LocalModelProfile(
-                "composer-gemini", "gemini-3.8-flash",
-                "https://generativelanguage.googleapis.com/v1beta/openai",
-            )
-        }
-        slider.assert(SemanticsMatcher.expectValue(
-            SemanticsProperties.StateDescription,
-            context.getString(R.string.local_composer_temperature_value, 2.0),
-        ))
     }
 
     @Test fun chatTemperatureReflectsPersonaSliderWhenChangedOutsidePanel() {
