@@ -28,6 +28,19 @@ class LocalToolCapabilityIntentTest {
     }
 
     @Test
+    fun resumedWorkIgnoresSyntheticCheckpointsForDynamicToolSelection() {
+        val history = listOf(
+            message("user", "检查当前 Android 页面"),
+            message("assistant", "检查中"),
+            message("user", "<compacted-summary>错误提示：MCP 已授权</compacted-summary>"),
+            message("user", "<work-checkpoint>不应触发权限工具</work-checkpoint>"),
+        )
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(history) == "检查当前 Android 页面")
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(
+            listOf(message("user", "<chat-continuity>only synthetic</chat-continuity>"))) == null)
+    }
+
+    @Test
     fun explicitPrIntentIsDetectedWithoutRequiringGithubWord() {
         assertTrue(LocalToolCapabilityIntent.from("把 PR #42 的冲突处理掉", emptyList()).requestsGitHub)
         assertTrue(LocalToolCapabilityIntent.from("检查 pull request 42", emptyList()).requestsGitHub)
