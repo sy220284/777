@@ -173,10 +173,12 @@ private fun mergeGalleryChatContext(
     if (!left.hasUsefulFacts()) return right
     if (!right.hasUsefulFacts()) return left
     return right.copy(
-        // Incoming gallery story is the stage owner after the save boundary resolves
-        // stale foreground snapshots. Preserve its full authorization path and revocations.
-        storyStage = right.storyStage,
-        unlockedStoryStages = right.unlockedStoryStages,
+        // A story with no stage metadata cannot erase a known plot path when
+        // archives merge; the gallery save path already handles explicit stage resets.
+        storyStage = right.storyStage.ifBlank { left.storyStage },
+        unlockedStoryStages = if (right.storyStage.isNotBlank()) {
+            right.unlockedStoryStages
+        } else left.unlockedStoryStages,
         scene = right.scene.copy(
             sceneTime = right.scene.sceneTime.ifBlank { left.scene.sceneTime },
             location = right.scene.location.ifBlank { left.scene.location },
