@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.chat.LocalChatMemoryProjectionPort
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 class LocalSettingsDataFacade @Inject constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
+    private val chatMemoryProjection: LocalChatMemoryProjectionPort,
     private val pricing: DeepSeekPricingRepository,
     private val usage: DeepSeekUsageTracker,
 ) {
@@ -32,10 +34,19 @@ class LocalSettingsDataFacade @Inject constructor(
 
     internal fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
         memoryStore.listActive(allowedScopes = scopes, projectId = projectId, lineageId = lineageId, limit = 100)
-    internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord =
-        memoryManager.update(existing = existing, content = content, pinned = pinned)
-    internal fun forgetMemory(id: String, expectedUpdatedAt: Long): Boolean =
-        memoryStore.forget(id, expectedUpdatedAt)
+    internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
+        val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
+        if (existing.content != updated.content) {
+            chatMemoryProjection.invalidateGeneratedDiaryForSources(existing.sourceMessages)
+        }
+        return updated
+    }
+
+    internal fun forgetMemory(existing: MemoryRecord): Boolean {
+        val removed = memoryStore.forget(existing.id, existing.updatedAt)
+        if (removed) chatMemoryProjection.invalidateGeneratedDiaryForSources(existing.sourceMessages)
+        return removed
+    }
     internal fun memoriesFromSourceMessage(sessionId: String, messageId: String): List<MemoryRecord> =
         memoryStore.listActiveFromMessage(sessionId, messageId)
 }
