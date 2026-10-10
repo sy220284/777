@@ -82,7 +82,7 @@ internal class CharacterRuntimeProjector(
 
     private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
         appendLine("【人物底色】")
-        appendLine("身份、经历和人物内核优先；行为和表达由当前状态自然组合，不照着固定性格标签表演。")
+        // Put the actual biography first; the critical prompt already describes how to use it.
         persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
         persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
         persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("经历与生活：${it.take(520)}") }
@@ -135,6 +135,7 @@ internal class CharacterRuntimeProjector(
     private fun relevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
         if (userInput.isBlank()) return ""
         val anchors = listOf(
+            "人物身份与经历" to persona.portrait,
             "生活" to persona.lifeContext,
             "世界" to persona.worldSetting,
             "时间线" to persona.timelinePosition,

@@ -225,6 +225,22 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun rewrittenPresetCanRecallFormativeBiographyWithoutMakingItAlwaysOn() {
+        val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
+        val projector = CharacterRuntimeProjector(
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val normal = projector.project(persona, ChatCharacterState(), ChatContextState(), "今天一起散步吧", null)
+        val relevant = projector.project(persona, ChatCharacterState(), ChatContextState(), "神里绫人和托马在神里家的职责是什么？", null)
+        assertTrue(normal.stablePrompt.contains("神里绫华"))
+        assertTrue(estimateModelTokens(relevant.stablePrompt) <= 520)
+        assertTrue(relevant.dynamicPrompt.contains("【本轮相关背景】"))
+        assertTrue(relevant.dynamicPrompt.contains("人物身份与经历："))
+        assertTrue(relevant.dynamicPrompt.contains("神里绫人"))
+    }
+
+    @Test
     fun stablePersonaPrefixHasHardTokenBudget() {
         val persona = PersonaProfile(
             name = "阿青",
