@@ -51,6 +51,12 @@ internal class DurableSessionCatalog(
      */
     fun adopt(id: String) {
         require(SESSION_ID_PATTERN.matches(id)) { "非法会话编号：$id" }
+        // Normal reads should not decode a second copy of the same large snapshot.
+        val alreadyRegistered = synchronized(shared) {
+            ensureLoaded()
+            id in shared.ids
+        }
+        if (alreadyRegistered) return
         val primarySnapshot = File(root, "$id.json")
         val backupSnapshot = File(root, "$id.backup.json")
         if (documentHasIdentity(primarySnapshot, id) || documentHasIdentity(backupSnapshot, id)) {
