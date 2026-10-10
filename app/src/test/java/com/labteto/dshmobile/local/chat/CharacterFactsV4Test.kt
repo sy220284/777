@@ -67,6 +67,31 @@ class CharacterFactsV4Test {
         }
     }
 
+    @Test fun v4GalleryDirtyCheckTracksIdentityAndAllFactMetadata() {
+        val originalFact = CharacterFact(
+            id = "f", category = CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            content = "相信自己的判断", perspective = "本人",
+            provenance = CharacterFactProvenance.CANON,
+            sourceReference = "原作第一章",
+        )
+        val profile = PersonaProfile(
+            id = "persona", name = "叶澜", coreIdentity = "设计师", facts = listOf(originalFact),
+        )
+        val entry = PersonaGalleryEntry(id = "persona", persona = profile)
+        fun dirty(next: PersonaProfile): Boolean = galleryEntryHasUnsavedChanges(
+            entry = entry, storyId = null, persona = next,
+            history = emptyList(), chatState = ChatCharacterState(),
+        )
+        assertFalse(dirty(profile))
+        assertTrue(dirty(profile.copy(coreIdentity = "调查员")))
+        assertTrue(dirty(profile.copy(facts = listOf(originalFact.copy(content = "改变了认知")))))
+        assertTrue(dirty(profile.copy(facts = listOf(originalFact.copy(perspective = "旁人")))))
+        assertTrue(dirty(profile.copy(facts = listOf(originalFact.copy(temporalScope = "act-2")))))
+        assertTrue(dirty(profile.copy(facts = listOf(originalFact.copy(sourceReference = "原作第二章")))))
+        assertTrue(dirty(profile.copy(facts = listOf(originalFact.copy(provenance = CharacterFactProvenance.INFERRED)))))
+        assertTrue(dirty(profile.copy(facts = emptyList())))
+    }
+
     @Test fun v4GeneratedJsonCarriesSourceAndSubjectivePerspective() {
         val draft = parsePersonaDraft(json, """
             {"name":"黎深","coreIdentity":"心脏外科医生","franchise":"恋与深空",

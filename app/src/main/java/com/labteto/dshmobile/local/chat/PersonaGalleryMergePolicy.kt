@@ -266,6 +266,19 @@ internal fun galleryEntryHasUnsavedChanges(
 
 private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.name,
+    persona.coreIdentity,
+    persona.facts.joinToString("\u0000") { fact ->
+        listOf(
+            fact.id,
+            fact.category,
+            fact.content,
+            fact.relatedFactIds.joinToString("|"),
+            fact.perspective,
+            fact.temporalScope,
+            fact.provenance.name,
+            fact.sourceReference,
+        ).joinToString("~")
+    },
     persona.portrait,
     persona.lifeContext,
     persona.attentionBiases.joinToString("\u0000"),
