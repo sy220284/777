@@ -18,6 +18,8 @@ class SettingsModelProfileFiltersTest {
     fun modelAndAccountShareOneNavigationDestination() {
         assertTrue(SettingsDestination.entries.none { it.name == "ACCOUNT" })
         assertEquals(SettingsDestination.ROOT, SettingsDestination.MODELS.parentDestination())
+        assertEquals(SettingsDestination.ROOT, SettingsDestination.MODEL_PERFORMANCE.parentDestination())
+        assertEquals(1, SettingsDestination.MODEL_PERFORMANCE.navigationDepth())
     }
 
     private val api = LocalModelProfile(id = "api", model = "same", baseUrl = "https://example.com")

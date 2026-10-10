@@ -74,6 +74,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
 ) {
     init {
         LocalReasoningModeStore.attach(context)
+        com.labteto.dshmobile.local.model.LocalModelPerformanceStore.attach(context)
         com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.attach(context)
     }
 
@@ -934,11 +935,14 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             defaultChatFast = snapshot.usageMode == LocalUsageMode.CHAT,
         )
         // Work has its own persisted session sampling; Chat provides persona sampling explicitly.
-        val effectiveTemperature = temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
-            com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
-                snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+        val effectiveTemperature = com.labteto.dshmobile.local.model.LocalModelPerformanceStore
+            .current().constrainTemperature(
+                temperature ?: if (snapshot.usageMode == LocalUsageMode.WORK) {
+                    com.labteto.dshmobile.local.model.LocalWorkTemperatureStore.requestTemperature(
+                        snapshot.sessionId, frozenProfile.model, frozenProfile.baseUrl,
+                    )
+                } else null,
             )
-        } else null
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         return FrozenRequestConfiguration(frozenProfile, runSurface, reasoningEffort, effectiveTemperature, credentialDiagnostic)
     }

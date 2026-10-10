@@ -91,7 +91,7 @@ internal object LocalWorkTemperatureStore {
         val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
         val selected = level(sessionId, range)
         if (selected * 25 == range.defaultPosition && range.omitAtChatDefault) return null
-        return range.at(selected * 25)
+        return LocalModelPerformanceStore.current().constrainTemperature(range.at(selected * 25))
     }
 }
 
@@ -141,12 +141,13 @@ internal object LocalReasoningModeStore {
         defaultChatFast: Boolean = false,
     ): String? =
         LocalReasoningRequestPolicy.resolve(profile, withTools)?.let { policy ->
-            when (mode(sessionId, defaultChatFast)) {
+            val requested = when (mode(sessionId, defaultChatFast)) {
                 LocalReasoningMode.DEFAULT -> null
                 LocalReasoningMode.DEEP -> policy.enabledEffort
                 LocalReasoningMode.LOW -> policy.lowEffort
                 LocalReasoningMode.MAX -> policy.maxEffort
                 LocalReasoningMode.FAST -> policy.disabledEffort
             }
+            LocalModelPerformanceStore.current().constrainEffort(requested, policy.disabledEffort)
         }
 }

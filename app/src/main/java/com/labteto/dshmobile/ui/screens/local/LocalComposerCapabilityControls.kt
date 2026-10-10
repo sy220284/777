@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.ui.components.DsComposerAction
@@ -87,7 +89,8 @@ internal fun LocalComposerCapabilityActions(
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit,
 ) {
     val colors = DsTheme.colors
-    val modes = LocalReasoningControls.availableModes(profile, usageMode)
+    val limits = LocalModelPerformanceControls.state.collectAsState().value
+    val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     Box {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -153,7 +156,8 @@ internal fun LocalComposerCapabilityPanel(
     onTemperatureLevelChange: (Int) -> Unit = {},
 ) {
     val colors = DsTheme.colors
-    val modes = LocalReasoningControls.availableModes(profile, usageMode)
+    val limits = LocalModelPerformanceControls.state.collectAsState().value
+    val modes = LocalReasoningControls.availableModes(profile, usageMode, limits.reasoningCeiling)
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     val effectiveMode = LocalReasoningControls.effectiveMode(reasoningMode, modes, basicReasoning)
     Column(
@@ -229,7 +233,8 @@ internal fun LocalComposerCapabilityPanel(
                     color = colors.labelSecondary,
                 )
             } else {
-                val selectedLevel = temperatureLevel.coerceIn(0, 4)
+                val maxTemperatureLevel = LocalModelPerformanceControls.temperatureStopLimit(range)
+                val selectedLevel = temperatureLevel.coerceIn(0, maxTemperatureLevel)
                 var temperatureSelection by remember(
                     profile?.id, usageMode, selectedLevel, temperaturePosition, temperatureSaveFailed,
                 ) {
@@ -249,8 +254,9 @@ internal fun LocalComposerCapabilityPanel(
                     usageMode == LocalUsageMode.CHAT && !temperatureInteracted && temperaturePosition != null
                 ) temperaturePosition.coerceIn(0, 100) / 25f
                 else temperatureSelection
-                val visiblePosition = (sliderPosition * 25).roundToInt().coerceIn(0, 100)
-                val temperatureSample = range.at(visiblePosition)
+                val boundedPosition = sliderPosition.coerceIn(0f, maxTemperatureLevel.toFloat())
+                val visiblePosition = (boundedPosition * 25).roundToInt().coerceIn(0, 100)
+                val temperatureSample = LocalModelPerformanceControls.visibleTemperature(range.at(visiblePosition))
                 val temperatureState = if (range.omitAtChatDefault && visiblePosition == 50) {
                     stringResource(R.string.local_composer_temperature_provider_default, temperatureSample)
                 } else {
@@ -269,18 +275,18 @@ internal fun LocalComposerCapabilityPanel(
                             contentDescription = temperatureText
                             stateDescription = temperatureState
                         },
-                    value = sliderPosition,
+                    value = boundedPosition,
                     enabled = allowTemperature,
                     onValueChange = { next ->
                         temperatureSelection = next
                         temperatureInteracted = true
-                        temperatureTick(next.roundToInt().coerceIn(0, 4))
+                        temperatureTick(next.roundToInt().coerceIn(0, maxTemperatureLevel))
                     },
                     onValueChangeFinished = {
-                        onTemperatureLevelChange(temperatureSelection.roundToInt().coerceIn(0, 4))
+                        onTemperatureLevelChange(temperatureSelection.roundToInt().coerceIn(0, maxTemperatureLevel))
                     },
-                    valueRange = 0f..4f,
-                    steps = 3,
+                    valueRange = 0f..maxTemperatureLevel.toFloat(),
+                    steps = (maxTemperatureLevel - 1).coerceAtLeast(0),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(stringResource(

@@ -90,7 +90,7 @@ class LocalReasoningModeStoreTest {
         }
     }
 
-    @Test fun deepSeekWorkCapDoesNotConstrainGeminiOrUnverifiedRoutes() {
+    @Test fun globalTemperatureCapAlsoConstrainsGeminiWithoutEnablingUnsupportedRoutes() {
         val session = "model-scoped-temperature-cap-20261009"
         val geminiModel = "gemini-3.8-flash"
         val geminiUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -107,7 +107,8 @@ class LocalReasoningModeStoreTest {
             assertEquals(1.3, LocalWorkTemperatureStore.requestTemperature(
                 session, "deepseek-flash", "https://api.deepseek.com",
             )!!, 0.0)
-            assertEquals(2.0, LocalWorkTemperatureStore.requestTemperature(
+            // Model capabilities allow 2.0, but the app-wide default ceiling is 1.3.
+            assertEquals(1.3, LocalWorkTemperatureStore.requestTemperature(
                 session, geminiModel, geminiUrl,
             )!!, 0.0)
             LocalWorkTemperatureStore.setLevel(session, 2)
