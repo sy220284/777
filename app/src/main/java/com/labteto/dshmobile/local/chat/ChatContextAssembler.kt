@@ -22,10 +22,25 @@ internal object ChatMemorySelector {
         return text.length >= 8 && RELATIONSHIP_MEMORY_HINTS.any { text.contains(it) }
     }
 
-    fun semanticQuery(query: String, personaName: String): String =
-        listOf(query.trim(), personaName.trim())
-            .filter(String::isNotBlank)
-            .joinToString(" ")
+    fun semanticQuery(
+        query: String,
+        personaName: String,
+        context: ChatContextState = ChatContextState(),
+    ): String {
+        val text = query.trim().lowercase()
+        val needsReferent = shouldRecall(query) && IMPLICIT_CONTINUITY_HINTS.any(text::contains)
+        // Use public conversation evidence, never the character's private impressions or thoughts.
+        val referent = if (needsReferent) {
+            context.pendingTurns.sortedBy(ChatPendingTurn::sequence)
+                .lastOrNull { it.userMessage.isNotBlank() && it.userMessage.trim() != query.trim() }
+                ?.userMessage
+                ?: context.continuity.unfinished.lastOrNull()
+                ?: context.continuity.decisions.lastOrNull()
+                ?: context.continuity.recentEvents.lastOrNull()
+        } else null
+        return listOf(query.trim(), personaName.trim(), referent.orEmpty().trim())
+            .filter(String::isNotBlank).distinct().joinToString(" ")
+    }
 
     private val LOW_INFORMATION_REPLIES = setOf(
         "嗯", "嗯嗯", "好", "好的", "行", "可以", "继续", "接着", "然后呢", "哈哈", "哈哈哈",

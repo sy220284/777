@@ -78,6 +78,8 @@ internal fun LocalRunCenterScreen(
     onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onOpenResults: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenArtifact: (String) -> Unit = { onOpenResults() },
+    onContinueArtifact: (String) -> Unit = {},
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
@@ -252,7 +254,7 @@ internal fun LocalRunCenterScreen(
                                             "file" -> {
                                                 if (artifact.currentlyAvailable == false) {
                                                     artifactActionFailed = true
-                                                } else onOpenResults()
+                                                } else onOpenArtifact(artifact.reference)
                                             }
                                             "link" -> runCatching { uriHandler.openUri(artifact.reference) }
                                                 .onFailure { artifactActionFailed = true }
@@ -260,6 +262,14 @@ internal fun LocalRunCenterScreen(
                                         }
                                     },
                                 )
+                                if (artifact.category == "file" && artifact.currentlyAvailable != false) {
+                                    DsButton(
+                                        text = stringResource(R.string.local_artifact_continue),
+                                        onClick = { onContinueArtifact(artifact.reference) },
+                                        variant = DsButtonVariant.Ghost,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
                                 DsButton(
                                     text = stringResource(R.string.common_copy),
                                     onClick = { clipboard.setText(AnnotatedString(artifact.reference)) },
@@ -345,7 +355,13 @@ internal fun LocalRunCenterScreen(
     }
 
     if (showFullHistory && onHistoryPage != null) {
-        LocalWorkHistorySheet(state.sessionId, onHistoryPage, onToolEvidence, onOpenResults) { showFullHistory = false }
+        LocalWorkHistorySheet(
+            sessionId = state.sessionId,
+            readPage = onHistoryPage,
+            readEvidence = onToolEvidence,
+            onOpenArtifact = onOpenArtifact,
+            onDismiss = { showFullHistory = false },
+        )
     }
 
     if (showAgentLauncher) {

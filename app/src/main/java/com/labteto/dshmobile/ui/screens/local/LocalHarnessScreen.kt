@@ -166,11 +166,14 @@ fun LocalHarnessScreen(
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
+    var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
+    var workHandoffSourceSessionId by rememberSaveable { mutableStateOf("") }
+    var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
@@ -231,6 +234,8 @@ fun LocalHarnessScreen(
             handoffWorkCapability(prompt)
         } else {
             pendingWorkCapability = prompt
+            workHandoffSourceSessionId = shell.sessionId
+            workHandoffSummary = viewModel.workHandoffSummary()
             workCapabilityConfirmed = false
             workCapabilityFailed = false
         }
@@ -370,6 +375,11 @@ fun LocalHarnessScreen(
         ),
         localWorkFeatureUiContribution(
             filesMode = filesMode,
+            onContinueArtifact = { path ->
+                handoffWorkCapability(context.getString(R.string.local_artifact_continue_prompt, path))
+            },
+            requestedFilePath = requestedFilePath,
+            onRequestedFilePathChange = { requestedFilePath = it },
             shell = shell,
             actions = workActions,
             onFilesModeChange = { filesMode = it },
@@ -611,10 +621,15 @@ fun LocalHarnessScreen(
             switching = workCapabilityConfirmed,
             failed = workCapabilityFailed,
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+            prompt = pendingWorkCapability.orEmpty(),
+            summary = workHandoffSummary,
+            onPromptChange = { pendingWorkCapability = it },
+            onSummaryChange = { workHandoffSummary = it },
             onContinue = {
-                workCapabilityConfirmed = true
                 workCapabilityFailed = false
-                switchUsageMode(LocalUsageMode.WORK)
+                workCapabilityConfirmed = viewModel.createWorkContinuation(workHandoffSourceSessionId, workHandoffSummary)
+                if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
+                else workCapabilityFailed = true
             },
             onDismiss = {
                 pendingWorkCapability = null

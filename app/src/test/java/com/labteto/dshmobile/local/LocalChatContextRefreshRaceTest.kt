@@ -53,6 +53,7 @@ class LocalChatContextRefreshRaceTest {
         val coordinator: LocalChatContextRefreshCoordinator,
         val profile: LocalModelProfile,
         val observedProfiles: List<String>,
+        val observedUsageTurns: List<String?>,
         val persisted: () -> Int,
     )
     private fun fixture(scope: CoroutineScope): Fixture {
@@ -60,7 +61,7 @@ class LocalChatContextRefreshRaceTest {
         val message = LocalHarnessMessage("a", "assistant", "reply", createdAt = 1L)
         val event = log.append("assistant/message", buildJsonObject { put("transcript", encodeTranscriptMessages(listOf(message))) })
         val context = ChatContextState(scene = ChatSceneState(location = "old")).enqueuePendingDurably(
-            ChatPendingTurn(event.sequence, assistantMessageId = "a", branchHeadId = "a", assistantMessage = "reply"), log,
+            ChatPendingTurn(event.sequence, userMessageId = "original-user", assistantMessageId = "a", branchHeadId = "a", assistantMessage = "reply"), log,
         )
         val state = InterceptedFlow(MutableStateFlow(LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT, chat = LocalChatState(chatContext = context))))
         val turns = LocalChatTurnCoordinator(
@@ -74,6 +75,7 @@ class LocalChatContextRefreshRaceTest {
         var persisted = 0
         val profile = LocalModelProfile("profile-a", "model-a", "https://example.test/v1")
         val observedProfiles = mutableListOf<String>()
+        val observedUsageTurns = mutableListOf<String?>()
         val coordinator = LocalChatContextRefreshCoordinator(
             readState = { state.value },
             chatState = localAggregateChatStatePort(state),
@@ -88,12 +90,22 @@ class LocalChatContextRefreshRaceTest {
                     emptyList(),
                 )
             },
-            recordUsage = { _, _ -> },
+            recordUsage = { _, _, turnId -> observedUsageTurns += turnId },
             persistBranchState = { _, _ -> },
             persistSnapshot = { persisted++ },
             scope = scope,
         )
-        return Fixture(log, state, coordinator, profile, observedProfiles) { persisted }
+        return Fixture(log, state, coordinator, profile, observedProfiles, observedUsageTurns) { persisted }
+    }
+    @Test fun refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives() = runTest {
+        val fixture = fixture(backgroundScope)
+        fixture.state.delegate.value = fixture.state.value.copy(
+            transcriptIndex = fixture.state.value.transcriptIndex.copy(latestUserMessageId = "newer-user"),
+        )
+        val before = fixture.state.value
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chat.chatState,
+            before.chat.chatContext.generation, fixture.log, fixture.profile)
+        assertEquals(listOf("original-user"), fixture.observedUsageTurns)
     }
     @Test fun failedCompareFollowedBySessionSwitchCannotReportSuccessfulConsolidation() = runTest {
         val fixture = fixture(backgroundScope)

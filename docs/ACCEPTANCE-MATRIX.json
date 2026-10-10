@@ -105,7 +105,9 @@
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 关系记忆提取和召回",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContextAssemblerTest.kt#implicitRecallUsesPendingPublicUserEvidenceBeforeOlderSummary",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContextAssemblerTest.kt#explicitTopicAndResetDoNotBorrowPreviousTopic"
       ]
     },
     {
@@ -192,7 +194,9 @@
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#olderPageReplacesRecentRecordsAndShowsExactToolEvidence",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#artifactClickPassesExactPathAndDismissesHistory",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceArtifactPreviewTest.kt#requestedArtifactOpensEvenOutsideConversationFileList"
       ]
     },
     {
@@ -770,7 +774,8 @@
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / Token 请求级账本",
       "state": "automated_partial",
       "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens"
+        "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives"
       ]
     },
     {

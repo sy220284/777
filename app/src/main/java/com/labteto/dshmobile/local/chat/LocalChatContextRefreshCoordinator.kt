@@ -169,7 +169,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         LocalSessionEventLog,
         LocalModelProfile,
     ) -> LocalModelReply?,
-    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
+    private val recordUsage: (LocalHarnessState, LocalModelReply, String?) -> Unit,
     private val persistBranchState: (String, String) -> Unit,
     private val persistSnapshot: (String) -> Unit,
     private val scope: CoroutineScope,
@@ -202,8 +202,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 ),
             )
         },
-        recordUsage = { snapshot, reply ->
-            usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH)
+        recordUsage = { snapshot, reply, turnId ->
+            usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH, turnId = turnId)
         },
         persistBranchState = { sessionId, reason ->
             branchCoordinator.persistCurrentProjection(sessionId, reason)
@@ -455,7 +455,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             )
             return
         }
-        recordUsage(before, plannerReply)
+        recordUsage(before, plannerReply, pending.maxBy(ChatPendingTurn::sequence).userMessageId.takeIf(String::isNotBlank))
 
         val plan = chatTurnCoordinator.parsePostTurn(
             text = plannerReply.content.orEmpty(),

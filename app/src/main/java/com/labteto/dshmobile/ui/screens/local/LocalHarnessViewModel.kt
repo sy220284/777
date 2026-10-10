@@ -295,6 +295,15 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.WORK -> runtime.work.stop()
         }
     }
+    internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
+    internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
+        if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false
+        return runtime.session.createSession(
+            mode = LocalConversationMode.CONTINUATION,
+            usageMode = LocalUsageMode.WORK,
+            handoffSummaryOverride = summary,
+        )
+    }
     fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode)
     fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode, state.value.usageMode)
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
