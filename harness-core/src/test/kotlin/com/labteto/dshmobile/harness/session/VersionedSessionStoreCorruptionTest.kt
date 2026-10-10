@@ -40,6 +40,8 @@ class VersionedSessionStoreCorruptionTest {
             val id = "83b4f37f-fe6d-4213-97b6-8ca2251f825a"
             val store = VersionedSessionStore(root, Json)
             store.write(id, buildJsonObject { put("title", "原始对话") })
+            store.write("ordinary-chat", buildJsonObject { put("title", "其他正常聊天") })
+            store.write("older.events.jsonl", buildJsonObject { put("title", "含日志标记的合法旧会话") })
             val sidecar = File(root, "$id.events.jsonl.projection-work.agent-team.json")
                 .apply { writeText("""{"version":1,"identity":"projection","throughSequence":1,"payload":"{}"}""") }
             val nested = File(
@@ -55,9 +57,12 @@ class VersionedSessionStoreCorruptionTest {
             File(root, "$id.checkpoint-v0.json").writeText("{}")
             File(root, "unrelated invalid id.json").writeText("{}")
 
-            assertEquals(listOf(id), store.ids())
-            assertEquals(listOf(id), store.list().map { it.document.id })
+            assertEquals(setOf(id, "ordinary-chat", "older.events.jsonl"), store.ids().toSet())
+            assertEquals(setOf(id, "ordinary-chat", "older.events.jsonl"),
+                store.list().map { it.document.id }.toSet())
             assertEquals(id, store.read(id)?.document?.id)
+            assertEquals("ordinary-chat", store.read("ordinary-chat")?.document?.id)
+            assertEquals("older.events.jsonl", store.read("older.events.jsonl")?.document?.id)
             assertTrue(sidecar.isFile)
             assertTrue(nested.isFile)
             assertTrue(excessivelyNested.isFile)
