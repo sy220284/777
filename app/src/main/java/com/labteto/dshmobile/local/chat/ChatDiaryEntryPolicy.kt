@@ -22,7 +22,11 @@ internal object ChatDiaryEntryPolicy {
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
         ).takeIf { delta ->
-            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank()
+            // Shared experiences may be important even when the character did not
+            // report a feeling. Their event still needs source evidence and significance.
+            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank() ||
+                (delta.importance >= 4 && event.length >= 12 &&
+                    (delta.relationshipMeaning.isNotBlank() || event.length >= 18))
         }
     }
 

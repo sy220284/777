@@ -436,18 +436,47 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun majorEventWithoutSubjectiveExperienceIsRejected() {
+    fun groundedMajorEventWithoutSubjectiveFeelingStillBecomesSharedExperience() {
         val memory = store()
 
-        assertNull(memory.record(request(
+        val saved = memory.record(request(
             delta = ChatDiaryDelta(
                 event = "用户确认周末和我去海边",
                 relationshipMeaning = "我们有了一个明确的共同计划",
                 importance = 5,
             ),
             evidence = "用户确认周末和我去海边",
+        ))
+        assertNotNull(saved)
+        assertTrue(memory.search("周末去海边", "gallery:a", false, 3)
+            .any { it.id == saved!!.id })
+    }
+
+    @Test
+    fun witnessedGroupEventWithoutEmotionsCanReturnToDirectChat() {
+        val memory = store()
+        val saved = memory.record(request(
+            sourceMode = ChatDiarySourceMode.GROUP,
+            delta = ChatDiaryDelta(
+                event = "群聊里大家约定下周六一起制作旅行相册",
+                importance = 4,
+            ),
+            evidence = "群聊里大家约定下周六一起制作旅行相册",
+        ))
+        assertNotNull(saved)
+        assertTrue(memory.search("下周六制作旅行相册", "gallery:a", false, 3)
+            .any { it.id == saved!!.id })
+        assertTrue(memory.search("下周六制作旅行相册", "gallery:b", false, 3).isEmpty())
+
+        assertNull(memory.record(request(
+            sourceMode = ChatDiarySourceMode.GROUP,
+            delta = ChatDiaryDelta(
+                event = "群聊里大家约定下周六一起制作旅行相册",
+                importance = 4,
+            ),
+            userId = "u-ungrounded", assistantId = "a-ungrounded",
+            evidence = "用户只是打了声招呼",
         )))
-        assertTrue(memory.listActive("gallery:a").isEmpty())
     }
 
     @Test
