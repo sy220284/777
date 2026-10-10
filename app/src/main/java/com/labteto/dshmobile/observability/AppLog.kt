@@ -325,4 +325,8 @@ private val DIAGNOSTIC_SECRET_PATTERNS = listOf(
     Regex("(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s,;]+"),
     Regex("(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\\s*[:=]\\s*[\\\"']?)[^\\s,\\\"'}]+"),
     Regex("(?i)()\\b(?:github_pat|ghp|gho|ghu|ghs)_[A-Za-z0-9_]+\\b"),
+    Regex("(?i)([?&](?:access_token|refresh_token|api_key|token|key)=)[^&#\\s]+"),
+    Regex("(?i)((?:set-cookie|cookie)\\s*[:=]\\s*)[^\\r\\n]+"),
+    Regex("(?i)()\\bsk-[A-Za-z0-9_-]{12,}\\b"),
+    Regex("(?i)()/(?:data/(?:user/\\d+|data)|storage/emulated/\\d+|sdcard)/[^\\s,;]+"),
 )
