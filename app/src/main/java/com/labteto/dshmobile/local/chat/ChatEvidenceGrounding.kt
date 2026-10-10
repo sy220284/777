@@ -20,15 +20,15 @@ internal fun evidenceGrounded(
         else -> return false
     }
     if (sourceText.length < 2) return false
-    if (sourceText.contains(evidenceText)) return true
 
-    // Brief explicit denials must not support the opposite positive fact.
-    // Avoid comparing whole polarity of long multi-topic conversations.
+    // Polarity must be checked BEFORE substring matches: "不喜欢阿青"
+    // literally contains "喜欢阿青" but cannot ground the opposite relationship fact.
     val explicit = source == "user" || source == "explicit"
     if (explicit && sourceText.length <= 100 && evidenceText.length >= 4 &&
         CHAT_EVIDENCE_NEGATION.containsMatchIn(sourceText) !=
             CHAT_EVIDENCE_NEGATION.containsMatchIn(evidenceText)
     ) return false
+    if (sourceText.contains(evidenceText)) return true
 
     val evidenceBigrams = chatEvidenceBigrams(evidenceText)
     val sourceBigrams = chatEvidenceBigrams(sourceText)
