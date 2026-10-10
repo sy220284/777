@@ -16,7 +16,7 @@ internal object LocalProcessExitStatus {
                 .orEmpty()
         }.getOrElse { error ->
             AppLog.failure("LocalProcessExitStatus", "read_process_exit_history", error)
-            emptyList()
+            return "进程退出记录：读取失败（${error.javaClass.simpleName}），请在诊断报告中查看原因"
         }
         if (records.isEmpty()) return "进程退出记录：暂无可用记录"
 
