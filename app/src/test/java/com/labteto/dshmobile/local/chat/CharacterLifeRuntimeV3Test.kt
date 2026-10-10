@@ -142,7 +142,11 @@ class CharacterLifeRuntimeV3Test {
             assistantMessage = "这次经历我会记住。",
         )
         assertTrue(evolved.observationCount > previous.evolution.observationCount)
-        assertTrue(evolved.traitStates.isEmpty())
+        // V4 trusted habits may now seed runtime trait slots, but an unrelated
+        // milestone must not silently change any long-term tendency.
+        assertTrue(evolved.traitStates.values.all {
+            it.evidenceCount == 0 && it.currentWeight == it.baseline
+        })
         val attention = resolveCharacterAttention(persona, current, "神里家的祭典筹备进行得怎么样？")
         assertTrue(attention.noticed.isNotEmpty())
         assertTrue(resolveCharacterMode(persona, current, "神里家的祭典筹备进行得怎么样？", attention).focus.isNotEmpty())

@@ -14,28 +14,33 @@ internal fun evidenceGrounded(
     val evidenceText = normalizeChatEvidence(evidence.text)
     if (evidenceText.length < 2) return false
 
-    val sourceText = when (source) {
-        "user", "explicit" -> normalizeChatEvidence(userMessage)
-        "observed", "dialogue" -> normalizeChatEvidence(userMessage + assistantMessage)
+    val explicit = source == "user" || source == "explicit"
+    val spoken = when (source) {
+        "user", "explicit" -> listOf(userMessage)
+        "observed", "dialogue" -> listOf(userMessage, assistantMessage)
         else -> return false
     }
-    if (sourceText.length < 2) return false
-
-    // Polarity must be checked BEFORE substring matches: "不喜欢阿青"
-    // literally contains "喜欢阿青" but cannot ground the opposite relationship fact.
-    val explicit = source == "user" || source == "explicit"
-    if (explicit && sourceText.length <= 100 && evidenceText.length >= 4 &&
-        CHAT_EVIDENCE_NEGATION.containsMatchIn(sourceText) !=
-            CHAT_EVIDENCE_NEGATION.containsMatchIn(evidenceText)
-    ) return false
-    if (sourceText.contains(evidenceText)) return true
-
     val evidenceBigrams = chatEvidenceBigrams(evidenceText)
-    val sourceBigrams = chatEvidenceBigrams(sourceText)
-    if (evidenceBigrams.isEmpty() || sourceBigrams.isEmpty()) return false
-    val shared = evidenceBigrams.count(sourceBigrams::contains)
-    // Two frequent bigrams with 25% overlap do not establish a personal fact.
-    return shared >= 2 && shared.toDouble() / evidenceBigrams.size >= 0.50
+    if (evidenceBigrams.isEmpty()) return false
+
+    // Keep contradictory clauses separate. "她说周末有空，我还没约" supports the
+    // first claim even though the second clause contains "没". Conversely,
+    // "我不喜欢阿青" cannot support "喜欢阿青" via a substring match.
+    return spoken.asSequence()
+        .flatMap { it.split(CHAT_EVIDENCE_CLAUSE_BOUNDARIES).asSequence() }
+        .map(::normalizeChatEvidence)
+        .filter { it.length >= 2 }
+        .any { clause ->
+            if (explicit && clause.length <= 100 && evidenceText.length >= 4 &&
+                CHAT_EVIDENCE_NEGATION.containsMatchIn(clause) !=
+                    CHAT_EVIDENCE_NEGATION.containsMatchIn(evidenceText)
+            ) return@any false
+            if (clause.contains(evidenceText)) return@any true
+            val clauseBigrams = chatEvidenceBigrams(clause)
+            val shared = evidenceBigrams.count(clauseBigrams::contains)
+            // Two generic overlaps cannot establish a new relationship fact.
+            shared >= 2 && shared.toDouble() / evidenceBigrams.size >= 0.50
+        }
 }
 
 private fun normalizeChatEvidence(value: String): String =
@@ -47,4 +52,5 @@ private fun chatEvidenceBigrams(text: String): Set<String> =
         text.substring(index, index + 2)
     }
 
+private val CHAT_EVIDENCE_CLAUSE_BOUNDARIES = Regex("""[，。！？、,.!?；;\n]+""")
 private val CHAT_EVIDENCE_NEGATION = Regex("""(?:没有|没|不|未|拒绝|取消|撤销)""")

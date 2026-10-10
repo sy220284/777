@@ -54,6 +54,24 @@ class CharacterFactsV4Test {
         assertTrue(prompt.contains("叶澜相信阿宁是可信赖的人"))
     }
 
+    @Test fun genericSharedWordsDoNotBringAnUnrelatedSubjectiveBeliefIntoReply() {
+        val persona = PersonaProfile(
+            name = "叶澜", coreIdentity = "旅行者",
+            facts = listOf(
+                CharacterFact("seen", CharacterFactCategories.BIOGRAPHY,
+                    "叶澜和阿宁曾经参观灯塔"),
+                CharacterFact("unrelated", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "叶澜认为未来也许要换工作", perspective = "本人"),
+            ),
+        )
+        val projection = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(),
+                "你和阿宁参观灯塔时知道什么？", null)
+        val prompt = projection.stablePrompt + projection.dynamicPrompt
+        assertTrue(prompt.contains("叶澜和阿宁曾经参观灯塔"))
+        assertFalse(prompt.contains("叶澜认为未来也许要换工作"))
+    }
+
     @Test fun uncertainCoreFactsStayOutOfStableIdentityButRemainDiscoverableWithWarning() {
         val persona = PersonaProfile(name = "阿岚", coreIdentity = "药师",
             facts = listOf(CharacterFact("suspect", CharacterFactCategories.PERSONALITY,

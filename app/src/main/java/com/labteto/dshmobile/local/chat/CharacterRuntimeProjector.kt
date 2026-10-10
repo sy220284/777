@@ -244,8 +244,11 @@ internal class CharacterRuntimeProjector(
         // Expand only from genuinely relevant facts and only within the current story stage.
         // Fact IDs are internal references; users should never need to type them to recall a link.
         val linked = visible.filter { fact ->
-            fact.id !in directIds &&
-                (fact.id in linkedIds || fact.relatedFactIds.any(directIds::contains))
+            fact.id !in directIds && (
+                fact.id in linkedIds ||
+                    fact.relatedFactIds.any(directIds::contains) ||
+                    sharesRelevantTopicWithKnownFact(fact, direct, query)
+            )
         }.take(4 - direct.size)
         val relevant = direct + linked
         if (relevant.isEmpty()) return ""
@@ -267,6 +270,29 @@ internal class CharacterRuntimeProjector(
         }.trim(), 500)
     }
 
+    /**
+     * A single name/topic anchor can connect a directly matched event with this
+     * character's subjective impression of that same person. Do not expand an
+     * unrelated fact merely because it shares generic dialogue words.
+     */
+    private fun sharesRelevantTopicWithKnownFact(
+        candidate: CharacterFact,
+        matched: List<CharacterFact>,
+        query: String,
+    ): Boolean {
+        if (candidate.category != CharacterFactCategories.SUBJECTIVE_BELIEFS ||
+            matched.isEmpty()
+        ) return false
+        val queryPairs = normalize(query).windowed(2).toSet()
+        val factPairs = normalize(candidate.content).windowed(2).toSet()
+        return matched.any { related ->
+            normalize(related.content).windowed(2).any { pair ->
+                pair in queryPairs && pair in factPairs &&
+                    pair !in GENERIC_LINKED_FACT_PAIRS
+            }
+        }
+    }
+
     private fun relevantTo(source: String, query: String): Boolean {
         val a = normalize(source)
         val b = normalize(query)
@@ -285,6 +311,10 @@ internal class CharacterRuntimeProjector(
     }
 
     private companion object {
+        val GENERIC_LINKED_FACT_PAIRS = setOf(
+            "我们", "他们", "自己", "一起", "那个", "这个", "事情", "时候",
+            "知道", "关于", "什么", "可以", "认为", "感觉", "觉得",
+        )
         const val MAX_STORY_CONTEXT_CHARS = 2_500
         const val MAX_STABLE_VOICE_SAMPLES = 2
         const val STABLE_CRITICAL_TOKEN_BUDGET = 320
