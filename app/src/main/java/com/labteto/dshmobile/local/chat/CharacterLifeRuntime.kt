@@ -49,7 +49,7 @@ internal fun advanceCharacterLife(
     }
 
     val anchors = lifeAnchors(persona.factText(CharacterFactCategories.LIFE_GRAVITY)
-        .ifBlank { if (persona.facts.isEmpty()) persona.lifeContext else "" })
+        .ifBlank { if (persona.facts.isEmpty() && persona.coreIdentity.isBlank()) persona.lifeContext else "" })
     val beat = selectLifeBeat(anchors, previous.currentBeat, now, storyTime)
     if (beat.isNotBlank()) {
         upsert("persona", beat, CharacterLifeEventKind.BACKGROUND, LIFE_BACKGROUND_TTL_MILLIS)

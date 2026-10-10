@@ -45,16 +45,13 @@ internal object PersonaImmersionPolicy {
         findReplyViolations(persona, text).isNotEmpty()
 
     private fun personaMayHaveNonEmbodiedForm(persona: PersonaProfile): Boolean {
+        val canonical = persona.canonicalV4()
         val source = buildString {
-            appendLine(persona.coreIdentity)
-            persona.facts.forEach { appendLine(it.content) }
-            appendLine(persona.portrait)
-            appendLine(persona.lifeContext)
-            appendLine(persona.worldSetting)
-            appendLine(persona.franchise)
-            persona.limitations.forEach(::appendLine)
-            persona.hardConstraints.forEach(::appendLine)
-            persona.loreEntries.forEach { entry ->
+            appendLine(canonical.coreIdentity)
+            canonical.facts.forEach { appendLine(it.content) }
+            appendLine(canonical.franchise)
+            canonical.hardConstraints.forEach(::appendLine)
+            canonical.loreEntries.forEach { entry ->
                 appendLine(entry.title)
                 appendLine(entry.content)
                 entry.keywords.forEach(::appendLine)
