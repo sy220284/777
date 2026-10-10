@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** Settings-facing data facade for memory and DeepSeek accounting. */
 @Singleton
-class LocalSettingsDataFacade @Inject constructor(
+class LocalSettingsDataFacade @Inject internal constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val chatMemoryProjection: LocalChatMemoryProjectionPort,
