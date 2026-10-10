@@ -37,7 +37,7 @@ internal fun workHandoffSummaryWithSelectedMessages(
         appendLine("来源会话：$sourceSessionId")
         chosen.forEach { message ->
             val speaker = if (message.role == "user") "用户" else "助手"
-            val normalized = message.content.trim().replace(Regex("\\\\s+"), " ")
+            val normalized = message.content.trim().replace(Regex("\\s+"), " ")
             val excerpt = normalized.take(1_000)
             appendLine("- $speaker [消息ID: ${message.id}]：$excerpt" +
                 if (normalized.length > 1_000) "…（节选）" else "")
