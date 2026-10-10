@@ -61,6 +61,12 @@ class LocalHarnessViewModel @Inject constructor(
         null
     }
 
+    internal fun workHandoffCapabilityReadiness(
+        task: String,
+        githubConfigured: Boolean?,
+        networkSearchEnabled: Boolean,
+    ) = toolsUi.workHandoffCapabilityReadiness(task, githubConfigured, networkSearchEnabled)
+
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)

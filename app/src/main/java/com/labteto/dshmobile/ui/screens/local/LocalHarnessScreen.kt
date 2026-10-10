@@ -84,7 +84,6 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
-import com.labteto.dshmobile.local.presentation.projectWorkCapabilityReadiness
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -645,7 +644,7 @@ fun LocalHarnessScreen(
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
             prompt = pendingWorkCapability.orEmpty(),
             summary = workHandoffSummary,
-            capabilities = projectWorkCapabilityReadiness(
+            capabilities = viewModel.workHandoffCapabilityReadiness(
                 task = pendingWorkCapability.orEmpty(),
                 githubConfigured = githubConfiguredForHandoff,
                 networkSearchEnabled = networkSearchEnabled,
