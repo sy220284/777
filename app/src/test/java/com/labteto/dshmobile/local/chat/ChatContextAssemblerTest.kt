@@ -6,6 +6,27 @@ import org.junit.Test
 
 class ChatContextAssemblerTest {
     @Test
+    fun implicitRecallUsesPendingPublicUserEvidenceBeforeOlderSummary() {
+        val context = ChatContextState(
+            continuity = ChatContinuityState(unfinished = listOf("旧的海边约定")),
+            pendingTurns = listOf(ChatPendingTurn(sequence = 2, userMessage = "明天去城南修手表")),
+        )
+        val search = ChatMemorySelector.semanticQuery("那件事后来怎么样了", "小宁", context)
+        assertTrue(search.contains("明天去城南修手表"))
+        assertFalse(search.contains("旧的海边约定"))
+        assertTrue(search.contains("小宁"))
+    }
+
+    @Test
+    fun explicitTopicAndResetDoNotBorrowPreviousTopic() {
+        val context = ChatContextState(continuity = ChatContinuityState(unfinished = listOf("修手表")))
+        assertFalse(ChatMemorySelector.semanticQuery("你记得我喜欢什么花吗", "小宁", context).contains("修手表"))
+        assertFalse(ChatMemorySelector.semanticQuery("别再提那件事", "小宁", context).contains("修手表"))
+        assertFalse(ChatMemorySelector.semanticQuery("继续", "小宁", context).contains("修手表"))
+        assertTrue(ChatMemorySelector.semanticQuery("按原来的安排吧", "小宁", context).contains("修手表"))
+    }
+
+    @Test
     fun lowInformationRepliesDoNotRecallLongTermMemory() {
         assertFalse(ChatMemorySelector.shouldRecall("嗯"))
         assertFalse(ChatMemorySelector.shouldRecall("继续"))

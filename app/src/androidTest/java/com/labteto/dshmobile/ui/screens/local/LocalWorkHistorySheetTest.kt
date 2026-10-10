@@ -8,6 +8,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.*
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
@@ -15,6 +16,25 @@ import java.util.concurrent.CopyOnWriteArrayList
 class LocalWorkHistorySheetTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test fun artifactClickPassesExactPathAndDismissesHistory() {
+        var opened: String? = null
+        var dismissed = 0
+        compose.setContent {
+            DshTheme {
+                LocalWorkHistorySheet("session", { _, _ ->
+                    LocalWorkHistoryPageUi(listOf(LocalWorkHistoryRecord(1, "tool/result", "write_file", "saved", "call",
+                        listOf(LocalArtifactUiItem(reference = "results/report.md", category = "file", sourceCallId = "call", asOfSequence = 1, currentlyAvailable = true)))), null)
+                }, { _, _, _ -> null }, { opened = it }, { dismissed++ })
+            }
+        }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("results/report.md").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("results/report.md").performClick()
+        compose.runOnIdle {
+            assertEquals("results/report.md", opened)
+            assertEquals(1, dismissed)
+        }
+    }
 
     @Test fun olderPageReplacesRecentRecordsAndShowsExactToolEvidence() {
         val reads = CopyOnWriteArrayList<Long?>()

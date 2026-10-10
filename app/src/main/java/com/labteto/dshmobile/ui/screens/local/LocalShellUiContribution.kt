@@ -47,6 +47,10 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            usageRevision = actions.usageRevision,
+            loadTurnSummaries = actions.turnUsageSummaries,
+            loadTurnUsage = actions.turnUsage,
+            loadUsageRequest = actions.requestUsage,
             composerHandoff = composerHandoff,
             skillDisplayNames = skillDisplayNames,
             onUseWorkCapability = onUseWorkCapability,

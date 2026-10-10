@@ -89,6 +89,7 @@ internal class LocalSessionLifecycleCoordinator(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec? = null,
+        handoffSummaryOverride: String? = null,
     ): Boolean {
         if (!chatSessionLifecycle.acceptsCreateSpec(usageMode, domainSpec)) return false
         if (!beginTransition()) return false
@@ -143,7 +144,9 @@ internal class LocalSessionLifecycleCoordinator(
                         sourceChat = sourceState.chat,
                         sessionsRoot = sessionsRoot,
                     )
-                    val handoff = when (val override = chatPlan.handoffOverride) {
+                    val handoff = if (mode == LocalConversationMode.CONTINUATION && handoffSummaryOverride != null) {
+                        handoffSummaryOverride.trim().takeIf(String::isNotBlank)
+                    } else when (val override = chatPlan.handoffOverride) {
                         null -> if (mode == LocalConversationMode.CONTINUATION) {
                             buildHandoffSummary(sourceState)
                         } else {
@@ -368,6 +371,8 @@ internal class LocalSessionLifecycleCoordinator(
             state.update { it.copy(loading = false) }
         }
     }
+
+    fun currentHandoffSummary(): String = buildHandoffSummary(state.value)
 
     private fun buildHandoffSummary(snapshot: LocalHarnessState): String =
         handoffBuilder.build(

@@ -55,6 +55,7 @@ internal class LocalTokenUsageContextBridge(
                 ?: fallbackTaskLabel?.trim()?.takeIf(String::isNotBlank)?.take(120),
             step = checkpoint?.get("step")?.jsonPrimitive?.intOrNull,
             action = action,
+            taskRunId = resolveTokenUsageTaskRunId(eventLogFor(resolvedSessionId), runId),
         )
     }
 }
@@ -64,3 +65,19 @@ private val TOOL_USAGE_CHECKPOINT_TYPES = setOf(
     LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT,
     LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT,
 )
+
+/** Run ancestry is immutable; resolve it once from durable Session facts before accounting. */
+internal fun resolveTokenUsageTaskRunId(eventLog: LocalSessionEventLog, runId: String?): String? {
+    var current = runId?.takeIf(String::isNotBlank) ?: return null
+    val visited = mutableSetOf<String>()
+    while (visited.add(current)) {
+        val checkpoint = eventLog.latestMatching(TOOL_USAGE_CHECKPOINT_TYPES) {
+            it["run_id"]?.jsonPrimitive?.contentOrNull == current
+        }?.data
+        val parent = checkpoint?.get("parent_run_id")?.jsonPrimitive?.contentOrNull
+            ?.takeIf(String::isNotBlank) ?: return current
+        current = parent
+    }
+    // A corrupt ancestry cannot establish a task root. Keep the original run identity available.
+    return null
+}

@@ -209,6 +209,12 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
     ): String? {
         if (call.name !in TOOL_NAMES) return null
+        // A message arriving while the Team projection rebuilds is new to this admitted wait.
+        // Capture its implicit cursor before the first suspension; explicit cursors remain exact.
+        val messageWaitCursor = if (call.name == "team_wait_for_message") {
+            call.arguments["after_sequence"]?.jsonPrimitive?.longOrNull?.takeIf { it >= 0L }
+                ?: eventLogFor(binding.sessionId).latestSequence()
+        } else -1L
         awaitProjection(binding.sessionId)
         if (call.name in MUTATING_TOOL_NAMES) {
             synchronizeTeamRuntime(binding.sessionId)
@@ -266,7 +272,7 @@ internal class LocalAgentTeamRuntime(
             "team_wait_for_message" -> waitForMessage(
                 sessionId = binding.sessionId,
                 targetName = args.optionalTeamString("target"),
-                afterSequence = args["after_sequence"]?.jsonPrimitive?.longOrNull ?: -1L,
+                afterSequence = messageWaitCursor,
                 timeoutMs = (args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 10_000)
                     .coerceIn(MIN_WAIT_MS, MAX_WAIT_MS),
             )
@@ -1458,11 +1464,7 @@ internal class LocalAgentTeamRuntime(
         afterSequence: Long,
         timeoutMs: Int,
     ): String {
-        var scanAfter = if (afterSequence >= 0L) {
-            afterSequence
-        } else {
-            eventLogFor(sessionId).latestSequence()
-        }
+        var scanAfter = afterSequence
 
         fun scanNext(): LocalTeamAgentMessageSnapshot? {
             val scan = nextAgentMessageAfter(

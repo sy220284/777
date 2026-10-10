@@ -19,11 +19,15 @@ class LocalSessionRuntime @Inject internal constructor(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec? = null,
+        handoffSummaryOverride: String? = null,
     ) = lifecycle.createSession(
         mode = mode,
         usageMode = usageMode,
         domainSpec = domainSpec,
+        handoffSummaryOverride = handoffSummaryOverride,
     )
+
+    internal fun currentHandoffSummary() = lifecycle.currentHandoffSummary()
 
     internal fun switchDomainMode(command: LocalSessionDomainModeCommand) =
         lifecycle.switchDomainMode(command)

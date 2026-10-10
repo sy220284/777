@@ -32,6 +32,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,12 +44,22 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     private val projects: LocalProjectUiFacade,
     private val toolsUi: LocalToolsUiFacade,
+    private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val approvalPreferences: LocalApprovalPreferences,
     private val networkSearchSettings: LocalNetworkSearchSettings,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
+
+    /** Config presence is a hint only; the actual tool invocation still checks credentials and policy. */
+    internal suspend fun githubConfiguredForHandoff(): Boolean? = try {
+        toolsUi.githubConfigured()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
@@ -60,6 +71,12 @@ class LocalHarnessViewModel @Inject constructor(
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
     val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
+    internal val usageRevision = usageUi.revision
+    internal fun sessionUsage(sessionId: String) = usageUi.sessionSnapshot(sessionId)
+    internal fun taskUsage(runId: String) = usageUi.taskDetail(runId)
+    internal fun turnUsageSummaries(sessionId: String) = usageUi.turnSummaries(sessionId)
+    internal fun turnUsage(sessionId: String, turnId: String) = usageUi.turnDetail(sessionId, turnId)
+    internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
     internal val projectCatalog = projects.catalog
     internal val projectRecoveryNotice = projects.recoveryNotice
     internal fun backupAndResetProjectCatalog() = projects.backupAndResetCatalog()
@@ -293,6 +310,15 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.CHAT -> runtime.chat.stop()
             LocalUsageMode.WORK -> runtime.work.stop()
         }
+    }
+    internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
+    internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
+        if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false
+        return runtime.session.createSession(
+            mode = LocalConversationMode.CONTINUATION,
+            usageMode = LocalUsageMode.WORK,
+            handoffSummaryOverride = summary,
+        )
     }
     fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode)
     fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode, state.value.usageMode)

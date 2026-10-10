@@ -4,6 +4,15 @@
   "status_explanation": "This index contains only executable repository evidence mapped to feature-tree leaves. Each automated_partial entry proves only named assertions; no entry means untested, not passed. External-only conditions are excluded from repository acceptance.",
   "items": [
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#enteringWorkRequiresAnExplicitUserAction",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#handoffDraftCanBeEditedAndCancelDoesNotStartWork",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "state": "automated_partial",
       "evidence": [
@@ -105,7 +114,9 @@
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 关系记忆提取和召回",
       "state": "automated_partial",
       "evidence": [
-        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt#boundRelationshipMemoryOnlyMatchesItsCharacter",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContextAssemblerTest.kt#implicitRecallUsesPendingPublicUserEvidenceBeforeOlderSummary",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContextAssemblerTest.kt#explicitTopicAndResetDoNotBorrowPreviousTopic"
       ]
     },
     {
@@ -179,6 +190,14 @@
       ]
     },
     {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitWithoutCursorIgnoresHistoricalResultAndReturnsNextNewResult",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntimeTest.kt#waitForMessageReturnsEarliestResultAfterCursorWithoutSkippingLaterResult"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
       "state": "automated_partial",
       "evidence": [
@@ -192,7 +211,9 @@
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#pagesReachEarliestArtifactBeyond4096EventsWithoutDuplicates",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkHistoryProjectionTest.kt#cursorRejectsResetAndAnotherSessionLog",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#olderPageReplacesRecentRecordsAndShowsExactToolEvidence",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#sessionChangeResetsPaginationToLatestPage",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkHistorySheetTest.kt#artifactClickPassesExactPathAndDismissesHistory",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceArtifactPreviewTest.kt#requestedArtifactOpensEvenOutsideConversationFileList"
       ]
     },
     {
@@ -770,7 +791,13 @@
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / Token 请求级账本",
       "state": "automated_partial",
       "evidence": [
-        "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens"
+        "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt#cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives",
+        "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#nestedAndResumedRunsKeepDirectParentAndAggregateUnderOriginalTaskAfterRestart",
+        "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#oldAccountingPayloadRemainsReadableWithoutTaskRoot",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterUsageTest.kt#missingUsageIsExplicitAndTaskDetailsRefreshWithoutCrossingSessions",
+        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt#turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalChatTurnUsageTest.kt#lateUsageUpdatesSourceTurnAndSwitchingSessionClosesItsDetails"
       ]
     },
     {

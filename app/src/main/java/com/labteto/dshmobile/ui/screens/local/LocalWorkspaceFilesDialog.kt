@@ -87,6 +87,8 @@ internal fun LocalWorkspaceFilesDialog(
     loadConversation: suspend (String) -> LocalConversationFiles,
     loadPreview: suspend (String) -> LocalWorkspaceFilePreview,
     onDismiss: () -> Unit,
+    initialFilePath: String? = null,
+    onInitialFilePathConsumed: () -> Unit = {},
 ) {
     var loading by remember(mode, sessionId) { mutableStateOf(true) }
     var error by remember(mode, sessionId) { mutableStateOf<String?>(null) }
@@ -199,7 +201,15 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
-    LaunchedEffect(mode, sessionId) { reload() }
+    LaunchedEffect(mode, sessionId) {
+        // An explicit route request wins over restored browsing state, then is consumed.
+        // Rotating after returning to the list must not reopen an already handled artifact.
+        if (initialFilePath != null) {
+            previewPath = initialFilePath
+            onInitialFilePathConsumed()
+        }
+        reload()
+    }
 
     fun navigateBack() {
         when {

@@ -178,7 +178,19 @@ internal fun LocalConversationSurface(
     onConsumeComposerHandoff: () -> Unit = {},
     onOpenDrawer: (() -> Unit)? = null,
     onUseWorkCapability: ((String) -> Unit)? = null,
+    usageRevision: StateFlow<Long>? = null,
+    loadTurnSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate> = { emptyMap() },
+    loadTurnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { _, _ -> null },
+    loadUsageRequest: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 ) {
+    val turnUsage = LocalChatTurnUsageController(
+        sessionId = state.sessionId,
+        enabled = state.usageMode == LocalUsageMode.CHAT,
+        revision = usageRevision,
+        loadSummaries = loadTurnSummaries,
+        loadTurn = loadTurnUsage,
+        loadRequest = loadUsageRequest,
+    )
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
@@ -707,31 +719,38 @@ internal fun LocalConversationSurface(
                 }
                 items(transcriptItems, key = { it.key }) { transcriptItem ->
                     when (transcriptItem) {
-                        is LocalTranscriptItem.Message -> LocalMessageRow(
-                            message = transcriptItem.message,
-                            chatMode = state.usageMode == LocalUsageMode.CHAT,
-                            workspacePath = state.workspacePath,
-                            skillDisplayNames = skillDisplayNames,
-                            groupMode = state.groupChat.enabled,
-                            canEdit = messageEditingEnabled &&
-                                messageActionsEnabled &&
-                                transcriptItem.message.role == "user",
-                            canRegenerate = !state.groupChat.enabled &&
-                                messageActionsEnabled &&
-                                !transcriptItem.message.proactive &&
-                                state.messages.lastOrNull()?.id == transcriptItem.message.id,
-                            canSelectVariant = messageBranchingEnabled &&
-                                messageActionsEnabled &&
-                                !state.groupChat.enabled,
-                            branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
-                                chatBranchInfo(state.chatBranches, transcriptItem.message.id)
-                            } else {
-                                null
-                            },
-                            onEdit = { message -> editingUserMessage = message },
-                            onSelectVariant = onSelectMessageVariant,
-                            onRegenerate = onRegenerate,
-                        )
+                        is LocalTranscriptItem.Message -> Column {
+                            LocalMessageRow(
+                                message = transcriptItem.message,
+                                chatMode = state.usageMode == LocalUsageMode.CHAT,
+                                workspacePath = state.workspacePath,
+                                skillDisplayNames = skillDisplayNames,
+                                groupMode = state.groupChat.enabled,
+                                canEdit = messageEditingEnabled &&
+                                    messageActionsEnabled &&
+                                    transcriptItem.message.role == "user",
+                                canRegenerate = !state.groupChat.enabled &&
+                                    messageActionsEnabled &&
+                                    !transcriptItem.message.proactive &&
+                                    state.messages.lastOrNull()?.id == transcriptItem.message.id,
+                                canSelectVariant = messageBranchingEnabled &&
+                                    messageActionsEnabled &&
+                                    !state.groupChat.enabled,
+                                branchInfo = if (messageBranchingEnabled && !state.groupChat.enabled) {
+                                    chatBranchInfo(state.chatBranches, transcriptItem.message.id)
+                                } else {
+                                    null
+                                },
+                                onEdit = { message -> editingUserMessage = message },
+                                onSelectVariant = onSelectMessageVariant,
+                                onRegenerate = onRegenerate,
+                            )
+                            if (state.usageMode == LocalUsageMode.CHAT && transcriptItem.message.role == "user") {
+                                turnUsage.summaries[transcriptItem.message.id]?.let { aggregate ->
+                                    LocalChatTurnUsageButton(aggregate) { turnUsage.open(transcriptItem.message.id) }
+                                }
+                            }
+                        }
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
                     }

@@ -115,7 +115,10 @@ internal class LocalSessionComposition @Inject constructor(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec?,
-    ): Boolean = coordinator.createSession(mode, usageMode, domainSpec)
+        handoffSummaryOverride: String?,
+    ): Boolean = coordinator.createSession(mode, usageMode, domainSpec, handoffSummaryOverride)
+
+    override fun currentHandoffSummary(): String = coordinator.currentHandoffSummary()
 
     override fun switchDomainMode(command: LocalSessionDomainModeCommand) {
         coordinator.switchDomainMode(command)
