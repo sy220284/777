@@ -326,6 +326,48 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun changedSharingLabelDoesNotRevokeIndependentExperiences() {
+        val memory = store()
+        val first = memory.record(request(
+            delta = ChatDiaryDelta(event = "用户说他喜欢雨天散步",
+                feeling = "每次下雨会想起这件事",
+                importance = 4, disclosure = "SHAREABLE"),
+            evidence = "用户说他喜欢雨天散步",
+        ))!!
+        val second = memory.record(request(
+            delta = ChatDiaryDelta(event = "用户再次提到喜欢雨天散步，想起童年的学校",
+                feeling = "我更理解这段记忆了",
+                importance = 4, disclosure = "PUBLIC"),
+            userId = "u-new", assistantId = "a-new",
+            evidence = "用户再次提到喜欢雨天散步，想起童年的学校",
+        ))!!
+        assertEquals(null, memory.listActive("gallery:a").first { it.id == first.id }.supersededBy)
+        val group = memory.search("雨天散步", "gallery:a", true, 6)
+        val direct = memory.search("雨天散步", "gallery:a", false, 6)
+        assertTrue(group.any { it.id == first.id })
+        assertTrue(group.any { it.id == second.id })
+        assertEquals(direct.map(ChatDiaryEntry::id), group.map(ChatDiaryEntry::id))
+    }
+
+    @Test
+    fun changedOtherPlanCannotEraseUnrelatedCommitment() {
+        val memory = store()
+        val garden = memory.record(request(
+            delta = ChatDiaryDelta(event = "我们约定周末去植物园看花",
+                feeling = "植物园的行程让我期待", importance = 4),
+            evidence = "我们约定周末去植物园看花",
+        ))!!
+        memory.record(request(
+            delta = ChatDiaryDelta(event = "接朋友的行程改为下周三在车站",
+                feeling = "接站日期终于确定", importance = 5),
+            userId = "u-plan", assistantId = "a-plan",
+            evidence = "接朋友的行程改为下周三在车站",
+        ))
+        assertEquals(null, memory.listActive("gallery:a")
+            .first { it.id == garden.id }.supersededBy)
+    }
+
+    @Test
     fun groupDiaryCanRecallLaterInDirectChat() {
         val memory = store()
         val saved = memory.record(request(
