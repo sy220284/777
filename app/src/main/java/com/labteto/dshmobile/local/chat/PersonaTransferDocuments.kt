@@ -121,7 +121,7 @@ internal object PersonaTransferDocuments {
 
     fun decodeArchive(json: Json, canonicalJson: String): PersonaArchiveEnvelope =
         json.decodeFromString(PersonaArchiveEnvelope.serializer(), canonicalJson).also {
-            require(it.schema == 3 || it.schema == 4) { "人物文件版本不受支持，请使用新版人物生命档案" }
+            require(it.schema == 4) { "人物文件版本不受支持，请使用新版人物生命档案" }
         }
 
     private fun portableEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry =

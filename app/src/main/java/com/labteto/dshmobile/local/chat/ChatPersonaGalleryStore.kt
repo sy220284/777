@@ -111,7 +111,7 @@ class ChatPersonaGalleryStore internal constructor(
         mimeType: String? = null,
     ): PersonaGalleryPreparedImport {
         val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(bytes, fileName, mimeType)
-        return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
+        return when (val decoded = PersonaDocumentCodec.decodeDocumentImport(json, canonicalJson)) {
             is PersonaDocumentImport.Archive -> {
                 val current = readNormalized()
                 val planned = PersonaGalleryImportPlanner.archive(current, decoded.entry, decoded.diaryEntries)
@@ -157,7 +157,7 @@ class ChatPersonaGalleryStore internal constructor(
         require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
             "人物分享数据为空或过大"
         }
-        val decodedPersona = PersonaSchemaMigration.decodeShare(json, cleanPayload)
+        val decodedPersona = PersonaDocumentCodec.decodeShare(json, cleanPayload)
 
         val now = System.currentTimeMillis()
         val imported = fullSharePersona(decodedPersona).copy(updatedAt = now)
@@ -501,7 +501,7 @@ class ChatPersonaGalleryStore internal constructor(
         require(document.version == 5) {
             "人物图集版本不受支持"
         }
-        val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
+        val entries = document.entries.map(history::migrate)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         val recovered = recoverDurableHistoryExclusions(normalized)

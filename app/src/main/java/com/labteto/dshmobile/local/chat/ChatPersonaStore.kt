@@ -187,16 +187,12 @@ private val QUESTION_LIKE_CORRECTION_END = Regex("""(?:吗|么|吧|是不是|对
 class ChatPersonaStore internal constructor(
     private val file: File,
     private val json: Json,
-    private val legacyFile: File? = null,
-    private val migrationMarker: File? = null,
     private val onDocumentDecode: () -> Unit = {},
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(
             file = File(context.filesDir, "local-harness/chat/personas-v4.json"),
             json = json,
-            legacyFile = File(context.filesDir, "local-harness/chat/personas.json"),
-            migrationMarker = File(context.filesDir, "local-harness/chat/personas-v1-to-v2.done"),
         )
 
     private val durableFile = RecoveringDocumentFile(file)

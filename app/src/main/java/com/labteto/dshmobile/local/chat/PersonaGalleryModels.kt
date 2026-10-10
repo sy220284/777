@@ -100,7 +100,7 @@ data class PersonaGallerySaveOutcome(
 
 @Serializable
 internal data class PersonaShareEnvelope(
-    val schema: Int = 2,
+    val schema: Int = 4,
     val source: String = "神言神语",
     val persona: PersonaProfile,
 )
