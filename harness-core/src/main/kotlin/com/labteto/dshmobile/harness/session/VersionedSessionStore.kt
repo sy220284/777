@@ -241,9 +241,9 @@ class VersionedSessionStore(
                 !name.endsWith(BACKUP_SUFFIX) &&
                 !name.contains(CHECKPOINT_MARKER) &&
                 !name.contains(CORRUPT_MARKER) &&
-                // EventLog projections are JSON files too. Never treat them as Session snapshots:
-                // reading one as a session can recursively create more projection paths.
-                !name.contains(EVENT_LOG_MARKER) &&
+                // Exclude the exact EventLog projection sidecar namespace only. A valid legacy
+                // Session ID can contain ".events.jsonl" without being a projection file.
+                !name.contains(EVENT_PROJECTION_MARKER) &&
                 id.matches(SESSION_ID_PATTERN)
         }
 
@@ -262,7 +262,7 @@ class VersionedSessionStore(
         File(root, "$id.corrupt-${clock()}.json")
 
     private fun validateId(id: String) {
-        require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：$id" }
+        require(id.matches(SESSION_ID_PATTERN)) { "非法会话编号：$id" }
     }
 
     private fun rotatePrimaryToBackup(source: File, backup: File) {
@@ -316,7 +316,7 @@ class VersionedSessionStore(
         const val BACKUP_SUFFIX = ".backup.json"
         const val CHECKPOINT_MARKER = ".checkpoint-v"
         const val CORRUPT_MARKER = ".corrupt-"
-        const val EVENT_LOG_MARKER = ".events.jsonl"
+        const val EVENT_PROJECTION_MARKER = ".events.jsonl.projection-"
         val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }
