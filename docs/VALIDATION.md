@@ -313,7 +313,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - refresh 成功后若套餐 scope 降级，必须先原子保存轮换后的 access/refresh token 与新 scopes，再退休对应套餐 Profile；当前活动套餐路由立即变为未配置，禁止静默回退到 API Key 或其他可能计费来源。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
 - ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
-- ChatGPT 套餐请求收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
+- ChatGPT 套餐 Responses 长流不得按固定六分钟整次超时切断正在正常传输的请求；保留连接/读空闲超时与协程取消。收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
 - 运行诊断必须记录脱敏的 profile/account/client_id 绑定、OpenAI request ID、provider code 与 HTTP status，禁止记录 access/refresh token。
 - ChatGPT 模型档案必须绑定保存的 issued client_id 对应账户；切换模型档案时同步账户选择，禁止用可变“当前账户”替代档案 credentialRef。
 - ChatGPT 套餐共享的 function/custom tools 必须按 SIWC 预览契约放入 namespace；标准 API Key Responses 继续使用普通顶层 function tools，不相互污染协议。
