@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -178,7 +180,7 @@ internal fun PersonaGalleryScreen(
     currentSessionId: String,
     canSave: Boolean,
     onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
-    onEditNotes: suspend (String, String, String) -> Result<Unit>,
+    onEditStoryDetails: suspend (String, String, String, String) -> Result<Unit>,
     onRenameStory: suspend (String, String, String) -> Result<Unit>,
     onInspect: suspend (String, String?) -> Result<PersonaInspectionResult>,
     onApplySuggestions: suspend (String, List<PersonaAppendSuggestion>) -> Result<PersonaGalleryEntry>,
@@ -214,6 +216,9 @@ internal fun PersonaGalleryScreen(
     var notes by rememberSaveable(selectedId, selectedStoryId, selectedStory?.notes) {
         mutableStateOf(selectedStory?.notes.orEmpty())
     }
+    var storyStage by rememberSaveable(selectedId, selectedStoryId, selectedStory?.chatContext?.storyStage) {
+        mutableStateOf(selectedStory?.chatContext?.storyStage.orEmpty())
+    }
     var storyTitle by rememberSaveable(selectedId, selectedStoryId, selectedStory?.title) {
         mutableStateOf(selectedStory?.title.orEmpty())
     }
@@ -237,7 +242,8 @@ internal fun PersonaGalleryScreen(
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
-        notes != story.notes || (editingStoryTitle && storyTitle.trim() != story.title)
+        notes != story.notes || storyStage.trim() != story.chatContext.storyStage ||
+            (editingStoryTitle && storyTitle.trim() != story.title)
     } == true
     val selectedSuggestionKeys = remember(selectedId, selectedStoryId) { mutableStateListOf<String>() }
 
@@ -461,7 +467,7 @@ internal fun PersonaGalleryScreen(
                         onValueChange = { storyTitle = it },
                         label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("personaGalleryStoryTitleInput"),
                         enabled = !busy,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -947,13 +953,64 @@ internal fun PersonaGalleryScreen(
                             },
                         )
 
-                        if (notes != story.notes) {
+                        DsTextField(
+                            value = storyStage,
+                            onValueChange = { storyStage = it.take(160) },
+                            label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("personaGalleryStoryStageInput"),
+                            enabled = !busy && !inspecting,
+                        )
+                        Text(
+                            stringResource(R.string.persona_v4_story_stage_hint),
+                            style = DsType.small13.withReadingWeight(),
+                            color = DsTheme.colors.labelSecondary,
+                        )
+                        val savedKnowledgePath = story.chatContext.unlockedStoryStages
+                            .ifEmpty {
+                                story.chatContext.storyStage.takeIf(String::isNotBlank)?.let { listOf(it) }
+                                    .orEmpty()
+                            }
+                        if (savedKnowledgePath.isNotEmpty()) {
+                            Text(
+                                stringResource(
+                                    R.string.persona_vnext_saved_stage_path,
+                                    savedKnowledgePath.joinToString(" → "),
+                                ),
+                                style = DsType.small13.withReadingWeight(),
+                                color = DsTheme.colors.labelSecondary,
+                            )
+                        }
+                        // Let people reuse real stage IDs already present in facts and lore.
+                        // Typing an unfamiliar technical identifier should not be required.
+                        val stageChoices = (selected.persona.facts.map { it.temporalScope } +
+                            selected.persona.loreEntries.map { it.temporalScope })
+                            .map(String::trim).filter(String::isNotBlank).distinct().take(12)
+                        if (stageChoices.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                stageChoices.forEach { availableStage ->
+                                    DsButton(
+                                        text = availableStage,
+                                        onClick = { storyStage = availableStage },
+                                        variant = if (storyStage.trim() == availableStage) {
+                                            DsButtonVariant.Primary
+                                        } else DsButtonVariant.Ghost,
+                                        enabled = !busy && !inspecting,
+                                    )
+                                }
+                            }
+                        }
+
+                        if (notes != story.notes || storyStage.trim() != story.chatContext.storyStage) {
                             DsButton(
                                 text = stringResource(R.string.persona_gallery_save_story),
                                 onClick = {
                                     busy = true
                                     scope.launch {
-                                        onEditNotes(selected.id, story.id, notes)
+                                        onEditStoryDetails(selected.id, story.id, notes, storyStage)
                                             .onSuccess { notice = storySavedText }
                                             .onFailure { error = it.message ?: saveFailedText }
                                         busy = false

@@ -372,7 +372,7 @@ class LocalHistoryCompactorTest {
         assertTrue(compaction.summary.contains("较早聊天"))
         assertTrue(compaction.summary.contains("较早用户表达与事件"))
         assertTrue(compaction.summary.contains("当前人设、关系、长期记忆和近期原始对话优先"))
-        assertFalse(compaction.summary.contains("我还记得你说想看日落"))
+        assertTrue(compaction.summary.contains("人物：我还记得你说想看日落"))
         assertFalse(compaction.summary.contains("当前目标、计划"))
         assertTrue(compaction.estimatedTokensAfter < compaction.estimatedTokensBefore)
     }

@@ -29,9 +29,9 @@ class GroupAnnouncementService @Inject constructor(
         val cast = members.joinToString("\n") { member ->
             val persona = personaStore.get(member.personaId)
             val values = listOf(
-                persona.portrait.take(180),
-                persona.initialUserImpression.take(120),
-                persona.coreValues.take(2).joinToString("；"),
+                persona.coreIdentity.take(180),
+                persona.factText(CharacterFactCategories.PERSONALITY).take(140),
+                persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS).take(160),
             ).filter(String::isNotBlank)
             "${member.displayName}：${values.joinToString("；")}"
         }

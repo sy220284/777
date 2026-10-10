@@ -157,7 +157,13 @@ internal class LocalChatMemoryRuntime @Inject constructor(
 
         if (searchDiary) {
             val diary = persistence.diaryStore.search(
-                query = query,
+                // Use only recent public user evidence to resolve demonstratives such as
+                // "after that"; private thoughts never become search terms.
+                query = ChatMemorySelector.semanticQuery(
+                    query, "",
+                    if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
+                    else snapshot.chat.chatContext,
+                ),
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
                 maxItems = diaryRecallItemLimit(query),
@@ -169,13 +175,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                         appendLine(diaryRecallUsageInstruction(groupAudience))
                         appendLine("当前输入和当前状态优先。")
                         diary.forEach { entry ->
-                            appendLine("- 事件：${entry.event}")
-                            entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
-                            entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
-                            entry.relationshipMeaning.takeIf(String::isNotBlank)?.let {
-                                appendLine("  关系意义：$it")
-                            }
-                            entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
+                            appendLine(renderRecalledChatDiary(entry, groupAudience))
                         }
                     }.trim(),
                     budget.diaryTokens,

@@ -7,12 +7,18 @@
     <string name="local_persona_ai_generate">AI 帮我完善人设</string>
     <string name="local_persona_ai_generating">正在生成人设…</string>
     <string name="local_persona_ai_working_hint">正在整理人物设定，请稍候…</string>
-    <string name="local_persona_ai_synced">已更新当前人物设定。还想调整的话，修改下方内容后再点击「保存人物设定」。</string>
-    <string name="local_persona_ai_new_hint">用一句话介绍人物，AI 会帮你补齐设定。检查满意后，再点保存。</string>
+    <string name="local_persona_ai_synced">已生成当前人物的人设草稿。请检查原作资料和世界书，确认后再点击「保存人物设定」。</string>
+    <string name="local_persona_ai_new_hint">告诉 AI 人物身份与重要经历，优先生成精炼的人物内核。原作细节可以按需查询，确认草稿后再保存。</string>
     <string name="local_persona_ai_new_draft">人物草稿已经生成。可以先改名字和简介，也可以展开详细设定，满意后再保存。</string>
     <string name="local_persona_ai_busy">当前还在回复消息，完成后就能生成人设。</string>
     <string name="local_persona_ai_unconfigured">还没有可用的 AI 模型，请先去设置里连接一个。</string>
     <string name="local_persona_ai_stale">刚才切换了对话或人物，为避免覆盖你的修改，请重新生成。</string>
     <string name="local_persona_ai_failed">这次没能生成人设。请再试一次，如果一直失败，可以检查 AI 模型是否能正常使用。</string>
     <string name="local_persona_ai_example">例如：神里绫人，保留原作气质，和我更亲近一点，说话自然，别有客服腔。</string>
+    <string name="persona_v4_story_stage_label">当前剧情阶段</string>
+    <string name="persona_v4_story_stage_hint">可选择已有阶段或输入自定义标识。阶段调整控制人物设定与世界书的可用范围，返回较早阶段会收回后续阶段设定的解锁。已发生的聊天与人物经历不会清空；要重新经历剧情，请新建故事。空闲故事保存后立即生效，回复中重新进入故事生效。</string>
+    <string name="persona_vnext_saved_stage_path">当前故事已保存的知识路径：%1$s</string>
+    <string name="persona_v4_fact_stage">适用剧情阶段 ID（空白为基础事实）</string>
+    <string name="persona_v4_fact_perspective">事实陈述视角（可选）</string>
+    <string name="persona_v4_fact_source">来源依据（可选）</string>
 </resources>

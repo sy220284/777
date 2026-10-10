@@ -31,7 +31,7 @@ internal object ChatMemorySelector {
         val needsReferent = shouldRecall(query) && IMPLICIT_CONTINUITY_HINTS.any(text::contains)
         // Use public conversation evidence, never the character's private impressions or thoughts.
         val referent = if (needsReferent) {
-            context.pendingTurns.sortedBy(ChatPendingTurn::sequence)
+            context.pendingForRequest(limit = 8).sortedBy(ChatPendingTurn::sequence)
                 .lastOrNull { it.userMessage.isNotBlank() && it.userMessage.trim() != query.trim() }
                 ?.userMessage
                 ?: context.continuity.unfinished.lastOrNull()
@@ -62,7 +62,8 @@ internal object ChatMemorySelector {
         "前任", "暧昧", "关系", "在一起", "分手", "复合",
     )
     private val IMPLICIT_CONTINUITY_HINTS = listOf(
-        "那件事", "那后来", "后来怎么样", "最后怎么样", "最后怎么", "答应过", "说好了",
+        "那件事", "那后来", "那以后", "那之后", "从那次起", "后来怎么样",
+        "最后怎么样", "最后怎么", "答应过", "说好了",
         "原来的安排", "照原来", "照旧", "按原来", "还是原来", "别像上次",
     )
     private val RESET_HINTS = listOf(
@@ -135,11 +136,38 @@ internal object ChatContextAssembler {
     private fun sameStructuredFactSlot(left: String, right: String): Boolean {
         val a = left.trim()
         val b = right.trim()
-        if (hasField(a, "时间") && hasField(b, "时间")) return true
-        if (hasField(a, "地点") && hasField(b, "地点")) return true
-        if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) return true
+        // Bare time/location fields describe the current scene. Named events with their
+        // own time/location must coexist even when they use identical field labels.
+        if (isCurrentSceneField(a) && isCurrentSceneField(b)) {
+            if (hasField(a, "时间") && hasField(b, "时间")) return true
+            if (hasField(a, "地点") && hasField(b, "地点")) return true
+        }
+        if (hasRelationshipStateField(a) && hasRelationshipStateField(b)) {
+            val leftPerson = relationshipSubject(a)
+            val rightPerson = relationshipSubject(b)
+            if (leftPerson != null || rightPerson != null) {
+                return leftPerson != null && leftPerson == rightPerson
+            }
+            // An event's relation attribute does not replace current relationship state.
+            return isCurrentRelationshipField(a) && isCurrentRelationshipField(b)
+        }
         return false
     }
+
+    private fun isCurrentSceneField(text: String): Boolean =
+        text.startsWith("当前硬场景：") ||
+            text.startsWith("当前硬场景:") ||
+            Regex("""^(?:时间|地点)\s*[=:：]""").containsMatchIn(text)
+
+    private fun isCurrentRelationshipField(text: String): Boolean =
+        text.startsWith("关系状态：") ||
+            text.startsWith("保存时的关系：") ||
+            text.startsWith("【当前状态】") ||
+            Regex("""^关系\s*[=:：]""").containsMatchIn(text)
+
+    private fun relationshipSubject(text: String): String? =
+        Regex("""关系状态：我和([^｜|:：\n]{1,80})""").find(text)?.groupValues?.get(1)?.trim()
+
 
     private fun hasField(text: String, label: String): Boolean =
         Regex("""(?:^|[｜|])\s*$label\s*[=:：]""").containsMatchIn(text) ||

@@ -207,22 +207,34 @@ class ChatSceneRuntimeTest {
     }
 
     @Test
-    fun continuityGuardRejectsSecondUnbridgedSceneJump() = runBlocking {
-        var rejected = false
-        try {
-            ChatReplyContinuityGuard.enforce(
-                previous = ChatSceneState(location = "院子"),
-                userMessage = "继续。",
-                initial = "她坐在卧室床边看着你。",
-                mode = ChatContinuityGuardMode.DIRECT,
-                contentOf = { it },
-                retry = { "她躺在书房沙发上继续说。" },
-            )
-        } catch (_: IllegalStateException) {
-            rejected = true
-        }
+    fun continuityGuardAllowsReplyWithLoggedWarningAfterSecondSceneJump() = runBlocking {
+        val actions = mutableListOf<String>()
+        val result = ChatReplyContinuityGuard.enforce(
+            previous = ChatSceneState(location = "院子"),
+            userMessage = "继续。",
+            initial = "她坐在卧室床边看着你。",
+            mode = ChatContinuityGuardMode.DIRECT,
+            contentOf = { it },
+            retry = { "她躺在书房沙发上继续说。" },
+            onEvent = { action, _ -> actions += action },
+        )
 
-        assertTrue(rejected)
+        assertEquals("她躺在书房沙发上继续说。", result)
+        assertTrue(actions.any { it.contains("accepted-with-warning") })
+    }
+
+    @Test
+    fun continuityGuardRepairRequestFailurePreservesCompletedReply() = runBlocking {
+        val original = "她坐在卧室床边看着你。"
+        val result = ChatReplyContinuityGuard.enforce(
+            previous = ChatSceneState(location = "院子"),
+            userMessage = "继续。",
+            initial = original,
+            mode = ChatContinuityGuardMode.DIRECT,
+            contentOf = { it },
+            retry = { throw IllegalStateException("临时网络断开") },
+        )
+        assertEquals(original, result)
     }
 
 }

@@ -21,7 +21,9 @@ internal object PersonaGalleryImportPlanner {
         diaryEntries: List<ChatDiaryEntry>,
         now: Long = System.currentTimeMillis(),
     ): PersonaGalleryPreparedImport.Archive {
-        val importedPersona = fullSharePersona(source.persona).copy(updatedAt = now)
+        val importedPersona = fullSharePersona(source.persona).let { it.copy(
+            loreEntries = uniqueLoreEntryIds(it.loreEntries), updatedAt = now,
+        ) }
         require(isMeaningfulGalleryPersona(importedPersona)) { "人物设定内容不足，无法导入" }
 
         val seenStoryIds = hashSetOf<String>()
@@ -60,7 +62,7 @@ internal object PersonaGalleryImportPlanner {
         }
         return PersonaGalleryPreparedImport.Archive(
             baseDocument = current,
-            entry = migrateLegacyPersonaGalleryEntry(mergedEntry),
+            entry = mergedEntry,
             diaryEntries = diaryEntries,
         )
     }

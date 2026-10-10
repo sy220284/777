@@ -22,6 +22,98 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun gameCanonFieldsAndWorldBookSurviveAllExportFormats() {
+        val original = PersonaProfile(
+            name = "神里绫华",
+            portrait = "社奉行神里家大小姐",
+            attentionKeywords = listOf("社奉行", "托马", "冰元素"),
+            franchise = "原神",
+            timelinePosition = "稻妻主线已相识阶段",
+            knowledgeBoundary = listOf("未经历的后续事件不知道"),
+            loreEntries = listOf(
+                PersonaLoreEntry(
+                    id = "yashiro",
+                    title = "社奉行",
+                    content = "社奉行的神里家负责相关事务。",
+                    keywords = listOf("社奉行", "神里家"),
+                    secondaryKeywords = listOf("家族"),
+                    priority = 85,
+                    alwaysOn = false,
+                    spoilerLevel = 0,
+                ),
+            ),
+        )
+        val entry = PersonaGalleryEntry(id = "canon-1", persona = original)
+        listOf(PersonaTransferFormat.JSON, PersonaTransferFormat.MARKDOWN, PersonaTransferFormat.WORD)
+            .forEach { format ->
+                val exported = PersonaTransferDocuments.encode(json, entry, format)
+                val canonical = PersonaTransferDocuments.decodeToCanonicalJson(
+                    exported.bytes, "角色.persona.${format.extension}",
+                )
+                val restored = PersonaTransferDocuments.decodeArchive(json, canonical).entry.persona
+                assertEquals(original.attentionKeywords, restored.attentionKeywords)
+                assertEquals(original.franchise, restored.franchise)
+                assertEquals(original.timelinePosition, restored.timelinePosition)
+                assertEquals(original.knowledgeBoundary, restored.knowledgeBoundary)
+                assertEquals(original.loreEntries, restored.loreEntries)
+            }
+    }
+
+    @Test
+    fun v4FactsStageAndCharacterStateSurviveAllFileFormatsAndDiskReload() {
+        val source = sampleEntry().let { entry ->
+            entry.copy(
+                persona = entry.persona.copy(
+                    coreIdentity = "旅行摄影师",
+                    loreEntries = listOf(PersonaLoreEntry(
+                        id = "later-lore", title = "第二幕世界书",
+                        content = "后来出现的另一座城市", keywords = listOf("城市"),
+                        temporalScope = "act-2")),
+                    facts = listOf(
+                        CharacterFact("choice", CharacterFactCategories.DEFINING_CHOICES,
+                            "决定辞职旅行", relatedFactIds = listOf("memory"),
+                            provenance = CharacterFactProvenance.USER_CREATED),
+                        CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                            "第二幕发现一封旧信", perspective = "本人",
+                            temporalScope = "act-2", provenance = CharacterFactProvenance.CANON,
+                            sourceReference = "第二幕第三章"),
+                    ),
+                ),
+                stories = entry.stories.map { story ->
+                    story.copy(chatContext = ChatContextState(storyStage = "act-2"))
+                },
+            )
+        }
+        listOf(PersonaTransferFormat.JSON, PersonaTransferFormat.MARKDOWN, PersonaTransferFormat.WORD)
+            .forEach { format ->
+                val bytes = PersonaTransferDocuments.encode(json, source, format).bytes
+                val fileName = "小岚.persona.${format.extension}"
+                val destination = File(temporary.root, "v4-stage-${format.extension}.json")
+                val imported = ChatPersonaGalleryStore(destination, json)
+                    .importPersonaDocument(bytes, fileName, format.mimeType)
+                assertEquals(source.persona.facts, imported.persona.facts)
+                assertEquals(source.persona.loreEntries, imported.persona.loreEntries)
+                assertEquals(source.persona.coreIdentity, imported.persona.coreIdentity)
+                assertEquals("act-2", imported.stories.single().chatContext.storyStage)
+                assertEquals("挚友", imported.stories.single().chatState.relationshipState)
+
+                val reloaded = ChatPersonaGalleryStore(destination, json)
+                    .findEntry(imported.id)!!
+                assertEquals(source.persona.facts, reloaded.persona.facts)
+                assertEquals(source.persona.loreEntries, reloaded.persona.loreEntries)
+                assertEquals("act-2", reloaded.stories.single().chatContext.storyStage)
+
+                val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+                val before = projector.project(reloaded.persona, reloaded.stories.single().chatState,
+                    ChatContextState(), "那封旧信是什么？", null)
+                val after = projector.project(reloaded.persona, reloaded.stories.single().chatState,
+                    reloaded.stories.single().chatContext, "那封旧信是什么？", null)
+                assertFalse(before.dynamicPrompt.contains("第二幕发现一封旧信"))
+                assertTrue(after.dynamicPrompt.contains("第二幕发现一封旧信"))
+            }
+    }
+
+    @Test
     fun markdownRoundTripKeepsProfileMemoryDiaryAndDialogue() {
         val document = PersonaTransferDocuments.encode(
             json = json,
@@ -497,6 +589,7 @@ class PersonaTransferDocumentsTest {
         persona = PersonaProfile(
             id = "gallery-lan",
             name = "小岚",
+            coreIdentity = "旅行摄影师",
             portrait = "旅行摄影师，爽快、细心，说话简短自然。",
             lifeContext = "常年在沿海城市旅行。",
             initialUserImpression = "和用户是多年朋友",

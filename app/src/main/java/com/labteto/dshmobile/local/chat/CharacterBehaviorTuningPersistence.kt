@@ -50,7 +50,11 @@ internal fun persistCharacterBehaviorTuning(
     profile: PersonaProfile,
 ): CharacterBehaviorTuningSave {
     var saved = personaStore.upsert(profile.copy(id = personaId))
-    val sameBoundCharacter = samePersonaIdentity(currentPersona, saved)
+    // An already-bound persona keeps its tuning even when it has no authored
+    // V4 identity yet. Automatic name-based gallery merging stays conservative.
+    val sameDurableProfile = currentPersona.id == personaId && saved.id == personaId &&
+        currentPersona.name.trim() == saved.name.trim()
+    val sameBoundCharacter = sameDurableProfile || samePersonaIdentity(currentPersona, saved)
     if (sameBoundCharacter) galleryId?.let { id ->
         persistGalleryBehaviorTuning(galleryStore, id, saved.behaviorTuning)
             ?.takeIf { it != saved.behaviorTuning }

@@ -366,15 +366,23 @@ internal object ChatReplyContinuityGuard {
         if (firstCheck.accepted) return initial
 
         onEvent("${mode.actionPrefix}retry", firstCheck)
-        val retried = retry(repairHint(previous, mode))
+        val retried = try {
+            retry(repairHint(previous, mode))
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Keep the initial model response when an optional continuity repair fails.
+            onEvent("${mode.actionPrefix}repair-failed-returned-original", firstCheck)
+            return initial
+        }
         val retryCheck = ChatSceneRuntime.inspectReply(
             previous = previous,
             userMessage = userMessage,
             assistantMessage = contentOf(retried),
         )
         if (!retryCheck.accepted) {
-            onEvent("${mode.actionPrefix}rejected", retryCheck)
-            throw IllegalStateException(mode.failureMessage)
+            onEvent("${mode.actionPrefix}accepted-with-warning", retryCheck)
+            return if (contentOf(retried).isNotBlank()) retried else initial
         }
 
         onEvent("${mode.actionPrefix}repaired", retryCheck)

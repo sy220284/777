@@ -170,7 +170,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 relationshipMemory = relationshipMemory,
             )
             val turnContext = preparedChat.context
-            val networkContext = webContext.forInput(input)
+            val networkContext = webContext.forInput(input, turnContext.persona)
             val dynamicContext = networkContext + preparedChat.dynamicContext
             check(
                 modelHistory.compactChatIfNeeded(

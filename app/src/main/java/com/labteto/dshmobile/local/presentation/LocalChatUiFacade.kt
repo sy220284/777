@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.visibleStoryStages
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
@@ -48,7 +49,8 @@ class LocalChatUiFacade @Inject constructor(
     internal fun applyGallerySuggestions(id: String, suggestions: List<PersonaAppendSuggestion>) =
         gallery.applySuggestions(id, suggestions)
     internal fun updateGalleryPortrait(id: String, path: String) = gallery.updatePortraitPath(id, path)
-    internal fun updateStoryNotes(id: String, storyId: String, notes: String) = gallery.updateStoryNotes(id, storyId, notes)
+    internal fun updateStoryDetails(id: String, storyId: String, notes: String, storyStage: String) =
+        gallery.updateStoryDetails(id, storyId, notes, storyStage)
     internal fun renameStory(id: String, storyId: String, title: String) = gallery.renameStory(id, storyId, title)
     internal fun deleteGallery(id: String) = gallery.delete(id)
     internal fun deleteStory(id: String, storyId: String) = gallery.deleteStory(id, storyId)
@@ -77,7 +79,11 @@ class LocalChatUiFacade @Inject constructor(
         profileId: String?,
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
-    ): PersonaInspectionResult = inspection.inspect(model, baseUrl, profileId, persona, messages)
+        chatContext: ChatContextState? = null,
+    ): PersonaInspectionResult = inspection.inspect(
+        model, baseUrl, profileId, persona, messages,
+        chatContext?.storyStage.orEmpty(), chatContext?.visibleStoryStages().orEmpty(),
+    )
 
     internal suspend fun generateGroupAnnouncement(
         model: String,

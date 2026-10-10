@@ -55,6 +55,10 @@ import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.CharacterFact
+import com.labteto.dshmobile.local.chat.CharacterFactProvenance
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.PersonaLoreEntry
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
 import com.labteto.dshmobile.local.session.LocalConversationMode
@@ -72,6 +76,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
 internal fun NewSessionModeDialog(
@@ -490,24 +495,15 @@ internal fun ChatPersonaDialog(
 ) {
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
-    var portrait by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.portrait) }
-    var lifeContext by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.lifeContext) }
-    var attention by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionBiases.joinToString("\n")) }
-    var blindSpots by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.perceptionBlindSpots.joinToString("\n")) }
-    var quirks by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.quirks.joinToString("\n")) }
-    var limitations by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.limitations.joinToString("\n")) }
-    var coreValues by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreValues.joinToString("\n")) }
-    var coreTension by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreTension) }
-    var stableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.stableTraits.joinToString("\n")) }
-    var mutableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.mutableTraits.joinToString("\n")) }
-    var initialUserImpression by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.initialUserImpression) }
-    var voiceSamples by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.voiceSamples.joinToString("\n")) }
-    var worldSetting by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.worldSetting) }
-    var constraints by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.hardConstraints.joinToString("\n")) }
-    var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
-    var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
+    var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
+    var factDrafts by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.facts) }
+    var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
+    var customContent by rememberSaveable(profile.id) { mutableStateOf("") }
+    var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
+    var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
+    val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
-    var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(!creatingNew) }
+    var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(false) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
     var saving by remember(profile.id) { mutableStateOf(false) }
     var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
@@ -516,30 +512,13 @@ internal fun ChatPersonaDialog(
     val coroutineScope = rememberCoroutineScope()
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    fun lines(value: String): List<String> = value.lineSequence()
-        .map(String::trim)
-        .filter(String::isNotBlank)
-        .toList()
-
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
-        portrait = generated.portrait
-        lifeContext = generated.lifeContext
-        attention = generated.attentionBiases.joinToString("\n")
-        blindSpots = generated.perceptionBlindSpots.joinToString("\n")
-        quirks = generated.quirks.joinToString("\n")
-        limitations = generated.limitations.joinToString("\n")
-        coreValues = generated.coreValues.joinToString("\n")
-        coreTension = generated.coreTension
-        stableTraits = generated.stableTraits.joinToString("\n")
-        mutableTraits = generated.mutableTraits.joinToString("\n")
-        initialUserImpression = generated.initialUserImpression
-        voiceSamples = generated.voiceSamples.joinToString("\n")
-        worldSetting = generated.worldSetting
-        constraints = generated.hardConstraints.joinToString("\n")
-        banned = generated.bannedPhrases.joinToString("\n")
-        corrections = generated.corrections.joinToString("\n")
+        coreIdentity = generated.coreIdentity
+        factDrafts = generated.facts
+        franchise = generated.franchise
+        loreEntries = generated.loreEntries
     }
 
     DsBottomSheet(
@@ -561,22 +540,10 @@ internal fun ChatPersonaDialog(
                         onSave(
                             runtimeProfile.copy(
                                 name = name,
-                                portrait = portrait,
-                                lifeContext = lifeContext,
-                                attentionBiases = lines(attention),
-                                perceptionBlindSpots = lines(blindSpots),
-                                quirks = lines(quirks),
-                                limitations = lines(limitations),
-                                coreValues = lines(coreValues),
-                                coreTension = coreTension,
-                                stableTraits = lines(stableTraits),
-                                mutableTraits = lines(mutableTraits),
-                                initialUserImpression = initialUserImpression,
-                                voiceSamples = lines(voiceSamples),
-                                worldSetting = worldSetting,
-                                hardConstraints = lines(constraints),
-                                bannedPhrases = lines(banned),
-                                corrections = lines(corrections),
+                                coreIdentity = coreIdentity,
+                                facts = factDrafts,
+                                franchise = franchise,
+                                loreEntries = loreEntries.filter { it.content.isNotBlank() },
                             ),
                         )
                     }.getOrElse { Result.failure(it) }
@@ -681,43 +648,195 @@ internal fun ChatPersonaDialog(
             }
         }
 
-        PersonaFormSection(stringResource(R.string.persona_form_basics)) {
+        val essentialFields = listOf(
+            "personality" to R.string.persona_v4_personality,
+            "valuesAndTradeoffs" to R.string.persona_v4_values_tradeoffs,
+            "biography" to R.string.persona_v4_biography,
+            "relationships" to R.string.persona_v4_relationships,
+        )
+        val extendedFields = listOf(
+            "selfNarrative" to R.string.persona_v4_self_narrative,
+            "identityGap" to R.string.persona_v4_identity_gap,
+            "subjectiveBeliefs" to R.string.persona_v4_subjective_beliefs,
+            "definingChoices" to R.string.persona_v4_defining_choices,
+            "emotionalImprints" to R.string.persona_v4_emotional_imprints,
+            "lifeGravity" to R.string.persona_v4_life_gravity,
+            "unfinishedBusiness" to R.string.persona_v4_unfinished_business,
+            "limitsAndCosts" to R.string.persona_v4_limits_costs,
+            "sensorySignature" to R.string.persona_v4_sensory_signature,
+            "preferencesAndHabits" to R.string.persona_v4_preferences_habits,
+            "voiceStyle" to R.string.persona_v4_voice_style,
+            "customFacts" to R.string.persona_v4_custom_facts,
+        )
+
+        PersonaFormSection(stringResource(R.string.persona_v4_section_core)) {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
-            PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+            PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
+            PersonaTextField(stringResource(R.string.persona_v4_core_identity), coreIdentity, { coreIdentity = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_v4_section_depth)) {
+            essentialFields.forEach { (category, title) ->
+                PersonaFactCategoryEditor(
+                    category = category,
+                    title = stringResource(title),
+                    facts = factDrafts,
+                    onChange = { factDrafts = it },
+                    showMetadata = advancedOpen,
+                )
+            }
         }
         DsButton(
-            text = stringResource(
-                if (advancedOpen) R.string.local_persona_hide_more else R.string.local_persona_show_more
-            ),
+            text = stringResource(if (advancedOpen) R.string.persona_v4_hide_advanced else R.string.persona_v4_show_advanced),
             onClick = { advancedOpen = !advancedOpen },
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Ghost,
         )
         if (advancedOpen) {
-        PersonaFormSection(stringResource(R.string.persona_form_life)) {
-            PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
-            PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
-            PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
-            PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
-            PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
+            PersonaFormSection(stringResource(R.string.persona_v4_section_advanced)) {
+                extendedFields.forEach { (category, title) ->
+                    PersonaFactCategoryEditor(
+                        category = category,
+                        title = stringResource(title),
+                        facts = factDrafts,
+                        onChange = { factDrafts = it },
+                        showMetadata = true,
+                    )
+                }
+                factDrafts.map(CharacterFact::category).distinct()
+                    .filterNot { category -> (essentialFields + extendedFields).any { it.first == category } }
+                    .forEach { category ->
+                        PersonaFactCategoryEditor(
+                            category = category,
+                            title = stringResource(R.string.persona_v4_category_extra, category),
+                            facts = factDrafts,
+                            onChange = { factDrafts = it },
+                            showMetadata = true,
+                        )
+                    }
+                PersonaTextField(stringResource(R.string.persona_v4_category_code), customCategory, { customCategory = it }, singleLine = true)
+                PersonaTextField(stringResource(R.string.persona_v4_category_content), customContent, { customContent = it })
+                DsButton(
+                    text = stringResource(R.string.persona_v4_add_custom),
+                    onClick = {
+                        if (customCategory.isNotBlank() && customContent.isNotBlank()) {
+                            factDrafts = factDrafts + CharacterFact(
+                                id = UUID.randomUUID().toString(),
+                                category = customCategory.trim(),
+                                content = customContent.trim(),
+                                provenance = CharacterFactProvenance.USER_CREATED,
+                            )
+                            customCategory = ""
+                            customContent = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                    enabled = customCategory.isNotBlank() && customContent.isNotBlank(),
+                )
+            }
+            bundledPreset?.let { preset ->
+                DsButton(
+                    text = stringResource(R.string.persona_v4_load_preset),
+                    onClick = {
+                        coreIdentity = preset.persona.coreIdentity
+                        factDrafts = preset.persona.facts
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+                DsButton(
+                    text = stringResource(R.string.persona_v4_fill_lore),
+                    onClick = {
+                        val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
+                        loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+            PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
+                PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
+            }
         }
-        PersonaFormSection(stringResource(R.string.persona_form_character)) {
-            PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
-            PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
-            PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
-            PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
+
+    }
+}
+
+@Composable
+private fun PersonaFactCategoryEditor(
+    category: String,
+    title: String,
+    facts: List<CharacterFact>,
+    onChange: (List<CharacterFact>) -> Unit,
+    showMetadata: Boolean = false,
+) {
+    val entries = facts.filter { it.category == category }
+    if (entries.isEmpty()) {
+        PersonaTextField(title, "", { content ->
+            if (content.isNotBlank()) onChange(facts + CharacterFact(
+                id = UUID.randomUUID().toString(),
+                category = category,
+                content = content,
+                provenance = CharacterFactProvenance.USER_CREATED,
+            ))
+        })
+    } else {
+        entries.forEachIndexed { index, entry ->
+            val label = if (index == 0) title
+                else stringResource(R.string.persona_v4_fact_number, title, index + 1)
+            PersonaTextField(label, entry.content, { content ->
+                onChange(if (content.isBlank()) facts.filterNot { it.id == entry.id }
+                    else facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(
+                            content = content,
+                            provenance = CharacterFactProvenance.USER_CREATED,
+                            sourceReference = "",
+                        ) else fact
+                    })
+            })
+            if (showMetadata) {
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_stage),
+                    entry.temporalScope,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(temporalScope = value.trim().take(160))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_perspective),
+                    entry.perspective,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(perspective = value.trim().take(120))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_source),
+                    entry.sourceReference,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(sourceReference = value.trim().take(240))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+            }
         }
-        PersonaFormSection(stringResource(R.string.persona_form_expression)) {
-            PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-            PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
-        }
-        PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
-            PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
-            PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
-            PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
-            PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
-        }
-        }
+        DsButton(
+            text = stringResource(R.string.persona_v4_add_fact),
+            onClick = {
+                onChange(facts + CharacterFact(
+                    id = UUID.randomUUID().toString(),
+                    category = category,
+                    content = "",
+                    provenance = CharacterFactProvenance.USER_CREATED,
+                ))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            variant = DsButtonVariant.Ghost,
+        )
     }
 }
 

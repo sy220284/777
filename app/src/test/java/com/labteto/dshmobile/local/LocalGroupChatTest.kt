@@ -8,6 +8,8 @@ import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_RESPONDERS_PER_TURN
 import com.labteto.dshmobile.local.chat.groupChatResponders
+import com.labteto.dshmobile.local.chat.groupMemberMemoryQuery
+import com.labteto.dshmobile.local.chat.groupMemberMayStaySilent
 import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
 import com.labteto.dshmobile.local.chat.groupTranscriptLine
 import com.labteto.dshmobile.local.chat.migrateLegacyConversationContext
@@ -37,6 +39,34 @@ class LocalGroupChatTest {
         displayName = "赵二",
         chatState = ChatCharacterState(),
     )
+
+    @Test
+    fun groupFollowUpMemoryUsesOnlyDeliveredSpeechAndKeepsItBounded() {
+        val first = groupMemberMemoryQuery("你们觉得怎么样？", emptyList())
+        assertEquals("你们觉得怎么样？", first)
+        val expanded = groupMemberMemoryQuery(
+            "你们觉得怎么样？",
+            listOf("阿青：我想起一起去海边的那次约定", "卡芙卡：那天我们还见过灯塔"),
+        )
+        assertTrue(expanded.contains("一起去海边的那次约定"))
+        assertTrue(expanded.contains("那天我们还见过灯塔"))
+        val many = groupMemberMemoryQuery(
+            "新问题",
+            listOf("旧发言不应保留", "第二位：车站见面", "第三位：失而复得的地图"),
+        )
+        assertTrue(!many.contains("旧发言不应保留"))
+        assertTrue(many.contains("车站见面"))
+        assertTrue(many.contains("地图"))
+        assertTrue(groupMemberMemoryQuery("x".repeat(900), listOf("话".repeat(900))).length <= 640)
+    }
+
+    @Test
+    fun optionalGroupSilenceNeverOverridesExplicitlyRequestedSpeakers() {
+        assertTrue(!groupMemberMayStaySilent("大家聊聊今天的事", ayaka, 0))
+        assertTrue(groupMemberMayStaySilent("大家聊聊今天的事", kafka, 1))
+        assertTrue(!groupMemberMayStaySilent("每个人都回答：你们怎么看？", kafka, 1))
+        assertTrue(!groupMemberMayStaySilent("卡芙卡，你怎么看？", kafka, 1))
+    }
 
     @Test
     fun explicitMentionRoutesOnlyToNamedCharacter() {
@@ -69,6 +99,29 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun fourOrSixExplicitlyAddressedMembersAreAllHonored() {
+        val extras = listOf(
+            LocalGroupChatMember("other1", "other1", "云浅"),
+            LocalGroupChatMember("other2", "other2", "陆璃"),
+            LocalGroupChatMember("other3", "other3", "叶澜"),
+        )
+        val group = listOf(ayaka, kafka, zhao) + extras
+        val four = groupChatResponders(
+            "@神里绫华，@卡芙卡，@赵二，@云浅，四位都说说。",
+            group,
+        )
+        assertEquals(listOf("ayaka", "kafka", "zhao", "other1"),
+            four.map(LocalGroupChatMember::galleryId))
+        val six = groupChatResponders(
+            "@神里绫华，@卡芙卡，@赵二，@云浅，@陆璃，@叶澜，逐个回应。",
+            group,
+        )
+        assertEquals(group.map(LocalGroupChatMember::galleryId),
+            six.map(LocalGroupChatMember::galleryId))
+        assertEquals(2, groupChatResponders("大家随便聊聊", group).size)
+    }
+
+    @Test
     fun ordinaryMessageUsesOneRotatedPrimarySpeaker() {
         val responders = groupChatResponders(
             input = "今天怎么这么安静",
@@ -93,6 +146,23 @@ class LocalGroupChatTest {
 
         assertEquals(MAX_GROUP_CHAT_RESPONDERS_PER_TURN, responders.size)
         assertEquals(listOf("ayaka", "kafka"), responders.map { it.galleryId })
+    }
+
+    @Test
+    fun explicitlyAskingEveryoneInvitesEveryMemberInRosterOrder() {
+        val extra = LocalGroupChatMember(
+            galleryId = "extra", personaId = "extra",
+            displayName = "黎深", chatState = ChatCharacterState(),
+        )
+        val responders = groupChatResponders(
+            input = "每个人都回答：你们各自怎么看这件事？",
+            members = listOf(ayaka, kafka, zhao, extra),
+        )
+        assertEquals(listOf("ayaka", "kafka", "zhao", "extra"),
+            responders.map { it.galleryId })
+        assertEquals(listOf("ayaka", "kafka"), groupChatResponders(
+            "大家随便聊聊", listOf(ayaka, kafka, zhao, extra),
+        ).map { it.galleryId })
     }
 
     @Test

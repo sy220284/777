@@ -18,6 +18,32 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun naturalFollowUpFindsRelatedPublicEventWithoutInjectingPrivateThoughts() {
+        val state = ChatContextState(
+            continuity = ChatContinuityState(unfinished = listOf("我们在大雨中约好见面")),
+        )
+        assertTrue(ChatMemorySelector.shouldRecall("那之后我一直很在意"))
+        val query = ChatMemorySelector.semanticQuery("那之后我一直很在意", "", state)
+        assertTrue(query.contains("大雨中约好见面"))
+        assertFalse(ChatMemorySelector.shouldRecall("继续"))
+        assertFalse(ChatMemorySelector.shouldRecall("先不聊这个了"))
+    }
+
+    @Test
+    fun implicitRecallNeverBorrowsPendingEvidenceFromDiscardedGeneration() {
+        val context = ChatContextState(
+            generation = 3L,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 12, generation = 2L, userMessage = "旧分支里答应去机场",
+            )),
+            continuity = ChatContinuityState(unfinished = listOf("现在在城南等修表师傅")),
+        )
+        val query = ChatMemorySelector.semanticQuery("那以后发生什么", "小宁", context)
+        assertFalse(query.contains("旧分支里答应去机场"))
+        assertTrue(query.contains("现在在城南等修表师傅"))
+    }
+
+    @Test
     fun explicitTopicAndResetDoNotBorrowPreviousTopic() {
         val context = ChatContextState(continuity = ChatContinuityState(unfinished = listOf("修手表")))
         assertFalse(ChatMemorySelector.semanticQuery("你记得我喜欢什么花吗", "小宁", context).contains("修手表"))
@@ -158,6 +184,50 @@ class ChatContextAssemblerTest {
         assertFalse(context.contains("地点=院子"))
     }
 
+
+    @Test
+    fun independentEventsWithTheirOwnTimeAndPlaceBothSurviveContextAssembly() {
+        val rendered = ChatContextAssembler.assemble(
+            dynamicPrompt = """
+                【当前状态】
+                时间=今晚｜地点=家里
+            """.trimIndent(),
+            relationshipMemory = """
+                【人物长期经历】
+                聚会｜时间=周六晚上｜地点=阿青家
+                旅行｜时间=下周二早上｜地点=车站
+            """.trimIndent(),
+            userInput = "我们后来去了哪些地方？",
+        )
+        assertTrue(rendered.contains("时间=今晚｜地点=家里"))
+        assertTrue(rendered.contains("聚会｜时间=周六晚上｜地点=阿青家"))
+        assertTrue(rendered.contains("旅行｜时间=下周二早上｜地点=车站"))
+    }
+
+    @Test
+    fun differentCharacterRelationshipStatesAreNotMergedTogether() {
+        assertFalse(ChatContextAssembler.factConflicts(
+            "关系状态：我和阿青｜熟悉", "关系状态：我和阿紫｜稳定关系",
+        ))
+        assertTrue(ChatContextAssembler.factConflicts(
+            "关系状态：我和阿青｜熟悉", "关系状态：我和阿青｜稳定关系",
+        ))
+    }
+
+    @Test
+    fun independentEventRelationshipsAreNotDeletedAsCurrentRelationshipConflicts() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = "【当前状态】情绪=平稳｜关系=信任",
+            relationshipMemory = """
+                【经历】
+                聚会｜关系=朋友｜地点=街角书店
+                工作｜关系=同事｜地点=摄影棚
+            """.trimIndent(),
+            userInput = "后来和朋友同事怎么样了？",
+        )
+        assertTrue(context.contains("聚会｜关系=朋友"))
+        assertTrue(context.contains("工作｜关系=同事"))
+    }
 
     @Test
     fun userQuestionDoesNotSuppressCurrentCommittedSchedule() {

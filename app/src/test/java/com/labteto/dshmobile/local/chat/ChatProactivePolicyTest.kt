@@ -192,6 +192,64 @@ class ChatProactivePolicyTest {
         )
     }
 
+    @Test
+    fun proactiveFocusIgnoresAutomaticMessagesAndKeepsOnlyRecentRealDialogue() {
+        val history = listOf(
+            message("u1", "user", "很久前的旧对话", 1L),
+            message("a1", "assistant", "很久前的角色回复", 2L),
+            message("p1", "assistant", "昨天自动问过你睡了吗", 3L, proactive = true),
+            message("u2", "user", "我今天答应去医院看望朋友", 4L),
+            message("a2", "assistant", "好，希望一切顺利", 5L),
+            message("p2", "assistant", "我又来问你睡了吗", 6L, proactive = true),
+        )
+        val focus = proactiveConversationFocus(history, fallback = "后台定时触发条件")
+        assertTrue(focus.contains("我今天答应去医院看望朋友"))
+        assertTrue(focus.contains("好，希望一切顺利"))
+        assertFalse(focus.contains("后台定时触发条件"))
+        assertFalse(focus.contains("我又来问你睡了吗"))
+        assertFalse(focus.contains("昨天自动问过你睡了吗"))
+        assertEquals("真实故事摘要", proactiveConversationFocus(
+            listOf(message("p3", "assistant", "自动打招呼", 7L, proactive = true)),
+            fallback = "真实故事摘要",
+        ))
+        assertEquals("", proactiveConversationFocus(emptyList(), fallback = ""))
+    }
+
+    @Test
+    fun proactiveAvoidanceAndDuplicateCheckLookOnlyAtMostRecentFiveProactiveTurns() {
+        val messages = buildList {
+            add(message("p-old", "assistant", "今天给你带了草莓奶昔，记得趁凉喝。", 1L, proactive = true))
+            repeat(250) { index ->
+                add(message("u$index", "user", "这次真实聊天内容$index", index + 2L))
+                add(message("p$index", "assistant", "第${index}次给你发的新鲜祝福，今天也顺利。", index + 300L, proactive = true))
+            }
+            add(message("p-new", "assistant", "刚刚翻开一本旧书，想起我们在雨天的约定。", 900L, proactive = true))
+        }
+        val avoidance = recentProactiveAvoidanceContext(messages)
+        assertTrue(avoidance.contains("刚刚翻开一本旧书"))
+        assertFalse(avoidance.contains("草莓奶昔"))
+        assertTrue(isNearDuplicateProactive(
+            "刚刚翻开一本旧书，想起我们在雨天的约定。", messages,
+        ))
+        assertFalse(isNearDuplicateProactive(
+            "今天给你带了草莓奶昔，记得趁凉喝。", messages,
+        ))
+    }
+
+    @Test
+    fun proactivePromptAnchorsRealUnfinishedPlansWithoutFabricatingUserTurns() {
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "园艺师")
+        val state = ChatCharacterState(
+            unresolvedThreads = listOf("还没把旧花盆归还给朋友"),
+            currentAgenda = "今天要整理温室里的新苗",
+        )
+        val prompt = characterProactiveDirective("用户设置的晚上提醒", persona, state)
+        assertTrue(prompt.contains("还没把旧花盆归还给朋友"))
+        assertTrue(prompt.contains("整理温室里的新苗"))
+        assertTrue(prompt.contains("不要编造用户刚刚说过"))
+        assertTrue(prompt.contains("不编造重大事件"))
+    }
+
     private fun message(
         id: String,
         role: String,

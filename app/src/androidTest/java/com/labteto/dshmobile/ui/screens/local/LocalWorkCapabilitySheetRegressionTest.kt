@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -79,6 +82,48 @@ class LocalWorkCapabilitySheetRegressionTest {
         compose.runOnIdle { assertEquals(0, entered) }
         compose.onNodeWithText("进入工作模式").performClick()
         compose.runOnIdle { assertEquals(1, entered) }
+    }
+
+    @Test
+    fun configurationReturnAndRefreshPreserveDraftWithoutStartingWork() {
+        val configuring = mutableStateOf(false)
+        val configured = mutableStateOf(false)
+        val prompt = mutableStateOf("检查 GitHub PR")
+        val summary = mutableStateOf("材料引用")
+        var entered = 0
+        var refreshed = 0
+        compose.setContent {
+            DshTheme {
+                if (configuring.value) {
+                    Text("返回交接", modifier = Modifier.clickable { configuring.value = false })
+                } else {
+                    LocalWorkCapabilitySheet(
+                        false, false, true, { entered++ }, {},
+                        prompt = prompt.value, summary = summary.value,
+                        onPromptChange = { prompt.value = it }, onSummaryChange = { summary.value = it },
+                        capabilities = listOf(LocalTaskCapabilityReadiness(
+                            LocalTaskCapabilityKind.GITHUB,
+                            if (configured.value) LocalTaskCapabilityState.CONFIGURED
+                            else LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                        )),
+                        onConfigureCapabilities = { configuring.value = true },
+                        onRefreshCapabilities = { refreshed++; configured.value = true },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("检查 GitHub PR").performTextReplacement("修改 GitHub PR")
+        compose.onNodeWithText("材料引用").performTextReplacement("materials/requirements.md")
+        compose.onNodeWithText("前往能力中心配置").performClick()
+        compose.onNodeWithText("返回交接").performClick()
+        compose.onNodeWithText("修改 GitHub PR").assertIsDisplayed()
+        compose.onNodeWithText("materials/requirements.md").assertIsDisplayed()
+        compose.onNodeWithText("刷新").performClick()
+        compose.onNodeWithText("GitHub · 配置已开启；实际调用仍需验证").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(0, entered)
+            assertEquals(1, refreshed)
+        }
     }
 
     @Test

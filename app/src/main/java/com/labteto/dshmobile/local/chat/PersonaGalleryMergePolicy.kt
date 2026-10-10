@@ -16,13 +16,17 @@ import kotlinx.serialization.json.jsonPrimitive
 internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
     val name = normalizePersonaText(persona.name)
     if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
-    return persona.portrait.isNotBlank() ||
+    return persona.coreIdentity.isNotBlank() ||
+        persona.facts.isNotEmpty() ||
+        persona.portrait.isNotBlank() ||
         persona.lifeContext.isNotBlank() ||
         persona.attentionBiases.isNotEmpty() ||
         persona.attentionKeywords.isNotEmpty() ||
         persona.coreValues.isNotEmpty() ||
         persona.stableTraits.isNotEmpty() ||
         persona.worldSetting.isNotBlank() ||
+        persona.franchise.isNotBlank() ||
+        persona.timelinePosition.isNotBlank() ||
         persona.knowledgeBoundary.isNotEmpty() ||
         persona.loreEntries.isNotEmpty() ||
         persona.hardConstraints.isNotEmpty() ||
@@ -39,8 +43,11 @@ internal fun samePersonaIdentity(left: PersonaProfile, right: PersonaProfile): B
     val rightName = normalizePersonaText(right.name)
     if (leftName.isBlank() || rightName.isBlank() || leftName != rightName) return false
     if (leftName in DEFAULT_PERSONA_NAMES || rightName in DEFAULT_PERSONA_NAMES) return false
-    return compatibleIdentityField(left.worldSetting, right.worldSetting) &&
-        compatibleIdentityField(left.franchise, right.franchise)
+    // V4 merges require an actual identity anchor; names and retired worldSetting text
+    // are insufficient to merge distinct people or alternate-universe variants.
+    if (left.coreIdentity.isBlank() || right.coreIdentity.isBlank()) return false
+    return compatibleIdentityField(left.franchise, right.franchise) &&
+        compatibleIdentityField(left.coreIdentity, right.coreIdentity)
 }
 
 private fun compatibleIdentityField(left: String, right: String): Boolean {
@@ -50,9 +57,30 @@ private fun compatibleIdentityField(left: String, right: String): Boolean {
     return a == b || a.contains(b) || b.contains(a)
 }
 
+/** Preserve distinct facts; an existing user-authored fact always wins against automatic enrichment. */
+internal fun mergeCharacterFacts(
+    base: List<CharacterFact>,
+    incoming: List<CharacterFact>,
+): List<CharacterFact> {
+    val byId = linkedMapOf<String, CharacterFact>()
+    base.forEach { byId[it.id] = it }
+    incoming.forEach { candidate ->
+        val original = byId[candidate.id]
+        if (original == null) byId[candidate.id] = candidate
+        else if (
+            original.provenance != CharacterFactProvenance.USER_CREATED &&
+            original.provenance != CharacterFactProvenance.CANON &&
+            candidate.provenance == CharacterFactProvenance.USER_CREATED
+        ) byId[candidate.id] = candidate
+    }
+    return byId.values.toList()
+}
+
 internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
     base.copy(
         name = chooseDisplayName(base.name, incoming.name),
+        coreIdentity = mergePersonaText(base.coreIdentity, incoming.coreIdentity, 4_000),
+        facts = mergeCharacterFacts(base.facts, incoming.facts),
         portrait = mergePersonaText(base.portrait, incoming.portrait, 4_000),
         lifeContext = mergePersonaText(base.lifeContext, incoming.lifeContext, 4_000),
         attentionBiases = mergePersonaLines(base.attentionBiases, incoming.attentionBiases, 8),
@@ -88,6 +116,15 @@ internal fun applyPersonaSuggestions(
         val value = suggestion.value.trim()
         if (value.isBlank()) return@forEach
         result = when (suggestion.field) {
+            "coreIdentity" -> result.copy(
+                coreIdentity = mergePersonaText(result.coreIdentity, value, 4_000),
+            )
+            in CharacterFactCategories.canonical -> result.copy(facts = result.facts + CharacterFact(
+                id = java.util.UUID.randomUUID().toString(),
+                category = suggestion.field,
+                content = value,
+                provenance = CharacterFactProvenance.USER_CREATED,
+            ))
             "portrait" -> result.copy(portrait = mergePersonaText(result.portrait, value, 4_000))
             "lifeContext" -> result.copy(lifeContext = mergePersonaText(result.lifeContext, value, 4_000))
             "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))
@@ -139,6 +176,12 @@ private fun mergeGalleryChatContext(
     if (!left.hasUsefulFacts()) return right
     if (!right.hasUsefulFacts()) return left
     return right.copy(
+        // A story with no stage metadata cannot erase a known plot path when
+        // archives merge; the gallery save path already handles explicit stage resets.
+        storyStage = right.storyStage.ifBlank { left.storyStage },
+        unlockedStoryStages = if (right.storyStage.isNotBlank()) {
+            right.unlockedStoryStages
+        } else left.unlockedStoryStages,
         scene = right.scene.copy(
             sceneTime = right.scene.sceneTime.ifBlank { left.scene.sceneTime },
             location = right.scene.location.ifBlank { left.scene.location },
@@ -234,6 +277,19 @@ internal fun galleryEntryHasUnsavedChanges(
 
 private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.name,
+    persona.coreIdentity,
+    persona.facts.joinToString("\u0000") { fact ->
+        listOf(
+            fact.id,
+            fact.category,
+            fact.content,
+            fact.relatedFactIds.joinToString("|"),
+            fact.perspective,
+            fact.temporalScope,
+            fact.provenance.name,
+            fact.sourceReference,
+        ).joinToString("~")
+    },
     persona.portrait,
     persona.lifeContext,
     persona.attentionBiases.joinToString("\u0000"),
@@ -256,6 +312,7 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
             entry.id, entry.title, entry.content,
             entry.keywords.joinToString("|"), entry.secondaryKeywords.joinToString("|"),
             entry.priority.toString(), entry.alwaysOn.toString(), entry.spoilerLevel.toString(),
+            entry.temporalScope,
         ).joinToString("~")
     },
     persona.presetId + "|" + persona.behaviorTuning.signature(),
@@ -343,31 +400,55 @@ private fun mergePersonaText(base: String, incoming: String, limit: Int): String
     return (existingClauses + additions).joinToString("；").take(limit)
 }
 
+/**
+ * Same canonical lore ID can exist in several explicitly gated stages. The stage is part of
+ * the merge key; storage still needs distinct physical IDs for editing and round trips.
+ */
+private fun loreMergeIdentity(entry: PersonaLoreEntry): String {
+    val originalId = entry.id.substringBefore("#stage-").take(48)
+    return normalizePersonaText(originalId.ifBlank { entry.title.ifBlank { entry.content.take(80) } })
+}
+
+internal fun uniqueLoreEntryIds(entries: List<PersonaLoreEntry>): List<PersonaLoreEntry> {
+    val used = mutableSetOf<String>()
+    return entries.map { entry ->
+        val normalizedId = normalizePersonaText(entry.id)
+        if (normalizedId.isNotBlank() && used.add(normalizedId)) entry else {
+            val stem = entry.id.substringBefore("#stage-").take(48).ifBlank { "lore" }
+            val stageKey = entry.temporalScope.hashCode().toUInt().toString(16)
+            var suffix = 0
+            var nextId: String
+            do {
+                nextId = "${stem}#stage-${stageKey}" +
+                    (if (suffix == 0) "" else "-${suffix}")
+                suffix++
+            } while (!used.add(normalizePersonaText(nextId)))
+            entry.copy(id = nextId.take(80))
+        }
+    }
+}
+
 private fun mergeLoreEntries(
     base: List<PersonaLoreEntry>,
     incoming: List<PersonaLoreEntry>,
     limit: Int,
 ): List<PersonaLoreEntry> {
-    val merged = linkedMapOf<String, PersonaLoreEntry>()
+    val merged = linkedMapOf<Pair<String, String>, PersonaLoreEntry>()
     (base + incoming).forEach { entry ->
-        val key = normalizePersonaText(entry.id.ifBlank { entry.title.ifBlank { entry.content.take(80) } })
-        if (key.isBlank() || entry.content.isBlank()) return@forEach
+        val key = loreMergeIdentity(entry) to entry.temporalScope.trim()
+        if (key.first.isBlank() || entry.content.isBlank()) return@forEach
         val existing = merged[key]
-        merged[key] = if (existing == null) {
-            entry
-        } else {
-            existing.copy(
-                title = mergePersonaText(existing.title, entry.title, 120),
-                content = mergePersonaText(existing.content, entry.content, 4_000),
-                keywords = mergePersonaLines(existing.keywords, entry.keywords, 16),
-                secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
-                priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
-                alwaysOn = existing.alwaysOn || entry.alwaysOn,
-                spoilerLevel = maxOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
-            )
-        }
+        merged[key] = if (existing == null) entry else existing.copy(
+            title = mergePersonaText(existing.title, entry.title, 120),
+            content = mergePersonaText(existing.content, entry.content, 4_000),
+            keywords = mergePersonaLines(existing.keywords, entry.keywords, 16),
+            secondaryKeywords = mergePersonaLines(existing.secondaryKeywords, entry.secondaryKeywords, 16),
+            priority = maxOf(existing.priority, entry.priority).coerceIn(0, 100),
+            alwaysOn = existing.alwaysOn || entry.alwaysOn,
+            spoilerLevel = maxOf(existing.spoilerLevel, entry.spoilerLevel).coerceIn(0, 3),
+        )
     }
-    return merged.values.toList().takeLast(limit)
+    return uniqueLoreEntryIds(merged.values.toList().takeLast(limit))
 }
 
 internal fun mergePersonaLines(base: List<String>, incoming: List<String>, limit: Int): List<String> {

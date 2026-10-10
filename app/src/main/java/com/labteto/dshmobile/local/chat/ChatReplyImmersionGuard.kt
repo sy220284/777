@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import kotlin.coroutines.cancellation.CancellationException
+
 internal object ChatReplyImmersionGuard {
     suspend fun <T> enforce(
         persona: PersonaProfile,
@@ -17,7 +19,15 @@ internal object ChatReplyImmersionGuard {
         if (initialViolations.isEmpty()) return initial
 
         onEvent("retry", initialViolations)
-        val repaired = retry(repairHint(persona, initialViolations))
+        val repaired = try {
+            retry(repairHint(persona, initialViolations))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A failed optional style repair must not discard a completed foreground reply.
+            onEvent("repair-failed-returned-original", initialViolations)
+            return initial
+        }
         val remaining = PersonaImmersionPolicy.findReplyViolations(
             persona = persona,
             text = contentOf(repaired),
@@ -27,8 +37,10 @@ internal object ChatReplyImmersionGuard {
             return repaired
         }
 
-        onEvent("blocked", remaining)
-        throw IllegalStateException("角色回复仍然脱离人物设定，已阻止写入聊天记录，请重新生成")
+        // Record the violation; a heuristically judged style defect should not block a
+        // successful model response after the one permitted repair attempt.
+        onEvent("accepted-with-warning", remaining)
+        return if (contentOf(repaired).isNotBlank()) repaired else initial
     }
 
     private fun repairHint(

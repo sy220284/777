@@ -19,12 +19,26 @@ class CharacterLoreEngine @Inject constructor() {
         maxSpoilerLevel: Int = 0,
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
+        storyStage: String = "",
+        unlockedStages: Collection<String> = emptyList(),
     ): List<PersonaLoreEntry> {
         if (persona.loreEntries.isEmpty()) return emptyList()
         val normalizedQuery = normalize(query)
         val terms = terms(query)
+        val visibleStages = (unlockedStages + storyStage)
+            .map(String::trim).filter(String::isNotBlank).toSet()
         val candidates = persona.loreEntries.asSequence()
-            .filter { it.content.isNotBlank() && it.spoilerLevel <= maxSpoilerLevel.coerceIn(0, 3) }
+            // A chosen plot stage grants only lore bound to that stage. Unscoped high-
+            // spoiler content still requires an independent spoiler-level grant.
+            .filter { entry ->
+                val stage = entry.temporalScope.trim()
+                // A stage-scoped entry is released only by an explicitly visited stage.
+                // An unscoped high-spoiler entry still needs a spoiler-level grant.
+                val stageUnlocked = stage.isNotBlank() && stage in visibleStages
+                entry.content.isNotBlank() &&
+                    (stage.isBlank() || stageUnlocked) &&
+                    (entry.spoilerLevel <= maxSpoilerLevel.coerceIn(0, 3) || stageUnlocked)
+            }
             .map { entry -> entry to score(entry, normalizedQuery, terms) }
             .filter { (entry, score) -> entry.alwaysOn || score > 0 }
             .sortedWith(
@@ -76,11 +90,17 @@ class CharacterLoreEngine @Inject constructor() {
         persona: PersonaProfile,
         query: String,
         maxSpoilerLevel: Int = 0,
+        storyStage: String = "",
+        unlockedStages: Collection<String> = emptyList(),
     ): String {
-        val active = activated(persona, query, maxSpoilerLevel)
+        val active = activated(
+            persona, query, maxSpoilerLevel,
+            storyStage = storyStage, unlockedStages = unlockedStages,
+        )
         if (active.isEmpty()) return ""
         return buildString {
-            appendLine("【相关世界信息】仅使用以下已激活背景，不补写未提供内容。")
+            appendLine("【相关世界信息】以下是当前已解锁的故事背景，不等于人物亲历或已知。")
+            appendLine("只在符合人物当前认知、经历与记忆时使用；未获知的秘密不得以本人见闻自述，不补写未提供的设定。")
             active.forEach { entry ->
                 if (entry.title.isNotBlank()) appendLine("【${entry.title}】")
                 appendLine(entry.content)

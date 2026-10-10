@@ -76,7 +76,8 @@ internal class LocalChatModelAssistController(
             ) {
                 "persona_autofill_stale"
             }
-            Result.success(runtime.chat.syncDefaultChatPersona(generated))
+            // Only the persona editor may commit this draft; generation must not detach gallery binding.
+            Result.success(generated)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {

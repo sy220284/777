@@ -31,6 +31,8 @@ internal fun LocalWorkCapabilitySheet(
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
     capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
+    onConfigureCapabilities: (() -> Unit)? = null,
+    onRefreshCapabilities: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     DsBottomSheet(
@@ -87,6 +89,26 @@ internal fun LocalWorkCapabilitySheet(
                 Text(stringResource(R.string.work_capability_readiness_row,
                     stringResource(name), stringResource(status)),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
+            }
+            if (onConfigureCapabilities != null && capabilities.any {
+                    it.state != LocalTaskCapabilityState.CONFIGURED
+                }) {
+                DsButton(
+                    text = stringResource(R.string.work_capability_configure),
+                    onClick = onConfigureCapabilities,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+            if (onRefreshCapabilities != null) {
+                DsButton(
+                    text = stringResource(R.string.common_refresh),
+                    onClick = onRefreshCapabilities,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
             }
         }
         if (failed) Text(stringResource(R.string.work_capability_failed), style = DsType.small13.withReadingWeight(), color = colors.error)

@@ -21,12 +21,114 @@ data class PersonaLoreEntry(
     val priority: Int = 50,
     val alwaysOn: Boolean = false,
     val spoilerLevel: Int = 0,
+    /** Exact story stage; a blank scope is independent of plot progress. */
+    val temporalScope: String = "",
 )
+
+/** A single canonical person fact; categories are extensible without adding schema fields. */
+@Serializable
+data class CharacterFact(
+    val id: String,
+    val category: String,
+    val content: String,
+    val relatedFactIds: List<String> = emptyList(),
+    /** Named viewpoint for subjective beliefs; empty means the character's own account. */
+    val perspective: String = "",
+    /** Optional explicit story-stage identifier; stage-gated facts require an exact match. */
+    val temporalScope: String = "",
+    val provenance: CharacterFactProvenance = CharacterFactProvenance.UNVERIFIED,
+    val sourceReference: String = "",
+)
+
+@Serializable
+enum class CharacterFactProvenance { CANON, INFERRED, USER_CREATED, UNVERIFIED }
+
+/** Default editor categories. Additional category codes remain valid for original characters. */
+object CharacterFactCategories {
+    const val PERSONALITY = "personality"
+    const val SELF_NARRATIVE = "selfNarrative"
+    const val IDENTITY_GAP = "identityGap"
+    const val VALUES_AND_TRADEOFFS = "valuesAndTradeoffs"
+    const val SUBJECTIVE_BELIEFS = "subjectiveBeliefs"
+    const val BIOGRAPHY = "biography"
+    const val DEFINING_CHOICES = "definingChoices"
+    const val EMOTIONAL_IMPRINTS = "emotionalImprints"
+    const val LIFE_GRAVITY = "lifeGravity"
+    const val UNFINISHED_BUSINESS = "unfinishedBusiness"
+    const val RELATIONSHIPS = "relationships"
+    const val LIMITS_AND_COSTS = "limitsAndCosts"
+    const val SENSORY_SIGNATURE = "sensorySignature"
+    const val PREFERENCES_AND_HABITS = "preferencesAndHabits"
+    const val VOICE_STYLE = "voiceStyle"
+    const val CUSTOM_FACTS = "customFacts"
+    val canonical = listOf(
+        PERSONALITY, SELF_NARRATIVE, IDENTITY_GAP, VALUES_AND_TRADEOFFS,
+        SUBJECTIVE_BELIEFS, BIOGRAPHY, DEFINING_CHOICES, EMOTIONAL_IMPRINTS,
+        LIFE_GRAVITY, UNFINISHED_BUSINESS, RELATIONSHIPS, LIMITS_AND_COSTS,
+        SENSORY_SIGNATURE, PREFERENCES_AND_HABITS, VOICE_STYLE, CUSTOM_FACTS,
+    )
+}
+
+/** Actual source of character facts; unrelated chat state is owned by its runtime. */
+fun PersonaProfile.trustedFactText(category: String): String =
+    facts.asSequence()
+        .filter { it.category == category && it.temporalScope.isBlank() }
+        .filter { it.provenance == CharacterFactProvenance.CANON || it.provenance == CharacterFactProvenance.USER_CREATED }
+        .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")
+
+fun PersonaProfile.factText(category: String): String =
+    facts.asSequence().filter { it.category == category && it.temporalScope.isBlank() }
+        .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")
+
+fun PersonaProfile.withFact(category: String, content: String): PersonaProfile {
+    // Category-level editing must replace existing preset summaries, regardless of fact ID.
+    // Stage-gated individual facts are preserved.
+    val previous = facts.firstOrNull { it.category == category && it.temporalScope.isBlank() }
+    val others = facts.filterNot { it.category == category && it.temporalScope.isBlank() }
+    val updated = content.trim().takeIf(String::isNotBlank)?.let {
+        CharacterFact(
+            id = previous?.id ?: "v4-$category",
+            category = category,
+            content = it,
+            relatedFactIds = previous?.relatedFactIds.orEmpty(),
+            perspective = previous?.perspective.orEmpty(),
+            provenance = CharacterFactProvenance.USER_CREATED,
+        )
+    }
+    return copy(facts = if (updated == null) others else others + updated)
+}
+
+fun PersonaProfile.visibleFacts(
+    storyStage: String = "",
+    unlockedStages: Collection<String> = emptyList(),
+): List<CharacterFact> {
+    val stages = (unlockedStages + storyStage).filter(String::isNotBlank).toSet()
+    return facts.filter { it.temporalScope.isBlank() || it.temporalScope in stages }
+}
+
+/**
+ * A subjective belief from another named observer must not become the active person's
+ * private knowledge automatically. The editor retains all perspectives unchanged.
+ * Stage access and viewpoint access are separate decisions.
+ */
+fun PersonaProfile.characterKnownFacts(
+    storyStage: String = "",
+    unlockedStages: Collection<String> = emptyList(),
+): List<CharacterFact> = visibleFacts(storyStage, unlockedStages).filter { fact ->
+    if (fact.category != CharacterFactCategories.SUBJECTIVE_BELIEFS) return@filter true
+    val viewpoint = fact.perspective.trim()
+    viewpoint.isBlank() || viewpoint == name.trim() ||
+        viewpoint in setOf("本人", "自述", "本人视角", "自身", "角色自己", "角色自身")
+}
 
 @Serializable
 data class PersonaProfile(
     val id: String = DEFAULT_PERSONA_ID,
     val name: String = "默认角色",
+    /** V4 canonical identity: factual identity and public role, not a behavioral script. */
+    val coreIdentity: String = "",
+    /** V4 facts are the single editable source; legacy shape is retired in the V4 path. */
+    val facts: List<CharacterFact> = emptyList(),
     /** Friend-like whole-person description. This is the stable identity anchor, not a trait checklist. */
     val portrait: String = "",
     /** Independent daily life, work, responsibilities and ongoing concerns outside the user. */
@@ -75,7 +177,7 @@ internal fun PersonaProfile.isUnboundChatPersona(): Boolean =
 
 @Serializable
 private data class PersonaDocument(
-    val version: Int = 2,
+    val version: Int = 4,
     val personas: List<PersonaProfile> = listOf(PersonaProfile()),
 )
 
@@ -122,16 +224,12 @@ private val QUESTION_LIKE_CORRECTION_END = Regex("""(?:吗|么|吧|是不是|对
 class ChatPersonaStore internal constructor(
     private val file: File,
     private val json: Json,
-    private val legacyFile: File? = null,
-    private val migrationMarker: File? = null,
     private val onDocumentDecode: () -> Unit = {},
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(
-            file = File(context.filesDir, "local-harness/chat/personas-v2.json"),
+            file = File(context.filesDir, "local-harness/chat/personas-v4.json"),
             json = json,
-            legacyFile = File(context.filesDir, "local-harness/chat/personas.json"),
-            migrationMarker = File(context.filesDir, "local-harness/chat/personas-v1-to-v2.done"),
         )
 
     private val durableFile = RecoveringDocumentFile(file)
@@ -201,6 +299,19 @@ class ChatPersonaStore internal constructor(
     private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.copy(
         id = profile.id.trim().take(80).ifBlank { PersonaProfile.DEFAULT_PERSONA_ID },
         name = profile.name.trim().take(80).ifBlank { "默认角色" },
+        coreIdentity = profile.coreIdentity.trim().take(MAX_LONG_FIELD_CHARS),
+        facts = profile.facts.mapNotNull { fact ->
+            val content = fact.content.trim()
+            if (content.isEmpty()) null else fact.copy(
+                id = fact.id.trim().ifEmpty { "fact-${fact.category}-${content.hashCode()}" }.take(120),
+                category = fact.category.trim().take(80),
+                content = content.take(MAX_LONG_FIELD_CHARS),
+                relatedFactIds = fact.relatedFactIds.map(String::trim).filter(String::isNotBlank).distinct(),
+                perspective = fact.perspective.trim().take(160),
+                temporalScope = fact.temporalScope.trim().take(160),
+                sourceReference = fact.sourceReference.trim().take(500),
+            )
+        }.distinctBy(CharacterFact::id),
         portrait = profile.portrait.trim().take(MAX_LONG_FIELD_CHARS),
         lifeContext = profile.lifeContext.trim().take(MAX_LONG_FIELD_CHARS),
         attentionBiases = cleanLines(profile.attentionBiases, 8),
@@ -237,12 +348,17 @@ class ChatPersonaStore internal constructor(
                     secondaryKeywords = cleanLines(entry.secondaryKeywords, 16),
                     priority = entry.priority.coerceIn(0, 100),
                     spoilerLevel = entry.spoilerLevel.coerceIn(0, 3),
+                    temporalScope = entry.temporalScope.trim().take(160),
                 )
             }
             .filter { it.content.isNotBlank() }
-            .distinctBy { entry -> normalize(entry.id.ifBlank { entry.title + entry.content.take(80) }) }
+            .distinctBy { entry ->
+                normalize(entry.id.ifBlank { entry.title + entry.content.take(80) }) +
+                    "\u0000" + entry.temporalScope
+            }
             .take(MAX_LORE_ENTRIES)
             .toList()
+            .let(::uniqueLoreEntryIds)
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
@@ -259,7 +375,6 @@ class ChatPersonaStore internal constructor(
     private fun read(): PersonaDocument {
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-        migrateLegacyIfNeeded()
         val document = durableFile.read(
             defaultValue = ::PersonaDocument,
             decode = ::decodeDocument,
@@ -267,67 +382,6 @@ class ChatPersonaStore internal constructor(
         cachedDocument = document
         cachedStamp = documentStamp()
         return document
-    }
-
-    private fun migrateLegacyIfNeeded() {
-        val legacy = legacyFile ?: return
-        val marker = migrationMarker ?: return
-        val currentReadable = listOf(file, backupFile)
-            .asSequence()
-            .filter(File::isFile)
-            .any { candidate ->
-                runCatching { decodeDocument(candidate.readText()) }.isSuccess
-            }
-        if (marker.isFile && currentReadable) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
-
-        var needsRecovery = false
-        val current = runCatching {
-            durableFile.read(
-                defaultValue = ::PersonaDocument,
-                decode = ::decodeDocument,
-            )
-        }.getOrElse {
-            // A retained legacy source is a valid recovery source. Fail closed only after both
-            // the current generation and the migration source are unavailable.
-            needsRecovery = true
-            PersonaDocument()
-        }
-        val legacyDocument = PersonaSchemaMigration.readLegacyPersonaDocument(legacy, json)
-        val merged = current.personas.toMutableList()
-        legacyDocument.personas.forEach { old ->
-            val migrated = sanitize(PersonaSchemaMigration.toCurrent(old))
-            val index = merged.indexOfFirst { it.id == migrated.id }
-            if (index >= 0) {
-                merged[index] = sanitize(
-                    PersonaSchemaMigration.mergeCurrentFirst(merged[index], migrated),
-                )
-            } else {
-                merged += migrated
-            }
-        }
-        val migrated = current.copy(version = 2, personas = merged)
-        if (needsRecovery) {
-            durableFile.restoreFromRecoverySource(json.encodeToString(PersonaDocument.serializer(), migrated)) {
-                runCatching { decodeDocument(it) }.isSuccess
-            }
-            cachedDocument = null
-        } else write(migrated)
-        markMigrationDone(marker)
-    }
-
-    private fun markMigrationDone(marker: File) {
-        marker.parentFile?.mkdirs()
-        val temporary = File(marker.parentFile, marker.name + ".tmp")
-        temporary.outputStream().use { output ->
-            output.write("v2\n".toByteArray())
-            output.flush()
-            output.fd.sync()
-        }
-        if (!temporary.renameTo(marker)) {
-            temporary.copyTo(marker, overwrite = true)
-            check(temporary.delete()) { "人物迁移标记临时文件无法清理" }
-        }
     }
 
     private fun write(document: PersonaDocument) {
@@ -342,7 +396,7 @@ class ChatPersonaStore internal constructor(
     private fun decodeDocument(encoded: String): PersonaDocument {
         onDocumentDecode()
         return json.decodeFromString(PersonaDocument.serializer(), encoded).also { document ->
-            require(document.version == 2) {
+            require(document.version == 4) {
                 "人物库版本不受支持；新版角色系统不读取旧人物数据"
             }
         }
@@ -351,7 +405,6 @@ class ChatPersonaStore internal constructor(
 
     private fun documentStamp(): DocumentFileStamp = DocumentFileStamp.of(
         file, backupFile, File(file.parentFile, "${file.name}.recovery-required"),
-        legacyFile, migrationMarker,
     )
 
     private companion object {

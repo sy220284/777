@@ -218,6 +218,7 @@ suspend fun inspectGalleryPersona(
             profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
+            chatContext = story?.chatContext,
         )
     }
 }
@@ -306,11 +307,15 @@ private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
     }
 }
 
-suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
+suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(chatUi.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
+        check(chatUi.updateStoryDetails(id, storyId, notes, storyStage)) { "图集故事已不存在" }
         _gallery.value = chatUi.galleryEntries()
     }
+    // The gallery owns persisted stage data. Update the active copy through Chat's
+    // session owner only when this very story is bound and the turn is idle.
+    runtime.chat.updateBoundStoryStage(id, storyId, storyStage)
+    Unit
 }
 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {

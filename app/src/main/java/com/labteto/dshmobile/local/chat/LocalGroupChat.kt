@@ -56,7 +56,13 @@ internal const val MAX_GROUP_CHAT_MEMBERS = 6
 internal const val MIN_GROUP_CHAT_MEMBERS = 2
 internal const val GROUP_CHAT_SILENT_TOKEN = "__GROUP_CHAT_SILENT__"
 internal const val MAX_GROUP_CHAT_RESPONDERS_PER_TURN = 2
-internal const val MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN = 3
+internal const val MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN = MAX_GROUP_CHAT_MEMBERS
+
+/** Only an explicit request to hear everybody expands past the normal reply budget. */
+private val GROUP_CHAT_EVERYONE_CUES = listOf(
+    "每个人都说", "每个人都回答", "所有人都说", "所有人都回答",
+    "全部人都说", "全部人都回答", "大家依次回答", "全员依次回答", "所有角色回答",
+)
 
 private val GROUP_CHAT_COLLECTIVE_CUES = listOf(
     "你们", "大家", "各位", "所有人", "每个人", "都说", "都聊", "一起说", "一起聊",
@@ -117,15 +123,45 @@ internal fun groupChatMentionedMembers(
         .toList()
 }
 
+/** Secondary speakers may listen naturally; direct or explicitly all-member requests still expect replies. */
+/**
+ * Only speech actually delivered to the group can expand another member's memory query.
+ * Every member still searches under their own subject key. This is request-local and
+ * bounded; it neither persists memories under a different character nor broadcasts them.
+ */
+internal fun groupMemberMemoryQuery(
+    userInput: String,
+    deliveredPublicSpeech: List<String>,
+): String = buildString {
+    append(userInput.trim().take(380))
+    deliveredPublicSpeech.takeLast(2).forEach { spoken ->
+        val excerpt = spoken.trim().take(240)
+        if (excerpt.isNotEmpty()) {
+            append("\n群聊前一位成员说：")
+            append(excerpt)
+        }
+    }
+}.trim()
+
+internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMember, index: Int): Boolean =
+    index > 0 &&
+        GROUP_CHAT_EVERYONE_CUES.none(input::contains) &&
+        (member.displayName.isBlank() || !input.contains(member.displayName))
+
 internal fun groupChatResponders(
     input: String,
     members: List<LocalGroupChatMember>,
 ): List<LocalGroupChatMember> {
     if (members.isEmpty()) return emptyList()
-    val explicitlyMentioned = groupChatMentionedMembers(input, members)
+    val distinct = members.distinctBy(LocalGroupChatMember::galleryId)
+    // When the user clearly requests each participant, honor the actual 2–6 person
+    // roster; the normal one/two speaker budget still applies to casual group chat.
+    if (GROUP_CHAT_EVERYONE_CUES.any(input::contains)) {
+        return distinct.take(MAX_GROUP_CHAT_MEMBERS)
+    }
+    val explicitlyMentioned = groupChatMentionedMembers(input, distinct)
     if (explicitlyMentioned.isNotEmpty()) return explicitlyMentioned
 
-    val distinct = members.distinctBy(LocalGroupChatMember::galleryId)
     return if (groupChatWantsMultipleReplies(input)) {
         distinct.take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
     } else {

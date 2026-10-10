@@ -19,11 +19,13 @@ internal class CharacterRuntimeProjector(
         userInput: String,
         storyContext: String?,
     ): CharacterRuntimeProjection {
+        // Only facts visible at the current plot stage may influence replies or behavior.
+        val activePersona = persona.forRuntimeStoryStage(context)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
-        val lifeState = advanceCharacterLife(persona, privateState, storyTime = context.scene.sceneTime)
+        val lifeState = advanceCharacterLife(activePersona, privateState, storyTime = context.scene.sceneTime)
         val runtimeState = privateState.copy(lifeState = lifeState)
-        val attention = resolveCharacterAttention(persona, runtimeState, userInput)
-        val mode = resolveCharacterMode(persona, runtimeState, userInput, attention)
+        val attention = resolveCharacterAttention(activePersona, runtimeState, userInput)
+        val mode = resolveCharacterMode(activePersona, runtimeState, userInput, attention)
         val storyPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
             """
             【连续性摘要｜已发生】
@@ -33,18 +35,53 @@ internal class CharacterRuntimeProjector(
         }.orEmpty()
 
         return CharacterRuntimeProjection(
-            stablePrompt = stablePrompt(persona),
+            stablePrompt = stablePrompt(activePersona),
             dynamicPrompt = listOf(
-                takeWithinModelTokenBudget(momentPrompt(persona, runtimeState), MOMENT_TOKEN_BUDGET),
+                takeWithinModelTokenBudget(momentPrompt(activePersona, runtimeState), MOMENT_TOKEN_BUDGET),
                 renderCharacterLifePrompt(lifeState),
                 takeWithinModelTokenBudget(renderCharacterModePrompt(mode), MODE_TOKEN_BUDGET),
+                takeWithinModelTokenBudget(renderCharacterDecisionPrompt(activePersona, runtimeState, userInput), 190),
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
-                relevantBackgroundPrompt(persona, userInput),
+                relevantBackgroundPrompt(activePersona, userInput),
+                relevantCharacterFactPrompt(persona, context, userInput, storyContext),
+                context.storyStage.takeIf(String::isNotBlank)
+                    ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
-                loreEngine.prompt(persona, userInput),
+                loreEngine.prompt(
+                    activePersona, userInput, storyStage = context.storyStage,
+                    unlockedStages = context.visibleStoryStages(),
+                ),
                 relationshipEngine.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
+        )
+    }
+
+    private fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): PersonaProfile {
+        // A new V4 identity is authoritative even before the first fact is filled in.
+        // Legacy-only profiles still retain their old runtime fallback until converted.
+        if (facts.isEmpty() && coreIdentity.isBlank()) return this
+        // A request-local projection preserves the stored sources and stage IDs. Even if
+        // all facts are future-gated, obsolete legacy prose must not be restored.
+        return copy(
+            facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
+                .map { it.copy(temporalScope = "") },
+            portrait = "",
+            lifeContext = "",
+            attentionBiases = emptyList(),
+            attentionKeywords = emptyList(),
+            perceptionBlindSpots = emptyList(),
+            quirks = emptyList(),
+            limitations = emptyList(),
+            coreValues = emptyList(),
+            coreTension = "",
+            stableTraits = emptyList(),
+            mutableTraits = emptyList(),
+            initialUserImpression = "",
+            voiceSamples = emptyList(),
+            // Old prose must not bypass V4 stage-gated facts or world-book disclosure.
+            timelinePosition = "",
+            worldSetting = "",
         )
     }
 
@@ -52,9 +89,18 @@ internal class CharacterRuntimeProjector(
         val critical = takeWithinModelTokenBudget(
             buildString {
                 appendLine("【人物】${persona.name}")
+                persona.coreIdentity.takeIf(String::isNotBlank)?.let { appendLine("稳定身份：${it.take(300)}") }
+                persona.trustedFactText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
+                    ?.let { appendLine("稳定性格：${it.take(180)}") }
+                persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
+                    ?.let { appendLine("价值与取舍：${it.take(180)}") }
+                persona.franchise.takeIf(String::isNotBlank)?.let { appendLine("原作来源：${it.take(90)}") }
+                persona.timelinePosition.takeIf(String::isNotBlank)?.let { appendLine("当前剧情阶段：${it.take(120)}") }
                 appendLine(COMMON_CHARACTER_BOUNDARY)
                 appendLine(ANTI_PERFORMANCE_RULE)
-                appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
+                if (persona.facts.isEmpty()) {
+                    appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
+                }
                 appendStableSection(
                     "专属硬约束",
                     persona.hardConstraints.filterNot(::isCommonCharacterBoundary),
@@ -70,21 +116,39 @@ internal class CharacterRuntimeProjector(
             }.trim(),
             STABLE_CRITICAL_TOKEN_BUDGET,
         )
-        val remaining = (STABLE_PERSONA_TOKEN_BUDGET - estimateModelTokens(critical)).coerceAtLeast(0)
+        val separator = "\n\n"
+        val remaining = (
+            STABLE_PERSONA_TOKEN_BUDGET - estimateModelTokens(critical) -
+                estimateModelTokens(separator)
+            ).coerceAtLeast(0)
         val descriptive = if (remaining == 0) "" else takeWithinModelTokenBudget(
             descriptiveStablePrompt(persona),
             remaining,
         )
-        return listOf(critical, descriptive).filter(String::isNotBlank).joinToString("\n\n")
+        // Token estimates for separately clipped segments need not be exactly additive.
+        // The final cap covers the separator and any estimate-rounding difference.
+        return takeWithinModelTokenBudget(
+            listOf(critical, descriptive).filter(String::isNotBlank).joinToString(separator),
+            STABLE_PERSONA_TOKEN_BUDGET,
+        )
     }
 
     private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
         appendLine("【人物底色】")
-        appendLine("只保留长期身份与生活底色；具体脑回路、行为和表达由每轮模式自由组合，不把任何形容词演成固定套路。")
-        persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
-        persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("生活：${it.take(520)}") }
+        // Put the actual biography first; the critical prompt already describes how to use it.
+        if (persona.facts.isNotEmpty()) {
+            persona.factText(CharacterFactCategories.BIOGRAPHY).takeIf(String::isNotBlank)
+                ?.let { appendLine("人物经历：${it.take(700)}") }
+            persona.factText(CharacterFactCategories.VOICE_STYLE).takeIf(String::isNotBlank)
+                ?.let { appendLine("语言风格：${it.take(280)}") }
+        } else {
+            persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
+            persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
+            persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("经历与生活：${it.take(520)}") }
+        }
+        if (persona.franchise.isNotBlank()) appendLine("可用已知原作知识补足细节；当前剧情和用户明确改编优先，不把未知情节编成事实。")
 
-        val samples = persona.voiceSamples.asSequence()
+        val samples = (if (persona.facts.isEmpty()) persona.voiceSamples else emptyList()).asSequence()
             .map(String::trim)
             .filter(String::isNotBlank)
             .take(MAX_STABLE_VOICE_SAMPLES)
@@ -111,7 +175,8 @@ internal class CharacterRuntimeProjector(
         state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
         state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
-            ?: persona.initialUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+            ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
+                ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { lines += "关系里还没过去的事：${it.take(180)}" }
         state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
@@ -130,17 +195,102 @@ internal class CharacterRuntimeProjector(
 
     private fun relevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
         if (userInput.isBlank()) return ""
-        val anchors = listOf(
-            "生活" to persona.lifeContext,
-            "世界" to persona.worldSetting,
-            "时间线" to persona.timelinePosition,
-            "来源" to persona.franchise,
-        ).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
+        val anchors = (if (persona.facts.isNotEmpty()) {
+            listOf(
+                "人物身份与经历" to persona.coreIdentity,
+                "既有经历" to persona.factText(CharacterFactCategories.BIOGRAPHY),
+                "生活牵引" to persona.factText(CharacterFactCategories.LIFE_GRAVITY),
+                "世界" to persona.worldSetting,
+                "来源" to persona.franchise,
+            )
+        } else {
+            listOf(
+                "人物身份与经历" to persona.portrait,
+                "生活" to persona.lifeContext,
+                "世界" to persona.worldSetting,
+                "时间线" to persona.timelinePosition,
+                "来源" to persona.franchise,
+            )
+        }).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
         if (anchors.isEmpty()) return ""
         return buildString {
             appendLine("【本轮相关背景】只在当前话题自然需要时使用，不主动扩写。")
             anchors.forEach { (label, value) -> appendLine("$label：${value.take(800)}") }
         }.trim()
+    }
+
+    /** Select factual depth on demand; never use the character's current feelings as stored facts. */
+    private fun relevantCharacterFactPrompt(
+        persona: PersonaProfile,
+        context: ChatContextState,
+        userInput: String,
+        storyContext: String?,
+    ): String {
+        val query = listOf(userInput, storyContext.orEmpty().takeLast(450)).joinToString(" ")
+        if (query.isBlank()) return ""
+        val core = setOf(
+            CharacterFactCategories.PERSONALITY,
+            CharacterFactCategories.VALUES_AND_TRADEOFFS,
+        )
+        val visible = persona.characterKnownFacts(context.storyStage, context.visibleStoryStages())
+            .filter { it.content.isNotBlank() &&
+                (it.category !in core || it.provenance == CharacterFactProvenance.INFERRED ||
+                    it.provenance == CharacterFactProvenance.UNVERIFIED) }
+        val direct = visible.filter { fact ->
+            relevantTo(fact.content, query) || relevantTo(fact.category, query)
+        }.take(3)
+        val directIds = direct.mapTo(hashSetOf(), CharacterFact::id)
+        val linkedIds = direct.flatMap(CharacterFact::relatedFactIds).toSet()
+        // Expand only from genuinely relevant facts and only within the current story stage.
+        // Fact IDs are internal references; users should never need to type them to recall a link.
+        val linked = visible.filter { fact ->
+            fact.id !in directIds && (
+                fact.id in linkedIds ||
+                    fact.relatedFactIds.any(directIds::contains) ||
+                    sharesRelevantTopicWithKnownFact(fact, direct, query)
+            )
+        }.take(4 - direct.size)
+        val relevant = direct + linked
+        if (relevant.isEmpty()) return ""
+        return takeWithinModelTokenBudget(buildString {
+            appendLine("【本轮相关人物事实】")
+            relevant.forEach { fact ->
+                val status = when (fact.provenance) {
+                    CharacterFactProvenance.CANON -> "原作资料"
+                    CharacterFactProvenance.USER_CREATED -> "作者明确设定"
+                    CharacterFactProvenance.INFERRED -> "推断，须保持不确定性"
+                    CharacterFactProvenance.UNVERIFIED -> "尚未核实，不当作既定事实"
+                }
+                val viewpoint = fact.perspective.takeIf(String::isNotBlank)
+                    ?.let { "；视角：${it.take(60)}" }.orEmpty()
+                val evidence = fact.sourceReference.takeIf(String::isNotBlank)
+                    ?.let { "；来源：${it.take(80)}" }.orEmpty()
+                appendLine("${fact.category}（${status}${viewpoint}${evidence}）：${fact.content.take(650)}")
+            }
+        }.trim(), 500)
+    }
+
+    /**
+     * A single name/topic anchor can connect a directly matched event with this
+     * character's subjective impression of that same person. Do not expand an
+     * unrelated fact merely because it shares generic dialogue words.
+     */
+    private fun sharesRelevantTopicWithKnownFact(
+        candidate: CharacterFact,
+        matched: List<CharacterFact>,
+        query: String,
+    ): Boolean {
+        if (candidate.category != CharacterFactCategories.SUBJECTIVE_BELIEFS ||
+            matched.isEmpty()
+        ) return false
+        val queryPairs = normalize(query).windowed(2).toSet()
+        val factPairs = normalize(candidate.content).windowed(2).toSet()
+        return matched.any { related ->
+            normalize(related.content).windowed(2).any { pair ->
+                pair in queryPairs && pair in factPairs &&
+                    pair !in GENERIC_LINKED_FACT_PAIRS
+            }
+        }
     }
 
     private fun relevantTo(source: String, query: String): Boolean {
@@ -161,6 +311,10 @@ internal class CharacterRuntimeProjector(
     }
 
     private companion object {
+        val GENERIC_LINKED_FACT_PAIRS = setOf(
+            "我们", "他们", "自己", "一起", "那个", "这个", "事情", "时候",
+            "知道", "关于", "什么", "可以", "认为", "感觉", "觉得",
+        )
         const val MAX_STORY_CONTEXT_CHARS = 2_500
         const val MAX_STABLE_VOICE_SAMPLES = 2
         const val STABLE_CRITICAL_TOKEN_BUDGET = 320

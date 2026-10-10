@@ -24,6 +24,58 @@ class LocalChatPersonaCoordinatorTest {
     ))
 
     @Test
+    fun editingBoundStoryStageUpdatesLiveChatContextAndCommits() {
+        val state = initialState()
+        state.value = state.value.copy(chat = state.value.chat.copy(
+            galleryId = "gallery", galleryStoryId = "story",
+            chatContext = ChatContextState(storyStage = "act-1"),
+        ))
+        var committed = 0
+        val coordinator = LocalChatPersonaCoordinator(
+            state = localAggregateChatStatePort(state),
+            loadPersona = { null },
+            savePersona = { it },
+            restorePersona = { _, _ -> },
+            commitDomainState = { target, reason ->
+                assertEquals("act-2", target.chat.chatContext.storyStage)
+                assertEquals("gallery-story-stage-updated", reason)
+                committed++
+            },
+            enqueueSnapshot = { true },
+        )
+        assertTrue(coordinator.updateBoundStoryStage("gallery", "story", "act-2"))
+        assertEquals("act-2", state.value.chat.chatContext.storyStage)
+        assertEquals(1, committed)
+        assertFalse(coordinator.updateBoundStoryStage("gallery", "other-story", "act-3"))
+        assertEquals("act-2", state.value.chat.chatContext.storyStage)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
+    }
+
+    @Test
+    fun busyTurnCannotBeOverwrittenByGalleryStageChanges() {
+        val state = initialState()
+        state.value = state.value.copy(chat = state.value.chat.copy(
+            galleryId = "gallery", galleryStoryId = "story",
+            chatContext = ChatContextState(storyStage = "act-1"),
+        ))
+        val coordinator = LocalChatPersonaCoordinator(
+            state = localAggregateChatStatePort(state),
+            loadPersona = { null }, savePersona = { it }, restorePersona = { _, _ -> },
+            commitDomainState = { _, _ -> error("busy state should not commit") },
+            enqueueSnapshot = { true },
+        )
+        val owner = requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+            "persona-edit", LocalSessionRuntimeKind.AUTOMATION_CHAT,
+        ))
+        try {
+            assertFalse(coordinator.updateBoundStoryStage("gallery", "story", "act-2"))
+            assertEquals("act-1", state.value.chat.chatContext.storyStage)
+        } finally {
+            owner.close()
+        }
+    }
+
+    @Test
     fun selectionCommitsDurableFactBeforePublishingRuntimeProjection() = runBlocking {
         val state = initialState()
         var commits = 0

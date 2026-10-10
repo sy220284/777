@@ -186,12 +186,19 @@ internal class ChatDiaryStore(
     }
 
     @Synchronized
-    fun listActive(subjectKey: String, limit: Int = 100): List<ChatDiaryEntry> =
-        documents.read().entries.asSequence()
+    fun listActive(subjectKey: String, limit: Int = 100): List<ChatDiaryEntry> {
+        val stored = documents.read().entries
+        // Older files could mark a fact obsolete based solely on its disclosure label.
+        // Normalize the view without rewriting the saved source/history on a read.
+        val current = if (stored.any { it.supersededBy != null }) {
+            ChatDiarySupersessionPolicy.repairLinks(stored)
+        } else stored
+        return current.asSequence()
             .filter { it.active && it.subjectKey == subjectKey }
             .sortedByDescending(ChatDiaryEntry::updatedAt)
             .take(limit.coerceIn(1, MAX_CHAT_DIARY_ENTRIES))
             .toList()
+    }
 
     @Synchronized
     internal fun listForTransfer(subjectKey: String): List<ChatDiaryEntry> = transfer.list(subjectKey)

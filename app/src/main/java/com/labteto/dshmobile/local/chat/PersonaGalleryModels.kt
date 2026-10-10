@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable
 data class PersonaGalleryStory(
@@ -98,9 +100,11 @@ data class PersonaGallerySaveOutcome(
     val storyId: String?,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class PersonaShareEnvelope(
-    val schema: Int = 2,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val schema: Int = 4,
     val source: String = "神言神语",
     val persona: PersonaProfile,
 )

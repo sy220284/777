@@ -179,7 +179,8 @@ private fun evolveMutableTraits(
     evidenceText: String,
     significance: String,
 ): Map<String, CharacterTraitEvolutionState> {
-    if (persona.mutableTraits.isEmpty()) return previous
+    val anchors = persona.evolvingTraitAnchors()
+    if (anchors.isEmpty()) return previous
     val now = System.currentTimeMillis()
     val evidenceKey = normalizeEvolutionText(evidenceText)
         .take(240)
@@ -188,7 +189,7 @@ private fun evolveMutableTraits(
         ?.toUInt()
         ?.toString(16)
         .orEmpty()
-    return persona.mutableTraits.take(8).associate { rawTrait ->
+    return anchors.associate { rawTrait ->
         val trait = rawTrait.trim().take(80)
         val old = previous[trait] ?: CharacterTraitEvolutionState()
         if (
@@ -219,6 +220,32 @@ private fun evolveMutableTraits(
         }
     }
 }
+
+/**
+ * V4 facts remain the author-owned baseline. Only verified habits and subjective beliefs
+ * may form a slow-moving runtime tendency; changes never rewrite the original card.
+ * Future-stage and unverified facts cannot silently become evidence targets.
+ */
+private fun PersonaProfile.evolvingTraitAnchors(): List<String> =
+    if (facts.isEmpty()) {
+        mutableTraits.asSequence().map(String::trim)
+            .filter(String::isNotBlank).distinct().take(8).toList()
+    } else {
+        // Growth must use the same character-knowledge view as reply projection.
+        // Another observer's subjective belief is not this character's tendency.
+        characterKnownFacts().asSequence()
+            .filter { it.temporalScope.isBlank() }
+            .filter {
+                it.category == CharacterFactCategories.PREFERENCES_AND_HABITS ||
+                    it.category == CharacterFactCategories.SUBJECTIVE_BELIEFS
+            }
+            .filter {
+                it.provenance == CharacterFactProvenance.USER_CREATED ||
+                    it.provenance == CharacterFactProvenance.CANON
+            }
+            .map { it.content.trim().take(80) }
+            .filter(String::isNotBlank).distinct().take(8).toList()
+    }
 
 private fun traitRelated(trait: String, text: String): Boolean {
     val a = normalizeEvolutionText(trait)

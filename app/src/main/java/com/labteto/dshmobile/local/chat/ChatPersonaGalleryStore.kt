@@ -16,14 +16,13 @@ class ChatPersonaGalleryStore internal constructor(
     private val json: Json,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(File(context.filesDir, "local-harness/chat/persona-gallery-v5.json"), json)
+        this(File(context.filesDir, "local-harness/chat/persona-gallery-v6.json"), json)
 
     private val documentStore = PersonaGalleryDocumentStore(file, json)
     private val history = PersonaGalleryHistoryCoordinator(
-        File(requireNotNull(file.parentFile), "persona-history-v5"),
+        File(requireNotNull(file.parentFile), "persona-history-v6"),
         json,
     )
-    private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
     private val archiveDeletionJournal = PersonaGalleryArchiveDeletionJournal(file, json)
 
     private var excludedHistoryReconciled = false
@@ -112,7 +111,7 @@ class ChatPersonaGalleryStore internal constructor(
         mimeType: String? = null,
     ): PersonaGalleryPreparedImport {
         val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(bytes, fileName, mimeType)
-        return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
+        return when (val decoded = PersonaDocumentCodec.decodeDocumentImport(json, canonicalJson)) {
             is PersonaDocumentImport.Archive -> {
                 val current = readNormalized()
                 val planned = PersonaGalleryImportPlanner.archive(current, decoded.entry, decoded.diaryEntries)
@@ -158,10 +157,12 @@ class ChatPersonaGalleryStore internal constructor(
         require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
             "人物分享数据为空或过大"
         }
-        val decodedPersona = PersonaSchemaMigration.decodeShare(json, cleanPayload)
+        val decodedPersona = PersonaDocumentCodec.decodeShare(json, cleanPayload)
 
         val now = System.currentTimeMillis()
-        val imported = fullSharePersona(decodedPersona).copy(updatedAt = now)
+        val imported = fullSharePersona(decodedPersona).let { it.copy(
+            loreEntries = uniqueLoreEntryIds(it.loreEntries), updatedAt = now,
+        ) }
         require(isMeaningfulGalleryPersona(imported)) { "人物设定内容不足，无法导入" }
 
         val doc = readNormalized()
@@ -195,17 +196,21 @@ class ChatPersonaGalleryStore internal constructor(
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
     ): PersonaGallerySaveOutcome {
+        val savedPersona = persona.copy(loreEntries = uniqueLoreEntryIds(persona.loreEntries))
         val doc = readNormalized()
         val explicit = existingId?.let { id -> doc.entries.firstOrNull { it.id == id } }
         val compatible = if (explicit == null) {
-            doc.entries.filter { samePersonaIdentity(it.persona, persona) }.singleOrNull()
+            doc.entries.filter { samePersonaIdentity(it.persona, savedPersona) }.singleOrNull()
         } else null
         val matched = explicit ?: compatible
         val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
+        // An explicitly bound gallery card is an authoritative edited snapshot.
+        // Import/name-based matching still uses enrichment merge semantics below.
+        val explicitlyEdited = explicit != null
         val baseEntry = matched ?: PersonaGalleryEntry(
             id = entryId,
-            persona = persona.copy(id = entryId),
+            persona = savedPersona.copy(id = entryId),
             updatedAt = now,
         )
 
@@ -228,7 +233,7 @@ class ChatPersonaGalleryStore internal constructor(
             chatContext.hasUsefulFacts()
         if (!shouldSaveStory) {
             val entry = baseEntry.copy(
-                persona = mergePersonaProfiles(baseEntry.persona, persona)
+                persona = (if (explicitlyEdited) savedPersona else mergePersonaProfiles(baseEntry.persona, savedPersona))
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
@@ -247,7 +252,12 @@ class ChatPersonaGalleryStore internal constructor(
             historyTotalCount = archivedHistory.totalCount,
             historyArchived = true,
             chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
-            chatContext = chatContext.normalized(),
+            // The archive's user-edited story stage wins over a stale foreground snapshot.
+            chatContext = chatContext.normalized().copy(
+                storyStage = baseStory?.chatContext?.storyStage ?: chatContext.storyStage,
+                unlockedStoryStages =
+                    baseStory?.chatContext?.unlockedStoryStages ?: chatContext.unlockedStoryStages,
+            ).normalized(),
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
@@ -259,7 +269,8 @@ class ChatPersonaGalleryStore internal constructor(
                 historyArchived = true,
             )
         val entry = baseEntry.copy(
-            persona = mergePersonaProfiles(baseEntry.persona, persona).copy(id = entryId, updatedAt = now),
+            persona = (if (explicitlyEdited) savedPersona else mergePersonaProfiles(baseEntry.persona, savedPersona))
+                .copy(id = entryId, updatedAt = now),
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
         )
@@ -404,14 +415,18 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     @Synchronized
-    fun updateStoryNotes(id: String, storyId: String, notes: String): Boolean {
+    fun updateStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Boolean {
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         if (current.stories.none { it.id == storyId }) return false
         val now = System.currentTimeMillis()
         val updated = current.copy(
             stories = current.stories.map { story ->
-                if (story.id == storyId) story.copy(notes = notes.trim().take(4_000), updatedAt = now) else story
+                if (story.id == storyId) story.copy(
+                    notes = notes.trim().take(4_000),
+                    chatContext = story.chatContext.withStoryStageSelection(storyStage),
+                    updatedAt = now,
+                ) else story
             },
             updatedAt = now,
         )
@@ -498,12 +513,11 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     private fun readNormalized(): GalleryDocument {
-        schemaMigration.migrateIfNeeded()
         val document = documentStore.read()
         require(document.version == 5) {
             "人物图集版本不受支持"
         }
-        val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
+        val entries = document.entries.map(history::migrate)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         val recovered = recoverDurableHistoryExclusions(normalized)

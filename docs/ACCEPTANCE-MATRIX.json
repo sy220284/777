@@ -9,7 +9,8 @@
       "evidence": [
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#enteringWorkRequiresAnExplicitUserAction",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#handoffDraftCanBeEditedAndCancelDoesNotStartWork",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#configurationReturnAndRefreshPreserveDraftWithoutStartingWork"
       ]
     },
     {
@@ -34,7 +35,7 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / 人设导入、导出与版本迁移",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物导入、导出（旧版本不兼容）",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryTest.kt#structuredRuntimeFieldsSurviveSaveExportAndImport"

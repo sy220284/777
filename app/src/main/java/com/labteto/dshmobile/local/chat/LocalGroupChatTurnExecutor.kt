@@ -202,7 +202,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 sharedContext = snapshot.chat.groupChat.context,
                 memoryContext = memoryContext,
                 announcement = snapshot.chat.groupChat.announcement,
-                mayStaySilent = false,
+                mayStaySilent = groupMemberMayStaySilent(input, member, index),
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
             val groupRequestHistory = withChatTurnContext(
@@ -516,9 +516,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             observers.forEach { (member, persona) ->
                 appendLine()
                 appendLine("===== 在场旁观人物 ${member.galleryId} / ${persona.name} =====")
-                appendLine("人物底色：${persona.portrait.take(320)}")
-                if (persona.coreValues.isNotEmpty()) appendLine("真正重要：${persona.coreValues.take(3).joinToString("；")}")
-                persona.initialUserImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户初始印象：${it.take(180)}") }
+                appendLine("人物身份：${persona.coreIdentity.take(320)}")
+                persona.factText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
+                    ?.let { appendLine("稳定性格：${it.take(180)}") }
+                persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
+                    ?.let { appendLine("价值取舍：${it.take(180)}") }
                 appendLine(
                     "当前心理：情绪=${member.chatState.mood}｜关系=${member.chatState.relationshipState}｜" +
                         "关注=${member.chatState.currentFocus.take(120).ifBlank { "无" }}｜" +
@@ -711,34 +713,49 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
             coroutineScope {
-                val generatedReplies = responders.mapIndexed { index, initialMember ->
+                // Later speakers must actually hear the previous public reply in this turn.
+                // Sequential generation also avoids showing a conversation whose participants
+                // responded to stale parallel snapshots. Only delivered messages are shared.
+                val speakingHistory = baseHistory.toMutableList()
+                val deliveredPublicSpeech = mutableListOf<String>()
+                responders.forEachIndexed { index, initialMember ->
                     val member = currentGroup.members.firstOrNull {
                         it.galleryId == initialMember.galleryId
                     } ?: initialMember
-                    async {
-                        generateGroupReply(
-                            key = key,
-                            snapshot = snapshot,
-                            baseHistory = baseHistory,
-                            input = input,
-                            allMembers = members,
-                            member = member,
-                            memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
-                            index = index,
-                            turnId = turnId,
-                        )
-                    }
-                }
-
-                generatedReplies.forEachIndexed { index, deferred ->
-                    val initialMember = responders[index]
                     chatState.update { current ->
                         current.copy(
                             chat = current.chat.copy(groupActiveSpeakerName = initialMember.displayName),
                         )
                     }
 
-                    val generated = deferred.await()
+                    // Re-evaluate only this member's own relevant memories when an
+                    // earlier speaker has introduced new public facts this turn.
+                    val memoryForMember = if (deliveredPublicSpeech.isEmpty()) {
+                        groupMemoryContexts[member.galleryId].orEmpty()
+                    } else {
+                        val persona = chatPersonaStore.get(member.personaId)
+                        val subjectKey = chatRelationshipSubjectKey(member.galleryId, member.personaId)
+                        val related = subjectKey?.let {
+                            chatMemory.relationshipContext(
+                                query = groupMemberMemoryQuery(input, deliveredPublicSpeech),
+                                viewerSubjectKey = it,
+                                viewerName = persona.name,
+                                groupAudience = true,
+                            )
+                        }.orEmpty()
+                        related + sharedWebContext
+                    }
+                    val generated = generateGroupReply(
+                        key = key,
+                        snapshot = snapshot,
+                        baseHistory = speakingHistory.toList(),
+                        input = input,
+                        allMembers = members,
+                        member = member,
+                        memoryContext = memoryForMember,
+                        index = index,
+                        turnId = turnId,
+                    )
                     generated.failure?.let { failure ->
                         currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-failed", buildJsonObject {
@@ -754,6 +771,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     }
 
                     val content = generated.content
+                    if (content == GROUP_CHAT_SILENT_TOKEN &&
+                        groupMemberMayStaySilent(input, generated.member, index)
+                    ) {
+                        // Listening is an intentional choice, never a failed delivery or
+                        // a fabricated public utterance.
+                        eventLog.append("group/agent-silent", buildJsonObject {
+                            put("gallery_id", generated.member.galleryId)
+                            put("persona_id", generated.member.personaId)
+                        })
+                        return@forEachIndexed
+                    }
                     if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
                         currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-empty", buildJsonObject {
@@ -779,12 +807,13 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         listOf(transcript),
                     )
                     val assistantEvent = eventLog.append("assistant/message", eventData)
-                    modelHistory.append(
-                        buildJsonObject {
-                            put("role", "assistant")
-                            put("content", groupTranscriptLine(transcript))
-                        },
-                    )
+                    val publicReply = buildJsonObject {
+                        put("role", "assistant")
+                        put("content", groupTranscriptLine(transcript))
+                    }
+                    modelHistory.append(publicReply)
+                    speakingHistory += publicReply
+                    deliveredPublicSpeech += groupTranscriptLine(transcript)
                     updateContextMetrics()
                     val beforeAssistant = runtimeStateStore.state.value
                     transcriptRuntime.applyMessages(

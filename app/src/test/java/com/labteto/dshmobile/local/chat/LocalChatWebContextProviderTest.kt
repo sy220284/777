@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -12,6 +13,22 @@ class LocalChatWebContextProviderTest {
         assertTrue(chatWebLookup("今天的天气预报") is ChatWebLookup.Search)
         assertEquals(ChatWebLookup.Page("https://example.com/news"),
             chatWebLookup("看看 https://example.com/news。"))
+    }
+
+    @Test
+    fun originalWorkFactQuestionsUseSelectedCharacterWithoutSearchingOrdinaryRoleplay() {
+        val ayaka = PersonaProfile(name = "神里绫华", franchise = "原神", timelinePosition = "稻妻篇")
+        val lookup = chatWebLookup("原作里神里绫华和托马具体是什么关系？", ayaka)
+        assertTrue(lookup is ChatWebLookup.Search)
+        assertTrue((lookup as ChatWebLookup.Search).query.contains("原神 神里绫华"))
+        assertTrue(lookup.cacheable)
+        assertFalse((chatWebLookup("今天最新新闻") as ChatWebLookup.Search).cacheable)
+        assertNull(chatWebLookup("绫华，我们今天去街上走走吧", ayaka))
+        assertNull(chatWebLookup("我们今天讨论原作剧情", ayaka))
+        assertNull(chatWebLookup("原作里托马和绫华具体是什么关系？"))
+        assertNull(chatWebLookup("不要联网，原作里神里绫华和托马具体是什么关系？", ayaka))
+        assertNull(chatWebLookup("原作里人物结局是什么？", ayaka))
+        assertTrue(chatWebLookup("联网搜索原作里人物结局是什么？", ayaka) is ChatWebLookup.Search)
     }
 
     @Test

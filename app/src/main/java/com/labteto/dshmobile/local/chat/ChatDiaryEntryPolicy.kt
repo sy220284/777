@@ -22,7 +22,12 @@ internal object ChatDiaryEntryPolicy {
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
         ).takeIf { delta ->
-            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank()
+            // Shared experiences may be important even when the character did not
+            // report a feeling. Their event still needs source evidence and significance.
+            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank() ||
+                (delta.importance >= 4 &&
+                    ((delta.relationshipMeaning.isNotBlank() && event.length >= 10) ||
+                        event.length >= 18))
         }
     }
 
@@ -233,6 +238,12 @@ internal object ChatDiaryEntryPolicy {
     private fun normalizeRecallText(text: String): String =
         normalizeText(text)
             .replace(RECALL_PLAN_VARIANTS, "约定")
+            // True lexical equivalents only. Avoid expanding broad words like "喜欢",
+            // which would retrieve unrelated memories and reduce user relevance.
+            .replace("遛弯", "散步")
+            .replace("走走", "散步")
+            .replace("碰面", "见面")
+            .replace("改天", "另一天")
 
     private fun normalizeText(text: String): String =
         text.lowercase()

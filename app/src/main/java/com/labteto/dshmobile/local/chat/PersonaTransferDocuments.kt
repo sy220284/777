@@ -8,6 +8,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
 internal const val PERSONA_WORD_MIME =
@@ -45,8 +47,10 @@ internal data class PersonaTransferMemorySummary(
     val activeGoal: String = "",
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class PersonaArchiveEnvelope(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val schema: Int = 4,
     val source: String = "神言神语",
     val entry: PersonaGalleryEntry,
@@ -57,13 +61,7 @@ internal data class PersonaArchiveEnvelope(
 internal object PersonaTransferDocuments {
     private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V4_BASE64"
     private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V4_BASE64_END -->"
-    private const val LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V3_BASE64"
-    private const val LEGACY_V3_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V3_BASE64_END -->"
-    private const val LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V2_BASE64"
-    private const val LEGACY_V2_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V2_BASE64_END -->"
     private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V4_BASE64:"
-    private const val LEGACY_V3_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V3_BASE64:"
-    private const val LEGACY_V2_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V2_BASE64:"
     private const val CUSTOM_XML_ENTRY = "customXml/persona-transfer.xml"
 
     fun encode(
@@ -121,7 +119,7 @@ internal object PersonaTransferDocuments {
 
     fun decodeArchive(json: Json, canonicalJson: String): PersonaArchiveEnvelope =
         json.decodeFromString(PersonaArchiveEnvelope.serializer(), canonicalJson).also {
-            require(it.schema == 3 || it.schema == 4) { "人物文件版本不受支持，请使用新版人物生命档案" }
+            require(it.schema == 4) { "人物文件版本不受支持，请使用新版人物生命档案" }
         }
 
     private fun portableEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry =
@@ -193,17 +191,10 @@ internal object PersonaTransferDocuments {
     }
 
     private fun extractMarkdownPayload(text: String): String {
-        val markers = listOf(
-            MARKDOWN_PAYLOAD_BEGIN to MARKDOWN_PAYLOAD_END,
-            LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V3_MARKDOWN_PAYLOAD_END,
-            LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V2_MARKDOWN_PAYLOAD_END,
-        )
-        val (begin, endMarker) = markers.firstOrNull { (candidate, _) ->
-            text.indexOf(candidate) >= 0
-        } ?: throw IllegalArgumentException("Markdown 中未找到 777 人物迁移数据")
-        val start = text.indexOf(begin)
-        val payloadStart = start + begin.length
-        val end = text.indexOf(endMarker, payloadStart)
+        val start = text.indexOf(MARKDOWN_PAYLOAD_BEGIN)
+        require(start >= 0) { "Markdown 中未找到 777 V4 人物档案" }
+        val payloadStart = start + MARKDOWN_PAYLOAD_BEGIN.length
+        val end = text.indexOf(MARKDOWN_PAYLOAD_END, payloadStart)
         require(end > payloadStart) { "Markdown 人物迁移数据不完整" }
         val encoded = text.substring(payloadStart, end).filterNot(Char::isWhitespace)
         return runCatching {
@@ -226,26 +217,19 @@ internal object PersonaTransferDocuments {
 
             add(DocLine("人物生命资料", 2))
             addField("姓名", persona.name)
-            addField("人物整体", persona.portrait)
-            addField("独立生活", persona.lifeContext)
-            addList("天然注意", persona.attentionBiases)
-            addList("关注关键词", persona.attentionKeywords)
-            addList("容易漏掉或误读", persona.perceptionBlindSpots)
-            addList("小习惯和小坚持", persona.quirks)
-            addList("不擅长", persona.limitations)
-            addList("真正重要", persona.coreValues)
-            addField("长期内在拉扯", persona.coreTension)
-            addList("稳定部分", persona.stableTraits)
-            addList("可缓慢变化", persona.mutableTraits)
-            addField("对用户初始印象", persona.initialUserImpression)
-            addList("自然声音样本", persona.voiceSamples)
-            addField("世界设定", persona.worldSetting)
-            addField("作品/世界来源", persona.franchise)
-            addField("时间线位置", persona.timelinePosition)
-            addList("知识边界", persona.knowledgeBoundary)
-            addList("硬约束", persona.hardConstraints)
-            addList("禁用表达", persona.bannedPhrases)
-            addList("用户纠正", persona.corrections)
+            addField("原作或世界来源", persona.franchise)
+            addField("核心身份", persona.coreIdentity)
+            if (persona.facts.isNotEmpty()) {
+                add(DocLine("人物深度事实", 3))
+                persona.facts.forEachIndexed { index, fact ->
+                    add(DocLine("${index + 1}. ${fact.category}"))
+                    add(DocLine(fact.content))
+                    fact.perspective.takeIf(String::isNotBlank)?.let { add(DocLine("观点主体：$it")) }
+                    fact.temporalScope.takeIf(String::isNotBlank)?.let { add(DocLine("故事阶段：$it")) }
+                    add(DocLine("事实来源：${fact.provenance}"))
+                    fact.sourceReference.takeIf(String::isNotBlank)?.let { add(DocLine("来源依据：$it")) }
+                }
+            }
             if (persona.loreEntries.isNotEmpty()) {
                 add(DocLine("世界书", 3))
                 persona.loreEntries.forEachIndexed { index, lore ->
@@ -256,6 +240,8 @@ internal object PersonaTransferDocuments {
                         .filter(String::isNotBlank)
                         .distinct()
                     if (keywords.isNotEmpty()) add(DocLine("关键词：${keywords.joinToString("、")}"))
+                    lore.temporalScope.takeIf(String::isNotBlank)?.let { add(DocLine("适用剧情阶段：$it")) }
+                    if (lore.spoilerLevel > 0) add(DocLine("剧透等级：${lore.spoilerLevel}"))
                 }
             }
 
@@ -407,12 +393,6 @@ internal object PersonaTransferDocuments {
                     hiddenPayload = plain.substringAfter(WORD_PAYLOAD_PREFIX, "")
                         .takeIf(String::isNotBlank)
                         ?.filterNot(Char::isWhitespace)
-                        ?: plain.substringAfter(LEGACY_V3_WORD_PAYLOAD_PREFIX, "")
-                            .takeIf(String::isNotBlank)
-                            ?.filterNot(Char::isWhitespace)
-                        ?: plain.substringAfter(LEGACY_V2_WORD_PAYLOAD_PREFIX, "")
-                            .takeIf(String::isNotBlank)
-                            ?.filterNot(Char::isWhitespace)
                 }
             }
         }

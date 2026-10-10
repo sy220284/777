@@ -33,6 +33,7 @@ class PersonaGalleryDetailActionsTest {
     )
     private var deletionCount = 0
     private var saves = 0
+    private var savedStoryStage: String? = null
 
     private fun openDetail(pendingProgress: Boolean = false) {
         compose.setContent {
@@ -47,7 +48,10 @@ class PersonaGalleryDetailActionsTest {
                     currentSessionId = "detail-actions-session",
                     canSave = true,
                     onSaveCurrent = { _, _, _, _ -> saves++; Result.success(entry) },
-                    onEditNotes = { _, _, _ -> Result.success(Unit) },
+                    onEditStoryDetails = { _, _, _, stage ->
+                        savedStoryStage = stage
+                        Result.success(Unit)
+                    },
                     onRenameStory = { _, _, _ -> Result.success(Unit) },
                     onInspect = { _, _ -> Result.success(PersonaInspectionResult()) },
                     onApplySuggestions = { _, _ -> Result.success(entry) },
@@ -89,7 +93,7 @@ class PersonaGalleryDetailActionsTest {
         openDetail()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
+        compose.onNodeWithTag("personaGalleryStoryTitleInput").performTextInput("未保存名称")
         // Renaming is inline in the actions sheet: cancel the edit, then close the sheet.
         // Device Back may first dismiss the IME without cancelling the inline edit.
         compose.onAllNodesWithText("取消").onFirst().performClick()
@@ -103,13 +107,24 @@ class PersonaGalleryDetailActionsTest {
     }
 
     @Test
+    fun stageEditorBlocksStorySwitchAndSavesThroughTheRealCallback() {
+        savedStoryStage = null
+        openDetail()
+        compose.onNodeWithTag("personaGalleryStoryStageInput").performTextInput("act-2")
+        compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
+        compose.onNodeWithText("保存剧情提要").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals("act-2", savedStoryStage)
+    }
+
+    @Test
     fun unsavedNotesBlockStoryStartAndProgressSaveUsesExistingCallback() {
         openDetail(pendingProgress = true)
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("保存本次对话进展").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1, saves) }
         compose.onNodeWithText("添加").performScrollTo().performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("必须保存的剧情提要")
+        compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("必须保存的剧情提要")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
         compose.onNodeWithText("用这个人物开启新故事").assertIsNotEnabled()
     }

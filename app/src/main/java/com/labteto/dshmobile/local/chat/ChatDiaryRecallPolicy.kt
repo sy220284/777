@@ -57,18 +57,22 @@ internal fun isHistoricalDiaryRecall(query: String): Boolean {
 
 
 /**
- * Security boundary for group-chat memory injection.
- *
- * PRIVATE and SHAREABLE are intentionally rejected here. Do not weaken this to "!= PRIVATE":
- * a direct-chat memory must have explicit public permission and be stored as PUBLIC before it may
- * enter a group prompt.
+ * Each person's diary is available in either mode through relevance-based recall.
+ * This does not broadcast the diary to other group participants.
  */
-internal fun canExposeDiaryToGroup(disclosure: ChatDiaryDisclosure): Boolean =
-    disclosure == ChatDiaryDisclosure.PUBLIC
+@Suppress("UNUSED_PARAMETER")
+internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boolean): String =
+    buildString {
+        appendLine("- 事件：${entry.event}")
+        entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
+        entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
+        entry.relationshipMeaning.takeIf(String::isNotBlank)?.let { appendLine("  关系意义：$it") }
+        entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
+    }.trimEnd()
 
 internal fun diaryRecallUsageInstruction(groupAudience: Boolean): String =
     if (groupAudience) {
-        "群聊只能使用 disclosure=PUBLIC 且仍为当前有效版本的人物日记。PRIVATE 与 SHAREABLE 都不得进入群聊 Prompt，也不得以隐私余波、态度提示、隐藏摘要或其他旁路影响群聊回复。公开旧事属于当前人物自己的经历，不代表其他成员此前已经知情；只有本轮真正说出口后，其他成员才获得这条公开信息。被后续取消、改期、结束或重新收紧权限的旧版本不得回潮。"
+        "这些是当前人物自己的经历和感受，已按当前问题关联性选取。只在自然相关且符合人物意愿时提及；想起并不等于一定说出来。其他成员不会自动获得此人物的完整记忆，也不能当作自己的亲历；他们只能听到实际说出口的话。已取消、改期、结束或修正的旧版本不得作为当前有效事实回潮."
     } else {
         "这些日记属于当前角色自己的经历与内在记忆，只用于自然延续，不要为了展示记忆而逐条复述。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
     }

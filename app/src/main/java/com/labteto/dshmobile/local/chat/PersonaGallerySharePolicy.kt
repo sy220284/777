@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.chat
 internal fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
     id = PersonaProfile.DEFAULT_PERSONA_ID,
     name = profile.name.trim().take(80).ifBlank { "默认角色" },
+    coreIdentity = profile.coreIdentity.trim().take(4_000),
+    facts = profile.facts.filter { it.content.isNotBlank() }.map { it.copy(content = it.content.trim().take(4_000)) },
     portrait = profile.portrait.trim().take(4_000),
     lifeContext = profile.lifeContext.trim().take(4_000),
     attentionBiases = sharePersonaLines(profile.attentionBiases, 8, 240),
@@ -31,6 +33,15 @@ internal fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile
 internal fun compactSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
     id = PersonaProfile.DEFAULT_PERSONA_ID,
     name = profile.name.trim().take(80).ifBlank { "默认角色" },
+    coreIdentity = profile.coreIdentity.trim().take(420),
+    facts = profile.facts.filter {
+        it.category in listOf(
+            CharacterFactCategories.PERSONALITY,
+            CharacterFactCategories.VALUES_AND_TRADEOFFS,
+            CharacterFactCategories.BIOGRAPHY,
+            CharacterFactCategories.RELATIONSHIPS,
+        )
+    }.take(4).map { it.copy(content = it.content.take(300)) },
     portrait = profile.portrait.trim().take(320),
     lifeContext = profile.lifeContext.trim().take(220),
     attentionBiases = sharePersonaLines(profile.attentionBiases, 2, 80),

@@ -90,6 +90,105 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun realResponsibilitiesAffectCharacterChoiceWithoutOverwritingIdentity() {
+        val committed = PersonaProfile(name = "叶澜", coreIdentity = "书店店主",
+            facts = listOf(
+                CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                    "答应员工的值班不能随便取消", provenance = CharacterFactProvenance.USER_CREATED),
+                CharacterFact("duty", CharacterFactCategories.LIFE_GRAVITY,
+                    "周末负责书店开门", provenance = CharacterFactProvenance.CANON),
+            ))
+        val state = ChatCharacterState(currentAgenda = "今天还要安排书店值班")
+        val grounded = renderCharacterDecisionPrompt(committed, state, "周末陪我去远足可以吗？")
+        assertTrue(grounded.contains("值班"))
+        assertTrue(grounded.contains("书店开门"))
+        assertTrue(grounded.contains("接受、商量、拒绝或改变主意"))
+        assertTrue(renderCharacterDecisionPrompt(committed, state, "早安").isBlank())
+
+        val uncertain = committed.copy(facts = listOf(CharacterFact(
+            "speculation", CharacterFactCategories.LIMITS_AND_COSTS,
+            "可能永远不敢出门", provenance = CharacterFactProvenance.INFERRED,
+        )))
+        assertTrue(renderCharacterDecisionPrompt(uncertain, ChatCharacterState(), "陪我去远足可以吗？").isBlank())
+    }
+
+    @Test
+    fun v4UnscopedLegacyTimelineCannotBypassStoryKnowledge() {
+        val persona = PersonaProfile(name = "叶澜", coreIdentity = "书店店主",
+            facts = listOf(CharacterFact("opening", CharacterFactCategories.BIOGRAPHY,
+                "正在经营书店", provenance = CharacterFactProvenance.CANON)),
+            timelinePosition = "最终章揭秘：阿宁是卧底",
+            worldSetting = "未来结局：书店被毁",
+        )
+        val rendered = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(), "今天怎么样", null)
+        assertTrue((rendered.stablePrompt + rendered.dynamicPrompt).contains("书店"))
+        assertTrue(!(rendered.stablePrompt + rendered.dynamicPrompt).contains("阿宁是卧底"))
+        assertTrue(!(rendered.stablePrompt + rendered.dynamicPrompt).contains("书店被毁"))
+    }
+
+    @Test
+    fun bundledPersonaRunsLifeAndModeWithoutScriptedGrowthGoals() {
+        val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
+        assertTrue(persona.mutableTraits.isEmpty())
+        val previous = ChatCharacterState(initiative = 42, shareDesire = 42)
+        val current = previous.copy(initiative = 76, shareDesire = 69)
+        val evolved = evolveCharacterEvolution(
+            persona = persona,
+            previous = previous,
+            current = current,
+            significance = "MAJOR",
+            userMessage = "今天一起完成了重要的事情",
+            assistantMessage = "这次经历我会记住。",
+        )
+        assertTrue(evolved.observationCount > previous.evolution.observationCount)
+        // V4 trusted habits may now seed runtime trait slots, but an unrelated
+        // milestone must not silently change any long-term tendency.
+        assertTrue(evolved.traitStates.values.all {
+            it.evidenceCount == 0 && it.currentWeight == it.baseline
+        })
+        val attention = resolveCharacterAttention(persona, current, "神里家的祭典筹备进行得怎么样？")
+        assertTrue(attention.noticed.isNotEmpty())
+        assertTrue(resolveCharacterMode(persona, current, "神里家的祭典筹备进行得怎么样？", attention).focus.isNotEmpty())
+    }
+
+    @Test
+    fun v4HabitsEvolveAcrossSeveralRelevantEventsWithoutModifyingCanonFacts() {
+        val habit = CharacterFact(
+            id = "habit", category = CharacterFactCategories.PREFERENCES_AND_HABITS,
+            content = "愿意求助", provenance = CharacterFactProvenance.USER_CREATED,
+        )
+        val future = CharacterFact("future", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "相信密探", temporalScope = "act-3", provenance = CharacterFactProvenance.CANON)
+        val unverified = CharacterFact("guess", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "渴望离开", provenance = CharacterFactProvenance.UNVERIFIED)
+        val anotherPersonsBelief = CharacterFact("observer", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            "怀疑所有同事", perspective = "阿紫", provenance = CharacterFactProvenance.CANON)
+        val persona = PersonaProfile(name = "阿青",
+            facts = listOf(habit, future, unverified, anotherPersonsBelief))
+        assertTrue(persona.mutableTraits.isEmpty())
+        var state = ChatCharacterState()
+        listOf(
+            "这回我愿意求助，你能帮我看看吗？",
+            "遇到麻烦时，我愿意求助并一起想办法。",
+            "我逐渐发现愿意求助也是自己的选择。",
+        ).forEach { reply ->
+            val evolved = evolveCharacterEvolution(
+                persona = persona, previous = state, current = state,
+                significance = "MINOR", userMessage = "需要帮忙就说。", assistantMessage = reply,
+            )
+            state = state.copy(evolution = evolved)
+        }
+        val trace = state.evolution.traitStates.getValue("愿意求助")
+        assertEquals(3, trace.evidenceCount)
+        assertTrue(trace.currentWeight > trace.baseline)
+        assertTrue("相信密探" !in state.evolution.traitStates)
+        assertTrue("渴望离开" !in state.evolution.traitStates)
+        assertTrue("怀疑所有同事" !in state.evolution.traitStates)
+        assertEquals(habit, persona.facts.first())
+    }
+
+    @Test
     fun mutableTraitsChangeSlowlyAndRemainBoundedAcrossLongRuns() {
         val persona = PersonaProfile(
             name = "陈拾",
@@ -200,6 +299,47 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun gamePersonaKeepsSourceTimelineAndWorldInStablePrompt() {
+        val persona = PersonaProfile(
+            name = "神里绫华",
+            portrait = "神里家的大小姐，负责社奉行事务。",
+            franchise = "原神",
+            timelinePosition = "稻妻已与旅行者相识",
+            worldSetting = "提瓦特大陆的稻妻，社奉行承担文化礼仪事务。",
+        )
+        val projection = CharacterRuntimeProjector(
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        ).project(
+            persona = persona,
+            state = ChatCharacterState(),
+            context = ChatContextState(),
+            userInput = "早上好",
+            storyContext = null,
+        )
+        assertTrue(projection.stablePrompt.contains("原作来源：原神"))
+        assertTrue(projection.stablePrompt.contains("当前剧情阶段：稻妻已与旅行者相识"))
+        assertTrue(projection.stablePrompt.contains("原作世界：提瓦特大陆的稻妻"))
+        assertTrue(estimateModelTokens(projection.stablePrompt) <= 520)
+    }
+
+    @Test
+    fun rewrittenPresetCanRecallFormativeBiographyWithoutMakingItAlwaysOn() {
+        val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
+        val projector = CharacterRuntimeProjector(
+            relationshipEngine = ChatRelationshipEngine(),
+            loreEngine = CharacterLoreEngine(),
+        )
+        val normal = projector.project(persona, ChatCharacterState(), ChatContextState(), "今天一起散步吧", null)
+        val relevant = projector.project(persona, ChatCharacterState(), ChatContextState(), "神里绫人和托马在神里家的职责是什么？", null)
+        assertTrue(normal.stablePrompt.contains("神里绫华"))
+        assertTrue(estimateModelTokens(relevant.stablePrompt) <= 520)
+        assertTrue(relevant.dynamicPrompt.contains("【本轮相关背景】"))
+        assertTrue(relevant.dynamicPrompt.contains("人物身份与经历："))
+        assertTrue(relevant.dynamicPrompt.contains("神里绫人"))
+    }
+
+    @Test
     fun stablePersonaPrefixHasHardTokenBudget() {
         val persona = PersonaProfile(
             name = "阿青",
@@ -240,12 +380,31 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun groupDiaryBoundaryCannotRegressToPrivateOrShareable() {
-        assertTrue(!canExposeDiaryToGroup(ChatDiaryDisclosure.PRIVATE))
-        assertTrue(!canExposeDiaryToGroup(ChatDiaryDisclosure.SHAREABLE))
-        assertTrue(canExposeDiaryToGroup(ChatDiaryDisclosure.PUBLIC))
-        assertTrue(diaryRecallUsageInstruction(groupAudience = true).contains("只能使用 disclosure=PUBLIC"))
-        assertTrue(diaryRecallUsageInstruction(groupAudience = true).contains("不得以隐私余波"))
+    fun groupMemoryRecallRespectsIndividualOwnershipWithoutModeWideBlocking() {
+        val note = ChatDiaryEntry(
+            id = "same-person", subjectKey = "gallery:one", personaName = "阿青",
+            event = "约定下雨时一起散步",
+            feeling = "我期待下一次相见",
+            innerThought = "我想带一把伞",
+            disclosure = ChatDiaryDisclosure.SHAREABLE,
+            createdAt = 1L, updatedAt = 2L,
+        )
+        val direct = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:one",
+            groupAudience = false, maxItems = 2,
+        )
+        val group = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:one",
+            groupAudience = true, maxItems = 2,
+        )
+        val other = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:two",
+            groupAudience = true, maxItems = 2,
+        )
+        assertEquals(direct, group)
+        assertTrue(group.isNotEmpty())
+        assertTrue(other.isEmpty())
+        assertTrue(renderRecalledChatDiary(group.single(), groupAudience = true).contains("我期待下一次相见"))
     }
 
     @Test
