@@ -106,6 +106,21 @@ fun PersonaProfile.visibleFacts(
     return facts.filter { it.temporalScope.isBlank() || it.temporalScope in stages }
 }
 
+/**
+ * A subjective belief from another named observer must not become the active person's
+ * private knowledge automatically. The editor retains all perspectives unchanged.
+ * Stage access and viewpoint access are separate decisions.
+ */
+fun PersonaProfile.characterKnownFacts(
+    storyStage: String = "",
+    unlockedStages: Collection<String> = emptyList(),
+): List<CharacterFact> = visibleFacts(storyStage, unlockedStages).filter { fact ->
+    if (fact.category != CharacterFactCategories.SUBJECTIVE_BELIEFS) return@filter true
+    val viewpoint = fact.perspective.trim()
+    viewpoint.isBlank() || viewpoint == name.trim() ||
+        viewpoint in setOf("本人", "自述", "本人视角", "自身", "角色自己", "角色自身")
+}
+
 @Serializable
 data class PersonaProfile(
     val id: String = DEFAULT_PERSONA_ID,

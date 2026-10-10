@@ -62,7 +62,7 @@ internal class CharacterRuntimeProjector(
         // A request-local projection preserves the stored sources and stage IDs. Even if
         // all facts are future-gated, obsolete legacy prose must not be restored.
         return copy(
-            facts = visibleFacts(context.storyStage, context.visibleStoryStages())
+            facts = characterKnownFacts(context.storyStage, context.visibleStoryStages())
                 .map { it.copy(temporalScope = "") },
             portrait = "",
             lifeContext = "",
@@ -228,7 +228,7 @@ internal class CharacterRuntimeProjector(
             CharacterFactCategories.PERSONALITY,
             CharacterFactCategories.VALUES_AND_TRADEOFFS,
         )
-        val visible = persona.visibleFacts(context.storyStage, context.visibleStoryStages())
+        val visible = persona.characterKnownFacts(context.storyStage, context.visibleStoryStages())
             .filter { it.content.isNotBlank() &&
                 (it.category !in core || it.provenance == CharacterFactProvenance.INFERRED ||
                     it.provenance == CharacterFactProvenance.UNVERIFIED) }

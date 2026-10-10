@@ -31,6 +31,29 @@ class CharacterFactsV4Test {
         assertEquals("本人", restored.facts.single().perspective)
     }
 
+    @Test fun thirdPartySubjectiveBeliefsDoNotBecomeCharactersOwnKnowledge() {
+        val persona = PersonaProfile(name = "叶澜", coreIdentity = "出版社设计师",
+            facts = listOf(
+                CharacterFact("own", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "叶澜相信阿宁是可信赖的人", perspective = "本人"),
+                CharacterFact("other", CharacterFactCategories.SUBJECTIVE_BELIEFS,
+                    "阿紫认为阿宁藏着秘密", perspective = "阿紫"),
+                CharacterFact("public", CharacterFactCategories.BIOGRAPHY,
+                    "叶澜和阿宁一起参观过灯塔", perspective = "公开事件"),
+            ))
+        // The complete source survives in the authoring card.
+        assertEquals(3, persona.facts.size)
+        assertEquals(listOf("own", "public"),
+            persona.characterKnownFacts().map(CharacterFact::id))
+        val model = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(),
+                "你和阿宁知道关于灯塔与秘密的哪些事情？", null)
+        val prompt = model.stablePrompt + model.dynamicPrompt
+        assertFalse(prompt.contains("阿紫认为阿宁藏着秘密"))
+        assertTrue(prompt.contains("叶澜和阿宁一起参观过灯塔"))
+        assertTrue(prompt.contains("叶澜相信阿宁是可信赖的人"))
+    }
+
     @Test fun uncertainCoreFactsStayOutOfStableIdentityButRemainDiscoverableWithWarning() {
         val persona = PersonaProfile(name = "阿岚", coreIdentity = "药师",
             facts = listOf(CharacterFact("suspect", CharacterFactCategories.PERSONALITY,
