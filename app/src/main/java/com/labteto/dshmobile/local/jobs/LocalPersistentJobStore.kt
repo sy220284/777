@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.jobs
 
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobInboxContract
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
@@ -43,17 +44,20 @@ internal class LocalPersistentJobStore(
         try {
             readFrom(file)
         } catch (primaryError: Exception) {
+            AppLog.failure("LocalPersistentJobStore", "read_primary_job_snapshot", primaryError)
             if (!backup.isFile) throw primaryError
             val recovered = try {
                 readFrom(backup)
-            } catch (_: Exception) {
+            } catch (backupError: Exception) {
+                AppLog.failure("LocalPersistentJobStore", "read_backup_job_snapshot", backupError)
                 throw primaryError
             }
             runCatching {
                 File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}").also { corrupt ->
                     file.copyTo(corrupt, overwrite = true)
                 }
-            }
+            }.onFailure { AppLog.failure("LocalPersistentJobStore", "preserve_corrupt_job_snapshot", it) }
+            AppLog.warn("LocalPersistentJobStore", "operation=restore_job_snapshot_from_backup status=recovered")
             atomicWrite(file, backup.readText())
             recovered
         }
