@@ -128,23 +128,19 @@ internal fun applyPersonaSuggestions(
                 content = value,
                 provenance = CharacterFactProvenance.USER_CREATED,
             ))
-            "portrait" -> result.withFact(
-                CharacterFactCategories.BIOGRAPHY,
-                mergePersonaText(result.factText(CharacterFactCategories.BIOGRAPHY), value, 4_000))
-            "lifeContext" -> result.withFact(
-                CharacterFactCategories.LIFE_GRAVITY,
-                mergePersonaText(result.factText(CharacterFactCategories.LIFE_GRAVITY), value, 4_000))
-            "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))
-            "attentionKeywords" -> result.copy(attentionKeywords = mergePersonaLines(result.attentionKeywords, listOf(value), 12))
-            "perceptionBlindSpots" -> result.copy(perceptionBlindSpots = mergePersonaLines(result.perceptionBlindSpots, listOf(value), 8))
-            "quirks" -> result.copy(quirks = mergePersonaLines(result.quirks, listOf(value), 12))
-            "limitations" -> result.copy(limitations = mergePersonaLines(result.limitations, listOf(value), 8))
-            "coreValues" -> result.copy(coreValues = mergePersonaLines(result.coreValues, listOf(value), 6))
-            "coreTension" -> result.copy(coreTension = mergePersonaText(result.coreTension, value, 2_000))
-            "stableTraits" -> result.copy(stableTraits = mergePersonaLines(result.stableTraits, listOf(value), 8))
-            "mutableTraits" -> result.copy(mutableTraits = mergePersonaLines(result.mutableTraits, listOf(value), 8))
-            "initialUserImpression" -> result.copy(initialUserImpression = mergePersonaText(result.initialUserImpression, value, 2_000))
-            "voiceSamples" -> result.copy(voiceSamples = mergePersonaLines(result.voiceSamples, listOf(value), 20))
+            "portrait" -> result.appendV4Suggestion(CharacterFactCategories.BIOGRAPHY, value)
+            "lifeContext" -> result.appendV4Suggestion(CharacterFactCategories.LIFE_GRAVITY, value)
+            "attentionBiases", "attentionKeywords", "perceptionBlindSpots" ->
+                result.appendV4Suggestion(CharacterFactCategories.SENSORY_SIGNATURE, value)
+            "quirks" -> result.appendV4Suggestion(CharacterFactCategories.PREFERENCES_AND_HABITS, value)
+            "limitations" -> result.appendV4Suggestion(CharacterFactCategories.LIMITS_AND_COSTS, value)
+            "coreValues" -> result.appendV4Suggestion(CharacterFactCategories.VALUES_AND_TRADEOFFS, value)
+            "coreTension" -> result.appendV4Suggestion(CharacterFactCategories.IDENTITY_GAP, value)
+            "stableTraits", "mutableTraits" ->
+                result.appendV4Suggestion(CharacterFactCategories.PERSONALITY, value)
+            "initialUserImpression" ->
+                result.appendV4Suggestion(CharacterFactCategories.SUBJECTIVE_BELIEFS, value)
+            "voiceSamples" -> result.appendV4Suggestion(CharacterFactCategories.VOICE_STYLE, value)
             "worldSetting" -> result.copy(loreEntries = mergeLoreEntries(
                 result.loreEntries,
                 listOf(PersonaLoreEntry(id = "v4-world-suggestion", title = "世界背景",
@@ -159,6 +155,19 @@ internal fun applyPersonaSuggestions(
         }
     }
     return result.canonicalV4()
+}
+
+/** Append explicitly applied suggestions as distinct V4 facts; never write retired shadow fields. */
+private fun PersonaProfile.appendV4Suggestion(category: String, text: String): PersonaProfile {
+    val clean = text.trim().take(4_000)
+    if (clean.isBlank() || facts.any {
+        it.category == category && it.temporalScope.isBlank() && it.content.trim() == clean
+    }) return this
+    return copy(facts = facts + CharacterFact(
+        id = java.util.UUID.randomUUID().toString(),
+        category = category, content = clean,
+        provenance = CharacterFactProvenance.USER_CREATED,
+    ))
 }
 
 internal fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterState): ChatCharacterState {
