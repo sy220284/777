@@ -161,6 +161,31 @@ internal class ChatDiaryStore(
         return true
     }
 
+    /**
+     * Invalidate only machine-derived diary projections proven to depend on an explicitly
+     * corrected long-term fact's source message. Keep archived revisions and all raw dialogue.
+     * User-authored diary corrections retain priority over this automatic invalidation.
+     */
+    @Synchronized
+    fun invalidateGeneratedFromMessage(sessionId: String, userMessageId: String): Int {
+        if (sessionId.isBlank() || userMessageId.isBlank()) return 0
+        val document = documents.read()
+        var affected = 0
+        val entries = document.entries.map { entry ->
+            if (entry.active && entry.revisions.lastOrNull()?.userCorrected != true &&
+                entry.sources.any { it.sessionId == sessionId && it.userMessageId == userMessageId }
+            ) {
+                affected++
+                entry.copy(active = false, supersededBy = null,
+                    updatedAt = maxOf(System.currentTimeMillis(), entry.updatedAt + 1))
+            } else entry
+        }
+        if (affected > 0) {
+            documents.write(document.copy(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        }
+        return affected
+    }
+
     @Synchronized
     fun search(
         query: String,
