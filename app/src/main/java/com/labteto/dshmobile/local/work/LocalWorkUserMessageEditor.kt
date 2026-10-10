@@ -35,7 +35,7 @@ import kotlinx.serialization.json.put
 
 /** A Work edit rewrites the logical timeline; previously performed external side effects remain auditable. */
 internal sealed interface LocalWorkMessageEditPreparation {
-    data class Ready(val send: LocalPreparedSend, val reservedLease: LocalSessionRuntimeLease? = null) : LocalWorkMessageEditPreparation
+    data class Ready(val send: LocalPreparedSend, val reservedLease: LocalSessionRuntimeLease) : LocalWorkMessageEditPreparation
     data class Rejected(val reason: LocalUserMessageEditResult) : LocalWorkMessageEditPreparation
 }
 

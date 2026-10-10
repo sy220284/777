@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -107,12 +109,16 @@ class LocalWorkExecutionCoordinatorTest {
     @Test
     fun workEditUsesItsOwnExecutionPortAndStartsOneNewWorkTurn() {
         val fake = RecordingTurnPort()
+        val runtime = defaultRuntime()
         val coordinator = coordinator(
-            fake,
+            fake, runtime,
             prepareEditedTurn = { messageId, text ->
                 assertEquals("old-user-message", messageId)
                 LocalWorkMessageEditPreparation.Ready(
                     requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+                    requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+                        runtime.state.value.sessionId, LocalSessionRuntimeKind.FOREGROUND,
+                    )),
                 )
             },
         )
@@ -126,9 +132,13 @@ class LocalWorkExecutionCoordinatorTest {
     fun workEditReportsCommittedButNotStartedWhenRunAdmissionThrows() {
         val fake = RecordingTurnPort()
         fake.failNextStart = true
-        val coordinator = coordinator(fake, prepareEditedTurn = { _, text ->
+        val runtime = defaultRuntime()
+        val coordinator = coordinator(fake, runtime, prepareEditedTurn = { _, text ->
             LocalWorkMessageEditPreparation.Ready(
                 requireNotNull(com.labteto.dshmobile.local.send.prepareLocalSend(text, emptyList())),
+                requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
+                    runtime.state.value.sessionId, LocalSessionRuntimeKind.FOREGROUND,
+                )),
             )
         })
         assertEquals(
