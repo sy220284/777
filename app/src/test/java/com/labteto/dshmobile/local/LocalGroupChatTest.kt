@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
