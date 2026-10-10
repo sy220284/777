@@ -269,7 +269,16 @@ internal class LocalSessionRepository(
         val validIds = ids.toSet()
         summaryIndex.prune(validIds)
         return ids.mapNotNull { id ->
-            val sourceModifiedAt = storeFor(id).lastModified(id) ?: return@mapNotNull null
+            val sourceModifiedAt = try {
+                storeFor(id).lastModified(id)
+            } catch (future: FutureSessionVersionException) {
+                throw future
+            } catch (error: Exception) {
+                // A failed backup-only recovery belongs to this session, never the entire list.
+                AppLog.warn("LocalSessionRepository", "session/corrupt-skipped id=$id stage=metadata", error)
+                onError(IllegalStateException("会话 $id 无法恢复，已从列表跳过；原文件保留", error))
+                null
+            } ?: return@mapNotNull null
             summaryIndex.read(id, sourceModifiedAt)?.let { return@mapNotNull it }
 
             val loaded = try {
