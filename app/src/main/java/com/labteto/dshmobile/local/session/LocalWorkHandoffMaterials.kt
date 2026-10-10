@@ -29,8 +29,8 @@ internal fun visibleWorkHandoffMessages(
         val recent = messages.takeLast(12).mapTo(hashSetOf(), LocalHarnessMessage::id)
         messages.filter { it.id in selected || it.id in recent }
     } else {
-        messages.asSequence().filter { it.content.contains(term, ignoreCase = true) }
-            .takeLast(30).toList()
+        messages.filter { it.content.contains(term, ignoreCase = true) }
+            .takeLast(30)
     }
 }
 
