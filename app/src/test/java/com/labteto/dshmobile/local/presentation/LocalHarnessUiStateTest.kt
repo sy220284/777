@@ -56,6 +56,19 @@ class LocalHarnessUiStateTest {
     }
 
     @Test
+    fun shellPreservesParentChatIdentityForWorkSourceNavigation() {
+        val root = LocalHarnessState(
+            sessionId = "work-child", usageMode = LocalUsageMode.WORK,
+            parentSessionId = "chat-origin",
+        )
+        val shell = root.toShellUiState()
+        assertEquals("chat-origin", shell.parentSessionId)
+        assertEquals("work-child", shell.sessionId)
+        assertEquals(null, root.copy(parentSessionId = null).toShellUiState().parentSessionId)
+        assertNotEquals(shell, root.copy(parentSessionId = "different-origin").toShellUiState())
+    }
+
+    @Test
     fun shellProjectionIgnoresStreamingAndResourceChurn() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
