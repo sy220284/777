@@ -222,6 +222,11 @@ class VersionedSessionStore(
         val wrappedVersion = element["formatVersion"]?.jsonPrimitive?.intOrNull
         val legacy = wrappedVersion == null
         val version = wrappedVersion ?: 0
+        if (!legacy) {
+            require(element["id"]?.jsonPrimitive?.content == id) {
+                "会话快照身份不一致：请求 $id"
+            }
+        }
         if (version > migrations.currentVersion) {
             throw FutureSessionVersionException(version, migrations.currentVersion)
         }
