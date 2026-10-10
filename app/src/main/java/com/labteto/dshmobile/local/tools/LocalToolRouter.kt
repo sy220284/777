@@ -203,13 +203,13 @@ internal object LocalToolRouter {
             listed.groupBy { it.metadata.family }
                 .toSortedMap(String.CASE_INSENSITIVE_ORDER)
                 .forEach { (family, members) ->
-                    val selected = members.count { it.name in enabledOptional }
+                    val selected = members.count { it.exposure == ToolExposure.CORE || it.name in enabledOptional }
                     appendLine("- $family：已注册 ${members.size}，本轮已选 ${selected}；工具：" +
                         members.joinToString(", ") { tool ->
                             tool.name + if (tool.name in blocked) "（当前设置已关闭）" else ""
                         })
                 }
-            append("目录由实时注册表生成；本轮未选不代表无法使用。选择具体能力时再次调用 capability_search 加载工具定义；实际执行仍需满足连接与授权条件。")
+            append("目录由实时注册表生成；核心工具默认提供，可选扩展按需通过 capability_search 加载。本轮未选不代表未注册；实际执行仍需满足连接与授权条件。")
         }.trimEnd()
 
     fun description(tool: HarnessTool): String =
