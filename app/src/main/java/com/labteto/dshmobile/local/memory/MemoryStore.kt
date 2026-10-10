@@ -137,11 +137,15 @@ class MemoryStore internal constructor(
         kind: MemoryKind? = null,
         importance: Int? = null,
         pinned: Boolean? = null,
+        expectedUpdatedAt: Long? = null,
     ): MemoryRecord {
         val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         require(index >= 0) { "长期记忆不存在或已停用：$id" }
         val current = records[index]
+        require(expectedUpdatedAt == null || current.updatedAt == expectedUpdatedAt) {
+            "记忆已被其他操作更新，请刷新后重试"
+        }
         val clean = content?.trim() ?: current.content
         require(clean.length <= MAX_MEMORY_CONTENT_CHARS) { "记忆正文超过单条存储安全上限，原记录已保留；请拆分保存" }
         require(clean.isNotEmpty()) { "记忆内容不能为空" }
@@ -150,7 +154,7 @@ class MemoryStore internal constructor(
             kind = kind ?: current.kind,
             importance = (importance ?: current.importance).coerceIn(0, 100),
             pinned = pinned ?: current.pinned,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
         )
         records[index] = updated
         documents.write(MemoryDocument(records = records))
@@ -158,14 +162,18 @@ class MemoryStore internal constructor(
     }
 
     @Synchronized
-    fun forget(id: String): Boolean {
+    fun forget(id: String, expectedUpdatedAt: Long? = null): Boolean {
         val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         if (index < 0) return false
-        records[index] = records[index].copy(
+        val current = records[index]
+        require(expectedUpdatedAt == null || current.updatedAt == expectedUpdatedAt) {
+            "记忆已被其他操作更新，请刷新后重试"
+        }
+        records[index] = current.copy(
             active = false,
             supersededBy = null,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = maxOf(System.currentTimeMillis(), current.updatedAt + 1),
         )
         documents.write(MemoryDocument(records = records))
         return true
