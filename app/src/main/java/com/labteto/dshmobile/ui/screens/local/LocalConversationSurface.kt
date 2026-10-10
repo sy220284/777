@@ -144,6 +144,7 @@ internal fun LocalConversationSurface(
     onStopTeamMember: suspend (String) -> LocalWorkUiActionResult,
     onStopTeam: suspend () -> LocalWorkUiActionResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
+    onLocateMemoryForMessage: (String) -> Unit = {},
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
@@ -742,6 +743,7 @@ internal fun LocalConversationSurface(
                                     null
                                 },
                                 onEdit = { message -> editingUserMessage = message },
+                                 onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
