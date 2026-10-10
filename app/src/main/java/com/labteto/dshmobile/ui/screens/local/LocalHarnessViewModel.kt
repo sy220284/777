@@ -32,6 +32,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,6 +51,15 @@ class LocalHarnessViewModel @Inject constructor(
 ) : ViewModel() {
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
+
+    /** Config presence is a hint only; the actual tool invocation still checks credentials and policy. */
+    internal suspend fun githubConfiguredForHandoff(): Boolean? = try {
+        toolsUi.githubConfigured()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
     val approvalMode = approvalPreferences.approvalMode
     val networkSearchEnabled = networkSearchSettings.enabled
