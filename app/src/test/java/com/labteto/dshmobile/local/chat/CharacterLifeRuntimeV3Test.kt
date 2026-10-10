@@ -340,12 +340,31 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun groupDiaryBoundaryCannotRegressToPrivateOrShareable() {
-        assertTrue(!canExposeDiaryToGroup(ChatDiaryDisclosure.PRIVATE))
-        assertTrue(!canExposeDiaryToGroup(ChatDiaryDisclosure.SHAREABLE))
-        assertTrue(canExposeDiaryToGroup(ChatDiaryDisclosure.PUBLIC))
-        assertTrue(diaryRecallUsageInstruction(groupAudience = true).contains("只能使用 disclosure=PUBLIC"))
-        assertTrue(diaryRecallUsageInstruction(groupAudience = true).contains("不得以隐私余波"))
+    fun groupMemoryRecallRespectsIndividualOwnershipWithoutModeWideBlocking() {
+        val note = ChatDiaryEntry(
+            id = "same-person", subjectKey = "gallery:one", personaName = "阿青",
+            event = "约定下雨时一起散步",
+            feeling = "我期待下一次相见",
+            innerThought = "我想带一把伞",
+            disclosure = ChatDiaryDisclosure.SHAREABLE,
+            createdAt = 1L, updatedAt = 2L,
+        )
+        val direct = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:one",
+            groupAudience = false, maxItems = 2,
+        )
+        val group = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:one",
+            groupAudience = true, maxItems = 2,
+        )
+        val other = ChatDiaryRecallEngine.search(
+            listOf(note), "下雨时一起散步", "gallery:two",
+            groupAudience = true, maxItems = 2,
+        )
+        assertEquals(direct, group)
+        assertTrue(group.isNotEmpty())
+        assertTrue(other.isEmpty())
+        assertTrue(renderRecalledChatDiary(group.single(), groupAudience = true).contains("我期待下一次相见"))
     }
 
     @Test
