@@ -137,6 +137,45 @@ class CharacterFactsV4Test {
         assertTrue(late.dynamicPrompt.contains("【当前剧情阶段】act-2"))
     }
 
+    @Test fun storyStageGatesStableTraitsLifeAndLegacyFallbackTogether() {
+        val persona = PersonaProfile(
+            name = "阿云", coreIdentity = "旧书店店主",
+            portrait = "隐藏旧版背景：后来的全部秘密",
+            lifeContext = "隐藏旧版生活：被永远安排的计划",
+            facts = listOf(
+                CharacterFact("early", CharacterFactCategories.BIOGRAPHY, "在小镇经营书店"),
+                CharacterFact("later", CharacterFactCategories.PERSONALITY,
+                    "得知真相后变得格外谨慎", temporalScope = "act-2"),
+                CharacterFact("later-life", CharacterFactCategories.LIFE_GRAVITY,
+                    "夜里会整理那封密信", temporalScope = "act-2"),
+            ),
+        )
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        fun stage(value: String) = projector.project(
+            persona, ChatCharacterState(), ChatContextState(storyStage = value),
+            "你现在每天在做什么？", null,
+        )
+        val early = stage("")
+        val late = stage("act-2")
+        assertFalse(early.stablePrompt.contains("格外谨慎"))
+        assertFalse(early.dynamicPrompt.contains("那封密信"))
+        assertFalse((early.stablePrompt + early.dynamicPrompt).contains("隐藏旧版背景"))
+        assertFalse((early.stablePrompt + early.dynamicPrompt).contains("隐藏旧版生活"))
+        assertTrue(late.stablePrompt.contains("格外谨慎"))
+        assertTrue(late.dynamicPrompt.contains("那封密信"))
+    }
+
+    @Test fun aiEnrichmentAddsDistinctFactsAlongsideProtectedUserEdit() {
+        val user = CharacterFact("user", CharacterFactCategories.RELATIONSHIPS,
+            "与阿宁是旧识", provenance = CharacterFactProvenance.USER_CREATED)
+        val generated = CharacterFact("new", CharacterFactCategories.RELATIONSHIPS,
+            "与小周在大学相识", provenance = CharacterFactProvenance.USER_CREATED)
+        val merged = mergeGeneratedCharacterFacts(listOf(user), listOf(generated))
+        assertEquals(2, merged.size)
+        assertEquals(user, merged.first())
+        assertEquals(CharacterFactProvenance.INFERRED, merged.last().provenance)
+    }
+
     @Test fun storyStageIsDistinctFromSceneClock() {
         val story = ChatContextState(
             scene = ChatSceneState(sceneTime = "晚上八点"),

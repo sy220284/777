@@ -19,11 +19,13 @@ internal class CharacterRuntimeProjector(
         userInput: String,
         storyContext: String?,
     ): CharacterRuntimeProjection {
+        // Only facts visible at the current plot stage may influence replies or behavior.
+        val activePersona = persona.forRuntimeStoryStage(context.storyStage)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
-        val lifeState = advanceCharacterLife(persona, privateState, storyTime = context.scene.sceneTime)
+        val lifeState = advanceCharacterLife(activePersona, privateState, storyTime = context.scene.sceneTime)
         val runtimeState = privateState.copy(lifeState = lifeState)
-        val attention = resolveCharacterAttention(persona, runtimeState, userInput)
-        val mode = resolveCharacterMode(persona, runtimeState, userInput, attention)
+        val attention = resolveCharacterAttention(activePersona, runtimeState, userInput)
+        val mode = resolveCharacterMode(activePersona, runtimeState, userInput, attention)
         val storyPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
             """
             【连续性摘要｜已发生】
@@ -33,21 +35,41 @@ internal class CharacterRuntimeProjector(
         }.orEmpty()
 
         return CharacterRuntimeProjection(
-            stablePrompt = stablePrompt(persona),
+            stablePrompt = stablePrompt(activePersona),
             dynamicPrompt = listOf(
-                takeWithinModelTokenBudget(momentPrompt(persona, runtimeState), MOMENT_TOKEN_BUDGET),
+                takeWithinModelTokenBudget(momentPrompt(activePersona, runtimeState), MOMENT_TOKEN_BUDGET),
                 renderCharacterLifePrompt(lifeState),
                 takeWithinModelTokenBudget(renderCharacterModePrompt(mode), MODE_TOKEN_BUDGET),
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
-                relevantBackgroundPrompt(persona, userInput),
+                relevantBackgroundPrompt(activePersona, userInput),
                 relevantCharacterFactPrompt(persona, context.storyStage, userInput, storyContext),
                 context.storyStage.takeIf(String::isNotBlank)
                     ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
-                loreEngine.prompt(persona, userInput),
+                loreEngine.prompt(activePersona, userInput),
                 relationshipEngine.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
+        )
+    }
+
+    private fun PersonaProfile.forRuntimeStoryStage(storyStage: String): PersonaProfile {
+        if (facts.isEmpty()) return this
+        // A request-local projection preserves the stored sources and stage IDs. Even if
+        // all facts are future-gated, obsolete legacy prose must not be restored.
+        return copy(
+            facts = visibleFacts(storyStage).map { it.copy(temporalScope = "") },
+            portrait = "",
+            lifeContext = "",
+            attentionBiases = emptyList(),
+            perceptionBlindSpots = emptyList(),
+            quirks = emptyList(),
+            limitations = emptyList(),
+            coreValues = emptyList(),
+            coreTension = "",
+            stableTraits = emptyList(),
+            initialUserImpression = "",
+            voiceSamples = emptyList(),
         )
     }
 

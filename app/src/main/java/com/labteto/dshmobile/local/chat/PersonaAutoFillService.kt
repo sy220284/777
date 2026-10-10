@@ -55,10 +55,7 @@ internal fun mergeGeneratedCharacterFacts(
 ): List<CharacterFact> {
     val result = previous.toMutableList()
     incoming.filter { it.category.isNotBlank() && it.content.isNotBlank() }.forEach { fact ->
-        // User-authored facts win over new AI drafts. No accidental replacement of explicit edits.
-        if (result.any { it.category == fact.category && it.provenance == CharacterFactProvenance.USER_CREATED }) {
-            return@forEach
-        }
+        // An edited fact owns only its own ID; another distinct fact may use the same category.
         val index = result.indexOfFirst { it.id == fact.id }
         if (index >= 0) {
             if (result[index].provenance != CharacterFactProvenance.USER_CREATED) result[index] = fact
@@ -66,7 +63,10 @@ internal fun mergeGeneratedCharacterFacts(
                 it.category == fact.category && it.content.trim() == fact.content.trim()
             }) {
             // Distinct facts in the same category carry independent events and sources.
-            result += fact
+            // Model-generated text is not a manually authored user correction.
+            result += if (fact.provenance == CharacterFactProvenance.USER_CREATED) {
+                fact.copy(provenance = CharacterFactProvenance.INFERRED)
+            } else fact
         }
     }
     return result
