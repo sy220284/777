@@ -967,7 +967,7 @@ internal fun PersonaGalleryScreen(
                         )
                         val savedKnowledgePath = story.chatContext.unlockedStoryStages
                             .ifEmpty {
-                                story.chatContext.storyStage.takeIf(String::isNotBlank)?.let(::listOf)
+                                story.chatContext.storyStage.takeIf(String::isNotBlank)?.let { listOf(it) }
                                     .orEmpty()
                             }
                         if (savedKnowledgePath.isNotEmpty()) {
