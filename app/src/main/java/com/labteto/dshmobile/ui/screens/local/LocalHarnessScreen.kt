@@ -42,6 +42,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -83,6 +84,7 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
@@ -151,6 +153,7 @@ fun LocalHarnessScreen(
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
+    val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
@@ -178,6 +181,13 @@ fun LocalHarnessScreen(
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
+    var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
+    var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(workCapabilityOpenVersion) {
+        if (pendingWorkCapability != null) {
+            githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
+        }
+    }
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
@@ -240,6 +250,8 @@ fun LocalHarnessScreen(
             workHandoffSummary = viewModel.workHandoffSummary()
             workCapabilityConfirmed = false
             workCapabilityFailed = false
+            githubConfiguredForHandoff = null
+            workCapabilityOpenVersion += 1
         }
     }
 
@@ -633,6 +645,11 @@ fun LocalHarnessScreen(
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
             prompt = pendingWorkCapability.orEmpty(),
             summary = workHandoffSummary,
+            capabilities = LocalTaskCapabilityReadinessProjector.project(
+                task = pendingWorkCapability.orEmpty(),
+                githubConfigured = githubConfiguredForHandoff,
+                networkSearchEnabled = networkSearchEnabled,
+            ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
             onContinue = {
