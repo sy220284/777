@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import java.io.File
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.work.LocalTodoItem
@@ -17,6 +18,8 @@ internal data class LocalRequirementEvidenceLink(
     val sourceCallId: String,
     val versionAtLink: String,
     val eventSequence: Long,
+    /** SHA-256 of the actual current file, null when unreadable or removed. */
+    val versionNow: String? = null,
 )
 
 internal fun projectRequirementEvidenceLinks(
@@ -54,4 +57,14 @@ internal fun sourceArtifactMatchesEvidence(
         artifact.reference == expected.reference && artifact.sourceCallId == expected.sourceCallId &&
             artifact.asOfSequence == expected.asOfSequence
     }
+}
+
+/** Check exact file bytes; historic evidence may be absent from the recent artifact window. */
+internal fun checkRequirementEvidenceVersions(
+    workspaceRoot: File,
+    links: List<LocalRequirementEvidenceLink>,
+): List<LocalRequirementEvidenceLink> {
+    val byPath = links.map(LocalRequirementEvidenceLink::artifactPath).distinct()
+        .associateWith { path -> localWorkFileSha256(workspaceRoot, path) }
+    return links.map { it.copy(versionNow = byPath[it.artifactPath]) }
 }
