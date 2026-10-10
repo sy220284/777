@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.local.security.KeystorePreferenceSecretStore
+import com.labteto.dshmobile.observability.AppLog
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,14 +35,18 @@ class ChatGptAccountStore @Inject constructor(
         val ids = accountIds()
         return ids.mapNotNull { id ->
             secret(id).get()?.let { raw ->
-                runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }.getOrNull()
+                runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
+                    .onFailure { AppLog.failure("ChatGptAccountStore", "decode_account_record", it, requestId = id.takeLast(8)) }
+                    .getOrNull()
             }
         }
     }
 
     suspend fun get(id: String): ChatGptAccountRecord? =
         secret(id).get()?.let { raw ->
-            runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }.getOrNull()
+            runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
+                    .onFailure { AppLog.failure("ChatGptAccountStore", "decode_account_record", it, requestId = id.takeLast(8)) }
+                    .getOrNull()
         }
 
     suspend fun selectedId(): String? = dataStore.data.first()[selectedKey]
