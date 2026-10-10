@@ -586,19 +586,27 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "customFacts" -> R.string.persona_v4_custom_facts
                 else -> null
             }
+            val provenanceLabel = when (fact.provenance) {
+                com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED ->
+                    stringResource(R.string.persona_v4_provenance_inferred)
+                com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED ->
+                    stringResource(R.string.persona_v4_provenance_unverified)
+                com.labteto.dshmobile.local.chat.CharacterFactProvenance.CANON ->
+                    stringResource(R.string.persona_v4_provenance_canon)
+                com.labteto.dshmobile.local.chat.CharacterFactProvenance.USER_CREATED ->
+                    stringResource(R.string.persona_v4_provenance_user)
+            }
+            val storyStageLabel = stringResource(R.string.persona_v4_story_stage_label)
+            val sourceLabel = stringResource(R.string.persona_v4_fact_source)
             val metadata = buildList {
-                when (fact.provenance) {
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED -> add("推断")
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED -> add("待核实")
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.CANON -> add("原作")
-                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.USER_CREATED -> add("作者设定")
-                }
-                fact.temporalScope.takeIf(String::isNotBlank)?.let { add("剧情阶段：$it") }
+                add(provenanceLabel)
+                fact.temporalScope.takeIf(String::isNotBlank)?.let { add("$storyStageLabel：$it") }
             }
             val label = labelRes?.let { stringResource(it) } ?: fact.category
             PersonaDetailRow(
                 "$label · ${metadata.joinToString(" · ")}",
-                fact.content + fact.sourceReference.takeIf(String::isNotBlank)?.let { "\n出处：$it" }.orEmpty(),
+                fact.content + fact.sourceReference.takeIf(String::isNotBlank)
+                    ?.let { "\n$sourceLabel：$it" }.orEmpty(),
             )
         }
         if (persona.loreEntries.isNotEmpty()) {

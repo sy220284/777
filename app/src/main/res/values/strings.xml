@@ -1935,5 +1935,9 @@
     <string name="persona_v4_fill_lore">补充原作知识条目</string>
     <string name="persona_v4_add_fact">添加一条事实</string>
     <string name="persona_v4_fact_number">%1$s · 第%2$d条</string>
+    <string name="persona_v4_provenance_canon">原作</string>
+    <string name="persona_v4_provenance_inferred">推断</string>
+    <string name="persona_v4_provenance_unverified">待核实</string>
+    <string name="persona_v4_provenance_user">作者设定</string>
 </resources>
 
