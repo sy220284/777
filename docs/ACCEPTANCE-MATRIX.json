@@ -4,6 +4,15 @@
   "status_explanation": "This index contains only executable repository evidence mapped to feature-tree leaves. Each automated_partial entry proves only named assertions; no entry means untested, not passed. External-only conditions are excluded from repository acceptance.",
   "items": [
     {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
+      "state": "automated_partial",
+      "evidence": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#enteringWorkRequiresAnExplicitUserAction",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#handoffDraftCanBeEditedAndCancelDoesNotStartWork",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt#pendingModeTransitionCannotBeSubmittedAgainOrDismissed"
+      ]
+    },
+    {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
       "state": "automated_partial",
       "evidence": [

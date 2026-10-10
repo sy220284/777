@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -159,6 +160,7 @@ fun LocalHarnessScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val drawerFocusManager = LocalFocusManager.current
     val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
@@ -376,7 +378,7 @@ fun LocalHarnessScreen(
         localWorkFeatureUiContribution(
             filesMode = filesMode,
             onContinueArtifact = { path ->
-                handoffWorkCapability(context.getString(R.string.local_artifact_continue_prompt, path))
+                handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
