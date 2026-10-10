@@ -131,7 +131,7 @@ internal fun EnvironmentInfoDialog(
             modifier = Modifier.fillMaxWidth(),
         )
         SelectionContainer {
-            val visible = events.filter { !errorsOnly || it.level == "E" }.takeLast(40)
+            val visible = events.filter { !errorsOnly || it.level == "E" || it.throwableType != null }.takeLast(40)
             Text(
                 if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
                     "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"
