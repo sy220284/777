@@ -21,28 +21,10 @@ import kotlinx.serialization.json.put
 
 internal data class PersonaDraft(
     val name: String = "",
+    val franchise: String = "",
     val coreIdentity: String = "",
     val facts: List<CharacterFact> = emptyList(),
-    val portrait: String = "",
-    val lifeContext: String = "",
-    val attentionBiases: List<String> = emptyList(),
-    val attentionKeywords: List<String> = emptyList(),
-    val perceptionBlindSpots: List<String> = emptyList(),
-    val quirks: List<String> = emptyList(),
-    val limitations: List<String> = emptyList(),
-    val coreValues: List<String> = emptyList(),
-    val coreTension: String = "",
-    val stableTraits: List<String> = emptyList(),
-    val mutableTraits: List<String> = emptyList(),
-    val initialUserImpression: String = "",
-    val voiceSamples: List<String> = emptyList(),
-    val worldSetting: String = "",
-    val franchise: String = "",
-    val timelinePosition: String = "",
-    val knowledgeBoundary: List<String> = emptyList(),
     val loreEntries: List<PersonaLoreEntry> = emptyList(),
-    val hardConstraints: List<String> = emptyList(),
-    val bannedPhrases: List<String> = emptyList(),
 )
 
 /**
@@ -118,28 +100,10 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
 
     return PersonaDraft(
         name = root.text("name"),
+        franchise = root.text("franchise"),
         coreIdentity = root.text("coreIdentity"),
         facts = root.characterFacts(),
-        portrait = root.text("portrait"),
-        lifeContext = root.text("lifeContext"),
-        attentionBiases = root.stringList("attentionBiases"),
-        attentionKeywords = root.stringList("attentionKeywords"),
-        perceptionBlindSpots = root.stringList("perceptionBlindSpots"),
-        quirks = root.stringList("quirks"),
-        limitations = root.stringList("limitations"),
-        coreValues = root.stringList("coreValues"),
-        coreTension = root.text("coreTension"),
-        stableTraits = root.stringList("stableTraits"),
-        mutableTraits = root.stringList("mutableTraits"),
-        initialUserImpression = root.text("initialUserImpression"),
-        voiceSamples = root.stringList("voiceSamples"),
-        worldSetting = root.text("worldSetting"),
-        franchise = root.text("franchise"),
-        timelinePosition = root.text("timelinePosition"),
-        knowledgeBoundary = root.stringList("knowledgeBoundary"),
         loreEntries = root.loreEntries(),
-        hardConstraints = root.stringList("hardConstraints"),
-        bannedPhrases = root.stringList("bannedPhrases"),
     )
 }
 
@@ -598,31 +562,20 @@ class PersonaAutoFillService @Inject constructor(
 
 private fun personaDraftImmersionViolations(draft: PersonaDraft): List<String> {
     val fragments = buildList {
-        add(draft.coreIdentity)
-        draft.facts.forEach { add(it.content); add(it.perspective) }
-        add(draft.portrait)
-        add(draft.lifeContext)
-        addAll(draft.attentionBiases)
-        addAll(draft.perceptionBlindSpots)
-        addAll(draft.quirks)
-        addAll(draft.limitations)
-        addAll(draft.coreValues)
-        add(draft.coreTension)
-        addAll(draft.stableTraits)
-        addAll(draft.mutableTraits)
-        add(draft.initialUserImpression)
-        addAll(draft.voiceSamples)
-        add(draft.worldSetting)
+        add(draft.name)
         add(draft.franchise)
-        add(draft.timelinePosition)
-        addAll(draft.knowledgeBoundary)
+        add(draft.coreIdentity)
+        draft.facts.forEach { fact ->
+            add(fact.content)
+            add(fact.perspective)
+            add(fact.sourceReference)
+        }
         draft.loreEntries.forEach { entry ->
             add(entry.title)
             add(entry.content)
             addAll(entry.keywords)
             addAll(entry.secondaryKeywords)
         }
-        addAll(draft.hardConstraints)
     }
     return fragments.asSequence()
         .filter(String::isNotBlank)

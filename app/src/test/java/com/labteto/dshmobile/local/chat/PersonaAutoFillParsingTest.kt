@@ -12,26 +12,30 @@ class PersonaAutoFillParsingTest {
     }
 
     @Test
-    fun parsesFencedLooseShapesAndTrailingCommas() {
+    fun parsesV4FactsAndWorldBookFromFencedLooseJson() {
         val raw = """
             这里是整理结果：
             ```json
             {
               "name": "流萤",
-              "portrait": "星核猎手成员",
-              "coreValues": "活下去；守护珍视的人",
-              "attentionKeywords": "匹诺康尼；星核猎手；萨姆",
               "franchise": "崩坏：星穹铁道",
-              "timelinePosition": "匹诺康尼主线初期",
-              "knowledgeBoundary": ["未知的后续剧情不能直接引用"],
-              "hardConstraints": ["避免机械式解释", "保持角色视角"],
+              "coreIdentity": "星核猎手成员",
+              "facts": [
+                {
+                  "id": "choice",
+                  "category": "valuesAndTradeoffs",
+                  "content": "珍惜自由与普通生活",
+                  "provenance": "INFERRED"
+                }
+              ],
               "loreEntries": {
                 "title": "萨姆",
                 "content": "装甲形态相关设定",
                 "keywords": "星核猎手；萨姆",
                 "priority": "80",
                 "alwaysOn": "true",
-                "spoilerLevel": "0"
+                "spoilerLevel": "0",
+                "temporalScope": "act-2"
               },
             }
             ```
@@ -39,17 +43,15 @@ class PersonaAutoFillParsingTest {
         """.trimIndent()
 
         val draft = parsePersonaDraft(json, raw)
-
         assertEquals("流萤", draft.name)
-        assertEquals(listOf("活下去", "守护珍视的人"), draft.coreValues)
-        assertEquals(listOf("匹诺康尼", "星核猎手", "萨姆"), draft.attentionKeywords)
+        assertEquals("星核猎手成员", draft.coreIdentity)
         assertEquals("崩坏：星穹铁道", draft.franchise)
-        assertEquals("匹诺康尼主线初期", draft.timelinePosition)
-        assertEquals(listOf("未知的后续剧情不能直接引用"), draft.knowledgeBoundary)
-        assertEquals(1, draft.loreEntries.size)
+        assertEquals("珍惜自由与普通生活", draft.facts.single().content)
+        assertEquals(CharacterFactProvenance.INFERRED, draft.facts.single().provenance)
         assertEquals(listOf("星核猎手", "萨姆"), draft.loreEntries.single().keywords)
         assertEquals(80, draft.loreEntries.single().priority)
         assertTrue(draft.loreEntries.single().alwaysOn)
+        assertEquals("act-2", draft.loreEntries.single().temporalScope)
     }
 
     @Test
@@ -106,17 +108,16 @@ class PersonaAutoFillParsingTest {
             前置说明
             {
               "name": "流萤",
-              "lifeContext": "她记得一句话：{别怕，我在。}",
-              "voiceSamples": "第一句\n第二句",
+              "coreIdentity": "她记得一句话：{别怕，我在。}",
+              "facts": [{"id":"voice","category":"voiceStyle","content":"说话自然"}],
             }
             {"name":"不应读取这个对象"}
         """.trimIndent()
 
         val draft = parsePersonaDraft(json, raw)
-
         assertEquals("流萤", draft.name)
-        assertEquals("她记得一句话：{别怕，我在。}", draft.lifeContext)
-        assertEquals(listOf("第一句", "第二句"), draft.voiceSamples)
+        assertEquals("她记得一句话：{别怕，我在。}", draft.coreIdentity)
+        assertEquals("说话自然", draft.facts.single().content)
     }
 
     @Test
@@ -124,7 +125,7 @@ class PersonaAutoFillParsingTest {
         val result = runCatching {
             parsePersonaDraft(
                 json,
-                """{"name":"流萤","portrait":"星核猎手成员"""",
+                """{"name":"流萤","coreIdentity":"星核猎手成员"""",
             )
         }
 
