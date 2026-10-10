@@ -369,6 +369,23 @@ class LocalWorkExecutionBudgetTest {
         assertEquals(4, usage.admittedRequests)
         assertTrue(usage.uncertainExposureTokens > 0L)
         assertEquals(0, usage.reservedRequests)
+
+        // Another Work run sharing the physical route must remain independently usable.
+        val sibling = LocalWorkExecutionControl()
+        val siblingError = runCatching {
+            executeWithModelAdmission(
+                control = sibling,
+                routeFingerprint = "same-route",
+                model = "unknown",
+                baseUrl = "https://example.test",
+                messages = messages,
+                tools = kotlinx.serialization.json.JsonArray(emptyList()),
+            ) {
+                throw streamInterrupted()
+            }
+        }.exceptionOrNull() as LocalModelException
+        assertEquals("CHATGPT_PLAN_STREAM_INTERRUPTED", siblingError.code)
+        assertEquals(1, sibling.budget.snapshot().admittedRequests)
     }
 
     private fun streamInterrupted() = LocalModelException(
