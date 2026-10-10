@@ -1975,5 +1975,9 @@
     <string name="local_delivery_file_missing">文件已失效</string>
     <string name="local_delivery_file_unknown">文件当前可用性尚未核实</string>
     <string name="local_delivery_open_evidence">来源记录</string>
+    <string name="advanced_memory_from_message">以下记忆由选中的聊天消息产生，可直接修改或停用。历史原对话不会被改写。</string>
+    <string name="advanced_memory_no_message_source">尚未找到与这条消息明确关联的长期记忆。可查看全部记忆或返回聊天。</string>
+    <string name="advanced_memory_show_all">查看全部长期记忆</string>
+    <string name="chat_locate_message_memory">定位并纠正相关记忆</string>
 </resources>
 
