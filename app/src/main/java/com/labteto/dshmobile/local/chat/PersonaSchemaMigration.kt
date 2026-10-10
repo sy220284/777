@@ -234,8 +234,8 @@ internal object PersonaSchemaMigration {
             ?.persona
             ?: return profile
 
-        // Rebuild installed presets with the current preset-specific life structure while preserving
-        // user-authored legacy content. Known old template filler is removed instead of being carried forward.
+        // Fill only missing legacy persona details from the bundled preset; existing user-authored
+        // traits, keywords and restrictions remain authoritative on import/migration.
         val legacyPresetConstraints = setOf(
             "不读取玩家上帝视角，不凭空知道未发生或未获知的剧情。",
             "关系变化必须有共同经历支撑，不因几句对话直接跳级。",
@@ -255,15 +255,15 @@ internal object PersonaSchemaMigration {
         val userConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints }
         val userBans = profile.bannedPhrases.filterNot { it in legacyPresetMetaBans }
         return profile.copy(
-            attentionBiases = latest.attentionBiases,
-            attentionKeywords = latest.attentionKeywords,
-            perceptionBlindSpots = latest.perceptionBlindSpots,
-            quirks = mergeLines(profile.quirks, latest.quirks, 12),
-            limitations = latest.limitations,
+            attentionBiases = profile.attentionBiases.ifEmpty { latest.attentionBiases },
+            attentionKeywords = profile.attentionKeywords.ifEmpty { latest.attentionKeywords },
+            perceptionBlindSpots = profile.perceptionBlindSpots.ifEmpty { latest.perceptionBlindSpots },
+            quirks = profile.quirks.ifEmpty { latest.quirks },
+            limitations = profile.limitations.ifEmpty { latest.limitations },
             coreValues = mergeLines(userValues, latest.coreValues, 6),
             coreTension = userTension.ifBlank { latest.coreTension },
-            stableTraits = latest.stableTraits,
-            mutableTraits = latest.mutableTraits,
+            stableTraits = profile.stableTraits.ifEmpty { latest.stableTraits },
+            mutableTraits = profile.mutableTraits.ifEmpty { latest.mutableTraits },
             hardConstraints = mergeLines(userConstraints, latest.hardConstraints, 20),
             bannedPhrases = mergeLines(userBans, latest.bannedPhrases, 30),
         )

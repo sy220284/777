@@ -76,7 +76,7 @@ class PersonaAutoFillParsingTest {
         )
         val merged = mergeGeneratedLoreEntries(original, generated)
         assertEquals(3, merged.size)
-        assertEquals("原作更新设定", merged[0].content)
+        assertEquals("原作旧设定", merged[0].content)
         assertEquals("first", merged[0].id)
         assertEquals(listOf("社奉行", "神里家"), merged[0].keywords)
         assertTrue(merged[0].alwaysOn)

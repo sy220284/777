@@ -515,7 +515,7 @@ internal fun ChatPersonaDialog(
     var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
     val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
-    var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(!creatingNew) }
+    var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(false) }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
     var saving by remember(profile.id) { mutableStateOf(false) }
     var saveError by remember(profile.id) { mutableStateOf<String?>(null) }
@@ -701,7 +701,24 @@ internal fun ChatPersonaDialog(
 
         PersonaFormSection(stringResource(R.string.persona_form_basics)) {
             PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
+            PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
             PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_character)) {
+            PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
+            PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
+            PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_life)) {
+            PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_expression)) {
+            PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
+            PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
+        }
+        PersonaFormSection(stringResource(R.string.persona_form_story)) {
+            PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
+            PersonaTextField(stringResource(R.string.local_persona_knowledge_boundary), knowledgeBoundary, { knowledgeBoundary = it })
         }
         DsButton(
             text = stringResource(
@@ -726,29 +743,16 @@ internal fun ChatPersonaDialog(
                 )
             }
             PersonaFormSection(stringResource(R.string.persona_form_canon)) {
-                PersonaTextField(stringResource(R.string.local_persona_franchise), franchise, { franchise = it }, singleLine = true)
-                PersonaTextField(stringResource(R.string.local_persona_timeline_position), timelinePosition, { timelinePosition = it })
                 PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
-                PersonaTextField(stringResource(R.string.local_persona_knowledge_boundary), knowledgeBoundary, { knowledgeBoundary = it })
                 PersonaWorldBookEditor(entries = loreEntries, onChange = { loreEntries = it })
             }
-            PersonaFormSection(stringResource(R.string.persona_form_life)) {
-                PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
+            PersonaFormSection(stringResource(R.string.persona_form_life_extra)) {
                 PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
                 PersonaTextField(stringResource(R.string.local_persona_attention_keywords), attentionKeywords, { attentionKeywords = it })
                 PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
                 PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
                 PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
-            }
-            PersonaFormSection(stringResource(R.string.persona_form_character)) {
-                PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
-                PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
-                PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
                 PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
-            }
-            PersonaFormSection(stringResource(R.string.persona_form_expression)) {
-                PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
-                PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
             }
             PersonaFormSection(stringResource(R.string.persona_form_boundaries)) {
                 PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })

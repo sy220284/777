@@ -82,10 +82,11 @@ internal class CharacterRuntimeProjector(
 
     private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
         appendLine("【人物底色】")
-        appendLine("只保留长期身份与生活底色；具体脑回路、行为和表达由每轮模式自由组合，不把任何形容词演成固定套路。")
+        appendLine("身份、经历和人物内核优先；行为和表达由当前状态自然组合，不照着固定性格标签表演。")
         persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
         persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
-        persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("生活：${it.take(520)}") }
+        persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("经历与生活：${it.take(520)}") }
+        if (persona.franchise.isNotBlank()) appendLine("可用已知原作知识补足细节；当前剧情和用户明确改编优先，不把未知情节编成事实。")
 
         val samples = persona.voiceSamples.asSequence()
             .map(String::trim)
