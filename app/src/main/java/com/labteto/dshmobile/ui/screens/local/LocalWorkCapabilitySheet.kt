@@ -97,7 +97,7 @@ internal fun LocalWorkCapabilitySheet(
                     )
                     val speaker = if (message.role == "user")
                         stringResource(R.string.work_handoff_user) else stringResource(R.string.work_handoff_assistant)
-                    Text("$speaker · ${message.content.trim().replace(Regex("\\\\s+"), " ").take(100)}",
+                    Text("$speaker · ${message.content.trim().replace(Regex("\\s+"), " ").take(100)}",
                         style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
