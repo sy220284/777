@@ -82,6 +82,41 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun currentTaskReordersPreviouslySelectedToolsAheadOfOlderWork() {
+        val registry = ToolRegistry().apply {
+            repeat(200) { index ->
+                register(tool(name = "older_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "旧工具", keywords = setOf("旧任务")) { ToolResult("ok") })
+            }
+            register(tool(name = "current_task_tool", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "新任务", keywords = setOf("现在处理")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 200).map { "older_$it" } + "current_task_tool")
+        coordinator.enableTaskRelevantOptionalTools("现在处理这个问题")
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertEquals("current_task_tool", visible.first())
+    }
+
+    @Test
+    fun disabledNetworkToolsRemainDiscoverableButNotCallable() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "web_search", access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "网络", keywords = setOf("联网")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry, networkSearchEnabled = { false })
+        val directory = coordinator.searchCapabilities("能力目录")
+        assertTrue(directory.contains("web_search（当前设置已关闭）"))
+        assertTrue(coordinator.capabilitySummary().contains("运行策略关闭：web_search"))
+        assertFalse("web_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        coordinator.searchCapabilities("联网")
+        assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
     fun newlyRegisteredTaskToolsTakePriorityOverOlderOptionalSchemas() {
         val registry = ToolRegistry().apply {
             repeat(300) { index ->
