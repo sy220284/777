@@ -73,6 +73,8 @@ class VersionedSessionStore(
     private val clock: () -> Long = System::currentTimeMillis,
     private val onCorruptSkipped: (String, Exception) -> Unit = { _, _ -> },
 ) {
+    private val catalog = DurableSessionCatalog(root, json)
+
     init {
         root.mkdirs()
     }
@@ -112,6 +114,9 @@ class VersionedSessionStore(
     @Synchronized
     fun write(id: String, payload: JsonObject, updatedAt: Long = clock()): SessionDocument {
         validateId(id)
+        // Publish the identity before the atomic session snapshot. An interrupted write cannot
+        // leave a valid durable session invisible to the catalog.
+        catalog.register(id)
         val source = fileFor(id)
         val existing = read(id)
         if (existing?.legacy == true) {
@@ -146,17 +151,23 @@ class VersionedSessionStore(
                     file.name.startsWith("$id.corrupt-")
             }
             .forEach { file -> changed = file.delete() || changed }
+        // Unregister last: interrupted deletion never hides still-existing source files.
+        catalog.unregister(id)
         return changed
     }
 
     @Synchronized
-    fun ids(): List<String> = sessionFiles()
-        .map { file -> file.name.removeSuffix(SESSION_SUFFIX) }
+    fun ids(): List<String> = catalog.ids()
+        .filter { id -> fileFor(id).isFile || backupFor(id).isFile }
 
     @Synchronized
     fun lastModified(id: String): Long? {
         validateId(id)
-        return fileFor(id).takeIf(File::isFile)?.lastModified()?.takeIf { it > 0L }
+        val primary = fileFor(id)
+        // Recovery of a rotated snapshot is rare. Rebuild the primary only in this case so
+        // summary-cache provenance always points to the authoritative file generation.
+        if (!primary.isFile && backupFor(id).isFile) read(id)
+        return primary.takeIf(File::isFile)?.lastModified()?.takeIf { it > 0L }
     }
 
     @Synchronized
@@ -231,22 +242,6 @@ class VersionedSessionStore(
         )
     }
 
-    private fun sessionFiles(): List<File> = root.listFiles().orEmpty()
-        .filter { file ->
-            val name = file.name
-            val id = name.removeSuffix(SESSION_SUFFIX)
-            file.isFile &&
-                name.endsWith(SESSION_SUFFIX) &&
-                !name.endsWith(TEMP_SUFFIX) &&
-                !name.endsWith(BACKUP_SUFFIX) &&
-                !name.contains(CHECKPOINT_MARKER) &&
-                !name.contains(CORRUPT_MARKER) &&
-                // Exclude the exact EventLog projection sidecar namespace only. A valid legacy
-                // Session ID can contain ".events.jsonl" without being a projection file.
-                !name.contains(EVENT_PROJECTION_MARKER) &&
-                id.matches(SESSION_ID_PATTERN)
-        }
-
     private fun fileFor(id: String): File {
         validateId(id)
         return File(root, "$id$SESSION_SUFFIX")
@@ -312,11 +307,7 @@ class VersionedSessionStore(
 
     private companion object {
         const val SESSION_SUFFIX = ".json"
-        const val TEMP_SUFFIX = ".json.tmp"
         const val BACKUP_SUFFIX = ".backup.json"
-        const val CHECKPOINT_MARKER = ".checkpoint-v"
-        const val CORRUPT_MARKER = ".corrupt-"
-        const val EVENT_PROJECTION_MARKER = ".events.jsonl.projection-"
         val SESSION_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,128}")
     }
 }
