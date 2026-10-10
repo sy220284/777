@@ -190,10 +190,12 @@ fun LocalHarnessScreen(
     var workCapabilityConfiguring by rememberSaveable { mutableStateOf(false) }
     var githubConfiguredForHandoff by remember { mutableStateOf<Boolean?>(null) }
     var externalReadinessForHandoff by remember { mutableStateOf<Pair<Boolean?, Boolean?>>(null to null) }
+    var deviceReadinessForHandoff by remember { mutableStateOf<Pair<Boolean?, Boolean?>>(null to null) }
     LaunchedEffect(workCapabilityOpenVersion, pendingWorkCapability != null, workCapabilityConfiguring) {
         if (pendingWorkCapability != null && !workCapabilityConfiguring) {
             githubConfiguredForHandoff = null
             externalReadinessForHandoff = null to null
+            deviceReadinessForHandoff = viewModel.deviceReadinessForHandoff()
             githubConfiguredForHandoff = viewModel.githubConfiguredForHandoff()
             externalReadinessForHandoff = viewModel.externalReadinessForHandoff()
         }
@@ -682,6 +684,8 @@ fun LocalHarnessScreen(
                 modelConfigured = chatSurface.configured,
                 mcpToolsAvailable = externalReadinessForHandoff.first,
                 pluginsInstalled = externalReadinessForHandoff.second,
+                accessibilityActive = deviceReadinessForHandoff.first,
+                notificationAccessActive = deviceReadinessForHandoff.second,
             ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
@@ -695,6 +699,11 @@ fun LocalHarnessScreen(
             onConfigureModel = {
                 workCapabilityConfiguring = true
                 settingsDestination = SettingsDestination.MODELS
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
+            onConfigureDevice = {
+                workCapabilityConfiguring = true
+                settingsDestination = SettingsDestination.PERMISSIONS
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onContinue = {

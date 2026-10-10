@@ -66,6 +66,25 @@ class LocalTaskCapabilityReadinessTest {
         )
     }
 
+    @Test fun devicePermissionsAreTaskSpecificAndNeverPretendAuthorization() {
+        assertEquals(
+            listOf(
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.ACCESSIBILITY, LocalTaskCapabilityState.CONNECTION_REQUIRED),
+                LocalTaskCapabilityReadiness(LocalTaskCapabilityKind.NOTIFICATION_ACCESS, LocalTaskCapabilityState.CONFIGURED),
+            ),
+            LocalTaskCapabilityReadinessProjector.project(
+                "通过无障碍操控手机并读取通知",
+                githubConfigured = null, networkSearchEnabled = false,
+                accessibilityActive = false, notificationAccessActive = true,
+            ),
+        )
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "不需要无障碍，不读取通知，仅分析文本",
+            githubConfigured = null, networkSearchEnabled = false,
+            accessibilityActive = true, notificationAccessActive = true,
+        ).isEmpty())
+    }
+
     @Test fun unrelatedTaskAndBlankHandoffHaveNoProjectedRequirements() {
         assertTrue(LocalTaskCapabilityReadinessProjector.project(
             "", githubConfigured = null, networkSearchEnabled = false,

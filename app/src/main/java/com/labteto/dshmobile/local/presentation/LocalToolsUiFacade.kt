@@ -25,9 +25,12 @@ class LocalToolsUiFacade @Inject constructor(
         modelConfigured: Boolean? = null,
         mcpToolsAvailable: Boolean? = null,
         pluginsInstalled: Boolean? = null,
+        accessibilityActive: Boolean? = null,
+        notificationAccessActive: Boolean? = null,
     ) = LocalTaskCapabilityReadinessProjector.project(
         task, githubConfigured, networkSearchEnabled,
         showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
+        accessibilityActive, notificationAccessActive,
     )
     internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
     internal suspend fun clearGitHub() = tools.clearGitHub()

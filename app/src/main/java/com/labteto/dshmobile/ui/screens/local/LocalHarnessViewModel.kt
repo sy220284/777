@@ -29,6 +29,7 @@ import com.labteto.dshmobile.local.presentation.projectWorkState
 import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.ui.screens.settings.readDeviceCapabilityState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -61,6 +62,9 @@ class LocalHarnessViewModel @Inject constructor(
         null
     }
 
+    internal fun deviceReadinessForHandoff(): Pair<Boolean, Boolean> =
+        readDeviceCapabilityState().let { it.accessibility to it.notifications }
+
     internal suspend fun externalReadinessForHandoff(): Pair<Boolean?, Boolean?> = try {
         toolsUi.handoffExternalReadiness()
     } catch (cancelled: CancellationException) {
@@ -76,10 +80,13 @@ class LocalHarnessViewModel @Inject constructor(
         modelConfigured: Boolean?,
         mcpToolsAvailable: Boolean?,
         pluginsInstalled: Boolean?,
+        accessibilityActive: Boolean?,
+        notificationAccessActive: Boolean?,
     ) = toolsUi.workHandoffCapabilityReadiness(
         task, githubConfigured, networkSearchEnabled,
         showModelStatus = true, modelConfigured = modelConfigured,
         mcpToolsAvailable = mcpToolsAvailable, pluginsInstalled = pluginsInstalled,
+        accessibilityActive = accessibilityActive, notificationAccessActive = notificationAccessActive,
     )
 
     val approvalMode = approvalPreferences.approvalMode

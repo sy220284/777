@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 /** Only observed configuration is projected; actual execution still enforces permissions. */
-internal enum class LocalTaskCapabilityKind { GITHUB, WEB_SEARCH, MODEL, MCP, PLUGINS }
+internal enum class LocalTaskCapabilityKind { GITHUB, WEB_SEARCH, MODEL, MCP, PLUGINS, ACCESSIBILITY, NOTIFICATION_ACCESS }
 
 internal enum class LocalTaskCapabilityState {
     CONFIGURED, CONNECTION_REQUIRED, DISABLED, UNKNOWN,
@@ -34,6 +34,8 @@ internal object LocalTaskCapabilityReadinessProjector {
         modelConfigured: Boolean? = null,
         mcpToolsAvailable: Boolean? = null,
         pluginsInstalled: Boolean? = null,
+        accessibilityActive: Boolean? = null,
+        notificationAccessActive: Boolean? = null,
     ): List<LocalTaskCapabilityReadiness> {
         if (task.isBlank()) return emptyList()
         val normalized = task.lowercase()
@@ -42,6 +44,13 @@ internal object LocalTaskCapabilityReadinessProjector {
             webNegations.none(normalized::contains)
         val asksMcp = normalized.contains("mcp") || normalized.contains("工具服务器")
         val asksPlugins = normalized.contains("插件") || normalized.contains("plugin")
+        val asksAccessibility = listOf("无障碍", "操控手机", "手机自动操作", "自动点击", "设备操作")
+            .any(normalized::contains) &&
+            listOf("不要自动点击", "不需要无障碍", "不要操作设备", "禁止操控手机")
+                .none(normalized::contains)
+        val asksNotificationAccess = listOf("读取通知", "监听通知", "通知监听", "通知访问")
+            .any(normalized::contains) &&
+            listOf("不读取通知", "不要读取通知", "不需要通知访问").none(normalized::contains)
         return buildList {
             // Work requires a configured model, but configuration alone does not prove connectivity.
             if (showModelStatus) {
@@ -68,6 +77,26 @@ internal object LocalTaskCapabilityReadinessProjector {
                 add(LocalTaskCapabilityReadiness(
                     LocalTaskCapabilityKind.PLUGINS,
                     when (pluginsInstalled) {
+                        true -> LocalTaskCapabilityState.CONFIGURED
+                        false -> LocalTaskCapabilityState.CONNECTION_REQUIRED
+                        null -> LocalTaskCapabilityState.UNKNOWN
+                    },
+                ))
+            }
+            if (asksAccessibility) {
+                add(LocalTaskCapabilityReadiness(
+                    LocalTaskCapabilityKind.ACCESSIBILITY,
+                    when (accessibilityActive) {
+                        true -> LocalTaskCapabilityState.CONFIGURED
+                        false -> LocalTaskCapabilityState.CONNECTION_REQUIRED
+                        null -> LocalTaskCapabilityState.UNKNOWN
+                    },
+                ))
+            }
+            if (asksNotificationAccess) {
+                add(LocalTaskCapabilityReadiness(
+                    LocalTaskCapabilityKind.NOTIFICATION_ACCESS,
+                    when (notificationAccessActive) {
                         true -> LocalTaskCapabilityState.CONFIGURED
                         false -> LocalTaskCapabilityState.CONNECTION_REQUIRED
                         null -> LocalTaskCapabilityState.UNKNOWN

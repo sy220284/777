@@ -42,6 +42,7 @@ internal fun LocalWorkCapabilitySheet(
     onConfigureCapabilities: (() -> Unit)? = null,
     onRefreshCapabilities: (() -> Unit)? = null,
     onConfigureModel: (() -> Unit)? = null,
+    onConfigureDevice: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     DsBottomSheet(
@@ -115,6 +116,8 @@ internal fun LocalWorkCapabilitySheet(
                     LocalTaskCapabilityKind.MODEL -> R.string.work_capability_readiness_model
                     LocalTaskCapabilityKind.MCP -> R.string.work_capability_readiness_mcp
                     LocalTaskCapabilityKind.PLUGINS -> R.string.work_capability_readiness_plugins
+                    LocalTaskCapabilityKind.ACCESSIBILITY -> R.string.work_capability_readiness_accessibility
+                    LocalTaskCapabilityKind.NOTIFICATION_ACCESS -> R.string.work_capability_readiness_notification_access
                 }
                 val status = when (item.state) {
                     LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
@@ -122,16 +125,24 @@ internal fun LocalWorkCapabilitySheet(
                     LocalTaskCapabilityState.DISABLED -> R.string.work_capability_readiness_disabled
                     LocalTaskCapabilityState.UNKNOWN -> R.string.work_capability_readiness_unknown
                 }
-                val statusLabel = if (item.kind == LocalTaskCapabilityKind.MODEL &&
-                    item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED
-                ) stringResource(R.string.work_capability_readiness_model_missing)
-                else stringResource(status)
+                val statusLabel = when {
+                    item.kind == LocalTaskCapabilityKind.MODEL &&
+                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
+                        stringResource(R.string.work_capability_readiness_model_missing)
+                    (item.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
+                        item.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
+                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
+                        stringResource(R.string.work_capability_readiness_device_missing)
+                    else -> stringResource(status)
+                }
                 Text(stringResource(R.string.work_capability_readiness_row,
                     stringResource(name), statusLabel),
                     style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
             }
             if (onConfigureCapabilities != null && capabilities.any {
                     it.kind != LocalTaskCapabilityKind.MODEL &&
+                        it.kind != LocalTaskCapabilityKind.ACCESSIBILITY &&
+                        it.kind != LocalTaskCapabilityKind.NOTIFICATION_ACCESS &&
                         it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
                 DsButton(
@@ -149,6 +160,19 @@ internal fun LocalWorkCapabilitySheet(
                 DsButton(
                     text = stringResource(R.string.work_capability_configure_model),
                     onClick = onConfigureModel,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+            if (onConfigureDevice != null && capabilities.any {
+                    (it.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
+                        it.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
+                        it.state != LocalTaskCapabilityState.CONFIGURED
+                }) {
+                DsButton(
+                    text = stringResource(R.string.work_capability_configure_device),
+                    onClick = onConfigureDevice,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
                     variant = DsButtonVariant.Ghost,

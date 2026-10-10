@@ -25,12 +25,7 @@ internal class DeviceCapabilitiesController(
     val state: StateFlow<DeviceCapabilitiesState> = _state.asStateFlow()
 
     fun refresh() {
-        _state.value = DeviceCapabilitiesState(
-            loading = false,
-            accessibility = HarnessAccessibilityService.active() != null,
-            notifications = HarnessNotificationListenerService.active() != null,
-            virtualDisplay = true,
-        )
+        _state.value = readDeviceCapabilityState()
     }
 
     fun openAccessibilitySettings() {
@@ -45,3 +40,12 @@ internal class DeviceCapabilitiesController(
         )
     }
 }
+
+/** Same read-only owner probe for Settings and task-specific handoff hints. */
+internal fun readDeviceCapabilityState(): DeviceCapabilitiesState = DeviceCapabilitiesState(
+    loading = false,
+    accessibility = HarnessAccessibilityService.active() != null,
+    notifications = HarnessNotificationListenerService.active() != null,
+    // Availability of the API does not imply a captured screen or user MediaProjection grant.
+    virtualDisplay = true,
+)

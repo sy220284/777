@@ -1948,5 +1948,9 @@
     <string name="work_capability_readiness_plugins">已安装插件</string>
     <string name="work_capability_readiness_model_missing">尚未配置模型，可前往模型设置</string>
     <string name="work_capability_configure_model">前往模型设置</string>
+    <string name="work_capability_readiness_accessibility">设备无障碍服务</string>
+    <string name="work_capability_readiness_notification_access">通知访问服务</string>
+    <string name="work_capability_readiness_device_missing">当前未激活，请检查系统授权</string>
+    <string name="work_capability_configure_device">前往设备权限设置</string>
 </resources>
 
