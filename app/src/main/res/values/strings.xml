@@ -1967,5 +1967,13 @@
     <string name="work_handoff_search_messages">搜索已加载的历史发言</string>
     <string name="work_handoff_no_matches">当前已加载的历史中没有匹配消息，可尝试加载更早记录。</string>
     <string name="work_handoff_load_older">加载更早的对话</string>
+    <string name="local_delivery_evidence_title">交付状态与可核对证据</string>
+    <string name="local_delivery_evidence_counts">文件可用 %1$d、已失效 %2$d、未检查 %3$d；工具已完成 %4$d、失败 %5$d、结果不明/取消 %6$d；未完成待办 %7$d</string>
+    <string name="local_delivery_evidence_scope">以上为当前加载范围内的真实记录。文件存在和工具返回成功均不等于内容、测试或用户全部要求验收通过。</string>
+    <string name="local_delivery_source_not_verified">可查看来源工具记录，未单独证明目标完成</string>
+    <string name="local_delivery_file_present">当前文件可用，内容与版本仍需按要求检查</string>
+    <string name="local_delivery_file_missing">文件已失效</string>
+    <string name="local_delivery_file_unknown">文件当前可用性尚未核实</string>
+    <string name="local_delivery_open_evidence">来源记录</string>
 </resources>
 
