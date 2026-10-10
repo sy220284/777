@@ -197,14 +197,20 @@ internal class CharacterRuntimeProjector(
             CharacterFactCategories.PERSONALITY,
             CharacterFactCategories.VALUES_AND_TRADEOFFS,
         )
-        val relevant = persona.visibleFacts(storyStage).asSequence()
+        val visible = persona.visibleFacts(storyStage)
             .filter { it.category !in core && it.content.isNotBlank() }
-            .filter { fact ->
-                relevantTo(fact.content, query) ||
-                    relevantTo(fact.category, query) ||
-                    (fact.relatedFactIds.isNotEmpty() && fact.relatedFactIds.any { query.contains(it) })
-            }
-            .take(4).toList()
+        val direct = visible.filter { fact ->
+            relevantTo(fact.content, query) || relevantTo(fact.category, query)
+        }.take(3)
+        val directIds = direct.mapTo(hashSetOf(), CharacterFact::id)
+        val linkedIds = direct.flatMap(CharacterFact::relatedFactIds).toSet()
+        // Expand only from genuinely relevant facts and only within the current story stage.
+        // Fact IDs are internal references; users should never need to type them to recall a link.
+        val linked = visible.filter { fact ->
+            fact.id !in directIds &&
+                (fact.id in linkedIds || fact.relatedFactIds.any(directIds::contains))
+        }.take(4 - direct.size)
+        val relevant = direct + linked
         if (relevant.isEmpty()) return ""
         return takeWithinModelTokenBudget(buildString {
             appendLine("【本轮相关人物事实】")
@@ -217,7 +223,9 @@ internal class CharacterRuntimeProjector(
                 }
                 val viewpoint = fact.perspective.takeIf(String::isNotBlank)
                     ?.let { "；视角：${it.take(60)}" }.orEmpty()
-                appendLine("${fact.category}（${status}${viewpoint}）：${fact.content.take(650)}")
+                val evidence = fact.sourceReference.takeIf(String::isNotBlank)
+                    ?.let { "；来源：${it.take(80)}" }.orEmpty()
+                appendLine("${fact.category}（${status}${viewpoint}${evidence}）：${fact.content.take(650)}")
             }
         }.trim(), 500)
     }

@@ -88,6 +88,32 @@ class CharacterFactsV4Test {
         assertFalse(runtime.dynamicPrompt.contains("宇宙飞船"))
     }
 
+    @Test fun relatedFactsAreRecalledOnlyWhenVisibleInCurrentStoryStage() {
+        val persona = PersonaProfile(
+            name = "阿云", coreIdentity = "档案管理员",
+            facts = listOf(
+                CharacterFact("decision", CharacterFactCategories.DEFINING_CHOICES,
+                    "阿云决定守护旧图书馆", relatedFactIds = listOf("memory")),
+                CharacterFact("memory", CharacterFactCategories.EMOTIONAL_IMPRINTS,
+                    "童年的那场洪水留下无法磨灭的记忆",
+                    temporalScope = "act-2", sourceReference = "原作第二幕"),
+            ),
+        )
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val early = projector.project(
+            persona, ChatCharacterState(), ChatContextState(),
+            "为什么阿云决定守护旧图书馆？", null,
+        )
+        val late = projector.project(
+            persona, ChatCharacterState(), ChatContextState(storyStage = "act-2"),
+            "为什么阿云决定守护旧图书馆？", null,
+        )
+        assertTrue(early.dynamicPrompt.contains("守护旧图书馆"))
+        assertFalse(early.dynamicPrompt.contains("童年的那场洪水"))
+        assertTrue(late.dynamicPrompt.contains("童年的那场洪水"))
+        assertTrue(late.dynamicPrompt.contains("来源：原作第二幕"))
+    }
+
     @Test fun onlyCurrentStoryStageCanReleasePlotScopedFactsToModel() {
         val persona = PersonaProfile(
             name = "阿云", coreIdentity = "档案管理员",
