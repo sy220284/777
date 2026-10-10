@@ -74,6 +74,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
             state = snapshot.chat.chatState,
             messages = snapshot.messages,
             latestAssistantMessageId = expectedAssistantMessageId,
+            context = snapshot.chat.chatContext,
         )
         val reply = try {
             requestRuntime.complete(
