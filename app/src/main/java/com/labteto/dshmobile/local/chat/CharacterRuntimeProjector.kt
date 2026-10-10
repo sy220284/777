@@ -41,7 +41,7 @@ internal class CharacterRuntimeProjector(
                 renderChatContextForModel(context),
                 renderChatTurnModeForModel(userInput),
                 relevantBackgroundPrompt(persona, userInput),
-                relevantCharacterFactPrompt(persona, context.scene.sceneTime, userInput, storyContext),
+                relevantCharacterFactPrompt(persona, context.storyStage, userInput, storyContext),
                 storyPrompt,
                 loreEngine.prompt(persona, userInput),
                 relationshipEngine.prompt(userInput, runtimeState),

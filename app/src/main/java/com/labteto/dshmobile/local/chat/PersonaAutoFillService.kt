@@ -59,9 +59,15 @@ internal fun mergeGeneratedCharacterFacts(
         if (result.any { it.category == fact.category && it.provenance == CharacterFactProvenance.USER_CREATED }) {
             return@forEach
         }
-        val index = result.indexOfFirst { it.id == fact.id ||
-            (it.category == fact.category && it.provenance != CharacterFactProvenance.USER_CREATED) }
-        if (index >= 0) result[index] = fact else result += fact
+        val index = result.indexOfFirst { it.id == fact.id }
+        if (index >= 0) {
+            if (result[index].provenance != CharacterFactProvenance.USER_CREATED) result[index] = fact
+        } else if (result.none {
+                it.category == fact.category && it.content.trim() == fact.content.trim()
+            }) {
+            // Distinct facts in the same category carry independent events and sources.
+            result += fact
+        }
     }
     return result
 }

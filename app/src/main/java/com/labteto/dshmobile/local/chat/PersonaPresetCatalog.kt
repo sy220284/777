@@ -236,6 +236,9 @@ private fun presetPersona(
                 ))
             }
             add(CharacterFactCategories.BIOGRAPHY, lifeContext)
+            add(CharacterFactCategories.LIFE_GRAVITY, lifeContext)
+            add(CharacterFactCategories.IDENTITY_GAP,
+                coreTensionCandidates.firstOrNull() ?: PRESET_CORE_TENSIONS[name].orEmpty())
             add(CharacterFactCategories.PERSONALITY, stableTraitsText)
             add(CharacterFactCategories.VALUES_AND_TRADEOFFS,
                 (coreValues + secondaryValues + coreTensionCandidates).joinToString("；"))

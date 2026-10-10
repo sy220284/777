@@ -39,6 +39,45 @@ class CharacterFactsV4Test {
         assertEquals("认真且有主见", profile.factText(CharacterFactCategories.PERSONALITY))
     }
 
+    @Test fun categoryEditReplacesPresetFactAndPreservesStageSpecificFacts() {
+        val original = CharacterFact(
+            "builtin-personality", CharacterFactCategories.PERSONALITY, "原始性格",
+            provenance = CharacterFactProvenance.CANON,
+        )
+        val later = CharacterFact(
+            "later", CharacterFactCategories.PERSONALITY, "后续揭示",
+            temporalScope = "act-2",
+        )
+        val profile = PersonaProfile(facts = listOf(original, later))
+            .withFact(CharacterFactCategories.PERSONALITY, "用户修改")
+        assertEquals("用户修改", profile.factText(CharacterFactCategories.PERSONALITY))
+        assertEquals(listOf("builtin-personality", "later"), profile.facts.map(CharacterFact::id))
+        assertEquals(CharacterFactProvenance.USER_CREATED,
+            profile.facts.first { it.id == original.id }.provenance)
+        assertEquals(listOf("later"),
+            profile.facts.filter { it.temporalScope.isNotBlank() }.map(CharacterFact::id))
+    }
+
+    @Test fun automaticEnrichmentPreservesDistinctFactsWithinOneCategory() {
+        val previous = listOf(CharacterFact("one", CharacterFactCategories.BIOGRAPHY, "少年时学医"))
+        val additional = listOf(
+            CharacterFact("two", CharacterFactCategories.BIOGRAPHY, "后来成为主治医师"),
+            CharacterFact("three", CharacterFactCategories.BIOGRAPHY, "后来成为主治医师"),
+        )
+        val merged = mergeGeneratedCharacterFacts(previous, additional)
+        assertEquals(2, merged.size)
+        assertEquals(listOf("one", "two"), merged.map(CharacterFact::id))
+    }
+
+    @Test fun storyStageIsDistinctFromSceneClock() {
+        val story = ChatContextState(
+            scene = ChatSceneState(sceneTime = "晚上八点"),
+            storyStage = "act-2",
+        ).normalized()
+        assertEquals("act-2", story.storyStage)
+        assertEquals("晚上八点", story.scene.sceneTime)
+    }
+
     @Test fun explicitStoryStageGatesUnreleasedFacts() {
         val profile = PersonaProfile(name = "阿云", facts = listOf(
             CharacterFact("now", CharacterFactCategories.RELATIONSHIPS, "认识阿宁"),

@@ -73,10 +73,19 @@ fun PersonaProfile.factText(category: String): String =
         .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")
 
 fun PersonaProfile.withFact(category: String, content: String): PersonaProfile {
-    val id = "v4-$category"
-    val others = facts.filterNot { it.id == id }
+    // Category-level editing must replace existing preset summaries, regardless of fact ID.
+    // Stage-gated individual facts are preserved.
+    val previous = facts.firstOrNull { it.category == category && it.temporalScope.isBlank() }
+    val others = facts.filterNot { it.category == category && it.temporalScope.isBlank() }
     val updated = content.trim().takeIf(String::isNotBlank)?.let {
-        CharacterFact(id = id, category = category, content = it, provenance = CharacterFactProvenance.USER_CREATED)
+        CharacterFact(
+            id = previous?.id ?: "v4-$category",
+            category = category,
+            content = it,
+            relatedFactIds = previous?.relatedFactIds.orEmpty(),
+            perspective = previous?.perspective.orEmpty(),
+            provenance = CharacterFactProvenance.USER_CREATED,
+        )
     }
     return copy(facts = if (updated == null) others else others + updated)
 }

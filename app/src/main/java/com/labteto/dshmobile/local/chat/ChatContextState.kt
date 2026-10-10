@@ -11,6 +11,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ChatContextState(
     val scene: ChatSceneState = ChatSceneState(),
+    /** Explicit plot-stage identifier, independent of the clock or time of day. */
+    val storyStage: String = "",
     val continuity: ChatContinuityState = ChatContinuityState(),
     val processedThroughSequence: Long = -1L,
     val pendingTurns: List<ChatPendingTurn> = emptyList(),
@@ -59,6 +61,7 @@ internal fun ChatContextState.normalized(): ChatContextState {
         .takeLast(MAX_CONTINUITY_EVIDENCE)
 
     return copy(
+        storyStage = storyStage.trim().take(160),
         scene = scene.copy(
             sceneTime = scene.sceneTime.trim().take(80),
             location = scene.location.trim().take(120),
