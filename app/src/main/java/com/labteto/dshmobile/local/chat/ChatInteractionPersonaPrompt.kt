@@ -11,7 +11,7 @@ internal fun StringBuilder.appendPostTurnPersonaContext(persona: PersonaProfile)
         CharacterFactCategories.RELATIONSHIPS,
     )
     relevant.forEach { category ->
-        persona.factText(category).takeIf(String::isNotBlank)
+        persona.trustedFactText(category).takeIf(String::isNotBlank)
             ?.let { appendLine("$category：${it.take(280)}") }
     }
     appendPersonaExpressionContext(persona)

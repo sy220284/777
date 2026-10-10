@@ -80,8 +80,10 @@ internal fun mergeGeneratedLoreEntries(
     incoming.filter { it.content.isNotBlank() }.forEach { next ->
         val key = next.title.trim().lowercase().replace(Regex("\\s+"), "")
         val index = merged.indexOfFirst { old ->
-            (next.id.isNotBlank() && next.id == old.id) ||
-                (key.isNotBlank() && old.title.trim().lowercase().replace(Regex("\\s+"), "") == key)
+            old.temporalScope == next.temporalScope && (
+                (next.id.isNotBlank() && next.id == old.id) ||
+                    (key.isNotBlank() && old.title.trim().lowercase().replace(Regex("\\s+"), "") == key)
+            )
         }
         if (index >= 0) {
             val old = merged[index]
@@ -97,7 +99,7 @@ internal fun mergeGeneratedLoreEntries(
         } else {
             merged += next.copy(
                 id = next.id.ifBlank {
-                    "ai-lore-${(next.title.ifBlank { next.content.take(80) }).hashCode().toUInt().toString(16)}"
+                    "ai-lore-${(next.title.ifBlank { next.content.take(80) } + next.temporalScope).hashCode().toUInt().toString(16)}"
                 },
             )
         }
@@ -534,28 +536,10 @@ class PersonaAutoFillService @Inject constructor(
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             coreIdentity = draft.coreIdentity.ifBlank { current.coreIdentity },
             facts = mergeGeneratedCharacterFacts(current.facts, draft.facts),
-            portrait = draft.portrait.ifBlank { current.portrait },
-            lifeContext = draft.lifeContext.ifBlank { current.lifeContext },
-            attentionBiases = draft.attentionBiases.ifEmpty { current.attentionBiases },
-            attentionKeywords = (current.attentionKeywords + draft.attentionKeywords).distinct(),
-            perceptionBlindSpots = draft.perceptionBlindSpots.ifEmpty { current.perceptionBlindSpots },
-            quirks = draft.quirks.ifEmpty { current.quirks },
-            limitations = draft.limitations.ifEmpty { current.limitations },
-            coreValues = draft.coreValues.ifEmpty { current.coreValues },
-            coreTension = draft.coreTension.ifBlank { current.coreTension },
-            stableTraits = draft.stableTraits.ifEmpty { current.stableTraits },
-            // Mutable-trait tracking belongs to runtime configuration, never to auto-generated
-            // character facts. Existing user-authored axes stay intact during regeneration.
-            mutableTraits = current.mutableTraits,
-            initialUserImpression = draft.initialUserImpression.ifBlank { current.initialUserImpression },
-            voiceSamples = draft.voiceSamples.ifEmpty { current.voiceSamples },
-            worldSetting = draft.worldSetting.ifBlank { current.worldSetting },
             franchise = draft.franchise.ifBlank { current.franchise },
-            timelinePosition = draft.timelinePosition.ifBlank { current.timelinePosition },
-            knowledgeBoundary = (current.knowledgeBoundary + draft.knowledgeBoundary).distinct(),
+            // V4 AI only writes canonical identity, facts and world-book; no new
+            // legacy trait copies or runtime/correction overrides are generated here.
             loreEntries = mergeGeneratedLoreEntries(current.loreEntries, draft.loreEntries),
-            hardConstraints = draft.hardConstraints.ifEmpty { current.hardConstraints },
-            bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
         )
         }
     }

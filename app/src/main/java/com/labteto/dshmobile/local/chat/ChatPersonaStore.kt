@@ -70,6 +70,12 @@ object CharacterFactCategories {
 }
 
 /** Actual source of character facts; unrelated chat state is owned by its runtime. */
+fun PersonaProfile.trustedFactText(category: String): String =
+    facts.asSequence()
+        .filter { it.category == category && it.temporalScope.isBlank() }
+        .filter { it.provenance == CharacterFactProvenance.CANON || it.provenance == CharacterFactProvenance.USER_CREATED }
+        .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")
+
 fun PersonaProfile.factText(category: String): String =
     facts.asSequence().filter { it.category == category && it.temporalScope.isBlank() }
         .map(CharacterFact::content).filter(String::isNotBlank).joinToString("\n")

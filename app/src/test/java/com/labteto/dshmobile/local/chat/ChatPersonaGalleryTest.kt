@@ -104,6 +104,7 @@ class ChatPersonaGalleryTest {
         val base = PersonaProfile(
             id = "gallery-1",
             name = "小岚",
+            coreIdentity = "花店店主",
             portrait = "花店店主",
             stableTraits = listOf("嘴硬心软"),
             hardConstraints = listOf("不会无故失约"),
@@ -111,6 +112,7 @@ class ChatPersonaGalleryTest {
         val incoming = PersonaProfile(
             id = "temp",
             name = "小岚",
+            coreIdentity = "花店店主",
             portrait = "经营街角花店的店主",
             stableTraits = listOf("嘴硬心软", "遇到重要的人会主动解释"),
             hardConstraints = listOf("不会无故失约", "不拿感情问题开恶意玩笑"),
@@ -128,9 +130,11 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
-    fun sameNameDifferentWorldSettingsStaySeparate() {
-        val teyvat = PersonaProfile(name = "神里绫华", worldSetting = "提瓦特稻妻")
-        val modern = PersonaProfile(name = "神里绫华", worldSetting = "现代东京校园")
+    fun sameNameDifferentV4IdentityStaysSeparate() {
+        val teyvat = PersonaProfile(name = "神里绫华", franchise = "原神",
+            coreIdentity = "社奉行的大小姐")
+        val modern = PersonaProfile(name = "神里绫华", franchise = "原神",
+            coreIdentity = "现代都市的建筑师")
 
         assertFalse(samePersonaIdentity(teyvat, modern))
     }

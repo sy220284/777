@@ -218,6 +218,7 @@ suspend fun inspectGalleryPersona(
             profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
+            storyStage = story?.chatContext?.storyStage.orEmpty(),
         )
     }
 }

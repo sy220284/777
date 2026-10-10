@@ -31,6 +31,17 @@ class CharacterFactsV4Test {
         assertEquals("本人", restored.facts.single().perspective)
     }
 
+    @Test fun uncertainCoreFactsStayOutOfStableIdentityButRemainDiscoverableWithWarning() {
+        val persona = PersonaProfile(name = "阿岚", coreIdentity = "药师",
+            facts = listOf(CharacterFact("suspect", CharacterFactCategories.PERSONALITY,
+                "可能隐瞒一段旧事", provenance = CharacterFactProvenance.INFERRED)))
+        val projected = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(),
+                "你是不是隐瞒旧事？", null)
+        assertFalse(projected.stablePrompt.contains("可能隐瞒一段旧事"))
+        assertTrue(projected.dynamicPrompt.contains("推断，须保持不确定性"))
+    }
+
     @Test fun oneFactCanBeEditedWithoutCreatingASecondSource() {
         val profile = PersonaProfile(name = "叶澜")
             .withFact(CharacterFactCategories.PERSONALITY, "认真")

@@ -53,6 +53,7 @@ class PersonaInspectionService @Inject constructor(
         profileId: String? = null,
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
+        storyStage: String = "",
     ): PersonaInspectionResult {
         val dialogue = messages
             .filter { it.role == "user" || it.role == "assistant" }
@@ -70,8 +71,9 @@ class PersonaInspectionService @Inject constructor(
             appendLine("name：${persona.name}")
             appendField("coreIdentity", persona.coreIdentity)
             appendField("franchise", persona.franchise)
-            persona.facts.forEach { fact ->
-                appendField(fact.category, fact.content)
+            appendLine("当前故事阶段：${storyStage.ifBlank { "未指定" }}")
+            persona.visibleFacts(storyStage).forEach { fact ->
+                appendField("${fact.category}（${fact.provenance}；${fact.perspective}）", fact.content)
             }
             appendLine()
             appendLine("【真实对话】")

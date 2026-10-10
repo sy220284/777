@@ -78,7 +78,8 @@ class LocalChatUiFacade @Inject constructor(
         profileId: String?,
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
-    ): PersonaInspectionResult = inspection.inspect(model, baseUrl, profileId, persona, messages)
+        storyStage: String = "",
+    ): PersonaInspectionResult = inspection.inspect(model, baseUrl, profileId, persona, messages, storyStage)
 
     internal suspend fun generateGroupAnnouncement(
         model: String,

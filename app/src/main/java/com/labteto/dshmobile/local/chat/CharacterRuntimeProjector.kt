@@ -78,9 +78,9 @@ internal class CharacterRuntimeProjector(
             buildString {
                 appendLine("【人物】${persona.name}")
                 persona.coreIdentity.takeIf(String::isNotBlank)?.let { appendLine("稳定身份：${it.take(300)}") }
-                persona.factText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
+                persona.trustedFactText(CharacterFactCategories.PERSONALITY).takeIf(String::isNotBlank)
                     ?.let { appendLine("稳定性格：${it.take(180)}") }
-                persona.factText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
+                persona.trustedFactText(CharacterFactCategories.VALUES_AND_TRADEOFFS).takeIf(String::isNotBlank)
                     ?.let { appendLine("价值与取舍：${it.take(180)}") }
                 persona.franchise.takeIf(String::isNotBlank)?.let { appendLine("原作来源：${it.take(90)}") }
                 persona.timelinePosition.takeIf(String::isNotBlank)?.let { appendLine("当前剧情阶段：${it.take(120)}") }
@@ -221,7 +221,9 @@ internal class CharacterRuntimeProjector(
             CharacterFactCategories.VALUES_AND_TRADEOFFS,
         )
         val visible = persona.visibleFacts(storyStage)
-            .filter { it.category !in core && it.content.isNotBlank() }
+            .filter { it.content.isNotBlank() &&
+                (it.category !in core || it.provenance == CharacterFactProvenance.INFERRED ||
+                    it.provenance == CharacterFactProvenance.UNVERIFIED) }
         val direct = visible.filter { fact ->
             relevantTo(fact.content, query) || relevantTo(fact.category, query)
         }.take(3)

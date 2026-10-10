@@ -43,8 +43,10 @@ internal fun samePersonaIdentity(left: PersonaProfile, right: PersonaProfile): B
     val rightName = normalizePersonaText(right.name)
     if (leftName.isBlank() || rightName.isBlank() || leftName != rightName) return false
     if (leftName in DEFAULT_PERSONA_NAMES || rightName in DEFAULT_PERSONA_NAMES) return false
+    // V4 merges require an actual identity anchor; names and retired worldSetting text
+    // are insufficient to merge distinct people or alternate-universe variants.
+    if (left.coreIdentity.isBlank() || right.coreIdentity.isBlank()) return false
     return compatibleIdentityField(left.franchise, right.franchise) &&
-        compatibleIdentityField(left.worldSetting, right.worldSetting) &&
         compatibleIdentityField(left.coreIdentity, right.coreIdentity)
 }
 

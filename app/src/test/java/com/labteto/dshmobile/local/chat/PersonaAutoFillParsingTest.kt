@@ -87,6 +87,19 @@ class PersonaAutoFillParsingTest {
     }
 
     @Test
+    fun sameTitleWorldBookFactsAtDifferentStoryStagesStayIndependent() {
+        val old = PersonaLoreEntry(id = "same", title = "阿宁的身份",
+            content = "早期只知道阿宁是普通学徒", temporalScope = "act-1",
+            keywords = listOf("阿宁"))
+        val later = PersonaLoreEntry(id = "same", title = "阿宁的身份",
+            content = "第二幕才确认阿宁的真实身份", temporalScope = "act-2",
+            keywords = listOf("阿宁"))
+        val merged = mergeGeneratedLoreEntries(listOf(old), listOf(later))
+        assertEquals(2, merged.size)
+        assertEquals(setOf("act-1", "act-2"), merged.map { it.temporalScope }.toSet())
+    }
+
+    @Test
     fun extractsFirstBalancedObjectWithoutBeingConfusedByBracesInStrings() {
         val raw = """
             前置说明

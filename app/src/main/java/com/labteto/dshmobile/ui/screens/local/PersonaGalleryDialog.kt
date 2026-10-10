@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -964,6 +965,26 @@ internal fun PersonaGalleryScreen(
                             style = DsType.small13.withReadingWeight(),
                             color = DsTheme.colors.labelSecondary,
                         )
+                        // Let people reuse real stage IDs already present in facts and lore.
+                        // Typing an unfamiliar technical identifier should not be required.
+                        val stageChoices = (selected.persona.facts.map { it.temporalScope } +
+                            selected.persona.loreEntries.map { it.temporalScope })
+                            .map(String::trim).filter(String::isNotBlank).distinct().take(12)
+                        if (stageChoices.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                stageChoices.forEach { availableStage ->
+                                    DsButton(
+                                        text = availableStage,
+                                        onClick = { storyStage = availableStage },
+                                        variant = DsButtonVariant.Ghost,
+                                        enabled = !busy && !inspecting,
+                                    )
+                                }
+                            }
+                        }
 
                         if (notes != story.notes || storyStage.trim() != story.chatContext.storyStage) {
                             DsButton(
