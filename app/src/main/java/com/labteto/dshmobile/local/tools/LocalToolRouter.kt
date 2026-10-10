@@ -29,9 +29,9 @@ internal object LocalToolRouter {
         taskContext: String,
         limit: Int = MAX_TASK_PREACTIVATED_TOOLS,
     ): List<String> {
-        val normalized = taskContext
-            .takeLast(MAX_TASK_CONTEXT_CHARS)
-            .lowercase()
+        val normalized = (if (taskContext.length <= MAX_TASK_CONTEXT_CHARS) taskContext
+            else taskContext.take(MAX_TASK_CONTEXT_CHARS / 2) + "\n" +
+                taskContext.takeLast(MAX_TASK_CONTEXT_CHARS / 2)).lowercase()
         if (normalized.isBlank()) return emptyList()
 
         return tools.asSequence()
@@ -92,11 +92,14 @@ internal object LocalToolRouter {
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
-        val terms: Set<String> = Regex("[\\p{L}\\p{N}_-]{2,}")
-            .findAll(normalized)
-            .map { match -> match.value }
-            .take(24)
-            .toSet()
+        // Bound parsing work while preserving intent at both ends of a long request.
+        // A tool name appended after detailed instructions must remain discoverable.
+        val termPattern = Regex("[\\p{L}\\p{N}_-]{2,}")
+        val front = termPattern.findAll(normalized.take(MAX_CAPABILITY_QUERY_EDGE_CHARS))
+            .map { it.value }.take(12).toList()
+        val tail = termPattern.findAll(normalized.takeLast(MAX_CAPABILITY_QUERY_EDGE_CHARS))
+            .map { it.value }.toList().takeLast(12)
+        val terms = (front + tail).toSet()
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
         for (tool in tools) {
             if (!isOptional(tool)) continue
@@ -210,4 +213,5 @@ internal object LocalToolRouter {
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
     private const val MAX_TASK_PREACTIVATED_TOOLS = 16
     private const val MAX_TASK_CONTEXT_CHARS = 12_000
+    private const val MAX_CAPABILITY_QUERY_EDGE_CHARS = 4_096
 }

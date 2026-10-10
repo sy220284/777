@@ -98,6 +98,44 @@ class MemoryStoreTest {
         assertTrue(restarted.search("apples", setOf(MemoryScope.GLOBAL), null, "lineage").isEmpty())
     }
 
+    @Test fun longRelevantMemoryDoesNotHideOtherMemoriesOrOverwriteDurableFacts() {
+        val memoryStore = store()
+        val long = memoryStore.remember(
+            "target " + "history ".repeat(180) + "relevant detail",
+            MemoryScope.GLOBAL,
+            importance = 95,
+        )
+        val short = memoryStore.remember(
+            "target important short fact",
+            MemoryScope.GLOBAL,
+            importance = 20,
+        )
+        val result = memoryStore.search(
+            query = "target",
+            allowedScopes = setOf(MemoryScope.GLOBAL),
+            projectId = null,
+            lineageId = null,
+            maxItems = 4,
+            maxChars = 256,
+        )
+        assertEquals(setOf(long.id, short.id), result.map { it.id }.toSet())
+        assertTrue(result.sumOf { it.content.length + 32 } <= 256)
+        assertEquals(long.content, all(memoryStore).first { it.id == long.id }.content)
+    }
+
+    @Test fun largeMemoryIsPersistedExactlyAndOversizeIsRejectedWithoutDataLoss() {
+        val memoryStore = store()
+        val original = "关键决策：" + "长期信息 ".repeat(450) + "收尾标记"
+        val record = memoryStore.remember(original, MemoryScope.GLOBAL)
+        assertEquals(original, all(memoryStore).single().content)
+        val revised = original + "，续写已完成"
+        memoryStore.update(record.id, content = revised)
+        assertEquals(revised, all(store()).single().content)
+        val failure = runCatching { memoryStore.update(record.id, content = "过长".repeat(20_000)) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(revised, all(store()).single().content)
+    }
+
     @Test fun searchCanExcludeRelationshipMemories() {
         val memoryStore = store()
         memoryStore.remember(

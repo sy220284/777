@@ -181,12 +181,13 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 }
                 "补丁已应用" + stat.stdout.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
             }
-            "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
-            "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
+            "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3), args.int("cursor", 0))
+            "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".", args.int("cursor", 0))
             "grep", "search_text" -> workspace.search(
                 args.string("query"),
                 args.optionalString("path") ?: ".",
                 args.boolean("regex", false),
+                args.optionalString("cursor"),
             )
             "bash", "run_shell" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
@@ -285,8 +286,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 }
             }
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readModelSkill)
-                ?: workspace.modelSkillCatalog()
-            "list_skills" -> workspace.modelSkillCatalog()
+                ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
+            "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "read_skill" -> workspace.readModelSkill(args.string("name"))
             "session_search" -> sessionAccess.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->

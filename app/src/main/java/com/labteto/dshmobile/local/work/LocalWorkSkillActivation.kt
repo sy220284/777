@@ -24,12 +24,12 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
         """.trimIndent()
     }
 
-    val catalog = workspace.modelSkillCatalog()
+    val catalog = workspace.modelSkillCatalog(query = input, maxChars = 2_200)
     if (catalog.startsWith("未安装")) return ""
     return """
         [本地技能目录]
-        以下技能可通过 skill(name) 工具读取完整规则。若当前任务明显适用某项技能，请先读取，再执行。
-        ${catalog.take(2400)}
+        以下是当前任务优先的技能目录页；目录可能还有更多技能。可调用 skill(query, offset) 分页发现，或 skill(name) 读取完整规则。若明显适用，请先读取，再执行。
+        ${catalog}
         [目录结束]
     """.trimIndent()
 }

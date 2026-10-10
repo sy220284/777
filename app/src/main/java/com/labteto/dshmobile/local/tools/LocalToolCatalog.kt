@@ -39,15 +39,18 @@ object LocalToolCatalog {
         add(tool("list_files", "列出工作区目录", properties(
             "path" to string("相对路径，默认 ."),
             "depth" to integer("递归深度，1 到 8"),
+            "cursor" to integer("可选；目录扫描未完时返回的下一页游标"),
         )))
         add(tool("glob", "按 glob 模式发现工作区文件", properties(
             "pattern" to string("例如 **/*.kt"),
             "path" to string("相对路径，默认 ."),
+            "cursor" to integer("可选；目录扫描未完时返回的下一页游标"),
         ), listOf("pattern")))
         add(tool("grep", "在工作区文件中搜索文字；默认字面量，可指定正则表达式", properties(
             "query" to string("搜索内容；regex=true 时按正则表达式解析"),
             "path" to string("相对路径，默认 ."),
             "regex" to boolean("是否按正则表达式搜索，默认 false"),
+            "cursor" to string("可选；上次返回的搜索未完成游标，保持 query/path/regex 不变以继续扫描"),
         ), listOf("query")))
         add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
             "command" to string("shell 命令"),
@@ -149,8 +152,10 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("question")))
-        add(tool("skill", "列出技能，或读取指定技能的 SKILL.md", properties(
-            "name" to string("可选；留空列出技能，填写后读取技能"),
+        add(tool("skill", "列出可由模型调用的技能（支持分页和任务关键词），或读取指定技能的 SKILL.md", properties(
+            "name" to string("可选；填写后精确读取技能规则"),
+            "query" to string("可选；按当前任务内容优先展示相关技能；分页时保持一致"),
+            "offset" to integer("可选；继续上次技能目录的 offset，默认 0"),
         )))
         add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),

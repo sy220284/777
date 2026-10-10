@@ -35,16 +35,41 @@ class CharacterLoreEngine @Inject constructor() {
             .map { it.first }
             .toList()
 
+        val characterBudget = maxChars.coerceIn(400, 6_000)
+        val entryLimit = maxItems.coerceIn(1, 12)
         var used = 0
         val selected = mutableListOf<PersonaLoreEntry>()
         for (entry in candidates) {
-            val cost = entry.title.length + entry.content.length + 24
-            if (selected.isNotEmpty() && used + cost > maxChars.coerceIn(400, 6_000)) break
-            selected += entry
+            if (selected.size >= entryLimit) break
+            val remaining = characterBudget - used - entry.title.length - 24
+            if (remaining <= 0) continue
+
+            // A long high-priority entry must not prevent shorter relevant lore from being considered.
+            // Keep the canonical persona entry untouched; only project a bounded excerpt for this turn.
+            val projected = if (entry.content.length <= remaining) entry else {
+                val excerptBudget = minOf(remaining, maxOf(160, characterBudget / minOf(entryLimit, 3)))
+                if (excerptBudget < 40) continue
+                entry.copy(content = relevantLoreExcerpt(entry.content, query, excerptBudget))
+            }
+            val cost = projected.title.length + projected.content.length + 24
+            if (cost > characterBudget - used) continue
+            selected += projected
             used += cost
-            if (selected.size >= maxItems.coerceIn(1, 12)) break
         }
         return selected
+    }
+
+    private fun relevantLoreExcerpt(content: String, query: String, limit: Int): String {
+        if (content.length <= limit) return content
+        val queryTerms = terms(query).filter { it.length >= 2 }
+        val matched = queryTerms.asSequence().map { content.indexOf(it, ignoreCase = true) }
+            .firstOrNull { it >= 0 } ?: 0
+        val available = (limit - 2).coerceAtLeast(1)
+        val start = (matched - available / 3).coerceIn(0, content.length - available)
+        val end = start + available
+        return (if (start > 0) "…" else "") +
+            content.substring(start, end) +
+            (if (end < content.length) "…" else "")
     }
 
     fun prompt(
