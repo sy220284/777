@@ -16,12 +16,12 @@ class ChatDiaryRecallPolicyTest {
 
 
     @Test
-    fun groupRecallKeepsPrivateDiaryOutOfPromptAndInnerNarrativeBounded() {
+    fun groupRecallSelectsRelevantIndividualMemoryWithoutBroadcasting() {
         val instruction = diaryRecallUsageInstruction(groupAudience = true)
-        assertTrue(instruction.contains("只能使用 disclosure=PUBLIC"))
-        assertTrue(instruction.contains("PRIVATE 与 SHAREABLE 都不得进入群聊 Prompt"))
-        assertTrue(instruction.contains("不代表其他成员此前已经知情"))
-        assertTrue(instruction.contains("不得回潮"))
+        assertTrue(instruction.contains("按当前问题关联性选取"))
+        assertTrue(instruction.contains("其他成员不会自动获得此人物的完整记忆"))
+        assertTrue(instruction.contains("只能听到实际说出口的话"))
+        assertTrue(instruction.contains("不得作为当前有效事实回潮"))
     }
 
     @Test

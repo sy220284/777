@@ -91,76 +91,51 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun groupProjectionNeverExposesPrivateThoughtsFromPublicDiaryEvent() {
+    fun sameCharacterCanUseFullRelatedDiaryInBothChatModes() {
         val entry = ChatDiaryEntry(
-            id = "public-event", subjectKey = "gallery:a", personaName = "阿青",
-            event = "大家公开决定去海边", feeling = "我其实很害怕",
-            innerThought = "我打算单独离开",
-            relationshipMeaning = "我开始不再信任朋友",
-            unresolvedEcho = "还没说出口的计划",
-            disclosure = ChatDiaryDisclosure.PUBLIC,
+            id = "experience", subjectKey = "gallery:a", personaName = "阿青",
+            event = "大家约好去海边", feeling = "我其实有点紧张",
+            innerThought = "我想带一本书", relationshipMeaning = "关系更亲近",
+            unresolvedEcho = "还没定出发时间", disclosure = ChatDiaryDisclosure.SHAREABLE,
             createdAt = 1L, updatedAt = 2L,
         )
         val group = renderRecalledChatDiary(entry, groupAudience = true)
         val direct = renderRecalledChatDiary(entry, groupAudience = false)
-        assertTrue(group.contains("大家公开决定去海边"))
-        assertTrue(!group.contains("很害怕"))
-        assertTrue(!group.contains("单独离开"))
-        assertTrue(!group.contains("不再信任"))
-        assertTrue(!group.contains("没说出口"))
-        assertTrue(direct.contains("我其实很害怕"))
-        assertTrue(direct.contains("我打算单独离开"))
+        assertEquals(direct, group)
+        assertTrue(group.contains("海边"))
+        assertTrue(group.contains("有点紧张"))
+        assertTrue(group.contains("想带一本书"))
     }
 
     @Test
-    fun groupRecallAcceptsOnlyPublicDiaryAndNeverPrivateOrShareable() {
+    fun groupAndDirectSelectRelatedMemoriesWithoutOtherCharacterOrUnrelatedEvents() {
         val memory = store()
         memory.record(request(
-            delta = ChatDiaryDelta(
-                event = "用户说他一直喜欢雨天散步",
-                feeling = "我觉得这个小习惯很像他",
-                innerThought = "以后下雨时我大概会想起这句话",
-                importance = 3,
-                disclosure = "SHAREABLE",
-            ),
-            evidence = "用户说他一直喜欢雨天散步，角色说以后下雨会想到这句话",
+            delta = ChatDiaryDelta(event = "用户喜欢雨天散步",
+                feeling = "下雨我会想到这件事", importance = 3, disclosure = "SHAREABLE"),
+            evidence = "用户喜欢雨天散步，下雨我会想到这件事",
         ))
         memory.record(request(
-            delta = ChatDiaryDelta(
-                event = "用户说他喜欢海边，并明确说群里可以提",
-                feeling = "我觉得这个偏好挺容易记住",
-                innerThought = "以后聊旅行时可以自然提到",
-                importance = 3,
-                disclosure = "PUBLIC",
-            ),
-            userId = "u-public",
-            assistantId = "a-public",
-            evidence = "用户说他喜欢海边，并明确说群里可以提，可以告诉大家",
+            delta = ChatDiaryDelta(event = "两人说起了山顶的观星台",
+                feeling = "很有趣", importance = 3),
+            userId = "u-star", assistantId = "a-star",
+            evidence = "两人说起了山顶的观星台，很有趣",
         ))
         memory.record(request(
-            delta = ChatDiaryDelta(
-                event = "用户私下告诉我他准备给朋友一个惊喜",
-                feeling = "我有点替他兴奋，也知道这件事不能说出去",
-                innerThought = "在惊喜揭晓前，我得把这件事藏好",
-                importance = 4,
-                disclosure = "PRIVATE",
-            ),
-            userId = "u-secret",
-            assistantId = "a-secret",
-            evidence = "用户私下告诉我他准备给朋友一个惊喜，并说先别告诉别人",
-        ))
-
-        val groupRecall = memory.search("你还记得我喜欢什么吗", "gallery:a", groupAudience = true, maxItems = 6)
-        assertEquals(1, groupRecall.size)
-        assertTrue(groupRecall.single().event.contains("海边"))
-        assertEquals(ChatDiaryDisclosure.PUBLIC, groupRecall.single().disclosure)
-
-        val directRecall = memory.search("之前我跟你说过的惊喜", "gallery:a", groupAudience = false, maxItems = 6)
-        assertTrue(directRecall.any { it.event.contains("惊喜") })
+            delta = ChatDiaryDelta(event = "另一个人物也喜欢雨天散步",
+                feeling = "记住了", importance = 3),
+            userId = "u-other", assistantId = "a-other",
+            evidence = "另一个人物也喜欢雨天散步",
+        ).copy(subjectKey = "gallery:b", personaName = "阿紫"))
+        val group = memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 6)
+        val direct = memory.search("雨天散步", "gallery:a", groupAudience = false, maxItems = 6)
+        assertTrue(group.any { it.event.contains("用户喜欢雨天散步") })
+        assertTrue(group.none { it.event.contains("观星台") || it.subjectKey == "gallery:b" })
+        assertEquals(direct.map(ChatDiaryEntry::id), group.map(ChatDiaryEntry::id))
     }
 
     @Test
-    fun privateDiaryCanBeExplicitlyReleasedToGroupAndRelockedLater() {
+    fun diaryNotesStayRecallableAcrossModesAfterMetadataChanges() {
         val memory = store()
         memory.record(request(
             delta = ChatDiaryDelta(
@@ -200,7 +175,7 @@ class ChatDiaryStoreTest {
             evidence = "用户说：辞职这件事还是先别告诉别人，不要公开。",
         ))
         assertEquals(ChatDiaryDisclosure.PRIVATE, relocked?.disclosure)
-        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isNotEmpty())
         assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
     }
 
@@ -249,7 +224,7 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun directPublicRequestWithoutExplicitPermissionIsDowngradedAndCannotEnterGroup() {
+    fun storedDiarySharingLabelDoesNotBlockRelevantRecall() {
         val memory = store()
         val saved = memory.record(request(
             delta = ChatDiaryDelta(
@@ -263,7 +238,7 @@ class ChatDiaryStoreTest {
         ))
 
         assertEquals(ChatDiaryDisclosure.SHAREABLE, saved?.disclosure)
-        assertTrue(memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 3).isNotEmpty())
     }
 
     @Test
@@ -281,12 +256,12 @@ class ChatDiaryStoreTest {
         ))
 
         assertEquals(ChatDiaryDisclosure.PRIVATE, saved?.disclosure)
-        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isNotEmpty())
         assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
     }
 
     @Test
-    fun explicitPublicAuthorizationCreatesSeparatePublicEntryWithoutRelaxingEarlierBoundary() {
+    fun separateNotesRemainRecallableAcrossBothModes() {
         val memory = store()
         memory.record(request(
             delta = ChatDiaryDelta(
@@ -318,8 +293,8 @@ class ChatDiaryStoreTest {
             all.map(ChatDiaryEntry::disclosure).toSet(),
         )
         val groupRecall = memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 6)
-        assertEquals(1, groupRecall.size)
-        assertEquals(ChatDiaryDisclosure.PUBLIC, groupRecall.single().disclosure)
+        assertTrue(groupRecall.any { it.disclosure == ChatDiaryDisclosure.PUBLIC })
+        assertTrue(groupRecall.any { it.disclosure == ChatDiaryDisclosure.SHAREABLE })
     }
 
     @Test
@@ -422,7 +397,7 @@ class ChatDiaryStoreTest {
         ))
 
         assertEquals(ChatDiaryDisclosure.PRIVATE, saved?.disclosure)
-        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isNotEmpty())
         assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
     }
 

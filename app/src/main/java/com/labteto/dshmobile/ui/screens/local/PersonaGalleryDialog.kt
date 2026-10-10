@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -466,7 +467,7 @@ internal fun PersonaGalleryScreen(
                         onValueChange = { storyTitle = it },
                         label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("personaGalleryStoryTitleInput"),
                         enabled = !busy,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -957,7 +958,7 @@ internal fun PersonaGalleryScreen(
                             onValueChange = { storyStage = it.take(160) },
                             label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().testTag("personaGalleryStoryStageInput"),
                             enabled = !busy && !inspecting,
                         )
                         Text(

@@ -16,7 +16,7 @@
     <string name="local_persona_ai_failed">这次没能生成人设。请再试一次，如果一直失败，可以检查 AI 模型是否能正常使用。</string>
     <string name="local_persona_ai_example">例如：神里绫人，保留原作气质，和我更亲近一点，说话自然，别有客服腔。</string>
     <string name="persona_v4_story_stage_label">当前剧情阶段</string>
-    <string name="persona_v4_story_stage_hint">可选择已有阶段或输入自定义标识。进入新阶段会保留此前已知剧情；选择曾经访问的较早阶段会撤销其后的知识授权。留空恢复基础知识。空闲故事保存后立即生效，回复中重新进入故事生效。</string>
+    <string name="persona_v4_story_stage_hint">可选择已有阶段或输入自定义标识。阶段调整控制人物设定与世界书的可用范围，返回较早阶段会收回后续阶段设定的解锁。已发生的聊天与人物经历不会清空；要重新经历剧情，请新建故事。空闲故事保存后立即生效，回复中重新进入故事生效。</string>
     <string name="persona_vnext_saved_stage_path">当前故事已保存的知识路径：%1$s</string>
     <string name="persona_v4_fact_stage">适用剧情阶段 ID（空白为基础事实）</string>
     <string name="persona_v4_fact_perspective">事实陈述视角（可选）</string>

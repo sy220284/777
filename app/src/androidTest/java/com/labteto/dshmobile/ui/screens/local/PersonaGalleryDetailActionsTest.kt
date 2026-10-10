@@ -93,7 +93,7 @@ class PersonaGalleryDetailActionsTest {
         openDetail()
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("重命名故事").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("未保存名称")
+        compose.onNodeWithTag("personaGalleryStoryTitleInput").performTextInput("未保存名称")
         // Renaming is inline in the actions sheet: cancel the edit, then close the sheet.
         // Device Back may first dismiss the IME without cancelling the inline edit.
         compose.onAllNodesWithText("取消").onFirst().performClick()
@@ -110,7 +110,7 @@ class PersonaGalleryDetailActionsTest {
     fun stageEditorBlocksStorySwitchAndSavesThroughTheRealCallback() {
         savedStoryStage = null
         openDetail()
-        compose.onNode(hasSetTextAction()).performTextInput("act-2")
+        compose.onNodeWithTag("personaGalleryStoryStageInput").performTextInput("act-2")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
         compose.onNodeWithText("保存剧情提要").performScrollTo().performClick()
         compose.waitForIdle()

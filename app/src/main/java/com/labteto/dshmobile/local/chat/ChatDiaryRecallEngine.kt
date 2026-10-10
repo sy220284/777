@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 internal object ChatDiaryRecallEngine {
+    @Suppress("UNUSED_PARAMETER")
     fun search(
         entries: List<ChatDiaryEntry>,
         query: String,
@@ -21,8 +22,7 @@ internal object ChatDiaryRecallEngine {
             .filter { entry ->
                 entry.active &&
                     entry.subjectKey == cleanSubject &&
-                    (entry.supersededBy == null || historical) &&
-                    (!groupAudience || canExposeDiaryToGroup(entry.disclosure))
+                    (entry.supersededBy == null || historical)
             }
             .toList()
 
