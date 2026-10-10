@@ -64,13 +64,17 @@ class DiagnosticReportTest {
     @Test
     fun diagnosticSanitizerRedactsCommonCredentialShapes() {
         val text = sanitizeDiagnosticText(
-            "Authorization: Bearer abc api_key=xyz github_pat_123456789 secret='hidden'",
+            "Authorization: Bearer abc api_key=xyz github_pat_123456789 secret='hidden' " +
+                "https://api.test?access_token=visible123&mode=fast " +
+                "Cookie: session=rawcookie",
         )
 
         assertFalse(text.contains("abc"))
         assertFalse(text.contains("xyz"))
         assertFalse(text.contains("github_pat_123456789"))
         assertFalse(text.contains("hidden"))
+        assertFalse(text.contains("visible123"))
+        assertFalse(text.contains("rawcookie"))
         assertTrue(text.count { it == '<' } >= 4)
     }
 }
