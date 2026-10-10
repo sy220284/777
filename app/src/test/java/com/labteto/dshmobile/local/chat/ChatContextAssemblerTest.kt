@@ -30,6 +30,20 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun implicitRecallNeverBorrowsPendingEvidenceFromDiscardedGeneration() {
+        val context = ChatContextState(
+            generation = 3L,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 12, generation = 2L, userMessage = "旧分支里答应去机场",
+            )),
+            continuity = ChatContinuityState(unfinished = listOf("现在在城南等修表师傅")),
+        )
+        val query = ChatMemorySelector.semanticQuery("那以后发生什么", "小宁", context)
+        assertFalse(query.contains("旧分支里答应去机场"))
+        assertTrue(query.contains("现在在城南等修表师傅"))
+    }
+
+    @Test
     fun explicitTopicAndResetDoNotBorrowPreviousTopic() {
         val context = ChatContextState(continuity = ChatContinuityState(unfinished = listOf("修手表")))
         assertFalse(ChatMemorySelector.semanticQuery("你记得我喜欢什么花吗", "小宁", context).contains("修手表"))
