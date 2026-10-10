@@ -24,7 +24,8 @@ internal object ChatDiarySupersessionPolicy {
         replacementIds: Set<String>,
         now: Long,
     ): List<ChatDiaryEntry> {
-        val predecessors = entries.filter { it.supersededBy != null }.groupBy { it.supersededBy }
+        val normalized = repairLinks(entries)
+        val predecessors = normalized.filter { it.supersededBy != null }.groupBy { it.supersededBy }
         val retained = hashSetOf<String>()
         val pending = ArrayDeque<String>().apply { addAll(replacementIds) }
         while (pending.isNotEmpty()) {
@@ -32,7 +33,7 @@ internal object ChatDiarySupersessionPolicy {
                 if (retained.add(entry.id)) pending.add(entry.id)
             }
         }
-        return entries.map { entry ->
+        return normalized.map { entry ->
             if (entry.id in retained && !entry.supersessionRetained) {
                 entry.copy(supersessionRetained = true, updatedAt = maxOf(now, entry.updatedAt + 1))
             } else entry

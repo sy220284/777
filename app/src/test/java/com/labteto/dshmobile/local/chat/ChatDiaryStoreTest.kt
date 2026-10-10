@@ -14,6 +14,20 @@ import org.junit.rules.TemporaryFolder
 class ChatDiaryStoreTest {
 
     @Test
+    fun userDecisionDoesNotPreserveAnInvalidLegacySupersessionLink() {
+        val old = ChatDiaryEntry(id = "old", subjectKey = "gallery:a", personaName = "阿青",
+            event = "用户喜欢在雨天散步", supersededBy = "unrelated", createdAt = 1, updatedAt = 1)
+        val unrelated = old.copy(id = "unrelated", event = "用户喜欢在雨天散步",
+            disclosure = ChatDiaryDisclosure.PRIVATE, supersededBy = null)
+        val normalized = ChatDiarySupersessionPolicy.retainHistoryBeforeUserDecision(
+            listOf(old, unrelated), setOf(unrelated.id), 2,
+        ).first()
+        assertNull(normalized.supersededBy)
+        assertTrue(!normalized.supersessionRetained)
+        assertTrue(ChatDiaryRecallEngine.search(listOf(normalized), "用户喜欢雨天散步", "gallery:a", false, 6).isNotEmpty())
+    }
+
+    @Test
     fun invalidatingReplacementSourceDoesNotRestoreTheObsoleteAppointment() {
         val diary = store()
         val oldEvent = "两人约定周六上午十点在南门钟楼见面"
