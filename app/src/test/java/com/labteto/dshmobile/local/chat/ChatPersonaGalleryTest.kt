@@ -156,6 +156,46 @@ class ChatPersonaGalleryTest {
     }
 
     @Test
+    fun galleryKnowledgePathSurvivesStaleSaveAndExplicitRewind() {
+        val file = File(temporary.newFolder("stage-knowledge-path"), "gallery.json")
+        val store = ChatPersonaGalleryStore(file, json)
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "旅行者")
+        val created = store.save(
+            persona = persona, sourceSessionId = "session",
+            history = listOf(LocalHarnessMessage("first", "user", "第一幕", createdAt = 1L)),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState().withStoryStageSelection("opening"),
+        )
+        val id = created.entry.id
+        val storyId = requireNotNull(created.storyId)
+        assertTrue(store.updateStoryDetails(id, storyId, "", "later"))
+        fun saved() = ChatPersonaGalleryStore(file, json).findEntry(id)!!.story(storyId)!!.chatContext
+        assertEquals(listOf("opening", "later"), saved().unlockedStoryStages)
+
+        // An in-flight snapshot created before the manual stage edit cannot rewrite authority.
+        store.save(
+            persona = persona, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "opening"),
+            existingId = id, existingStoryId = storyId,
+        )
+        assertEquals(listOf("opening", "later"), saved().unlockedStoryStages)
+        assertEquals("later", saved().storyStage)
+
+        assertTrue(store.updateStoryDetails(id, storyId, "", "opening"))
+        assertEquals(listOf("opening"), saved().unlockedStoryStages)
+        assertTrue(store.updateStoryDetails(id, storyId, "", ""))
+        store.save(
+            persona = persona, sourceSessionId = "session", history = emptyList(),
+            chatState = ChatCharacterState(), notes = "",
+            chatContext = ChatContextState(storyStage = "later"),
+            existingId = id, existingStoryId = storyId,
+        )
+        assertEquals("", saved().storyStage)
+        assertTrue(saved().unlockedStoryStages.isEmpty())
+    }
+
+    @Test
     fun storyStageSurvivesGallerySaveReloadAndResave() {
         val file = File(temporary.newFolder("stage-roundtrip"), "gallery.json")
         val gallery = ChatPersonaGalleryStore(file, json)
