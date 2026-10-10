@@ -586,7 +586,20 @@ internal fun PersonaDetails(persona: PersonaProfile) {
                 "customFacts" -> R.string.persona_v4_custom_facts
                 else -> null
             }
-            PersonaDetailRow(labelRes?.let { stringResource(it) } ?: fact.category, fact.content)
+            val metadata = buildList {
+                when (fact.provenance) {
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.INFERRED -> add("推断")
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.UNVERIFIED -> add("待核实")
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.CANON -> add("原作")
+                    com.labteto.dshmobile.local.chat.CharacterFactProvenance.USER_CREATED -> add("作者设定")
+                }
+                fact.temporalScope.takeIf(String::isNotBlank)?.let { add("剧情阶段：$it") }
+            }
+            val label = labelRes?.let { stringResource(it) } ?: fact.category
+            PersonaDetailRow(
+                "$label · ${metadata.joinToString(" · ")}",
+                fact.content + fact.sourceReference.takeIf(String::isNotBlank)?.let { "\n出处：$it" }.orEmpty(),
+            )
         }
         if (persona.loreEntries.isNotEmpty()) {
             PersonaDetailRow(

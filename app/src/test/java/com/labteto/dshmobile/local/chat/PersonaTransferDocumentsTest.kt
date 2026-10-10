@@ -65,6 +65,10 @@ class PersonaTransferDocumentsTest {
             entry.copy(
                 persona = entry.persona.copy(
                     coreIdentity = "旅行摄影师",
+                    loreEntries = listOf(PersonaLoreEntry(
+                        id = "later-lore", title = "第二幕世界书",
+                        content = "后来出现的另一座城市", keywords = listOf("城市"),
+                        temporalScope = "act-2")),
                     facts = listOf(
                         CharacterFact("choice", CharacterFactCategories.DEFINING_CHOICES,
                             "决定辞职旅行", relatedFactIds = listOf("memory"),
@@ -88,6 +92,7 @@ class PersonaTransferDocumentsTest {
                 val imported = ChatPersonaGalleryStore(destination, json)
                     .importPersonaDocument(bytes, fileName, format.mimeType)
                 assertEquals(source.persona.facts, imported.persona.facts)
+                assertEquals(source.persona.loreEntries, imported.persona.loreEntries)
                 assertEquals(source.persona.coreIdentity, imported.persona.coreIdentity)
                 assertEquals("act-2", imported.stories.single().chatContext.storyStage)
                 assertEquals("挚友", imported.stories.single().chatState.relationshipState)
@@ -95,6 +100,7 @@ class PersonaTransferDocumentsTest {
                 val reloaded = ChatPersonaGalleryStore(destination, json)
                     .findEntry(imported.id)!!
                 assertEquals(source.persona.facts, reloaded.persona.facts)
+                assertEquals(source.persona.loreEntries, reloaded.persona.loreEntries)
                 assertEquals("act-2", reloaded.stories.single().chatContext.storyStage)
 
                 val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())

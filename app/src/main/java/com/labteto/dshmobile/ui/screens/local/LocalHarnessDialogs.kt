@@ -495,31 +495,12 @@ internal fun ChatPersonaDialog(
 ) {
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
-    var portrait by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.portrait) }
     var coreIdentity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreIdentity) }
     var factDrafts by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.facts) }
     var customCategory by rememberSaveable(profile.id) { mutableStateOf("") }
     var customContent by rememberSaveable(profile.id) { mutableStateOf("") }
-    var lifeContext by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.lifeContext) }
-    var attention by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionBiases.joinToString("\n")) }
-    var attentionKeywords by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionKeywords.joinToString("\n")) }
-    var blindSpots by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.perceptionBlindSpots.joinToString("\n")) }
-    var quirks by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.quirks.joinToString("\n")) }
-    var limitations by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.limitations.joinToString("\n")) }
-    var coreValues by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreValues.joinToString("\n")) }
-    var coreTension by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreTension) }
-    var stableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.stableTraits.joinToString("\n")) }
-    var mutableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.mutableTraits.joinToString("\n")) }
-    var initialUserImpression by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.initialUserImpression) }
-    var voiceSamples by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.voiceSamples.joinToString("\n")) }
-    var worldSetting by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.worldSetting) }
     var franchise by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.franchise) }
-    var timelinePosition by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.timelinePosition) }
-    var knowledgeBoundary by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.knowledgeBoundary.joinToString("\n")) }
     var loreEntries by remember(profile.id, profile.updatedAt) { mutableStateOf(profile.loreEntries) }
-    var constraints by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.hardConstraints.joinToString("\n")) }
-    var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
-    var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
     val bundledPreset = remember(profile.presetId) { PersonaPresetCatalog.find(profile.presetId) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
     var advancedOpen by rememberSaveable(profile.id, creatingNew) { mutableStateOf(false) }
@@ -531,37 +512,13 @@ internal fun ChatPersonaDialog(
     val coroutineScope = rememberCoroutineScope()
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    fun lines(value: String): List<String> = value.lineSequence()
-        .map(String::trim)
-        .filter(String::isNotBlank)
-        .toList()
-
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
-        portrait = generated.portrait
         coreIdentity = generated.coreIdentity
         factDrafts = generated.facts
-        lifeContext = generated.lifeContext
-        attention = generated.attentionBiases.joinToString("\n")
-        attentionKeywords = generated.attentionKeywords.joinToString("\n")
-        blindSpots = generated.perceptionBlindSpots.joinToString("\n")
-        quirks = generated.quirks.joinToString("\n")
-        limitations = generated.limitations.joinToString("\n")
-        coreValues = generated.coreValues.joinToString("\n")
-        coreTension = generated.coreTension
-        stableTraits = generated.stableTraits.joinToString("\n")
-        mutableTraits = generated.mutableTraits.joinToString("\n")
-        initialUserImpression = generated.initialUserImpression
-        voiceSamples = generated.voiceSamples.joinToString("\n")
-        worldSetting = generated.worldSetting
         franchise = generated.franchise
-        timelinePosition = generated.timelinePosition
-        knowledgeBoundary = generated.knowledgeBoundary.joinToString("\n")
         loreEntries = generated.loreEntries
-        constraints = generated.hardConstraints.joinToString("\n")
-        banned = generated.bannedPhrases.joinToString("\n")
-        corrections = generated.corrections.joinToString("\n")
     }
 
     DsBottomSheet(
@@ -585,27 +542,8 @@ internal fun ChatPersonaDialog(
                                 name = name,
                                 coreIdentity = coreIdentity,
                                 facts = factDrafts,
-                                portrait = portrait,
-                                lifeContext = lifeContext,
-                                attentionBiases = lines(attention),
-                                attentionKeywords = lines(attentionKeywords),
-                                perceptionBlindSpots = lines(blindSpots),
-                                quirks = lines(quirks),
-                                limitations = lines(limitations),
-                                coreValues = lines(coreValues),
-                                coreTension = coreTension,
-                                stableTraits = lines(stableTraits),
-                                mutableTraits = lines(mutableTraits),
-                                initialUserImpression = initialUserImpression,
-                                voiceSamples = lines(voiceSamples),
-                                worldSetting = worldSetting,
                                 franchise = franchise,
-                                timelinePosition = timelinePosition,
-                                knowledgeBoundary = lines(knowledgeBoundary),
                                 loreEntries = loreEntries.filter { it.content.isNotBlank() },
-                                hardConstraints = lines(constraints),
-                                bannedPhrases = lines(banned),
-                                corrections = lines(corrections),
                             ),
                         )
                     }.getOrElse { Result.failure(it) }

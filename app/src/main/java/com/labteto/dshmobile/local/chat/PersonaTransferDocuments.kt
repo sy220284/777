@@ -240,6 +240,8 @@ internal object PersonaTransferDocuments {
                         .filter(String::isNotBlank)
                         .distinct()
                     if (keywords.isNotEmpty()) add(DocLine("关键词：${keywords.joinToString("、")}"))
+                    lore.temporalScope.takeIf(String::isNotBlank)?.let { add(DocLine("适用剧情阶段：$it")) }
+                    if (lore.spoilerLevel > 0) add(DocLine("剧透等级：${lore.spoilerLevel}"))
                 }
             }
 

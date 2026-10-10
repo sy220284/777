@@ -20,6 +20,8 @@ class LocalChatWebContextProviderTest {
         val lookup = chatWebLookup("原作里神里绫华和托马具体是什么关系？", ayaka)
         assertTrue(lookup is ChatWebLookup.Search)
         assertTrue((lookup as ChatWebLookup.Search).query.contains("原神 神里绫华"))
+        assertTrue(lookup.cacheable)
+        assertFalse((chatWebLookup("今天最新新闻") as ChatWebLookup.Search).cacheable)
         assertNull(chatWebLookup("绫华，我们今天去街上走走吧", ayaka))
         assertNull(chatWebLookup("我们今天讨论原作剧情", ayaka))
         assertNull(chatWebLookup("原作里托马和绫华具体是什么关系？"))

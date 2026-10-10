@@ -97,11 +97,15 @@ internal fun mergeGeneratedLoreEntries(
                 spoilerLevel = maxOf(old.spoilerLevel, next.spoilerLevel),
             )
         } else {
-            merged += next.copy(
-                id = next.id.ifBlank {
-                    "ai-lore-${(next.title.ifBlank { next.content.take(80) } + next.temporalScope).hashCode().toUInt().toString(16)}"
-                },
-            )
+            val incomingId = next.id.ifBlank {
+                "ai-lore-${(next.title.ifBlank { next.content.take(80) } + next.temporalScope).hashCode().toUInt().toString(16)}"
+            }
+            // A source can reuse its ID for distinct plot stages. Do not let later
+            // document normalization drop either stage's independent world-book entry.
+            val uniqueId = if (merged.any { it.id == incomingId }) {
+                "${incomingId}-${merged.size}"
+            } else incomingId
+            merged += next.copy(id = uniqueId)
         }
     }
     return merged.take(80)

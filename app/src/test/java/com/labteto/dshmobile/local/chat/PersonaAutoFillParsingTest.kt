@@ -97,6 +97,7 @@ class PersonaAutoFillParsingTest {
         val merged = mergeGeneratedLoreEntries(listOf(old), listOf(later))
         assertEquals(2, merged.size)
         assertEquals(setOf("act-1", "act-2"), merged.map { it.temporalScope }.toSet())
+        assertEquals(2, merged.map { it.id }.distinct().size)
     }
 
     @Test
