@@ -110,20 +110,23 @@ internal class DurableSessionCatalog(
         root.listFiles().orEmpty().asSequence()
             .filter(File::isFile)
             .forEach { file ->
-                val id = candidateIdentity(file.name) ?: return@forEach
-                if (documentHasIdentity(file, id)) discovered += id
+                // ".backup" is a legal part of a session ID, too. A backup-shaped filename
+                // must not conceal a real session named "foo.backup": prefer document identity.
+                candidateIdentities(file.name)
+                    .firstOrNull { candidate -> documentHasIdentity(file, candidate) }
+                    ?.let(discovered::add)
             }
         return discovered
     }
 
-    private fun candidateIdentity(name: String): String? {
+    private fun candidateIdentities(name: String): List<String> {
         // Path reconstruction is limited to ONE-TIME migration, never ordinary enumeration.
-        val id = when {
-            name.endsWith(BACKUP_SUFFIX) -> name.removeSuffix(BACKUP_SUFFIX)
-            name.endsWith(SESSION_SUFFIX) -> name.removeSuffix(SESSION_SUFFIX)
-            else -> return null
+        // For unwrapped documents lacking an ID, the backup interpretation is preferred.
+        val candidates = buildList {
+            if (name.endsWith(BACKUP_SUFFIX)) add(name.removeSuffix(BACKUP_SUFFIX))
+            if (name.endsWith(SESSION_SUFFIX)) add(name.removeSuffix(SESSION_SUFFIX))
         }
-        return id.takeIf(SESSION_ID_PATTERN::matches)
+        return candidates.distinct().filter(SESSION_ID_PATTERN::matches)
     }
 
     private fun documentHasIdentity(file: File, id: String): Boolean {
