@@ -495,8 +495,36 @@ class ChatPersonaGalleryTest {
 
         val merged = applyPersonaSuggestions(profile, listOf(suggestion, phrase, phrase))
 
-        assertEquals("和用户是多年好友；私下会叫用户小名", merged.initialUserImpression)
-        assertEquals(listOf("少来"), merged.voiceSamples)
+        assertEquals("", merged.initialUserImpression)
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("和用户是多年好友"))
+        assertTrue(merged.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            .contains("私下会叫用户小名"))
+        assertEquals("少来", merged.factText(CharacterFactCategories.VOICE_STYLE))
+        assertEquals(1, merged.facts.count {
+            it.category == CharacterFactCategories.VOICE_STYLE && it.content == "少来"
+        })
+    }
+
+    @Test
+    fun legacySuggestionNamesAppendToV4FactsWithoutOverwritingExistingUserFacts() {
+        val current = PersonaProfile(name = "小岚", coreIdentity = "设计师",
+            facts = listOf(CharacterFact("authored", CharacterFactCategories.PERSONALITY,
+                "平日沉稳", provenance = CharacterFactProvenance.USER_CREATED)))
+        val suggestions = listOf(
+            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "用户直接修正"),
+            PersonaAppendSuggestion("attentionBiases", "很在意钟表声音", "人物自己的观察"),
+            PersonaAppendSuggestion("lifeContext", "在独立工作室上班", "用户补充"),
+            PersonaAppendSuggestion("stableTraits", "遇到朋友时会开玩笑", "重复建议"),
+        )
+        val result = applyPersonaSuggestions(current, suggestions)
+        assertEquals(current.facts.first(), result.facts.first())
+        assertTrue(result.factText(CharacterFactCategories.PERSONALITY).contains("遇到朋友时会开玩笑"))
+        assertTrue(result.factText(CharacterFactCategories.SENSORY_SIGNATURE).contains("钟表声音"))
+        assertTrue(result.factText(CharacterFactCategories.LIFE_GRAVITY).contains("独立工作室"))
+        assertEquals(1, result.facts.count { it.content == "遇到朋友时会开玩笑" })
+        assertEquals("", result.lifeContext)
+        assertEquals("", result.attentionBiases.joinToString())
     }
 
     @Test
