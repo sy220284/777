@@ -419,7 +419,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.map { story ->
                 if (story.id == storyId) story.copy(
                     notes = notes.trim().take(4_000),
-                    chatContext = story.chatContext.copy(storyStage = storyStage.trim().take(160)).normalized(),
+                    chatContext = story.chatContext.withStoryStageSelection(storyStage),
                     updatedAt = now,
                 ) else story
             },
