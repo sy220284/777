@@ -743,6 +743,7 @@ internal fun ChatPersonaDialog(
                     title = stringResource(title),
                     facts = factDrafts,
                     onChange = { factDrafts = it },
+                    showMetadata = advancedOpen,
                 )
             }
         }
@@ -760,6 +761,7 @@ internal fun ChatPersonaDialog(
                         title = stringResource(title),
                         facts = factDrafts,
                         onChange = { factDrafts = it },
+                        showMetadata = true,
                     )
                 }
                 factDrafts.map(CharacterFact::category).distinct()
@@ -770,6 +772,7 @@ internal fun ChatPersonaDialog(
                             title = stringResource(R.string.persona_v4_category_extra, category),
                             facts = factDrafts,
                             onChange = { factDrafts = it },
+                            showMetadata = true,
                         )
                     }
                 PersonaTextField(stringResource(R.string.persona_v4_category_code), customCategory, { customCategory = it }, singleLine = true)
@@ -827,6 +830,7 @@ private fun PersonaFactCategoryEditor(
     title: String,
     facts: List<CharacterFact>,
     onChange: (List<CharacterFact>) -> Unit,
+    showMetadata: Boolean = false,
 ) {
     val entries = facts.filter { it.category == category }
     if (entries.isEmpty()) {
@@ -852,6 +856,35 @@ private fun PersonaFactCategoryEditor(
                         ) else fact
                     })
             })
+            if (showMetadata) {
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_stage),
+                    entry.temporalScope,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(temporalScope = value.trim().take(160))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_perspective),
+                    entry.perspective,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(perspective = value.trim().take(120))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+                PersonaTextField(
+                    stringResource(R.string.persona_v4_fact_source),
+                    entry.sourceReference,
+                    { value -> onChange(facts.map { fact ->
+                        if (fact.id == entry.id) fact.copy(sourceReference = value.trim().take(240))
+                        else fact
+                    }) },
+                    singleLine = true,
+                )
+            }
         }
         DsButton(
             text = stringResource(R.string.persona_v4_add_fact),
