@@ -48,7 +48,8 @@ internal fun advanceCharacterLife(
         upsert("unfinished", it, CharacterLifeEventKind.ONGOING, 7L * DAY_MILLIS)
     }
 
-    val anchors = lifeAnchors(persona.factText(CharacterFactCategories.LIFE_GRAVITY).ifBlank { persona.lifeContext })
+    val anchors = lifeAnchors(persona.factText(CharacterFactCategories.LIFE_GRAVITY)
+        .ifBlank { if (persona.facts.isEmpty()) persona.lifeContext else "" })
     val beat = selectLifeBeat(anchors, previous.currentBeat, now, storyTime)
     if (beat.isNotBlank()) {
         upsert("persona", beat, CharacterLifeEventKind.BACKGROUND, LIFE_BACKGROUND_TTL_MILLIS)

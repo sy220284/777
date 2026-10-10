@@ -190,6 +190,7 @@ internal fun ChatContextState.pendingForRequest(limit: Int = 6): List<ChatPendin
         .takeLast(limit.coerceAtLeast(1))
 
 internal fun ChatContextState.hasUsefulFacts(): Boolean =
+    storyStage.isNotBlank() ||
     scene.sceneTime.isNotBlank() ||
         scene.location.isNotBlank() ||
         continuity.recentEvents.isNotEmpty() ||

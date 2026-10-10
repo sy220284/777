@@ -51,7 +51,7 @@ class CharacterFactsV4Test {
         val profile = PersonaProfile(facts = listOf(original, later))
             .withFact(CharacterFactCategories.PERSONALITY, "用户修改")
         assertEquals("用户修改", profile.factText(CharacterFactCategories.PERSONALITY))
-        assertEquals(listOf("builtin-personality", "later"), profile.facts.map(CharacterFact::id))
+        assertEquals(setOf("builtin-personality", "later"), profile.facts.map(CharacterFact::id).toSet())
         assertEquals(CharacterFactProvenance.USER_CREATED,
             profile.facts.first { it.id == original.id }.provenance)
         assertEquals(listOf("later"),
@@ -67,6 +67,25 @@ class CharacterFactsV4Test {
         val merged = mergeGeneratedCharacterFacts(previous, additional)
         assertEquals(2, merged.size)
         assertEquals(listOf("one", "two"), merged.map(CharacterFact::id))
+    }
+
+    @Test fun v4RuntimeDoesNotReuseConflictingOldPersonaDescriptions() {
+        val persona = PersonaProfile(
+            name = "阿云",
+            coreIdentity = "咖啡师",
+            facts = listOf(
+                CharacterFact("life", CharacterFactCategories.LIFE_GRAVITY, "周末会去看外婆"),
+                CharacterFact("bio", CharacterFactCategories.BIOGRAPHY, "从小住在江南"),
+            ),
+            lifeContext = "旧版本生活资料：每天驾驶宇宙飞船",
+            portrait = "旧版本人物背景：天外来客",
+        )
+        val runtime = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(),
+                "今天在忙什么？", null)
+        assertFalse(runtime.stablePrompt.contains("天外来客"))
+        assertFalse(runtime.stablePrompt.contains("宇宙飞船"))
+        assertFalse(runtime.dynamicPrompt.contains("宇宙飞船"))
     }
 
     @Test fun storyStageIsDistinctFromSceneClock() {

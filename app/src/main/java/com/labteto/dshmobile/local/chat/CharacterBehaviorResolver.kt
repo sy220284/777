@@ -97,7 +97,8 @@ internal fun resolveCharacterMode(
         state.lifeState.currentBeat.isNotBlank() &&
         relatedAttentionText(state.lifeState.currentBeat, userInput)
     val stableAttention = persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
-        .takeIf(String::isNotBlank)?.let(::listOf) ?: persona.attentionBiases
+        .takeIf(String::isNotBlank)?.let(::listOf)
+        ?: if (persona.facts.isEmpty()) persona.attentionBiases else emptyList()
     val characterEngaged = stableAttention.any { bias ->
         attention.noticed.any { noticed -> attentionBiasMatches(bias, noticed) }
     }
@@ -144,7 +145,11 @@ internal fun resolveCharacterMode(
         repair += 10
         if (!criticalInput) coverage -= 8
     }
-    if (lifeRelated && persona.lifeContext.isNotBlank()) {
+    if (lifeRelated && (
+            persona.factText(CharacterFactCategories.LIFE_GRAVITY).isNotBlank() ||
+                (persona.facts.isEmpty() && persona.lifeContext.isNotBlank())
+        )
+    ) {
         disclosure += 18
         initiative += 8
     }
@@ -157,13 +162,26 @@ internal fun resolveCharacterMode(
     if (state.currentUserImpression.isNotBlank()) subtext += 5
 
     val cues = buildList {
-        persona.coreTension.takeIf(String::isNotBlank)?.let(::add)
-        addAll(persona.stableTraits)
-        addAll(persona.mutableTraits)
-        addAll(persona.quirks)
-        addAll(persona.limitations)
-        addAll(persona.attentionBiases)
-        addAll(persona.perceptionBlindSpots)
+        if (persona.facts.isNotEmpty()) {
+            listOf(
+                CharacterFactCategories.IDENTITY_GAP,
+                CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                CharacterFactCategories.LIMITS_AND_COSTS,
+                CharacterFactCategories.PREFERENCES_AND_HABITS,
+                CharacterFactCategories.SENSORY_SIGNATURE,
+                CharacterFactCategories.SUBJECTIVE_BELIEFS,
+            ).forEach { category ->
+                persona.factText(category).takeIf(String::isNotBlank)?.let(::add)
+            }
+        } else {
+            persona.coreTension.takeIf(String::isNotBlank)?.let(::add)
+            addAll(persona.stableTraits)
+            addAll(persona.mutableTraits)
+            addAll(persona.quirks)
+            addAll(persona.limitations)
+            addAll(persona.attentionBiases)
+            addAll(persona.perceptionBlindSpots)
+        }
     }.asSequence()
         .map(String::trim)
         .filter(String::isNotBlank)

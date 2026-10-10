@@ -171,6 +171,7 @@ private fun mergeGalleryChatContext(
     if (!left.hasUsefulFacts()) return right
     if (!right.hasUsefulFacts()) return left
     return right.copy(
+        storyStage = right.storyStage.ifBlank { left.storyStage },
         scene = right.scene.copy(
             sceneTime = right.scene.sceneTime.ifBlank { left.scene.sceneTime },
             location = right.scene.location.ifBlank { left.scene.location },

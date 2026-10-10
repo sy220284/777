@@ -22,7 +22,7 @@ internal fun resolveCharacterAttention(
         if (isHighPriorityUserClause(clause)) score += 8
         score += persona.attentionKeywords.count { attentionKeywordMatches(it, clause) } * 6
         val intrinsicAttention = persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
-            .ifBlank { persona.attentionBiases.joinToString("；") }
+            .ifBlank { if (persona.facts.isEmpty()) persona.attentionBiases.joinToString("；") else "" }
         score += listOf(intrinsicAttention).filter(String::isNotBlank)
             .count { attentionBiasMatches(it, clause) } * 3
         if (relatedAttentionText(state.currentFocus, clause)) score += 3
@@ -40,8 +40,8 @@ internal fun resolveCharacterAttention(
         .distinct()
         .take(2)
 
-    val knownBlindSpots = persona.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
-        .takeIf(String::isNotBlank)?.let(::listOf) ?: persona.perceptionBlindSpots
+    // A subjective belief is not automatically a perceptual blind spot.
+    val knownBlindSpots = if (persona.facts.isEmpty()) persona.perceptionBlindSpots else emptyList()
     val directBlindSpot = knownBlindSpots.firstOrNull { relatedAttentionText(it, userInput) }
 
     return CharacterAttentionProjection(

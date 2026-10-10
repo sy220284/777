@@ -42,6 +42,8 @@ internal class CharacterRuntimeProjector(
                 renderChatTurnModeForModel(userInput),
                 relevantBackgroundPrompt(persona, userInput),
                 relevantCharacterFactPrompt(persona, context.storyStage, userInput, storyContext),
+                context.storyStage.takeIf(String::isNotBlank)
+                    ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
                 loreEngine.prompt(persona, userInput),
                 relationshipEngine.prompt(userInput, runtimeState),
@@ -62,7 +64,9 @@ internal class CharacterRuntimeProjector(
                 persona.timelinePosition.takeIf(String::isNotBlank)?.let { appendLine("当前剧情阶段：${it.take(120)}") }
                 appendLine(COMMON_CHARACTER_BOUNDARY)
                 appendLine(ANTI_PERFORMANCE_RULE)
-                appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
+                if (persona.facts.isEmpty()) {
+                    appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
+                }
                 appendStableSection(
                     "专属硬约束",
                     persona.hardConstraints.filterNot(::isCommonCharacterBoundary),
@@ -98,12 +102,19 @@ internal class CharacterRuntimeProjector(
     private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
         appendLine("【人物底色】")
         // Put the actual biography first; the critical prompt already describes how to use it.
-        persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
-        persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
-        persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("经历与生活：${it.take(520)}") }
+        if (persona.facts.isNotEmpty()) {
+            persona.factText(CharacterFactCategories.BIOGRAPHY).takeIf(String::isNotBlank)
+                ?.let { appendLine("人物经历：${it.take(700)}") }
+            persona.factText(CharacterFactCategories.VOICE_STYLE).takeIf(String::isNotBlank)
+                ?.let { appendLine("语言风格：${it.take(280)}") }
+        } else {
+            persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
+            persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
+            persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("经历与生活：${it.take(520)}") }
+        }
         if (persona.franchise.isNotBlank()) appendLine("可用已知原作知识补足细节；当前剧情和用户明确改编优先，不把未知情节编成事实。")
 
-        val samples = persona.voiceSamples.asSequence()
+        val samples = (if (persona.facts.isEmpty()) persona.voiceSamples else emptyList()).asSequence()
             .map(String::trim)
             .filter(String::isNotBlank)
             .take(MAX_STABLE_VOICE_SAMPLES)
@@ -130,7 +141,8 @@ internal class CharacterRuntimeProjector(
         state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
         state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
-            ?: persona.initialUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+            ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
+                ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { lines += "关系里还没过去的事：${it.take(180)}" }
         state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
@@ -149,13 +161,22 @@ internal class CharacterRuntimeProjector(
 
     private fun relevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
         if (userInput.isBlank()) return ""
-        val anchors = listOf(
-            "人物身份与经历" to persona.portrait,
-            "生活" to persona.lifeContext,
-            "世界" to persona.worldSetting,
-            "时间线" to persona.timelinePosition,
-            "来源" to persona.franchise,
-        ).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
+        val anchors = (if (persona.facts.isNotEmpty()) {
+            listOf(
+                "人物经历" to persona.factText(CharacterFactCategories.BIOGRAPHY),
+                "生活牵引" to persona.factText(CharacterFactCategories.LIFE_GRAVITY),
+                "世界" to persona.worldSetting,
+                "来源" to persona.franchise,
+            )
+        } else {
+            listOf(
+                "人物身份与经历" to persona.portrait,
+                "生活" to persona.lifeContext,
+                "世界" to persona.worldSetting,
+                "时间线" to persona.timelinePosition,
+                "来源" to persona.franchise,
+            )
+        }).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
         if (anchors.isEmpty()) return ""
         return buildString {
             appendLine("【本轮相关背景】只在当前话题自然需要时使用，不主动扩写。")
@@ -187,7 +208,17 @@ internal class CharacterRuntimeProjector(
         if (relevant.isEmpty()) return ""
         return takeWithinModelTokenBudget(buildString {
             appendLine("【本轮相关人物事实】")
-            relevant.forEach { appendLine("${it.category}：${it.content.take(650)}") }
+            relevant.forEach { fact ->
+                val status = when (fact.provenance) {
+                    CharacterFactProvenance.CANON -> "原作资料"
+                    CharacterFactProvenance.USER_CREATED -> "作者明确设定"
+                    CharacterFactProvenance.INFERRED -> "推断，须保持不确定性"
+                    CharacterFactProvenance.UNVERIFIED -> "尚未核实，不当作既定事实"
+                }
+                val viewpoint = fact.perspective.takeIf(String::isNotBlank)
+                    ?.let { "；视角：${it.take(60)}" }.orEmpty()
+                appendLine("${fact.category}（${status}${viewpoint}）：${fact.content.take(650)}")
+            }
         }.trim(), 500)
     }
 
