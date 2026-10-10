@@ -34,6 +34,21 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
+    fun teamRequestNeverFallsBackToOrdinaryChatAfterModeSwitch() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            sessionId = "chat-mode", loading = false, usageMode = LocalUsageMode.CHAT,
+            modelState = LocalModelState(configured = true),
+        ))
+        val fake = RecordingTurnPort()
+        val result = coordinator(fake, runtime).sendWithTeam("执行团队任务", emptyList())
+        assertFalse(result.accepted)
+        assertEquals(com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION, result.rejectReason)
+        assertEquals(0, fake.startCalls)
+        assertTrue(runtime.state.value.error.orEmpty().contains("工作模式"))
+    }
+
+    @Test
     fun preparedWorkInputStartsThroughTheNarrowTurnBridge() {
         val fake = RecordingTurnPort()
         val coordinator = coordinator(fake)

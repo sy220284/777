@@ -266,6 +266,11 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         text: String,
         attachments: List<LocalImportedAttachment>,
     ): LocalSendResult {
+        val snapshot = runtimeStateStore.state.value
+        if (snapshot.usageMode != LocalUsageMode.WORK) {
+            runtimeStateStore.projection.publishError("团队请求只支持工作模式，请切换回原工作会话后发送；草稿与附件已保留")
+            return reject(snapshot.sessionId, LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION))
+        }
         val prepared = prepareLocalAgentTeamSend(text, attachments) ?: return LocalSendResult.Empty
         return sendPrepared(prepared)
     }
