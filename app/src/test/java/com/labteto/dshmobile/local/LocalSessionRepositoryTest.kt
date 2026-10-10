@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -321,6 +322,15 @@ class LocalSessionRepositoryTest {
             eventLogFor = { log },
         )
         assertSame(log, access.authorizedLog(id))
+        log.append("user/message", kotlinx.serialization.json.buildJsonObject {
+            put("transcript", com.labteto.dshmobile.local.session.encodeTranscriptMessages(
+                listOf(LocalHarnessMessage("history-1", "user", "恢复出来的历史消息", createdAt = 1L)),
+            ))
+        })
+        val page = com.labteto.dshmobile.local.session.LocalSessionTranscriptPager(
+            access.authorizedLog(id),
+        ).page(limit = 10)
+        assertEquals("恢复出来的历史消息", page.messages.single().content)
         assertTrue(failures.isEmpty())
         assertTrue(sidecar.isFile)
         assertTrue(nested.isFile)
