@@ -10,9 +10,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertTrue
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import androidx.compose.ui.test.onAllNodesWithText
@@ -25,6 +28,50 @@ class LocalRunCenterAgentActionsTest {
 
     private val context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun evidenceWriteFailureKeepsSelectionOpenAndAllowsRetry() {
+        val attempts = AtomicInteger()
+        compose.setContent {
+            DshTheme {
+                LocalRunCenterScreen(
+                    state = LocalWorkUiState(sessionId = "work-evidence",
+                        todos = listOf(LocalTodoItem("交付报告", "pending"))),
+                    onJobOutput = { "" },
+                    onArtifacts = { listOf(LocalArtifactUiItem(
+                        "report.md", "file", "call-1", 0L, currentlyAvailable = true,
+                        versionAtCreation = "a".repeat(64), versionNow = "a".repeat(64),
+                    )) },
+                    onLinkRequirementEvidence = { _, _, _ ->
+                        if (attempts.incrementAndGet() == 1) throw java.io.IOException("disk write failed")
+                        true
+                    },
+                    onStopJob = { "" },
+                    onStartBackgroundAgent = { LocalWorkUiActionResult(false, "") },
+                    onSendAgentMessage = { _, _ -> LocalWorkUiActionResult(false, "") },
+                    onOpenResults = {}, onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(context.getString(R.string.local_delivery_link_action))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_delivery_link_action))
+            .performScrollTo().performClick()
+        compose.onNodeWithText("1. 交付报告").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(context.getString(R.string.local_delivery_link_save_failed))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_delivery_link_save_failed)).assertIsDisplayed()
+        compose.onNodeWithText("1. 交付报告").performClick()
+        compose.waitUntil(5_000) {
+            attempts.get() == 2 && compose.onAllNodesWithText("1. 交付报告")
+                .fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithText("report.md").assertExists()
+    }
 
     @Test
     fun toolStatusRefreshesWhenEventSequenceAdvancesWithoutWorkStateChange() {

@@ -55,8 +55,21 @@ internal fun sourceArtifactMatchesEvidence(
         event.sequence != expected.asOfSequence) return false
     return projectLocalWorkArtifacts(listOf(event)).any { artifact ->
         artifact.reference == expected.reference && artifact.sourceCallId == expected.sourceCallId &&
-            artifact.asOfSequence == expected.asOfSequence
+            artifact.asOfSequence == expected.asOfSequence &&
+            artifact.versionAtCreation == expected.versionAtCreation
     }
+}
+
+/** Link the version the user actually selected, never silently bind later file bytes. */
+internal fun selectedRequirementEvidenceVersion(
+    workspaceRoot: File,
+    source: LocalSessionEventLog.Event?,
+    selected: LocalArtifactUiItem,
+): String? {
+    if (!sourceArtifactMatchesEvidence(source, selected)) return null
+    val displayedVersion = selected.versionNow ?: return null
+    return localWorkFileSha256(workspaceRoot, selected.reference)
+        ?.takeIf { it == displayedVersion }
 }
 
 /** Check exact file bytes; historic evidence may be absent from the recent artifact window. */

@@ -93,10 +93,17 @@ class LocalWorkRuntime @Inject internal constructor(
         val requirement = snapshot.work.todos.getOrNull(requirementIndex)?.content ?: return false
         val sourceCallId = artifact.sourceCallId?.takeIf(String::isNotBlank) ?: return false
         val log = eventLogs.get(sessionId)
+        val generation = log.resetGeneration
         val origin = log.pageAfter(artifact.asOfSequence - 1, 1).singleOrNull()
-        if (!sourceArtifactMatchesEvidence(origin, artifact)) return false
-        val version = localWorkFileSha256(File(sessionFiles.workspace.path), artifact.reference)
-            ?: return false
+        val version = selectedRequirementEvidenceVersion(
+            File(sessionFiles.workspace.path), origin, artifact,
+        ) ?: return false
+        val current = runtimeStateStore.state.value
+        if (sessionId != runtimeStateStore.currentSessionId || current.sessionId != sessionId ||
+            current.usageMode != LocalUsageMode.WORK ||
+            current.work.todos.getOrNull(requirementIndex)?.content != requirement ||
+            log.isClosed || log.resetGeneration != generation
+        ) return false
         log.append("work/requirement-evidence", buildJsonObject {
             put("requirement_index", requirementIndex)
             put("requirement", requirement)

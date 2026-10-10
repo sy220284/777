@@ -11,6 +11,53 @@ import org.junit.Test
 
 class VersionedSessionStoreCorruptionTest {
     @Test
+    fun legacyAndWrappedPayloadIdentitiesCannotOpenAnotherSession() {
+        val root = Files.createTempDirectory("session-payload-identity").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            File(root, "legacy.json").writeText("""{"id":"other","title":"错误旧会话"}""")
+            File(root, "wrapped.json").writeText(
+                """{"formatVersion":1,"id":"wrapped","updatedAt":1,"payload":{"id":"other"}}""",
+            )
+            File(root, "invalid-version.json").writeText(
+                """{"formatVersion":"broken","id":"invalid-version","payload":{}}""",
+            )
+            assertTrue(runCatching { store.read("legacy") }.isFailure)
+            assertTrue(runCatching { store.read("wrapped") }.isFailure)
+            assertTrue(runCatching { store.read("invalid-version") }.isFailure)
+            assertTrue(runCatching {
+                store.write("new", buildJsonObject { put("id", "other") })
+            }.isFailure)
+            assertTrue(!File(root, "new.json").exists())
+            File(root, "before-id.json").writeText("""{"title":"没有编号的旧会话","messages":[]}""")
+            assertEquals("before-id", store.read("before-id")?.document?.id)
+            File(root, "blank-id.json").writeText("""{"id":"","title":"空编号旧会话","messages":[]}""")
+            assertEquals("blank-id", store.read("blank-id")?.document?.id)
+            assertTrue("blank-id" in store.ids())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun mismatchedPayloadRecoversOnlyFromCorrectlyIdentifiedBackup() {
+        val root = Files.createTempDirectory("session-payload-backup").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("one", buildJsonObject { put("id", "one"); put("title", "原会话") })
+            File(root, "one.json").writeText(
+                """{"formatVersion":1,"id":"one","updatedAt":2,"payload":{"id":"other"}}""",
+            )
+            val recovered = store.read("one")!!
+            assertTrue(recovered.recovered)
+            assertEquals("\"one\"", recovered.document.payload["id"].toString())
+            assertTrue(File(root, "one.backup.json").isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun listReportsCorruptSessionInsteadOfSilentlyDroppingIt() {
         val root = Files.createTempDirectory("session-store-corrupt").toFile()
         try {

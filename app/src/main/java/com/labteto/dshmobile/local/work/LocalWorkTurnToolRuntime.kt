@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
 import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.localToolFailure
+import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
@@ -60,6 +61,13 @@ internal class LocalWorkTurnToolRuntime(
         // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
+        // A connection or plugin install can register new tools during this run.
+        // Re-evaluate only the active user's task before each model step; newly registered
+        // capabilities become available automatically without restarting or editing tool maps.
+        val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
+        if (!activeTask.isNullOrBlank()) {
+            execution.enableTaskRelevantOptionalTools(activeTask, binding.enabledOptionalTools)
+        }
         val enabled = synchronized(binding.enabledOptionalTools) {
             if (teamMode) {
                 val priority = listOf(

@@ -105,6 +105,8 @@ internal fun LocalRunCenterScreen(
     var requirementLinks by remember(state.sessionId) { mutableStateOf(emptyList<LocalRequirementEvidenceLink>()) }
     var pendingRequirementArtifact by remember(state.sessionId) { mutableStateOf<LocalArtifactUiItem?>(null) }
     var requirementLinkFeedback by remember(state.sessionId) { mutableStateOf("") }
+    var linkingRequirement by remember(state.sessionId) { mutableStateOf(false) }
+    val requirementLinkFailureText = stringResource(R.string.local_delivery_link_save_failed)
     var selectedToolCallId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var toolActivities by remember(state.sessionId) { mutableStateOf(emptyList<LocalToolActivityUiItem>()) }
     var artifactScanLimit by remember(state.sessionId) { mutableStateOf(384) }
@@ -414,7 +416,8 @@ internal fun LocalRunCenterScreen(
         DsBottomSheet(
             title = stringResource(R.string.local_delivery_link_title),
             subtitle = stringResource(R.string.local_delivery_link_hint),
-            onDismiss = { pendingRequirementArtifact = null },
+            onDismiss = { if (!linkingRequirement) pendingRequirementArtifact = null },
+            dismissEnabled = !linkingRequirement,
             scrollable = true,
         ) {
             if (requirementLinkFeedback.isNotBlank()) {
@@ -424,15 +427,25 @@ internal fun LocalRunCenterScreen(
             state.todos.forEachIndexed { index, todo ->
                 DsButton(
                     text = "${index + 1}. ${todo.content.take(100)}",
+                    enabled = !linkingRequirement,
                     onClick = {
+                        linkingRequirement = true
                         scope.launch {
-                            val success = withContext(Dispatchers.IO) {
-                                onLinkRequirementEvidence(state.sessionId, index, artifact)
+                            val success = try {
+                                withContext(Dispatchers.IO) {
+                                    onLinkRequirementEvidence(state.sessionId, index, artifact)
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            } finally {
+                                linkingRequirement = false
                             }
                             requirementLinkFeedback = if (success) {
                                 pendingRequirementArtifact = null
                                 ""
-                            } else "关联未保存：来源或文件版本可能已变化"
+                            } else requirementLinkFailureText
                         }
                     },
                     variant = DsButtonVariant.Ghost, modifier = Modifier.fillMaxWidth(),

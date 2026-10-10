@@ -9,6 +9,8 @@ import java.nio.file.StandardCopyOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -117,6 +119,7 @@ class VersionedSessionStore(
     @Synchronized
     fun write(id: String, payload: JsonObject, updatedAt: Long = clock()): SessionDocument {
         validateId(id)
+        validatePayloadIdentity(id, payload)
         // Publish the identity before the atomic session snapshot. An interrupted write cannot
         // leave a valid durable session invisible to the catalog.
         catalog.register(id)
@@ -219,8 +222,9 @@ class VersionedSessionStore(
 
     private fun readFromFile(id: String, file: File): SessionLoadResult {
         val element = json.parseToJsonElement(file.readText()).jsonObject
-        val wrappedVersion = element["formatVersion"]?.jsonPrimitive?.intOrNull
-        val legacy = wrappedVersion == null
+        val wrappedVersion = (element["formatVersion"] as? JsonPrimitive)?.intOrNull
+        val legacy = "formatVersion" !in element
+        require(legacy || wrappedVersion != null) { "会话格式版本无效：$id" }
         val version = wrappedVersion ?: 0
         if (!legacy) {
             require(element["id"]?.jsonPrimitive?.content == id) {
@@ -235,7 +239,9 @@ class VersionedSessionStore(
         } else {
             element["payload"]?.jsonObject ?: error("会话文档缺少 payload：$id")
         }
+        validatePayloadIdentity(id, payload)
         val migratedPayload = migrations.migrate(version, payload)
+        validatePayloadIdentity(id, migratedPayload)
         val updatedAt = if (legacy) {
             file.lastModified().takeIf { it > 0L } ?: clock()
         } else {
@@ -269,6 +275,15 @@ class VersionedSessionStore(
 
     private fun validateId(id: String) {
         require(id.matches(SESSION_ID_PATTERN)) { "非法会话编号：$id" }
+    }
+
+    /** The application consumes payload.id; validating only the envelope leaves a second identity. */
+    private fun validatePayloadIdentity(id: String, payload: JsonObject) {
+        if ("id" !in payload) return // Generic and pre-ID legacy payloads remain supported.
+        val embeddedId = (payload["id"] as? JsonPrimitive)?.contentOrNull
+        require(embeddedId != null && (embeddedId.isEmpty() || embeddedId == id)) {
+            "会话正文身份不一致：请求 $id"
+        }
     }
 
     private fun rotatePrimaryToBackup(source: File, backup: File) {

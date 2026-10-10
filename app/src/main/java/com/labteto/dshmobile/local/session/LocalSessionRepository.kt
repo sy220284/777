@@ -237,7 +237,8 @@ internal class LocalSessionRepository(
         } else {
             persistedPayload?.let { payload ->
                 LocalSessionRead(
-                    session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
+                    session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload)
+                        .copy(id = id),
                     legacySafeAutoApproval = legacySafeAutoApproval(payload),
                 )
             }

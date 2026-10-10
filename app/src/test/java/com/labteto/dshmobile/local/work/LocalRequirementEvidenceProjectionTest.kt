@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
@@ -14,6 +15,39 @@ import org.junit.Test
 
 class LocalRequirementEvidenceProjectionTest {
     @get:Rule val temp = TemporaryFolder()
+
+    @Test fun selectedVersionCannotSilentlyBindAFileChangedAfterSelection() {
+        val root = temp.newFolder("selected-workspace")
+        val file = File(root, "report.md").apply { writeText("selected bytes") }
+        val digest = localWorkFileSha256(root, "report.md")!!
+        val source = LocalSessionEventLog.Event(
+            sequence = 0L, type = "tool/result", createdAt = 1L,
+            data = buildJsonObject {
+                put("id", "call-1")
+                put("name", "write")
+                put("artifact_path", "report.md")
+                put("artifact_sha256", digest)
+            },
+        )
+        val selected = LocalArtifactUiItem(
+            reference = "report.md", category = "file", sourceCallId = "call-1",
+            asOfSequence = 0L, currentlyAvailable = true,
+            versionAtCreation = digest, versionNow = digest,
+        )
+        assertEquals(digest, selectedRequirementEvidenceVersion(root, source, selected))
+        file.writeText("changed after user selected")
+        assertEquals(null, selectedRequirementEvidenceVersion(root, source, selected))
+        val currentDigest = localWorkFileSha256(root, "report.md")!!
+        val refreshed = selected.copy(versionNow = currentDigest)
+        assertEquals(currentDigest, selectedRequirementEvidenceVersion(root, source, refreshed))
+        assertEquals(null, selectedRequirementEvidenceVersion(root, source,
+            refreshed.copy(versionAtCreation = "a".repeat(64))))
+        assertEquals(null, selectedRequirementEvidenceVersion(root, source,
+            refreshed.copy(versionNow = null)))
+        assertEquals(null, selectedRequirementEvidenceVersion(root, source.copy(sequence = 1L), refreshed))
+        file.delete()
+        assertEquals(null, selectedRequirementEvidenceVersion(root, source, refreshed))
+    }
 
     @Test fun archivedEvidenceReadsCurrentFileWithoutRecentArtifactProjection() {
         val root = temp.newFolder("workspace")

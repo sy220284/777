@@ -1988,6 +1988,7 @@
     <string name="local_delivery_linked_line">第 %1$d 项 · %2$s · %3$s</string>
     <string name="local_delivery_link_current">版本一致，待逐项验证</string>
     <string name="local_delivery_link_stale">文件版本变化或无法核实，需重新检查</string>
+    <string name="local_delivery_link_save_failed">关联未保存：来源、文件版本或存储状态已变化，请刷新后重试</string>
     <string name="local_work_handoff_return_source">返回来源聊天</string>
     <string name="local_work_handoff_source_removed">原聊天会话已不存在；当前工作与已保存的交接摘要仍可继续使用。</string>
 </resources>

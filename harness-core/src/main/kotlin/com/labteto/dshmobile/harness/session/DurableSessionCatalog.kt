@@ -143,7 +143,7 @@ internal class DurableSessionCatalog(
         }
         // Old unwrapped snapshots are self-describing through their session ID, or through
         // established legacy session fields for snapshots saved before IDs became mandatory.
-        val embeddedId = (rootObject["id"] as? JsonPrimitive)?.content
+        val embeddedId = (rootObject["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotEmpty)
         if (embeddedId != null && embeddedId != id) return false
         return (embeddedId == id && rootObject.keys.any { it in LEGACY_FIELDS }) ||
             (embeddedId == null &&

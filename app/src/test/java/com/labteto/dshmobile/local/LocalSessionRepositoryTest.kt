@@ -28,6 +28,20 @@ import org.junit.rules.TemporaryFolder
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalSessionRepositoryTest {
     @get:Rule val temporary = TemporaryFolder()
+
+    @Test fun legacyMissingAndBlankIdsUseTheValidatedSessionIdentity() = runTest {
+        val missing = java.io.File(temporary.root, "legacy-missing.json")
+        missing.writeText("""{"title":"旧聊天","usageMode":"CHAT","messages":[]}""")
+        java.io.File(temporary.root, "legacy-blank.json").writeText(
+            """{"id":"","title":"空编号旧聊天","usageMode":"CHAT","messages":[]}""",
+        )
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        assertEquals(setOf("legacy-missing", "legacy-blank"), repository.summaries().map { it.id }.toSet())
+        assertEquals("legacy-missing", repository.read("legacy-missing")!!.id)
+        assertEquals("legacy-blank", repository.read("legacy-blank")!!.id)
+        repository.writeNow(repository.read("legacy-missing")!!)
+        assertEquals("legacy-missing", repository.read("legacy-missing")!!.id)
+    }
     @Test fun deletionCannotBeUndoneByQueuedSnapshots() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.enqueue(LocalHarnessSession(id = "gone", title = "old"))
