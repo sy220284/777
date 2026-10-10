@@ -291,7 +291,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
         runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
-    fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
+    internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
     fun linkRequirementEvidenceForUi(
         sessionId: String, index: Int,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
