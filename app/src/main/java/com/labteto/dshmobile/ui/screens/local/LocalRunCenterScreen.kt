@@ -356,7 +356,7 @@ internal fun LocalRunCenterScreen(
                             Text(stringResource(R.string.local_delivery_linked_title),
                                 style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                             requirementLinks.forEach { link ->
-                                val current = artifacts.firstOrNull { it.reference == link.artifactPath }?.versionNow
+                                val current = link.versionNow
                                 Text(
                                     stringResource(
                                         R.string.local_delivery_linked_line,
