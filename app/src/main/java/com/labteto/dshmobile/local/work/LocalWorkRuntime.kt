@@ -115,9 +115,12 @@ class LocalWorkRuntime @Inject internal constructor(
         if (sessionId != runtimeStateStore.currentSessionId ||
             snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK
         ) return emptyList()
-        return projectRequirementEvidenceLinks(
-            eventLogs.get(sessionId).pageBeforeChronological(limit = 8_192),
-            snapshot.work.todos,
+        return checkRequirementEvidenceVersions(
+            File(sessionFiles.workspace.path),
+            projectRequirementEvidenceLinks(
+                eventLogs.get(sessionId).pageBeforeChronological(limit = 8_192),
+                snapshot.work.todos,
+            ),
         )
     }
 
