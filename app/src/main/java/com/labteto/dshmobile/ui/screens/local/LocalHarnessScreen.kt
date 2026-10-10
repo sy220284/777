@@ -437,6 +437,11 @@ fun LocalHarnessScreen(
             onContinueArtifact = { path ->
                 handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
+            onOpenSourceSession = { sourceSessionId ->
+                if (viewModel.switchSession(sourceSessionId)) {
+                    resetFeatureNavigation()
+                }
+            },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
             shell = shell,
