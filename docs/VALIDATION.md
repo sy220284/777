@@ -271,7 +271,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Work exposure 成功结算以供应商实报 input Token 为准；累计 exposure 仅用于诊断，不得作为单轮 Work 的硬输入上限；客户端估算用于单请求上下文准入、并发 pending 风险控制与未知受理校准。
 - 并发 pending reservation 只按当前在途估算量做有界等待；已有累计 exposure 不得阻塞后续请求。单个请求仍必须遵守当前路由上下文窗口 / operational limit，pending 释放语义与请求次数护栏保持有效。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
-- Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
+- Work 模型传输失败须将原始模型/网络错误返回给当前调用者并记录真实 admission state；不得因其他会话或前几次暂时断流设置跨请求冷却、half-open 单请求探测或拒绝用户主动重试。未发送的可恢复故障仍按现有重试策略处理；请求可能已送达或已经接收后，禁止在未确认安全的情况下自动重放整轮，继续执行应从已落盘检查点恢复。
 - “上次打开会话”持久化必须 latest-wins：并发 A→B 快速切换时，即使 A 的持久化更慢，最终落盘也必须是 B；不得依赖协程调度顺序。
 
 当前高风险领域：
@@ -313,7 +313,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - refresh 成功后若套餐 scope 降级，必须先原子保存轮换后的 access/refresh token 与新 scopes，再退休对应套餐 Profile；当前活动套餐路由立即变为未配置，禁止静默回退到 API Key 或其他可能计费来源。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
 - ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
-- ChatGPT 套餐请求收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
+- ChatGPT 套餐 Responses 长流不得按固定六分钟整次超时切断正在正常传输的请求；保留连接/读空闲超时与协程取消。收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
 - 运行诊断必须记录脱敏的 profile/account/client_id 绑定、OpenAI request ID、provider code 与 HTTP status，禁止记录 access/refresh token。
 - ChatGPT 模型档案必须绑定保存的 issued client_id 对应账户；切换模型档案时同步账户选择，禁止用可变“当前账户”替代档案 credentialRef。
 - ChatGPT 套餐共享的 function/custom tools 必须按 SIWC 预览契约放入 namespace；标准 API Key Responses 继续使用普通顶层 function tools，不相互污染协议。

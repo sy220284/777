@@ -42,7 +42,9 @@ class OpenAiResponsesClient @Inject constructor(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.MINUTES)
         .writeTimeout(60, TimeUnit.SECONDS)
-        .callTimeout(6, TimeUnit.MINUTES)
+        // Long-lived Responses streams must not be cancelled solely for total elapsed time.
+        // readTimeout still bounds idle sockets; the coroutine cancels the call when work stops.
+        .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
     suspend fun completeStreaming(

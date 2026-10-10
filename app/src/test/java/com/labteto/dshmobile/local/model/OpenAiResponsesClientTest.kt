@@ -98,9 +98,11 @@ class OpenAiResponsesClientTest {
         var postedBody = ""
         var postedAuthorization = ""
         var postedUrl = ""
+        var observedCallTimeoutNanos = -1L
         val completed = """data: {"type":"response.completed","response":{"id":"response-test","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"通过"}]}],"usage":{"input_tokens":8,"output_tokens":5}}}""" + "\n\n"
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             postedUrl = chain.request().url.toString()
+            observedCallTimeoutNanos = chain.call().timeout().timeoutNanos()
             postedAuthorization = chain.request().header("Authorization").orEmpty()
             postedBody = Buffer().also { chain.request().body?.writeTo(it) }.readUtf8()
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
@@ -121,6 +123,7 @@ class OpenAiResponsesClientTest {
             )
             assertEquals("通过", result.content)
             assertEquals("https://api.openai.com/v1/responses", postedUrl)
+            assertEquals(0L, observedCallTimeoutNanos)
             assertEquals("Bearer mock-plan-access-token", postedAuthorization)
             val wire = Json.parseToJsonElement(postedBody).jsonObject
             assertEquals("gpt-6-sol", wire["model"]!!.jsonPrimitive.content)

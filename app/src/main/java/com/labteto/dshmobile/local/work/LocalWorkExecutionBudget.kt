@@ -256,7 +256,6 @@ internal fun shouldAutoContinueWorkFailure(
 
 internal class LocalWorkExecutionControl(
     val budget: LocalWorkExecutionBudget = LocalWorkExecutionBudget(),
-    val circuitBreaker: LocalModelRouteCircuitBreaker = LocalModelRouteCircuitBreaker(),
 )
 
 internal suspend fun executeWithModelAdmission(
@@ -282,16 +281,9 @@ internal suspend fun executeWithModelAdmission(
             retryable = false,
         )
     }
-    val routePermit = control?.circuitBreaker?.acquire(routeFingerprint)
-    val lease = try {
-        control?.budget?.reserve(pressure.estimatedInputTokens, routeFingerprint)
-    } catch (error: Throwable) {
-        routePermit?.release()
-        throw error
-    }
+    val lease = control?.budget?.reserve(pressure.estimatedInputTokens, routeFingerprint)
     try {
         val reply = block()
-        routePermit?.success()
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
         return reply
     } catch (cancelled: CancellationException) {
@@ -300,7 +292,6 @@ internal suspend fun executeWithModelAdmission(
             LocalModelAdmissionState.REJECTED -> lease?.release()
             else -> lease?.commit()
         }
-        routePermit?.release()
         throw cancelled
     } catch (error: LocalModelException) {
         when (error.admissionState) {
@@ -308,11 +299,9 @@ internal suspend fun executeWithModelAdmission(
             LocalModelAdmissionState.REJECTED -> lease?.release()
             else -> lease?.commit()
         }
-        routePermit?.failure(error)
         throw error
     } catch (error: Throwable) {
         lease?.commit()
-        routePermit?.release()
         throw error
     }
 }
