@@ -137,4 +137,44 @@ class VersionedSessionStoreCorruptionTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun directReadRegistersLateLegacySessionAndRejectsUnrelatedProjection() {
+        val root = Files.createTempDirectory("session-catalog-late-legacy").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("existing", buildJsonObject { put("title", "已有") })
+            File(root, "late.json").writeText(
+                """{"id":"late","title":"补迁旧会话","usageMode":"CHAT"}""",
+            )
+            val projectionId = "existing.events.jsonl.projection-work.agent-team"
+            File(root, "$projectionId.json").writeText(
+                """{"version":1,"identity":"hash","throughSequence":1,"payload":"{}"}""",
+            )
+            assertEquals(listOf("existing"), store.ids())
+            assertEquals("late", store.read("late")?.document?.id)
+            assertEquals(setOf("existing", "late"), store.ids().toSet())
+            // A direct read of a stray derived JSON file must not put it in the catalog.
+            assertTrue(store.read(projectionId) != null)
+            assertEquals(setOf("existing", "late"), store.ids().toSet())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun mismatchedWrappedDocumentCannotBeAcceptedForAnotherSession() {
+        val root = Files.createTempDirectory("session-catalog-identity-mismatch").toFile()
+        try {
+            val store = VersionedSessionStore(root, Json)
+            store.write("correct", buildJsonObject { put("title", "原会话") })
+            File(root, "wrong.json").writeText(
+                """{"formatVersion":1,"id":"correct","updatedAt":2,"payload":{"title":"错误归属"}}""",
+            )
+            assertTrue(runCatching { store.read("wrong") }.isFailure)
+            assertEquals(listOf("correct"), store.ids())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
