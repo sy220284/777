@@ -420,6 +420,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             state = plannerState,
             userMessage = orderedTranscript,
             assistantMessage = "",
+            context = baseContext,
         )
         val plannerReply = try {
             requestPlanner(before, prompt, boundEventLog, profile)
