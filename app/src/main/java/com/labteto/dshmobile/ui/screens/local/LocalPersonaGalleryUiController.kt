@@ -7,7 +7,6 @@ import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.visibleStoryStages
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
@@ -219,8 +218,7 @@ suspend fun inspectGalleryPersona(
             profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
-            storyStage = story?.chatContext?.storyStage.orEmpty(),
-            unlockedStages = story?.chatContext?.visibleStoryStages() ?: emptySet(),
+            chatContext = story?.chatContext,
         )
     }
 }

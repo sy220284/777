@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.visibleStoryStages
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.GroupAnnouncementService
@@ -78,10 +79,10 @@ class LocalChatUiFacade @Inject constructor(
         profileId: String?,
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
-        storyStage: String = "",
-        unlockedStages: Collection<String> = emptyList(),
+        chatContext: ChatContextState? = null,
     ): PersonaInspectionResult = inspection.inspect(
-        model, baseUrl, profileId, persona, messages, storyStage, unlockedStages,
+        model, baseUrl, profileId, persona, messages,
+        chatContext?.storyStage.orEmpty(), chatContext?.visibleStoryStages().orEmpty(),
     )
 
     internal suspend fun generateGroupAnnouncement(
