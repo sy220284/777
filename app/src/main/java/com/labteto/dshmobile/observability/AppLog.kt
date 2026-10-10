@@ -203,7 +203,7 @@ object AppLog {
     private fun summarizeCauseChain(error: Throwable): String =
         generateSequence(error) { it.cause }.take(5).joinToString(" <- ") { current ->
             val kind = current.javaClass.simpleName.take(80)
-            val reason = current.message?.let(::sanitizeDiagnosticText)?.replace("\\n", " ")?.take(200)
+            val reason = current.message?.let(::sanitizeDiagnosticText)?.replace("\n", " ")?.take(200)
             if (reason.isNullOrBlank()) kind else "$kind: $reason"
         }.take(1_000)
 
@@ -213,7 +213,7 @@ object AppLog {
             runCatching {
                 file.parentFile?.mkdirs()
                 rotateIfNeeded(file)
-                file.appendText(encodeEntry(entry) + "\\n")
+                file.appendText(encodeEntry(entry) + "\n")
             }
         }
     }
