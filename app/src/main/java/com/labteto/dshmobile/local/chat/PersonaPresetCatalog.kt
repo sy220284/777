@@ -264,7 +264,7 @@ private fun compactPreset(
     loreTitle: String,
     loreContent: String,
     loreKeywords: List<String>,
-    hardConstraints: List<String>,
+    hardConstraints: List<String> = emptyList(),
 ): PersonaPreset = PersonaPreset(
     id = id,
     franchise = franchise,
