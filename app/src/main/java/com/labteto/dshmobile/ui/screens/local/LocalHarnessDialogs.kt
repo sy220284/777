@@ -756,7 +756,6 @@ internal fun ChatPersonaDialog(
                 PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
             }
         }
-        }
     }
 }
 
