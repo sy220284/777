@@ -390,4 +390,19 @@ class LocalSessionRepositoryTest {
         assertTrue(nested.isFile)
         assertTrue(failures.isEmpty())
     }
+
+    @Test fun corruptBackupForOneSessionDoesNotBlockHealthyConversationList() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "healthy", title = "正常会话", updatedAt = 100L))
+        repository.writeNow(LocalHarnessSession(id = "broken", title = "损坏会话", updatedAt = 101L))
+        assertTrue(java.io.File(temporary.root, "broken.json").delete())
+        java.io.File(temporary.root, "broken.backup.json").writeText("{broken")
+        val failures = mutableListOf<Throwable>()
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        val summaries = reopened.summaries()
+        assertEquals(listOf("healthy"), summaries.map { it.id })
+        assertEquals("正常会话", reopened.read("healthy")?.title)
+        assertEquals(1, failures.size)
+        assertTrue(java.io.File(temporary.root, "broken.backup.json").isFile)
+    }
 }
