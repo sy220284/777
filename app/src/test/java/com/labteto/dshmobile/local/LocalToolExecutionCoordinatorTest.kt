@@ -64,7 +64,7 @@ class LocalToolExecutionCoordinatorTest {
     @Test
     fun explicitlyDiscoveredToolTakesPrecedenceOverEarlierOptionalBudget() {
         val registry = ToolRegistry().apply {
-            repeat(18) { index ->
+            repeat(300) { index ->
                 register(tool(name = "background_$index", access = ToolAccess.READ_ONLY,
                     approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
                     family = "后台扩展", keywords = setOf("background")) { ToolResult("ok") })
@@ -74,11 +74,89 @@ class LocalToolExecutionCoordinatorTest {
                 family = "精确发现", keywords = setOf("critical")) { ToolResult("ok") })
         }
         val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 18).map { "background_$it" })
+        coordinator.enableOptionalTools((0 until 300).map { "background_$it" })
         assertFalse("critical_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         val response = coordinator.searchCapabilities("critical_lookup")
         assertTrue(response.contains("critical_lookup"))
         assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).contains("critical_lookup"))
+    }
+
+    @Test
+    fun currentTaskReordersPreviouslySelectedToolsAheadOfOlderWork() {
+        val registry = ToolRegistry().apply {
+            repeat(200) { index ->
+                register(tool(name = "older_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "旧工具", keywords = setOf("旧任务")) { ToolResult("ok") })
+            }
+            register(tool(name = "current_task_tool", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "新任务", keywords = setOf("现在处理")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 200).map { "older_$it" } + "current_task_tool")
+        coordinator.enableTaskRelevantOptionalTools("现在处理这个问题")
+        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertEquals("current_task_tool", visible.first())
+    }
+
+    @Test
+    fun disabledNetworkToolsRemainDiscoverableButNotCallable() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "web_search", access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "网络", keywords = setOf("联网")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry, networkSearchEnabled = { false })
+        val directory = coordinator.searchCapabilities("能力目录")
+        assertTrue(directory.contains("web_search（当前设置已关闭）"))
+        assertTrue(coordinator.capabilitySummary().contains("运行策略关闭：web_search"))
+        assertFalse("web_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
+        coordinator.searchCapabilities("联网")
+        assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
+    }
+
+    @Test
+    fun newlyRegisteredTaskToolsTakePriorityOverOlderOptionalSchemas() {
+        val registry = ToolRegistry().apply {
+            repeat(300) { index ->
+                register(tool(name = "old_$index", access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "后台", keywords = setOf("旧任务")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools((0 until 300).map { "old_$it" })
+        registry.register(tool(name = "new_capability", access = ToolAccess.READ_ONLY,
+            approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+            family = "扩展", keywords = setOf("当前任务")) { ToolResult("ok") })
+        coordinator.enableTaskRelevantOptionalTools("使用当前任务新能力")
+        val names = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertTrue("new_capability" in names)
+        assertEquals("new_capability", names.first())
+    }
+
+    @Test
+    fun newlyRegisteredExtensionsAppearInDirectoryAndCanBeLoadedWithoutCodeChanges() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "local_core", access = ToolAccess.READ_ONLY,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.CORE,
+                family = "文件") { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val initial = coordinator.searchCapabilities("能力目录")
+        assertFalse(initial.contains("mcp_newly_added"))
+        registry.register(tool(name = "mcp_newly_added", access = ToolAccess.PRIVILEGED,
+            approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
+            family = "MCP", keywords = setOf("新服务", "MCP")) { ToolResult("ok") })
+        val directory = coordinator.searchCapabilities("工具与能力检测")
+        assertTrue(directory.contains("mcp_newly_added"))
+        val fallback = coordinator.searchCapabilities("完全不在关键词中的陌生描述")
+        assertTrue(fallback.contains("mcp_newly_added"))
+        assertFalse("mcp_newly_added" in coordinator.enabledOptionalSnapshot())
+        val result = coordinator.searchCapabilities("mcp_newly_added")
+        assertTrue(result.contains("mcp_newly_added"))
+        assertTrue("mcp_newly_added" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
     }
 
     @Test
