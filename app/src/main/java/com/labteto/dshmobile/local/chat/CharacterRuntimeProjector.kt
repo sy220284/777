@@ -52,6 +52,8 @@ internal class CharacterRuntimeProjector(
         val critical = takeWithinModelTokenBudget(
             buildString {
                 appendLine("【人物】${persona.name}")
+                persona.franchise.takeIf(String::isNotBlank)?.let { appendLine("原作来源：${it.take(90)}") }
+                persona.timelinePosition.takeIf(String::isNotBlank)?.let { appendLine("当前剧情阶段：${it.take(120)}") }
                 appendLine(COMMON_CHARACTER_BOUNDARY)
                 appendLine(ANTI_PERFORMANCE_RULE)
                 appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
@@ -82,6 +84,7 @@ internal class CharacterRuntimeProjector(
         appendLine("【人物底色】")
         appendLine("只保留长期身份与生活底色；具体脑回路、行为和表达由每轮模式自由组合，不把任何形容词演成固定套路。")
         persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
+        persona.worldSetting.takeIf(String::isNotBlank)?.let { appendLine("原作世界：${it.take(180)}") }
         persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("生活：${it.take(520)}") }
 
         val samples = persona.voiceSamples.asSequence()
