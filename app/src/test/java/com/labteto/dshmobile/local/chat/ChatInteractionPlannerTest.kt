@@ -48,7 +48,7 @@ class ChatInteractionPlannerTest {
         assertFalse(earlyPlanner.contains("旧版预告"))
         assertFalse(earlySuggestion.contains("旧版预告"))
         assertTrue(latePlanner.contains("钟楼密钥"))
-        assertTrue(lateSuggestion.contains("钟楼密钥"))
+        assertTrue(lateSuggestion.contains("阿宁的秘密"))
     }
 
 
