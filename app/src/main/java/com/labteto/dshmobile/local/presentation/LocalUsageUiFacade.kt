@@ -15,5 +15,7 @@ class LocalUsageUiFacade @Inject constructor(private val usage: DeepSeekUsageTra
     internal val revision: StateFlow<Long> = usage.analyticsRevision
     internal fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot = usage.analyticsSessionSnapshot(sessionId)
     internal fun taskDetail(runId: String): TokenUsageGroupDetail? = usage.analyticsGroupDetail(TokenUsageGroupKind.TASK, runId)
+    internal fun turnSummaries(sessionId: String) = usage.analyticsTurnSummaries(sessionId)
+    internal fun turnDetail(sessionId: String, turnId: String) = usage.analyticsTurnDetail(sessionId, turnId)
     internal fun requestDetail(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
 }

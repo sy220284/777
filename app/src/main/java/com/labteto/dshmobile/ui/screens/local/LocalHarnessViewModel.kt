@@ -64,6 +64,8 @@ class LocalHarnessViewModel @Inject constructor(
     internal val usageRevision = usageUi.revision
     internal fun sessionUsage(sessionId: String) = usageUi.sessionSnapshot(sessionId)
     internal fun taskUsage(runId: String) = usageUi.taskDetail(runId)
+    internal fun turnUsageSummaries(sessionId: String) = usageUi.turnSummaries(sessionId)
+    internal fun turnUsage(sessionId: String, turnId: String) = usageUi.turnDetail(sessionId, turnId)
     internal fun requestUsage(requestId: String) = usageUi.requestDetail(requestId)
     internal val projectCatalog = projects.catalog
     internal val projectRecoveryNotice = projects.recoveryNotice

@@ -1867,5 +1867,9 @@
     <string name="local_run_usage_missing">有 %1$d 次请求未返回用量，总量尚不完整。</string>
     <string name="local_run_usage_task">%1$s · 已知 %2$d Token</string>
     <string name="local_run_usage_no_tasks">暂无任务用量记录</string>
+    <string name="local_chat_turn_usage_known">本轮已知用量 · %1$d Token</string>
+    <string name="local_chat_turn_usage_incomplete">本轮已知用量 · %1$d Token（数据不完整）</string>
+    <string name="local_chat_turn_usage_title">本轮用量</string>
+    <string name="local_chat_turn_usage_scope">包含本轮回复、重新生成和已关联的后台请求；仅展示保留期内已记录的用量。</string>
 </resources>
 

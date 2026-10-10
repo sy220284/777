@@ -282,6 +282,10 @@ fun LocalHarnessScreen(
         disableAutoApproval = viewModel::disableAutoApproval,
         answerQuestion = viewModel::answerQuestion,
         cancelQuestion = viewModel::cancelQuestion,
+        usageRevision = viewModel.usageRevision,
+        turnUsageSummaries = viewModel::turnUsageSummaries,
+        turnUsage = viewModel::turnUsage,
+        requestUsage = viewModel::requestUsage,
     )
     val chatActions = LocalChatFeatureUiActions(
         personaPresets = viewModel.personaPresets,

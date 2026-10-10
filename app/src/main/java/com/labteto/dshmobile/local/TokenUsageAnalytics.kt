@@ -217,6 +217,7 @@ data class TokenUsageAnalyticsSnapshot(
 enum class TokenUsageGroupKind {
     SESSION,
     TASK,
+    TURN,
 }
 
 data class TokenUsageAgentSummary(
@@ -498,10 +499,16 @@ class TokenUsageAnalyticsStore @Inject constructor(
         kind: TokenUsageGroupKind,
         key: String,
         recordLimit: Int = DETAIL_RECORDS,
+        sessionId: String? = null,
     ): TokenUsageGroupDetail? {
+        require(kind != TokenUsageGroupKind.TURN || !sessionId.isNullOrBlank()) {
+            "Turn usage requires a source session"
+        }
         val detailLimit = recordLimit.coerceIn(1, MAX_DETAIL_RECORDS)
         val records = allRecords().distinctForAccounting().filter { record ->
             when (kind) {
+                TokenUsageGroupKind.TURN -> record.context.mode == LocalUsageMode.CHAT &&
+                    record.context.sessionId == sessionId && record.context.turnId == key
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
                 TokenUsageGroupKind.TASK ->
                     record.context.taskRunId == key || record.context.parentRunId == key || record.context.runId == key
@@ -538,6 +545,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
             .filter { !it.context.taskLabel.isNullOrBlank() }
             .maxByOrNull(TokenUsageRecord::timestamp)
         val title = when (kind) {
+            TokenUsageGroupKind.TURN -> "本轮用量"
             TokenUsageGroupKind.SESSION -> latest.context.sessionTitle?.takeIf(String::isNotBlank) ?: "对话"
             TokenUsageGroupKind.TASK -> mainTaskRecord?.context?.taskLabel
                 ?: latest.context.taskLabel?.takeIf(String::isNotBlank)
@@ -565,6 +573,9 @@ class TokenUsageAnalyticsStore @Inject constructor(
         ensureLoaded()
         database.recordById(requestId)
     }
+
+    fun turnSummaries(sessionId: String): Map<String, TokenUsageAggregate> =
+        aggregateChatTurnUsage(allRecords(), sessionId)
 
     fun sessionSnapshot(sessionId: String): TokenUsageAnalyticsSnapshot =
         aggregateTokenUsageRecords(allRecords().filter { it.context.sessionId == sessionId })
@@ -860,3 +871,16 @@ private val PERSONA_MARKERS = listOf(
     "【本轮相关背景】",
     "【群聊身份】",
 )
+
+/** A turn is identified by both its source session and user message, including late background usage. */
+internal fun aggregateChatTurnUsage(records: Sequence<TokenUsageRecord>, sessionId: String): Map<String, TokenUsageAggregate> {
+    val turns = linkedMapOf<String, MutableTokenAggregate>()
+    records.distinctForAccounting().filter {
+        it.context.sessionId == sessionId && it.context.mode == LocalUsageMode.CHAT
+    }.forEach { record ->
+        record.context.turnId?.takeIf(String::isNotBlank)?.let { turn ->
+            turns.getOrPut(turn, ::MutableTokenAggregate).add(record)
+        }
+    }
+    return turns.mapValues { it.value.freeze() }
+}

@@ -795,7 +795,9 @@
         "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt#refreshUsageBelongsToProcessedTurnEvenWhenNewUserMessageArrives",
         "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#nestedAndResumedRunsKeepDirectParentAndAggregateUnderOriginalTaskAfterRestart",
         "app/src/test/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridgeTest.kt#oldAccountingPayloadRemainsReadableWithoutTaskRoot",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterUsageTest.kt#missingUsageIsExplicitAndTaskDetailsRefreshWithoutCrossingSessions"
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterUsageTest.kt#missingUsageIsExplicitAndTaskDetailsRefreshWithoutCrossingSessions",
+        "app/src/test/java/com/labteto/dshmobile/local/TokenUsageAnalyticsTest.kt#turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalChatTurnUsageTest.kt#lateUsageUpdatesSourceTurnAndSwitchingSessionClosesItsDetails"
       ]
     },
     {

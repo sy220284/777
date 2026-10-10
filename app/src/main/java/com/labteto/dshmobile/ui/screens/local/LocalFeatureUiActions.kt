@@ -61,6 +61,10 @@ internal data class LocalShellFeatureUiActions(
     val disableAutoApproval: () -> Unit,
     val answerQuestion: (String, String) -> Boolean,
     val cancelQuestion: (String) -> Unit,
+    val usageRevision: StateFlow<Long>? = null,
+    val turnUsageSummaries: (String) -> Map<String, com.labteto.dshmobile.local.TokenUsageAggregate> = { emptyMap() },
+    val turnUsage: (String, String) -> com.labteto.dshmobile.local.TokenUsageGroupDetail? = { _, _ -> null },
+    val requestUsage: (String) -> com.labteto.dshmobile.local.TokenUsageRecord? = { null },
 )
 
 /** Chat page actions only; no Feature contribution receives the aggregate ViewModel. */
