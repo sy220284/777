@@ -20,13 +20,20 @@ class CharacterLoreEngine @Inject constructor() {
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
         storyStage: String = "",
+        unlockedStages: Collection<String> = emptyList(),
     ): List<PersonaLoreEntry> {
         if (persona.loreEntries.isEmpty()) return emptyList()
         val normalizedQuery = normalize(query)
         val terms = terms(query)
+        val visibleStages = (unlockedStages + storyStage).filter(String::isNotBlank).toSet()
         val candidates = persona.loreEntries.asSequence()
-            .filter { it.content.isNotBlank() && it.spoilerLevel <= maxSpoilerLevel.coerceIn(0, 3) }
-            .filter { it.temporalScope.isBlank() || (storyStage.isNotBlank() && it.temporalScope == storyStage) }
+            // A chosen plot stage grants only lore bound to that stage. Unscoped high-
+            // spoiler content still requires an independent spoiler-level grant.
+            .filter { it.content.isNotBlank() && (
+                it.spoilerLevel <= maxSpoilerLevel.coerceIn(0, 3) ||
+                    (it.temporalScope.isNotBlank() && it.temporalScope in visibleStages)
+            ) }
+            .filter { it.temporalScope.isBlank() || it.temporalScope in visibleStages }
             .map { entry -> entry to score(entry, normalizedQuery, terms) }
             .filter { (entry, score) -> entry.alwaysOn || score > 0 }
             .sortedWith(
@@ -79,8 +86,12 @@ class CharacterLoreEngine @Inject constructor() {
         query: String,
         maxSpoilerLevel: Int = 0,
         storyStage: String = "",
+        unlockedStages: Collection<String> = emptyList(),
     ): String {
-        val active = activated(persona, query, maxSpoilerLevel, storyStage = storyStage)
+        val active = activated(
+            persona, query, maxSpoilerLevel,
+            storyStage = storyStage, unlockedStages = unlockedStages,
+        )
         if (active.isEmpty()) return ""
         return buildString {
             appendLine("【相关世界信息】仅使用以下已激活背景，不补写未提供内容。")
