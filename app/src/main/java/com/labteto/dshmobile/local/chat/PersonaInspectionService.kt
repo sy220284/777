@@ -217,7 +217,7 @@ class PersonaInspectionService @Inject constructor(
         )
 
         val SYSTEM_PROMPT = """
-            审计人物长期一致性和“活人感”，只整理证据，不修改人物。只输出标准 JSON：
+            审计人物长期一致性与运行时互动质量，只整理证据，不修改人物。只输出标准 JSON：
             {"conflicts":[{"field":"","fixedValue":"","observedValue":"","reason":""}],
              "suggestions":[{"field":"","value":"","evidence":""}]}
 
@@ -225,7 +225,7 @@ class PersonaInspectionService @Inject constructor(
             1. conflicts 只报有明确多轮证据的稳定冲突；单次玩笑、临时情绪、梦境、假设和用户猜测不算。
             2. 同时检查：知识越界、关系突变、过度迎合、把推测当事实、人物成长过快，以及长期选择与稳定部分冲突。
             3. 特别识别“设定表演”：频繁主动展示自身特点、重复固定句式/口头禅、所有回复都过度完整有用、人物生活完全围着用户、对用户理解得异常准确、连续多轮使用同一种互动节拍。此类问题有明确证据时写 conflicts，reason 说明具体表现。
-            4. suggestions 只提取明确、稳定、长期有用且人物资料未包含的新信息；同义项去重，一条只写一个事实。不要从模型自己的表演反推一个新的固定人设。
+            4. suggestions 只提取明确、稳定、长期有用且人物资料未包含的新事实；同义项去重，一条只写一个事实。情绪推进、主动性、关系节奏、表达多样性、成长速度等属于运行时问题，只能写入诊断，不提出加入固定人设；不要从模型表演反推新特质。
             5. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
             6. field 只能使用 portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
                limitations, coreValues, coreTension, stableTraits, mutableTraits,

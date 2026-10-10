@@ -90,6 +90,27 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
+    fun bundledPersonaRunsLifeAndModeWithoutScriptedGrowthGoals() {
+        val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
+        assertTrue(persona.mutableTraits.isEmpty())
+        val previous = ChatCharacterState(initiative = 42, shareDesire = 42)
+        val current = previous.copy(initiative = 76, shareDesire = 69)
+        val evolved = evolveCharacterEvolution(
+            persona = persona,
+            previous = previous,
+            current = current,
+            significance = "MAJOR",
+            userMessage = "今天一起完成了重要的事情",
+            assistantMessage = "这次经历我会记住。",
+        )
+        assertTrue(evolved.observationCount > previous.evolution.observationCount)
+        assertTrue(evolved.traitStates.isEmpty())
+        val attention = resolveCharacterAttention(persona, current, "神里家的祭典筹备进行得怎么样？")
+        assertTrue(attention.noticed.isNotEmpty())
+        assertTrue(resolveCharacterMode(persona, current, "神里家的祭典筹备进行得怎么样？", attention).focus.isNotEmpty())
+    }
+
+    @Test
     fun mutableTraitsChangeSlowlyAndRemainBoundedAcrossLongRuns() {
         val persona = PersonaProfile(
             name = "陈拾",

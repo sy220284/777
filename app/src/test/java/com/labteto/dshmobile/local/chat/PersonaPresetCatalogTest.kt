@@ -104,7 +104,7 @@ class PersonaPresetCatalogTest {
     }
 
     @Test
-    fun starterPresetsContainLivingCharacterSignals() {
+    fun starterPresetsDescribeCharacterWithoutRuntimeScripts() {
         PersonaPresetCatalog.presets.forEach { preset ->
             assertTrue(preset.persona.coreValues.isNotEmpty())
             assertTrue(preset.persona.coreTension.isNotBlank())
@@ -113,11 +113,12 @@ class PersonaPresetCatalogTest {
             assertTrue(preset.persona.perceptionBlindSpots.isNotEmpty())
             assertTrue(preset.persona.quirks.isNotEmpty())
             assertTrue(preset.persona.limitations.isNotEmpty())
-            assertTrue(preset.persona.mutableTraits.isNotEmpty())
-            assertTrue(preset.persona.voiceSamples.size >= 3)
-            assertTrue(preset.persona.voiceSamples.all { it.isNotBlank() })
-            assertTrue(preset.persona.voiceSamples.distinct().size >= 3)
-            assertTrue(preset.persona.hardConstraints.isNotEmpty())
+            assertTrue("${preset.id}: prewritten growth goals", preset.persona.mutableTraits.isEmpty())
+            assertTrue("${preset.id}: synthetic reply scripts", preset.persona.voiceSamples.isEmpty())
+            assertTrue("${preset.id}: predefined user relationship", preset.persona.initialUserImpression.isBlank())
+            assertEquals("${preset.id}: situational behavior scripted as stable traits", 1, preset.persona.stableTraits.size)
+            assertTrue("${preset.id}: relationship pacing scripted in hard limits",
+                preset.persona.hardConstraints.none { "亲密" in it || "几句" in it || "关系变化" in it })
             assertTrue(preset.persona.portrait.isNotBlank())
         }
     }
