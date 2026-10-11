@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "policy": "手工逐项核对的源码声明线索，仅用于静态证据等级，不代表行为验收或授权自动改树",
+  "items": [
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 跳转定义与查找引用",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "definition",
+            "references"
+          ]
+        }
+      ],
+      "scope": "LSP 查询方法源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 悬停信息和查找实现",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "hover",
+            "implementation"
+          ]
+        }
+      ],
+      "scope": "LSP 查询方法源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 文件／工作区符号",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "documentSymbols",
+            "workspaceSymbols"
+          ]
+        }
+      ],
+      "scope": "LSP 符号查询源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 诊断与重命名预览",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "rename"
+          ]
+        },
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+          "symbols": [
+            "execute"
+          ],
+          "literals": [
+            "lsp_diagnostics",
+            "lsp_rename_preview"
+          ]
+        }
+      ],
+      "scope": "重命名方法与诊断工具分发代码存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 持久会话身份登记册取代目录后缀发现",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "DurableSessionCatalog",
+            "ids",
+            "register"
+          ]
+        }
+      ],
+      "scope": "持久身份目录声明及登记入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 写入前登记、删除后注销及跨实例同步",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "register",
+            "unregister"
+          ]
+        }
+      ],
+      "scope": "注册与注销入口源码声明存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 旧会话按文档身份及备份核验补录",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "adopt",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "历史身份补录与快照校验入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 事件投影检查点与真实会话身份分离",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "discoverExistingDocuments",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "按文档身份发现已有会话的入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 登记册损坏后验证原文件重建",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "ensureLoaded",
+            "discoverExistingDocuments"
+          ]
+        }
+      ],
+      "scope": "损坏恢复及扫描入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话直接读取补登记与快照身份防串话",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "adopt",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "读取时补录及快照身份校验方法存在"
+    }
+  ]
+}
