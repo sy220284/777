@@ -762,7 +762,9 @@ class LocalWorkspace(
                         index = closing
                     } else output.append("\\{")
                 }
-                '.', '(', ')', '+', '|', '^', '
+                '.', '(', ')', '+', '|', '^', '$', '@', '%', '}', '[', ']', '\\' ->
+                    output.append('\\').append(char)
+                else -> output.append(char)
             }
             index++
         }
