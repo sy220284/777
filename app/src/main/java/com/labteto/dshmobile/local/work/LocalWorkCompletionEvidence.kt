@@ -13,6 +13,7 @@ internal data class LocalWorkCompletionEvidence(
     val activeTeamMembers: Int,
     val pendingTeamMessages: Int,
     val failedTeamMembers: Int,
+    val awaitingReviewMembers: Int,
     val teamFailure: Boolean,
     val teamRebuilding: Boolean,
     val blockedGoal: Boolean,
@@ -25,6 +26,7 @@ internal data class LocalWorkCompletionEvidence(
         if (activeTeamMembers > 0) add("完成声明与仍在运行的 Agent Team 成员冲突")
         if (pendingTeamMessages > 0) add("完成声明与待投递 Agent Team 消息冲突")
         if (failedTeamMembers > 0) add("完成声明与失败的 Agent Team 成员冲突")
+        if (awaitingReviewMembers > 0) add("完成声明与仍待核验的 Agent Team 成果冲突")
         if (teamFailure) add("完成声明与 Agent Team 异常状态冲突")
         if (teamRebuilding) add("完成声明与正在恢复的 Agent Team 状态冲突")
         if (blockedGoal) add("完成声明与阻塞目标状态冲突")
@@ -38,6 +40,7 @@ internal data class LocalWorkCompletionEvidence(
         if (activeTeamMembers > 0) add("仍有 $activeTeamMembers 个智能体在执行")
         if (pendingTeamMessages > 0) add("仍有 $pendingTeamMessages 条 Team 消息待投递")
         if (failedTeamMembers > 0) add("仍有 $failedTeamMembers 个 Agent Team 成员失败")
+        if (awaitingReviewMembers > 0) add("仍有 $awaitingReviewMembers 个 Agent Team 成果待核验")
         if (teamFailure) add("Agent Team 当前存在异常状态")
         if (teamRebuilding) add("Agent Team 正在恢复状态")
         if (blockedGoal) add("目标仍处于阻塞状态")
@@ -65,6 +68,7 @@ internal fun localWorkCompletionEvidence(work: LocalWorkState): LocalWorkComplet
             team.members.sumOf { it.pendingMessageCount },
         ),
         failedTeamMembers = failedMemberCount,
+        awaitingReviewMembers = team.returnedMemberCount,
         teamFailure = !team.failure.isNullOrBlank(),
         teamRebuilding = team.rebuilding,
         blockedGoal = work.goal?.status == "blocked",
