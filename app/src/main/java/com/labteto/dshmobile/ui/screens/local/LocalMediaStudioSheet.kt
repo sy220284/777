@@ -219,8 +219,10 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
                             val task = viewModel.startVideo(selected, prompt)
+                            // The external creation may already be billable; retain its returned ID even
+                            // if the user selected a different creative model while submission was pending.
+                            onVideoTaskChange(selected.id, task)
                             if (selected.id == activeOfferId) {
-                                onVideoTaskChange(selected.id, task)
                                 videoState = "Queueing"
                                 videoLink = null
                             }
