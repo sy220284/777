@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.LocalModelDelta
+import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalModelToolCallingMode
@@ -81,7 +82,12 @@ class DeepSeekClient @Inject constructor(
             put("messages", JsonArray(messages))
             put("stream", false)
             temperature?.let { put("temperature", it) }
-            if (reasoningEffort != null) {
+            val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
+            if (miniMax) {
+                put("reasoning_split", true)
+                LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
+            }
+            if (reasoningEffort != null && !miniMax) {
                 val officialDeepSeek = runCatching {
                     URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
                 }.getOrDefault(false)
@@ -188,7 +194,12 @@ class DeepSeekClient @Inject constructor(
             put("stream", true)
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
-            if (reasoningEffort != null) {
+            val miniMax = LocalMiniMaxPolicy.isOfficial(baseUrl)
+            if (miniMax) {
+                put("reasoning_split", true)
+                LocalMiniMaxPolicy.writeThinking(this, model, reasoningEffort, anthropic = false)
+            }
+            if (reasoningEffort != null && !miniMax) {
                 val officialDeepSeek = runCatching {
                     URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", true)
                 }.getOrDefault(false)
@@ -240,6 +251,7 @@ class DeepSeekClient @Inject constructor(
                 )
                 val content = StringBuilder()
                 val reasoning = StringBuilder()
+                val reasoningDetails = linkedMapOf<Int, JsonObject>()
                 val fallback = StringBuilder()
                 val toolCalls = linkedMapOf<Int, StreamToolCall>()
                 var streamUsage: JsonObject? = null
@@ -287,6 +299,7 @@ class DeepSeekClient @Inject constructor(
                         } catch (error: Exception) {
                             throw streamProtocolError("模型流式响应包含无法解析的数据帧", error)
                         }
+                        LocalMiniMaxPolicy.requireSuccessfulResponse(root)
                         if (root["error"] != null && root["error"] !is JsonNull) {
                             throw LocalModelException(
                                 code = "MODEL_STREAM_ERROR",
@@ -308,8 +321,23 @@ class DeepSeekClient @Inject constructor(
                         if (delta == null) continue
                         val textDelta = assistantText(delta["content"]).orEmpty() +
                             (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                        (delta["reasoning_details"] as? JsonArray)?.forEachIndexed { position, raw ->
+                            val part = raw as? JsonObject ?: throw streamProtocolError("reasoning_details 内容格式错误")
+                            val index = part["index"]?.jsonPrimitive?.intOrNull ?: position
+                            val previous = reasoningDetails[index]
+                            reasoningDetails[index] = buildJsonObject {
+                                previous?.forEach { (key, value) -> put(key, value) }
+                                part.forEach { (key, value) ->
+                                    if (key in setOf("text", "data", "signature") && value is JsonPrimitive && value.isString) {
+                                        put(key, previous?.get(key)?.jsonPrimitive?.contentOrNull.orEmpty() + value.content)
+                                    } else put(key, value)
+                                }
+                            }
+                        }
+                        val detailDelta = (delta["reasoning_details"] as? JsonArray).orEmpty()
+                            .mapNotNull { (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull }.joinToString("")
                         val reasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
-                            ?.contentOrNull.orEmpty()
+                            ?.contentOrNull ?: detailDelta
                         if (textDelta.isNotEmpty()) content.append(textDelta)
                         if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
                         if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
@@ -384,6 +412,7 @@ class DeepSeekClient @Inject constructor(
                     put("role", "assistant")
                     put("content", content.toString())
                     if (reasoning.isNotEmpty()) put("reasoning_content", reasoning.toString())
+                    if (reasoningDetails.isNotEmpty()) put("reasoning_details", JsonArray(reasoningDetails.toSortedMap().values.toList()))
                     if (calls.isNotEmpty()) {
                         put("tool_calls", buildJsonArray {
                             calls.zip(accumulated).forEach { (call, accumulator) ->
@@ -458,6 +487,7 @@ class DeepSeekClient @Inject constructor(
     )
     internal fun parse(body: String): LocalModelReply {
         val root = json.parseToJsonElement(body).jsonObject
+        LocalMiniMaxPolicy.requireSuccessfulResponse(root)
         val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
         (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull
             ?.takeIf(String::isNotBlank)?.let(::requireCompleteFinishReason)
@@ -486,7 +516,10 @@ class DeepSeekClient @Inject constructor(
             message = normalizedMessage,
             content = assistantText(message["content"])
                 ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull,
-            reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
+            reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull
+                ?: (message["reasoning_details"] as? JsonArray)?.mapNotNull {
+                    (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull
+                }?.joinToString(""),
             toolCalls = calls,
             usage = usage,
         )

@@ -291,7 +291,7 @@ internal fun prepareLocalModelAdapterRequest(
     val routedTemperature = temperature
         ?.takeIf {
             route.capabilities.temperature &&
-                (reasoningEffort == null || reasoningEffort == "none") &&
+                (reasoningEffort == null || reasoningEffort == "none" || LocalMiniMaxPolicy.isOfficial(route.baseUrl)) &&
                 (!providerRequiresDisabledThinking || reasoningEffort == "none")
         }
         .takeUnless {

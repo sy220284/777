@@ -150,6 +150,7 @@ internal class AnthropicMessagesAdapter @Inject constructor(
         temperature = request.temperature,
         streaming = streaming,
         onDelta = onDelta,
+        reasoningEffort = request.reasoningEffort,
     )
 }
 

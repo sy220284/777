@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1320,
-  "production_source_count": 786,
-  "test_code_file_count": 415,
+  "repository_code_file_count": 1363,
+  "production_source_count": 788,
+  "test_code_file_count": 417,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -69,7 +69,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
     }
   ],
-  "semantic_registration_count": 0,
+  "semantic_registration_count": 1,
   "production_file_fingerprints": [
     {
       "path": "app/src/main/java/com/github/sisong/HPatch.kt",
@@ -169,7 +169,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
-      "sha256": "45c765a7066a5e14"
+      "sha256": "24216b8d7a75decc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt",
-      "sha256": "35e3f65c28842692"
+      "sha256": "7b075f9f9413aa6d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/CancellableModelResponse.kt",
@@ -1049,7 +1049,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalCanonicalModel.kt",
-      "sha256": "45f2cdf41f5df5de"
+      "sha256": "1f2d973b9b67e279"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalDeepSeekSearchCredentialResolver.kt",
@@ -1076,12 +1076,16 @@
       "sha256": "90d2b41963fcfab6"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMiniMaxPolicy.kt",
+      "sha256": "6458f11277fee86a"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAccountStateCoordinator.kt",
       "sha256": "74231944df8f2e67"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAdapter.kt",
-      "sha256": "f2e7f44e92458f93"
+      "sha256": "5f57c1fa05f406c7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelApiKeyDraft.kt",
@@ -1113,7 +1117,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
-      "sha256": "7bf4cd180498972b"
+      "sha256": "d181035a5d966e08"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt",
@@ -1149,7 +1153,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfiles.kt",
-      "sha256": "65084bb6d8f5275a"
+      "sha256": "307b461a6eec5e23"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelReplyValidation.kt",
@@ -1221,7 +1225,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalReasoningRequestPolicy.kt",
-      "sha256": "4ea0dde76d7114a4"
+      "sha256": "1e39a24976624b3c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalRecoverableToolResultProjection.kt",
@@ -1768,6 +1772,10 @@
       "sha256": "c0eb5e95110e705d"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
+      "sha256": "e232bd9d0a7b61eb"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
       "sha256": "5a9ca4c3031b2a13"
     },
@@ -1789,7 +1797,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "sha256": "7194e01e0bc8a948"
+      "sha256": "3341bea8041f852c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
@@ -3217,26 +3225,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "7f29bc151292",
+  "source_snapshot": "bf8f52dc4c82",
   "observed_delta": {
-    "baseline": "8d1daeaebdc9",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionNavigationInbox.kt"
-    ],
+    "baseline": "71bdded768ba",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/ChatGptSettingsController.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAutomationUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
@@ -3249,7 +3243,7 @@
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 2,
   "verified_registrations": [],
-  "unverified_changes_count": 0,
+  "unverified_changes_count": 1,
   "obsolete_historical_evidence_count": 11,
   "current_tree_outdated_source_count": 0
 }

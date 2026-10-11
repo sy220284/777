@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -113,7 +115,7 @@ internal object LocalPresetSkillCatalog {
             6. 校验遗漏、错译、数字和术语一致性；需要保留原格式的内容逐项对应。
             7. 交付完整译文，存在歧义时给出处置建议，不随意改写原作者观点。
             """.trimIndent()),
-    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) }
+    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) } + LocalMiniMaxSkillCatalog.entries
 }
 
 internal val LOCAL_SKILL_ID_PATTERN = Regex("[a-z][a-z0-9-]{1,47}")
@@ -139,7 +141,10 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
 }
 
 /** Single writer for workspace SKILL.md files; both the UI and the model read these same files. */
-internal class LocalSkillStore(private val workspace: LocalWorkspace) {
+internal class LocalSkillStore(
+    private val workspace: LocalWorkspace,
+    private val bundleFiles: ((String) -> Map<String, String>)? = null,
+) {
     private val skillsDir get() = File(workspace.path, ".dsh/skills")
     private val seedMarker = ".dsh/skills/.preset-seed-v1"
 
@@ -246,17 +251,40 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     fun seedOnce() {
         if (File(workspace.path, seedMarker).exists()) {
             upgradeUntouchedPresets()
-            return
+        } else {
+            LocalPresetSkillCatalog.entries.filterNot { it.id in bundledIds }.forEach { preset ->
+                if (!workspace.skills().contains(preset.id)) install(preset.id)
+            }
+            workspace.write(".dsh/skills/.preset-seed-v1", "seeded\n")
         }
-        for (entry in LocalPresetSkillCatalog.entries) {
-            if (!File(skillsDir, entry.id).exists()) install(entry.id)
+        // A separate one-time migration preserves deletions of the original presets.
+        if (bundleFiles != null && !File(skillsDir, ".minimax-seed-v1").exists()) {
+            LocalMiniMaxSkillCatalog.entries.forEach { preset ->
+                if (!workspace.skills().contains(preset.id)) install(preset.id)
+            }
+            workspace.write(".dsh/skills/.minimax-seed-v1", "seeded\n")
         }
-        workspace.write(seedMarker, "v1\n")
     }
+
+    private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()
 
     fun install(id: String) {
         val preset = LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }
-            ?: throw IllegalArgumentException("未知预置技能")
+            ?: throw IllegalArgumentException("未知的预置技能")
+        require(!workspace.skills().contains(id)) { "同名技能已经存在" }
+        if (id in bundledIds) {
+            val files = requireNotNull(bundleFiles) { "当前环境未提供 MiniMax 技能资源" }(id)
+            require("upstream/SKILL.md" in files && "LICENSE" in files && "SOURCE.md" in files) {
+                "MiniMax 技能资源不完整"
+            }
+            // Publish SKILL.md last. Preserve supporting files edited by the user after removal.
+            files.forEach { (relative, text) ->
+                require(relative.split('/').none { it.isBlank() || it == "." || it == ".." } &&
+                    '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
+                val path = ".dsh/skills/$id/$relative"
+                if (!File(workspace.path, path).exists()) workspace.write(path, text)
+            }
+        }
         addDocument(id, buildLocalSkillDocument(id, preset.description, preset.instructions, preset.whenToUse, preset.title))
     }
 
@@ -343,10 +371,25 @@ internal class LocalSkillStore(private val workspace: LocalWorkspace) {
     }
 }
 
+// FEATURE_TREE: {"id":"skills.minimax-official-bundles","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录","owner":"TOOLS","entry":"LocalSkillManager","test":"app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"}
 @Singleton
-internal class LocalSkillManager @Inject constructor(storage: LocalSessionStorageRuntime) {
+internal class LocalSkillManager @Inject constructor(
+    storage: LocalSessionStorageRuntime,
+    @ApplicationContext context: Context,
+) {
     private val storageWorkspace = storage.files.workspace
-    private val store = LocalSkillStore(storageWorkspace)
+    private val store = LocalSkillStore(storageWorkspace) { id ->
+        val files = linkedMapOf<String, String>()
+        fun readDirectory(relative: String) {
+            val path = "minimax-skills/$id" + if (relative.isEmpty()) "" else "/$relative"
+            val children = context.assets.list(path).orEmpty()
+            if (children.isEmpty()) {
+                files[relative] = context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
+            } else children.forEach { child -> readDirectory(if (relative.isEmpty()) child else "$relative/$child") }
+        }
+        readDirectory("")
+        files
+    }
     fun initializeDefaults() = store.seedOnce()
     fun installed(): List<LocalInstalledSkill> = store.installed()
     fun presets(): List<LocalPresetSkill> = store.presets()
