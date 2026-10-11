@@ -171,6 +171,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             context = sharedContext,
             userInput = input,
             storyContext = handoffSummary,
+            subjectKey = chatRelationshipSubjectKey(member.galleryId, member.personaId),
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = "若本轮没有发言，使用 $silentToken 表示。"

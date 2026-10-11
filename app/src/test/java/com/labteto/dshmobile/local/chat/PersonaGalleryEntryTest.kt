@@ -47,7 +47,7 @@ class PersonaGalleryEntryTest {
         assertTrue(context.contains("不从旧场景快照继承"))
         assertFalse(context.contains("多次表示继续留在院中"))
         assertTrue(context.contains("明早九点出发"))
-        assertFalse(context.contains("日常片段30"))
-        assertTrue(context.contains("角色旧回复已归档"))
+        assertTrue(context.contains("日常片段30"))
+        assertTrue(context.contains("角色历史表达只说明当时发生过的交流"))
     }
 }

@@ -30,6 +30,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
     private val projects: ProjectContextPort,
+    private val persistence: LocalChatPersistence? = null,
 ) {
     /** ProjectFeature owns instruction text; Chat only decides when the current session may use it. */
     internal fun projectStablePrompt(snapshot: LocalHarnessState, base: String): String =
@@ -52,19 +53,25 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         } else {
             snapshot.chat.chatContext
         }
+        val decisions = persistence?.diaryStore?.decisionsForExperience(
+            chatRelationshipSubjectKey(snapshot.chat.galleryId, snapshot.chat.personaId),
+            sharedContext.withExperience(snapshot.sessionId, listOf(snapshot.sessionId)),
+        ).orEmpty()
+        val correctedState = reconcileDiaryState(snapshot.chat.chatState, decisions)
+        val correctedContext = reconcileDiaryContext(sharedContext, decisions)
         val context = if (snapshot.chat.chatPersona.isUnboundChatPersona()) {
             runner.prepareProfile(
                 persona = snapshot.chat.chatPersona,
-                state = snapshot.chat.chatState,
-                context = sharedContext,
+                state = correctedState,
+                context = correctedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
             )
         } else {
             runner.prepare(
                 personaId = snapshot.chat.personaId,
-                state = snapshot.chat.chatState,
-                context = sharedContext,
+                state = correctedState,
+                context = correctedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
             )
@@ -77,7 +84,8 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         return LocalPreparedChatTurn(
             context = context.copy(stablePrompt = projectStablePrompt(snapshot, context.stablePrompt)),
             dynamicContext = ChatContextAssembler.assemble(
-                dynamicPrompt = context.dynamicPrompt,
+                dynamicPrompt = listOf(context.dynamicPrompt, renderDiaryDecisions(decisions))
+                    .filter(String::isNotBlank).joinToString("\n\n"),
                 relationshipMemory = relationshipMemory,
                 userInput = input,
                 recentAssistantReplies = recentAssistantReplies,
@@ -91,13 +99,16 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         context: ChatContextState = ChatContextState(),
         userInput: String,
         storyContext: String?,
-    ): ChatTurnContext = runner.prepareProfile(
-        persona = persona,
-        state = state,
-        context = context,
-        userInput = userInput,
-        storyContext = storyContext,
-    )
+        subjectKey: String? = null,
+    ): ChatTurnContext {
+        val decisions = subjectKey?.let { persistence?.diaryStore?.decisionsForExperience(it, context) }.orEmpty()
+        val prepared = runner.prepareProfile(
+            persona = persona, state = reconcileDiaryState(state, decisions),
+            context = reconcileDiaryContext(context, decisions), userInput = userInput, storyContext = storyContext,
+        )
+        return prepared.copy(dynamicPrompt = listOf(prepared.dynamicPrompt, renderDiaryDecisions(decisions))
+            .filter(String::isNotBlank).joinToString("\n\n"))
+    }
 
     internal suspend fun finalize(
         snapshot: LocalHarnessState,

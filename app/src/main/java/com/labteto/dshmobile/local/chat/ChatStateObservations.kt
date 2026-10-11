@@ -38,7 +38,7 @@ internal fun ChatCharacterState.bindStateObservationSources(turns: List<ChatPend
             sourceUserMessageId = source.userMessageId, sourceAssistantMessageId = source.assistantMessageId)
     })
 
-private fun characterStateObservationValues(state: ChatCharacterState): Map<String, String> = linkedMapOf(
+internal fun characterStateObservationValues(state: ChatCharacterState): Map<String, String> = linkedMapOf(
     "physicalState" to state.physicalState, "mood" to state.mood,
     "relationshipState" to state.relationshipState, "currentFocus" to state.currentFocus,
     "currentUserImpression" to state.currentUserImpression, "activeGoal" to state.activeGoal,

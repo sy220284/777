@@ -26,6 +26,10 @@ data class ChatDiaryDelta(
     val unresolvedEcho: String = "",
     val importance: Int = 0,
     val disclosure: String = "SHAREABLE",
+    /** Search-only concepts grounded in this event; never instructions for the character. */
+    val recallAnchors: List<String> = emptyList(),
+    /** Optional original character expression supporting the subjective fields. */
+    val subjectiveEvidence: String = "",
 )
 
 @Serializable
@@ -49,6 +53,9 @@ data class ChatDiaryRevision(
     val projectionId: String? = null,
     /** A user-authored revision supersedes the generated summary without rewriting its source. */
     val userCorrected: Boolean = false,
+    val recallAnchors: List<String> = emptyList(),
+    val subjectiveEvidence: String = "",
+    val subjectiveInferred: Boolean = true,
 )
 
 @Serializable
@@ -75,6 +82,10 @@ data class ChatDiaryEntry(
     val active: Boolean = true,
     val createdAt: Long,
     val updatedAt: Long,
+    val experienceId: String = "",
+    val recallAnchors: List<String> = emptyList(),
+    val subjectiveEvidence: String = "",
+    val subjectiveInferred: Boolean = true,
 )
 
 @Serializable
@@ -98,4 +109,7 @@ internal data class ChatDiaryWriteRequest(
     val evidenceText: String,
     val generation: Long,
     val projectionId: String? = null,
+    val experienceId: String = "",
+    val experienceSessionIds: List<String> = emptyList(),
+    val characterEvidenceText: String = "",
 )

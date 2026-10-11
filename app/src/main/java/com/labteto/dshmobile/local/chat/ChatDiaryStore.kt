@@ -30,11 +30,25 @@ internal class ChatDiaryStore(
                 }
             }
         ) return null
+        document.entries.firstOrNull { entry ->
+            entry.subjectKey == request.subjectKey &&
+                diaryMatchesExperience(entry, request.experienceId,
+                    (request.experienceSessionIds + request.sourceSessionId).toSet()) &&
+                (!entry.active || entry.revisions.lastOrNull()?.userCorrected == true) &&
+                entry.sources.any { source -> source.sessionId == request.sourceSessionId &&
+                    ((source.userMessageId.isNotBlank() && source.userMessageId in request.sourceUserMessageIds) ||
+                        (source.assistantMessageId.isNotBlank() && source.assistantMessageId in request.sourceAssistantMessageIds)) }
+        }?.let { return null }
         request.projectionId?.let { id ->
             document.entries.firstOrNull { entry -> entry.revisions.any { it.projectionId == id } }
                 ?.let { return it }
         }
-        val entries = document.entries.toMutableList()
+        val entries = document.entries.map { entry ->
+            if (entry.subjectKey == request.subjectKey && entry.experienceId.isBlank() && request.experienceId.isNotBlank() &&
+                entry.sources.any { it.sessionId in request.experienceSessionIds }) {
+                entry.copy(experienceId = request.experienceId)
+            } else entry
+        }.toMutableList()
         val disclosure = ChatDiaryEntryPolicy.disclosureFor(request, delta)
         val candidateSources = ChatDiaryEntryPolicy.sourcesFor(request)
         val candidateRevision = ChatDiaryRevision(
@@ -43,6 +57,9 @@ internal class ChatDiaryStore(
             innerThought = delta.innerThought,
             relationshipMeaning = delta.relationshipMeaning,
             unresolvedEcho = delta.unresolvedEcho,
+            recallAnchors = delta.recallAnchors,
+            subjectiveEvidence = delta.subjectiveEvidence,
+            subjectiveInferred = delta.subjectiveEvidence.isBlank(),
             importance = delta.importance,
             disclosure = disclosure,
             sources = candidateSources,
@@ -52,12 +69,16 @@ internal class ChatDiaryStore(
         val candidate = ChatDiaryEntry(
             id = UUID.randomUUID().toString(),
             subjectKey = request.subjectKey.trim(),
+            experienceId = request.experienceId,
             personaName = request.personaName.trim().take(120),
             event = delta.event,
             feeling = delta.feeling,
             innerThought = delta.innerThought,
             relationshipMeaning = delta.relationshipMeaning,
             unresolvedEcho = delta.unresolvedEcho,
+            recallAnchors = delta.recallAnchors,
+            subjectiveEvidence = delta.subjectiveEvidence,
+            subjectiveInferred = delta.subjectiveEvidence.isBlank(),
             importance = delta.importance,
             sourceMode = request.sourceMode,
             disclosure = disclosure,
@@ -132,6 +153,9 @@ internal class ChatDiaryStore(
             innerThought = correction.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = correction.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = correction.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            recallAnchors = previous.recallAnchors,
+            subjectiveEvidence = "",
+            subjectiveInferred = false,
             importance = previous.importance,
             disclosure = previous.disclosure,
             sources = previous.sources,
@@ -210,11 +234,24 @@ internal class ChatDiaryStore(
     }
 
     @Synchronized
+    fun decisionsForExperience(subjectKey: String?, context: ChatContextState): List<ChatDiaryEntry> =
+        documents.read().entries.filter { entry ->
+            entry.subjectKey == subjectKey &&
+                diaryMatchesExperience(entry, context.experienceId, context.experienceSessionIds.toSet()) &&
+                (!entry.active || entry.revisions.lastOrNull()?.userCorrected == true)
+        }
+
+    fun reconcileState(subjectKey: String?, state: ChatCharacterState, context: ChatContextState): ChatCharacterState =
+        reconcileDiaryState(state, decisionsForExperience(subjectKey, context))
+
+    @Synchronized
     fun search(
         query: String,
         subjectKey: String,
         groupAudience: Boolean,
         maxItems: Int,
+        experienceId: String = "",
+        sourceSessionIds: Set<String> = emptySet(),
     ): List<ChatDiaryEntry> =
         ChatDiaryRecallEngine.search(
             entries = documents.read().entries,
@@ -222,6 +259,8 @@ internal class ChatDiaryStore(
             subjectKey = subjectKey,
             groupAudience = groupAudience,
             maxItems = maxItems,
+            experienceId = experienceId,
+            sourceSessionIds = sourceSessionIds,
         )
 
     @Synchronized

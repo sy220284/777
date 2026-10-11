@@ -55,10 +55,9 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                     .takeUnless {
                         it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色"
                     },
-                subjectKey = chatRelationshipSubjectKey(
-                    snapshot.chat.galleryId,
-                    snapshot.chat.personaId,
-                ),
+                subjectKey = scopedRelationshipSubjectKey(chatRelationshipSubjectKey(
+                    snapshot.chat.galleryId, snapshot.chat.personaId,
+                ), snapshot.chat.chatContext.experienceId.ifBlank { snapshot.sessionId }),
             )
         }.onFailure { error ->
             if (error is CancellationException) throw error
@@ -120,7 +119,6 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
-
         run {
             val relationshipKinds = setOf(
                 MemoryKind.RELATIONSHIP_FACT,
@@ -137,12 +135,15 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 allowedKinds = relationshipKinds,
                 maxItems = 4,
                 maxChars = (budget.factTokens * 3).coerceAtLeast(720),
+                additionalLineageIds = conversation.experienceSessionIds.toSet(),
                 recordFilter = { memory ->
                     relationshipMemoryMatchesSubject(
                         memory = memory,
                         currentSubjectKey = subjectKey,
                         currentLineageId = snapshot.lineageId,
                         subjectLabel = subjectLabel,
+                        experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
+                        sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
                     )
                 },
             ).distinctBy { it.id }
@@ -181,15 +182,18 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
                 maxItems = diaryRecallItemLimit(recallQuery),
+                experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
+                sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
             )
             if (diary.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine("【相关人物日记｜角色自己的长期经历】")
                         appendLine(diaryRecallUsageInstruction(groupAudience))
-                        diary.forEach { entry ->
-                            appendLine(renderRecalledChatDiary(entry, groupAudience))
-                        }
+                        packCompleteCharacterUnits(
+                            diary.map { renderRecalledChatDiary(it, groupAudience) },
+                            (budget.diaryTokens - 100).coerceAtLeast(0),
+                        ).forEach(::appendLine)
                     }.trim(),
                     budget.diaryTokens,
                 )

@@ -21,14 +21,11 @@ internal object ChatDiaryEntryPolicy {
             unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
-        ).takeIf { delta ->
-            // Shared experiences may be important even when the character did not
-            // report a feeling. Their event still needs source evidence and significance.
-            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank() ||
-                (delta.importance >= 4 &&
-                    ((delta.relationshipMeaning.isNotBlank() && event.length >= 10) ||
-                        event.length >= 18))
-        }
+            recallAnchors = raw.recallAnchors.map { it.trim().take(80) }
+                .filter(String::isNotBlank).distinct().take(12),
+            subjectiveEvidence = raw.subjectiveEvidence.trim().take(400)
+                .takeIf { it.isNotBlank() && request.characterEvidenceText.contains(it) }.orEmpty(),
+        )
     }
 
     fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure {
@@ -94,6 +91,9 @@ internal object ChatDiaryEntryPolicy {
                     innerThought = entry.innerThought,
                     relationshipMeaning = entry.relationshipMeaning,
                     unresolvedEcho = entry.unresolvedEcho,
+                    recallAnchors = entry.recallAnchors,
+                    subjectiveEvidence = entry.subjectiveEvidence,
+                    subjectiveInferred = entry.subjectiveInferred,
                     importance = entry.importance,
                     disclosure = entry.disclosure,
                     sources = entry.sources,
@@ -115,6 +115,9 @@ internal object ChatDiaryEntryPolicy {
             innerThought = current.innerThought.take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
             relationshipMeaning = current.relationshipMeaning.take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = current.unresolvedEcho.take(ChatDiaryBounds.MAX_ECHO_CHARS),
+            recallAnchors = current.recallAnchors,
+            subjectiveEvidence = current.subjectiveEvidence,
+            subjectiveInferred = current.subjectiveInferred,
             importance = revisions.maxOf(ChatDiaryRevision::importance),
             disclosure = current.disclosure,
             sources = sources,
@@ -131,6 +134,7 @@ internal object ChatDiaryEntryPolicy {
         existing.active &&
             existing.revisions.lastOrNull()?.userCorrected != true &&
             existing.subjectKey == candidate.subjectKey &&
+            existing.experienceId == candidate.experienceId &&
             existing.sourceMode == candidate.sourceMode &&
             existing.disclosure == candidate.disclosure &&
             revisionsOf(existing).size < ChatDiaryBounds.MAX_REFINEMENT_REVISIONS &&
@@ -165,7 +169,7 @@ internal object ChatDiaryEntryPolicy {
         queryTerms: Set<String>,
         now: Long,
     ): ChatDiaryMatchScore {
-        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho)
+        val lexical = terms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho + " " + entry.recallAnchors.joinToString(" "))
             .count(queryTerms::contains)
         val phrase = if (queryCore.isBlank()) 0 else {
             (similarity(queryCore, searchText(entry)) * 100).toInt()
@@ -200,6 +204,7 @@ internal object ChatDiaryEntryPolicy {
             entry.innerThought,
             entry.relationshipMeaning,
             entry.unresolvedEcho,
+            entry.recallAnchors.joinToString(" "),
         ).filter(String::isNotBlank).joinToString(" ")
 
     private fun similarity(left: String, right: String): Double {

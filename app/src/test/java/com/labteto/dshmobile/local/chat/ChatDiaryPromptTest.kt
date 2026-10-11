@@ -12,7 +12,7 @@ class ChatDiaryPromptTest {
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
-    fun diaryPromptDemandsNarrativePsychologyInsteadOfChronologyList() {
+    fun diaryPromptAllowsEventOnlyRecordsAndMarksUncertainPsychology() {
         val prompt = planner.prompt(
             persona = PersonaProfile(name = "阿青", portrait = "嘴硬心软，但不会为了证明这一点每轮都表演出来。"),
             state = ChatCharacterState(),
@@ -26,13 +26,10 @@ class ChatDiaryPromptTest {
         assertTrue(system.contains("精炼成稿"))
         assertTrue(system.contains("完整的当前版本"))
         assertTrue(system.contains("心理活动"))
-        assertTrue(system.contains("关系意味着什么"))
-        assertTrue(system.contains("角色本人视角") || system.contains("第一人称"))
-        assertTrue(system.contains("第一人称内在表述"))
-        assertTrue(system.contains("feeling 或 innerThought 至少一项非空"))
-        assertTrue(system.contains("MAJOR 也不能只写 event"))
-        assertTrue(system.contains("稳定性格和心理逻辑"))
-        assertTrue(system.contains("角色对用户动机的猜测不能写成事实"))
+        assertTrue(system.contains("可以只记录 event"))
+        assertTrue(system.contains("subjectiveEvidence"))
+        assertTrue(system.contains("保留不确定性"))
+        assertFalse(system.contains("至少一项非空"))
         assertTrue(system.contains("PRIVATE"))
         assertTrue(system.contains("该信息只属于当前人物"))
         assertTrue(system.contains("其他人物的所知以实际公开事件为准"))

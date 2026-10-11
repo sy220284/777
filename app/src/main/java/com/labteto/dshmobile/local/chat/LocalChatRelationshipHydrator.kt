@@ -21,6 +21,7 @@ internal class LocalChatRelationshipHydrator @Inject constructor(
 ) {
     internal fun hydrate() {
         val snapshot = chatState.value
+        if (snapshot.chat.groupChat.enabled) return
         if (
             snapshot.usageMode != LocalUsageMode.CHAT ||
             !snapshot.autoRecall ||
@@ -49,6 +50,8 @@ internal class LocalChatRelationshipHydrator @Inject constructor(
                         currentSubjectKey = subjectKey,
                         currentLineageId = aggregate.lineageId,
                         subjectLabel = aggregate.chat.chatPersona.name,
+                        experienceId = aggregate.chat.chatContext.experienceId.ifBlank { aggregate.sessionId },
+                        sourceSessionIds = (aggregate.chat.chatContext.experienceSessionIds + aggregate.sessionId).toSet(),
                     ) &&
                     it.content.startsWith(prefix)
             }

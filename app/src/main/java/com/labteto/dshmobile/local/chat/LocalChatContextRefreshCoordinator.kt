@@ -486,7 +486,12 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             candidate = plan.state.continuity,
             pendingTurns = pending,
         )
-        val deterministicState = plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext()
+        val diaryDecisions = diaryStore.decisionsForExperience(
+            chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId), baseContext,
+        )
+        val deterministicState = reconcileDiaryState(
+            plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext(), diaryDecisions,
+        )
         val lease = LocalSessionRuntimeRegistry.tryAcquire(expectedSessionId, LocalSessionRuntimeKind.MAINTENANCE)
         if (lease == null) {
             scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "session-busy")
@@ -511,7 +516,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded")
                 return
             }
-            nextContext = currentContext.commitProcessed(currentContext.scene, groundedContinuity, throughSequence)
+            nextContext = reconcileDiaryContext(
+                currentContext.commitProcessed(currentContext.scene, groundedContinuity, throughSequence), diaryDecisions,
+            )
             val target = current.copy(chat = current.chat.copy(
                 chatState = deterministicState,
                 chatContext = nextContext,
@@ -531,6 +538,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                         listOf(turn.userMessage, turn.assistantMessage).filter(String::isNotBlank).joinToString(" ")
                     },
                     generation = expectedGeneration,
+                    experienceId = current.chat.chatContext.experienceId.ifBlank { expectedSessionId },
+                    experienceSessionIds = current.chat.chatContext.experienceSessionIds,
+                    characterEvidenceText = assistantEvidenceBatch,
                 )
             } else null
             // The full domain state and projection recipe are durable before publishing the cursor.
@@ -545,9 +555,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                     latest.chat.chatContext.processedThroughSequence != baseContext.processedThroughSequence
                 ) latest else {
                     applied = true
-                    nextContext = latest.chat.chatContext.commitProcessed(
+                    nextContext = reconcileDiaryContext(latest.chat.chatContext.commitProcessed(
                         latest.chat.chatContext.scene, groundedContinuity, throughSequence,
-                    )
+                    ), diaryDecisions)
                     latest.copy(chat = latest.chat.copy(
                         chatState = deterministicState, chatContext = nextContext,
                         chatBranches = if (latest.transcriptIndex.branchingEligible) {

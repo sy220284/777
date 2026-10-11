@@ -235,8 +235,8 @@ class CharacterLifeRuntimeV3Test {
         assertTrue(!shouldRecallDiary("今天天气不错，晚上吃什么"))
         assertTrue(shouldSearchDiary("我们之前提过的海边那张照片挺好看的"))
         assertTrue(shouldRecallDiary("你还记得上次我们说好的那件事吗"))
-        assertEquals(3, diaryRecallItemLimit("你还记得上次我们说好的那件事吗"))
-        assertEquals(1, diaryRecallItemLimit("最近那件事还在影响你吗"))
+        assertEquals(6, diaryRecallItemLimit("你还记得上次我们说好的那件事吗"))
+        assertEquals(4, diaryRecallItemLimit("最近那件事还在影响你吗"))
     }
 
     @Test

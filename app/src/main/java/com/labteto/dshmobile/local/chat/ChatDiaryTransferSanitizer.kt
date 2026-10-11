@@ -17,6 +17,8 @@ internal object ChatDiaryTransferSanitizer {
         innerThought = raw.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
         relationshipMeaning = raw.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
         unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+        recallAnchors = raw.recallAnchors.map { it.trim().take(80) }.filter(String::isNotBlank).distinct().take(12),
+        subjectiveEvidence = raw.subjectiveEvidence.trim().take(400),
         importance = raw.importance.coerceIn(0, 5),
         sources = emptyList(),
         revisions = raw.revisions.takeLast(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS).map { revision ->
@@ -26,6 +28,8 @@ internal object ChatDiaryTransferSanitizer {
                 innerThought = revision.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
                 relationshipMeaning = revision.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
                 unresolvedEcho = revision.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
+                recallAnchors = revision.recallAnchors.map { it.trim().take(80) }.filter(String::isNotBlank).distinct().take(12),
+                subjectiveEvidence = revision.subjectiveEvidence.trim().take(400),
                 importance = revision.importance.coerceIn(0, 5),
                 sources = emptyList(),
             )

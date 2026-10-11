@@ -221,13 +221,17 @@ internal class LocalChatSessionLifecyclePlanner(
                 gallerySaveSuppressedThrough = 0L,
                 chatPersona = chatPersona,
                 chatState = chatState.withoutLegacyConversationContext(),
-                chatContext = chatContext,
+                chatContext = chatContext.withExperience(
+                    selectedGalleryStory.takeUnless { freshGalleryStory }?.id ?: nextSessionId,
+                    selectedGalleryStory.takeUnless { freshGalleryStory }?.sourceSessionIds.orEmpty() + nextSessionId,
+                ),
                 replySuggestions = emptyList(),
                 chatBranches = LocalChatBranchState(),
                 groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
                     continuedGroup ?: LocalGroupChatState(
                         mode = LocalChatMode.GROUP,
                         members = initialGroupMembers,
+                        context = ChatContextState().withExperience(nextSessionId, listOf(nextSessionId)),
                     )
                 } else {
                     LocalGroupChatState()

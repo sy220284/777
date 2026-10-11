@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "4329d6d7d65b",
+  "source_snapshot": "7f29bc151292",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -20,7 +20,7 @@
   },
   "unproven_manual_investigation": [
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
       "structural_kind": "integrated_character_profile",
       "separate_product_entry": false,
       "availability": "code_and_tests_present_execution_unverified",
@@ -535,7 +535,7 @@
       "verification": "源码中类/对象及Kotlin具名方法已读取；跨文件文本引用仍非编译解析调用链或实际运行验证"
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记人工纠正、停用与并发版本核验",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记纠正、停用与当前状态同步",
       "file_sources": [
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
       ],
@@ -544,34 +544,35 @@
         "ChatDiaryStore",
         "correctEntry",
         "deactivateEntry",
+        "decisionsForExperience",
         "detachSourceSessions",
         "invalidateGeneratedFromMessage",
         "listActive",
         "listForTransfer",
+        "reconcileState",
         "rollbackSourceSessionFrom"
       ],
-      "best_static_cross_file_symbol": "listActive",
+      "best_static_cross_file_symbol": "ChatDiaryStore",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 7,
+      "other_production_symbol_reference_count": 6,
       "other_production_reference_samples": [
-        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRelationshipHydrator.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryTools.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryManager.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalProjectUiFacade.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersistence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommit.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalTimelineRewriteTransaction.kt"
       ],
-      "test_file_symbol_reference_count": 8,
+      "test_file_symbol_reference_count": 9,
       "test_reference_samples": [
-        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContinuityExperienceTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryInvalidationTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt",
-        "app/src/test/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommitTest.kt",
-        "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt",
-        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt"
+        "app/src/test/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommitTest.kt"
       ],
       "separate_product_entry": null,
       "static_integration_hint": "candidate_external_source_reference",
@@ -681,6 +682,7 @@
         "LocalChatRuntime",
         "bindChatGallery",
         "clearChatGalleryBinding",
+        "commitDiaryDecision",
         "configureChatPersona",
         "configureGroupChatMembers",
         "correctDiaryEntry",
@@ -691,6 +693,7 @@
         "diaryEntriesForTransfer",
         "editAndResendUserMessage",
         "generateReplySuggestions",
+        "reconcileDiaryDecision",
         "regenerateReply",
         "removeGroupChatMemberByGalleryId",
         "selectChatMessageVariant",
@@ -699,8 +702,7 @@
         "startSessionFromGallery",
         "switchChatMode",
         "syncDefaultChatPersona",
-        "undoChatPersonaCorrection",
-        "updateBoundStoryStage"
+        "undoChatPersonaCorrection"
       ],
       "best_static_cross_file_symbol": "editAndResendUserMessage",
       "source_file_shared_by_tree_descriptions": 1,
@@ -1267,15 +1269,15 @@
       "best_static_cross_file_symbol": "complete",
       "source_file_shared_by_tree_descriptions": 3,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 62,
+      "other_production_symbol_reference_count": 63,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionAdapter.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt"
       ],
       "test_file_symbol_reference_count": 33,
       "test_reference_samples": [
@@ -2096,7 +2098,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 46,
+      "test_file_symbol_reference_count": 47,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2150,7 +2152,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 46,
+      "test_file_symbol_reference_count": 47,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2204,7 +2206,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 46,
+      "test_file_symbol_reference_count": 47,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2545,7 +2547,7 @@
       "best_static_cross_file_symbol": "current",
       "source_file_shared_by_tree_descriptions": 2,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 198,
+      "other_production_symbol_reference_count": 199,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
@@ -2635,11 +2637,12 @@
         "app/src/main/java/com/labteto/dshmobile/ui/components/ConversationScrollShortcut.kt",
         "app/src/main/java/com/labteto/dshmobile/ui/components/DisclosureRow.kt"
       ],
-      "test_file_symbol_reference_count": 6,
+      "test_file_symbol_reference_count": 7,
       "test_reference_samples": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContinuityExperienceTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTimelineMemoryRecoveryTest.kt"
@@ -3069,7 +3072,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 46,
+      "test_file_symbol_reference_count": 47,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -3167,15 +3170,15 @@
       "best_static_cross_file_symbol": "complete",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 62,
+      "other_production_symbol_reference_count": 63,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
         "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt"
       ],
       "test_file_symbol_reference_count": 33,
       "test_reference_samples": [
@@ -3220,15 +3223,15 @@
       "best_static_cross_file_symbol": "complete",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 62,
+      "other_production_symbol_reference_count": 63,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
         "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionAdapter.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt"
       ],
       "test_file_symbol_reference_count": 33,
       "test_reference_samples": [
@@ -3415,15 +3418,15 @@
       "best_static_cross_file_symbol": "complete",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 62,
+      "other_production_symbol_reference_count": 63,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
         "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt"
       ],
       "test_file_symbol_reference_count": 33,
       "test_reference_samples": [
@@ -3607,11 +3610,12 @@
         "app/src/main/java/com/labteto/dshmobile/ui/components/ConversationScrollShortcut.kt",
         "app/src/main/java/com/labteto/dshmobile/ui/components/DisclosureRow.kt"
       ],
-      "test_file_symbol_reference_count": 6,
+      "test_file_symbol_reference_count": 7,
       "test_reference_samples": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatContinuityExperienceTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTimelineMemoryRecoveryTest.kt"
