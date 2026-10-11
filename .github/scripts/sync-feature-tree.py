@@ -504,6 +504,29 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
     return result
 
 
+def ambiguous_source_anchors(root, entries):
+    """仅统计某个文件中实际存在声明的符号，不能把一个符号虚构到所有相关文件。"""
+    cached = {}
+    assignments = {}
+    for record in entries:
+        path = record["path"]
+        for filename in record.get("existing_production_sources", []):
+            if filename not in cached:
+                file = root / filename
+                cached[filename] = (file.read_text(encoding="utf-8", errors="replace")
+                                    if file.is_file() else "")
+            body = cached[filename]
+            for symbol in record.get("named_symbols", []):
+                if not symbol.get("declaration_found"):
+                    continue
+                name = symbol["symbol"]
+                if re.search(SYMBOL % re.escape(name), body):
+                    assignments.setdefault((filename, name), set()).add(path)
+    return [{"source": src, "symbol": name, "features": sorted(paths)}
+            for (src, name), paths in sorted(assignments.items())
+            if len(paths) > 1]
+
+
 def historical_identity_review(root, leafpaths, entries):
     """静态身份台账只用于溯源；缺失入口进入待核，不授权任何语义修改。"""
     manifest = root / LEGACY_IDENTITIES
@@ -557,18 +580,8 @@ def historical_identity_review(root, leafpaths, entries):
         if "problem" in candidate:
             stale.append(candidate)
         identities[path] = candidate
-    # 尚不能唯一证明一个符号对应一个功能的历史线索单独汇总。
-    bindings_by_entry = {}
-    for evidence in entries:
-        symbols = [x["symbol"] for x in evidence.get("named_symbols", [])
-                   if x.get("declaration_found")]
-        for symbol in symbols:
-            for source in evidence.get("existing_production_sources", []):
-                bindings_by_entry.setdefault((source, symbol), []).append(evidence["path"])
-    ambiguous = sorted({
-        path for pair, candidates in bindings_by_entry.items()
-        if len(candidates) > 1 for path in candidates
-    })
+    groups = ambiguous_source_anchors(root, entries)
+    ambiguous = sorted({name for group in groups for name in group["features"]})
     return identities, stale, ambiguous
 
 
@@ -1107,6 +1120,7 @@ def generate(root):
         "tracked_legacy_identities": len(identities),
         "stale_legacy_identities": stale_identities,
         "ambiguous_named_entry_paths": ambiguous_identities,
+        "ambiguous_named_entry_groups": ambiguous_source_anchors(root, evidence),
         "unproven_feature_triage": unresolved_features,
         "observed_code_delta": delta,
         "source_verified_registrations": len(registry_nodes),
