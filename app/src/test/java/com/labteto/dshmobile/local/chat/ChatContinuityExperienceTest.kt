@@ -152,6 +152,17 @@ class ChatContinuityExperienceTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun legacyCorrectionAlsoRejectsDelayedWriteAfterExperienceMigration() {
+        val root = Files.createTempDirectory("legacy-diary-correction").toFile()
+        try {
+            val store = ChatDiaryStore(root, json)
+            val legacy = store.record(request("我答应明晚九点陪用户去海边").copy(experienceId = ""))!!
+            assertTrue(store.correctEntry(legacy.subjectKey, legacy.id, legacy.updatedAt,
+                ChatDiaryDelta(event = "约定已经取消")))
+            assertEquals(null, ChatDiaryStore(root, json).record(request("我答应明晚九点陪用户去海边")))
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun authoredFactsArePackedWholeAndUnusedBudgetCanFitOtherCategories() {
         val fact = "经历过背叛，因此对承诺格外在意，但仍想尝试信任。"
         val heading = "【人物】阿青"

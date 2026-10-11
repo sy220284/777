@@ -902,12 +902,17 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val refreshedStates = refreshBatch.states
             val refreshedInReplyOrder = repliesForStateUpdate
                 .mapNotNull { reply -> refreshedStates[reply.member.galleryId] }
-            val nextSharedContext = finalizeGroupContextAfterRefresh(
+            val diaryDecisions = currentGroup.members.flatMap { member ->
+                diaryStore.decisionsForExperience(
+                    chatRelationshipSubjectKey(member.galleryId, member.personaId), currentGroup.context,
+                )
+            }
+            val nextSharedContext = reconcileDiaryContext(finalizeGroupContextAfterRefresh(
                 context = currentGroup.context,
                 statesInReplyOrder = refreshedInReplyOrder,
                 processedPending = sharedPendingForRefresh,
                 complete = refreshBatch.complete,
-            )
+            ), diaryDecisions)
             if (!refreshBatch.complete) {
                 eventLog.append("group/post-turn-batch", buildJsonObject {
                     put("status", "pending-preserved")

@@ -633,7 +633,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt",
-      "sha256": "81475d1bc6404cce"
+      "sha256": "0b5663f82d2d6afc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatControlProjection.kt",
@@ -737,7 +737,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionRestorer.kt",
-      "sha256": "621a2ec10b3c4ff1"
+      "sha256": "ca3d0c452a3c8900"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatState.kt",
@@ -805,7 +805,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt",
-      "sha256": "22fe06000ed137e1"
+      "sha256": "925db585e81d141b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt",
@@ -3205,14 +3205,13 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "f4cb6646bb21",
+  "source_snapshot": "d05b9adc0570",
   "observed_delta": {
-    "baseline": "395cca0f8962",
+    "baseline": "92b450422afd",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionRestorer.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

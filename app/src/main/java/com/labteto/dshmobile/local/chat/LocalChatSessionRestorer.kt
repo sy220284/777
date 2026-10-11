@@ -49,6 +49,23 @@ internal class LocalChatSessionRestorer @Inject constructor(
         val group = if (usageMode == LocalUsageMode.CHAT) {
             controls.groupChat.copy(context = controls.groupChat.context.boundDurablePending(log, "group").withExperience(sessionId, listOf(sessionId)))
         } else LocalGroupChatState()
+        val reconciledGroup = reconcileGroupCharacterBehaviorTuning(
+                    group, persistence.personaStore, persistence.galleryStore,
+                ).let { restored ->
+                    val decisions = restored.members.flatMap { member ->
+                        persistence.diaryStore.decisionsForExperience(
+                            chatRelationshipSubjectKey(member.galleryId, member.personaId), restored.context,
+                        )
+                    }
+                    restored.copy(
+                        context = reconcileDiaryContext(restored.context, decisions),
+                        members = restored.members.map { member ->
+                            member.copy(chatState = persistence.diaryStore.reconcileState(
+                                chatRelationshipSubjectKey(member.galleryId, member.personaId), member.chatState, restored.context,
+                            ))
+                        },
+                    )
+                }
         LocalChatSessionRestore(
             chat = LocalChatState(
                 personaId = controls.personaId,
@@ -67,16 +84,10 @@ internal class LocalChatSessionRestorer @Inject constructor(
                         replySuggestions = controls.replySuggestions,
                     )
                 } else LocalChatBranchState(),
-                groupChat = reconcileGroupCharacterBehaviorTuning(
-                    group, persistence.personaStore, persistence.galleryStore,
-                ).let { restored -> restored.copy(members = restored.members.map { member ->
-                    member.copy(chatState = persistence.diaryStore.reconcileState(
-                        chatRelationshipSubjectKey(member.galleryId, member.personaId), member.chatState, restored.context,
-                    ))
-                }) },
+                groupChat = reconciledGroup,
             ),
             needsPersist = behavior.changed || context != controls.chatContext ||
-                reconciledState != behavior.chatState || group != controls.groupChat,
+                reconciledState != behavior.chatState || reconciledGroup != controls.groupChat,
         )
     }
 

@@ -486,9 +486,11 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             candidate = plan.state.continuity,
             pendingTurns = pending,
         )
-        val deterministicState = diaryStore.reconcileState(
-            chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId),
-            plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext(), baseContext,
+        val diaryDecisions = diaryStore.decisionsForExperience(
+            chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId), baseContext,
+        )
+        val deterministicState = reconcileDiaryState(
+            plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext(), diaryDecisions,
         )
         val lease = LocalSessionRuntimeRegistry.tryAcquire(expectedSessionId, LocalSessionRuntimeKind.MAINTENANCE)
         if (lease == null) {
@@ -514,7 +516,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded")
                 return
             }
-            nextContext = currentContext.commitProcessed(currentContext.scene, groundedContinuity, throughSequence)
+            nextContext = reconcileDiaryContext(
+                currentContext.commitProcessed(currentContext.scene, groundedContinuity, throughSequence), diaryDecisions,
+            )
             val target = current.copy(chat = current.chat.copy(
                 chatState = deterministicState,
                 chatContext = nextContext,
@@ -551,9 +555,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                     latest.chat.chatContext.processedThroughSequence != baseContext.processedThroughSequence
                 ) latest else {
                     applied = true
-                    nextContext = latest.chat.chatContext.commitProcessed(
+                    nextContext = reconcileDiaryContext(latest.chat.chatContext.commitProcessed(
                         latest.chat.chatContext.scene, groundedContinuity, throughSequence,
-                    )
+                    ), diaryDecisions)
                     latest.copy(chat = latest.chat.copy(
                         chatState = deterministicState, chatContext = nextContext,
                         chatBranches = if (latest.transcriptIndex.branchingEligible) {
