@@ -14,6 +14,8 @@ MATRIX = Path("docs/ACCEPTANCE-MATRIX.json")
 REG = Path("docs/FEATURE-TREE-SOURCE-REGISTRY.json")
 INDEX = Path("docs/FEATURE-SOURCE-INDEX.auto.json")
 REVIEW = Path("docs/FEATURE-REVIEW.auto.json")
+EVIDENCE = Path("docs/FEATURE-CODE-EVIDENCE.zh-CN.md")
+RETIREMENTS = Path("docs/FEATURE-TREE-RETIREMENTS.json")
 import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
@@ -258,6 +260,118 @@ def checked_registration(root, current, previous):
             # 有问题的变更不能自动撤销历史登记或旧功能。
             verified[ident] = item
     return verified, retired, pending
+
+
+HISTORICAL_LINK = re.compile(
+    r"https://github\.com/[^/]+/[^/]+/blob/[^/]+/"
+    r"(app/src/(?:main|test|androidTest)/[^\s)#]+?\.(?:kt|java))(?:#|[)])"
+)
+
+
+def historical_code_evidence(root, leafpaths):
+    """扫描历史证据与现行代码的反向差异；缺失单一入口不能证明功能已退役。"""
+    file = root / EVIDENCE
+    if not file.is_file():
+        return [], []
+    current = set(leafpaths)
+    missing_entries, current_orphans = [], []
+    for line in file.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| "):
+            continue
+        cells = [x.strip() for x in line.strip("|").split("|")]
+        if len(cells) < 4 or not cells[0].isdigit() or " / " not in cells[1]:
+            continue
+        name, prior_level, raw = cells[1:4]
+        ref_paths = sorted(set(HISTORICAL_LINK.findall(raw)))
+        production = [x for x in ref_paths if "/src/main/" in "/" + x]
+        tests = [x for x in ref_paths if "/src/test/" in "/" + x
+                 or "/src/androidTest/" in "/" + x]
+        missing = [x for x in production if not (root / x).is_file()]
+        kept = [x for x in production if (root / x).is_file()]
+        item = {
+            "path": name, "historical_grade": prior_level,
+            "historical_production_sources": production,
+            "missing_production_sources": missing,
+            "remaining_production_sources": kept,
+            "historical_test_files": tests,
+        }
+        if name in current:
+            if missing:
+                item["assessment"] = "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+                current_orphans.append(item)
+        else:
+            if production and len(missing) == len(production):
+                item["assessment"] = "不在现行树内且历史生产来源全部消失；高度疑似已退役"
+            elif kept:
+                item["assessment"] = "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+            else:
+                item["assessment"] = "不在现行树内，历史证据不足以判定退役"
+            missing_entries.append(item)
+    return missing_entries, current_orphans
+
+
+def approved_legacy_retirements(root, model, registered, previous, matrix):
+    """旧功能下线必须有独立的明确审核记录及负向源码证据。"""
+    file = root / RETIREMENTS
+    if not file.is_file():
+        return [], []
+    config = json.loads(file.read_text(encoding="utf-8"))
+    if config.get("version") != 1 or not isinstance(config.get("approvals"), list):
+        raise ValueError("功能退役批准清单版本或格式错误")
+    approved, pending = [], []
+    records = config["approvals"]
+    code_contents = [
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in sorted((root / "app").rglob("*"))
+        if p.is_file() and p.suffix in {".kt", ".java"} and "/src/main/" in "/" + p.relative_to(root).as_posix()
+    ] if records else []
+    seen = set()
+    for item in records:
+        if not isinstance(item, dict):
+            raise ValueError("退役审批记录必须是结构化对象")
+        name, source, symbol, reason = (item.get("path"), item.get("source"),
+                                        item.get("symbol"), item.get("reason"))
+        if not isinstance(name, str) or name in seen:
+            raise ValueError("退役路径为空或重复")
+        seen.add(name)
+        try:
+            path = parts(name)
+        except ValueError as e:
+            raise ValueError("退役路径不合法") from e
+        if not all(isinstance(x, str) for x in (source, symbol, reason)):
+            raise ValueError("退役证据和中文审核理由缺失")
+        if not source.startswith("app/src/main/") or not source.endswith((".kt", ".java")):
+            raise ValueError("退役源码证据必须是生产 Kotlin/Java 路径")
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", symbol):
+            raise ValueError("退役符号无效")
+        if len(CHINESE.findall(reason)) < 4:
+            raise ValueError("退役须给出不少于四个中文字的审核原因")
+        if any(r["path"] == name for r in registered.values()):
+            pending.append({"path": name, "reason": "当前源码仍显式登记此功能"})
+            continue
+        declaration = re.compile(SYMBOL % re.escape(symbol))
+        if any(declaration.search(text) for text in code_contents):
+            pending.append({"path": name, "reason": "生产源码仍存在原入口声明，可能已经迁移"})
+            continue
+        if (root / source).is_file():
+            body = (root / source).read_text(encoding="utf-8", errors="replace")
+            if declaration.search(body):
+                pending.append({"path": name, "reason": "历史生产源码仍含原入口"})
+                continue
+        test_references = [
+            x for x in matrix["items"] if x["path"] == name
+        ]
+        if test_references:
+            pending.append({"path": name, "reason": "此功能仍有关联验收映射，须先处理测试与替代归属"})
+            continue
+        node = find(model, path)
+        if node is None:
+            approved.append({"path": name, "status": "已不在现行功能树"})
+        elif node["children"]:
+            pending.append({"path": name, "reason": "分类仍有子功能，禁止批量删除"})
+        else:
+            approved.append({"path": name, "status": "入口消失、测试映射已清理，批准删除"})
+    return approved, pending
 
 
 def snapshot(root):
