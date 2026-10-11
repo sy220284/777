@@ -55,7 +55,7 @@ Python 和 Node 的脚本按实际依赖执行；Word 的 .NET 流程需可用�
 来源：MiniMax-AI/skills，基于固定版本 60aaae52 的设计资料，由 777 改造成手机执行流程。
 先读取 .dsh/skills/minimax-media/MOBILE.md，按照其中手机端实际可用的文件、Python、Node 和预览流程执行；详细资料按该文档链接读取。
 本技能不提供桌面 SDK、.NET、LibreOffice、桌面浏览器或 ffmpeg 流程。不要安装这些桌面宿主补齐流程，也不要宣称已经完成未执行的构建或渲染。
-产物必须实际写入工作区并验证。外部 API 凭据和权限按任务需求配置，聊天套餐不能自动当作媒体生成权限；不得把密钥写入提示、日志或生成文件。
+产物必须实际写入工作区并验证。用户可自行通过受控配置方式提供 MiniMax 媒体 CLI 凭据；明确授权且凭据及媒体 API 权限实际可用时直接按要求执行，不得仅因技能默认建议拒绝；缺少配置时说明具体配置方式。聊天套餐不自动具备媒体 API 权限；不要求用户在聊天中发送密钥，不把密钥写入提示、命令参数、日志或生成文件。
         """.trimIndent(), whenToUse = "MiniMax 图片、视频、语音与音乐 API"),
         LocalPresetSkill("minimax-music-gen", "MiniMax 音乐创作", "歌曲、伴奏与音乐生成。", """
 来源：MiniMax-AI/skills，基于固定版本 60aaae52 的设计资料，由 777 改造成手机执行流程。
