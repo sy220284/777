@@ -4,6 +4,9 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -80,41 +83,87 @@ internal object LocalToolRouter {
     private fun Char.isAsciiIdentifierChar(): Boolean =
         this in 'a'..'z' || this in '0'..'9' || this == '_'
 
+    internal data class ToolSchemaSelection(
+        val schemas: JsonArray,
+        val omittedReasons: Map<String, String>,
+        val compactedNames: Set<String>,
+    )
+
     fun visibleSchemas(
         tools: List<HarnessTool>,
         enabledOptional: Set<String>,
         maxOptionalDefinitionTokens: Int = DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): JsonArray {
+    ): JsonArray = selectSchemas(tools, enabledOptional, maxOptionalDefinitionTokens).schemas
+
+    /**
+     * Tool capability discovery is never the authority for admission. Selection reports why a
+     * requested registered tool was not exposed. Oversized human descriptions are abbreviated
+     * without altering argument types, required fields or the runtime's full validator schema.
+     */
+    internal fun selectSchemas(
+        tools: List<HarnessTool>,
+        enabledOptional: Set<String>,
+        maxOptionalDefinitionTokens: Int = DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+    ): ToolSchemaSelection {
         val core = tools
-            .filter { tool -> tool.exposure == ToolExposure.CORE }
+            .filter { it.exposure == ToolExposure.CORE }
             .sortedBy(HarnessTool::name)
         val optionalByName = tools
             .asSequence()
-            .filter { tool -> tool.exposure == ToolExposure.OPTIONAL }
+            .filter { it.exposure == ToolExposure.OPTIONAL }
             .associateBy(HarnessTool::name)
 
-        var remainingTokens = maxOptionalDefinitionTokens
-            .coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
-        val optional = ArrayList<HarnessTool>()
+        var remainingTokens = maxOptionalDefinitionTokens.coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
+        val optionalSchemas = ArrayList<JsonElement>()
+        val omitted = linkedMapOf<String, String>()
+        val compacted = linkedSetOf<String>()
         for (name in enabledOptional) {
-            if (remainingTokens <= 0) break
-            val tool = optionalByName[name] ?: continue
-            val schema = tool.schema
-            val complexity = schemaComplexity(schema)
-            if (
-                complexity.depth > MAX_OPTIONAL_SCHEMA_DEPTH ||
+            val tool = optionalByName[name] ?: continue // Missing tools remain absent on purpose.
+            val original = tool.schema
+            val complexity = schemaComplexity(original)
+            if (complexity.depth > MAX_OPTIONAL_SCHEMA_DEPTH ||
                 complexity.properties > MAX_OPTIONAL_SCHEMA_PROPERTIES
-            ) continue
-            val tokens = estimateModelTokens(schema.toString())
-            if (tokens > MAX_OPTIONAL_SCHEMA_TOKENS || tokens > remainingTokens) continue
-            optional += tool
-            remainingTokens -= tokens
+            ) {
+                omitted[name] = "参数结构超过当前支持的层级或字段数量；原始工具仍在目录中"
+                continue
+            }
+            if (remainingTokens <= 0) {
+                omitted[name] = "本轮可选工具定义预算已用尽；按精确名称重新选择可优先装入"
+                continue
+            }
+
+            val originalCost = estimateModelTokens(original.toString())
+            val reduced = if (originalCost > minOf(remainingTokens, MAX_OPTIONAL_SCHEMA_TOKENS)) {
+                compactDescriptiveAnnotations(original)
+            } else original
+            val selectedCost = estimateModelTokens(reduced.toString())
+            if (selectedCost > MAX_OPTIONAL_SCHEMA_TOKENS || selectedCost > remainingTokens) {
+                omitted[name] = "工具参数定义需要约 $selectedCost Token，当前可用 $remainingTokens；已尝试精简说明文本"
+                continue
+            }
+            optionalSchemas += reduced
+            if (reduced != original) compacted += name
+            remainingTokens -= selectedCost
         }
 
-        // Core remains deterministic for prompt-cache stability; optional tools append in activation order.
-        // Registry limits protect process resources; this separate budget protects the model prompt.
-        return JsonArray((core + optional).map(HarnessTool::schema))
+        // The core surface remains byte-for-byte stable for cache continuity.
+        return ToolSchemaSelection(JsonArray(core.map(HarnessTool::schema) + optionalSchemas),
+            omitted, compacted)
     }
+
+    private fun compactDescriptiveAnnotations(value: JsonElement, propertyNames: Boolean = false): JsonElement =
+        when (value) {
+            is JsonObject -> JsonObject(value.mapValues { (key, child) ->
+                when {
+                    key == "description" && !propertyNames && child is JsonPrimitive &&
+                        child.isString && child.content.length > MAX_COMPACT_DESCRIPTION_CHARS ->
+                        JsonPrimitive(child.content.take(MAX_COMPACT_DESCRIPTION_CHARS) + "…")
+                    else -> compactDescriptiveAnnotations(child, propertyNames = key == "properties")
+                }
+            })
+            is JsonArray -> JsonArray(value.map { compactDescriptiveAnnotations(it) })
+            else -> value
+        }
 
     /**
      * Ranks capabilities by the strongest matching evidence. A flood of weak description/family
@@ -288,7 +337,8 @@ internal object LocalToolRouter {
 
     internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
     private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
-    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 4_000
+    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 24_000
+    private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_OPTIONAL_SCHEMA_DEPTH = 12
     private const val MAX_OPTIONAL_SCHEMA_PROPERTIES = 256
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
