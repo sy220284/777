@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.interop.lsp.LspProcessClient
+import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
 import com.labteto.dshmobile.local.runtime.BundledNodeRuntime
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import java.io.File
@@ -17,6 +18,20 @@ import org.junit.Test
  * CI on Android 16/17 catches Android executable, TLS and process compatibility regressions.
  */
 class OnDemandLanguageServerAndroidTest {
+    @Test fun workspaceToolGuideIsCreatedOnceAndPreservesUserEdits() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val workspace = File(context.cacheDir, "guide-smoke").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        assertTrue(LocalWorkspaceToolGuide.ensure(context, workspace))
+        val readme = File(workspace, ".dsh/tools/README.md")
+        assertTrue(readme.readText().contains("capability_search"))
+        readme.writeText("# 自定义工具说明\\n")
+        assertTrue(!LocalWorkspaceToolGuide.ensure(context, workspace))
+        assertEquals("# 自定义工具说明\\n", readme.readText())
+    }
+
     @Test fun installTypeScriptAndServeRealWorkspaceSymbols() = runBlocking {
         withTimeout(240_000L) {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -55,9 +70,13 @@ class OnDemandLanguageServerAndroidTest {
                 client.initialize(workspace.toURI().toString())
                 client.didOpen(file.toURI().toString(), "typescript", 1, code)
                 val symbols = client.documentSymbols(file.toURI().toString())
-                assertTrue("返回结构应为 JSON", symbols.toString().isNotBlank())
+                assertTrue("应返回实际代码符号", symbols.toString().contains("hello"))
                 val definition = client.definition(file.toURI().toString(), 1, 2)
-                assertTrue("查询应完成 JSON-RPC 往返", definition.toString().isNotBlank())
+                assertTrue("定义应指向实际源文件", definition.toString().contains("probe.ts"))
+                val references = client.references(file.toURI().toString(), 1, 2)
+                assertTrue("引用应定位实际源文件", references.toString().contains("probe.ts"))
+                val hover = client.hover(file.toURI().toString(), 1, 2)
+                assertTrue("悬停应返回相关类型", hover.toString().contains("hello"))
             } finally {
                 client.close()
             }
