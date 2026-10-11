@@ -391,7 +391,7 @@ class LspPluginTest {
         Assume.assumeTrue(File("/bin/sh").isFile)
         val file = temporary.newFile("late.ts").apply { writeText("const value: string = 123;\n") }
         val uri = file.toURI().toString()
-        fun frame(message: String) = "Content-Length: \${message.toByteArray().size}\r\n\r\n$message"
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val init = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
         val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$uri","version":1,"diagnostics":[{"message":"Type 'number' is not assignable to type 'string'","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
         val script = temporary.newFile("delayed-diagnostics.sh").apply {
@@ -417,7 +417,7 @@ class LspPluginTest {
                     context = ToolContext(approval = { true }),
                 )
                 assertFalse(result.isError)
-                assertTrue(result.content.contains(""""published":true"""))
+                assertTrue(result.content.contains("\"published\":true"))
                 assertTrue(result.content.contains("not assignable"))
             }
         } finally {
@@ -428,7 +428,7 @@ class LspPluginTest {
     @Test fun diagnosticsTimeoutNeverClaimsAnEmptyErrorListIsFinal() = runBlocking {
         Assume.assumeTrue(File("/bin/sh").isFile)
         temporary.newFile("waiting.ts").writeText("const a = 1")
-        fun frame(message: String) = "Content-Length: \${message.toByteArray().size}\r\n\r\n$message"
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("silent-diagnostics.sh").apply {
             writeText(
                 "printf '%s' '" + frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
@@ -450,7 +450,7 @@ class LspPluginTest {
                 )
                 assertFalse(result.isError)
                 assertTrue(result.content.contains("timeout_waiting_for_publish"))
-                assertTrue(result.content.contains(""""published":false"""))
+                assertTrue(result.content.contains("\"published\":false"))
             }
         } finally {
             plugin.uninstall(context)
