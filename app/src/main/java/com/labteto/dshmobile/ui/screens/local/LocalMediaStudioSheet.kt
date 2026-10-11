@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
     preferredProfileId: String?,
-    videoTasks: Map<String, String>,
+    videoTasks: Map<String, List<String>>,
     onVideoTaskChange: (String, String) -> Unit,
     onInsertTranscript: (String) -> Unit,
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
@@ -83,6 +83,7 @@ internal fun LocalMediaStudioSheetContent(
     var image by remember(selected?.id) { mutableStateOf<LocalMediaImage?>(null) }
     var videoLink by remember(selected?.id) { mutableStateOf<String?>(null) }
     var videoState by remember(selected?.id) { mutableStateOf<String?>(null) }
+    var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
     var transcript by remember(selected?.id) { mutableStateOf<String?>(null) }
     var audioFile by remember(selected?.id) { mutableStateOf<File?>(null) }
     var voices by remember(selected?.id) { mutableStateOf<List<LocalMediaVoice>>(emptyList()) }
@@ -229,11 +230,37 @@ internal fun LocalMediaStudioSheetContent(
                             // if the user selected a different creative model while submission was pending.
                             onVideoTaskChange(selected.id, task)
                             if (selected.id == activeOfferId) {
+                                viewedVideoTaskId = task
                                 videoState = "Queueing"
                                 videoLink = null
                             }
                         } })
-                    val videoTaskId = videoTasks[selected.id].orEmpty()
+                    val taskIds = videoTasks[selected.id].orEmpty()
+                    val videoTaskId = viewedVideoTaskId.takeIf { it in taskIds }
+                        ?: taskIds.lastOrNull().orEmpty()
+                    if (taskIds.size > 1) {
+                        Text(stringResource(R.string.media_studio_previous_video_tasks),
+                            style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().height(128.dp),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            items(taskIds.asReversed(), key = { it }) { taskId ->
+                                DsButton(
+                                    text = taskId,
+                                    size = DsButtonSize.Small,
+                                    variant = if (videoTaskId == taskId) DsButtonVariant.Primary
+                                        else DsButtonVariant.Ghost,
+                                    onClick = {
+                                        viewedVideoTaskId = taskId
+                                        videoState = null
+                                        videoLink = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                    }
                     if (videoTaskId.isNotBlank()) {
                         Text(stringResource(R.string.minimax_media_task_id, videoTaskId),
                             color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
