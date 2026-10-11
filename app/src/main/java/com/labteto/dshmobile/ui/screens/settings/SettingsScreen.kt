@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -188,17 +187,8 @@ private val usageDetailSelectionStateSaver =
         save = { state -> encodeUsageDetailSelection(state.value) },
         restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
     )
-/** Settings-only pure-black ink on light surfaces; keep dark and matte-black contrast intact. */
-internal fun settingsInkColors(colors: DsColors): DsColors =
-    if (colors.bgBase.luminance() > 0.5f) {
-        colors.copy(
-            labelPrimary = Color.Black,
-            labelSecondary = Color.Black,
-            labelCaption = Color.Black,
-        )
-    } else {
-        colors
-    }
+/** Settings consume the same readable ink hierarchy as every other native feature. */
+internal fun settingsInkColors(colors: DsColors): DsColors = colors
 
 @Composable
 fun SettingsScreen(

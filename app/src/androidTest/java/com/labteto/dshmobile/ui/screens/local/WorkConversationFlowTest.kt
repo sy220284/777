@@ -39,13 +39,14 @@ class WorkConversationFlowTest {
 
         compose.runOnIdle { running.value = false }
         compose.waitForIdle()
-        // Completed work folds back to a lightweight one-line status; the final assistant
-        // answer is rendered independently by the existing transcript message component.
+        // Finishing retains the semantic steps, while private tool details stay hidden.
+        compose.onNodeWithText("我先检查当前消息流。").assertExists()
+        compose.onNodeWithText("已经定位问题，正在更新实现。").assertExists()
         compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Figma", substring = true).assertDoesNotExist()
     }
 
-    @Test fun manuallyExpandedStepsStayOpenWhenRunningStateChanges() {
+    @Test fun completedStepsStayVisibleAndExplicitDisclosureIsRespected() {
         val running = mutableStateOf(true)
         val events = listOf(
             LocalHarnessMessage("p1", "progress", "首轮检查完成", createdAt = 1L),
@@ -55,9 +56,11 @@ class WorkConversationFlowTest {
         compose.waitForIdle()
         compose.runOnIdle { running.value = false }
         compose.waitForIdle()
-        compose.onNodeWithText("首轮检查完成").assertDoesNotExist()
+        compose.onNodeWithText("首轮检查完成").assertExists()
 
-        // The reader opened the folded timeline: finishing again must not override it.
+        // Only an explicit reader action folds the process.
+        compose.onNodeWithText("工作过程").performClick()
+        compose.onNodeWithText("首轮检查完成").assertDoesNotExist()
         compose.onNodeWithText("工作过程").performClick()
         compose.onNodeWithText("首轮检查完成").assertExists()
         compose.runOnIdle { running.value = true }

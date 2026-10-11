@@ -60,10 +60,7 @@ fun DsCard(
             .then(if (elevated) Modifier.shadow(1.dp, DsShapes.block, clip = false) else Modifier)
             .clip(DsShapes.block)
             .background(background)
-            .then(
-                if (elevated) Modifier.border(1.dp, colors.borderL2, DsShapes.block)
-                else Modifier
-            )
+            .border(1.dp, colors.borderL1, DsShapes.block)
             .then(
                 if (onClick != null) {
                     Modifier

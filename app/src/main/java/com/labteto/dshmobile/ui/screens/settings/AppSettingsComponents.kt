@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +47,7 @@ internal fun AppSettingsSection(compact: Boolean = false, content: @Composable C
         shape = if (compact) DsShapes.settingsGroup else DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, colors.borderL1),
     ) {
         Column(Modifier.padding(vertical = DsSpacing.tiny), content = content)
     }

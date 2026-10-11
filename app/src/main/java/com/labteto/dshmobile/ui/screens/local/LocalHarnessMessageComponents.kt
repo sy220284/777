@@ -258,26 +258,22 @@ internal fun LocalMessageRow(
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
         else -> {
-            val readingLayer = chatMode && backgroundState.hasImage
+            val readingLayer = chatMode && (backgroundState.hasImage || backgroundState.fluidGlass)
             val readingModifier = if (readingLayer) {
                 Modifier
                     .fillMaxWidth()
                     .background(
                         backgroundState.wallpaperSurface(
-                            base = colors.bgBase,
+                            base = colors.bgLayer1,
                             level = WallpaperSurfaceLevel.CARD,
                             region = BackgroundRegion.MIDDLE,
                         ),
-                        DsShapes.block,
+                        DsShapes.characterBubble,
                     )
                     .border(
                         width = 1.dp,
-                        color = if (backgroundState.darkTheme) {
-                            Color.White.copy(alpha = 0.26f)
-                        } else {
-                            Color.Black.copy(alpha = 0.22f)
-                        },
-                        shape = DsShapes.block,
+                        color = colors.borderL1,
+                        shape = DsShapes.characterBubble,
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             } else {

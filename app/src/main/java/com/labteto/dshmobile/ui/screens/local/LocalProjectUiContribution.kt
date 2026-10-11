@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsTextField
@@ -21,6 +25,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -90,14 +96,11 @@ internal fun LocalProjectScreen(
         modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DsButton(text = stringResource(R.string.local_project_back), onClick = onBack, variant = DsButtonVariant.Ghost)
-            Text(
-                stringResource(R.string.local_project_management_title),
-                style = DsType.base16Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
-            )
-        }
+        DsTopBar(
+            title = stringResource(R.string.local_project_management_title),
+            onBack = onBack,
+            backContentDescription = stringResource(R.string.local_project_back),
+        )
         Text(
             stringResource(R.string.local_project_new_session_hint),
             style = DsType.small13.withReadingWeight(),
@@ -128,80 +131,92 @@ internal fun LocalProjectScreen(
             style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
-        state.projects.forEach { project ->
-            DsButton(
-                text = if (project.id == state.activeId) "✓ ${project.name}" else project.name,
-                onClick = {
-                    runCatching { actions.select(project.id) }
-                        .onFailure { error = it.message }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
-            )
+        DsCard {
+            state.projects.forEach { project ->
+                DsCategoryRow(
+                    icon = if (project.id == state.activeId) FeatherIcons.CheckCircle else FeatherIcons.Folder,
+                    title = project.name,
+                    modifier = Modifier.testTag("projectRow:${project.id}")
+                        .semantics { selected = project.id == state.activeId },
+                    subtitle = project.instructions.takeIf(String::isNotBlank),
+                    onClick = {
+                        runCatching { actions.select(project.id) }
+                            .onSuccess { error = null }
+                            .onFailure { error = it.message }
+                    },
+                )
+            }
         }
-        DsTextField(
-            value = newName,
-            onValueChange = { newName = it.take(80) },
-            label = { Text(stringResource(R.string.local_project_name_hint)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        DsButton(
-            text = stringResource(R.string.local_project_create),
-            onClick = {
-                runCatching { actions.create(newName) }
-                    .onSuccess { newName = ""; error = null }
-                    .onFailure { error = it.message }
-            },
-            enabled = newName.isNotBlank(),
-        )
-        active?.let { project ->
-            Text(
-                stringResource(R.string.local_project_current_settings),
-                style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
-            )
+        DsCard {
             DsTextField(
-                value = nameDraft,
-                onValueChange = { nameDraft = it.take(80) },
-                label = { Text(stringResource(R.string.local_project_rename_hint)) },
+                value = newName,
+                onValueChange = { newName = it.take(80) },
+                label = { Text(stringResource(R.string.local_project_name_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             DsButton(
-                text = stringResource(R.string.local_project_rename),
+                text = stringResource(R.string.local_project_create),
                 onClick = {
-                    runCatching { actions.rename(project.id, nameDraft) }
-                        .onSuccess { error = null }
+                    runCatching { actions.create(newName) }
+                        .onSuccess { newName = ""; error = null }
                         .onFailure { error = it.message }
                 },
-                enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
+                enabled = newName.isNotBlank(),
+                variant = DsButtonVariant.Outline,
             )
-            Text(stringResource(R.string.local_project_instruction_label, project.name))
-            DsTextField(
-                value = instructionDraft,
-                onValueChange = { instructionDraft = it.take(8_000) },
-                label = { Text(stringResource(R.string.local_project_instruction_hint)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 4,
-                maxLines = 12,
-            )
-            DsButton(
-                text = stringResource(R.string.local_project_save_instruction),
-                onClick = {
-                    runCatching { actions.updateInstructions(project.id, instructionDraft) }
-                        .onSuccess { error = null }
-                        .onFailure { error = it.message }
-                },
-                enabled = instructionDraft != project.instructions,
-            )
-            if (project.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID) {
-                DsButton(
-                    text = stringResource(R.string.local_project_delete),
-                    onClick = { pendingDeleteId = project.id },
-                    variant = DsButtonVariant.Danger,
-                    enabled = !deleting,
+        }
+        active?.let { project ->
+            DsCard {
+                Text(
+                    stringResource(R.string.local_project_current_settings),
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = DsTheme.colors.labelPrimary,
                 )
+                DsTextField(
+                    value = nameDraft,
+                    onValueChange = { nameDraft = it.take(80) },
+                    label = { Text(stringResource(R.string.local_project_rename_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_project_rename),
+                    onClick = {
+                        runCatching { actions.rename(project.id, nameDraft) }
+                            .onSuccess { error = null }
+                            .onFailure { error = it.message }
+                    },
+                    enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
+                    variant = DsButtonVariant.Outline,
+                )
+                Text(stringResource(R.string.local_project_instruction_label, project.name))
+                DsTextField(
+                    value = instructionDraft,
+                    onValueChange = { instructionDraft = it.take(8_000) },
+                    label = { Text(stringResource(R.string.local_project_instruction_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 4,
+                    maxLines = 12,
+                )
+                DsButton(
+                    text = stringResource(R.string.local_project_save_instruction),
+                    onClick = {
+                        runCatching { actions.updateInstructions(project.id, instructionDraft) }
+                            .onSuccess { error = null }
+                            .onFailure { error = it.message }
+                    },
+                    enabled = instructionDraft != project.instructions,
+                    variant = DsButtonVariant.Outline,
+                )
+                if (project.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID) {
+                    DsButton(
+                        text = stringResource(R.string.local_project_delete),
+                        onClick = { pendingDeleteId = project.id },
+                        variant = DsButtonVariant.Danger,
+                        enabled = !deleting,
+                    )
+                }
             }
         }
         error?.let {

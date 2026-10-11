@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,6 +39,10 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.screens.settings.UsageCalculationPage
+import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
+import com.labteto.dshmobile.ui.screens.settings.MiniMaxQuotaCard
+import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
@@ -57,9 +62,11 @@ class ReadmeScreenshotActivity : ComponentActivity() {
         require(screen in SUPPORTED_SCREENS) { "未知 README 截图页面：$screen" }
 
         setContent {
-            DshTheme(preference = ThemePreference.LIGHT) {
-                ReadmeScreenshotSurface(screen)
-                ScreenshotReadySignal(screen)
+            DshTheme(preference = if (intent.getBooleanExtra("readme_dark", false)) ThemePreference.DARK else ThemePreference.LIGHT) {
+                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    ReadmeScreenshotSurface(screen)
+                    ScreenshotReadySignal(screen)
+                }
             }
         }
     }
@@ -73,6 +80,7 @@ class ReadmeScreenshotActivity : ComponentActivity() {
             "work",
             "character-tuning",
             "usage",
+            "quota",
         )
     }
 }
@@ -93,6 +101,7 @@ private fun ReadmeScreenshotSurface(screen: String) {
         "work" -> WorkScreenshot()
         "character-tuning" -> CharacterTuningScreenshot()
         "usage" -> UsageScreenshot()
+        "quota" -> QuotaScreenshot()
     }
 }
 
@@ -101,7 +110,7 @@ private fun NavigationScreenshot() {
     Box(
         Modifier
             .fillMaxSize()
-            .background(DsTheme.colors.bgBase),
+            .background(DsTheme.colors.rootSurface()),
     ) {
         LocalModeDrawer(
             currentSessionId = "chat-current",
@@ -159,7 +168,7 @@ private fun ChatScreenshot() {
     Column(
         Modifier
             .fillMaxSize()
-            .background(DsTheme.colors.bgBase)
+            .background(DsTheme.colors.rootSurface())
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         ChatSurfaceHeader(
@@ -254,7 +263,7 @@ private fun WorkScreenshot() {
     Column(
         Modifier
             .fillMaxSize()
-            .background(DsTheme.colors.bgBase)
+            .background(DsTheme.colors.rootSurface())
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         WorkSurfaceHeader(
@@ -350,7 +359,7 @@ private fun CharacterTuningScreenshot() {
     Box(
         Modifier
             .fillMaxSize()
-            .background(DsTheme.colors.bgBase),
+            .background(DsTheme.colors.rootSurface()),
     ) {
         CharacterBehaviorTuningDialog(
             personaName = "神里绫华",
@@ -370,7 +379,7 @@ private fun UsageScreenshot() {
     Column(
         Modifier
             .fillMaxSize()
-            .background(DsTheme.colors.bgBase)
+            .background(DsTheme.colors.rootSurface())
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
@@ -387,5 +396,23 @@ private fun UsageScreenshot() {
             ),
             onOpenPricing = {},
         )
+    }
+}
+
+/** Deterministic fixture data for visual QA only; production queries the provider. */
+@Composable
+private fun QuotaScreenshot() {
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        DsTopBar(title = "MiniMax 套餐额度", onBack = {}, backContentDescription = "返回")
+        MiniMaxQuotaCard(MiniMaxProviderUsage.ModelQuota(
+            name = "general",
+            interval = MiniMaxProviderUsage.Window(null, null, 83.0),
+            weekly = MiniMaxProviderUsage.Window(null, null, 94.0),
+            intervalResetMillis = 13_080_000L,
+            weeklyResetMillis = 579_600_000L,
+        ))
     }
 }

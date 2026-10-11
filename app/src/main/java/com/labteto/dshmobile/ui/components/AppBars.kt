@@ -67,7 +67,7 @@ fun DsTopBar(
                 icon = backIcon,
                 contentDescription = backContentDescription,
                 onClick = onBack,
-                containerColor = if (plainBackButton) Color.Transparent else colors.bgLayer1,
+                containerColor = Color.Transparent,
                 iconSize = 24.dp,
                 tint = colors.labelPrimary,
             )
@@ -85,7 +85,7 @@ fun DsTopBar(
                     contentDescription = actionContentDescription,
                     onClick = onAction,
                     enabled = actionEnabled,
-                    containerColor = colors.bgLayer1,
+                    containerColor = Color.Transparent,
                     iconSize = 24.dp,
                     tint = colors.labelPrimary,
                 )
@@ -131,7 +131,7 @@ fun DsSegmentedTabs(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clip(DsShapes.row)
                     .background(segmentColor)
                     .selectable(

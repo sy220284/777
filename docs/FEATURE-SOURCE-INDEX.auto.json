@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1377,
+  "repository_code_file_count": 1379,
   "production_source_count": 795,
-  "test_code_file_count": 424,
+  "test_code_file_count": 425,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -2313,7 +2313,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/AppBars.kt",
-      "sha256": "f58a24db585ac771"
+      "sha256": "2b528e80d1e524d8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/ChatComponents.kt",
@@ -2333,11 +2333,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt",
-      "sha256": "965e6022c6c7d9e1"
+      "sha256": "e7430097797dd608"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsCard.kt",
-      "sha256": "82bccf7a2c016fc5"
+      "sha256": "1404e6da1bff2f51"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsCheckbox.kt",
@@ -2349,7 +2349,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt",
-      "sha256": "9a5a0e1a4c4e0ce7"
+      "sha256": "0c709e51d7258f2e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsDeliverableCard.kt",
@@ -2369,7 +2369,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsHierarchyPage.kt",
-      "sha256": "6b26318321d96330"
+      "sha256": "24da5184da4074bf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsIconBox.kt",
@@ -2401,7 +2401,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsSegmented.kt",
-      "sha256": "fea78fa8e44c4db6"
+      "sha256": "9e609c5ba7582245"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsSheetChoiceRow.kt",
@@ -2445,7 +2445,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/GroupedSurfaces.kt",
-      "sha256": "c4fc6903c73e2a83"
+      "sha256": "45009f20fc7e6711"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/Markdown.kt",
@@ -2453,7 +2453,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/Overlays.kt",
-      "sha256": "2e16b2c6d1033929"
+      "sha256": "b6e9c89daf4f4c8b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/RelativeTime.kt",
@@ -2569,7 +2569,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureAnimatedHost.kt",
-      "sha256": "44dfb0fccecd171e"
+      "sha256": "594e7df4845883ee"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt",
@@ -2605,7 +2605,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt",
-      "sha256": "c5874704629fabbb"
+      "sha256": "b7c16d8b42358363"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
@@ -2645,7 +2645,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-      "sha256": "ff24fdf95dd53a35"
+      "sha256": "ffe03891298fadcc"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt",
@@ -2709,7 +2709,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkProcessComponents.kt",
-      "sha256": "6965fbbc431516f0"
+      "sha256": "b5515a15fe0fdd62"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkStateContent.kt",
@@ -2789,7 +2789,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppSettingsComponents.kt",
-      "sha256": "c884d5997236df24"
+      "sha256": "0439de85c39a409d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt",
@@ -2833,7 +2833,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
-      "sha256": "d3f2e16ecb9f58ad"
+      "sha256": "5e205037a3546fbf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ModelPerformanceSettings.kt",
@@ -2849,7 +2849,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "sha256": "d916948b3795da5d"
+      "sha256": "58e7919237e2f8d9"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
@@ -2913,23 +2913,23 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/AccentTheme.kt",
-      "sha256": "862d1fe3f2b8cf0c"
+      "sha256": "2fb90cf2ae0ded74"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Animation.kt",
-      "sha256": "5d7f1ad9d6521e31"
+      "sha256": "a12b66441b828e41"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt",
-      "sha256": "68522f6e3b9e5a07"
+      "sha256": "23e748b9b13ae9ff"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Color.kt",
-      "sha256": "2583aab535acf28e"
+      "sha256": "8c57af830fb144a6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Shape.kt",
-      "sha256": "9674d8cf662b8882"
+      "sha256": "3465202c9edabe96"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Spacing.kt",
@@ -2937,7 +2937,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
-      "sha256": "1b771d1a740d0888"
+      "sha256": "8e2cd31a7e956578"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt",
@@ -3253,12 +3253,16 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d6c8d221a201",
+  "source_snapshot": "02f029cc2ffb",
   "observed_delta": {
-    "baseline": "a8b74b33a63c",
+    "baseline": "aad58e1a46f7",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/theme/Color.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

@@ -3,9 +3,8 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 当前默认 surfaces with retained optional accent palettes; originally ported from
- * packages/client/ui-theme/src/styles/design-platform.css (harness repo).
- * Static primitive scales + semantic alias tokens for light and dark.
+ * Fluid-glass v1.4 semantic aliases. Primitive blue/neutral scales remain available
+ * for explicit appearance presets and specialist meters.
  */
 
 // ---- Primitive scales (identical in light & dark) ---------------------------
@@ -54,94 +53,84 @@ object Ds {
 
 /** Semantic alias tokens for the light theme. */
 object DsLight {
-    // Paper canvas with white floating surfaces, matching the mobile-first hierarchy used
-    // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF5F5F5)
-    val bgLayer1 = Color(0xFFFFFFFF)
-    val bgLayer2 = Color(0xFFFFFFFF)
-    val bgLayer3 = Color(0xFFFFFFFF)
-    val bgModulePlatform = Color(0xFFF5F5F5)
-    val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
-    val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
-    val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
-    val brandPrimary = Color(0xFF191919) // ink button fill
-    val onBrandPrimary = Color(0xFFFFFFFF)
-    val labelPrimary = Color(0xFF121212)
-    val labelSecondary = Color(0xFF353535)
-    val labelTertiary = Color(0xFF8F909A)
-    val labelCaption = Color(0xFFC6C6D0)
-    val labelDimmed = Color(0xFFE2E2E6)
-    val accent = Ds.AccentBlue600
-    val onAccent = Color(0xFFFFFFFF)
-    val accentTertiary = Ds.AccentBlue100
-    val accentHover = Ds.AccentBlue500
-    val hover = Color(0x0F1E3230) // rgba(30,50,48,.06)
-    val hoverSolid = Color(0xFFF1F1EF)
-    val hoverAccent = Color(0x241E3230) // rgba(30,50,48,.14)
-    val active = Color(0x1A1E3230) // rgba(30,50,48,.10)
-    val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
-    val buttonPrimaryHover = Ds.Bluish750
-    val buttonPrimaryDimmed = Ds.Bluish100
-    val buttonInfoFill = Ds.AccentBlue600
-    val buttonInfoHover = Ds.AccentBlue500
-    val error = Ds.Red600
-    val errorSecondary = Ds.Red400
-    val errorTertiary = Ds.Red50
-    val success = Ds.Green500
-    val successSecondary = Ds.Green400
-    val successTertiary = Ds.Green100
-    val warnLabel = Ds.Amber600
-    val warn = Ds.Amber500
-    val warnSecondary = Ds.Amber400
-    val warnTertiary = Ds.Amber100
-    val toastBg = Ds.Bluish800
-    val tooltipBg = Ds.Bluish850
-    /**
-     * One step darker than the harness's own `--dsw-specific-bubble` (pale celadon), and the one
-     * deliberate divergence in this table.
-     *
-     * The web value is 1.06:1 against the white transcript — legible there only because the bubble
-     * is a wide pill in a 748px column on a desk monitor. At phone size and phone brightness the
-     * shape stopped reading, and a message you cannot tell apart from the assistant's is a worse
-     * failure than a fill that is a shade off the reference.
-     */
-    val userBubble = Color(0xFFF5F5F5)
-    val userBubbleHighlight = Color(0xFFEDEDED)
-    val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF5F5F5)
-    val sidebarNavActive = Color(0xFFECECEC)
-    val sidebarNavAccent = Ds.AccentBlue100
-    val sidebarNavHover = Color(0xFFF1F1F1)
-    val tipSurface = Color(0xFFF5F5F5)
-    val codeBlockBg = Color(0xFFF5F5F5)
-    val codeBlockBanner = Color(0xFFEDEDED)
-    val inlineCode = Color(0xFFEDEDED)
-    val citation = Color(0xFFB9B9B9)
-    val markdownTag = Color(0xFFF5F5F5)
-    val overlayMask = Color(0x3D000000) // rgba(0,0,0,.24)
+    val bgBase = Color(0xFFEDE6DA)
+    val bgLayer1 = Color.White
+    val bgLayer2 = Color(0xFFF5F0E8)
+    val bgLayer3 = Color(0xFFFAF7F2)
+    val bgModulePlatform = Color(0xFFF5F0E8)
+    val borderL1 = Color(0x66FFFFFF)
+    val borderL2 = Color(0x1F9C9286)
+    val borderL3 = Color(0x389C9286)
+    val brandPrimary = Color(0xFFE8A87C)
+    val onBrandPrimary = Color(0xFF3A342D)
+    val labelPrimary = Color(0xFF3A342D)
+    val labelSecondary = Color(0xFF6F675D)
+    // Small metadata uses the stronger ink; ink3 is reserved for disabled/large text.
+    val labelTertiary = Color(0xFF746A5E)
+    val labelCaption = Color(0xFF746A5E)
+    val labelDimmed = Color(0xFFBEB4A7)
+    val accent = Color(0xFFD9926B)
+    val onAccent = Color(0xFF3A342D)
+    val accentTertiary = Color(0xFFF2C7A8)
+    val accentHover = Color(0xFFD9926B)
+    val hover = Color(0x10E8A87C)
+    val hoverSolid = Color(0xFFF5EADC)
+    val hoverAccent = Color(0x30E8A87C)
+    val active = Color(0x26E8A87C)
+    val dangerHover = Color(0x18D9705F)
+    val buttonPrimaryHover = Color(0xFFD9926B)
+    val buttonPrimaryDimmed = Color(0xFFF2C7A8)
+    val buttonInfoFill = Color(0xFFF2C7A8)
+    val buttonInfoHover = Color(0xFFD9926B)
+    val error = Color(0xFFAA4435)
+    val errorSecondary = Color(0xFFD9705F)
+    val errorTertiary = Color(0xFFF9E4DE)
+    val success = Color(0xFF407B66)
+    val successSecondary = Color(0xFF7FBFA8)
+    val successTertiary = Color(0xFFE2F0E9)
+    val warnLabel = Color(0xFF8C5B22)
+    val warn = Color(0xFFE0A458)
+    val warnSecondary = Color(0xFFE0A458)
+    val warnTertiary = Color(0xFFF8EDD9)
+    val toastBg = Color(0xFF3A342D)
+    val tooltipBg = Color(0xFF3A342D)
+    val userBubble = Color(0xFFF2C7A8)
+    val userBubbleHighlight = Color(0xFFE8B48E)
+    val composerCard = Color.White
+    val sidebar = Color(0xFFF5F0E8)
+    val sidebarNavActive = Color(0xB3FFFFFF)
+    val sidebarNavAccent = Color(0x40E8A87C)
+    val sidebarNavHover = Color(0x66FFFFFF)
+    val tipSurface = Color(0xFFF5F0E8)
+    val codeBlockBg = Color(0xFFF5F0E8)
+    val codeBlockBanner = Color(0xFFEDE6DA)
+    val inlineCode = Color(0xFFEDE6DA)
+    val citation = Color(0xFFE3D7C6)
+    val markdownTag = Color(0xFFF5F0E8)
+    val overlayMask = Color(0x3D3A342D)
 }
 
 /** Semantic alias tokens for the dark theme. */
 object DsDark {
-    val bgBase = Color(0xFF121212)
-    val bgLayer1 = Color(0xFF1A1A1A)
-    val bgLayer2 = Color(0xFF1F1F1F)
-    val bgLayer3 = Color(0xFF282828)
-    val bgModulePlatform = Color(0xFF242424)
+    val bgBase = Color(0xFF24211E)
+    val bgLayer1 = Color(0xFF2E2B28)
+    val bgLayer2 = Color(0xFF35312D)
+    val bgLayer3 = Color(0xFF403A34)
+    val bgModulePlatform = Color(0xFF35312D)
     val borderL1 = Color(0x0FFFFFFF) // rgba(255,255,255,.06)
     val borderL2 = Color(0x1FFFFFFF) // rgba(255,255,255,.12)
     val borderL3 = Color(0x29FFFFFF) // rgba(255,255,255,.16)
-    val brandPrimary = Ds.Bluish50 // inverted ink button fill
-    val onBrandPrimary = Ds.Bluish1000
-    val labelPrimary = Color(0xFFF5F5F5)
-    val labelSecondary = Color(0xFFD5D5D5)
-    val labelTertiary = Color(0xFF909096)
-    val labelCaption = Ds.Bluish600
+    val brandPrimary = Color(0xFFE8A87C)
+    val onBrandPrimary = Color(0xFF3A342D)
+    val labelPrimary = Color(0xFFF5F0E8)
+    val labelSecondary = Color(0xFFD9D0C5)
+    val labelTertiary = Color(0xFFB8AB9B)
+    val labelCaption = Color(0xFFB8AB9B)
     val labelDimmed = Ds.Bluish750
-    val accent = Ds.AccentBlue400
+    val accent = Color(0xFFE8A87C)
     val onAccent = Color(0xFF0C1A19)
-    val accentTertiary = Ds.AccentBlue900
-    val accentHover = Ds.AccentBlue500
+    val accentTertiary = Color(0xFF5B4032)
+    val accentHover = Color(0xFFD9926B)
     val hover = Color(0x14FFFFFF) // rgba(255,255,255,.08)
     val hoverSolid = Ds.Bluish850
     val hoverAccent = Color(0x3DFFFFFF) // rgba(255,255,255,.24)
@@ -149,13 +138,13 @@ object DsDark {
     val dangerHover = Color(0x26DE7A72) // rgba(222,122,114,.15)
     val buttonPrimaryHover = Ds.Bluish100
     val buttonPrimaryDimmed = Ds.Bluish750
-    val buttonInfoFill = Ds.AccentBlue400
-    val buttonInfoHover = Ds.AccentBlue500
+    val buttonInfoFill = Color(0xFFE8A87C)
+    val buttonInfoHover = Color(0xFFD9926B)
     val error = Ds.Red400
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red900
-    val success = Ds.Green500
-    val successSecondary = Ds.Green400
+    val success = Color(0xFF7FBFA8)
+    val successSecondary = Color(0xFF69AE97)
     val successTertiary = Ds.Green900
     val warnLabel = Ds.Amber600
     val warn = Ds.Amber500
@@ -165,8 +154,8 @@ object DsDark {
     val tooltipBg = Ds.Bluish750
     val userBubble = Color(0xFF2C2C2E)
     val userBubbleHighlight = Color(0xFF38383A)
-    val composerCard = Color(0xFF1F1F1F)
-    val sidebar = Color(0xFF171717)
+    val composerCard = Color(0xFF35312D)
+    val sidebar = Color(0xFF2E2B28)
     val sidebarNavActive = Color(0xFF2A2A2A)
     val sidebarNavAccent = Ds.Bluish800
     val sidebarNavHover = Color(0xFF222220)
@@ -175,6 +164,6 @@ object DsDark {
     val codeBlockBanner = Color(0xFF2B2B2B)
     val inlineCode = Color(0xFF303030)
     val citation = Color(0xFF636363)
-    val markdownTag = Color(0xFF282828)
+    val markdownTag = Color(0xFF403A34)
     val overlayMask = Color(0x80000000) // rgba(0,0,0,.5)
 }

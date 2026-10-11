@@ -88,13 +88,13 @@ fun DsDialog(
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     val scale by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.985f,
-        animationSpec = DsAnimations.pageFade,
+        targetValue = if (appeared) 1f else 0.92f,
+        animationSpec = DsAnimations.modal,
         label = "dialogScale",
     )
     val alpha by animateFloatAsState(
         targetValue = if (appeared) 1f else 0f,
-        animationSpec = DsAnimations.fade,
+        animationSpec = DsAnimations.modal,
         label = "dialogAlpha",
     )
     Dialog(

@@ -210,7 +210,7 @@ internal fun WorkProcessRow(
         return
     }
     val processStatus = workProcessStatus(nodes, running)
-    val processSurface = if (backgroundState.hasImage) {
+    val processSurface = if (backgroundState.hasImage || backgroundState.fluidGlass) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
             region = BackgroundRegion.MIDDLE,
@@ -219,13 +219,8 @@ internal fun WorkProcessRow(
         Color.Transparent
     }
 
-    var expanded by remember(messages.first().id) { mutableStateOf(running) }
-    var manuallyToggled by remember(messages.first().id) { mutableStateOf(false) }
+    var expanded by remember(messages.first().id) { mutableStateOf(true) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    // Automatically fold only if the reader has not chosen their own disclosure state.
-    LaunchedEffect(messages.first().id, running) {
-        if (!manuallyToggled) expanded = running
-    }
     // Keep event order, but merge tool outcomes into their immediately preceding narration.
     val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
     val firstReasoningTimestamp = messages.firstOrNull {
@@ -277,7 +272,6 @@ internal fun WorkProcessRow(
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
                 .clickable(role = Role.Button) {
-                    manuallyToggled = true
                     expanded = !expanded
                 }
                 .semantics { stateDescription = disclosureState }
@@ -383,7 +377,7 @@ internal fun WorkOperationIcon(
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = if (running) DsTheme.colors.accent else DsTheme.colors.labelSecondary,
+        tint = if (running) DsTheme.colors.success else DsTheme.colors.labelSecondary,
         modifier = Modifier.size(18.dp),
     )
 }

@@ -1,19 +1,18 @@
 package com.labteto.dshmobile.ui.screens.settings
 
-import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.theme.DsThemeTokens
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SettingsInkColorsTest {
     @Test
-    fun lightSettingsUsePureBlackForLabelsAndIcons() {
+    fun lightSettingsPreserveTheSharedReadableInkHierarchy() {
         val original = DsThemeTokens.light
         val actual = settingsInkColors(original)
 
-        assertEquals(Color.Black, actual.labelPrimary)
-        assertEquals(Color.Black, actual.labelSecondary)
-        assertEquals(Color.Black, actual.labelCaption)
+        assertEquals(original.labelPrimary, actual.labelPrimary)
+        assertEquals(original.labelSecondary, actual.labelSecondary)
+        assertEquals(original.labelCaption, actual.labelCaption)
         assertEquals(original.labelTertiary, actual.labelTertiary)
         assertEquals(original.labelDimmed, actual.labelDimmed)
         assertEquals(original.bgBase, actual.bgBase)

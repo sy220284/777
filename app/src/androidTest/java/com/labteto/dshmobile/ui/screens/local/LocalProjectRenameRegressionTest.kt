@@ -1,8 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -52,6 +54,6 @@ class LocalProjectRenameRegressionTest {
             assertEquals("新名称", catalog.value.projects.single().name)
             assertEquals("原项目规则", catalog.value.projects.single().instructions)
         }
-        compose.onNodeWithText("✓ 新名称").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("projectRow:project-1").performScrollTo().assertIsDisplayed().assertIsSelected()
     }
 }

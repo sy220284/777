@@ -47,6 +47,7 @@ data class DsColors(
     val buttonInfoFill: Color,
     val buttonInfoHover: Color,
     val error: Color,
+    val onError: Color,
     val errorSecondary: Color,
     val errorTertiary: Color,
     val success: Color,
@@ -85,14 +86,14 @@ object DsThemeTokens {
         labelDimmed = DsLight.labelDimmed,
         accent = DsLight.accent, onAccent = DsLight.onAccent,
         accentTertiary = DsLight.accentTertiary,
-        characterAccent = DsLight.accent,
-        characterAccentTertiary = DsLight.accentTertiary,
+        characterAccent = Color(0xFF84619D),
+        characterAccentTertiary = Color(0x30B9A0D4),
         accentHover = DsLight.accentHover,
         hover = DsLight.hover, hoverSolid = DsLight.hoverSolid, hoverAccent = DsLight.hoverAccent,
         active = DsLight.active, dangerHover = DsLight.dangerHover,
         buttonPrimaryHover = DsLight.buttonPrimaryHover, buttonPrimaryDimmed = DsLight.buttonPrimaryDimmed,
         buttonInfoFill = DsLight.buttonInfoFill, buttonInfoHover = DsLight.buttonInfoHover,
-        error = DsLight.error, errorSecondary = DsLight.errorSecondary, errorTertiary = DsLight.errorTertiary,
+        error = DsLight.error, onError = Color.White, errorSecondary = DsLight.errorSecondary, errorTertiary = DsLight.errorTertiary,
         success = DsLight.success, successSecondary = DsLight.successSecondary,
         successTertiary = DsLight.successTertiary,
         warnLabel = DsLight.warnLabel, warn = DsLight.warn, warnSecondary = DsLight.warnSecondary,
@@ -118,14 +119,14 @@ object DsThemeTokens {
         labelDimmed = DsDark.labelDimmed,
         accent = DsDark.accent, onAccent = DsDark.onAccent,
         accentTertiary = DsDark.accentTertiary,
-        characterAccent = DsDark.accent,
-        characterAccentTertiary = DsDark.accentTertiary,
+        characterAccent = Color(0xFFB9A0D4),
+        characterAccentTertiary = Color(0x30B9A0D4),
         accentHover = DsDark.accentHover,
         hover = DsDark.hover, hoverSolid = DsDark.hoverSolid, hoverAccent = DsDark.hoverAccent,
         active = DsDark.active, dangerHover = DsDark.dangerHover,
         buttonPrimaryHover = DsDark.buttonPrimaryHover, buttonPrimaryDimmed = DsDark.buttonPrimaryDimmed,
         buttonInfoFill = DsDark.buttonInfoFill, buttonInfoHover = DsDark.buttonInfoHover,
-        error = DsDark.error, errorSecondary = DsDark.errorSecondary, errorTertiary = DsDark.errorTertiary,
+        error = DsDark.error, onError = Color(0xFF0C1A19), errorSecondary = DsDark.errorSecondary, errorTertiary = DsDark.errorTertiary,
         success = DsDark.success, successSecondary = DsDark.successSecondary,
         successTertiary = DsDark.successTertiary,
         warnLabel = DsDark.warnLabel, warn = DsDark.warn, warnSecondary = DsDark.warnSecondary,
@@ -157,7 +158,7 @@ object DsThemeTokens {
         borderL3 = Color(0x29F3F0E8),
         brandPrimary = Color(0xFFF3F0E8),
         onBrandPrimary = Color(0xFF10100F),
-        onAccent = Color(0xFFF3F0E8),
+        onAccent = Color(0xFF3A342D),
         labelPrimary = Color(0xFFF4F3EF),
         labelSecondary = Color(0xFFD5D1C9),
         labelTertiary = Color(0xFFAAA69E),
@@ -215,7 +216,7 @@ private fun materialLightScheme(c: DsColors) = lightColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = c.onAccent,
+    onError = c.onError,
 )
 
 private fun materialDarkScheme(c: DsColors) = darkColorScheme(
@@ -233,7 +234,7 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
     outline = c.borderL2,
     outlineVariant = c.borderL1,
     error = c.error,
-    onError = c.onAccent,
+    onError = c.onError,
 )
 
 /**
@@ -263,7 +264,7 @@ fun DshTheme(
         ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
         ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
     }
-    // 旧 celadon 持久值由 AccentPalettes.of 迁移为 默认蓝；显式色卡覆盖 accent 家族
+    // 旧 celadon 持久值由 AccentPalettes.of 跟随流体杏默认；显式色卡覆盖 accent 家族
     val palette = AccentPalettes.of(accentKey)
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
@@ -289,6 +290,7 @@ fun DshTheme(
             darkTheme = dark,
             surfaceBase = themed.bgBase,
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
+            fluidGlass = preference != ThemePreference.MATTE_BLACK,
         ) {
             MaterialTheme(
                 colorScheme = scheme,

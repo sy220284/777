@@ -70,7 +70,7 @@ internal fun MiniMaxQuotaPage(profile: LocalModelProfile, viewModel: SettingsVie
             }
             if (error != null) {
                 Text(stringResource(R.string.minimax_quota_error, error.orEmpty()),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                    style = DsType.std14Strong.withReadingWeight(), color = colors.error)
             }
         }
     }
@@ -142,7 +142,7 @@ private fun MiniMaxQuotaWindow(
         window.remainingFraction()?.let { fraction ->
             LinearProgressIndicator(
                 progress = { fraction }, modifier = Modifier.fillMaxWidth(),
-                color = colors.accent, trackColor = colors.borderL3,
+                color = colors.successSecondary, trackColor = colors.borderL3,
             )
         }
         resetMillis?.takeIf { it >= 0 }?.let {

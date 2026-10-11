@@ -5,12 +5,17 @@ import org.junit.Test
 
 class AccentThemeTest {
     @Test
-    fun legacyDefaultCeladonResolvesToDefaultBlue() {
-        assertEquals("default_blue", AccentPalettes.of(null).key)
-        assertEquals("default_blue", AccentPalettes.of("").key)
-        assertEquals("default_blue", AccentPalettes.of("celadon").key)
-        assertEquals("默认蓝", AccentPalettes.DEFAULT.cnName)
-        assertEquals("default_blue", AccentPalettes.of("unknown").key)
+    fun legacyDefaultFollowsFluidApricot() {
+        assertEquals("fluid_apricot", AccentPalettes.of(null).key)
+        assertEquals("fluid_apricot", AccentPalettes.of("").key)
+        assertEquals("fluid_apricot", AccentPalettes.of("celadon").key)
+        assertEquals("流体杏", AccentPalettes.DEFAULT.cnName)
+        assertEquals("fluid_apricot", AccentPalettes.of("unknown").key)
+    }
+
+    @Test
+    fun explicitBlueRemainsSelectable() {
+        assertEquals("default_blue", AccentPalettes.of("default_blue").key)
     }
 
     @Test
