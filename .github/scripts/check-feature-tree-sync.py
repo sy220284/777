@@ -198,6 +198,69 @@ def inspect():
         raise ValueError("全量分级统计与逐功能证据不一致")
     if review.get("observed_code_delta") != index.get("observed_delta"):
         raise ValueError("功能变化报告与扫描索引不一致")
+    # 不依赖扫描器的身份声明：重新验证静态 ID、路径、原始文件和真实 Kotlin/Java 声明。
+    identities_file = DOCS / "FEATURE-TREE-LEGACY-IDENTITIES.json"
+    manifest = (json.loads(identities_file.read_text(encoding="utf-8"))
+                if identities_file.is_file() else {"version": 1, "bindings": []})
+    if manifest.get("version") != 1 or not isinstance(manifest.get("bindings"), list):
+        raise ValueError("现有功能稳定身份文件格式不合法")
+    bound, unique_keys, problems = set(), set(), []
+    declared_by_path = {r["path"]: r for r in reported}
+    for binding in manifest["bindings"]:
+        identity, path, source, symbol = (
+            binding.get("id"), binding.get("path"),
+            binding.get("source"), binding.get("entry")
+        )
+        if (not isinstance(identity, str) or not re.fullmatch(r"existing\.\d{4,}", identity)
+                or not isinstance(path, str) or identity in bound):
+            raise ValueError("旧功能身份必须采用唯一 existing.NNNN 标识")
+        bound.add(identity)
+        if not isinstance(source, str) or not isinstance(symbol, str):
+            raise ValueError("旧功能身份缺少真实代码关联")
+        pair = (source, symbol)
+        if pair in unique_keys:
+            raise ValueError("多功能共享同一源码声明，不得假设功能身份唯一")
+        unique_keys.add(pair)
+        if binding.get("evidence") != "static_declaration_only":
+            raise ValueError("静态身份不能标为已经完成运行验收")
+        reason = None
+        if path not in declared_by_path:
+            reason = "路径不在当前末级树中"
+        elif not (ROOT / source).is_file():
+            reason = "源码文件不存在"
+        elif not re.search(r"(?:fun|class|object|interface|val|var|enum\s+class)\s+" +
+                           re.escape(symbol) + r"\b",
+                           (ROOT / source).read_text(encoding="utf-8", errors="replace")):
+            reason = "源码具名声明已消失"
+        evidence = declared_by_path.get(path)
+        if evidence is not None:
+            if evidence.get("identity_id") != identity:
+                raise ValueError("功能报告没有保持正确的稳定源码身份")
+            if not reason and evidence.get("identity_status") != "静态声明已核，尚未授权自动改树":
+                raise ValueError("稳定身份状态与当前源码不符")
+        if reason:
+            problems.append(identity)
+    stale_ids = {x["id"] for x in review.get("stale_legacy_identities", [])}
+    if set(problems) != stale_ids:
+        raise ValueError("旧功能身份已过期名单与源码不符")
+    if (review.get("tracked_legacy_identities") != len(bound)
+            or index.get("tracked_legacy_identities") != len(bound)):
+        raise ValueError("稳定身份登记数量与全量扫描报告不一致")
+    ambiguous_keys = {}
+    for record in reported:
+        for src in record.get("existing_production_sources", []):
+            for declaration in record.get("named_symbols", []):
+                if declaration.get("declaration_found"):
+                    ambiguous_keys.setdefault((src, declaration["symbol"]), []).append(record["path"])
+    ambiguous_paths = sorted({path for paths in ambiguous_keys.values()
+                              if len(paths) > 1 for path in paths})
+    if review.get("ambiguous_named_entry_paths") != ambiguous_paths:
+        raise ValueError("一对多入口歧义名单有遗漏")
+    missing = [r["path"] for r in reported
+               if r.get("verification") == "没有可确认的现行入口证据"]
+    pending = review.get("unproven_feature_triage", [])
+    if [r["path"] for r in pending] != missing or index.get("unproven_feature_count") != len(missing):
+        raise ValueError("逐项无源码证据功能的待核实登记不完整")
     by_path = {x["path"]: x for x in reported}
     def check_display(node, stack):
         for child in node["children"]:
