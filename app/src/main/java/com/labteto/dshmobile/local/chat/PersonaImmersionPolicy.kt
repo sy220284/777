@@ -67,7 +67,7 @@ internal object PersonaImmersionPolicy {
     // A limitation or an emotion is not evidence of leaving the character. Retry only
     // explicit platform identity claims; authored AI/non-human characters keep their form.
     private val RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS = listOf(
-        Regex("""(?i)(?:作为|身为|我是|我只是)\s*(?:一个|一名)?\s*(?:语言模型|大语言模型|ChatGPT|聊天机器人|虚拟助手|智能助手)"""),
+        Regex("""(?i)(?:作为|身为|我是|我只是)\s*(?:一个|一名)?\s*(?:AI\s*)?(?:语言模型|大语言模型|ChatGPT|聊天机器人|虚拟助手|智能助手)"""),
         Regex("""(?i)\b(?:as an? (?:language model|virtual assistant)|i (?:am|'m) (?:an? )?(?:language model|virtual assistant))\b"""),
     )
 
