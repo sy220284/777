@@ -74,6 +74,30 @@ internal class TokenUsageDatabase(
     fun enforceRetention(): Boolean = transaction(writableDatabase) { prune(writableDatabase) }
     fun lifetimeTotals(): UsageLifetimeTotals = totals(readableDatabase)
 
+    /** Older installations kept only a cross-model lifetime total. Restore everything that is
+     * still retained, and flag the pre-retention portion as unattributable rather than guessing. */
+    fun backfillModelTotalsIfNeeded() {
+        val db = writableDatabase
+        transaction(db) {
+            val current = totals(db)
+            if (current.models.isNotEmpty() ||
+                (current.tracked.requestCount == 0L && current.tracked.unreportedRequestCount == 0L)
+            ) return@transaction
+            val records = retainedRecords()
+            val models = linkedMapOf<String, UsageModelLifetimeTotals>()
+            records.forEach { record ->
+                val key = record.model.trim().ifEmpty { "未知模型" }
+                models[key] = (models[key] ?: UsageModelLifetimeTotals()).add(record)
+            }
+            val retainedCount = records.size.toLong()
+            val lifetimeCount = current.tracked.requestCount + current.tracked.unreportedRequestCount
+            putMetadata(db, "totals", json.encodeToString(
+                UsageLifetimeTotals.serializer(),
+                current.copy(models = models, modelHistoryPartial = retainedCount < lifetimeCount),
+            ))
+        }
+    }
+
     private fun insert(db: SQLiteDatabase, record: TokenUsageRecord): Boolean {
         require(record.requestId.isNotBlank()) { "用量请求编号不能为空" }
         val payload = json.encodeToString(TokenUsageRecord.serializer(), record)
@@ -126,9 +150,26 @@ internal data class UsageLifetimeTotals(
     val tracked: TokenUsageAggregate = TokenUsageAggregate(),
     val chat: TokenUsageAggregate = TokenUsageAggregate(),
     val work: TokenUsageAggregate = TokenUsageAggregate(),
+    val models: Map<String, UsageModelLifetimeTotals> = emptyMap(),
+    val modelHistoryPartial: Boolean = false,
 ) {
     fun add(record: TokenUsageRecord): UsageLifetimeTotals = copy(
         since = if (since == 0L) record.timestamp else minOf(since, record.timestamp),
+        tracked = tracked.add(record),
+        chat = if (record.context.mode == LocalUsageMode.CHAT) chat.add(record) else chat,
+        work = if (record.context.mode == LocalUsageMode.WORK) work.add(record) else work,
+        models = models + (record.model.trim().ifEmpty { "未知模型" } to
+            (models[record.model.trim().ifEmpty { "未知模型" }] ?: UsageModelLifetimeTotals()).add(record)),
+    )
+}
+
+@Serializable
+internal data class UsageModelLifetimeTotals(
+    val tracked: TokenUsageAggregate = TokenUsageAggregate(),
+    val chat: TokenUsageAggregate = TokenUsageAggregate(),
+    val work: TokenUsageAggregate = TokenUsageAggregate(),
+) {
+    fun add(record: TokenUsageRecord): UsageModelLifetimeTotals = copy(
         tracked = tracked.add(record),
         chat = if (record.context.mode == LocalUsageMode.CHAT) chat.add(record) else chat,
         work = if (record.context.mode == LocalUsageMode.WORK) work.add(record) else work,
