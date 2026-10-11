@@ -88,19 +88,19 @@ internal class CharacterRuntimeProjector(
             "人物自身限制" to persona.hardConstraints.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物所知范围" to persona.knowledgeBoundary.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物修订资料" to persona.corrections.joinToString("；"),
-            "语言风格资料" to persona.factText(CharacterFactCategories.VOICE_STYLE)
+            "语言风格资料" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE)
                 .ifBlank { if (legacy) persona.voiceSamples.joinToString("\n") else "" },
-            "自身认知与矛盾" to persona.factText(CharacterFactCategories.IDENTITY_GAP)
+            "自身认知与矛盾" to persona.trustedFactText(CharacterFactCategories.IDENTITY_GAP)
                 .ifBlank { if (legacy) persona.coreTension else "" },
-            "主观认识" to persona.factText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
+            "主观认识" to persona.trustedFactText(CharacterFactCategories.SUBJECTIVE_BELIEFS)
                 .ifBlank { if (legacy) persona.perceptionBlindSpots.joinToString("；") else "" },
-            "感知特点" to persona.factText(CharacterFactCategories.SENSORY_SIGNATURE)
+            "感知特点" to persona.trustedFactText(CharacterFactCategories.SENSORY_SIGNATURE)
                 .ifBlank { if (legacy) persona.attentionBiases.joinToString("；") else "" },
-            "偏好与习惯" to persona.factText(CharacterFactCategories.PREFERENCES_AND_HABITS)
+            "偏好与习惯" to persona.trustedFactText(CharacterFactCategories.PREFERENCES_AND_HABITS)
                 .ifBlank { if (legacy) persona.quirks.joinToString("；") else "" },
-            "人物经历" to persona.factText(CharacterFactCategories.BIOGRAPHY)
+            "人物经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY)
                 .ifBlank { if (legacy) persona.lifeContext else "" },
-            "生活与责任" to persona.factText(CharacterFactCategories.LIFE_GRAVITY),
+            "生活与责任" to persona.trustedFactText(CharacterFactCategories.LIFE_GRAVITY),
             "原作来源" to persona.franchise,
             "当前剧情阶段" to persona.timelinePosition,
             "世界背景" to persona.worldSetting,
