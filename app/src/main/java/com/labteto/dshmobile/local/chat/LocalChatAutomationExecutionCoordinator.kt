@@ -16,7 +16,7 @@ import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
-import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
+import com.labteto.dshmobile.local.chat.recentProactiveContext
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -361,7 +361,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     storyContext = session.handoffSummary,
                 )
                 val relationshipMemory = chatComposition.memory.relationshipContext(conversationFocus, boundState)
-                val proactiveAvoidance = recentProactiveAvoidanceContext(recentTranscript)
+                val proactiveBackground = recentProactiveContext(recentTranscript)
                 val proactiveDirective = characterProactiveDirective(
                     trigger = trigger,
                     persona = persona,
@@ -384,7 +384,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 val dynamicContext = listOf(
                     chatContext.dynamicPrompt,
                     relationshipMemory,
-                    proactiveAvoidance,
+                    proactiveBackground,
                     proactiveDirective,
                 )
                     .filter(String::isNotBlank)
@@ -427,36 +427,9 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 require(content.isNotEmpty()) { "角色没有生成可用的主动消息" }
 
                 if (isNearDuplicateProactive(content, recentTranscript)) {
-                    val retryRawReply = completeAutomationChat(
-                        snapshot = boundState,
-                        profile = runProfile,
-                        messages = withEphemeralContext(
-                            requestMessages,
-                            """
-                            【主动互动去重】
-                            上一版与近期内容过近。保持人物与剧情连续，换切入点和表达重新生成。
-                            只输出新消息。
-                            """.trimIndent(),
-                        ),
-                    )
-                    reply = chatTurnCoordinator.finalize(
-                        snapshot = boundState,
-                        persona = persona,
-                        reply = retryRawReply,
-                        recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.CHAT_REPAIR, proactiveDirective) },
-                        onGuardEvent = { action, violations ->
-                            styleGuardSettings.recordHits(violations)
-                            boundEventLog.append("chat/style-guard", buildJsonObject {
-                                put("action", action)
-                                put("automation", true)
-                                put("proactive", true)
-                                put("dedupe_retry", true)
-                                put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                            })
-                        },
-                    )
-                    content = reply.content.orEmpty().trim()
-                    require(content.isNotEmpty()) { "角色主动消息去重重写后为空" }
+                    boundEventLog.append("chat/proactive-repeat", buildJsonObject {
+                        put("action", "repeat-detected")
+                    })
                 }
 
                 val proactiveScene = sessionContext.scene
