@@ -47,9 +47,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** Recurring jobs keep their schedule after a model or transport failure. */
-internal fun automationFailureStatus(task: AutomationTask): AutomationStatus =
-    if (task.recurringMinutes == null) AutomationStatus.FAILED else AutomationStatus.SCHEDULED
+internal fun shouldAutoPauseChatAutomation(
+    task: AutomationTask,
+    nextFailureStreak: Int,
+): Boolean =
+    task.mode == AutomationMode.CHAT &&
+        task.recurringMinutes != null &&
+        nextFailureStreak >= 3
 
 class HarnessAutomationWorker(
     appContext: Context,
