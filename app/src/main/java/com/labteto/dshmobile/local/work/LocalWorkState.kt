@@ -55,7 +55,9 @@ data class LocalAgentTeamMemberUiState(
     val phase: String,
     val activity: String,
     val currentTask: String? = null,
-    val progressPercent: Int = 0,
+    // Execution steps measure consumed work, never percentage of the user's goal completed.
+    val executionSteps: Int? = null,
+    val executionStepLimit: Int? = null,
     val resultMessageCount: Int = 0,
     val pendingMessageCount: Int = 0,
     val error: String? = null,
