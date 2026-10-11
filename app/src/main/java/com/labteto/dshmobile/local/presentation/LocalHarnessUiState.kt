@@ -8,8 +8,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
+import com.labteto.dshmobile.local.model.canQueryMiniMaxQuota
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import kotlinx.coroutines.CoroutineScope
@@ -43,9 +42,7 @@ data class LocalHarnessSettingsState(
     /** UI only sees a capability-filtered, selected profile; provider rules stay in Model. */
     val miniMaxQuotaProfile: LocalModelProfile?
         get() = modelSelection.activeProfile?.takeIf { profile ->
-            profile.authKind == LocalModelAuthKind.API_KEY &&
-                profile.model.startsWith("MiniMax-", ignoreCase = true) &&
-                LocalMiniMaxPolicy.isOfficial(profile.baseUrl)
+            profile.canQueryMiniMaxQuota()
         }
 }
 

@@ -17,6 +17,7 @@ internal enum class LocalFeatureDrawerEntry {
     DIARY,
     TASKS,
     TOOLS,
+    MINIMAX_QUOTA,
     SETTINGS,
 }
 

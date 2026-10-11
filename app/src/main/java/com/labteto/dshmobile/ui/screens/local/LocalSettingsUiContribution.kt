@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
 
+// FEATURE_TREE: {"id":"settings.minimax.quota","path":"第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度","entry":"localSettingsFeatureUiContribution","owner":"SETTINGS","test":"app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt#quotaDrawerOpensQuotaDirectlyAndClosesDrawer"}
 internal fun localSettingsFeatureUiContribution(
     settingsDestination: SettingsDestination,
     memorySourceSessionId: String? = null,
@@ -17,6 +18,11 @@ internal fun localSettingsFeatureUiContribution(
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(
     moduleId = LocalFeatureModuleId.SETTINGS,
     drawerActions = mapOf(
+        LocalFeatureDrawerEntry.MINIMAX_QUOTA to {
+            onSettingsDestinationChange(SettingsDestination.MINIMAX_QUOTA)
+            onOpenFromDrawer(LocalFeaturePage.SETTINGS)
+            onCloseDrawer()
+        },
         LocalFeatureDrawerEntry.SETTINGS to {
             onSettingsDestinationChange(SettingsDestination.ROOT)
             onOpenFromDrawer(LocalFeaturePage.SETTINGS)

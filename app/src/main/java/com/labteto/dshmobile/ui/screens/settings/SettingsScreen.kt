@@ -303,6 +303,8 @@ fun SettingsScreen(
             } else {
                 page = usageDetailReturnPage
             }
+        } else if (page == SettingsDestination.MINIMAX_QUOTA && initialDestination == page) {
+            onClose()
         } else {
             page.parentDestination()?.let { page = it } ?: onClose()
         }
@@ -442,16 +444,6 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                                 compact = true,
                             )
-                            if (selectedMiniMaxProfile != null) {
-                                AppSettingsDivider()
-                                AppSettingsRow(
-                                    icon = FeatherIcons.CreditCard,
-                                    title = stringResource(R.string.minimax_quota_title),
-                                    subtitle = stringResource(R.string.minimax_quota_entry_hint),
-                                    onClick = { page = SettingsDestination.MINIMAX_QUOTA },
-                                    compact = true,
-                                )
-                            }
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,

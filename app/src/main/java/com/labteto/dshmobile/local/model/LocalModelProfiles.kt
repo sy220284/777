@@ -812,3 +812,9 @@ internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
     require(matches.size <= 1) { "同一模型地址存在多个配置，请从列表选择要编辑的配置" }
     return matches.singleOrNull()
 }
+
+/** Only official API-key routes can query the provider's account quota. */
+internal fun LocalModelProfile.canQueryMiniMaxQuota(): Boolean =
+    authKind == LocalModelAuthKind.API_KEY &&
+        model.startsWith("MiniMax-", ignoreCase = true) &&
+        LocalMiniMaxPolicy.isOfficial(baseUrl)

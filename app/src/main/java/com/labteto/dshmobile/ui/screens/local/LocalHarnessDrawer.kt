@@ -92,6 +92,7 @@ internal fun LocalModeDrawer(
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
+    onMiniMaxQuota: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
@@ -292,6 +293,7 @@ internal fun LocalModeDrawer(
                             onProjects = onProjects,
                             onOpenRunCenter = onOpenRunCenter,
                             onTools = onTools,
+                            onMiniMaxQuota = onMiniMaxQuota,
                         )
                     }
                 }
