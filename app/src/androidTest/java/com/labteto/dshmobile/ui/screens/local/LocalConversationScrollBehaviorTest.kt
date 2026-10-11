@@ -203,6 +203,7 @@ class LocalConversationScrollBehaviorTest {
         lateinit var listState: LazyListState
         val rows = mutableIntStateOf(12)
         val catchingUp = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
         compose.setContent {
             DshTheme {
                 listState = rememberLazyListState()
@@ -216,6 +217,7 @@ class LocalConversationScrollBehaviorTest {
                         listState = listState, sessionId = "work-test",
                         tailIndex = rows.intValue - 1, tailKey = "work-" + (rows.intValue - 1),
                         isReady = true, isCatchingUp = catchingUp,
+                        isReaderPaused = readerPaused,
                     )
                 }
             }
