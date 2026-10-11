@@ -70,7 +70,9 @@ class UsageCalculationPageTest {
         compose.onNodeWithText("450").assertExists()
         compose.onNodeWithText("MiniMax-M3 ▾").performClick()
         compose.onNodeWithText("never-used").performClick()
-        compose.onNodeWithText("0").assertExists()
+        compose.onNodeWithText("never-used ▾").assertExists()
+        compose.onNodeWithText("450").assertDoesNotExist()
+        compose.onAllNodesWithText("0").onFirst().assertExists()
     }
 
     @Test
