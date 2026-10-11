@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.restoreChatStateBefore
 import com.labteto.dshmobile.local.chat.restoreGroupStateBefore
 import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import kotlinx.serialization.json.Json
@@ -24,6 +25,29 @@ class LocalChatTimelineRollbackTest {
     val temporary = TemporaryFolder()
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun malformedRollbackCheckpointIsLoggedAndOlderValidStateRemainsAvailable() {
+        AppLog.clear()
+        val original = ChatCharacterState(mood = "安静", relationshipState = "熟悉")
+        val invalid = LocalSessionEventLog.Event(
+            sequence = 2L,
+            type = "chat/state-baseline",
+            createdAt = 2L,
+            data = buildJsonObject {
+                put("state", buildJsonObject { put("mood", buildJsonObject { put("bad", true) }) })
+            },
+        )
+        val restored = restoreChatStateBefore(
+            sequenceOf(baseline(1L, original), invalid),
+            json, 3L, 3L,
+        )
+        assertEquals(original, restored)
+        val diagnostic = AppLog.snapshot().lastOrNull { it.tag == "ChatTimeline" }
+        assertNotNull(diagnostic)
+        assertEquals(true, diagnostic!!.message.contains("event_seq=2"))
+        assertEquals(true, diagnostic.message.contains("operation=restore_chat_timeline"))
+    }
 
     @Test
     fun restoresExactStateCheckpointBeforeUserMessage() {

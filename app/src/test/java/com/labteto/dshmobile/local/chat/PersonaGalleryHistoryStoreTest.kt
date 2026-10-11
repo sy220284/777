@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -28,6 +29,20 @@ class PersonaGalleryHistoryStoreTest {
         assertTrue(store.deleteMessage("entry", "story", galleryMessageArchiveKey(message("m10", 10))))
         assertEquals(120, store.tail("entry", "story", 2).totalCount)
         assertEquals(120, PersonaGalleryHistoryStore(root, json).tail("entry", "story", 2).totalCount)
+    }
+
+    @Test
+    fun malformedArchiveRowIsSkippedWithDiagnosticEvidence() {
+        val root = temporary.newFolder("malformed")
+        val store = PersonaGalleryHistoryStore(root, json)
+        store.merge("entry", "story", listOf(message("m1", 1)))
+        File(File(root, "entry"), "story.jsonl").appendText("{invalid-json}\n")
+        AppLog.clear()
+        val page = store.tail("entry", "story", 3)
+        assertEquals(listOf("m1"), page.messages.map { it.id })
+        assertTrue(AppLog.snapshot().any {
+            it.tag == "PersonaHistory" && it.message.contains("decode_persona_archive_row")
+        })
     }
 
     @Test

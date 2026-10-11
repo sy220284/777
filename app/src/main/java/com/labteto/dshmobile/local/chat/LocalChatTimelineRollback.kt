@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -82,7 +83,7 @@ internal fun restoreChatStateBefore(
             runCatching {
                 json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
                     .canonicalizeLegacyCharacterState()
-            }.getOrNull()
+            }.onFailure { logTimelineDecodeFailure(event, it) }.getOrNull()
         } else {
             // Compatibility with old post-turn events that only persisted these two fields.
             val mood = event.data["mood"]?.jsonPrimitive?.contentOrNull
@@ -122,7 +123,7 @@ internal fun restoreGroupStateBefore(
         runCatching {
             json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
                 .migrateLegacyConversationContext()
-        }.getOrNull()
+        }.onFailure { logTimelineDecodeFailure(event, it) }.getOrNull()
     }
     .lastOrNull()
 
@@ -199,7 +200,7 @@ internal fun restoreGroupStateBefore(
     runCatching {
         json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
             .migrateLegacyConversationContext()
-    }.getOrNull()
+    }.onFailure { logTimelineDecodeFailure(event, it) }.getOrNull()
 }
 
 private fun decodeChatStateEvent(
@@ -211,7 +212,7 @@ private fun decodeChatStateEvent(
         return runCatching {
             json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
                 .canonicalizeLegacyCharacterState()
-        }.getOrNull()
+        }.onFailure { logTimelineDecodeFailure(event, it) }.getOrNull()
     }
 
     // Compatibility with old post-turn events that only persisted these two fields.
@@ -222,6 +223,15 @@ private fun decodeChatStateEvent(
         mood = mood ?: "自然",
         relationshipState = relationship ?: "熟悉中",
         updatedAt = event.createdAt,
+    )
+}
+
+private fun logTimelineDecodeFailure(event: LocalSessionEventLog.Event, error: Throwable) {
+    // Do not include user-facing state or serialized messages in diagnostics.
+    AppLog.warn(
+        "ChatTimeline",
+        "failure=true operation=restore_chat_timeline event_type=${event.type.take(64)} " +
+            "event_seq=${event.sequence} cause_type=${error.javaClass.simpleName}",
     )
 }
 
