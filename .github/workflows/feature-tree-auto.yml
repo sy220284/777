@@ -39,7 +39,7 @@ jobs:
           python3 .github/scripts/sync-feature-tree.py --check
           python3 .github/scripts/check-acceptance-matrix.py
           git diff --check
-      - name: 自动提交维护结果
+      - name: 自动创建或更新维护 PR
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,24 +55,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "自动同步功能树与生产源码登记"
-          # 仅尝试非强制更新主线；拒绝覆盖并发提交和受保护分支。
-          if git push origin HEAD:main; then
-            echo "功能树已自动写入 main"
-            exit 0
-          fi
-          echo "::notice::无法直接更新 main；改走单一自动维护 PR"
-          git fetch origin main
-          git switch -C automation/feature-tree-maintenance
-          git rebase origin/main
-          python3 .github/scripts/sync-feature-tree.py
-          python3 .github/scripts/sync-feature-tree.py --check
-          python3 .github/scripts/check-acceptance-matrix.py
-          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
-            docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json \
-            docs/FEATURE-SOURCE-INDEX.auto.json
-          if ! git diff --cached --quiet; then
-            git commit -m "同步最新主线功能树索引"
-          fi
+          # 只维护机器人分支，不直接向 main 追加未触发 CI 的文档提交。
+          # 主线发布要求最终 SHA 有真实 CI 证据。
           git fetch origin refs/heads/automation/feature-tree-maintenance:refs/remotes/origin/automation/feature-tree-maintenance || true
           git push --force-with-lease origin HEAD:refs/heads/automation/feature-tree-maintenance
           PR_NUMBER="$(gh pr list --base main --head automation/feature-tree-maintenance --state open --json number --jq '.[0].number // empty')"
