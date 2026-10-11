@@ -72,6 +72,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         validate(offer, LocalMediaKind.VIDEO)
         return when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.startVideo(offer.profile, prompt)
+            LocalMediaProvider.QWEN -> api.startVideo(offer, prompt)
             else -> error("此服务商尚未接入视频生成")
         }
     }
@@ -80,6 +81,9 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         validate(offer, LocalMediaKind.VIDEO)
         return when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.videoStatus(offer.profile, taskId).let {
+                LocalMediaVideoStatus(it.state, it.downloadUrl)
+            }
+            LocalMediaProvider.QWEN -> api.videoStatus(offer, taskId).let {
                 LocalMediaVideoStatus(it.state, it.downloadUrl)
             }
             else -> error("此服务商尚未接入视频任务查询")
