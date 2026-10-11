@@ -349,14 +349,17 @@ class ChatRelationshipEngine @Inject constructor() {
         }
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)
             ?.let { lines += "尚未解决的事：${it.take(240)}" }
-        state.dynamics.facts.takeLast(8).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { lines += "已有事实：${it.joinToString("；") { fact -> fact.text }}" }
-        state.dynamics.hypotheses.takeLast(5).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { lines += "尚未确认的印象：${it.joinToString("；") { fact -> fact.text }}" }
+        state.dynamics.facts.takeLast(8).forEach { fact ->
+            lines += "已有事实：${fact.text}"
+        }
+        state.dynamics.hypotheses.takeLast(5).forEach { impression ->
+            lines += "尚未确认的印象：${impression.text}"
+        }
         state.dynamics.unknowns.takeLast(5).takeIf(List<String>::isNotEmpty)
             ?.let { lines += "仍未知：${it.joinToString("；")}" }
-        state.dynamics.sharedMoments.takeLast(6).takeIf(List<String>::isNotEmpty)
-            ?.let { lines += "共同经历：${it.joinToString("；")}" }
+        state.dynamics.sharedMoments.takeLast(6).forEach { event ->
+            lines += "共同经历：$event"
+        }
         state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)
             ?.let { lines += "共同物与约定：${it.joinToString("；")}" }
         if (lines.isEmpty()) return ""
