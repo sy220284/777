@@ -344,6 +344,119 @@
         }
       ],
       "scope": "设备工具插件及虚拟显示控制器真实声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbols": [
+            "BundledGitRuntime",
+            "prepare",
+            "searchPaths"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "打包Git运行时准备及通用执行入口已存在，具体Git仓库操作需真实命令验证"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "McpToolBridgePlugin",
+            "uninstall",
+            "disconnectFromUi"
+          ]
+        }
+      ],
+      "scope": "MCP断连、卸载和协程取消相关声明存在，外部超时表现另验"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "McpToolBridgePlugin",
+            "connectHttpFromUi",
+            "connectStdioFromUi"
+          ]
+        }
+      ],
+      "scope": "MCP HTTP与stdio的连接入口已声明，协议真实互通仍需测试"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
+          "symbols": [
+            "observeCharacterStateChanges",
+            "bindStateObservationSources"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+          "symbols": [
+            "ChatSceneRuntime",
+            "extractTurnEvents"
+          ]
+        }
+      ],
+      "scope": "人物状态变化观察、来源绑定及场景事件提取声明存在，情绪关系完整性待验"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+          "symbols": [
+            "ChatSceneRuntime",
+            "inspectReply"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatContinuitySanitizer.kt",
+          "symbols": [
+            "sanitizeChatContinuity"
+          ]
+        }
+      ],
+      "scope": "场景回复连续性检查与文本清理入口存在，身份及背景全量校验待测"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbols": [
+            "BundledGitRuntime",
+            "prepare",
+            "status"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "Git打包运行时与工具执行入口存在，真实Git二进制启动需设备验证"
     }
   ]
 }
