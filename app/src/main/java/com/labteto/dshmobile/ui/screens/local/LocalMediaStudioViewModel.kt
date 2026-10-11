@@ -26,7 +26,7 @@ class LocalMediaStudioViewModel @Inject constructor(
         creation.speech(route, text, voiceId)
     suspend fun transcribe(route: LocalMediaOffer, uri: Uri): String =
         creation.transcribe(route, uri)
-    fun createVideo(route: LocalMediaOffer, prompt: String): LocalMediaVideoTask =
+    suspend fun createVideo(route: LocalMediaOffer, prompt: String): LocalMediaVideoTask =
         creation.createVideo(route, prompt)
     suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) =
         creation.refreshVideo(route, taskId)
