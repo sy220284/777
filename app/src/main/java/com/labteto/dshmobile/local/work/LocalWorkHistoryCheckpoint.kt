@@ -26,6 +26,7 @@ internal data class LocalStructuredWorkState(
     val facts: List<String> = emptyList(),
     val artifacts: List<String> = emptyList(),
     val tools: List<String> = emptyList(),
+    val toolCallIds: List<String> = emptyList(),
 ) : com.labteto.dshmobile.local.model.LocalHistorySummaryInput
 
 internal data class LocalWorkCheckpoint(
@@ -42,9 +43,10 @@ internal data class LocalWorkCheckpoint(
     val facts: List<String> = emptyList(),
     val artifacts: List<String>,
     val tools: List<String>,
+    val toolCallIds: List<String> = emptyList(),
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
-        put("version", 4)
+        put("version", 5)
         put("goals", JsonArray(goals.map(::JsonPrimitive)))
         put("plan", JsonArray(plan.map(::JsonPrimitive)))
         put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
@@ -58,6 +60,7 @@ internal data class LocalWorkCheckpoint(
         put("facts", JsonArray(facts.map(::JsonPrimitive)))
         put("artifacts", JsonArray(artifacts.map(::JsonPrimitive)))
         put("tools", JsonArray(tools.map(::JsonPrimitive)))
+        put("tool_call_ids", JsonArray(toolCallIds.map(::JsonPrimitive)))
     }
 
     fun toModelBlock(): String = buildString {
@@ -111,6 +114,7 @@ internal data class LocalWorkCheckpoint(
                 facts = list("facts"),
                 artifacts = list("artifacts"),
                 tools = list("tools"),
+                toolCallIds = list("tool_call_ids"),
             )
         }
     }
