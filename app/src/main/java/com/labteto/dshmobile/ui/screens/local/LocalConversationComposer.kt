@@ -107,7 +107,10 @@ internal fun LocalConversationComposer(
     var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
     var steerCurrentRun by remember(state.sessionId) { mutableStateOf(false) }
-    LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
+    LaunchedEffect(state.running) {
+        if (state.running) capabilityPanel = null
+        else steerCurrentRun = false
+    }
 
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
     val expanded = state.usageMode == LocalUsageMode.WORK || focused || input.contains('\n') || attachments.isNotEmpty() ||
