@@ -409,6 +409,8 @@ internal class LocalSessionLifecycleCoordinator(
                 }
             }
         } finally {
+            // A mode tap queued during deletion must not navigate to an old session later.
+            queuedUsageMode.set(null)
             endTransition()
             state.update { it.copy(loading = false) }
         }
