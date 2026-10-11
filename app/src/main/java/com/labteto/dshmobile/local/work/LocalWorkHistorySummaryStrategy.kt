@@ -74,12 +74,18 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
         // nests <work-checkpoint> markers inside the next checkpoint and corrupts subsequent
         // parsing while also wasting context.
         val extractionMessages = messages.filterNot { isTrustedContextCheckpointModelMessage(it) }
+        val lastDecisionReset = extractionMessages.indexOfLast { message ->
+            message["role"].asText() == "user" &&
+                (messageText(message)?.let(::isExplicitWorkDecisionReset) == true)
+        }
 
         fun select(
             role: String? = null,
             cues: Set<String>? = null,
             maxItems: Int,
-        ): List<String> = extractionMessages.asReversed()
+            decisionsAfterResetOnly: Boolean = false,
+        ): List<String> = (if (decisionsAfterResetOnly && lastDecisionReset >= 0)
+            extractionMessages.drop(lastDecisionReset) else extractionMessages).asReversed()
             .asSequence()
             .filter { role == null || it["role"].asText() == role }
             .mapNotNull(::messageText)
@@ -117,9 +123,19 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             select(cues = WORK_FAILURE_CUES, maxItems = 4),
             maxItems = 6,
         )
+        val previousDecisionEpoch = previousCheckpoint?.decisionEpoch ?: 0L
+        val observedDecisionEpoch = structuredWorkState?.decisionEpoch ?: 0L
+        val explicitReset = observedDecisionEpoch > previousDecisionEpoch ||
+            (observedDecisionEpoch == 0L && lastDecisionReset >= 0)
+        val decisionEpoch = when {
+            observedDecisionEpoch > previousDecisionEpoch -> observedDecisionEpoch
+            explicitReset -> previousDecisionEpoch + 1L
+            else -> previousDecisionEpoch
+        }
         val decisions = mergeStructured(
-            structuredWorkState?.decisions.orEmpty() + previousCheckpoint?.decisions.orEmpty(),
-            select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4),
+            structuredWorkState?.decisions.orEmpty() +
+                if (explicitReset) emptyList() else previousCheckpoint?.decisions.orEmpty(),
+            select(cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
             maxItems = 6,
         )
         // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
@@ -180,6 +196,7 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             plan = plan,
             constraints = constraints,
             decisions = decisions,
+            decisionEpoch = decisionEpoch,
             failures = failures,
             unfinished = unfinished,
             progress = progress,
