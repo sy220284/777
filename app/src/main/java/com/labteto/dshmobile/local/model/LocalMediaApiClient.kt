@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Base64
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +43,38 @@ internal object LocalMediaApiResponse {
             throw IllegalStateException("创作服务返回错误$label：${reason?.take(320) ?: "请检查模型和账户权限"}")
         }
         return root
+    }
+
+    data class AudioUploadFormat(val extension: String, val contentType: String)
+
+    /**
+     * SAF providers may expose the original audio as application/octet-stream; use its real
+     * extension first, or a documented MIME mapping. Do not disguise unsupported audio as MP3.
+     */
+    fun audioUploadFormat(filename: String?, mime: String?): AudioUploadFormat {
+        val suffix = filename?.substringAfterLast('.', "")?.lowercase()
+        val fromMime = when (mime?.lowercase()?.substringBefore(';')) {
+            "audio/mpeg", "audio/mp3", "audio/x-mp3", "audio/mpeg3" -> "mp3"
+            "audio/mp4", "audio/x-m4a", "audio/m4a" -> "m4a"
+            "audio/x-wav", "audio/wav", "audio/wave" -> "wav"
+            "audio/ogg", "application/ogg" -> "ogg"
+            "audio/webm", "video/webm" -> "webm"
+            "audio/flac", "audio/x-flac" -> "flac"
+            else -> null
+        }
+        val ext = suffix?.takeIf {
+            it in setOf("flac", "mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "wav", "webm")
+        } ?: fromMime ?: error("不支持这种录音格式。请选用 MP3、M4A、WAV、FLAC、OGG 或 WEBM 文件")
+        val contentType = when (ext) {
+            "mp3", "mpga", "mpeg" -> "audio/mpeg"
+            "mp4", "m4a" -> "audio/mp4"
+            "wav" -> "audio/wav"
+            "ogg" -> "audio/ogg"
+            "webm" -> "audio/webm"
+            "flac" -> "audio/flac"
+            else -> error("未识别的录音格式")
+        }
+        return AudioUploadFormat(ext, contentType)
     }
 
     fun imageExtension(mime: String): String = when (mime.lowercase()) {
@@ -237,20 +270,21 @@ internal class LocalMediaApiClient @Inject constructor(
             }
         }
         try {
-            val mime = context.contentResolver.getType(uri)?.takeIf { it.startsWith("audio/") }
-                ?: "audio/mpeg"
-            val ext = when (mime.substringAfter('/').substringBefore(';')) {
-                "wav", "x-wav" -> "wav"
-                "mp4", "x-m4a" -> "m4a"
-                "ogg" -> "ogg"
-                "webm" -> "webm"
-                "flac", "x-flac" -> "flac"
-                else -> "mp3"
+            val filename = context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
             }
+            val format = LocalMediaApiResponse.audioUploadFormat(
+                filename, context.contentResolver.getType(uri)
+            )
             val body = MultipartBody.Builder().setType(MultipartBody.FORM)
                 .addFormDataPart("model", offer.model)
                 .addFormDataPart("response_format", "json")
-                .addFormDataPart("file", "recording.$ext", source.asRequestBody(mime.toMediaType()))
+                .addFormDataPart(
+                    "file", "recording.${format.extension}",
+                    source.asRequestBody(format.contentType.toMediaType())
+                )
                 .build()
             val root = sendJson(offer, "https://api.openai.com/v1/audio/transcriptions", body)
             return root["text"]?.jsonPrimitive?.contentOrNull
