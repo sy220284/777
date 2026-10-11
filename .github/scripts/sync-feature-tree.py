@@ -437,10 +437,34 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
                     if not isinstance(literal, str) or literal not in body:
                         raise ValueError("手工证据约定的工具调用分支不存在: " + str(literal))
                 verified.append({"path": source, "symbols": names})
+            test_candidates = []
+            for candidate in item.get("tests", []):
+                test_path, method, reference = (
+                    candidate.get("path"), candidate.get("method"), candidate.get("references")
+                )
+                if (not isinstance(test_path, str) or ".." in Path(test_path).parts
+                    or not test_path.endswith(".kt")
+                    or not ("/src/test/" in "/" + test_path
+                            or "/src/androidTest/" in "/" + test_path)
+                    or not isinstance(method, str) or not re.fullmatch(r"[A-Za-z_]\w*", method)
+                    or not isinstance(reference, str)
+                    or not re.fullmatch(r"[A-Za-z_]\w*", reference)
+                    or not (root / test_path).is_file()):
+                    raise ValueError("候选功能测试引用必须是已存在的真实Kotlin测试")
+                actual_test = (root / test_path).read_text(encoding="utf-8")
+                if (not re.search(r"@Test\s+fun\s+" + re.escape(method) + r"\s*\(", actual_test)
+                    or not re.search(r"\b" + re.escape(reference) + r"\b", actual_test)):
+                    raise ValueError("测试方法或实现引用并未出现在声明的真实测试文件")
+                if not any(reference in src["symbols"] for src in verified):
+                    raise ValueError("候选测试的实现引用没有对应已经核实的生产源码")
+                test_candidates.append({"path": test_path, "method": method,
+                                        "references": reference,
+                                        "status": "仅发现测试源码，未验证CI是否执行通过"})
             scope = item.get("scope", "")
             if len(CHINESE.findall(scope)) < 4:
                 raise ValueError("手工证据必须用中文解释静态验证的范围")
-            explicit[item["path"]] = {"sources": verified, "scope": scope}
+            explicit[item["path"]] = {"sources": verified, "scope": scope,
+                                      "tests": test_candidates}
     workflow = verified_workflow_evidence(root, leafpaths)
     mapped = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
     result = []
@@ -480,6 +504,8 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             grade_now = "真实测试映射及具名源码声明（静态）"
         elif test_count:
             grade_now = "真实测试映射（仅局部）"
+        elif manual and manual["tests"] and any(x["declaration_found"] for x in symbols):
+            grade_now = "具名源码及仪表测试声明存在（静态，未执行）"
         elif any(x["declaration_found"] for x in symbols):
             grade_now = "具名源码声明存在（静态，待调用链复核）"
         elif workflow_anchor:
@@ -499,6 +525,7 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             "named_symbols": symbols,
             "explicit_source_anchor": bool(manual),
             "explicit_static_scope": manual["scope"] if manual else None,
+            "explicit_test_candidates": manual["tests"] if manual else [],
             "workflow_evidence": workflow_anchor["sources"] if workflow_anchor else [],
         })
     return result
