@@ -15,7 +15,6 @@ internal fun localChatFeatureUiContribution(
     gallery: List<PersonaGalleryEntry>,
     state: StateFlow<LocalConversationSurfaceState>,
     actions: LocalChatFeatureUiActions,
-    onResetNavigation: () -> Unit,
     onNewPersona: () -> Unit,
     onPopFeature: () -> Unit,
     sessions: List<LocalSessionSummary>,
@@ -32,11 +31,13 @@ internal fun localChatFeatureUiContribution(
             LocalFeatureDrawerEntry.GROUP_CHAT to {
                 val establishedSessionId = findEstablishedGroupChatSession(sessions)?.id
                 if (establishedSessionId != null) {
-                    if (onSwitchSession(establishedSessionId)) onResetNavigation()
+                    if (onSwitchSession(establishedSessionId) && establishedSessionId == surface.sessionId) {
+                        onCloseDrawer()
+                    }
                 } else {
                     onOpenGroupSetup()
+                    onCloseDrawer()
                 }
-                onCloseDrawer()
             },
             LocalFeatureDrawerEntry.PERSONA_GALLERY to {
                 onCloseDrawer()
@@ -45,6 +46,7 @@ internal fun localChatFeatureUiContribution(
             },
             LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE to {
                 onOpenFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
+                onCloseDrawer()
             },
             LocalFeatureDrawerEntry.DIARY to {
                 onOpenFromDrawer(LocalFeaturePage.DIARY)
@@ -63,10 +65,7 @@ internal fun localChatFeatureUiContribution(
                 onCorrectEntry = actions.correctDiaryEntry,
                 onDeactivateEntry = actions.deactivateDiaryEntry,
                 onOpenSourceSession = { sessionId ->
-                    if (onSwitchSession(sessionId)) {
-                        onResetNavigation()
-                        true
-                    } else false
+                    onSwitchSession(sessionId)
                 },
                 onDismiss = onPopFeature,
             )
@@ -93,7 +92,8 @@ internal fun localChatFeatureUiContribution(
                 onSetPortrait = actions.setGalleryPortrait,
                 onRemovePortrait = actions.removeGalleryPortrait,
                 onStart = { id, storyId, freshStory ->
-                    if (actions.startFromGallery(id, storyId, freshStory)) onResetNavigation()
+                    // The shell returns home when the new gallery session has actually loaded.
+                    actions.startFromGallery(id, storyId, freshStory)
                 },
                 onCreate = onNewPersona,
                 onDismiss = onPopFeature,

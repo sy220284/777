@@ -1,6 +1,6 @@
 # 777《神言神语》全功能架构树
 
-代码核对基准：本次全量扫描的源码内容指纹 `8d1daeaebdc9`。扫描后确认的功能变更写入功能树；证据不足的候选变化保留待核实，不能视为已交付。
+代码核对基准：本次全量扫描的源码内容指纹 `7f29bc151292`。扫描后确认的功能变更写入功能树；证据不足的候选变化保留待核实，不能视为已交付。
 
 说明：本图展示已登记的产品功能及归属。历史功能仍需按真实调用链逐项验收；源码符号、路由和测试存在仅构成局部证据，不证明全部功能可用。参考 [功能审计](FUNCTION-AUDIT.zh-CN.md)、[代码证据台账](FEATURE-CODE-EVIDENCE.zh-CN.md)、[自动复核结果](FEATURE-REVIEW.auto.json) 与[交互式树状图](FEATURE-TREE.zh-CN.html)。
 
@@ -614,6 +614,6 @@ HTML 交互版中的 PR 专属节点另外逐项附有代码路径。此功能�
 
 本分支的人物生成范围与体验验收边界见 [聊天人物自由回应改造](CHAT-FREE-RESPONSE.zh-CN.md)。
 
-### 聊天连续性优化（本分支未合并）
+### 聊天连续性优化
 
 独立故事以 `ChatExperienceScope` 隔离共同经历；`LocalChatHistoryWindow` 保留双方表达；`groupChatResponders` 延续实际交流对象；`ChatDiaryStateCorrection` 将人工纠正投影到当前状态与连续性，恢复和生成前沿用同一决定。人物资料按完整事实取用，检索线索只帮助找回事件，心理记录保留来源和不确定性。详见 [聊天改造说明](CHAT-FREE-RESPONSE.zh-CN.md)，实际验证结果以最终提交的 CI 为准。

@@ -11,6 +11,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicLong
 
 /** ModelFeature capability boundary used by UI and Settings. */
 @Singleton
@@ -22,6 +25,8 @@ class LocalModelRuntime @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = localModelStatePort(runtimeStateStore)
+    private val modelSelectionMutex = Mutex()
+    private val latestModelSelection = AtomicLong()
     private val accounts = LocalModelAccountStateCoordinator(
         configuration = configuration,
         gateway = gateway,
@@ -55,13 +60,27 @@ class LocalModelRuntime @Inject constructor(
     }
 
     internal fun selectModel(id: String) {
+        val request = latestModelSelection.incrementAndGet()
         scope.launch {
-            if (identityMutationLocked()) return@launch
-            val before = state.value.modelState
-            if (before.modelSelection.activeProfileId == id) return@launch
-            runCatching { configuration.select(id, before.modelSelection.profiles) }
-                .onSuccess { result -> result?.let(::commit) }
-                .onFailure { error -> state.publishError(error.message ?: "模型切换失败") }
+            modelSelectionMutex.withLock {
+                if (request != latestModelSelection.get()) return@withLock
+                if (identityMutationLocked()) {
+                    state.publishError("当前任务正在执行，请结束后再切换模型")
+                    return@withLock
+                }
+                val before = state.value.modelState
+                if (before.modelSelection.activeProfileId == id) return@withLock
+                try {
+                    val result = configuration.select(id, before.modelSelection.profiles)
+                    if (request == latestModelSelection.get()) result?.let(::commit)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (request == latestModelSelection.get()) {
+                        state.publishError(error.message ?: "模型切换失败")
+                    }
+                }
+            }
         }
     }
 

@@ -204,16 +204,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { onDone(localHarness.testChatGptAccount(id)) }
     }
 
+    private var latestChatGptAccountTap = 0L
+
     fun selectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
+        val tap = ++latestChatGptAccountTap
         viewModelScope.launch {
             try {
                 localHarness.selectChatGptAccount(id)
-                onDone(null)
+                if (tap == latestChatGptAccountTap) onDone(null)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "select_chatgpt_account", error)
-                onDone(error.message ?: "切换 ChatGPT 账户失败")
+                if (tap == latestChatGptAccountTap) {
+                    onDone(error.message ?: "切换 ChatGPT 账户失败")
+                }
             }
         }
     }

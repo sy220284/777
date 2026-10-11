@@ -128,10 +128,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Only a committed session can move the selected tab. */
+@Suppress("UNUSED_PARAMETER")
 internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
-): LocalUsageMode = pending ?: current
+): LocalUsageMode = current
 @Composable
 internal fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
     LocalSendRejectReason.EMPTY -> stringResource(R.string.local_send_rejected_empty)
@@ -173,6 +175,8 @@ fun LocalHarnessScreen(
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
+    var settledSessionId by rememberSaveable { mutableStateOf("") }
+    var settledUsageMode by rememberSaveable { mutableStateOf("") }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
@@ -257,6 +261,64 @@ fun LocalHarnessScreen(
         featureStack = localFeatureHome()
     }
 
+    // Only a settled session/mode transition commits navigation. This covers every entry point,
+    // including tasks, gallery, notifications, projects and drawer history.
+    LaunchedEffect(shell.sessionId, shell.usageMode, shell.loading) {
+        if (!shell.loading && shell.sessionId.isNotBlank()) {
+            if (settledSessionId.isNotBlank() &&
+                (settledSessionId != shell.sessionId || settledUsageMode != shell.usageMode.name)
+            ) {
+                resetFeatureNavigation()
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                settingsDestination = SettingsDestination.ROOT
+                taskMode = null
+                requestedFilePath = null
+                filesMode = LocalFilesMode.WORKSPACE
+                composerHandoff = emptyList()
+                if (drawerState.isOpen) drawerState.close()
+            }
+            settledSessionId = shell.sessionId
+            settledUsageMode = shell.usageMode.name
+        }
+    }
+
+    suspend fun deleteSessionsAndNavigate(ids: Set<String>): Int {
+        val deletingCurrent = shell.sessionId in ids
+        return try {
+            val deleted = viewModel.deleteSessions(ids)
+            if (deleted > 0 && deletingCurrent) {
+                resetFeatureNavigation()
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                settingsDestination = SettingsDestination.ROOT
+                taskMode = null
+                filesMode = LocalFilesMode.WORKSPACE
+                requestedFilePath = null
+                composerHandoff = emptyList()
+                pendingWorkCapability = null
+                workCapabilityConfirmed = false
+                workCapabilityConfiguring = false
+                pendingUsageMode = null
+                showGroupSetup = false
+                showNewSessionMode = false
+                drawerState.close()
+            } else if (deleted == 0) {
+                android.widget.Toast.makeText(
+                    context, R.string.local_delete_session_failed, android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+            deleted
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            android.widget.Toast.makeText(
+                context, R.string.local_delete_session_failed, android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            0
+        }
+    }
+
     fun handoffWorkCapability(prompt: String) {
         composerHandoff = listOf(shell.sessionId, prompt)
         taskMode = null
@@ -301,7 +363,7 @@ fun LocalHarnessScreen(
         exitGroupChat = viewModel::leaveGroupChatMode,
         toggleSessionPinned = viewModel::toggleSessionPinned,
         renameSession = viewModel::renameSession,
-        deleteSessions = viewModel::deleteSessions,
+        deleteSessions = ::deleteSessionsAndNavigate,
         configureChatPersona = viewModel::configureChatPersona,
         configureGroupMembers = viewModel::configureGroupChatMembers,
         selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
@@ -374,7 +436,6 @@ fun LocalHarnessScreen(
         recoveryNotice = viewModel.projectRecoveryNotice,
         backupAndReset = viewModel::backupAndResetProjectCatalog,
         createProjectWorkSession = viewModel::createProjectWorkSession,
-        onProjectSessionAccepted = ::resetFeatureNavigation,
         create = viewModel::createProject,
         select = viewModel::selectProject,
         rename = viewModel::renameProject,
@@ -420,7 +481,6 @@ fun LocalHarnessScreen(
             gallery = gallery,
             state = viewModel.chatSurfaceState,
             actions = chatActions,
-            onResetNavigation = ::resetFeatureNavigation,
             onNewPersona = { showNewPersona = true },
             onPopFeature = ::popFeature,
             sessions = shell.sessions,
@@ -436,9 +496,7 @@ fun LocalHarnessScreen(
                 handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
             onOpenSourceSession = { sourceSessionId ->
-                if (viewModel.switchSession(sourceSessionId)) {
-                    resetFeatureNavigation()
-                }
+                viewModel.switchSession(sourceSessionId)
             },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
@@ -465,7 +523,6 @@ fun LocalHarnessScreen(
             onCreateViaChat = ::useWorkCapability,
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
-            onResetNavigation = ::resetFeatureNavigation,
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -557,7 +614,11 @@ fun LocalHarnessScreen(
             target == LocalUsageMode.CHAT &&
                 shell.usageMode == LocalUsageMode.CHAT &&
                 shell.groupChat.enabled
-        if (target == shell.usageMode && pendingUsageMode == null && !returningFromGroupToSingle) return
+        if (target == shell.usageMode && !returningFromGroupToSingle && !shell.loading) {
+            // This tap must cancel a previously queued switch back to the other mode.
+            viewModel.switchUsageMode(target)
+            return
+        }
         if (target != shell.usageMode) {
             val key = "shown_" + target.name.lowercase()
             if (!modeIntroPreferences.getBoolean(key, false)) {
@@ -565,21 +626,28 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
-        pendingUsageMode = target
+        // Work capability handoff owns pendingUsageMode; ordinary taps use the
+        // runtime navigation inbox, keeping the drawer tied to the real session.
         viewModel.switchUsageMode(target)
     }
 
     LaunchedEffect(requestedSessionId, shell.sessions, shell.loading, shell.sessionId) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
-        val accepted = acceptLocalSessionNavigation(
-            currentSessionId = shell.sessionId,
-            targetSessionId = target,
-            sessions = shell.sessions,
-            switchSession = viewModel::switchSession,
-        )
-        if (accepted) {
-            resetFeatureNavigation()
+        if (shell.loading || shell.sessionId.isBlank()) return@LaunchedEffect
+        if (target == shell.sessionId) {
             onSessionRequestConsumed()
+        } else if (shell.sessions.none { it.id == target }) {
+            onSessionRequestConsumed()
+            android.widget.Toast.makeText(
+                context, R.string.local_session_target_missing, android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        } else {
+            acceptLocalSessionNavigation(
+                currentSessionId = shell.sessionId,
+                targetSessionId = target,
+                sessions = shell.sessions,
+                switchSession = viewModel::switchSession,
+            )
         }
     }
 
@@ -630,7 +698,7 @@ fun LocalHarnessScreen(
                 sessions = shell.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
-                modeSwitchEnabled = !shell.loading &&
+                modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 drawerOpen = drawerState.isOpen,
                 pinnedSessionIds = pinnedSessionIds,
@@ -652,12 +720,12 @@ fun LocalHarnessScreen(
                     showNewSessionMode = true
                 },
                 onSwitchSession = { sessionId ->
-                    if (viewModel.switchSession(sessionId)) {
-                        resetFeatureNavigation()
+                    if (viewModel.switchSession(sessionId) && sessionId == shell.sessionId) {
+                        // Different sessions close the drawer only once the shell activates them.
                         scope.launch { drawerState.close() }
                     }
                 },
-                onDeleteSessions = viewModel::deleteSessions,
+                onDeleteSessions = ::deleteSessionsAndNavigate,
                 onRenameSession = viewModel::renameSession,
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
@@ -768,7 +836,7 @@ fun LocalHarnessScreen(
                 onNewSingle = {
                     if (viewModel.createSingleChatSession()) {
                         showNewSessionMode = false
-                        resetFeatureNavigation()
+                        // The settled session observer owns navigation reset.
                     }
                 },
             )
@@ -780,7 +848,7 @@ fun LocalHarnessScreen(
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
                         showNewSessionMode = false
-                        resetFeatureNavigation()
+                        // The settled session observer owns navigation reset.
                     }
                 },
             )
@@ -806,7 +874,7 @@ fun LocalHarnessScreen(
                 val created = viewModel.createGroupChatSession(ids)
                 if (created) {
                     showGroupSetup = false
-                    resetFeatureNavigation()
+                    // Wait for the committed group session before resetting feature navigation.
                 }
                 created
             },

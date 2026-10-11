@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "8d1daeaebdc9",
+  "source_snapshot": "7f29bc151292",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -2088,7 +2088,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 123,
+      "other_production_symbol_reference_count": 127,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2142,7 +2142,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 123,
+      "other_production_symbol_reference_count": 127,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2196,7 +2196,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 123,
+      "other_production_symbol_reference_count": 127,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2474,15 +2474,15 @@
       "best_static_cross_file_symbol": "summary",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 51,
+      "other_production_symbol_reference_count": 52,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolApprovalRuntime.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentHistoryEvents.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRecoveryEvents.kt",
-        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterLifeModels.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRecoveryEvents.kt"
       ],
       "test_file_symbol_reference_count": 18,
       "test_reference_samples": [
@@ -2906,8 +2906,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
         "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt"
       ],
-      "test_file_symbol_reference_count": 6,
+      "test_file_symbol_reference_count": 7,
       "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/ConversationActionsMenuRegressionTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/WorkConversationFlowTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRuntimeFoundationV2Test.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalSubagentToolCallPolicyTest.kt",
@@ -3061,7 +3062,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 123,
+      "other_production_symbol_reference_count": 127,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
