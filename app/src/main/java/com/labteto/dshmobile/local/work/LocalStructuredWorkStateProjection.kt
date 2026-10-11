@@ -124,6 +124,20 @@ internal fun structuredWorkState(
             }
         }
 
+    // The incremental Work window holds only the newest events. A broad revocation may be
+    // older than that window yet newer than the last compacted checkpoint. Recover its exact
+    // authoritative event sequence before merging any older checkpoint facts.
+    if (constraintEpoch == 0L) {
+        constraintEpoch = eventLog.latestMatching(setOf("user/message")) { data ->
+            eventText(data)?.let(::isExplicitWorkConstraintReset) == true
+        }?.sequence ?: 0L
+    }
+    if (decisionEpoch == 0L) {
+        decisionEpoch = eventLog.latestMatching(setOf("user/message")) { data ->
+            eventText(data)?.let(::isExplicitWorkDecisionReset) == true
+        }?.sequence ?: 0L
+    }
+
     return LocalStructuredWorkState(
         goals = goals,
         plan = plan,
