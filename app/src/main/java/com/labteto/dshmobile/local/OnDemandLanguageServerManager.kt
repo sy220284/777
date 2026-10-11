@@ -157,7 +157,7 @@ internal class OnDemandLanguageServerManager(
                     if (error is InterruptedException) throw error
                     lastError = error
                     archive.delete()
-                    if (attempt < 2) Thread.sleep(250L * (1L shl attempt))
+                    // Retrying is bounded; keep this synchronous IO path free of thread sleeps.
                 }
             }
             check(valid) { "npm 引导包下载或校验失败：" + lastError?.message }
