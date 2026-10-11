@@ -70,6 +70,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -172,6 +174,7 @@ internal class LocalWorkAgentTurnExecutor(
             val modelToolStepSurface = LocalModelToolStepSurface()
             var requestPrepared = false
             var workPromptContext = LocalWorkTurnPromptContext()
+            var projectedSteeringRevision = binding.steeringRevision.value
             val runSnapshot = runState.value
             val runToolSurface = LocalRunToolSurface(
                 runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
@@ -284,6 +287,22 @@ internal class LocalWorkAgentTurnExecutor(
                     val observedSteer = binding.steeringRevision.value
                     workModelHistoryRuntime.drainPendingInputs(binding)
                     val snapshot = runState.value
+                    if (observedSteer != projectedSteeringRevision) {
+                        val effectiveInput = runHistory.snapshot().asReversed()
+                            .firstOrNull { (it["role"] as? JsonPrimitive)?.contentOrNull == "user" }
+                            ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
+                            ?.takeIf(String::isNotBlank) ?: input
+                        workPromptContext = contextComposer.composeWorkTurnContext(
+                            input = effectiveInput,
+                            snapshot = snapshot,
+                            workspacePath = workspacePath,
+                            projectInstructions = projectContext.instructionsFor(snapshot.projectId),
+                            skillGuidance = resolveLocalWorkSkillGuidance(
+                                sessionStorage.files.workspace, effectiveInput,
+                            ),
+                        )
+                        projectedSteeringRevision = observedSteer
+                    }
                     val tools = modelToolStepSurface.capture(
                         runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),
                     )
