@@ -73,6 +73,18 @@ def analyze():
     prod = files_under("/src/main/")
     tests = {p: body for p, body in files_under("/src/test/").items()}
     tests.update(files_under("/src/androidTest/"))
+    # Token postings are built once for the whole repository: avoiding an O(features * symbols * files)
+    # nested regexp scan is important for CI latency as the codebase grows.
+    production_postings = defaultdict(set)
+    test_postings = defaultdict(set)
+    token_pattern = re.compile(r"\b[A-Za-z_]\w*\b")
+    for path, body in prod.items():
+        for token in set(token_pattern.findall(body)):
+            production_postings[token].add(path)
+    for path, body in tests.items():
+        if "@Test" in body:
+            for token in set(token_pattern.findall(body)):
+                test_postings[token].add(path)
     grouped_source = defaultdict(list)
     for r in baseline["leaf_evidence"]:
         for source in r.get("existing_production_sources", []):
@@ -129,10 +141,8 @@ def analyze():
         ]
         traces = []
         for symbol in candidates[:90]:
-            pattern = re.compile(r"\b" + re.escape(symbol) + r"\b")
-            used_by = [p for p, body in prod.items()
-                       if p not in sources and pattern.search(body)]
-            tested_by = [p for p, body in tests.items() if "@Test" in body and pattern.search(body)]
+            used_by = sorted(production_postings.get(symbol, set()).difference(sources))
+            tested_by = sorted(test_postings.get(symbol, set()))
             if used_by or tested_by:
                 traces.append((symbol, used_by, tested_by))
         traces.sort(key=lambda x: (len(x[1]) > 0, len(x[2]) > 0, len(x[1]) + len(x[2]), len(x[0])), reverse=True)
