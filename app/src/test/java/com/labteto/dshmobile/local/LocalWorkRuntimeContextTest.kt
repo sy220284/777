@@ -36,6 +36,8 @@ class LocalWorkRuntimeContextTest {
         )
 
         assertTrue(context.contains("777 本机 Harness · 工作模式"))
+        assertTrue(context.contains("用户指令优先级"))
+        assertTrue(context.contains("文件要求与用户本轮要求冲突时，按用户要求推进"))
         assertTrue(context.contains("工作区：/workspace"))
         assertTrue(context.contains("当前路由模型：gpt-5.6-luna"))
         assertTrue(context.contains("模型提供方：OpenAI"))
