@@ -210,10 +210,11 @@ internal class LocalToolExecutionCoordinator(
             target.addAll(previous)
             target.toSet()
         }
-        val projected = LocalToolRouter.visibleSchemas(
+        val selection = LocalToolRouter.selectSchemas(
             tools = tools,
             enabledOptional = currentEnabled,
-        ).mapNotNull { element ->
+        )
+        val projected = selection.schemas.mapNotNull { element ->
             val function = (element as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
@@ -223,7 +224,10 @@ internal class LocalToolExecutionCoordinator(
             // A large live MCP catalog is discoverable, but should not flood a model turn.
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
-                if (tool.name !in projected) append(" [按默认预算暂未装入：定义预算或复杂度]")
+                selection.omittedReasons[tool.name]?.let { reason ->
+                    append(" [当前未装入：").append(reason).append("]")
+                }
+                if (tool.name in selection.compactedNames) append(" [已精简冗长说明，保留完整参数定义]")
                 LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
                     append("：").append(it)
                 }
@@ -232,7 +236,7 @@ internal class LocalToolExecutionCoordinator(
             if (matches.size > MAX_SEARCH_RESULT_PREVIEW) {
                 appendLine("另有 ${matches.size - MAX_SEARCH_RESULT_PREVIEW} 个匹配工具未在此展开；可按类别或精确名称进一步搜索。")
             }
-            if (omitted > 0) appendLine("有 $omitted 个候选在默认工具定义 Token 预算下未装入；请按精确工具名搜索，将当前所需能力优先装入。")
+            if (omitted > 0) appendLine("有 $omitted 个候选当前未装入，原因已逐项标注；仍无法装入时需按实际工具定义修复，而非猜测调用参数。")
             append("实际调用仍以下一次模型请求真实提供的工具表及代理权限为准。")
         }.trimEnd()
     }
