@@ -220,6 +220,8 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 - 已安装组件存储于应用私有目录 `noBackupFilesDir/local-harness/lsp-components`，跨会话共享并在后续调用时离线复用。
 - 组件安装器下载经过独立 SHA-512 校验的 npm CLI（JavaScript），使用受控的 `npm install` 下载固定版本；关闭生命周期脚本与可选本机依赖，不执行下载的 ELF。
 - `lsp_status` 只报告状态，不触发安装；没有匹配语言、拒绝下载、网络失败或安装失败时，保留文件搜索/编译等原有代码能力。
+- `lsp_uninstall_component` 通过原有插件工具表提供组件卸载，必须在允许变更的任务中获得用户授权；卸载前停止使用中的语言服务器，下次需要时可重新下载。
+- 只读子代理或计划模式禁止触发下载安装；这些任务只能使用已安装组件。
 - Kotlin、Java、Rust、Go 与 C/C++ 当前仅保留已有外部 LSP 自动检测，不宣称可在 Android 上直接按需安装；需先解决实际运行环境兼容。
 - CI 单测可证明调用路径及目录复用，但不能代替 Android 16/17 真机下载安装及 LSP 初始化实测。
 
