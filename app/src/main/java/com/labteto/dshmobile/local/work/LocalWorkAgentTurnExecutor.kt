@@ -171,6 +171,7 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             var modelStep = 0
+            var latestAcceptedSamplingRevision = binding.steeringRevision.value
             val modelToolStepSurface = LocalModelToolStepSurface()
             var requestPrepared = false
             var workPromptContext = LocalWorkTurnPromptContext()
@@ -401,6 +402,7 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is LocalWorkSamplingOutcome.Completed -> sampling.value
                     }
+                    latestAcceptedSamplingRevision = observedSteer
                     val reply = rawReply.also { completed ->
                         usageTracker.recordForeground(
                             snapshot = snapshot,
@@ -436,7 +438,9 @@ internal class LocalWorkAgentTurnExecutor(
                 },
                 tools = AgentToolExecutor { call ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    if (!modelToolStepSurface.allows(call.name)) {
+                    if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
+                        workSteeredToolResult(call.toLocalToolCall())
+                    } else if (!modelToolStepSurface.allows(call.name)) {
                         modelToolStepSurface.hiddenCallResult(call.name)
                     } else {
                         workTurnToolRuntime.execute(
@@ -452,6 +456,7 @@ internal class LocalWorkAgentTurnExecutor(
                         binding = binding,
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
+                        superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
                     ).map { (_, result) -> result }
                 },
                 isParallelTool = { call ->
