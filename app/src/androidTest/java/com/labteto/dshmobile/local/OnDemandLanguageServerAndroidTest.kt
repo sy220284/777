@@ -77,6 +77,17 @@ class OnDemandLanguageServerAndroidTest {
                 assertTrue("引用应定位实际源文件", references.toString().contains("probe.ts"))
                 val hover = client.hover(file.toURI().toString(), 1, 2)
                 assertTrue("悬停应返回相关类型", hover.toString().contains("hello"))
+                val broken = File(workspace, "broken.ts").apply {
+                    writeText("const label: string = 123;\n")
+                }
+                val errorUri = broken.toURI().toString()
+                val revision = client.diagnosticRevision(errorUri)
+                client.didOpen(errorUri, "typescript", 1, broken.readText())
+                val diagnostics = client.awaitPublishedDiagnostics(
+                    uri = errorUri, sinceRevision = revision, version = 1, timeoutMillis = 15_000,
+                )
+                assertTrue("真实 TS 类型错误应触发异步诊断",
+                    diagnostics?.get("diagnostics").toString().contains("2322"))
             } finally {
                 client.close()
             }
