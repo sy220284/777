@@ -7,6 +7,8 @@ import com.labteto.dshmobile.local.model.LocalMediaImageResult
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
+import com.labteto.dshmobile.local.model.LocalMediaResultStore
+import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTaskStore
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
@@ -36,19 +38,30 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val miniMax: MiniMaxNativeMediaClient,
     private val api: LocalMediaApiClient,
     private val videoStore: LocalMediaVideoTaskStore,
+    private val resultStore: LocalMediaResultStore,
 ) {
     // The provider request belongs to the media capability, not a disposable Compose sheet.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
+    val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
+    fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
+    suspend fun removeResult(id: String) = withContext(Dispatchers.IO) { resultStore.remove(id) }
+
 
     fun models(profiles: List<LocalModelProfile>): List<LocalMediaOffer> = LocalMediaCatalog.offers(profiles)
 
     suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImage {
         validate(offer, LocalMediaKind.IMAGE)
-        return when (offer.provider) {
+        val result = when (offer.provider) {
             LocalMediaProvider.MINIMAX -> LocalMediaImage(url = miniMax.generateImage(offer.profile, prompt, ratio))
             else -> api.image(offer, prompt, ratio).let(::imageResult)
         }
+        withContext(Dispatchers.IO) {
+            result.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it) }
+                ?: result.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it) }
+                ?: error("生成服务没有返回可保存的图片成果")
+        }
+        return result
     }
 
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
@@ -67,11 +80,13 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     suspend fun speech(offer: LocalMediaOffer, text: String, voice: String): File {
         validate(offer, LocalMediaKind.SPEECH)
-        return when (offer.provider) {
+        val file = when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, text, voice)
             LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
             else -> error("此服务商未接入配音")
         }
+        withContext(Dispatchers.IO) { resultStore.addFile(offer, LocalMediaKind.SPEECH, file) }
+        return file
     }
 
     suspend fun transcribe(offer: LocalMediaOffer, uri: Uri): String {
