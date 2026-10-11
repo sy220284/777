@@ -8,6 +8,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Prepares the verified Python runtime bundled in the APK. */
 @Singleton
@@ -30,40 +32,44 @@ class BundledPythonRuntime @Inject constructor(
     private var prepared = false
 
     suspend fun prepare() = withContext(Dispatchers.IO) {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
-            ?: return@withContext
-        val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
-        require(version.isNotBlank()) { "内置 Python 版本信息为空" }
+        // Multiple runtime instances may be created by startup, instrumentation and recovery.
+        // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
+        prepareMutex.withLock {
+            val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
+                ?: return@withLock
+            val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(version.isNotBlank()) { "内置 Python 版本信息为空" }
 
-        val versionRoot = File(runtimeHome, "$version/$abi")
-        val libraryDir = File(versionRoot, "lib")
-        val homeDir = File(versionRoot, "home")
-        BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, version, abi) {
-            homeDir.mkdirs()
-            BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
-        }
+            val versionRoot = File(runtimeHome, "$version/$abi")
+            val libraryDir = File(versionRoot, "lib")
+            val homeDir = File(versionRoot, "home")
+            BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, version, abi) {
+                homeDir.mkdirs()
+                BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
+            }
 
-        require(File(homeDir, "etc/tls/cert.pem").isFile) {
-            "内置 Python CA 证书未打包"
-        }
-        require(File(homeDir, "etc/tls/openssl.cnf").isFile) {
-            "内置 Python OpenSSL 配置未打包"
-        }
+            require(File(homeDir, "etc/tls/cert.pem").isFile) {
+                "内置 Python CA 证书未打包"
+            }
+            require(File(homeDir, "etc/tls/openssl.cnf").isFile) {
+                "内置 Python OpenSSL 配置未打包"
+            }
 
-        val nativePython = File(context.applicationInfo.nativeLibraryDir, NATIVE_PYTHON_NAME)
-        require(nativePython.isFile && nativePython.canExecute()) {
-            "内置 Python 可执行文件未从 APK 提取：${nativePython.path}"
-        }
+            val nativePython = File(context.applicationInfo.nativeLibraryDir, NATIVE_PYTHON_NAME)
+            require(nativePython.isFile && nativePython.canExecute()) {
+                "内置 Python 可执行文件未从 APK 提取：${nativePython.path}"
+            }
 
-        PYTHON_COMMANDS.forEach { name ->
-            BundledRuntimeInstallation.linkExecutable(nativePython, File(binDir, name))
-        }
-        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
+            PYTHON_COMMANDS.forEach { name ->
+                BundledRuntimeInstallation.linkExecutable(nativePython, File(binDir, name))
+            }
+            BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
 
-        activeHomeDir = homeDir
-        activeLibraryDir = libraryDir
-        runtimeVersion = version
-        prepared = true
+            activeHomeDir = homeDir
+            activeLibraryDir = libraryDir
+            runtimeVersion = version
+            prepared = true
+        }
     }
 
     fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
@@ -97,6 +103,7 @@ class BundledPythonRuntime @Inject constructor(
     }
 
     private companion object {
+        private val prepareMutex = Mutex()
         const val ASSET_ROOT = "runtime/python"
         const val VERSION_ASSET = "$ASSET_ROOT/python-version.txt"
         const val NATIVE_PYTHON_NAME = "libdsh_python.so"

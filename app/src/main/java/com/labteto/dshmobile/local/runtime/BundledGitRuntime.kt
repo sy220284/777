@@ -8,6 +8,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Prepares the verified Git runtime bundled in the APK. */
 @Singleton
@@ -36,65 +38,69 @@ class BundledGitRuntime @Inject constructor(
     private var prepared = false
 
     suspend fun prepare() = withContext(Dispatchers.IO) {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
-            ?: return@withContext
-        val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
-        require(version.isNotBlank()) { "内置 Git 版本信息为空" }
+        // Multiple runtime instances may be created by startup, instrumentation and recovery.
+        // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
+        prepareMutex.withLock {
+            val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
+                ?: return@withLock
+            val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(version.isNotBlank()) { "内置 Git 版本信息为空" }
 
-        val versionRoot = File(runtimeHome, "$version/$abi")
-        val libraryDir = File(versionRoot, "lib")
-        val homeDir = File(versionRoot, "home")
-        val helperDir = File(versionRoot, "libexec/git-core")
-        BundledRuntimeInstallation.prepareVersion(context, "git", versionRoot, version, abi) {
-            homeDir.mkdirs()
+            val versionRoot = File(runtimeHome, "$version/$abi")
+            val libraryDir = File(versionRoot, "lib")
+            val homeDir = File(versionRoot, "home")
+            val helperDir = File(versionRoot, "libexec/git-core")
+            BundledRuntimeInstallation.prepareVersion(context, "git", versionRoot, version, abi) {
+                homeDir.mkdirs()
+                helperDir.mkdirs()
+                BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
+            }
             helperDir.mkdirs()
-            BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
-        }
-        helperDir.mkdirs()
 
-        val nativeGit = File(context.applicationInfo.nativeLibraryDir, NATIVE_GIT_NAME)
-        require(nativeGit.isFile && nativeGit.canExecute()) {
-            "内置 Git 可执行文件未从 APK 提取：${nativeGit.path}"
-        }
-
-        BundledRuntimeInstallation.linkExecutable(nativeGit, File(binDir, "git"))
-
-        helperDir.listFiles()?.forEach { it.delete() }
-        val helpers = context.assets.open("$ASSET_ROOT/$abi/helpers.tsv")
-            .bufferedReader()
-            .useLines { lines ->
-                lines.map(String::trim)
-                    .filter(String::isNotEmpty)
-                    .map { line ->
-                        val fields = line.split('\t')
-                        require(fields.size == 2) { "Git helper 清单格式无效：$line" }
-                        fields[0] to fields[1]
-                    }
-                    .toList()
+            val nativeGit = File(context.applicationInfo.nativeLibraryDir, NATIVE_GIT_NAME)
+            require(nativeGit.isFile && nativeGit.canExecute()) {
+                "内置 Git 可执行文件未从 APK 提取：${nativeGit.path}"
             }
-        require(helpers.any { it.first == "git-remote-http" }) { "缺少 git-remote-http helper" }
-        require(helpers.any { it.first == "git-remote-https" }) { "缺少 git-remote-https helper" }
-        helpers.forEach { (command, nativeName) ->
-            val nativeHelper = File(context.applicationInfo.nativeLibraryDir, nativeName)
-            require(nativeHelper.isFile && nativeHelper.canExecute()) {
-                "内置 Git helper 未从 APK 提取：$nativeName"
+
+            BundledRuntimeInstallation.linkExecutable(nativeGit, File(binDir, "git"))
+
+            helperDir.listFiles()?.forEach { it.delete() }
+            val helpers = context.assets.open("$ASSET_ROOT/$abi/helpers.tsv")
+                .bufferedReader()
+                .useLines { lines ->
+                    lines.map(String::trim)
+                        .filter(String::isNotEmpty)
+                        .map { line ->
+                            val fields = line.split('\t')
+                            require(fields.size == 2) { "Git helper 清单格式无效：$line" }
+                            fields[0] to fields[1]
+                        }
+                        .toList()
+                }
+            require(helpers.any { it.first == "git-remote-http" }) { "缺少 git-remote-http helper" }
+            require(helpers.any { it.first == "git-remote-https" }) { "缺少 git-remote-https helper" }
+            helpers.forEach { (command, nativeName) ->
+                val nativeHelper = File(context.applicationInfo.nativeLibraryDir, nativeName)
+                require(nativeHelper.isFile && nativeHelper.canExecute()) {
+                    "内置 Git helper 未从 APK 提取：$nativeName"
+                }
+                BundledRuntimeInstallation.linkExecutable(nativeHelper, File(helperDir, command))
             }
-            BundledRuntimeInstallation.linkExecutable(nativeHelper, File(helperDir, command))
+
+            val templateDir = File(homeDir, "share/git-core/templates")
+            require(templateDir.isDirectory) { "内置 Git 模板目录未打包" }
+            val certFile = File(homeDir, "etc/tls/cert.pem")
+            require(certFile.isFile) { "内置 Git CA 证书未打包" }
+
+            BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
+
+            activeLibraryDir = libraryDir
+            activeHelperDir = helperDir
+            activeTemplateDir = templateDir
+            activeCertFile = certFile
+            runtimeVersion = version
+            prepared = true
         }
-
-        val templateDir = File(homeDir, "share/git-core/templates")
-        require(templateDir.isDirectory) { "内置 Git 模板目录未打包" }
-        val certFile = File(homeDir, "etc/tls/cert.pem")
-        require(certFile.isFile) { "内置 Git CA 证书未打包" }
-
-        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
-
-        activeLibraryDir = libraryDir
-        activeHelperDir = helperDir
-        activeTemplateDir = templateDir
-        activeCertFile = certFile
-        runtimeVersion = version
-        prepared = true
     }
 
     fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
@@ -135,6 +141,7 @@ class BundledGitRuntime @Inject constructor(
     }
 
     private companion object {
+        private val prepareMutex = Mutex()
         const val ASSET_ROOT = "runtime/git"
         const val VERSION_ASSET = "$ASSET_ROOT/git-version.txt"
         const val NATIVE_GIT_NAME = "libdsh_git.so"
