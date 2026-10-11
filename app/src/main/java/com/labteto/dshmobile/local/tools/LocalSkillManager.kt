@@ -332,7 +332,7 @@ internal class LocalSkillStore(
                 }
             }
         }
-        workspace.write(marker, "seeded\\n")
+        workspace.write(marker, "seeded\n")
     }
 
     private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()
