@@ -83,4 +83,64 @@ class LocalMiniMaxCompatibilityTest {
         val changed = LocalCanonicalModelCodec.toLegacyMessages(listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "changed").single()
         assertFalse(changed.containsKey("reasoning_details"))
     }
+
+    @Test fun streamingTaggedContentSeparatesThinkingWithoutLeakingToolNarration() = runBlocking {
+        val stream = """
+            data: {"choices":[{"delta":{"content":"<th"}}]}
+            data: {"choices":[{"delta":{"content":"ink>用户要看仓库更新，先检查工具"}}]}
+            data: {"choices":[{"delta":{"content":"</th","tool_calls":[{"index":0,"id":"call1","type":"function","function":{"name":"read","arguments":"{}"}}]}}]}
+            data: {"choices":[{"delta":{"content":"ink>正在核查仓库最新提交"},"finish_reason":"tool_calls"}]}
+            data: [DONE]
+        """.trimIndent() + "\n"
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body(stream.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val deltas = mutableListOf<LocalModelDelta>()
+        val reply = DeepSeekClient(http, json).completeStreaming(
+            apiKey = "test", model = "MiniMax-M3", messages = emptyList(),
+            tools = JsonArray(emptyList()), baseUrl = "https://api.minimax.io/v1",
+            onDelta = deltas::add,
+        )
+        assertEquals("正在核查仓库最新提交", reply.content)
+        assertEquals("用户要看仓库更新，先检查工具", reply.reasoning)
+        assertEquals(1, reply.toolCalls.size)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertTrue(deltas.all { !it.content.contains("<th") && !it.content.contains("用户要看仓库") })
+        val canonical = LocalCanonicalModelCodec.canonicalizeReply(reply, LocalModelAdapterIds.OPENAI_CHAT, "same")
+            .canonicalMessage!!
+        val continuation = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "same",
+        ).single()
+        assertEquals("正在核查仓库最新提交", continuation["content"]!!.jsonPrimitive.content)
+        assertEquals("用户要看仓库更新，先检查工具",
+            continuation["reasoning_content"]!!.jsonPrimitive.content)
+        assertEquals("read", continuation["tool_calls"]!!.jsonArray.single()
+            .jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun nonStreamingTaggedContentRetainsNativeReasoningDetailsForReplay() {
+        val raw = """{"choices":[{"message":{
+            "role":"assistant",
+            "content":"<think>检查设置</think>检查完成",
+            "reasoning_details":[{"index":0,"id":"sig1","type":"reasoning.text","text":"官方推理"}],
+            "tool_calls":[{"id":"c1","type":"function","function":{"name":"read","arguments":"{}"}}]
+        },"finish_reason":"tool_calls"}]}"""
+        val reply = DeepSeekClient(OkHttpClient(), json).parse(raw, miniMax = true)
+        assertEquals("检查完成", reply.content)
+        assertTrue(reply.reasoning!!.contains("检查设置"))
+        val canonical = LocalCanonicalModelCodec.canonicalizeReply(reply, LocalModelAdapterIds.OPENAI_CHAT, "same")
+            .canonicalMessage!!
+        val sameRoute = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "same",
+        ).single()
+        assertEquals("sig1", sameRoute["reasoning_details"]!!.jsonArray[0]
+            .jsonObject["id"]!!.jsonPrimitive.content)
+        val differentRoute = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "different",
+        ).single()
+        assertFalse(differentRoute.containsKey("reasoning_details"))
+        assertEquals("检查完成", differentRoute["content"]!!.jsonPrimitive.content)
+        assertEquals(null, differentRoute["reasoning_content"])
+    }
 }
