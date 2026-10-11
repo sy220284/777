@@ -1,7 +1,12 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.model.LocalModelReply
 import java.io.File
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -152,6 +157,27 @@ class ChatTurnRunnerPromptPartitionTest {
 
         assertTrue(context.dynamicPrompt.contains("地点=院子"))
         assertFalse(context.dynamicPrompt.contains("只推进下一拍"))
+    }
+
+    @Test
+    fun finalizePreservesTheCharactersStructureAndRepeatedWords() = runTest {
+        val runner = ChatTurnRunner(
+            ChatPersonaStore(File(temporary.root, "personas-finalize.json"), json),
+            ChatRelationshipEngine(), CharacterLoreEngine(),
+        )
+        val content = "我理解你的感受。为什么？你想知道什么？要听我解释吗？\n" +
+            "1. 我答应明天来。\n2. 我答应明天来。"
+        val reply = LocalModelReply(
+            message = JsonObject(emptyMap()), content = content, reasoning = null, toolCalls = emptyList(),
+        )
+        var usageRecords = 0
+        val finalized = runner.finalizeReply(
+            persona = PersonaProfile(name = "阿青"), reply = reply,
+            recordUsage = { usageRecords++ }, recentAssistantReplies = listOf(content),
+        )
+        assertSame(reply, finalized)
+        assertEquals(content, finalized.content)
+        assertEquals(1, usageRecords)
     }
 
 }
