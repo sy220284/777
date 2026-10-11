@@ -1156,6 +1156,26 @@ def test():
         assert len(json.loads(legacy[REVIEW])["obsolete_historical_evidence"]) == 1
         write_outputs(legacy)
         assert generate(root)[MD] == (root / MD).read_text(encoding="utf-8")
+        # 静态身份仅追踪独立真实入口；路径删除时应报警，不能自动改写产品功能。
+        binding = {"version": 1, "bindings": [{
+            "id": "existing.0001", "path": "B / 试验功能",
+            "source": "app/src/main/java/sample/Feature.kt",
+            "entry": "Entry", "owner": "CHAT", "evidence": "static_declaration_only",
+        }]}
+        (root / LEGACY_IDENTITIES).write_text(
+            json.dumps(binding, ensure_ascii=False), encoding="utf-8"
+        )
+        identities, stale, ambiguity = historical_identity_review(
+            root, ["B / 试验功能"], [{
+                "path": "B / 试验功能",
+                "existing_production_sources": ["app/src/main/java/sample/Feature.kt"],
+                "named_symbols": [{"symbol": "Entry", "declaration_found": True}],
+            }]
+        )
+        assert len(identities) == 1 and not stale and not ambiguity
+        _, stale, _ = historical_identity_review(root, ["B / 已退役"], [])
+        assert len(stale) == 1
+        assert stale[0]["id"] == "existing.0001"
 
 
 if __name__ == "__main__":
