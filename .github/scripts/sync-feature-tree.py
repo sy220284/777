@@ -418,7 +418,10 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
                 if source["path"] not in existing:
                     existing.append(source["path"])
                 for symbol in source["symbols"]:
-                    if not any(x["symbol"] == symbol for x in symbols):
+                    old_symbol = next((x for x in symbols if x["symbol"] == symbol), None)
+                    if old_symbol is not None:
+                        old_symbol["declaration_found"] = True
+                    else:
                         symbols.append({"symbol": symbol, "declaration_found": True})
         test_count = mapped.get(name, 0)
         if missing and not existing and not test_count:
