@@ -227,7 +227,7 @@ internal class LocalMediaApiClient @Inject constructor(
     }
 
     private fun outputFile(extension: String): File =
-        File(File(context.cacheDir, "minimax-media").apply { mkdirs() },
+        File(File(context.cacheDir, "media-studio").apply { mkdirs() },
             "created-${UUID.randomUUID()}.$extension")
 
     private suspend fun saveEncodedImage(encoded: String): File = withContext(Dispatchers.IO) {
