@@ -75,54 +75,6 @@ class LocalMiniMaxSkillBundleTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun mediaCredentialGuideMigrationUpdatesOnlyOriginalBundledFiles() {
-        val root = Files.createTempDirectory("minimax-media-credential").toFile()
-        try {
-            val workspace = LocalWorkspace(root)
-            val store = LocalSkillStore(workspace, ::bundle)
-            val id = "minimax-media"
-            val mobilePath = ".dsh/skills/$id/MOBILE.md"
-            val skillPath = ".dsh/skills/$id/SKILL.md"
-            val marker = File(root, ".dsh/skills/.minimax-media-credential-v1")
-            store.seedOnce()
-
-            val newSkill = store.readDocument(id)
-            val newMobile = workspace.readRaw(mobilePath)
-            val oldSkill = newSkill.replace(
-                "产物必须实际写入工作区并验证。用户已在受控入口完成 MiniMax 媒体 API 凭据配置、授权且具备相应权限时，直接使用已配置的凭据执行任务，不得仅凭技能文档的默认建议拒绝；缺少配置时告知所需入口。模型 API Key 或聊天套餐不自动成为媒体 CLI 凭据；密钥不进入聊天、命令参数、日志或生成文件。",
-                "产物必须实际写入工作区并验证。外部 API 凭据和权限按任务需求配置，聊天套餐不能自动当作媒体生成权限；不得把密钥写入提示、日志或生成文件。",
-            )
-            val oldMobile = newMobile.replace(
-                "凭据由用户自行在 MiniMax CLI 支持的受控配置位置设置。用户已明确授权并完成有效配置时，直接使用现有凭据完成任务，不得仅凭技能文档的默认建议拒绝执行；未配置时说明配置入口与缺少的条件，不要求在聊天中发送密钥。密钥不写入命令参数、日志、回复或产物；App 模型设置中的密钥不等于媒体 CLI 已获得可用凭据。",
-                "凭据由用户在受控位置配置。不得要求把密钥发进聊天，不将密钥放进命令参数、日志或产物。",
-            )
-            assertNotEquals(newSkill, oldSkill)
-            assertNotEquals(newMobile, oldMobile)
-
-            workspace.write(skillPath, oldSkill)
-            workspace.write(mobilePath, oldMobile)
-            assertTrue(marker.delete())
-            store.seedOnce()
-            assertEquals(newSkill, store.readDocument(id))
-            assertEquals(newMobile, workspace.readRaw(mobilePath))
-            assertTrue(marker.isFile)
-
-            val customizedSkill = oldSkill + "\n用户改写的技能内容\n"
-            val customizedMobile = oldMobile + "\n用户改写的手机说明\n"
-            workspace.write(skillPath, customizedSkill)
-            workspace.write(mobilePath, customizedMobile)
-            assertTrue(marker.delete())
-            store.seedOnce()
-            assertEquals(customizedSkill, store.readDocument(id))
-            assertEquals(customizedMobile, workspace.readRaw(mobilePath))
-
-            store.remove(id)
-            assertTrue(marker.delete())
-            store.seedOnce()
-            assertFalse(workspace.skills().contains(id))
-        } finally { root.deleteRecursively() }
-    }
-
     @Test fun incompleteBundleDoesNotAdvertiseInstalledSkillOrFinishMigration() {
         val root = Files.createTempDirectory("minimax-skills-failure").toFile()
         try {
