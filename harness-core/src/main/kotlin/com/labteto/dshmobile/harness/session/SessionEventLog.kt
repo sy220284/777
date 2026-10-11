@@ -407,6 +407,35 @@ class SessionEventLog(
         null
     }
 
+    /**
+     * Fetch the newest event for each requested identity in a single reverse archive traversal.
+     * Large Agent Teams otherwise rescan compressed segments twice per member for UI updates.
+     * The first (newest) match wins; missing identities are deliberately not fabricated.
+     */
+    fun <K> latestMatchingByKey(
+        types: Set<String>,
+        requiredKeys: Set<K>,
+        keyOf: (SessionEvent) -> K?,
+    ): Map<K, SessionEvent> = synchronized(lock) {
+        if (requiredKeys.isEmpty()) return@synchronized emptyMap()
+        require(types.isNotEmpty()) { "事件类型集合不能为空" }
+        val remaining = requiredKeys.toMutableSet()
+        val found = linkedMapOf<K, SessionEvent>()
+        for (source in orderedFilesUnsafe().asReversed()) {
+            val completed = forEachEventReverseUnsafe(source) { event ->
+                if (event.type in types) {
+                    val key = keyOf(event)
+                    if (key != null && remaining.remove(key)) {
+                        found[key] = event
+                    }
+                }
+                remaining.isNotEmpty()
+            }
+            if (!completed) break
+        }
+        found
+    }
+
     fun latest(
         type: String,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
