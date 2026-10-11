@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
-import com.labteto.dshmobile.ui.components.DsStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -424,7 +423,7 @@ class LocalTranscriptPresentationTest {
     fun structuredSuccessDoesNotTreatErrorDocumentationAsFailedTool() {
         val nodes = buildWorkProcessNodes(listOf(LocalHarnessMessage(id = "tool", role = "tool",
             content = "说明：[NETWORK_ERROR] 是错误代码", createdAt = 1L, toolName = "read_file", toolIsError = false)))
-        assertEquals(DsStatus.Done, workProcessStatus(nodes, running = false))
+        assertFalse(nodes.single().failed)
     }
     @Test
     fun workTimelineNarrationKeepsStageSummaryAndOptionalExplanatoryText() {
