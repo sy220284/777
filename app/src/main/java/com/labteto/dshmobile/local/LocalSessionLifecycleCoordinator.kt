@@ -23,7 +23,6 @@ import com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import java.io.File
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,12 +80,34 @@ internal class LocalSessionLifecycleCoordinator(
     private val beforeEventLogsDeleted: (Set<String>) -> Unit = {},
     private val activeProjectId: () -> String,
 ) {
-    // Keep only the user's latest tap while a session is being persisted and restored.
-    private val queuedUsageMode = AtomicReference<LocalUsageMode?>(null)
+    // Mode and history taps share the same latest destination while a session is restored.
+    private val navigationLock = Any()
+    private val navigationInbox = LocalSessionNavigationInbox()
 
-    private fun continueQueuedModeSwitch() {
-        val requested = queuedUsageMode.getAndSet(null) ?: return
-        if (requested != state.value.usageMode) switchUsageMode(requested)
+    private fun continueQueuedNavigation() {
+        synchronized(navigationLock) {
+            if (state.value.loading) return
+            val request = navigationInbox.take() ?: return
+            val snapshot = state.value
+            if (request is LocalSessionNavigationRequest.Mode &&
+                snapshot.kernel.running && snapshot.usageMode == LocalUsageMode.CHAT &&
+                request.value != LocalUsageMode.CHAT
+            ) {
+                state.update { it.copy(error = "请先结束当前聊天回复再切换模式") }
+                return
+            }
+            val started = when (request) {
+                is LocalSessionNavigationRequest.Mode -> startUsageModeSwitch(request.value)
+                is LocalSessionNavigationRequest.Session -> startSessionSwitch(request.id)
+            }
+            if (!started) {
+                if (state.value.loading || navigationBusy()) {
+                    navigationInbox.offerIfEmpty(request)
+                } else {
+                    state.update { it.copy(error = "切换失败，请重试") }
+                }
+            }
+        }
     }
 
     fun createSession(mode: LocalConversationMode) =
@@ -195,7 +216,7 @@ internal class LocalSessionLifecycleCoordinator(
                     state.update { it.copy(loading = false) }
                 }
             }
-            continueQueuedModeSwitch()
+            continueQueuedNavigation()
         }
         return true
     }
@@ -227,16 +248,17 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     fun switchUsageMode(mode: LocalUsageMode) {
+        navigationInbox.offer(LocalSessionNavigationRequest.Mode(mode))
+        continueQueuedNavigation()
+    }
+
+    private fun startUsageModeSwitch(mode: LocalUsageMode): Boolean {
         val snapshot = state.value
-        val busy = navigationBusy()
-        if (snapshot.loading && !busy) return
-        if (snapshot.loading || busy) {
-            queuedUsageMode.set(mode)
-            return
-        }
-        // Work can continue in its session-bound runtime while the user moves to Chat. A running
-        // Chat turn still owns the visible runtime and therefore keeps the existing guard.
-        if (snapshot.kernel.running && snapshot.usageMode != LocalUsageMode.WORK) return
+        if (snapshot.loading) return false
+        // Work execution is session-owned and survives a change of visible mode.
+        if (snapshot.kernel.running && snapshot.usageMode != LocalUsageMode.WORK &&
+            mode != snapshot.usageMode
+        ) return false
         if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
             applyChatModeRoute(
                 chatSessionLifecycle.resolveSingleMode(
@@ -245,52 +267,46 @@ internal class LocalSessionLifecycleCoordinator(
                     sessions = snapshot.sessions,
                 ),
             )
-            return
+            return true
         }
-        if (snapshot.usageMode == mode) return
+        if (snapshot.usageMode == mode) return true
         val target = if (mode == LocalUsageMode.CHAT) {
             chatSessionLifecycle.preferredSingleSession(snapshot.sessions)
         } else {
-            snapshot.sessions.firstOrNull {
-                it.usageMode == mode && !it.blank
-            } ?: snapshot.sessions.firstOrNull {
-                it.usageMode == mode
-            }
+            snapshot.sessions.firstOrNull { it.usageMode == mode && !it.blank }
+                ?: snapshot.sessions.firstOrNull { it.usageMode == mode }
         }
-        val accepted = if (target != null) {
-            switchSession(target.id)
+        return if (target != null) {
+            startSessionSwitch(target.id)
         } else {
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = mode,
                 domainSpec = if (mode == LocalUsageMode.CHAT) {
                     chatSessionLifecycle.singleCreateSpec()
-                } else {
-                    null
-                },
+                } else null,
             )
-        }
-        if (!accepted) {
-            queuedUsageMode.set(mode)
-            if (!state.value.loading && !navigationBusy()) continueQueuedModeSwitch()
         }
     }
 
     fun switchSession(sessionId: String): Boolean {
-        if (sessionId == currentSessionId()) return true
-        // Missing or deleted IDs must never be reconstructed as phantom blank sessions.
         if (sessionCoordinator.summaries().none { it.id == sessionId }) return false
-        // Work turns are session-owned: changing the visible conversation only changes the UI
-        // projection. Never stop the Work turn, its subagents, terminals or non-persistent jobs here.
-        // Chat still uses the legacy visible turn slot; if one is active, close it safely before the
-        // shared Chat runtime is replaced.
+        navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
+        continueQueuedNavigation()
+        return true
+    }
+
+    private fun startSessionSwitch(sessionId: String): Boolean {
+        if (state.value.loading) return false
+        if (sessionId == currentSessionId()) return true
+        if (sessionCoordinator.summaries().none { it.id == sessionId }) return false
+        // The visible Chat run is cancelled; detached Work runs keep their ownership.
         val cancelVisibleChatRun = navigationBusy()
         if (!beginTransition()) return false
         state.update { it.copy(loading = true) }
         scope.launch {
             transitionMutex.withLock {
                 try {
-                    // Recheck after acquiring the transition lock: deletion may have won the race.
                     if (sessionCoordinator.summaries().none { it.id == sessionId }) {
                         state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                         return@withLock
@@ -305,7 +321,7 @@ internal class LocalSessionLifecycleCoordinator(
                     state.update { it.copy(loading = false) }
                 }
             }
-            continueQueuedModeSwitch()
+            continueQueuedNavigation()
             startNextQueuedTurnIfIdle()?.start()
         }
         return true
@@ -410,7 +426,7 @@ internal class LocalSessionLifecycleCoordinator(
             }
         } finally {
             // A mode tap queued during deletion must not navigate to an old session later.
-            queuedUsageMode.set(null)
+            navigationInbox.clear()
             endTransition()
             state.update { it.copy(loading = false) }
         }
