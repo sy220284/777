@@ -71,7 +71,7 @@
   ],
   "semantic_registration_count": 0,
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "532e248f7c6f",
+  "source_snapshot": "b4f1ecc2a3f8",
   "verified_registrations": [],
   "unverified_changes_count": 0
 }
