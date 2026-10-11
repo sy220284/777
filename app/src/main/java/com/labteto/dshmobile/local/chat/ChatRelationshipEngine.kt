@@ -47,6 +47,14 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     if (NEGATED_INTIMACY_HINTS.any { text.contains(it) }) {
         return ChatInteractionIntent.NORMAL
     }
+    // A question quoting an intimate action is not itself a request to perform it.
+    // This distinction is independent of the removed strategist response mode.
+    val question = text.trimEnd('？', '?', '。', '！', '!', '啊', '呀', '呢', '吗')
+    if (text.startsWith("帮我分析") || text.startsWith("分析一下") ||
+        question.endsWith("什么意思") || question.endsWith("怎么判断")
+    ) {
+        return ChatInteractionIntent.NORMAL
+    }
     val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
     if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
 
