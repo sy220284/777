@@ -18,7 +18,7 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
         }
         return """
             [本轮技能已加载：${name}]
-            用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。工具仍须遵守当前审批、权限与可用性限制。
+            用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
             ${document}
             [技能规则结束]
         """.trimIndent()
