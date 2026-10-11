@@ -935,6 +935,13 @@ def test():
         write_outputs(generate(root))
         assert json.loads((root / REG).read_text(encoding="utf-8"))["nodes"][0]["source"].endswith("Feature.kt")
         assert generate(root)[MD] == (root / MD).read_text(encoding="utf-8")
+        # 模拟把现有两个功能强制改成同一路径，必须拒绝合并。
+        mark("B / 已有能力")
+        conflicted = generate(root)
+        assert any("目标功能路径已经存在" in p["reason"]
+                   for p in json.loads(conflicted[REVIEW])["pending_changes"])
+        assert find(parse(conflicted[MD])[0], ["A", "旧功能"]) is not None
+        assert json.loads(conflicted[REG])["nodes"][0]["path"] == "A / 旧功能"
         mark("B / 新功能")
         renamed = generate(root)
         renamed_tree, _ = parse(renamed[MD])
