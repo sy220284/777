@@ -254,6 +254,30 @@ def inspect():
             })
     if recorded_sources != actual_sources or len(actual_sources) != sources:
         raise ValueError("生产源码文件清单或内容指纹与真实代码不一致")
+    catalog = ROOT / "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt"
+    if not catalog.is_file():
+        raise ValueError("真实产品功能路由登记目录丢失")
+    catalog_text = catalog.read_text(encoding="utf-8")
+    match = re.search(r"enum class LocalFeatureRoute\s*\{([^}]*)\}", catalog_text, re.S)
+    if not match:
+        raise ValueError("现行 Kotlin 路由枚举无法识别")
+    actual_routes = re.findall(r"^\s*([A-Z][A-Z_0-9]+)\s*,?\s*$", match.group(1), re.M)
+    if index["registered_routes"] != actual_routes:
+        raise ValueError("索引路由与实际 Kotlin 功能目录不一致")
+    found_ui = []
+    for entry in actual_sources:
+        source_path = entry["path"]
+        if "/ui/" not in source_path:
+            continue
+        code = (ROOT / source_path).read_text(encoding="utf-8", errors="replace")
+        for match in re.finditer(
+            r"@Composable\s+(?:(?:internal|private|public)\s+)?fun\s+(\w*Screen\w*)\s*\(",
+            code,
+        ):
+            found_ui.append({"symbol": match.group(1), "source": source_path})
+    found_ui.sort(key=lambda x: (x["symbol"], x["source"]))
+    if index.get("candidate_ui_screens") != found_ui:
+        raise ValueError("界面候选与当前 Compose 代码不一致")
     ids = set()
     for item in registry["nodes"]:
         ident = item["id"]
