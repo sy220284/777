@@ -24,7 +24,9 @@ internal fun ConversationActionsMenu(
 ) {
     val colors = DsTheme.colors
     var expanded by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    // Capture the target action at the original tap, even if the active session changes
+    // while the confirmation dialog is open.
+    var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     Box {
         DsIconButton(
             icon = FeatherIcons.MoreVertical,
@@ -52,20 +54,20 @@ internal fun ConversationActionsMenu(
                     danger = true,
                     onClick = {
                         expanded = false
-                        confirmDelete = true
+                        pendingDeleteAction = onDelete
                     },
                 ),
             ),
         )
-        if (confirmDelete) {
+        pendingDeleteAction?.let { deleteAction ->
             ConfirmDialog(
                 title = stringResource(R.string.local_delete_session),
                 body = stringResource(R.string.local_delete_session_confirm_message),
                 confirmLabel = stringResource(R.string.local_delete_session),
-                onDismiss = { confirmDelete = false },
+                onDismiss = { pendingDeleteAction = null },
                 onConfirm = {
-                    confirmDelete = false
-                    onDelete()
+                    pendingDeleteAction = null
+                    deleteAction()
                 },
             )
         }
