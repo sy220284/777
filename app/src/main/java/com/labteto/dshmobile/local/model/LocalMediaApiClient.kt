@@ -139,7 +139,7 @@ internal class LocalMediaApiClient @Inject constructor(
                 val file = outputFile("mp3")
                 try {
                     response.body?.byteStream()?.use { inputStream ->
-                        file.outputStream().use(inputStream::copyTo)
+                        file.outputStream().use { output -> inputStream.copyTo(output) }
                     } ?: error("OpenAI 未返回配音文件")
                     check(file.length() > 0) { "OpenAI 返回空配音文件" }
                     file
