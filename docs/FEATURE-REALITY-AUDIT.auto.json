@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "e95e92ed424d",
+  "source_snapshot": "8dad1fa41481",
   "tree": {
     "nodes_excluding_root": 541,
     "leaf_descriptions": 444,

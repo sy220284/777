@@ -3201,32 +3201,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "e95e92ed424d",
+  "source_snapshot": "8dad1fa41481",
   "observed_delta": {
-    "baseline": "68e8a56b2826",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionNavigationInbox.kt"
-    ],
+    "baseline": "e95e92ed424d",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/ChatGptSettingsController.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAutomationUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationActionsMenu.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessDrawer.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/ChatGptAccountPanel.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
