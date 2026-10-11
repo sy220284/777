@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -169,9 +170,13 @@ internal fun LocalWorkTimelineAutoScroller(
         // A streaming preview can be replaced by a much taller final answer at the
         // same index. Its NEW height is not the old tail's distance from the bottom.
         val replacingTail = tailIndex == oldTail && tailKey != oldKey
-        val previousTailGap = if (replacingTail) null else lastVisible
-            ?.takeIf { it.index == oldTail }
-            ?.let { it.offset + it.size - viewport.viewportEndOffset }
+        // An empty streaming placeholder may not appear in visibleItemsInfo.
+        // In that case trust the previous row only if its measured bottom is close.
+        val previousTailGap = when {
+            replacingTail && lastVisible?.index == oldTail -> 0
+            else -> lastVisible?.takeIf { it.index in (oldTail - 1)..oldTail }
+                ?.let { it.offset + it.size - viewport.viewportEndOffset }
+        }
         if (!shouldFollowNewWorkStep(
                 oldTail, lastVisible?.index ?: -1, previousTailGap,
                 isReaderPaused.value, readerDragging,
@@ -180,6 +185,9 @@ internal fun LocalWorkTimelineAutoScroller(
         isCatchingUp.value = true
         try {
             listState.animateScrollToItem(tailIndex)
+            if (!isReaderPaused.value) {
+                listState.alignWorkTimelineTailAfterScroll(tailIndex)
+            }
         } finally {
             isCatchingUp.value = false
         }
@@ -195,7 +203,22 @@ internal fun shouldFollowNewWorkStep(
 ): Boolean =
     previousTailIndex >= 0 && !readerPaused && !readerDragging &&
         lastVisibleIndex >= previousTailIndex - 1 &&
-        (previousTailGapPx == null || previousTailGapPx <= 72)
+        previousTailGapPx != null && previousTailGapPx <= 72
+
+/**
+ * animateScrollToItem brings a tall final answer to its START, not its bottom.
+ * Finish near the actual reading tail: gently move short distances, but skip a
+ * giant paragraph in one step instead of animating through thousands of pixels.
+ */
+internal suspend fun LazyListState.alignWorkTimelineTailAfterScroll(tailIndex: Int) {
+    val info = layoutInfo
+    val tail = info.visibleItemsInfo.lastOrNull { it.index == tailIndex } ?: return
+    val gap = tail.offset + tail.size - info.viewportEndOffset
+    if (gap <= 0) return
+    val viewportHeight = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
+    if (gap > viewportHeight) scrollBy(gap.toFloat())
+    else animateScrollBy(gap.toFloat())
+}
 
 private fun LazyListState.isAtWorkTimelineBottom(): Boolean {
     val info = layoutInfo
