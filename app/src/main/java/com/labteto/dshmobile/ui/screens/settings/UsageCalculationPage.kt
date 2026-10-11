@@ -52,6 +52,8 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -119,6 +121,7 @@ internal fun UsageCalculationPage(
     }
     val selectedDay = days.firstOrNull { it.first == selectedEpochDay } ?: days.lastOrNull()
     val colors = DsTheme.colors
+    val allModelsLabel = stringResource(R.string.usage_model_all)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -136,20 +139,16 @@ internal fun UsageCalculationPage(
                 onClick = { modelMenuExpanded = true },
                 variant = DsButtonVariant.Ghost,
             )
-            androidx.compose.material3.DropdownMenu(
+            DsPopupMenu(
                 expanded = modelMenuExpanded,
-                onDismissRequest = { modelMenuExpanded = false },
-            ) {
-                (listOf<String?>(null) + availableModels).forEach { model ->
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(model ?: stringResource(R.string.usage_model_all)) },
-                        onClick = {
-                            modelMenuExpanded = false
-                            onSelectModel(model)
-                        },
+                onDismiss = { modelMenuExpanded = false },
+                items = (listOf<String?>(null) + availableModels).map { model ->
+                    MenuItem(
+                        text = model ?: allModelsLabel,
+                        onClick = { onSelectModel(model) },
                     )
-                }
-            }
+                },
+            )
         }
     }
     DeviceUsageHero(visibleUsage, showEstimatedCost = selectedModel == null || visibleUsage.estimatedCostCny > 0.0)
