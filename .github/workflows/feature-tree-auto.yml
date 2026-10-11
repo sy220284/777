@@ -82,6 +82,48 @@ jobs:
             docs/FEATURE-REALITY-AUDIT.zh-CN.md
             docs/ACCEPTANCE-MATRIX.json
 
+  refresh-pr-616-independent-audit:
+    name: 一次性提交独立源码盘点与全量对照产物
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 616 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/auto-feature-tree-20261011'
+    needs: audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: 精确检出同源PR已核查的提交
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: 全量同步功能树与独立实况报告
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/sync-feature-tree.py --self-test
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-feature-tree-sync.py
+          python3 .github/scripts/audit-feature-reality.py --self-test
+          python3 .github/scripts/audit-feature-reality.py
+          python3 .github/scripts/audit-feature-reality.py --check
+          python3 .github/scripts/check-acceptance-matrix.py
+          git diff --check
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
+            docs/FEATURE-REVIEW.auto.json docs/ACCEPTANCE-MATRIX.json \
+            docs/FEATURE-REALITY-AUDIT.auto.json docs/FEATURE-REALITY-AUDIT.zh-CN.md
+          if git diff --cached --quiet; then
+            echo "真实源码独立盘点及文档已同步"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "提交444项功能树独立代码实况审计与跨源对照结果"
+          git push origin HEAD:refs/heads/"$TARGET_BRANCH"
+
   maintain:
     name: 主线单一维护 PR
     if: github.event_name != 'pull_request'
