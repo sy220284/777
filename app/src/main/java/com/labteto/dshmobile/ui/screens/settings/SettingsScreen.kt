@@ -236,7 +236,7 @@ fun SettingsScreen(
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         stream.write(report.toByteArray(Charsets.UTF_8))
                         stream.flush()
-                    } ?: error("无法打开导出文件")
+                    } ?: error("Cannot open diagnostic export destination")
                 }
                 val integrity = report.lineSequence()
                     .firstOrNull { it.startsWith("日志完整性：") }

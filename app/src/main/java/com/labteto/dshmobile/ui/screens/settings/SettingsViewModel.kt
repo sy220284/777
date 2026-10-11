@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.settings
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.labteto.dshmobile.R
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
@@ -131,7 +132,7 @@ class SettingsViewModel @Inject constructor(
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "import_background_image", error)
-                onError("背景图片设置失败，请重新选择图片；若仍失败，可导出诊断日志")
+                onError(appContext.getString(R.string.settings_background_import_failed))
             }
         }
     }

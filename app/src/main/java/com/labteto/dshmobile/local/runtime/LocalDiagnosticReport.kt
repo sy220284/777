@@ -20,6 +20,7 @@ internal fun appendLocalDiagnosticDetails(
     eventLog: LocalSessionEventLog,
     usageTracker: DeepSeekUsageTracker,
     appLogs: List<AppLogEntry>,
+    onSessionIntegrity: (Boolean) -> Unit = {},
 ): String = buildString {
     append(baseReport.trimEnd())
     appendLine()
@@ -71,6 +72,7 @@ internal fun appendLocalDiagnosticDetails(
     val logDiagnostics = eventLog.diagnostics()
     val sessionComplete = logDiagnostics.malformedRows == 0L &&
         logDiagnostics.segmentReadFailures == 0L && logDiagnostics.archiveFailures == 0L
+    onSessionIntegrity(sessionComplete)
     appendLine(if (sessionComplete) "会话事件完整性：正常" else "会话事件完整性：存在损坏或读取失败，请检查下列计数")
     appendLine(
         "持久事件：导出最近 ${events.size} 条；latest_sequence=$latestSequence；" +

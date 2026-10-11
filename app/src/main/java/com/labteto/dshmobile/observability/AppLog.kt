@@ -62,6 +62,7 @@ object AppLog {
     private const val MAX_EXPORT_ENTRIES = 2_000
     private const val MAX_PERSISTED_BYTES = 8L * 1024L * 1024L
     private const val ROTATED_ENTRIES = 1_500
+    private const val MAX_ROOT_CAUSE_ANCHORS = 32
     private val lock = Any()
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
@@ -265,14 +266,23 @@ object AppLog {
         val merged = deduplicateDiagnosticEntries(
             persisted.entries + emergency.entries + currentPending.map { it.entry } + snapshot(),
         ).sortedWith(compareBy(AppLogEntry::timestampMillis, { it.eventId.orEmpty() }))
+        val roots = LinkedHashMap<String, AppLogEntry>()
+        merged.forEach { entry ->
+            if (entry.isDiagnosticFailure() && roots.size < MAX_ROOT_CAUSE_ANCHORS) {
+                roots.putIfAbsent(rootCauseKey(entry), entry)
+            }
+        }
+        val retained = deduplicateDiagnosticEntries(
+            roots.values.toList() + merged.takeLast(MAX_EXPORT_ENTRIES - roots.size),
+        ).sortedWith(compareBy(AppLogEntry::timestampMillis, { it.eventId.orEmpty() }))
         AppLogExport(
-            entries = merged.takeLast(MAX_EXPORT_ENTRIES),
+            entries = retained,
             malformedRows = persisted.malformedRows,
             readFailure = persisted.failure,
             pendingRows = currentPending.size,
             overflowRows = pending.overflow,
             writeFailure = pending.writeError,
-            truncated = merged.size > MAX_EXPORT_ENTRIES,
+            truncated = persisted.truncated || merged.size > MAX_EXPORT_ENTRIES,
             emergencyRows = emergency.entries.size,
             emergencyFailure = emergency.failure ?: if (emergency.malformedRows > 0) "损坏行=${emergency.malformedRows}" else null,
         )
@@ -353,27 +363,48 @@ object AppLog {
         }
     }
 
+    private fun rootCauseKey(entry: AppLogEntry): String =
+        listOf(
+            entry.tag,
+            entry.throwableType.orEmpty(),
+            entry.message.substringAfter("operation=", "").substringBefore(' '),
+            entry.throwableCauseChain.orEmpty().substringBefore(':'),
+        ).joinToString("|")
+
     private fun rotateIfNeeded(file: File) {
         if (!file.exists() || file.length() < MAX_PERSISTED_BYTES) return
         val tail = ArrayDeque<String>(ROTATED_ENTRIES)
+        val anchors = LinkedHashMap<String, String>()
         file.useLines { lines ->
             lines.forEach { line ->
+                val decoded = decodeEntry(line)
+                if (decoded != null && decoded.isDiagnosticFailure() &&
+                    anchors.size < MAX_ROOT_CAUSE_ANCHORS
+                ) {
+                    anchors.putIfAbsent(rootCauseKey(decoded), line)
+                }
                 if (tail.size >= ROTATED_ENTRIES) tail.removeFirst()
                 tail.addLast(line)
             }
         }
-        file.writeText(tail.joinToString(separator = "\n", postfix = if (tail.isEmpty()) "" else "\n"))
+        // Carry one earliest example per failure class across rotations, alongside
+        // the recent timeline. Repeated ordinary events cannot evict the first failure.
+        val kept = (anchors.values + tail.toList()).distinct()
+        file.writeText(kept.joinToString(separator = "\n", postfix = if (kept.isEmpty()) "" else "\n"))
     }
 
     private data class PersistedRead(
         val entries: List<AppLogEntry>,
         val malformedRows: Int,
         val failure: String?,
+        val truncated: Boolean,
     )
 
     private fun readPersistedUnsafe(): PersistedRead {
-        val file = persistentFile ?: return PersistedRead(emptyList(), 0, null)
+        val file = persistentFile ?: return PersistedRead(emptyList(), 0, null, false)
         val tail = ArrayDeque<AppLogEntry>(MAX_EXPORT_ENTRIES)
+        val anchors = LinkedHashMap<String, AppLogEntry>()
+        var totalRows = 0
         var malformed = 0
         var failure: String? = null
         try {
@@ -384,6 +415,10 @@ object AppLog {
                         if (entry == null) {
                             malformed++
                         } else {
+                            totalRows++
+                            if (entry.isDiagnosticFailure() && anchors.size < MAX_ROOT_CAUSE_ANCHORS) {
+                                anchors.putIfAbsent(rootCauseKey(entry), entry)
+                            }
                             if (tail.size >= MAX_EXPORT_ENTRIES) tail.removeFirst()
                             tail.addLast(entry)
                         }
@@ -393,7 +428,10 @@ object AppLog {
         } catch (error: Exception) {
             failure = error.javaClass.simpleName
         }
-        return PersistedRead(tail.toList(), malformed, failure)
+        return PersistedRead(
+            deduplicateDiagnosticEntries(anchors.values.toList() + tail.toList()),
+            malformed, failure, totalRows > MAX_EXPORT_ENTRIES,
+        )
     }
 
     internal fun encodeEntry(entry: AppLogEntry): String = listOf(

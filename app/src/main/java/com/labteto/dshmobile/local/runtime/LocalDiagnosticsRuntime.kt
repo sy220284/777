@@ -71,13 +71,15 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
 
         // Capture session evidence before taking the final process-log snapshot: failures
         // in this stage must appear in the same report, not only in the next export.
+        var sessionComplete = true
         val sessionDetails = try {
             appendLocalDiagnosticDetails(
                 baseReport = "",
                 sessionId = sessionId,
                 eventLog = sessionStorage.eventLogs.get(sessionId),
                 usageTracker = usageTracker,
-                appLogs = AppLog.snapshot(),
+                appLogs = AppLog.exportForDiagnostics().entries,
+                onSessionIntegrity = { sessionComplete = it },
             )
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -86,6 +88,7 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
             captureIssues += "会话结构化追踪采集失败：${error.javaClass.simpleName}"
             "会话结构化追踪缺失：operation=export_session_trace；原因=${error.javaClass.simpleName}。基础进程日志仍可用。"
         }
+        if (!sessionComplete) captureIssues += "会话事件存在损坏或读取失败"
 
         val processLogs = AppLog.exportForDiagnostics()
         val integrity = listOf(processLogs.integrity) + captureIssues
