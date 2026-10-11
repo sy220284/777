@@ -162,6 +162,15 @@ def analyze():
             "test_file_symbol_reference_count": len(tested_by),
             "test_reference_samples": tested_by[:7],
             "separate_product_entry": None,
+            "static_integration_hint": (
+                "candidate_external_source_reference" if used_by
+                else "only_test_source_reference" if tested_by
+                else "no_external_symbol_reference_found"
+            ),
+            "source_uniqueness_hint": (
+                "tree_leaves_share_source" if len(shared_paths) > 1
+                else "source_associated_with_one_tree_leaf"
+            ),
             "availability": "source_code_present_actual_invocation_not_proven",
             "verification": "源码中类/对象及Kotlin具名方法已读取；跨文件文本引用仍非编译解析调用链或实际运行验证",
         })
@@ -177,6 +186,10 @@ def analyze():
         "weak_source_referenced_by_other_production": sum(x["other_production_symbol_reference_count"] > 0 for x in weak),
         "weak_source_referenced_by_tests": sum(x["test_file_symbol_reference_count"] > 0 for x in weak),
         "weak_source_reused_across_tree_leaves": sum(x["source_file_shared_by_tree_descriptions"] > 1 for x in weak),
+        "weak_source_without_external_or_test_symbol_reference": sum(
+            not x["other_production_symbol_reference_count"]
+            and not x["test_file_symbol_reference_count"] for x in weak
+        ),
         "runtime_verified_usable_count": None,
     }
     return {
@@ -216,6 +229,7 @@ def render(data: dict) -> str:
         f"在其他生产文件发现同名符号引用{s['weak_source_referenced_by_other_production']}项、"
         f"在测试文件发现同名符号{s['weak_source_referenced_by_tests']}项。",
         f"- {s['weak_source_reused_across_tree_leaves']}项弱证据条目与其他树叶共用同一生产文件。"
+        f"{s['weak_source_without_external_or_test_symbol_reference']}项未找到外部源码或测试符号引用，应优先核实是否纯内部实现、入口断链或待退役代码。"
         "共用源码本身不能证明某项功能独立或失效。",
         "",
         "## 原14项逐项独立性与使用判断",
