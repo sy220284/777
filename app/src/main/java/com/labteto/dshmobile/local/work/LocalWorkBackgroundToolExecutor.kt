@@ -16,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -178,7 +179,7 @@ internal class LocalWorkBackgroundToolExecutor(
         "capability_search" -> AgentToolResult(tools.execution.searchCapabilities(call.arguments.string("query"), enabledOptionalTools))
         "memory_search", "memory_list" -> AgentToolResult(memoryTools.execute(call.name, call.arguments, allowMutation = false))
         "tool_output_read" -> AgentToolResult(
-            call.arguments.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
+            (call.arguments["query"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)?.let { query ->
                 tools.toolOutputStore.search(
                     sessionId, call.arguments.string("call_id"), query,
                     call.arguments.int("start_byte", 0),
