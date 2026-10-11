@@ -213,6 +213,16 @@ PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature �
 
 语言服务器是可选能力。不存在合适 server 时，Agent 继续使用 read / grep / build / test。
 
+按需组件安装（PR #617，未合并，设备实测待验证）：
+
+- TypeScript / JavaScript：首次语义查询时，经用户许可后按需下载安装固定版本的 TypeScript Language Server 及 TypeScript；不在 APK 中预装。
+- Python：同样按需安装 Pyright，使用 APK 内置 Node.js 运行，不依赖额外 Python 语言服务进程。
+- 已安装组件存储于应用私有目录 `noBackupFilesDir/local-harness/lsp-components`，跨会话共享并在后续调用时离线复用。
+- 组件安装器下载经过独立 SHA-512 校验的 npm CLI（JavaScript），使用受控的 `npm install` 下载固定版本；关闭生命周期脚本与可选本机依赖，不执行下载的 ELF。
+- `lsp_status` 只报告状态，不触发安装；没有匹配语言、拒绝下载、网络失败或安装失败时，保留文件搜索/编译等原有代码能力。
+- Kotlin、Java、Rust、Go 与 C/C++ 当前仅保留已有外部 LSP 自动检测，不宣称可在 Android 上直接按需安装；需先解决实际运行环境兼容。
+- CI 单测可证明调用路径及目录复用，但不能代替 Android 16/17 真机下载安装及 LSP 初始化实测。
+
 ## Android 设备能力
 
 当前 provider 包括：
