@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "27865a2db640",
+  "snapshot": "c660a95caac4",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1307,
   "production_sources_scanned": 781,
@@ -15,7 +15,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
@@ -31,7 +33,9 @@
           "symbol": "LocalModeDrawer",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
@@ -47,7 +51,11 @@
           "symbol": "localFeatureRestoreStack",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0103",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
@@ -56,7 +64,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
@@ -72,7 +82,9 @@
           "symbol": "LocalHarnessScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 导航转场和加载状态",
@@ -88,7 +100,11 @@
           "symbol": "pushFeature",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0102",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
@@ -104,7 +120,11 @@
           "symbol": "summaries",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0096",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 历史消息加载与分页",
@@ -113,7 +133,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
@@ -129,7 +151,9 @@
           "symbol": "LocalConversationSurface",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
@@ -145,7 +169,9 @@
           "symbol": "LocalConversationSurface",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
@@ -161,7 +187,9 @@
           "symbol": "LocalConversationSurface",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
@@ -177,7 +205,11 @@
           "symbol": "localSendRejectMessage",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0097",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
@@ -193,7 +225,9 @@
           "symbol": "LocalConversationSurface",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 会话列表和历史读取按单会话故障隔离",
@@ -204,7 +238,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
@@ -220,7 +256,11 @@
           "symbol": "DsThemeTokens",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0101",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
@@ -236,7 +276,11 @@
           "symbol": "DshTheme",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0099",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
@@ -252,7 +296,11 @@
           "symbol": "DsBottomSheet",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0098",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
@@ -268,7 +316,11 @@
           "symbol": "DsButton",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0100",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
@@ -284,7 +336,9 @@
           "symbol": "LocalConversationSurface",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
@@ -293,7 +347,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
@@ -309,7 +365,9 @@
           "symbol": "LocalHarnessScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 前台服务与后台状态通知",
@@ -325,7 +383,11 @@
           "symbol": "onStartCommand",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0105",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 完成、审批和提问通知",
@@ -341,7 +403,11 @@
           "symbol": "ensureChannels",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0106",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
@@ -357,7 +423,9 @@
           "symbol": "LocalModeDrawer",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 更新提示、下载与安装",
@@ -373,7 +441,11 @@
           "symbol": "downloadVerifyAndLaunch",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0104",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与16类可扩展人物事实",
@@ -389,7 +461,11 @@
           "symbol": "CharacterFactCategories",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0072",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4自由与深度编辑、事实核验和AI补全",
@@ -405,7 +481,11 @@
           "symbol": "captureExplicitCorrection",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0073",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物导入、导出（旧版本不兼容）",
@@ -414,7 +494,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4事实字段规范与旧消费者一致性校验",
@@ -425,7 +507,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集创建、编辑、删除和归档",
@@ -434,7 +518,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物与会话绑定",
@@ -450,7 +536,9 @@
           "symbol": "PersonaGalleryEntry",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物头像、立绘和预置素材",
@@ -466,7 +554,9 @@
           "symbol": "PersonaGalleryEntry",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集历史、合并与转移",
@@ -482,7 +572,11 @@
           "symbol": "loadStoryHistory",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0070",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 预置人物及预置目录",
@@ -498,7 +592,11 @@
           "symbol": "list",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0071",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线和人物世界观",
@@ -507,7 +605,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
@@ -523,7 +623,9 @@
           "symbol": "updateStoryDetails",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线持续演化",
@@ -539,7 +641,9 @@
           "symbol": "updateStoryDetails",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 人物选择与对话启动",
@@ -555,7 +659,11 @@
           "symbol": "prepareProfile",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0059",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息生成与流式展示",
@@ -571,7 +679,11 @@
           "symbol": "prepare",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0060",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 回复重生成与版本切换",
@@ -587,7 +699,11 @@
           "symbol": "regenerateReply",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0057",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息修改后重发",
@@ -603,7 +719,11 @@
           "symbol": "editAndResendUserMessage",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0061",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 对话分支及历史回滚",
@@ -619,7 +739,11 @@
           "symbol": "selectVariant",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0056",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 连续消息与排队发送",
@@ -635,7 +759,11 @@
           "symbol": "startNextIfIdle",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0058",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 用户回复建议",
@@ -651,7 +779,11 @@
           "symbol": "generate",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0062",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员选择和管理",
@@ -667,7 +799,11 @@
           "symbol": "LocalGroupChatMember",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0068",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员身份与参与规则",
@@ -676,7 +812,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊发言编排与点名",
@@ -685,7 +823,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 成员回复顺序和失败反馈",
@@ -694,7 +834,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员关系和记忆隔离",
@@ -703,7 +845,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告编辑与保存",
@@ -712,7 +856,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊状态恢复",
@@ -721,7 +867,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 明确点名与一般提及分离，允许成员自然沉默",
@@ -732,7 +880,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
@@ -741,7 +891,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与未完成话题",
@@ -750,7 +902,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 用户互动习惯",
@@ -766,7 +920,11 @@
           "symbol": "CharacterEvolutionState",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0075",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 关系推进、阶段与变化",
@@ -782,7 +940,9 @@
           "symbol": "relationshipMilestone",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物生活状态与主动性",
@@ -798,7 +958,11 @@
           "symbol": "evolveCharacterEvolution",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0074",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
@@ -807,7 +971,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
@@ -816,7 +982,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
@@ -825,7 +993,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
@@ -834,7 +1004,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
@@ -843,7 +1015,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 关系记忆提取和召回",
@@ -852,7 +1026,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物日记生成和管理",
@@ -868,7 +1044,9 @@
           "symbol": "record",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记条目合并与取代",
@@ -884,7 +1062,9 @@
           "symbol": "record",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记相关性召回",
@@ -900,7 +1080,11 @@
           "symbol": "search",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0069",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记导入、导出与回滚恢复",
@@ -909,7 +1093,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 删除和重新编辑后的记忆维护",
@@ -918,7 +1104,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记人工纠正、停用与并发版本核验",
@@ -929,7 +1117,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记来源会话及消息标识与跳转",
@@ -940,7 +1130,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 同源长期事实变动触发派生日记失效",
@@ -951,7 +1143,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 未完成日记清理的重启补偿与召回隔离",
@@ -962,7 +1156,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 上下文和人物事实组装",
@@ -978,7 +1174,11 @@
           "symbol": "assemble",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0066",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色沉浸感与原设约束",
@@ -994,7 +1194,11 @@
           "symbol": "ChatReplyImmersionGuard",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0064",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
@@ -1003,7 +1207,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
@@ -1012,7 +1218,9 @@
       "historical_grade": null,
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 聊天后状态及关系更新",
@@ -1028,7 +1236,11 @@
           "symbol": "appendChatPostTurnCommit",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0065",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 网页背景信息引入",
@@ -1044,7 +1256,11 @@
           "symbol": "forInput",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0067",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 回复质量补救与修订预算",
@@ -1060,7 +1276,11 @@
           "symbol": "ChatReplyRepairBudget",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0063",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色独立记忆与群聊发言上下文约束",
@@ -1071,7 +1291,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 人物主动发起互动",
@@ -1087,7 +1309,9 @@
           "symbol": "evaluateChatProactivePolicy",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 与自动化任务联动",
@@ -1103,7 +1327,9 @@
           "symbol": "evaluateChatProactivePolicy",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 用户活跃情况判断",
@@ -1119,7 +1345,11 @@
           "symbol": "evaluateChatSilenceTrigger",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0076",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 主动消息归属与恢复",
@@ -1135,7 +1365,11 @@
           "symbol": "proactiveConversationFocus",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0077",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 创建和切换工作会话",
@@ -1151,7 +1385,11 @@
           "symbol": "send",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0026",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作请求发送与排队",
@@ -1160,7 +1398,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 目标、约束和当前进展提取",
@@ -1176,7 +1416,9 @@
           "symbol": "resolveWorkGoalTransition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作上下文组装",
@@ -1192,7 +1434,9 @@
           "symbol": "LocalWorkComposition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 任务执行模式与续轮",
@@ -1208,7 +1452,11 @@
           "symbol": "setPlanMode",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0028",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 回复重新生成和质量检查",
@@ -1224,7 +1472,11 @@
           "symbol": "regenerateReply",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0027",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 自主选择公开历史对话和消息来源",
@@ -1235,7 +1487,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 加载更早分页、筛选并保留已选消息",
@@ -1246,7 +1500,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 交接摘要携带来源会话、消息编号与节选",
@@ -1257,7 +1513,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 选中附件使用受限路径和 SHA-256 引用",
@@ -1268,7 +1526,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 模型、MCP、插件和设备当前能力提示",
@@ -1279,7 +1539,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 方案生成与阶段拆解",
@@ -1295,7 +1557,11 @@
           "symbol": "exitWorkPlanMode",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0030",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 计划展示和人工审阅",
@@ -1311,7 +1577,11 @@
           "symbol": "commitApprovedWorkPlan",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0031",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 只读规划与修改权限边界",
@@ -1320,7 +1590,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
@@ -1336,7 +1608,11 @@
           "symbol": "resolveWorkGoalUpdate",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0033",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
@@ -1352,7 +1628,9 @@
           "symbol": "resolveWorkGoalTransition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 待办建立与更新",
@@ -1368,7 +1646,9 @@
           "symbol": "LocalWorkComposition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
@@ -1384,7 +1664,9 @@
           "symbol": "inspect",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 任务进度与阶段状态投影",
@@ -1400,7 +1682,11 @@
           "symbol": "historyPageForUi",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0032",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 关键决定、失败尝试和未完事项",
@@ -1416,7 +1702,9 @@
           "symbol": "LocalWorkCheckpoint",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 多轮思考和工具调用",
@@ -1432,7 +1720,9 @@
           "symbol": "requestExecutor",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 工具结果回填与继续推理",
@@ -1448,7 +1738,9 @@
           "symbol": "requestExecutor",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
@@ -1464,7 +1756,11 @@
           "symbol": "answerQuestion",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0053",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 高风险操作审批",
@@ -1473,7 +1769,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 步骤、资源和上下文预算",
@@ -1482,7 +1780,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 任务取消、停止、受控结束",
@@ -1491,7 +1791,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 输出真实性与完成声明检查",
@@ -1500,7 +1802,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 团队未结消息和失败成员的完成声明复核",
@@ -1511,7 +1815,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 普通子代理与分叉子代理",
@@ -1527,7 +1833,9 @@
           "symbol": "prepareForkSeed",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久子代理与冷启动恢复",
@@ -1536,7 +1844,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 独立身份指令与本轮任务",
@@ -1552,7 +1862,9 @@
           "symbol": "runResultWithLease",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理权限、工具名单和深度限制",
@@ -1561,7 +1873,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理任务邮箱和消息接收",
@@ -1577,7 +1891,9 @@
           "symbol": "runResultWithLease",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理结果结构化校验",
@@ -1593,7 +1909,9 @@
           "symbol": "runResult",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 并行执行和流水线工作流",
@@ -1609,7 +1927,9 @@
           "symbol": "LocalWorkComposition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理模型选路与调用消耗",
@@ -1625,7 +1945,9 @@
           "symbol": "runResultWithLease",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 资料研究代理预设",
@@ -1641,7 +1963,9 @@
           "symbol": "LocalWorkComposition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
@@ -1657,7 +1981,11 @@
           "symbol": "createMember",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0039",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
@@ -1673,7 +2001,9 @@
           "symbol": "createTask",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
@@ -1689,7 +2019,11 @@
           "symbol": "spawn",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0038",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
@@ -1705,7 +2039,11 @@
           "symbol": "startMember",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0035",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
@@ -1721,7 +2059,11 @@
           "symbol": "updateTask",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0046",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
@@ -1737,7 +2079,11 @@
           "symbol": "dependenciesReady",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0047",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
@@ -1753,7 +2099,11 @@
           "symbol": "validateTaskTransition",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0048",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
@@ -1769,7 +2119,11 @@
           "symbol": "writeScopeWarnings",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0045",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
@@ -1778,7 +2132,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
@@ -1794,7 +2150,9 @@
           "symbol": "recoverMailbox",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
@@ -1810,7 +2168,11 @@
           "symbol": "reconcileMemberOutcomes",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0037",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
@@ -1826,7 +2188,11 @@
           "symbol": "hasFreshTaskResult",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0036",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
@@ -1842,7 +2208,11 @@
           "symbol": "LocalAgentSwarmLaunchEntry",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0041",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
@@ -1858,7 +2228,11 @@
           "symbol": "LocalAgentTeamStatusBar",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0042",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
@@ -1874,7 +2248,9 @@
           "symbol": "TeamMemberRow",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员执行输出展开",
@@ -1890,7 +2266,11 @@
           "symbol": "renderMemberStatus",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0040",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
@@ -1906,7 +2286,9 @@
           "symbol": "TeamMemberDetail",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
@@ -1922,7 +2304,9 @@
           "symbol": "LocalAgentTeamSheet",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
@@ -1938,7 +2322,9 @@
           "symbol": "TeamMemberRow",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
@@ -1954,7 +2340,11 @@
           "symbol": "TeamMemberWorksite",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0044",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
@@ -1970,7 +2360,11 @@
           "symbol": "TeamTaskRow",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0043",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
@@ -1986,7 +2380,9 @@
           "symbol": "LocalAgentTeamSheet",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
@@ -2002,7 +2398,9 @@
           "symbol": "TeamMemberDetail",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队事件记录及任务板重建",
@@ -2018,7 +2416,11 @@
           "symbol": "project",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0052",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 成员状态与子任务运行事实关联",
@@ -2034,7 +2436,11 @@
           "symbol": "LocalAgentTeamActivityProjection",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0049",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
@@ -2050,7 +2456,11 @@
           "symbol": "releaseOwnedTasks",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0050",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
@@ -2066,7 +2476,11 @@
           "symbol": "project",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0051",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
@@ -2082,7 +2496,9 @@
           "symbol": "recoverMailbox",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
@@ -2098,7 +2514,9 @@
           "symbol": "inspect",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 任务列表与运行状态",
@@ -2114,7 +2532,9 @@
           "symbol": "LocalRunCenterScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 主任务／子任务关联",
@@ -2130,7 +2550,9 @@
           "symbol": "LocalWorkCheckpoint",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 执行阶段和步骤轨迹",
@@ -2146,7 +2568,9 @@
           "symbol": "LocalRunCenterScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
@@ -2162,7 +2586,9 @@
           "symbol": "LocalRunCenterScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
@@ -2171,7 +2597,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
@@ -2187,7 +2615,11 @@
           "symbol": "latestFrom",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0034",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工作成果清单、逐项操作及历史范围",
@@ -2196,7 +2628,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付要求与真实成果事件来源绑定",
@@ -2207,7 +2641,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付成果当前版本及证据变化提示",
@@ -2218,7 +2654,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作目录与文件浏览",
@@ -2229,7 +2667,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件预览和分享",
@@ -2240,7 +2680,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件修改与补丁应用",
@@ -2251,7 +2693,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 从真实成功工具调用识别成果",
@@ -2267,7 +2711,11 @@
           "symbol": "writeToolArtifact",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0029",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果当前可用性和安全路径核对",
@@ -2276,7 +2724,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作状态压缩与恢复检查点",
@@ -2285,7 +2735,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果来源调用与事件序号可追溯",
@@ -2296,7 +2748,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactProjection.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果首次创建和当前内容哈希对照",
@@ -2307,7 +2761,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 自动工作任务执行入口",
@@ -2323,7 +2779,11 @@
           "symbol": "prepareSession",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0055",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 后台任务触发和恢复",
@@ -2339,7 +2799,9 @@
           "symbol": "prepareWorkAutomationRecovery",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 工作任务与计划、审批的联系",
@@ -2355,7 +2817,11 @@
           "symbol": "run",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0054",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
@@ -2364,7 +2830,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
@@ -2380,7 +2848,11 @@
           "symbol": "rename",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0092",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
@@ -2389,7 +2861,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
@@ -2398,7 +2872,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
@@ -2414,7 +2890,11 @@
           "symbol": "instructionsFor",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0095",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 规则文件不可读时拒绝执行",
@@ -2423,7 +2903,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 会话与项目绑定",
@@ -2432,7 +2914,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
@@ -2448,7 +2932,11 @@
           "symbol": "activeProjectId",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0093",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
@@ -2464,7 +2952,11 @@
           "symbol": "LocalProjectFeatureRuntime",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0094",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
@@ -2480,7 +2972,11 @@
           "symbol": "AutomationDocumentStore",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0117",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务启用、停用与暂停",
@@ -2496,7 +2992,11 @@
           "symbol": "pauseTask",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0115",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 手动执行和执行记录",
@@ -2512,7 +3012,11 @@
           "symbol": "runTaskNow",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0116",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
@@ -2521,7 +3025,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 本地时间与时区处理",
@@ -2530,7 +3036,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 日程生成和下一次运行计算",
@@ -2539,7 +3047,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 触发去重与并发限制",
@@ -2548,7 +3058,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 后台任务调度",
@@ -2564,7 +3076,11 @@
           "symbol": "scheduleOnce",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0107",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 任务代次与旧运行隔离",
@@ -2573,7 +3089,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 自然语言生成任务计划",
@@ -2589,7 +3107,11 @@
           "symbol": "plan",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0114",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 从原任务内容优化指令",
@@ -2605,7 +3127,9 @@
           "symbol": "suggestions",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 时间、触发条件的编辑和确认",
@@ -2621,7 +3145,11 @@
           "symbol": "parseAutomationPlan",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0113",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 任务更新与原调度器复用",
@@ -2630,7 +3158,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 角色主动互动任务",
@@ -2646,7 +3176,11 @@
           "symbol": "LocalChatAutomationPolicy",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0110",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 用户活跃情况限制",
@@ -2662,7 +3196,11 @@
           "symbol": "normalizeProactiveMaxUnanswered",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0111",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 定时发起聊天和会话归属",
@@ -2678,7 +3216,11 @@
           "symbol": "normalizeProactiveMinGapMinutes",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0109",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 中断及恢复",
@@ -2687,7 +3229,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 定时发起工作任务",
@@ -2703,7 +3247,9 @@
           "symbol": "prepareWorkAutomationRecovery",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 模型路由及工作执行契约",
@@ -2719,7 +3265,11 @@
           "symbol": "LocalWorkAutomationRecoveryPlan",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0108",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 后台任务状态与结果结算",
@@ -2735,7 +3285,9 @@
           "symbol": "prepareWorkAutomationRecovery",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / Webhook 接收和校验",
@@ -2751,7 +3303,11 @@
           "symbol": "WebhookController",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0112",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 请求大小及执行边界",
@@ -2760,7 +3316,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 触发结果保存和查询",
@@ -2769,7 +3327,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 任务持久化和冷恢复",
@@ -2778,7 +3338,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / Worker 状态与真实执行对账",
@@ -2787,7 +3349,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 删除／重建后阻止旧任务结算",
@@ -2796,7 +3360,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 暂停／恢复与手动执行代次保护",
@@ -2805,7 +3371,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
@@ -2816,7 +3384,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 分类浏览、配置和状态展示",
@@ -2827,7 +3397,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
@@ -2843,7 +3415,11 @@
           "symbol": "ToolCapabilityStatus",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0014",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具安装和管理入口",
@@ -2854,7 +3430,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
@@ -2870,7 +3448,11 @@
           "symbol": "LocalPresetSkillCatalog",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0019",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 已安装技能读取和调用",
@@ -2881,7 +3463,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能创建与编辑",
@@ -2892,7 +3476,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 上传 SKILL.md 与 ZIP 技能包",
@@ -2903,7 +3489,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能包附属文件安装与安全校验",
@@ -2919,7 +3507,11 @@
           "symbol": "LocalSkillPackageImporter",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0017",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / Work 对话创建并写入技能目录",
@@ -2930,7 +3522,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能文档和元数据解析",
@@ -2946,7 +3540,11 @@
           "symbol": "parseLocalSkillMetadata",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0018",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能调用标记识别",
@@ -2962,7 +3560,9 @@
           "symbol": "resolveLocalWorkSkillGuidance",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能使用范围和提示词预算",
@@ -2978,7 +3578,9 @@
           "symbol": "resolveLocalWorkSkillGuidance",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 大技能完整读取与损坏隔离",
@@ -2994,7 +3596,11 @@
           "symbol": "readModelSkill",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0016",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能中文显示名称",
@@ -3010,7 +3616,9 @@
           "symbol": "displayName",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 新技能创建时填写中文名",
@@ -3026,7 +3634,9 @@
           "symbol": "displayName",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能名称修改",
@@ -3042,7 +3652,11 @@
           "symbol": "updateDocument",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0020",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 输入框与历史消息显示中文名",
@@ -3053,7 +3667,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 保留技能原始调用标识",
@@ -3069,7 +3685,11 @@
           "symbol": "readDocument",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0015",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件读取和内容检索",
@@ -3078,7 +3698,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件编辑与差异修改",
@@ -3087,7 +3709,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件名匹配与全文搜索",
@@ -3096,7 +3720,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / JSON 结构查询",
@@ -3107,7 +3733,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / Shell 命令与脚本执行",
@@ -3116,7 +3744,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 长输出分页读取",
@@ -3127,7 +3757,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
@@ -3141,7 +3773,9 @@
           "symbol": "process_exec",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 连接凭据管理",
@@ -3157,7 +3791,11 @@
           "symbol": "configureGitHubCredential",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0012",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 工具调用",
@@ -3173,48 +3811,98 @@
           "symbol": "GitHubConnectorPlugin",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 跳转定义与查找引用",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "definition",
+          "declaration_found": true
+        },
+        {
+          "symbol": "references",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "LSP 查询方法源码声明存在"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 悬停信息和查找实现",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "hover",
+          "declaration_found": true
+        },
+        {
+          "symbol": "implementation",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "LSP 查询方法源码声明存在"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 文件／工作区符号",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt"
+      ],
       "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "workspaceSymbols",
-          "declaration_found": false
+          "declaration_found": true
+        },
+        {
+          "symbol": "documentSymbols",
+          "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "LSP 符号查询源码声明存在"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 诊断与重命名预览",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "rename",
+          "declaration_found": true
+        },
+        {
+          "symbol": "execute",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "重命名方法与诊断工具分发代码存在"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / MCP 服务器接入和管理",
@@ -3230,7 +3918,11 @@
           "symbol": "mcpServers",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0024",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / HTTP 与标准输入输出连接",
@@ -3246,7 +3938,11 @@
           "symbol": "connectMcpStdio",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0023",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部工具发现及动态注册",
@@ -3262,7 +3958,11 @@
           "symbol": "installStartup",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0022",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
@@ -3271,7 +3971,9 @@
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 高权限调用审批",
@@ -3282,7 +3984,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页搜索",
@@ -3293,7 +3997,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页抓取与页面正文获取",
@@ -3304,7 +4010,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / HTTP 请求",
@@ -3315,7 +4023,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 公网地址及重定向安全检查",
@@ -3324,7 +4034,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
@@ -3340,7 +4052,11 @@
           "symbol": "validateTarget",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0025",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
@@ -3351,7 +4067,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 截图和媒体附件处理",
@@ -3367,7 +4085,9 @@
           "symbol": "vision_analyze_screen",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 文件预览与 PDF 渲染",
@@ -3383,7 +4103,11 @@
           "symbol": "renderLocalPdfForModel",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0021",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图像分析缓存",
@@ -3394,7 +4118,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionAnalysisCache.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
@@ -3408,7 +4134,9 @@
           "symbol": "terminal_open",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
@@ -3422,7 +4150,9 @@
           "symbol": "process_exec",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
@@ -3436,7 +4166,9 @@
           "symbol": "process_exec",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
@@ -3450,7 +4182,9 @@
           "symbol": "process_exec",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
@@ -3464,7 +4198,9 @@
           "symbol": "process_exec",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
@@ -3478,7 +4214,9 @@
           "symbol": "accessibilityTree",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
@@ -3492,7 +4230,9 @@
           "symbol": "notificationList",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
@@ -3501,7 +4241,9 @@
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
@@ -3515,7 +4257,9 @@
           "symbol": "acquireAgentVirtualDisplay",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
@@ -3529,7 +4273,9 @@
           "symbol": "releaseAgentVirtualDisplay",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具可用范围",
@@ -3538,7 +4284,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 副作用识别",
@@ -3549,7 +4297,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 自动、手动和默认审批",
@@ -3560,7 +4310,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 修改型工具隔离",
@@ -3569,7 +4321,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具执行轨迹和失败状态",
@@ -3585,7 +4339,11 @@
           "symbol": "localToolActivityProjectionEvents",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0013",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型服务商和协议选择",
@@ -3594,7 +4352,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型配置新增、编辑、切换和移除",
@@ -3603,7 +4363,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / API 密钥与连接测试",
@@ -3612,7 +4374,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 账户授权登录",
@@ -3623,7 +4387,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 套餐模型目录与账号状态",
@@ -3634,7 +4400,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModelCatalog.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型表现全局上限、模型参数、推理模式和上下文长度",
@@ -3650,7 +4418,11 @@
           "symbol": "constrainEffort",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0081",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 主智能体与子智能体模型配置",
@@ -3666,7 +4438,11 @@
           "symbol": "LocalModelProfileStore",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0082",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 推理档位及温度上限对多入口的约束",
@@ -3677,7 +4453,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelPerformanceStore.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 本机累计 Token",
@@ -3686,7 +4464,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
@@ -3702,7 +4482,11 @@
           "symbol": "forMode",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0089",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
@@ -3718,7 +4502,11 @@
           "symbol": "TokenUsageDailyBucket",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0086",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 按会话、任务和请求追溯",
@@ -3734,7 +4522,11 @@
           "symbol": "groupDetail",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0087",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 主代理／子代理消耗区分",
@@ -3750,7 +4542,11 @@
           "symbol": "TokenUsageAgentSummary",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0091",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
@@ -3766,7 +4562,11 @@
           "symbol": "TokenPromptBreakdown",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0088",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
@@ -3782,7 +4582,11 @@
           "symbol": "TokenUsageAggregate",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0090",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
@@ -3798,7 +4602,11 @@
           "symbol": "listActive",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0080",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 全局／项目／对话链记忆归属",
@@ -3807,7 +4615,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
@@ -3816,7 +4626,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 人物私有记忆隔离展示",
@@ -3825,7 +4637,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实来源关联与显式纠正停用",
@@ -3836,7 +4650,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实修改后的来源失效待办",
@@ -3847,7 +4663,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
@@ -3863,7 +4681,11 @@
           "symbol": "ThemePreference",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0083",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
@@ -3879,7 +4701,11 @@
           "symbol": "DsTheme",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0084",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
@@ -3895,7 +4721,11 @@
           "symbol": "dsTypography",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0085",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 自定义聊天背景",
@@ -3911,7 +4741,9 @@
           "symbol": "AppBackground",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
@@ -3927,7 +4759,9 @@
           "symbol": "SettingsScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 运行步数和执行预算",
@@ -3936,7 +4770,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
@@ -3952,7 +4788,9 @@
           "symbol": "SettingsScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 工具审批策略",
@@ -3961,7 +4799,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
@@ -3977,7 +4817,9 @@
           "symbol": "SettingsScreen",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 任务相关配置状态与执行授权分开提示",
@@ -3988,7 +4830,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
@@ -3999,7 +4843,9 @@
         "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 屏幕共享和录制逐次系统授权提示",
@@ -4010,7 +4856,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
@@ -4026,7 +4874,11 @@
           "symbol": "LocalSessionStorageCard",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0078",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 日志和故障诊断",
@@ -4042,7 +4894,9 @@
           "symbol": "LocalDiagnosticsRuntime",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 运行环境信息",
@@ -4058,7 +4912,11 @@
           "symbol": "environmentInfo",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0079",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 诊断报告导出",
@@ -4074,7 +4932,9 @@
           "symbol": "diagnosticReport",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
@@ -4083,7 +4943,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话归属、运行租约与唯一写入者",
@@ -4092,7 +4954,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 消息块和正文记录",
@@ -4101,7 +4965,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话事件流水账",
@@ -4110,34 +4976,79 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 持久会话身份登记册取代目录后缀发现",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "DurableSessionCatalog",
+          "declaration_found": true
+        },
+        {
+          "symbol": "ids",
+          "declaration_found": true
+        },
+        {
+          "symbol": "register",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "持久身份目录声明及登记入口存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 写入前登记、删除后注销及跨实例同步",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "register",
+          "declaration_found": true
+        },
+        {
+          "symbol": "unregister",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "注册与注销入口源码声明存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 旧会话按文档身份及备份核验补录",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "adopt",
+          "declaration_found": true
+        },
+        {
+          "symbol": "documentHasIdentity",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "历史身份补录与快照校验入口存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 聊天历史分页与索引",
@@ -4146,7 +5057,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 消息／工具／上下文表面记录",
@@ -4157,7 +5070,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 请求证据重建与摘要校验",
@@ -4168,7 +5083,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalRequestReconstruction.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 状态投影注册、版本和事件水位",
@@ -4179,7 +5096,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionProjectionCheckpoints.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 模型历史检查点和尾部重放",
@@ -4188,7 +5107,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 工具活动只读投影",
@@ -4199,16 +5120,31 @@
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 事件投影检查点与真实会话身份分离",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "discoverExistingDocuments",
+          "declaration_found": true
+        },
+        {
+          "symbol": "documentHasIdentity",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "按文档身份发现已有会话的入口存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 持久会话登记与摘要投影索引分工",
@@ -4219,7 +5155,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 前台会话恢复",
@@ -4228,7 +5166,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 中断运行的事实核对",
@@ -4237,7 +5177,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 已知与未知副作用区分",
@@ -4246,7 +5188,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话清理与归档维护",
@@ -4255,7 +5199,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 批次投影和中断后重建",
@@ -4266,16 +5212,31 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionArchiveMaintenance.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 登记册损坏后验证原文件重建",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "ensureLoaded",
+          "declaration_found": true
+        },
+        {
+          "symbol": "discoverExistingDocuments",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "损坏恢复及扫描入口存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 单个会话备份损坏不阻断其他会话",
@@ -4286,16 +5247,31 @@
         "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话直接读取补登记与快照身份防串话",
-      "verification": "没有可确认的现行入口证据",
+      "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
       "historical_grade": "专属源码路径已核",
-      "existing_production_sources": [],
+      "existing_production_sources": [
+        "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt"
+      ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [
+        {
+          "symbol": "adopt",
+          "declaration_found": true
+        },
+        {
+          "symbol": "documentHasIdentity",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "读取时补录及快照身份校验方法存在"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / OpenAI 响应协议",
@@ -4304,7 +5280,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / Anthropic 消息协议",
@@ -4315,7 +5293,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / DeepSeek 兼容协议",
@@ -4326,7 +5306,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / ChatGPT 套餐专用协议分流",
@@ -4337,7 +5319,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptSessionManager.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 密钥加密保存",
@@ -4346,7 +5330,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / ChatGPT OAuth 授权回调",
@@ -4357,7 +5343,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptOAuthCallbackServer.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 身份令牌校验及刷新",
@@ -4366,7 +5354,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 账号权限和套餐凭据隔离",
@@ -4375,7 +5365,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型目录与能力识别",
@@ -4391,7 +5383,11 @@
           "symbol": "availableProfiles",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0004",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 一次运行固定真实模型路由",
@@ -4407,7 +5403,11 @@
           "symbol": "profileForRun",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0005",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 运行中配置变化隔离",
@@ -4418,7 +5418,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRunContext.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 连接健康诊断和重试约束",
@@ -4429,7 +5431,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelConnectionTester.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型路由的推理及温度上限统一生效",
@@ -4440,7 +5444,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求封装和入场校验",
@@ -4451,7 +5457,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/ModelAdmissionSafety.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 流式文本、思考和工具调用",
@@ -4467,7 +5475,11 @@
           "symbol": "completeStreaming",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0006",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 网络中断、取消和重试",
@@ -4476,7 +5488,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求证据和响应终态",
@@ -4485,7 +5499,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 图片等多模态输入",
@@ -4496,7 +5512,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 系统／开发者／动态提示词分层",
@@ -4512,7 +5530,11 @@
           "symbol": "withChatTurnContext",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0007",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 模型历史窗口和压缩",
@@ -4521,7 +5543,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Token 压力与上下文预算",
@@ -4530,7 +5554,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Prompt 缓存指纹与连续性",
@@ -4546,7 +5572,11 @@
           "symbol": "withEphemeralContext",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0008",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 工作语义检查点",
@@ -4555,7 +5585,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
@@ -4571,7 +5603,9 @@
           "symbol": "requestExecutor",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 主代理与子代理公共契约",
@@ -4580,7 +5614,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 运行标识和父子层级",
@@ -4589,7 +5625,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 全局步数和动态预算",
@@ -4598,7 +5636,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 创建和启动规格",
@@ -4614,7 +5654,9 @@
           "symbol": "prepareForkSeed",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 稳定身份与本轮任务分离",
@@ -4630,7 +5672,9 @@
           "symbol": "prepareForkSeed",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 前台／持久消息邮箱",
@@ -4646,7 +5690,9 @@
           "symbol": "persistContinuationCheckpoint",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 满载拒绝和消息去重",
@@ -4662,7 +5708,9 @@
           "symbol": "runResultWithLease",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 休眠、继续和重激活",
@@ -4678,7 +5726,9 @@
           "symbol": "persistContinuationCheckpoint",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 输出结构校验",
@@ -4694,7 +5744,9 @@
           "symbol": "runResult",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 步骤和历史检查点",
@@ -4703,7 +5755,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 最终结果先验证再提交",
@@ -4712,7 +5766,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 中断恢复和未知副作用保护",
@@ -4721,7 +5777,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 过期结果不能提交",
@@ -4730,7 +5788,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 并行与流水线工作流",
@@ -4739,7 +5799,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配",
@@ -4755,7 +5817,9 @@
           "symbol": "createTask",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 取消及继续执行契约",
@@ -4764,7 +5828,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具目录与能力声明",
@@ -4773,7 +5839,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 模型可见工具定义与过滤",
@@ -4782,7 +5850,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具调用入场和权限判断",
@@ -4791,7 +5861,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具执行身份与真实启动记录",
@@ -4800,7 +5872,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
@@ -4809,7 +5883,9 @@
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 错误、超时、取消与结果恢复",
@@ -4818,7 +5894,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
@@ -4834,7 +5912,11 @@
           "symbol": "LocalToolActivityProjectionRuntime",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0002",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
@@ -4843,7 +5925,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 作用域和可见性",
@@ -4852,7 +5936,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆冲突与来源合并",
@@ -4861,7 +5947,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆维护、过期和删除",
@@ -4870,7 +5958,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 记忆库只读分类投影",
@@ -4886,7 +5976,9 @@
           "symbol": "MemoryVault",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 来源失效待办持久化及清理确认",
@@ -4897,7 +5989,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享记忆 / 按来源精准失效派生日记并幂等恢复",
@@ -4908,7 +6002,9 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 资源调度和运行租约",
@@ -4917,7 +6013,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 后台任务注册与运行状态",
@@ -4926,7 +6024,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 子任务持久化与队列",
@@ -4935,7 +6035,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 请求并发控制和取消传播",
@@ -4944,7 +6046,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享资源与任务 / 进程恢复后的运行归属裁决",
@@ -4953,7 +6057,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 审批请求和结果回填",
@@ -4962,7 +6068,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 用户提问和回答继续",
@@ -4971,7 +6079,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 发送状态和队列控制",
@@ -4980,7 +6090,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享交互 / 后台结果到前台状态同步",
@@ -4996,7 +6108,11 @@
           "symbol": "LocalRuntimeStateStore",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0003",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / Token 请求级账本",
@@ -5005,7 +6121,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / 输入、输出、推理和缓存细分",
@@ -5021,7 +6139,11 @@
           "symbol": "LocalTokenUsageContextBridge",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0010",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / 成本与汇总统计",
@@ -5037,7 +6159,11 @@
           "symbol": "aggregateTokenUsageRecords",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0009",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / 运行事件和错误日志",
@@ -5053,7 +6179,9 @@
           "symbol": "LocalDiagnosticsRuntime",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享用量和诊断 / 结构化诊断与故障报告",
@@ -5069,7 +6197,9 @@
           "symbol": "diagnosticReport",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 本地数据持久化与备份",
@@ -5078,7 +6208,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 原子写入、损坏恢复和版本迁移",
@@ -5087,7 +6219,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 密钥安全存储",
@@ -5103,7 +6237,11 @@
           "symbol": "KeystorePreferenceSecretStore",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0001",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 文件访问路径边界",
@@ -5112,7 +6250,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 网络安全边界",
@@ -5121,7 +6261,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 共享存储与安全 / 权限及副作用约束",
@@ -5130,7 +6272,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动只执行一次",
@@ -5139,7 +6283,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 进程生命周期协程范围",
@@ -5155,7 +6301,9 @@
           "symbol": "LocalRuntimeKernel",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动初始化及恢复触发",
@@ -5164,7 +6312,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 初始化失败状态投影",
@@ -5180,7 +6330,11 @@
           "symbol": "start",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null,
+      "identity_id": "existing.0011",
+      "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
       "path": "第二层｜共享运行能力 / 轻量进程内核 / 功能及服务的组合根装配",
@@ -5196,7 +6350,9 @@
           "symbol": "LocalRuntimeKernel",
           "declaration_found": true
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
@@ -5210,7 +6366,9 @@
           "symbol": "terminal_open",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
@@ -5224,7 +6382,9 @@
           "symbol": "AndroidRuntimePlugin",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
@@ -5233,7 +6393,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 前台服务和 Android 后台执行",
@@ -5242,7 +6404,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
@@ -5256,7 +6420,9 @@
           "symbol": "AndroidDeviceProvider",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 底层协议与兼容 / JSON 请求与响应",
@@ -5265,7 +6431,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 流式响应和断流处理",
@@ -5274,7 +6442,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 请求状态和错误分类",
@@ -5283,7 +6453,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 外部互通适配 / GitHub 接口工具",
@@ -5292,7 +6464,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
@@ -5306,7 +6480,9 @@
           "symbol": "McpToolBridgePlugin",
           "declaration_found": false
         }
-      ]
+      ],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 外部互通适配 / LSP 语言服务器适配",
@@ -5315,7 +6491,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 外部互通适配 / Android 设备权限提供方",
@@ -5324,7 +6502,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / Kotlin／Gradle 多模块构建",
@@ -5333,7 +6513,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 代码格式与静态检查",
@@ -5342,7 +6524,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 架构 3.0 所有权门禁",
@@ -5351,7 +6535,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 性能、资源和安全门禁",
@@ -5360,7 +6546,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / ARM64／x86_64 运行时与安装包构建",
@@ -5369,7 +6557,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / Android 16／17 设备回归",
@@ -5378,7 +6568,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 运行时缓存的构建前校验保存",
@@ -5387,7 +6579,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 缓存命中与构建耗时汇总",
@@ -5396,7 +6590,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 安装包大小、签名和运行时完整性",
@@ -5405,7 +6601,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 构建与持续集成 / 合并前多阶段门禁",
@@ -5414,7 +6612,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / Android 应用单元测试",
@@ -5423,7 +6623,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 核心智能体循环测试",
@@ -5432,7 +6634,9 @@
       "historical_grade": "测试方法已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话、工具、模型与恢复测试",
@@ -5441,7 +6645,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
@@ -5450,7 +6656,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
@@ -5459,7 +6667,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
@@ -5468,7 +6678,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 测试数据来源与固定版本校验",
@@ -5477,7 +6689,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
@@ -5486,7 +6700,9 @@
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
@@ -5495,7 +6711,9 @@
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
@@ -5504,7 +6722,9 @@
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
@@ -5513,7 +6733,9 @@
       "historical_grade": "专属源码路径已核",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 发行版本和变更记录",
@@ -5522,7 +6744,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 构建安装包与签名校验",
@@ -5531,7 +6755,9 @@
       "historical_grade": "仅定位候选源码",
       "existing_production_sources": [],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 在线更新检测",
@@ -5542,7 +6768,9 @@
         "app/src/main/java/com/labteto/dshmobile/update/UpdateChecker.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 增量补丁下载与校验",
@@ -5553,7 +6781,9 @@
         "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 安全安装和失败反馈",
@@ -5564,18 +6794,745 @@
         "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt"
       ],
       "missing_production_sources": [],
-      "named_symbols": []
+      "named_symbols": [],
+      "explicit_source_anchor": false,
+      "explicit_static_scope": null
     }
   ],
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 128,
-    "具名源码声明存在（静态，待调用链复核）": 185,
+    "具名源码声明存在（静态，待调用链复核）": 195,
     "历史生产文件仍存在（待入口复核）": 73,
-    "没有可确认的现行入口证据": 55,
+    "没有可确认的现行入口证据": 45,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
+  "tracked_legacy_identities": 117,
+  "stale_legacy_identities": [],
+  "ambiguous_named_entry_paths": [
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 多轮思考和工具调用",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 工具结果回填与继续推理",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理任务邮箱和消息接收",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理模型选路与调用消耗",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理结果结构化校验",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 并行执行和流水线工作流",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 普通子代理与分叉子代理",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 独立身份指令与本轮任务",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 资料研究代理预设",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作上下文组装",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 目标、约束和当前进展提取",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 后台任务触发和恢复",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 待办建立与更新",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 关键决定、失败尝试和未完事项",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 主任务／子任务关联",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 任务列表与运行状态",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
+    "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 执行阶段和步骤轨迹",
+    "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能使用范围和提示词预算",
+    "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能调用标记识别",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
+    "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
+    "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 与自动化任务联动",
+    "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 人物主动发起互动",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物与会话绑定",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物头像、立绘和预置素材",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线持续演化",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物日记生成和管理",
+    "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记条目合并与取代",
+    "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 后台任务状态与结果结算",
+    "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 定时发起工作任务",
+    "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
+    "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 日志和故障诊断",
+    "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 诊断报告导出",
+    "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
+    "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
+    "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 写入前登记、删除后注销及跨实例同步",
+    "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 持久会话身份登记册取代目录后缀发现",
+    "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 旧会话按文档身份及备份核验补录",
+    "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 事件投影检查点与真实会话身份分离",
+    "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话直接读取补登记与快照身份防串话",
+    "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 登记册损坏后验证原文件重建",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 休眠、继续和重激活",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 创建和启动规格",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 前台／持久消息邮箱",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 满载拒绝和消息去重",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 稳定身份与本轮任务分离",
+    "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 输出结构校验",
+    "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配",
+    "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
+    "第二层｜共享运行能力 / 共享用量和诊断 / 结构化诊断与故障报告",
+    "第二层｜共享运行能力 / 共享用量和诊断 / 运行事件和错误日志",
+    "第二层｜共享运行能力 / 轻量进程内核 / 功能及服务的组合根装配",
+    "第二层｜共享运行能力 / 轻量进程内核 / 进程生命周期协程范围"
+  ],
+  "unproven_feature_triage": [
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "聊天人物与连续性",
+      "inspect": "app/local/chat",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "检查对应产品模块与共享运行目录",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "process_exec"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "检查对应产品模块与共享运行目录",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "terminal_open"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "process_exec"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "process_exec"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "process_exec"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "process_exec"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "accessibilityTree"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "notificationList"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "acquireAgentVirtualDisplay"
+      ]
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "releaseAgentVirtualDisplay"
+      ]
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "检查对应产品模块与共享运行目录",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "terminal_open"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "本机终端与执行环境",
+      "inspect": "harness-runtime-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+        "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "AndroidRuntimePlugin"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "设备权限与虚拟显示",
+      "inspect": "harness-device-android/src/main",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "AndroidDeviceProvider"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "共享工具或其他能力",
+      "inspect": "检查对应产品模块与共享运行目录",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+        "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": [
+        "McpToolBridgePlugin"
+      ]
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Kotlin／Gradle 多模块构建",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 代码格式与静态检查",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 架构 3.0 所有权门禁",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 性能、资源和安全门禁",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / ARM64／x86_64 运行时与安装包构建",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Android 16／17 设备回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 运行时缓存的构建前校验保存",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 缓存命中与构建耗时汇总",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 安装包大小、签名和运行时完整性",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 合并前多阶段门禁",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话、工具、模型与恢复测试",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 测试数据来源与固定版本校验",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "持续集成与测试",
+      "inspect": ".github/workflows/ 与 .github/scripts/、各模块 src/test",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/ci.yml",
+        ".github/scripts/check-local-architecture-boundaries.py",
+        ".github/scripts/check-test-quality.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 发行版本和变更记录",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "构建发布",
+      "inspect": ".github/workflows/release.yml、app/local/update",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/release.yml",
+        ".github/scripts/check-apk-runtime-layout.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 构建安装包与签名校验",
+      "issue": "缺少可确认的现行源码入口",
+      "domain": "构建发布",
+      "inspect": ".github/workflows/release.yml、app/local/update",
+      "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+      "candidate_files": [
+        ".github/workflows/release.yml",
+        ".github/scripts/check-apk-runtime-layout.py"
+      ],
+      "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
+      "existing_candidate_symbols": []
+    }
+  ],
   "observed_code_delta": {
-    "baseline": "2e17f10cc4d6",
+    "baseline": "27865a2db640",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],

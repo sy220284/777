@@ -3197,9 +3197,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "27865a2db640",
+  "source_snapshot": "c660a95caac4",
   "observed_delta": {
-    "baseline": "2e17f10cc4d6",
+    "baseline": "27865a2db640",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
@@ -3209,6 +3209,8 @@
     "added_ui": [],
     "removed_ui": []
   },
+  "tracked_legacy_identities": 117,
+  "unproven_feature_count": 45,
   "verified_registrations": [],
   "unverified_changes_count": 0,
   "obsolete_historical_evidence_count": 11,
