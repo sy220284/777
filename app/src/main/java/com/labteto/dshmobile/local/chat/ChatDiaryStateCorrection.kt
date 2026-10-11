@@ -30,7 +30,7 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
     val old = decisions.flatMap { entry ->
         val revisions = ChatDiaryEntryPolicy.revisionsOf(entry)
         (if (entry.active) revisions.dropLast(1) else revisions).flatMap { revision ->
-            listOf(revision.feeling, revision.innerThought, revision.relationshipMeaning, revision.unresolvedEcho)
+            listOf(revision.event, revision.feeling, revision.innerThought, revision.relationshipMeaning, revision.unresolvedEcho)
         }
     }.filter(String::isNotBlank).toSet()
     fun withdrawn(field: String, value: String) = field in invalid ||
@@ -79,6 +79,8 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
         dynamics = state.dynamics.copy(
             stage = revertedStage ?: state.dynamics.stage,
             unresolvedConflict = state.dynamics.unresolvedConflict.takeUnless { withdrawn("dynamics.unresolvedConflict", it) }.orEmpty(),
+            facts = state.dynamics.facts.filterNot { it.text in old },
+            hypotheses = state.dynamics.hypotheses.filterNot { it.text in old },
             sharedMoments = state.dynamics.sharedMoments.filterNot(old::contains),
             sharedObjects = state.dynamics.sharedObjects.filterNot(old::contains),
         ),
