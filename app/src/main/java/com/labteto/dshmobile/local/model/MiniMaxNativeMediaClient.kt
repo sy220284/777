@@ -117,10 +117,23 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             }
         }
         return try {
+            // MiniMax recognises uploads by their media type and filename; preserve an audio suffix.
+            val mediaType = context.contentResolver.getType(uri)
+                ?.takeIf { it.startsWith("audio/") } ?: "audio/mpeg"
+            val extension = when (mediaType.substringAfter('/').substringBefore(';')) {
+                "mpeg", "mp3" -> "mp3"
+                "mp4", "x-m4a" -> "m4a"
+                "wav", "x-wav", "wave" -> "wav"
+                "ogg" -> "ogg"
+                "webm" -> "webm"
+                "aac" -> "aac"
+                "flac", "x-flac" -> "flac"
+                else -> "mp3"
+            }
             val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
                 .addFormDataPart("model", "asr-1.0")
                 .addFormDataPart("response_format", "json")
-                .addFormDataPart("file", "recording", stage.asRequestBody("application/octet-stream".toMediaType()))
+                .addFormDataPart("file", "recording.$extension", stage.asRequestBody(mediaType.toMediaType()))
                 .build()
             val root = requestJson(profile, "/v1/speech_to_text", multipart)
             root["text"]?.jsonPrimitive?.contentOrNull
