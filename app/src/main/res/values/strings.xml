@@ -2064,5 +2064,12 @@
     <string name="minimax_media_select_voice">选择官方音色</string>
     <string name="minimax_media_filter_voice">搜索音色名称或编号</string>
     <string name="minimax_media_no_voices">当前账户未返回可选音色，可继续输入音色编号。</string>
+    <string name="media_studio_title">多模态创作</string>
+    <string name="media_studio_entry">多模态创作</string>
+    <string name="media_studio_notice">创作模型与聊天模型独立选择；不同服务商按各自 API 配额或账单计费。</string>
+    <string name="media_studio_no_model">当前没有为此功能接入可用的创作模型。请在设置中配置受支持的官方账户。</string>
+    <string name="media_studio_selected_model">%1$s · %2$s</string>
+    <string name="media_studio_share">分享／保存生成文件</string>
+    <string name="media_studio_share_image">分享／保存生成图片</string>
 </resources>
 
