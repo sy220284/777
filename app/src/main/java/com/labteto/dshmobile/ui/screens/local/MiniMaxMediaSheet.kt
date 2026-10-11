@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,12 +25,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.presentation.LocalMiniMaxVoice
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -64,6 +69,9 @@ internal fun MiniMaxMediaSheetContent(
     var videoState by remember(profile.id) { mutableStateOf<String?>(null) }
     var transcript by remember(profile.id) { mutableStateOf<String?>(null) }
     var audioFile by remember(profile.id) { mutableStateOf<File?>(null) }
+    var voices by remember(profile.id) { mutableStateOf<List<LocalMiniMaxVoice>>(emptyList()) }
+    var showVoices by remember(profile.id) { mutableStateOf(false) }
+    var voiceFilter by remember(profile.id) { mutableStateOf("") }
 
     fun run(action: suspend () -> Unit) {
         if (busy) return
@@ -192,6 +200,47 @@ internal fun MiniMaxMediaSheetContent(
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                DsButton(
+                    text = stringResource(R.string.minimax_media_select_voice),
+                    enabled = !busy,
+                    onClick = { run {
+                        voices = viewModel.voices(profile)
+                        showVoices = true
+                    } },
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Ghost,
+                )
+                if (showVoices) {
+                    DsTextField(
+                        value = voiceFilter,
+                        onValueChange = { voiceFilter = it },
+                        label = { Text(stringResource(R.string.minimax_media_filter_voice)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (voices.isEmpty()) {
+                        Text(stringResource(R.string.minimax_media_no_voices), color = colors.labelSecondary)
+                    } else {
+                        val filtered = voices.filter {
+                            it.name.contains(voiceFilter, ignoreCase = true) ||
+                                it.id.contains(voiceFilter, ignoreCase = true)
+                        }
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().height(192.dp),
+                            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            items(filtered, key = { it.id }) { voice ->
+                                DsButton(
+                                    text = voice.name,
+                                    onClick = { voiceId = voice.id; showVoices = false },
+                                    variant = DsButtonVariant.Ghost,
+                                    size = DsButtonSize.Small,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                    }
+                }
                 DsButton(text = stringResource(R.string.minimax_media_create_speech),
                     enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                     onClick = { run { audioFile = viewModel.speech(profile, prompt, voiceId) } },
