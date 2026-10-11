@@ -90,6 +90,59 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun shortEnglishKeywordsDoNotActivateUnrelatedOptionalTools() {
+        val tools = listOf(
+            tool("api_client", "请求 API", ToolExposure.OPTIONAL, "网络", setOf("api")),
+            tool("preview_pr", "读取合并请求", ToolExposure.OPTIONAL, "GitHub", setOf("pr")),
+            tool("web_lookup", "网页搜索", ToolExposure.OPTIONAL, "网络", setOf("web")),
+        )
+
+        // The old substring matcher matched api in capital, pr in preview, web in website.
+        assertTrue(LocalToolRouter.relevantOptionalToolNames(
+            tools, "Review capital allocations and preview the website",
+        ).isEmpty())
+        assertEquals(
+            listOf("api_client", "preview_pr", "web_lookup"),
+            LocalToolRouter.relevantOptionalToolNames(tools, "调用 API 查询 PR，再使用 web"),
+        )
+    }
+
+    @Test
+    fun categoryAloneDoesNotExpandEveryAdvancedToolButExplicitDiscoveryStillWorks() {
+        val tools = listOf(
+            tool("team_spawn", "创建团队", ToolExposure.OPTIONAL, "智能体", setOf("创建团队")),
+            tool("team_stop", "停止团队", ToolExposure.OPTIONAL, "智能体", setOf("停止团队")),
+            tool("memory_update", "更新记忆", ToolExposure.OPTIONAL, "记忆", setOf("更新记忆")),
+        )
+        assertTrue(LocalToolRouter.relevantOptionalToolNames(
+            tools, "介绍智能体和记忆功能",
+        ).isEmpty())
+        assertEquals(
+            listOf("team_spawn"),
+            LocalToolRouter.relevantOptionalToolNames(tools, "请创建团队"),
+        )
+        assertEquals(
+            listOf("team_spawn", "team_stop"),
+            LocalToolRouter.search(tools, "智能体").map(HarnessTool::name),
+        )
+    }
+
+    @Test
+    fun toolIdentifiersAndMixedChineseEnglishIntentStillPreactivate() {
+        val tools = listOf(
+            tool("github_lookup", "查看 GitHub", ToolExposure.OPTIONAL, "外部", setOf("github")),
+            tool("http_request", "HTTP 接口", ToolExposure.OPTIONAL, "网络", setOf("api")),
+        )
+        assertEquals(
+            listOf("github_lookup", "http_request"),
+            LocalToolRouter.relevantOptionalToolNames(tools, "请用GitHub项目里的 http_request查询"),
+        )
+        assertTrue(LocalToolRouter.relevantOptionalToolNames(
+            tools, "请检查 github_lookup_result 的日志",
+        ).isEmpty())
+    }
+
+    @Test
     fun longTaskContextPreservesExplicitToolIntentAtBothEnds() {
         val tools = listOf(
             tool("first_tool", "首部任务", ToolExposure.OPTIONAL, "测试", setOf("first-keyword")),
