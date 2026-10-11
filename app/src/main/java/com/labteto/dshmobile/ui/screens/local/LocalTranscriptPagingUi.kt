@@ -166,7 +166,11 @@ internal fun LocalWorkTimelineAutoScroller(
         ) return@LaunchedEffect
         val viewport = listState.layoutInfo
         val lastVisible = viewport.visibleItemsInfo.lastOrNull()
-        val previousTailGap = lastVisible?.takeIf { it.index == oldTail }
+        // A streaming preview can be replaced by a much taller final answer at the
+        // same index. Its NEW height is not the old tail's distance from the bottom.
+        val replacingTail = tailIndex == oldTail && tailKey != oldKey
+        val previousTailGap = if (replacingTail) null else lastVisible
+            ?.takeIf { it.index == oldTail }
             ?.let { it.offset + it.size - viewport.viewportEndOffset }
         if (!shouldFollowNewWorkStep(
                 oldTail, lastVisible?.index ?: -1, previousTailGap,
