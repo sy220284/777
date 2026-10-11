@@ -72,15 +72,15 @@
 | JSON 结构查询 | resolve | 39 | 34 | 是 |
 | 长输出分页读取 | resolve | 39 | 34 | 是 |
 | GitHub 工具调用 | githubConfigured | 8 | 1 | 是 |
-| 高权限调用审批 | metadata | 52 | 13 | 是 |
-| 网页搜索 | request | 127 | 48 | 是 |
-| 网页抓取与页面正文获取 | request | 127 | 48 | 是 |
-| HTTP 请求 | request | 127 | 48 | 是 |
+| 高权限调用审批 | metadata | 51 | 13 | 是 |
+| 网页搜索 | request | 128 | 48 | 是 |
+| 网页抓取与页面正文获取 | request | 128 | 48 | 是 |
+| HTTP 请求 | request | 128 | 48 | 是 |
 | 图片理解和视觉模型调用 | install | 18 | 13 | 是 |
 | 截图和媒体附件处理 | install | 18 | 13 | 是 |
 | 图像分析缓存 | LocalVisionAnalysisCache | 1 | 1 | 尚未发现 |
-| 副作用识别 | metadata | 52 | 13 | 是 |
-| 自动、手动和默认审批 | metadata | 52 | 13 | 是 |
+| 副作用识别 | metadata | 51 | 13 | 是 |
+| 自动、手动和默认审批 | metadata | 51 | 13 | 是 |
 | ChatGPT 账户授权登录 | summary | 52 | 18 | 尚未发现 |
 | ChatGPT 套餐模型目录与账号状态 | parseChatGptPlanModels | 1 | 1 | 尚未发现 |
 | 推理档位及温度上限对多入口的约束 | current | 199 | 39 | 是 |
@@ -90,12 +90,12 @@
 | 任务相关配置状态与执行授权分开提示 | project | 27 | 31 | 是 |
 | 无障碍与通知监听实时服务状态提示 | refresh | 23 | 6 | 尚未发现 |
 | 屏幕共享和录制逐次系统授权提示 | project | 27 | 31 | 是 |
-| 消息／工具／上下文表面记录 | snapshot | 142 | 49 | 尚未发现 |
+| 消息／工具／上下文表面记录 | snapshot | 142 | 50 | 尚未发现 |
 | 请求证据重建与摘要校验 | surface | 59 | 7 | 尚未发现 |
 | 状态投影注册、版本和事件水位 | fileFor | 2 | 0 | 尚未发现 |
-| 工具活动只读投影 | snapshot | 142 | 49 | 是 |
+| 工具活动只读投影 | snapshot | 142 | 50 | 是 |
 | 持久会话登记与摘要投影索引分工 | summaries | 27 | 8 | 是 |
-| 批次投影和中断后重建 | request | 127 | 48 | 尚未发现 |
+| 批次投影和中断后重建 | request | 128 | 48 | 尚未发现 |
 | 单个会话备份损坏不阻断其他会话 | summaries | 27 | 8 | 是 |
 | Anthropic 消息协议 | complete | 63 | 33 | 尚未发现 |
 | DeepSeek 兼容协议 | complete | 63 | 33 | 尚未发现 |
@@ -104,7 +104,7 @@
 | 运行中配置变化隔离 | LocalModelRunContext | 5 | 1 | 尚未发现 |
 | 连接健康诊断和重试约束 | LocalModelConnectionTester | 2 | 0 | 尚未发现 |
 | 模型路由的推理及温度上限统一生效 | complete | 63 | 33 | 是 |
-| 请求封装和入场校验 | snapshot | 142 | 49 | 尚未发现 |
+| 请求封装和入场校验 | snapshot | 142 | 50 | 尚未发现 |
 | 图片等多模态输入 | prepareLocalMultimodalMessages | 4 | 2 | 尚未发现 |
 | 记忆库只读分类投影 | memoryVaultFolders | 1 | 1 | 尚未发现 |
 | 来源失效待办持久化及清理确认 | remember | 64 | 7 | 是 |
