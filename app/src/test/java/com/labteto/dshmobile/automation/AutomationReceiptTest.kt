@@ -90,18 +90,7 @@ class AutomationReceiptTest {
     }
 
     @Test
-    fun recurringFailureNotificationsArePeriodicWithoutChangingTheSchedule() {
-        assertFalse(shouldNotifyAutomationFailure(0))
-        assertTrue(shouldNotifyAutomationFailure(1))
-        assertFalse(shouldNotifyAutomationFailure(2))
-        assertFalse(shouldNotifyAutomationFailure(4))
-        assertTrue(shouldNotifyAutomationFailure(5))
-        assertFalse(shouldNotifyAutomationFailure(6))
-        assertTrue(shouldNotifyAutomationFailure(10))
-    }
-
-    @Test
-    fun recurringChatTaskKeepsScheduleAfterRepeatedFailures() {
+    fun chatRecurringTaskAutoPausesAfterThirdFailure() {
         val task = AutomationTask(
             id = "chat",
             prompt = "主动来找我",
@@ -112,12 +101,13 @@ class AutomationReceiptTest {
             targetSessionId = "session",
         )
 
-        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(task))
-        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(task.copy(failureStreak = 100)))
+        assertFalse(shouldAutoPauseChatAutomation(task, 1))
+        assertFalse(shouldAutoPauseChatAutomation(task, 2))
+        assertTrue(shouldAutoPauseChatAutomation(task, 3))
     }
 
     @Test
-    fun recurringWorkKeepsScheduleAndOneShotFailureEnds() {
+    fun workAndOneShotTasksDoNotUseChatAutoPausePolicy() {
         val work = AutomationTask(
             id = "work",
             prompt = "task",
@@ -134,8 +124,8 @@ class AutomationReceiptTest {
             targetSessionId = "session",
         )
 
-        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(work))
-        assertEquals(AutomationStatus.FAILED, automationFailureStatus(oneShotChat))
+        assertFalse(shouldAutoPauseChatAutomation(work, 3))
+        assertFalse(shouldAutoPauseChatAutomation(oneShotChat, 3))
     }
 
     @Test
