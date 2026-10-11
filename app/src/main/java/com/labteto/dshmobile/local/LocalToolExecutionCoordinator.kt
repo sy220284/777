@@ -309,6 +309,7 @@ internal class LocalToolExecutionCoordinator(
                         put("call_id", call.id)
                         put("execution_id", executionIdentity.executionId)
                         put("root_call_id", executionIdentity.rootCallId)
+                        put("plan_mode", planModeEnabled)
                         executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
                         currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                     },
