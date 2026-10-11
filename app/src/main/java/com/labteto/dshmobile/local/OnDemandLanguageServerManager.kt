@@ -244,33 +244,66 @@ internal class OnDemandLanguageServerManager(
             GZIPInputStream(archive.inputStream().buffered()).use { stream ->
                 val header = ByteArray(512)
                 var total = 0L
-                while (true) {
-                    var offset = 0
-                    while (offset < header.size) {
-                        val n = stream.read(header, offset, header.size - offset)
-                        if (n < 0) {
-                            check(offset == 0) { "tar 头部不完整" }
-                            return
-                        }
-                        offset += n
+                var extendedPath: String? = null
+                fun readExactly(target: ByteArray) {
+                    var read = 0
+                    while (read < target.size) {
+                        val count = stream.read(target, read, target.size - read)
+                        check(count > 0) { "tar 文件提前结束" }
+                        read += count
                     }
+                }
+                fun consumePadding(size: Long) {
+                    var padding = (512 - size % 512) % 512
+                    while (padding > 0) {
+                        val count = stream.skip(padding)
+                        check(count > 0) { "tar 对齐数据不完整" }
+                        padding -= count
+                    }
+                }
+                while (true) {
+                    readExactly(header)
                     if (header.all { it == 0.toByte() }) return
                     fun field(start: Int, length: Int) =
                         String(header, start, length, Charsets.UTF_8).substringBefore('\u0000').trim()
                     val name = field(0, 100)
                     val prefix = field(345, 155)
-                    val relative = (if (prefix.isEmpty()) name else prefix + "/" + name)
+                    val ordinaryPath = if (prefix.isEmpty()) name else prefix + "/" + name
                     val size = field(124, 12).trim().toLongOrNull(8)
                         ?: error("tar 大小字段无效")
                     val kind = header[156].toInt().toChar()
                     check(size >= 0 && size <= MAX_UNPACKED_BYTES) { "tar 条目过大" }
                     total += size
                     check(total <= MAX_UNPACKED_BYTES) { "tar 解压体积超限" }
+
+                    // npm pack emits PAX extended headers for long file paths.
+                    // Only the path extension is needed; never accept arbitrary link types.
+                    if (kind == 'x') {
+                        check(size <= 256 * 1024) { "tar PAX 元数据过大" }
+                        val payload = ByteArray(size.toInt())
+                        readExactly(payload)
+                        val metadata = payload.toString(Charsets.UTF_8)
+                        extendedPath = metadata.lineSequence()
+                            .map { it.substringAfter(' ', "").trimEnd('\n') }
+                            .firstOrNull { it.startsWith("path=") }
+                            ?.removePrefix("path=")
+                        consumePadding(size)
+                        continue
+                    }
+
+                    check(kind == '0' || kind == '\u0000' || kind == '5') {
+                        "tar 包含不支持的链接或特殊文件"
+                    }
+                    val relative = extendedPath ?: ordinaryPath
+                    extendedPath = null
                     check(relative.isNotBlank() && !relative.startsWith("/") &&
-                        relative.split('/').none { it == ".." || it.isBlank() }) { "tar 路径越界" }
-                    check(kind == '0' || kind == '\u0000' || kind == '5') { "tar 包含不支持的链接或特殊文件" }
+                        relative.split('/').none { it == ".." || it.isBlank() }) {
+                        "tar 路径越界"
+                    }
                     val target = File(destination, relative).canonicalFile
-                    check(target.toPath().startsWith(destination.canonicalFile.toPath())) { "tar 文件越界" }
+                    check(target.toPath().startsWith(destination.canonicalFile.toPath())) {
+                        "tar 文件越界"
+                    }
                     if (kind == '5') {
                         check(target.isDirectory || target.mkdirs()) { "创建目录失败" }
                     } else {
@@ -286,7 +319,6 @@ internal class OnDemandLanguageServerManager(
                             }
                         }
                     }
-                    // Directories may have nonzero data in malformed archives; consume all entries.
                     if (kind == '5' && size > 0) {
                         var remaining = size
                         while (remaining > 0) {
@@ -295,13 +327,7 @@ internal class OnDemandLanguageServerManager(
                             remaining -= skipped
                         }
                     }
-                    val padding = (512 - size % 512) % 512
-                    var remaining = padding
-                    while (remaining > 0) {
-                        val skipped = stream.skip(remaining)
-                        check(skipped > 0) { "tar 对齐数据不完整" }
-                        remaining -= skipped
-                    }
+                    consumePadding(size)
                 }
             }
         }
