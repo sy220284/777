@@ -194,7 +194,7 @@ internal class OnDemandLanguageServerManager(
         return !dir.exists() || dir.deleteRecursively()
     }
 
-    private companion object {
+    companion object {
         // npm 11.6.2 registry dist.integrity, pinned independently of the network.
         const val NPM_SHA512 =
             "ee22b335fcbc95662cdf3ab8a053daf045d9cf9c6df6040d28965abb707512b2c16fa6c5eec049d34c74f78f390cebd14f697919eadb97756564d4f9eccc4954"
