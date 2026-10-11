@@ -43,6 +43,57 @@ data class LocalMediaVideoTask(
 @Serializable
 internal data class LocalMediaVideoTaskList(val tasks: List<LocalMediaVideoTask> = emptyList())
 
+/** Pure state transitions shared by persistence and JVM crash-recovery regression tests. */
+internal object LocalMediaVideoTransitions {
+    fun recover(tasks: List<LocalMediaVideoTask>): List<LocalMediaVideoTask> =
+        tasks.map { task ->
+            if (task.phase == LocalMediaVideoPhase.SUBMITTING) task.copy(
+                phase = LocalMediaVideoPhase.OUTCOME_UNKNOWN,
+                lastError = "应用退出时视频提交结果尚未确认。请检查服务商后台，勿直接重复生成。",
+            ) else task
+        }
+
+    fun accepted(
+        previous: LocalMediaVideoTask,
+        providerTaskId: String,
+        now: Long,
+    ): LocalMediaVideoTask {
+        require(providerTaskId.isNotBlank() && providerTaskId.length <= 256)
+        check(previous.phase == LocalMediaVideoPhase.SUBMITTING)
+        return previous.copy(
+            phase = LocalMediaVideoPhase.QUEUED,
+            providerTaskId = providerTaskId,
+            updatedAtMillis = now,
+            lastError = null,
+        )
+    }
+
+    fun polled(
+        previous: LocalMediaVideoTask,
+        phase: LocalMediaVideoPhase,
+        url: String?,
+        now: Long,
+    ): LocalMediaVideoTask {
+        require(phase in setOf(
+            LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING,
+            LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED,
+        ))
+        require(!previous.providerTaskId.isNullOrBlank())
+        if (previous.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED)) {
+            return previous
+        }
+        if (phase == LocalMediaVideoPhase.SUCCEEDED) {
+            require(url != null && url.startsWith("https://")) { "生成已完成但缺少可靠视频地址" }
+        }
+        return previous.copy(
+            phase = phase,
+            downloadUrl = if (phase == LocalMediaVideoPhase.SUCCEEDED) url else null,
+            lastError = null,
+            updatedAtMillis = now,
+        )
+    }
+}
+
 @Singleton
 class LocalMediaVideoTaskStore @Inject constructor(
     @ApplicationContext context: Context,
@@ -74,15 +125,8 @@ class LocalMediaVideoTaskStore @Inject constructor(
     /** Only the original creator can attach a provider task id to a persisted pending operation. */
     @Synchronized
     fun submitted(id: String, providerTaskId: String) {
-        require(providerTaskId.isNotBlank() && providerTaskId.length <= 256)
         transition(id) { previous ->
-            check(previous.phase == LocalMediaVideoPhase.SUBMITTING)
-            previous.copy(
-                phase = LocalMediaVideoPhase.QUEUED,
-                providerTaskId = providerTaskId,
-                updatedAtMillis = System.currentTimeMillis(),
-                lastError = null,
-            )
+            LocalMediaVideoTransitions.accepted(previous, providerTaskId, System.currentTimeMillis())
         }
     }
 
@@ -100,22 +144,8 @@ class LocalMediaVideoTaskStore @Inject constructor(
     /** Polling is read-only and never creates a new provider task; preserve existing ID. */
     @Synchronized
     fun checked(id: String, phase: LocalMediaVideoPhase, url: String?) {
-        require(phase in setOf(
-            LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING,
-            LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED,
-        ))
         transition(id) { previous ->
-            require(!previous.providerTaskId.isNullOrBlank())
-            if (previous.phase == LocalMediaVideoPhase.SUCCEEDED || previous.phase == LocalMediaVideoPhase.FAILED) {
-                previous
-            } else {
-                previous.copy(
-                    phase = phase,
-                    downloadUrl = if (phase == LocalMediaVideoPhase.SUCCEEDED) url else null,
-                    lastError = null,
-                    updatedAtMillis = System.currentTimeMillis(),
-                )
-            }
+            LocalMediaVideoTransitions.polled(previous, phase, url, System.currentTimeMillis())
         }
     }
 
@@ -146,12 +176,7 @@ class LocalMediaVideoTaskStore @Inject constructor(
         }.onFailure {
             AppLog.warn("MediaTasks", "failure=true operation=read_media_tasks cause_type=${it.javaClass.simpleName}")
         }.getOrElse { return emptyList() }
-        val recovered = restored.map { task ->
-            if (task.phase == LocalMediaVideoPhase.SUBMITTING) task.copy(
-                phase = LocalMediaVideoPhase.OUTCOME_UNKNOWN,
-                lastError = "应用退出时视频提交结果尚未确认。请检查服务商后台，勿直接重复生成。",
-            ) else task
-        }
+        val recovered = LocalMediaVideoTransitions.recover(restored)
         if (restored != recovered) {
             check(prefs.edit().putString(KEY,
                 json.encodeToString(LocalMediaVideoTaskList.serializer(), LocalMediaVideoTaskList(recovered))
