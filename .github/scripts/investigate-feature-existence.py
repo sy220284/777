@@ -225,8 +225,21 @@ def render(data: dict) -> str:
         "",
         "## 仍需调查的76项",
         "",
-        "其中所有条目都已记录真实生产文件、文件独占/共享情况、主声明、其他生产代码与测试文件的静态引用。"
-        "这些静态指标只决定复核优先级；不能据它们自动把功能标为可用或删除。",
+        "所有76项均逐项记录真实生产文件、具名类或函数、跨文件引用及测试关联。"
+        "多功能共用源码时，独立入口仍须看真实调用和用户行为。",
+        "",
+        "| 功能描述 | 源码入口线索 | 其他生产引用文件 | 测试引用文件 | 共用源文件 |",
+        "|---|---|---:|---:|---|",
+        *[
+            "| " + item["path"].split(" / ")[-1].replace("|", "｜") +
+            " | " + (item["best_static_cross_file_symbol"] or "仅发现源文件").replace("|", "｜") +
+            " | " + str(item["other_production_symbol_reference_count"]) +
+            " | " + str(item["test_file_symbol_reference_count"]) +
+            " | " + ("是" if item["source_is_shared_in_feature_tree"] else "尚未发现") + " |"
+            for item in data["weak_evidence_code_traces"]
+        ],
+        "",
+        "其中“尚未发现共用源文件”不意味着拥有独立产品入口，其他源码/测试文件含同名符号也不证明调用链真正可达。",
         "",
         "## 最终边界",
         "",
@@ -244,6 +257,7 @@ def main():
     args = cli.parse_args()
     assert re.search(TEST_METHOD % "sample", "@Test\n    fun sample() {}")
     assert re.search(DECL % "Example", "class Example()")
+    assert "canonicalV4" in source_symbols("internal fun PersonaProfile.canonicalV4(): PersonaProfile = this")
     if args.self_test:
         print("功能存在性溯源自测通过")
         return
