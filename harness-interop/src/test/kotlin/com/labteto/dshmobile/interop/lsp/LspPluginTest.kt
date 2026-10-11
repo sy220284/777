@@ -258,15 +258,16 @@ class LspPluginTest {
         temporary.newFile("sample.ts").writeText("const answer = 42")
         var installs = 0
         var approvals = 0
+        var installed = emptyList<String>()
         val context = HarnessContext()
         val plugin = LspPlugin(
             root = temporary.root,
             json = Json,
-            command = { emptyList() },
+            command = { installed },
             canInstallOnDemand = { it?.endsWith(".ts") == true },
             installOnDemand = {
                 installs++
-                listOf("/bin/sh", server.absolutePath)
+                listOf("/bin/sh", server.absolutePath).also { installed = it }
             },
         )
         plugin.install(context)
