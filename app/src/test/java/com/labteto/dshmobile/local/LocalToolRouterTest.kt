@@ -134,7 +134,7 @@ class LocalToolRouterTest {
             tool("http_request", "HTTP 接口", ToolExposure.OPTIONAL, "网络", setOf("api")),
         )
         assertEquals(
-            listOf("github_lookup", "http_request"),
+            listOf("http_request", "github_lookup"),
             LocalToolRouter.relevantOptionalToolNames(tools, "请用GitHub项目里的 http_request查询"),
         )
         assertTrue(LocalToolRouter.relevantOptionalToolNames(
