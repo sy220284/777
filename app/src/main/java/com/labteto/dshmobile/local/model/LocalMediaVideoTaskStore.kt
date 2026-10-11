@@ -104,7 +104,7 @@ class LocalMediaVideoTaskStore @Inject constructor(
         File(context.filesDir, "media-studio/video-tasks.json"), LocalMediaVideoTaskList.serializer(), json,
         legacySource = { prefs.getString(KEY, null) },
     )
-    val recoveryError: String? get() = document.recoveryError
+    val recoveryErrors: StateFlow<String?> get() = document.recoveryErrors
     private val mutableTasks = MutableStateFlow(readAndRecover())
     val tasks: StateFlow<List<LocalMediaVideoTask>> = mutableTasks
 

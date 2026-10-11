@@ -45,7 +45,7 @@ class LocalMediaResultStore @Inject constructor(
         File(directory, "results.json"), LocalMediaResultList.serializer(), json,
         legacySource = { prefs.getString(KEY, null) },
     )
-    val recoveryError: String? get() = document.recoveryError
+    val recoveryErrors: StateFlow<String?> get() = document.recoveryErrors
     fun requireAvailable() = document.requireAvailable()
     private val mutableResults = MutableStateFlow(load())
     val results: StateFlow<List<LocalMediaResult>> = mutableResults

@@ -66,6 +66,7 @@ internal fun LocalMediaStudioSheetContent(
     val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
     val videoTasks by viewModel.videoTasks.collectAsState()
     val generatedResults by viewModel.generatedResults.collectAsState()
+    val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
@@ -358,7 +359,7 @@ internal fun LocalMediaStudioSheetContent(
             error?.let { Text(stringResource(R.string.minimax_media_error, it),
                 color = colors.labelPrimary, style = DsType.caption11.withReadingWeight()) }
         }
-        viewModel.storageError?.let {
+        storageError?.let {
             Text(stringResource(R.string.minimax_media_error, it), color = colors.labelPrimary, style = DsType.caption11.withReadingWeight())
         }
         if (videoTasks.isNotEmpty()) {

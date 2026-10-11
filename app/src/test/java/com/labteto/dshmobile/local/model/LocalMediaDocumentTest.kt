@@ -58,6 +58,18 @@ class LocalMediaDocumentTest {
         assertTrue("broken-backup" in retained)
     }
 
+    @Test fun commitFailurePublishesRecoveryErrorAndBlocksFurtherPaidWork() {
+        val file = File(temporary.root, "results.json")
+        val store = document(file)
+        assertNotNull(store.readOrNull(::LocalMediaResultList))
+        store.write(existing)
+        file.writeText("broken-primary")
+        File(temporary.root, "results.json.bak").writeText("broken-backup")
+        assertThrows(IllegalStateException::class.java) { store.write(existing) }
+        assertNotNull(store.recoveryErrors.value)
+        assertThrows(IllegalStateException::class.java) { store.requireAvailable() }
+    }
+
     @Test fun officialMiniMaxWireVideoStatesMapToSharedLifecycle() {
         assertEquals("Queueing", normalizeMiniMaxVideoState("Preparing"))
         assertEquals("Queueing", normalizeMiniMaxVideoState("Queueing"))

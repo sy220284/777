@@ -18,10 +18,15 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -41,8 +46,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val resultStore: LocalMediaResultStore,
 ) {
     // The provider request belongs to the media capability, not a disposable Compose sheet.
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val storageError: String? get() = videoStore.recoveryError ?: resultStore.recoveryError
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
+        CoroutineExceptionHandler { _, failure -> AppLog.failure("MediaCreation", "submit_video", failure) })
+    val storageError: StateFlow<String?> = combine(videoStore.recoveryErrors, resultStore.recoveryErrors) {
+        videoError, resultError -> videoError ?: resultError
+    }.stateIn(scope, SharingStarted.Eagerly, null)
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
     fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
