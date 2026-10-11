@@ -280,6 +280,8 @@ internal class LocalWorkAgentTurnExecutor(
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
+                    while (true) {
+                    val observedSteer = binding.steeringRevision.value
                     workModelHistoryRuntime.drainPendingInputs(binding)
                     val snapshot = runState.value
                     val tools = modelToolStepSurface.capture(
@@ -320,7 +322,8 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    val rawReply = try {
+                    val sampling = try {
+                        sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                         modelRequests.complete(
                             snapshot = snapshot,
                             messages = requestMessages,
@@ -349,6 +352,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                             }
                         }
+                        }
                     } catch (error: Throwable) {
                         if (error is LocalModelException) lastModelError = error
                         val nativeImageRejected =
@@ -366,6 +370,16 @@ internal class LocalWorkAgentTurnExecutor(
                             throw error
                         }
                     }
+                    if (sampling === LocalWorkSamplingOutcome.Steered) {
+                        runEventLog.append("work/model-sampling-steered", buildJsonObject {
+                            put("step", modelStep + 1)
+                            put("run_id", runContext.runId)
+                            put("revision", binding.steeringRevision.value)
+                            put("effect", "model_only")
+                        })
+                        continue
+                    }
+                    val rawReply = (sampling as LocalWorkSamplingOutcome.Completed).value
                     val reply = rawReply.also { completed ->
                         usageTracker.recordForeground(
                             snapshot = snapshot,
@@ -381,7 +395,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog)
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
-                    AgentModelReply(
+                    return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
                             deliveryReply.toolCalls.map { call ->
@@ -396,6 +410,8 @@ internal class LocalWorkAgentTurnExecutor(
                             emptyList()
                         },
                     )
+                    }
+                    error("Unreachable: Work sampling must return or be cancelled")
                 },
                 tools = AgentToolExecutor { call ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
