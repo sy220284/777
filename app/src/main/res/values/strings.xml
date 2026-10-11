@@ -932,7 +932,7 @@
     <string name="local_persona_world_setting">世界设定</string>
     <string name="local_persona_constraints">不可违反的人设（每行一条）</string>
     <string name="local_persona_examples">对白参考（每行一条）</string>
-    <string name="local_persona_banned">角色专属禁用词（每行一条）</string>
+    <string name="local_persona_banned">人物表达偏好：避用词（每行一条）</string>
     <string name="local_persona_signature">角色常用表达（每行一条）</string>
     <string name="local_persona_corrections">已学到的人设纠正（每行一条，可编辑或删除）</string>
     <string name="local_persona_save">保存人物设定</string>
@@ -1156,21 +1156,21 @@
 
 
     <string name="settings_page_chat">聊天</string>
-    <string name="settings_chat_subtitle">流式过滤、过滤词与命中记录</string>
-    <string name="settings_chat_style_guard">自定义表达过滤</string>
-    <string name="settings_chat_style_guard_hint">按你添加的过滤词和人物作者填写的禁用表达过滤流式回复。</string>
-    <string name="settings_chat_filter_disabled_notice">自定义表达过滤已关闭，回复中的用词保留模型原文。</string>
+    <string name="settings_chat_subtitle">表达偏好与最近未遵循记录</string>
+    <string name="settings_chat_style_guard">表达偏好</string>
+    <string name="settings_chat_style_guard_hint">把你填写的避用表达交给模型参考，回复原文完整保留。</string>
+    <string name="settings_chat_filter_disabled_notice">表达偏好已关闭，回复中的用词保留模型原文。</string>
     <string name="settings_chat_builtin_filters_title">内置过滤词（%1$d）</string>
-    <string name="settings_chat_custom_filters_title">自定义过滤词（%1$d）</string>
-    <string name="settings_chat_custom_filter_hint">输入要追加过滤的词或短语</string>
+    <string name="settings_chat_custom_filters_title">避用表达（%1$d）</string>
+    <string name="settings_chat_custom_filter_hint">输入希望避用的词或短语</string>
     <string name="settings_chat_custom_filter_add">添加</string>
     <string name="settings_chat_custom_filter_remove">移除</string>
     <string name="settings_chat_filter_limits">最多 %1$d 条，每条不超过 %2$d 个字符。</string>
-    <string name="settings_chat_persona_filters_title">当前角色禁用表达（%1$d）</string>
-    <string name="settings_chat_persona_filters_empty">当前角色没有额外禁用表达。</string>
-    <string name="settings_chat_guard_hits_title">最近实际过滤</string>
-    <string name="settings_chat_guard_hits_empty">最近没有过滤到内容。</string>
-    <string name="settings_chat_guard_hits_clear">清空过滤记录</string>
+    <string name="settings_chat_persona_filters_title">当前人物的避用表达（%1$d）</string>
+    <string name="settings_chat_persona_filters_empty">当前人物没有填写额外表达偏好。</string>
+    <string name="settings_chat_guard_hits_title">最近未遵循的表达偏好</string>
+    <string name="settings_chat_guard_hits_empty">最近没有未遵循记录。</string>
+    <string name="settings_chat_guard_hits_clear">清空记录</string>
     <string name="local_mode_intro_chat">和你创建的人物自然聊天，延续之前的故事和彼此的关系。</string>
     <string name="local_mode_intro_work">在这里把任务交给 AI，查看进度、使用工具，并管理完成的文件。</string>
     <string name="local_persona_correction_recorded">已记入人设纠正</string>
