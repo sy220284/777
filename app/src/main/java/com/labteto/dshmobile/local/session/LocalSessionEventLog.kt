@@ -189,6 +189,15 @@ class LocalSessionEventLog(
         predicate: (JsonObject) -> Boolean,
     ): Event? = delegate.latestMatching(types, beforeSequenceExclusive, predicate)?.toLocalEvent()
 
+    /** Android-facing batched latest-by-identity projection over the single durable core log. */
+    fun <K> latestMatchingByKey(
+        types: Set<String>,
+        requiredKeys: Set<K>,
+        keyOf: (Event) -> K?,
+    ): Map<K, Event> = delegate.latestMatchingByKey(types, requiredKeys) { event ->
+        keyOf(event.toLocalEvent())
+    }.mapValues { (_, event) -> event.toLocalEvent() }
+
     fun latest(
         type: String,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
