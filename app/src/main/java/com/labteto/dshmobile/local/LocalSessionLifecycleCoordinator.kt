@@ -135,8 +135,9 @@ internal class LocalSessionLifecycleCoordinator(
             )
         }
         scope.launch {
-            transitionMutex.withLock {
-                try {
+            try {
+                transitionMutex.withLock {
+                    try {
                     // A Work turn owns its own session-bound runtime. Creating another conversation
                     // must not tear it down; it simply becomes a background run. Chat still uses the
                     // visible single-session runtime and keeps the old cancellation boundary.
@@ -212,12 +213,15 @@ internal class LocalSessionLifecycleCoordinator(
                     }
                     persist()
                     restartInterruptedSafeJobs()
-                } finally {
-                    endTransition()
-                    state.update { it.copy(loading = false) }
+                    } finally {
+                        endTransition()
+                        state.update { it.copy(loading = false) }
+                    }
                 }
+            } finally {
+                // Keep the last user-selected target even if session creation fails.
+                continueQueuedNavigation()
             }
-            continueQueuedNavigation()
         }
         return true
     }
@@ -325,14 +329,14 @@ internal class LocalSessionLifecycleCoordinator(
                 transitionMutex.withLock {
                     try {
                         if (sessionCoordinator.summaries().none { it.id == sessionId }) {
-                        state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
-                        return@withLock
-                    }
-                    if (cancelVisibleChatRun) cancelActiveRunAndJoin()
-                    persist()
-                    activateSession(sessionId, null)
-                    loadSession(sessionId)
-                    restartInterruptedSafeJobs()
+                            state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
+                            return@withLock
+                        }
+                        if (cancelVisibleChatRun) cancelActiveRunAndJoin()
+                        persist()
+                        activateSession(sessionId, null)
+                        loadSession(sessionId)
+                        restartInterruptedSafeJobs()
                     } finally {
                         endTransition()
                         state.update { it.copy(loading = false) }
