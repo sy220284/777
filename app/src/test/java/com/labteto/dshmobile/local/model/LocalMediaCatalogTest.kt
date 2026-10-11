@@ -25,7 +25,7 @@ class LocalMediaCatalogTest {
     }
 
     @Test fun multipleProvidersExposeOnlyTheirImplementedOperations() {
-        val qwen = profile("qwen3.8-max", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        val qwen = profile("qwen3.8-max", "https://12345.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
         val openAI = profile("gpt-6", "https://api.openai.com/v1")
         val gemini = profile("gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")
         val all = LocalMediaCatalog.offers(listOf(qwen, openAI, gemini))
@@ -37,6 +37,16 @@ class LocalMediaCatalogTest {
         assertTrue(all.any { it.model == "gpt-image-2.5-flare" })
         assertTrue(all.any { it.model == "qwen-image-3.0" })
         assertTrue(all.any { it.model == "gemini-3.1-flash-image" })
+    }
+
+    @Test fun qwenImage30IsExposedOnlyWhereTheOfficialWorkspaceApiIsDocumented() {
+        val standard = profile("qwen3.8-max", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        val studio = profile("qwen3.8-max", "https://12345.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
+        val legacy = LocalMediaCatalog.offers(listOf(standard))
+        val workspace = LocalMediaCatalog.offers(listOf(studio))
+        assertEquals(setOf(LocalMediaKind.VIDEO), legacy.map { it.kind }.toSet())
+        assertTrue(workspace.any { it.kind == LocalMediaKind.IMAGE && it.model == "qwen-image-3.0-pro" })
+        assertFalse(workspace.any { it.model == "qwen-image-plus" })
     }
 
     @Test fun avoidTokenPlansCustomHostsAndImplicitProxyCapabilities() {
