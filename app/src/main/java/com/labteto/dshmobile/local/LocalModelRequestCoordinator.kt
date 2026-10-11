@@ -21,7 +21,6 @@ import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelRequestConfigurationRuntime
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
