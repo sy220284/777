@@ -269,6 +269,8 @@ def snapshot(root):
     for file in sorted(root.rglob("*")):
         if not file.is_file() or any(x in skips for x in file.relative_to(root).parts):
             continue
+        if file.relative_to(root).as_posix() == ".github/workflows/feature-tree-auto.yml":
+            continue  # 工作流控制脚本自身的文档提交不改变实际功能源码指纹。
         if file.suffix not in suffixes and file.name != "gradlew":
             continue
         digest.update(file.relative_to(root).as_posix().encode("utf-8"))
