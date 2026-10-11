@@ -90,6 +90,17 @@ class AutomationReceiptTest {
     }
 
     @Test
+    fun recurringFailureNotificationsArePeriodicWithoutChangingTheSchedule() {
+        assertFalse(shouldNotifyAutomationFailure(0))
+        assertTrue(shouldNotifyAutomationFailure(1))
+        assertFalse(shouldNotifyAutomationFailure(2))
+        assertFalse(shouldNotifyAutomationFailure(4))
+        assertTrue(shouldNotifyAutomationFailure(5))
+        assertFalse(shouldNotifyAutomationFailure(6))
+        assertTrue(shouldNotifyAutomationFailure(10))
+    }
+
+    @Test
     fun recurringChatTaskKeepsScheduleAfterRepeatedFailures() {
         val task = AutomationTask(
             id = "chat",
