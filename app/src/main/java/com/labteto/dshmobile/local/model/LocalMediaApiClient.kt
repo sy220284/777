@@ -30,6 +30,25 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 internal data class LocalMediaVideoWireStatus(val state: String, val downloadUrl: String? = null)
 
+internal object QwenWanTaskResult {
+    fun parse(root: JsonObject): LocalMediaVideoWireStatus {
+        val output = root["output"] as? JsonObject ?: error("Wan 查询响应缺少任务信息")
+        return when (output["task_status"]?.jsonPrimitive?.contentOrNull) {
+            "PENDING" -> LocalMediaVideoWireStatus("Queueing")
+            "RUNNING" -> LocalMediaVideoWireStatus("Processing")
+            "FAILED", "CANCELED" -> LocalMediaVideoWireStatus("Failed")
+            "SUCCEEDED" -> {
+                val url = output["video_url"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf { it.startsWith("https://") }
+                    ?: error("Wan 视频已完成但没有可用的下载链接")
+                LocalMediaVideoWireStatus("Success", url)
+            }
+            else -> error("Wan 视频任务状态未知或任务已过查询有效期")
+        }
+    }
+}
+
+
 internal data class LocalMediaImageResult(val url: String? = null, val file: File? = null) {
     init { require((url != null) != (file != null)) }
 }
@@ -234,19 +253,7 @@ internal class LocalMediaApiClient @Inject constructor(
         val uri = java.net.URI(normalizeModelBaseUrl(offer.profile.baseUrl))
         val request = authorizedRequest(offer, "https://${uri.host}/api/v1/tasks/$taskId").get().build()
         val root = readJson(request)
-        val output = root["output"]?.jsonObject ?: error("Wan 查询响应缺少任务信息")
-        return when (output["task_status"]?.jsonPrimitive?.contentOrNull) {
-            "PENDING" -> LocalMediaVideoWireStatus("Queueing")
-            "RUNNING" -> LocalMediaVideoWireStatus("Processing")
-            "FAILED", "CANCELED" -> LocalMediaVideoWireStatus("Failed")
-            "SUCCEEDED" -> {
-                val link = output["video_url"]?.jsonPrimitive?.contentOrNull
-                    ?.takeIf { it.startsWith("https://") }
-                    ?: error("Wan 视频已完成但没有可用的下载链接")
-                LocalMediaVideoWireStatus("Success", link)
-            }
-            else -> error("Wan 视频任务状态未知或任务已过查询有效期")
-        }
+        return QwenWanTaskResult.parse(root)
     }
 
     private suspend fun sendJson(offer: LocalMediaOffer, url: String, body: JsonObject): JsonObject =
