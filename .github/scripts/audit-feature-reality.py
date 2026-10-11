@@ -107,9 +107,13 @@ def builtin_tools():
             names = re.findall(r'"(lsp_[a-z_]+)"', block.group(1))
         else:
             names = re.findall(r'\bname\s*=\s*"([a-z][a-z0-9_]*)"', code)
-        if not names or len(set(names)) != len(names):
-            raise ValueError("具名工具注册为空或重复：" + provider)
-        result += [{"provider": provider, "name": n, "source": path} for n in names]
+        # 同一工具在 HarnessTool 与工具 schema 中可能重复声明其名称。
+        # 这类元数据重复不能误算为两个实际工具入口。
+        if not names:
+            raise ValueError("具名工具注册为空：" + provider)
+        if provider == "device" and len(set(names)) != len(names):
+            raise ValueError("Android 工具 Spec 重复注册")
+        result += [{"provider": provider, "name": n, "source": path} for n in sorted(set(names))]
     return sorted(result, key=lambda x: (x["provider"], x["name"]))
 
 def screen_candidates(sources):
