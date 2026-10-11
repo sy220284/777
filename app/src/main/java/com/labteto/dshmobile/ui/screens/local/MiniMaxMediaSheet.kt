@@ -56,7 +56,7 @@ internal fun MiniMaxMediaSheetContent(
     var mode by rememberSaveable(profile.id) { mutableStateOf("image") }
     var prompt by rememberSaveable(profile.id) { mutableStateOf("") }
     var ratio by rememberSaveable(profile.id) { mutableStateOf("1:1") }
-    var voiceId by rememberSaveable(profile.id) { mutableStateOf("English_expressive_narrator") }
+    var voiceId by rememberSaveable(profile.id) { mutableStateOf("male-qn-qingse") }
     var busy by remember(profile.id) { mutableStateOf(false) }
     var error by remember(profile.id) { mutableStateOf<String?>(null) }
     var imageLink by remember(profile.id) { mutableStateOf<String?>(null) }
