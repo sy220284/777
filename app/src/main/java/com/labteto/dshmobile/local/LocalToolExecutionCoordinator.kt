@@ -296,8 +296,8 @@ internal class LocalToolExecutionCoordinator(
             executionId = executionIdFactory(),
             rootCallId = call.id,
         )
+        var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
-            workspaceReadWriteGate.execute(registered) {
             registry.executeTracked(
                 name = call.name,
                 input = call.arguments,
@@ -318,13 +318,15 @@ internal class LocalToolExecutionCoordinator(
                         if (!granted) approvalDenied = true
                         granted
                     },
-                    onExecutionStarted = {
+                    onExecutionStarted = { admittedTool ->
+                        // The registry calls this only after schema checks and user approval.
+                        // Waiting for approval must never hold a filesystem read/write lease.
+                        executionLease = workspaceReadWriteGate.acquire(admittedTool)
                         recordExecutionStarted(sessionId, call, executionIdentity)
                         executionStarted = true
                     },
                 ),
             )
-            }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
@@ -357,6 +359,8 @@ internal class LocalToolExecutionCoordinator(
                 call, registered, code, error.message ?: error::class.java.simpleName,
                 executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
             )
+        } finally {
+            executionLease?.close()
         }
         executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result
