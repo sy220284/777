@@ -1,0 +1,78 @@
+name: 自动维护功能树
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: feature-tree-auto-maintenance
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 获取完整主线
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: 扫描全量源码与同步两种功能树
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --self-test
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-acceptance-matrix.py
+          git diff --check
+      - name: 自动提交维护结果
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json \
+            docs/FEATURE-SOURCE-INDEX.auto.json
+          if git diff --cached --quiet; then
+            echo "功能树和当前代码一致，无需提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "自动同步功能树与生产源码登记"
+          # 仅尝试非强制更新主线；拒绝覆盖并发提交和受保护分支。
+          if git push origin HEAD:main; then
+            echo "功能树已自动写入 main"
+            exit 0
+          fi
+          echo "::notice::无法直接更新 main；改走单一自动维护 PR"
+          git fetch origin main
+          git switch -C automation/feature-tree-maintenance
+          git rebase origin/main
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-acceptance-matrix.py
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json \
+            docs/FEATURE-SOURCE-INDEX.auto.json
+          if ! git diff --cached --quiet; then
+            git commit -m "同步最新主线功能树索引"
+          fi
+          git push --force-with-lease origin HEAD:refs/heads/automation/feature-tree-maintenance
+          PR_NUMBER="$(gh pr list --base main --head automation/feature-tree-maintenance --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$PR_NUMBER" ]; then
+            gh pr create --base main --head automation/feature-tree-maintenance \
+              --title "自动更新功能树与源码索引" \
+              --body "全仓库生产代码扫描生成。包含功能声明新增、删除、改名、迁移或源码候选变化；Markdown、交互树和验收索引同步。请以实际代码与检查结果复核，源码候选不视作功能完成。"
+          else
+            echo "已复用自动维护 PR #$PR_NUMBER"
+          fi
