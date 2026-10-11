@@ -76,8 +76,11 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 modifier = Modifier.weight(1f),
                 style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
                     .withReadingWeight().copy(fontFamily = FontFamily.Default),
-                color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
-                    else colors.labelSecondary,
+                color = when {
+                    node.failed -> colors.error
+                    node.count > 0 -> colors.labelSecondary
+                    else -> colors.labelPrimary
+                },
             )
             if (node.failed) {
                 Text(
@@ -104,7 +107,7 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                 detail,
                 modifier = Modifier.padding(start = 18.dp + DsSpacing.small),
                 style = DsType.small13.withReadingWeight(),
-                color = if (node.failed) colors.error else colors.labelSecondary,
+                color = if (node.failed) colors.error else colors.labelPrimary,
             )
         }
     }
