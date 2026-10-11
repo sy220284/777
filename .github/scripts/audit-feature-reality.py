@@ -27,6 +27,11 @@ PROVIDERS = {
     "runtime": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
     "github": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/github/GitHubConnectorPlugin.kt",
     "lsp": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+    "local_builtin_catalog": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+    "automation": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt",
+    "webhook": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
+    "vision": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
+    "mcp_management": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
 }
 
 def read(path):
@@ -105,6 +110,11 @@ def builtin_tools():
             if not block:
                 raise ValueError("LSP注册表消失")
             names = re.findall(r'"(lsp_[a-z_]+)"', block.group(1))
+        elif provider == "local_builtin_catalog":
+            # LocalBuiltinPlugin iterates the 64 LocalToolCatalog.specs entries.
+            if "LocalToolCatalog.specs" not in read("app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt"):
+                raise ValueError("本机工具目录未真正接入插件注册")
+            names = re.findall(r'\badd\(\s*tool\(\s*"([a-z][a-z0-9_]*)"', code)
         else:
             names = re.findall(r'\bname\s*=\s*"([a-z][a-z0-9_]*)"', code)
         # 同一工具在 HarnessTool 与工具 schema 中可能重复声明其名称。
@@ -182,7 +192,7 @@ def audit():
          for match in re.finditer(r"\bclass\s+([A-Za-z_]\w*Plugin)\s*\(", body)],
         key=lambda item: (item["source"], item["class"]),
     )
-    audited_providers = set(PROVIDERS.values())
+    audited_providers = set(PROVIDERS.values()) | {"app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt"}
     other_plugins = [item for item in plugins if item["source"] not in audited_providers]
     all_methods = set()
     for item in matrix["items"]:
@@ -227,7 +237,7 @@ def audit():
                  "production_harness_plugin_implementations": plugins,
                  "plugin_implementation_count": len(plugins),
                  "other_plugin_implementations_not_tool_enumerated": other_plugins,
-                 "enumeration_scope": "Four explicit tool registration providers only; other internal/static or dynamic tool providers are not counted",
+                 "enumeration_scope": "Nine actual HarnessPlugin implementations: eight direct/static registration sites and the LocalBuiltinPlugin->LocalToolCatalog spec catalog; dynamically obtained MCP remote tools excluded",
                  "third_party_dynamic_mcp_tools_not_included": True},
         "tests": {"mapped_tree_leaves": len(matrix["items"]), "unique_test_method_refs": len(all_methods),
                   "android_test_methods_in_matrix": sum("/src/androidTest/" in x for x in all_methods),
@@ -257,8 +267,8 @@ def render_md(data):
         "",
         f"- 产品所有权：{code['module_count']}个模块，{code['route_count']}条具名路由。",
         f"- Compose入口候选：{len(code['compose_candidates'])}个，其中以Screen结尾的{code['compose_named_screens']}个，辅助组件{code['compose_support_components']}个。",
-        f"- 四类内置插件声明的具名工具：{code['builtin_tool_count']}个；此数仅覆盖四类可枚举注册，不是App所有工具的总量。",
-        f"- 直接可静态发现的HarnessPlugin实现：{code['plugin_implementation_count']}个；其中另有{len(code['other_plugin_implementations_not_tool_enumerated'])}个插件实现未纳入四类工具计数，第三方MCP工具同样未列举。",
+        f"- 内置插件与本机工具目录中直接可列举的具名工具：{code['builtin_tool_count']}个注册声明（按提供者和名称去重），动态MCP远端工具不在此数。",
+        f"- 实际发现HarnessPlugin实现：{code['plugin_implementation_count']}个，其中目录代理工具通过LocalBuiltinPlugin间接注册；未枚举的实现：{len(code['other_plugin_implementations_not_tool_enumerated'])}个。",
         "",
         "## 与实际功能树对照",
         "",
