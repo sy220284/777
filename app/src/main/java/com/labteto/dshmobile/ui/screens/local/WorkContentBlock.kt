@@ -112,3 +112,81 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
         }
     }
 }
+
+
+/** Each item is composed lazily, with milestones distinguished from routine operations. */
+@Composable
+internal fun WorkTimelineStepRow(
+    message: com.labteto.dshmobile.local.session.LocalHarnessMessage,
+    repeatCount: Int = 1,
+    active: Boolean = false,
+) {
+    val colors = DsTheme.colors
+    if (message.role != "tool") {
+        val content = localWorkTimelineText(message.content) ?: return
+        val milestone = isWorkTimelineMilestone(content)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            if (!milestone) {
+                WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Generic, active)
+            }
+            Text(
+                text = content, modifier = Modifier.weight(1f),
+                style = (if (milestone) DsType.mdSmall else DsType.small13).withReadingWeight(),
+                color = if (milestone) colors.labelPrimary else colors.labelSecondary,
+            )
+            if (active) {
+                Text(
+                    stringResource(agentOperationStatusRes(running = true, failed = false)),
+                    style = DsType.caption11.withReadingWeight(), color = colors.accent,
+                )
+            }
+        }
+        return
+    }
+
+    val failed = message.toolIsError ?: localWorkToolFailed(message.content)
+    val provider = userFacingWorkToolProvider(message.toolName)
+    val kind = com.labteto.dshmobile.ui.agentOperationKind(message.toolName)
+    val action = stringResource(agentOperationLabelRes(kind))
+    val label = if (provider != null) "$provider · $action" else action
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Icon(
+            imageVector = if (failed) FeatherIcons.AlertTriangle else FeatherIcons.CheckCircle,
+            contentDescription = null,
+            tint = if (failed) colors.error else colors.labelSecondary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = label, modifier = Modifier.weight(1f),
+            style = DsType.small13.withReadingWeight(),
+            color = if (failed) colors.error else colors.labelSecondary,
+        )
+        if (failed) {
+            Text(
+                stringResource(agentOperationStatusRes(running = false, failed = true)),
+                style = DsType.caption11.withReadingWeight(), color = colors.error,
+            )
+        } else if (repeatCount > 1) {
+            Text(
+                stringResource(R.string.local_work_process_operation_count, repeatCount),
+                style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary,
+            )
+        }
+    }
+}
+
+/** Explicit narrated findings are foregrounded; prose alone never proves a tool succeeded. */
+internal fun isWorkTimelineMilestone(text: String): Boolean =
+    WORK_TIMELINE_MILESTONE.containsMatchIn(text.trimStart())
+
+private val WORK_TIMELINE_MILESTONE = Regex(
+    "^(?:发现|已发现|已定位|定位到|确认|已确认|已完成|完成了|结果|验证通过|验证失败|阻塞|失败|风险|问题是|存在.+问题)"
+)
