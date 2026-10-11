@@ -713,7 +713,8 @@ fun LocalHarnessScreen(
                     showNewSessionMode = true
                 },
                 onSwitchSession = { sessionId ->
-                    if (viewModel.switchSession(sessionId)) {
+                    if (viewModel.switchSession(sessionId) && sessionId == shell.sessionId) {
+                        // Different sessions close the drawer only once the shell activates them.
                         scope.launch { drawerState.close() }
                     }
                 },
