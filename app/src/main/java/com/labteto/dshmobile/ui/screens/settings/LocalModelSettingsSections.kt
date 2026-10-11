@@ -46,6 +46,8 @@ import com.labteto.dshmobile.local.model.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalMediaCatalog
+import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
@@ -184,6 +186,24 @@ internal fun LocalModelSettingsCard(
                         ModelCapabilityTags(
                             LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
                         )
+                        val creatorKinds = LocalMediaCatalog.offers(listOf(profile)).map { it.kind }.distinct()
+                        if (creatorKinds.isNotEmpty()) {
+                            Text(
+                                stringResource(
+                                    R.string.media_studio_model_capabilities,
+                                    creatorKinds.joinToString(" · ") { kind ->
+                                        when (kind) {
+                                            LocalMediaKind.IMAGE -> "图片生成"
+                                            LocalMediaKind.VIDEO -> "视频生成"
+                                            LocalMediaKind.SPEECH -> "语音合成"
+                                            LocalMediaKind.TRANSCRIBE -> "录音转写"
+                                        }
+                                    },
+                                ),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
                     }
                     DsMenu(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
