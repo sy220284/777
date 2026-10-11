@@ -37,6 +37,7 @@ internal fun structuredWorkState(
     val constraints = linkedSetOf<String>()
     val decisions = linkedSetOf<String>()
     var decisionEpoch = 0L
+    var constraintEpoch = 0L
     val failures = linkedSetOf<String>()
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
@@ -48,21 +49,29 @@ internal fun structuredWorkState(
             when (event.type) {
                 "user/message" -> {
                     eventText(event.data)?.let { userText ->
-                        extractLocalWorkCueSnippet(userText, LocalWorkCueKind.CONSTRAINT)
-                            ?.let(constraints::add)
+                        val constraintReset = isExplicitWorkConstraintReset(userText)
+                        if (constraintReset) {
+                            constraints.clear()
+                            constraintEpoch = event.sequence
+                        }
+                        if (!constraintReset || hasNewWorkConstraintAfterReset(userText)) {
+                            extractLocalWorkCueSnippet(userText, LocalWorkCueKind.CONSTRAINT)
+                                ?.let(constraints::add)
+                        }
                         if (isExplicitWorkDecisionReset(userText)) {
                             decisions.clear()
                             decisionEpoch = event.sequence
                         }
-                        // User-authored corrections are authoritative over assistant proposals.
-                        extractLocalWorkCueSnippet(userText, LocalWorkCueKind.DECISION)
-                            ?.let(decisions::add)
+                        // Only explicitly committed user decisions can become authoritative.
+                        if (isExplicitUserWorkDecision(userText)) {
+                            extractLocalWorkCueSnippet(userText, LocalWorkCueKind.DECISION)
+                                ?.let(decisions::add)
+                        }
                     }
                 }
                 "assistant/message" -> {
                     val text = eventText(event.data)
-                    text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.DECISION) }
-                        ?.let(decisions::add)
+                    // Assistant proposals are history, not user approval.
                     text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.FAILURE) }
                         ?.let(failures::add)
                 }
@@ -121,6 +130,7 @@ internal fun structuredWorkState(
         constraints = constraints.toList().takeLast(MAX_STRUCTURED_CONSTRAINTS),
         decisions = decisions.toList().takeLast(MAX_STRUCTURED_DECISIONS),
         decisionEpoch = decisionEpoch,
+        constraintEpoch = constraintEpoch,
         failures = failures.toList().takeLast(MAX_STRUCTURED_FAILURES),
         unfinished = unfinished,
         progress = progress,
