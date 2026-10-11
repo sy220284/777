@@ -349,9 +349,9 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
         if any(r["path"] == name for r in registered.values()):
             pending.append({"path": name, "reason": "当前源码仍显式登记此功能"})
             continue
-        historical, _ = historical_code_evidence(root, [name])
+        obsolete, current_gaps = historical_code_evidence(root, [name])
         source_history = set()
-        for evidence in historical:
+        for evidence in obsolete + current_gaps:
             if evidence["path"] == name:
                 source_history.update(evidence["historical_production_sources"])
         for old in previous.values():
@@ -745,9 +745,9 @@ def test():
             "app/src/main/java/sample/LegacyDead.kt#L1"
         )
         (root / EVIDENCE).write_text(
-            "| 层级 | 功能完整路径 | 证据 | 代码 |\\n"
+            "| 层级 | 功能完整路径 | 证据 | 代码 |\n"
             "| 3 | B / 已有能力 | 专属源码路径已核 | "
-            "[旧实现](" + historical_url + ") |\\n", encoding="utf-8"
+            "[旧实现](" + historical_url + ") |\n", encoding="utf-8"
         )
         approval = {"version": 1, "approvals": [{
             "path": "B / 已有能力",
