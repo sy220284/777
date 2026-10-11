@@ -745,7 +745,71 @@ class LocalWorkspace(
                     } else output.append("[^/]*")
                 }
                 '?' -> output.append("[^/]")
-                '.', '(', ')', '+', '|', '^', '$', '@', '%' -> output.append('\\').append(char)
+                '{' -> {
+                    // Support the common extension alternation **/*.{md,json,yaml} without
+                    // handing raw braces to Regex (where they mean a numeric repetition).
+                    val closing = glob.indexOf('}', index + 1)
+                    val alternatives = if (closing >= 0) {
+                        glob.substring(index + 1, closing).split(',')
+                    } else emptyList()
+                    if (alternatives.size > 1 && alternatives.all { it.isNotEmpty() && '{' !in it && '}' !in it }) {
+                        output.append("(?:")
+                        alternatives.forEachIndexed { alternativeIndex, value ->
+                            if (alternativeIndex > 0) output.append('|')
+                            output.append(Regex.escape(value))
+                        }
+                        output.append(')')
+                        index = closing
+                    } else output.append("\\{")
+                }
+                '.', '(', ')', '+', '|', '^', '
+            }
+            index++
+        }
+        return Regex(output.append('$').toString())
+    }
+
+    private fun readBounded(reader: Reader, onProgress: ((String) -> Unit)?): String {
+        val output = StringBuilder()
+        val buffer = CharArray(8_192)
+        while (true) {
+            val read = reader.read(buffer)
+            if (read < 0) break
+            if (output.length < MAX_SHELL_CHARS) {
+                output.append(buffer, 0, minOf(read, MAX_SHELL_CHARS - output.length))
+                onProgress?.invoke(output.toString())
+            }
+        }
+        return output.toString()
+    }
+
+    private companion object {
+        val BINARY_PREVIEW_EXTENSIONS = setOf(
+            "png", "jpg", "jpeg", "gif", "webp", "bmp", "pdf",
+            "zip", "7z", "rar", "gz", "tar", "apk", "jar", "so", "bin",
+            "docx", "xlsx", "pptx", "mp3", "wav", "mp4", "mov", "webm",
+            "db", "sqlite", "woff", "woff2", "ttf", "otf",
+        )
+
+        const val MAX_TEXT_BYTES = 5_242_880L
+        const val MAX_READ_LINES = 400
+        const val MAX_READ_LINE_CHARS = 8 * 1024 * 1024
+        const val MAX_SEARCH_LINE_CHARS = 8 * 1024 * 1024
+        const val MAX_WRITE_BYTES = 2_097_152
+        const val MAX_TOOL_ARTIFACT_BYTES = 5 * 1024 * 1024
+        const val MAX_LIST_ROWS = 400
+        const val MAX_SEARCH_ROWS = 200
+        const val MAX_SEARCH_CHARS = 32_000
+        const val MAX_SEARCH_PREVIEW_CHARS = 1_200
+        const val MAX_SCAN_DEPTH = 32
+        const val MAX_SCAN_ENTRIES = 5_000
+        const val MAX_SCAN_MILLIS = 2_000L
+        const val MAX_SHELL_CHARS = 65_536
+        const val MAX_SHELL_TIMEOUT_SECONDS = 900
+    }
+}
+, '@', '%', '}', '[', ']', '\\' ->
+                    output.append('\\').append(char)
                 else -> output.append(char)
             }
             index++
