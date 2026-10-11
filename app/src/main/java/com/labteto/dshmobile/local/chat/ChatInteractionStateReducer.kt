@@ -358,7 +358,13 @@ internal class ChatInteractionStateReducer {
         assistantMessage: String,
     ): Boolean {
         val quote = rawQuote.trim().take(180)
-        if (quote.length < 6 || !(userMessage.contains(quote) || assistantMessage.contains(quote))) return false
+        // New free-form stage evidence must come from the user's actual utterance,
+        // not an assistant's speculation or a quoted third-party report.
+        val quoteIndex = userMessage.indexOf(quote)
+        if (quote.length < 6 || quoteIndex < 0) return false
+        val prefix = userMessage.take(quoteIndex).substringAfterLast('。').substringAfterLast('！')
+            .substringAfterLast('？').takeLast(48)
+        if (Regex("朋友|同事|室友|别人|他们|她们|前任|听说|说过|转述|如果|假如|要是|梦见|计划|希望").containsMatchIn(prefix)) return false
         if (!Regex("我们|咱们|你和我|我和你|我们俩|我与你|你与我|你我").containsMatchIn(quote)) return false
         if (!Regex("关系|伴侣|恋|约会|暧昧|婚|在一起|分开|冷战|和好|喜欢|相爱|分手|彼此|承诺").containsMatchIn(quote)) return false
         if (Regex("如果|假如|要是|希望|计划|打算|梦见|听说|没有|还没|尚未|并未|不会|不想|不要|不是|前任|朋友|同事|室友|他们|她们|别人").containsMatchIn(quote)) return false
