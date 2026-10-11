@@ -71,7 +71,7 @@ import java.util.Locale
 import kotlin.math.max
 
 @Composable
-internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot) {
+internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Boolean = true) {
     val colors = DsTheme.colors
     val cacheValue = if (usage.cacheMeasuredTokens > 0L) {
         String.format(Locale.US, "%.1f%%", usage.cacheHitRate * 100.0)
@@ -99,8 +99,8 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot) {
             )
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(usage.inputTokens)} · " +
-                    "${stringResource(R.string.usage_calculation_output)} ${formatTokens(usage.outputTokens)} · " +
-                    "¥${String.format(Locale.US, "%.4f", usage.estimatedCostCny)}",
+                    "${stringResource(R.string.usage_calculation_output)} ${formatTokens(usage.outputTokens)}" +
+                    if (showEstimatedCost) " · ${stringResource(R.string.usage_deepseek_cost_label)} ¥${String.format(Locale.US, "%.4f", usage.estimatedCostCny)}" else "",
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )

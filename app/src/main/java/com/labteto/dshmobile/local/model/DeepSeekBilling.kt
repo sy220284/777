@@ -423,7 +423,8 @@ class DeepSeekUsageTracker @Inject constructor(
         kind: TokenUsageGroupKind,
         key: String,
         recordLimit: Int = 300,
-    ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key, recordLimit)
+        modelFilter: String? = null,
+    ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key, recordLimit, modelFilter = modelFilter)
 
     fun analyticsTurnSummaries(sessionId: String) = analyticsStore.turnSummaries(sessionId)
 

@@ -266,6 +266,7 @@ fun SettingsScreen(
         mutableStateOf<UsageDetailSelection?>(null)
     }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
+    var selectedUsageModel by rememberSaveable { mutableStateOf<String?>(null) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
@@ -309,9 +310,7 @@ fun SettingsScreen(
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
     LaunchedEffect(page, selectedMiniMaxProfile?.id) {
-        if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) {
-            page = SettingsDestination.ROOT
-        }
+        if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) page = SettingsDestination.ROOT
     }
     LaunchedEffect(page, memorySourceSessionId, memorySourceMessageId, showAllMemories) {
         if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) {
@@ -734,9 +733,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MINIMAX_QUOTA -> {
-                        selectedMiniMaxProfile?.let { profile ->
-                            MiniMaxQuotaPage(profile = profile, viewModel = viewModel)
-                        }
+                        selectedMiniMaxProfile?.let { MiniMaxQuotaPage(profile = it, viewModel = viewModel) }
                     }
 
                     SettingsDestination.PRICING -> {
@@ -748,6 +745,9 @@ fun SettingsScreen(
                             usage = localHarness.usage,
                             onOpenPricing = { page = SettingsDestination.PRICING },
                             analytics = usageAnalytics,
+                            configuredModels = localHarness.modelProfiles.map { it.model },
+                            selectedModel = selectedUsageModel,
+                            onSelectModel = { selectedUsageModel = it },
                             onOpenGroup = { kind, key, title ->
                                 usageDetailSelection = UsageDetailSelection.Group(kind, key, title)
                                 usageDetailReturnPage = SettingsDestination.USAGE
@@ -759,6 +759,7 @@ fun SettingsScreen(
                     SettingsDestination.USAGE_LOG -> {
                         UsageLogPage(
                             analytics = usageAnalytics,
+                            selectedModel = selectedUsageModel,
                             onOpenRequest = { requestId ->
                                 usageDetailSelection = UsageDetailSelection.Request(requestId)
                                 usageDetailReturnPage = SettingsDestination.USAGE_LOG
@@ -774,8 +775,9 @@ fun SettingsScreen(
                                     initialValue = null,
                                     selection,
                                     usageAnalytics,
+                                    selectedUsageModel,
                                 ) {
-                                    value = viewModel.usageGroupDetail(selection.kind, selection.key)
+                                    value = viewModel.usageGroupDetail(selection.kind, selection.key, selectedUsageModel)
                                 }
                                 UsageGroupDetailPage(
                                     detail = detail,

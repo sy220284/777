@@ -126,6 +126,6 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithText("添加").performScrollTo().performClick()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("必须保存的剧情提要")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
-        compose.onNodeWithText("用这个人物开启新故事").assertIsNotEnabled()
+        compose.onNodeWithText("用这个人物开启独立新故事").assertIsNotEnabled()
     }
 }

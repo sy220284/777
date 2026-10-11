@@ -15,6 +15,39 @@ import org.junit.Test
 
 class TokenUsageAnalyticsTest {
     @Test
+    fun modelViewsIncludeWorkSubagentsAndChatWithoutCrossModelLeakage() {
+        val t = Instant.parse("2026-10-11T00:00:00Z").toEpochMilli()
+        val chat = TokenUsageContext(
+            mode = LocalUsageMode.CHAT, sessionId = "shared", turnId = "turn-1",
+            action = TokenUsageAction.CHAT_REPLY,
+        )
+        val work = TokenUsageContext(
+            mode = LocalUsageMode.WORK, runId = "task-1", taskRunId = "task-1",
+            runKind = LocalAgentRunKind.SUBAGENT.name.lowercase(),
+            action = TokenUsageAction.WORK_SUBAGENT,
+        )
+        val records = sequenceOf(
+            record("m3-chat", t, 100, 10, context = chat).copy(model = "MiniMax-M3"),
+            record("m3-work", t + 1, 300, 30, context = work).copy(model = "MiniMax-M3"),
+            record("ds-chat", t + 2, 20, 5, context = chat).copy(model = "deepseek-chat"),
+            record("m3-chat", t, 100, 10, context = chat).copy(model = "MiniMax-M3"),
+        )
+        val all = aggregateTokenUsageRecords(records, ZoneId.of("UTC"))
+        val m3 = all.byModel.getValue("MiniMax-M3")
+        val ds = all.byModel.getValue("deepseek-chat")
+        assertEquals(465L, all.tracked.totalTokens)
+        assertEquals(440L, m3.tracked.totalTokens)
+        assertEquals(110L, m3.chat.aggregate.totalTokens)
+        assertEquals(330L, m3.work.aggregate.totalTokens)
+        assertEquals(330L, m3.work.subagentTokens)
+        assertEquals(25L, ds.tracked.totalTokens)
+        assertEquals(1, m3.sessions.size)
+        assertEquals(1, m3.tasks.size)
+        assertEquals("MiniMax-M3", m3.recentRecords.first().model)
+        assertTrue(m3.byModel.isEmpty())
+    }
+
+    @Test
     fun turnUsageIncludesLateBackgroundAndRegenerationButNeverAnotherSession() {
         val context = TokenUsageContext(mode = LocalUsageMode.CHAT, sessionId = "source", turnId = "user-1", action = TokenUsageAction.CHAT_REPLY)
         val reply = record("reply", 1, 10, 2, context = context)
