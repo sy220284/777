@@ -24,7 +24,7 @@ object DiagnosticReport {
             environment.lineSequence()
                 .takeWhile { it != "最近诊断：" }
                 .filterNot { it.startsWith("工作区：") || it.startsWith("替代路径：") }
-                .forEach { line -> appendLine(line) }
+                .forEach { line -> appendLine(sanitizeDiagnosticText(line)) }
 
             appendLine("异常与关联操作（${failures.size} 条，含原始原因链）：")
             failures.forEach { entry ->
