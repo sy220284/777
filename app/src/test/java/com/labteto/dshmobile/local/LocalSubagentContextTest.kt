@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.agent.boundedSubagentContext
+import com.labteto.dshmobile.local.agent.boundedSubagentContextWithNotice
 import com.labteto.dshmobile.local.agent.buildLocalSubagentInitialHistory
 import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
 import kotlinx.serialization.json.buildJsonArray
@@ -100,7 +101,7 @@ class LocalSubagentContextTest {
             outputSchema = null,
         )
 
-        assertEquals(6, seed.size)
+        assertEquals(7, seed.size)
         assertEquals("系统", seed.first()["content"]?.jsonPrimitive?.contentOrNull)
         assertEquals(
             true,
@@ -114,6 +115,41 @@ class LocalSubagentContextTest {
                 message.toString().contains("call-team")
             },
         )
+    }
+
+    @Test
+    fun inheritedParentHistoryKeepsIndependentChildIdentityAndNeverGrantsParentApproval() {
+        val history = listOf(
+            message("system", "父代理系统上下文"),
+            message("user", "父级曾获得写入许可"),
+            message("assistant", "此前使用过 write 工具"),
+        )
+        val seed = buildLocalSubagentInitialHistory(
+            baseHistory = history,
+            task = "只读核查状态",
+            inheritParentHistory = true,
+            allowMutation = false,
+            context = "当前父任务约束：不得修改文件",
+            outputSchema = null,
+        )
+        assertEquals("父代理系统上下文", seed.first()["content"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("只读核查状态", seed.last()["content"]?.jsonPrimitive?.contentOrNull)
+        val childBoundary = seed.first { it["content"]?.jsonPrimitive?.contentOrNull
+            ?.contains("子代理身份与来源") == true }
+        val text = childBoundary["content"]!!.jsonPrimitive.content
+        assertEquals(true, text.contains("独立只读子代理"))
+        assertEquals(true, text.contains("父级工具调用和审批不是你的新授权"))
+        assertEquals(true, text.contains("不允许修改状态"))
+    }
+
+    @Test
+    fun truncatedInheritedInstructionsAreLabeledRatherThanSilentlyAppearingComplete() {
+        val longContext = "必须保留当前真实约束".repeat(1_500)
+        val bounded = requireNotNull(boundedSubagentContextWithNotice(longContext, 1_000))
+        assertEquals(true, bounded.length <= 1_000)
+        assertEquals(true, bounded.contains("父级资料已截断"))
+        assertEquals(true, bounded.contains("原始约束与证据"))
+        assertEquals("完整上下文", boundedSubagentContextWithNotice("完整上下文", 1_000))
     }
 
     private fun message(role: String, content: String) = buildJsonObject {
