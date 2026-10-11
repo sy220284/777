@@ -80,6 +80,23 @@ def inspect():
         raise ValueError("生成文件绑定的 SHA 与实际源码不同")
     if review["feature_nodes"] != len(html_paths) or review["functional_leaves"] != len(leaf_paths):
         raise ValueError("复核报告记录的功能节点数量有误")
+    actual_evidence = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
+    reported = review.get("leaf_evidence")
+    if not isinstance(reported, list) or [x.get("path") for x in reported] != leaf_paths:
+        raise ValueError("逐功能代码证据复核台账不完整或顺序错误")
+    for item in reported:
+        expected = actual_evidence.get(item["path"], 0)
+        if item.get("test_reference_count") != expected:
+            raise ValueError("逐功能测试证据数量不一致: " + item["path"])
+    def check_display(node, stack):
+        for child in node["children"]:
+            path = stack + [child["name"]]
+            if not child["children"]:
+                expected = actual_evidence.get(" / ".join(path), 0)
+                if child.get("testCount", 0) != expected:
+                    raise ValueError("HTML 逐项测试证据标注不一致")
+            check_display(child, path)
+    check_display(data, [])
     paths = [item["path"] for item in matrix["items"]]
     if (review["existing_executable_test_mappings"] != len(paths)
         or len(paths) != len(set(paths)) or any(v not in leaf_paths for v in paths)):
