@@ -31,9 +31,8 @@ internal fun localAutomationFeatureUiContribution(
             onPopFeature()
         },
         onOpenSession = { sessionId ->
-            if (actions.switchSession(sessionId)) {
-                onTaskModeChange(null)
-            }
+            // Keep the task page until the new conversation is actually visible.
+            actions.switchSession(sessionId)
         },
         initialMode = taskMode,
         onCreateViaChat = onCreateViaChat,
