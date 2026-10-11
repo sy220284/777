@@ -541,6 +541,7 @@ def test():
         assert find(removed_tree, ["B", "新功能"]) is None
         assert json.loads(removed[MATRIX])["items"] == []
         assert json.loads(removed[REG])["nodes"] == []
+        write_outputs(removed)
         mark("B / 新功能", evidence=False)
         rejected = generate(root)
         assert json.loads(rejected[REVIEW])["pending_changes"]
