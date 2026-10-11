@@ -13,13 +13,12 @@ import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
-import com.labteto.dshmobile.local.tools.requiresSharedWorkspaceMutationLease
+import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -50,7 +49,7 @@ internal class LocalToolExecutionCoordinator(
     private val networkSearchEnabled: () -> Boolean = { true },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
-    private val workspaceMutationMutex = Mutex()
+    private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
 
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
@@ -297,9 +296,8 @@ internal class LocalToolExecutionCoordinator(
             executionId = executionIdFactory(),
             rootCallId = call.id,
         )
-        val serializedMutation = !readLike && requiresSharedWorkspaceMutationLease(registered)
-        if (serializedMutation) workspaceMutationMutex.lock()
         val invocation = try {
+            workspaceReadWriteGate.execute(registered) {
             registry.executeTracked(
                 name = call.name,
                 input = call.arguments,
@@ -326,6 +324,7 @@ internal class LocalToolExecutionCoordinator(
                     },
                 ),
             )
+            }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
@@ -358,8 +357,6 @@ internal class LocalToolExecutionCoordinator(
                 call, registered, code, error.message ?: error::class.java.simpleName,
                 executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
             )
-        } finally {
-            if (serializedMutation) workspaceMutationMutex.unlock()
         }
         executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result
