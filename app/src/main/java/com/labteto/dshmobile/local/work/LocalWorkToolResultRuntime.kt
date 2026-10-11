@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.adaptiveToolResultBudget
 import com.labteto.dshmobile.local.model.projectRecoverableToolResult
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /** Work-owned projection/spill policy for model-visible tool results. */
 internal class LocalWorkToolResultRuntime(
@@ -19,6 +21,19 @@ internal class LocalWorkToolResultRuntime(
         retention: ToolResultRetention = ToolResultRetention.DURABLE,
     ): String {
         val history = binding.runHandle.modelHistory
+        // Reference protection is derived from existing Work history/checkpoints, never a
+        // separate authority for task facts. Eviction still honors private storage budgets.
+        val snapshot = history.snapshot()
+        val recentCallIds = snapshot.takeLast(80).mapNotNull { message ->
+            message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+        }
+        val referencedIds = LocalWorkCheckpoint.latestFrom(snapshot)?.facts.orEmpty()
+            .mapNotNull { fact ->
+                Regex("""(?:^|\s)call=([^\s]+)""").find(fact)?.groupValues?.getOrNull(1)
+            }
+        toolOutputStore.retainActiveReferences(
+            binding.sessionId, recentCallIds + referencedIds,
+        )
         val budget = adaptiveToolResultBudget(
             base = runtimeStateStore.historyBudgetFor(
                 binding.aggregateSnapshot(),

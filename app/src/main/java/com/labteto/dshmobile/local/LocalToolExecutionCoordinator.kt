@@ -416,9 +416,13 @@ internal class LocalToolExecutionCoordinator(
         cause: Throwable? = null,
         sessionId: String? = null,
     ): AgentToolResult {
-        val result = localToolFailure(code, message,
+        val baseResult = localToolFailure(code, message,
             readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
             executionStarted = executionStarted)
+        val result = if (code == "TOOL_INVALID_ARGUMENT") baseResult.copy(
+            recoveryHint = baseResult.recoveryHint.orEmpty() + "\n" +
+                com.labteto.dshmobile.local.tools.toolArgumentContractSummary(tool.schema),
+        ) else baseResult
         if (cause != null) {
             AppLog.failure(
                 "LocalToolExecution",

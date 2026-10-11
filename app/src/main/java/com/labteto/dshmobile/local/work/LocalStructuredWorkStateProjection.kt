@@ -36,6 +36,7 @@ internal fun structuredWorkState(
 
     val constraints = linkedSetOf<String>()
     val decisions = linkedSetOf<String>()
+    var decisionEpoch = 0L
     val failures = linkedSetOf<String>()
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
@@ -46,9 +47,17 @@ internal fun structuredWorkState(
         .forEach { event ->
             when (event.type) {
                 "user/message" -> {
-                    eventText(event.data)
-                        ?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.CONSTRAINT) }
-                        ?.let(constraints::add)
+                    eventText(event.data)?.let { userText ->
+                        extractLocalWorkCueSnippet(userText, LocalWorkCueKind.CONSTRAINT)
+                            ?.let(constraints::add)
+                        if (isExplicitWorkDecisionReset(userText)) {
+                            decisions.clear()
+                            decisionEpoch = event.sequence
+                        }
+                        // User-authored corrections are authoritative over assistant proposals.
+                        extractLocalWorkCueSnippet(userText, LocalWorkCueKind.DECISION)
+                            ?.let(decisions::add)
+                    }
                 }
                 "assistant/message" -> {
                     val text = eventText(event.data)
@@ -111,6 +120,7 @@ internal fun structuredWorkState(
         plan = plan,
         constraints = constraints.toList().takeLast(MAX_STRUCTURED_CONSTRAINTS),
         decisions = decisions.toList().takeLast(MAX_STRUCTURED_DECISIONS),
+        decisionEpoch = decisionEpoch,
         failures = failures.toList().takeLast(MAX_STRUCTURED_FAILURES),
         unfinished = unfinished,
         progress = progress,

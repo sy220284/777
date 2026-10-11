@@ -16,8 +16,9 @@ object LocalToolCatalog {
             "start_line" to integer("起始行，默认 1"),
             "end_line" to integer("结束行，默认读取 400 行"),
         ), listOf("path")))
-        add(tool("tool_output_read", "按 UTF-8 字节区间读取此前因上下文预算而省略的完整工具结果", properties(
+        add(tool("tool_output_read", "读取本机会话仍保留的完整工具结果，或按原文字面量搜索匹配的 UTF-8 偏移", properties(
             "call_id" to string("原工具调用编号"),
+            "query" to string("可选；非空时按 UTF-8 字面量搜索原文并返回偏移，不必先全量读取"),
             "start_byte" to integer("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移"),
             "max_bytes" to integer("单次读取字节数，默认 4096，允许 1024–49152；单页实际交付不超过当前可见额度，请按返回的下一偏移继续读取"),
         ), listOf("call_id")))

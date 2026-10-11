@@ -53,3 +53,14 @@ private val WORK_FAILURE_CUES = listOf(
     "失败", "报错", "错误", "异常", "超时", "冲突", "回退", "无法", "风险", "未通过",
     "failure", "failed", "error", "timeout", "conflict", "rollback", "risk",
 )
+
+/**
+ * Only an explicit, broad user cancellation clears earlier decisions. A reference to "旧方案"
+ * alone is not enough: unrelated approved decisions must not silently disappear.
+ */
+internal fun isExplicitWorkDecisionReset(text: String): Boolean =
+    WORK_DECISION_RESET_PATTERN.containsMatchIn(text.lowercase())
+
+private val WORK_DECISION_RESET_PATTERN = Regex(
+    """(?:此前|之前|先前|原有|旧的).{0,12}(?:全部|所有|一律).{0,8}(?:方案|决定|决策|结论).{0,12}(?:作废|废弃|撤销|取消|不再采用)|(?:此前|之前|先前|原有|旧的).{0,12}(?:方案|决定|决策|结论).{0,8}(?:全部|所有|一律).{0,8}(?:作废|废弃|撤销|取消|不再采用)""",
+)

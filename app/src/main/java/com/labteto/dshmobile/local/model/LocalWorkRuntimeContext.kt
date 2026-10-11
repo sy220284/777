@@ -31,7 +31,7 @@ internal fun withWorkRuntimeContext(
         appendLine("- 所有已注册扩展均可按需发现；新的插件或 MCP 工具在注册后自动进入能力目录。当前工具表未提供某项能力时，主动用 capability_search 搜索任务所需能力并在下一模型步骤调用，不要求用户提供内部工具名。")
         appendLine("- 用户要求能力自检或询问有哪些工具时，使用 capability_search 搜索『能力目录』读取实时注册表；不要将本轮未选用误判为未注册、未连接或故障。")
         appendLine("- 能力注册成功只代表可发现；使用前按需调用该能力的状态工具检查连接、权限或运行环境。需要用户批准时走现有审批，批准后继续原任务；切勿绕过权限或假定条件已经满足。")
-        appendLine("- 使用本机工具或代码分析时，先按需用 read 查阅 .dsh/tools/README.md 的简短使用流程；不要猜命令、在 PATH 放占位脚本或盲目下载安装。实时工具和权限仍以 capability_search 与当前工具定义为准。")
+        appendLine("- 使用本机工具或代码分析时，先按需用 read 查阅 .dsh/tools/777-runtime-guide.md 的当前使用流程；README.md 可包含用户专属说明；不要猜命令、在 PATH 放占位脚本或盲目下载安装。实时工具和权限仍以 capability_search 与当前工具定义为准。")
         appendLine("- 工作历史按“当前有效工作状态 + 最近因果链”投影；需要较早精确事实时用 session_event_search，需要旧工具完整原文时按 call_id 用 tool_output_read，不要为了找旧结果重复执行同一探查。")
         appendLine("- Token/上下文消耗分析优先使用 environment_info 中的 TokenUsageAnalyticsStore 结构化账本；不要用 bash 全量扫描 sessions/*.events.jsonl 或 usage/token_usage.jsonl 重新拼统计。")
         appendLine("- 探查优先使用 glob/grep/file_inspect/read 等窄结果工具；必须用 bash 时合并同类检查并限制输出范围，状态没有变化时不要重复运行相同命令。")

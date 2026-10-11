@@ -89,6 +89,62 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun searchesLongUtf8OutputAcrossChunkBoundariesAndRetainsSessionIsolation() {
+        val store = LocalToolOutputStore(File(temporary.root, "tool-output"))
+        val text = "x".repeat(8190) + "🌟匹配正文" + "y".repeat(9000)
+        assertTrue(store.store("session-a", "call-search", text) != null)
+        val found = store.search("session-a", "call-search", "🌟匹配正文")
+        assertTrue(found.contains("8190"))
+        assertTrue(store.read("session-a", "call-search", startByte = 8190).contains("🌟匹配正文"))
+        assertTrue(store.search("session-b", "call-search", "🌟匹配正文").startsWith("未找到"))
+        assertTrue(store.search("session-a", "call-search", "没有的内容").contains("没有匹配"))
+    }
+
+    @Test
+    fun evictionNeverReportsStaleResultAsRecoverable() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 512,
+            maxFilesPerSession = 1,
+            maxSessionBytes = 512,
+            maxGlobalBytes = 1024,
+        )
+        store.store("session-a", "first", "first")
+        store.store("session-a", "second", "second")
+        assertTrue(store.read("session-a", "first").contains("不可") ||
+            store.read("session-a", "first").contains("可能"))
+        assertTrue(store.search("session-a", "first", "first").contains("未找到"))
+    }
+
+    @Test
+    fun activeCheckpointReferenceSurvivesOrdinaryEvictionButNotStorageBudget() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 128,
+            maxFilesPerSession = 2,
+            maxSessionBytes = 256,
+            maxGlobalBytes = 512,
+        )
+        store.store("work", "important", "evidence")
+        store.retainActiveReferences("work", listOf("important"))
+        store.store("work", "ordinary", "temporary")
+        store.store("work", "latest", "fresh")
+        assertTrue(store.read("work", "important").contains("evidence"))
+        assertTrue(store.read("work", "ordinary").startsWith("未找到"))
+        assertTrue(store.read("work", "latest").contains("fresh"))
+        // Reference priorities survive process recreation because the manifest is private and durable.
+        val restored = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 128,
+            maxFilesPerSession = 2,
+            maxSessionBytes = 256,
+            maxGlobalBytes = 512,
+        )
+        restored.store("work", "next", "more")
+        assertTrue(restored.read("work", "important").contains("evidence"))
+    }
+
+    @Test
     fun deletingSessionRemovesItsPrivateOutputs() {
         val root = File(temporary.root, "tool-output")
         val store = LocalToolOutputStore(root)

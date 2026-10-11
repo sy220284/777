@@ -125,7 +125,14 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 startLine = args.int("start_line", 1),
                 endLine = args.int("end_line", args.int("start_line", 1) + 399),
             )
-            "tool_output_read" -> root.toolOutputStore.read(
+            "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
+                root.toolOutputStore.search(
+                    sessionId = boundSessionId,
+                    callId = args.string("call_id"),
+                    query = query,
+                    startByte = args.int("start_byte", 0),
+                )
+            } ?: root.toolOutputStore.read(
                 sessionId = boundSessionId,
                 callId = args.string("call_id"),
                 startByte = args.int("start_byte", 0),

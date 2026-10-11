@@ -40,6 +40,10 @@ class SidebarSystemBackRegressionTest {
             R.string.persona_gallery_add_title,
         )).assertIsDisplayed()
         pressDeviceBack()
+        // On Android emulators, Back may first dismiss a leftover input method.
+        // Check the real page callback after any IME dismissal, without masking a navigation failure.
+        compose.waitForIdle()
+        if (backCount.get() == 0) pressDeviceBack()
         compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
