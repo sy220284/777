@@ -34,6 +34,8 @@ internal object PersonaGalleryImportPlanner {
                 title = raw.title.trim().take(160),
                 notes = raw.notes.trim().take(4_000),
                 history = mergeHistory(emptyList(), raw.history),
+                chatContext = raw.chatContext.withExperience(raw.id.ifBlank { storyId }, emptyList())
+                    .copy(experienceSessionIds = emptyList()),
                 sourceSessionIds = emptyList(),
                 excludedMessageKeys = emptyList(),
             )

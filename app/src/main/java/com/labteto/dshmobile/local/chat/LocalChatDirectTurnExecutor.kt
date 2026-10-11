@@ -457,6 +457,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                                     snapshot = oldNode.chatContextAfter,
                                     legacyState = oldNode.chatStateAfter,
                                     previousGeneration = current.chat.chatContext.generation,
+                                    experienceContext = current.chat.chatContext,
                                 ).boundDurablePending(eventLog),
                                 replySuggestions = oldNode.replySuggestionsAfter,
                             ),

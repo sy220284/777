@@ -354,6 +354,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                             .joinToString(" ")
                     },
                     generation = snapshot.chat.groupChat.context.generation,
+                    experienceId = snapshot.chat.groupChat.context.experienceId.ifBlank { snapshot.sessionId },
+                    experienceSessionIds = snapshot.chat.groupChat.context.experienceSessionIds,
                     // Stable across pending-batch retries: the diary store deduplicates revisions
                     // by projectionId before applying any new write.
                     projectionId = buildString {
@@ -440,7 +442,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 persona = persona,
             ) ?: return null
             recordGroupDiary(member, persona, plan, sharedPending, snapshot)
-            plan.state.bindStateObservationSources(sharedPending)
+            diaryStore.reconcileState(chatRelationshipSubjectKey(member.galleryId, member.personaId),
+                plan.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -570,7 +573,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     persona = source.persona,
                 ) ?: return@forEach
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
-                result[galleryId] = parsed.state.bindStateObservationSources(sharedPending)
+                result[galleryId] = diaryStore.reconcileState(
+                    chatRelationshipSubjectKey(source.member.galleryId, source.member.personaId),
+                    parsed.state.bindStateObservationSources(sharedPending), snapshot.chat.groupChat.context)
             }
             val observerDiaries = (root["observerDiaries"] as? JsonArray).orEmpty()
             observerDiaries.forEach { element ->
@@ -653,7 +658,10 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             val members = snapshot.chat.groupChat.members
             val cursor = snapshot.chat.groupChat.turnCursor % members.size
             val rotated = members.drop(cursor) + members.take(cursor)
-            val responders = groupChatResponders(input, rotated)
+            val responders = groupChatResponders(input, rotated,
+                snapshot.chat.groupChat.activeSpeakerId ?: snapshot.messages.asReversed()
+                    .firstOrNull { it.role == "assistant" && it.speakerId != null }?.speakerId,
+            )
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
             // Search at most once for the group turn; reuse only within the current turn.
             val sharedWebContext = webContext.forInput(input)
@@ -840,7 +848,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         eventLog,
                         scope = "group",
                     )
-                    currentGroup = currentGroup.copy(context = pendingContext)
+                    currentGroup = currentGroup.copy(context = pendingContext, activeSpeakerId = generated.member.galleryId)
                     chatState.update { current ->
                         if (current.sessionId == snapshot.sessionId) {
                             current.copy(chat = current.chat.copy(groupChat = currentGroup))

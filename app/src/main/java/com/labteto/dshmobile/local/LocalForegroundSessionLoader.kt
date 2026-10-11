@@ -174,6 +174,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         val restoredChat = chatRestore.restore(
             usageMode = stored.usageMode,
             controls = projectedChatControls,
+            sessionId = sessionId,
             messages = restoredTranscript.messages,
             log = log,
         )

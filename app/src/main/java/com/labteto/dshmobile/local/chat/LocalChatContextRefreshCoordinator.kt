@@ -486,7 +486,10 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             candidate = plan.state.continuity,
             pendingTurns = pending,
         )
-        val deterministicState = plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext()
+        val deterministicState = diaryStore.reconcileState(
+            chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId),
+            plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext(), baseContext,
+        )
         val lease = LocalSessionRuntimeRegistry.tryAcquire(expectedSessionId, LocalSessionRuntimeKind.MAINTENANCE)
         if (lease == null) {
             scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "session-busy")
@@ -531,6 +534,9 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                         listOf(turn.userMessage, turn.assistantMessage).filter(String::isNotBlank).joinToString(" ")
                     },
                     generation = expectedGeneration,
+                    experienceId = current.chat.chatContext.experienceId.ifBlank { expectedSessionId },
+                    experienceSessionIds = current.chat.chatContext.experienceSessionIds,
+                    characterEvidenceText = assistantEvidenceBatch,
                 )
             } else null
             // The full domain state and projection recipe are durable before publishing the cursor.

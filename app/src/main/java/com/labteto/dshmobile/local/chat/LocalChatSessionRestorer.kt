@@ -29,13 +29,25 @@ internal class LocalChatSessionRestorer @Inject constructor(
         controls: LocalChatDurableState,
         messages: List<LocalHarnessMessage>,
         log: LocalSessionEventLog,
+        sessionId: String = "",
     ): LocalChatSessionRestore = withContext(Dispatchers.IO) {
         val behavior = reconcileCharacterBehaviorTuning(
             persistence.personaStore, persistence.galleryStore,
             controls.personaId, controls.galleryId, controls.chatState,
         )
+        val story = controls.galleryId?.let(persistence.galleryStore::findEntry)
+            ?.stories?.firstOrNull { it.id == controls.galleryStoryId }
+        val baseContext = controls.chatContext.boundDurablePending(log).withExperience(
+            story?.id ?: sessionId, story?.sourceSessionIds.orEmpty() + sessionId,
+        )
+        val context = reconcileDiaryContext(baseContext, persistence.diaryStore.decisionsForExperience(
+            chatRelationshipSubjectKey(controls.galleryId, controls.personaId), baseContext,
+        ))
+        val reconciledState = persistence.diaryStore.reconcileState(
+            chatRelationshipSubjectKey(controls.galleryId, controls.personaId), behavior.chatState, context,
+        )
         val group = if (usageMode == LocalUsageMode.CHAT) {
-            controls.groupChat.copy(context = controls.groupChat.context.boundDurablePending(log, "group"))
+            controls.groupChat.copy(context = controls.groupChat.context.boundDurablePending(log, "group").withExperience(sessionId, listOf(sessionId)))
         } else LocalGroupChatState()
         LocalChatSessionRestore(
             chat = LocalChatState(
@@ -44,22 +56,27 @@ internal class LocalChatSessionRestorer @Inject constructor(
                 galleryStoryId = controls.galleryStoryId,
                 gallerySaveSuppressedThrough = controls.gallerySaveSuppressedThrough,
                 chatPersona = behavior.persona,
-                chatState = behavior.chatState,
-                chatContext = controls.chatContext.boundDurablePending(log),
+                chatState = reconciledState,
+                chatContext = context,
                 replySuggestions = controls.replySuggestions,
                 chatBranches = if (usageMode == LocalUsageMode.CHAT && !group.enabled) {
                     restoreMaterializedChatBranchState(
                         current = controls.chatBranches,
                         activeMessages = messages,
-                        chatState = behavior.chatState,
+                        chatState = reconciledState,
                         replySuggestions = controls.replySuggestions,
                     )
                 } else LocalChatBranchState(),
                 groupChat = reconcileGroupCharacterBehaviorTuning(
                     group, persistence.personaStore, persistence.galleryStore,
-                ),
+                ).let { restored -> restored.copy(members = restored.members.map { member ->
+                    member.copy(chatState = persistence.diaryStore.reconcileState(
+                        chatRelationshipSubjectKey(member.galleryId, member.personaId), member.chatState, restored.context,
+                    ))
+                }) },
             ),
-            needsPersist = behavior.changed,
+            needsPersist = behavior.changed || context != controls.chatContext ||
+                reconciledState != behavior.chatState || group != controls.groupChat,
         )
     }
 

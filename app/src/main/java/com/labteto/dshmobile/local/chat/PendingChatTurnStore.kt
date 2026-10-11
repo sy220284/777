@@ -134,7 +134,7 @@ internal fun ChatContextState.continuePendingInSession(
     val source = log(sourceId)
     val target = log(targetId)
     var remaining = boundDurablePending(source, scope)
-    var result = copy(
+    var result = withExperience(sourceId, listOf(sourceId, targetId)).copy(
         processedThroughSequence = -1L, pendingThroughSequence = -1L,
         pendingTurns = emptyList(), pendingArchiveReady = true, generation = generation + 1L,
         sceneEvents = sceneEvents.mapIndexed { index, event ->

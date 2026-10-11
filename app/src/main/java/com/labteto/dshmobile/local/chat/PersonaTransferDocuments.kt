@@ -78,7 +78,14 @@ internal object PersonaTransferDocuments {
             },
             diaryEntries = diaryEntries
                 .take(MAX_CHAT_DIARY_ENTRIES)
-                .map(::portableDiaryEntry),
+                .map { diary ->
+                    val story = entry.stories.firstOrNull { story ->
+                        diary.sources.any { it.sessionId in story.sourceSessionIds }
+                    }
+                    portableDiaryEntry(diary.copy(experienceId = diary.experienceId.ifBlank {
+                        story?.let { it.chatContext.experienceId.ifBlank { it.id } }.orEmpty()
+                    }))
+                },
         )
         val canonicalJson = json.encodeToString(PersonaArchiveEnvelope.serializer(), archive)
         val bytes = when (format) {
@@ -127,6 +134,8 @@ internal object PersonaTransferDocuments {
             portraitPath = "",
             stories = entry.stories.map { story ->
                 story.copy(
+                    chatContext = story.chatContext.withExperience(story.id, emptyList())
+                        .copy(experienceSessionIds = emptyList()),
                     sourceSessionIds = emptyList(),
                     excludedMessageKeys = emptyList(),
                     history = story.history.filter { it.role == "user" || it.role == "assistant" },

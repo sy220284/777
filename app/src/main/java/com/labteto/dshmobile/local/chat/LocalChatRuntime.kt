@@ -105,10 +105,59 @@ class LocalChatRuntime @Inject internal constructor(
         groupMembership.remove(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = replySuggestions.generate()
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
-    internal fun correctDiaryEntry(subjectKey: String, id: String, revision: Long, correction: ChatDiaryDelta) =
-        persistence.diaryStore.correctEntry(subjectKey, id, revision, correction)
-    internal fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long) =
-        persistence.diaryStore.deactivateEntry(subjectKey, id, revision)
+    internal fun correctDiaryEntry(subjectKey: String, id: String, revision: Long, correction: ChatDiaryDelta): Boolean {
+        return commitDiaryDecision { persistence.diaryStore.correctEntry(subjectKey, id, revision, correction) }
+    }
+    internal fun deactivateDiaryEntry(subjectKey: String, id: String, revision: Long): Boolean {
+        return commitDiaryDecision { persistence.diaryStore.deactivateEntry(subjectKey, id, revision) }
+    }
+
+    private fun commitDiaryDecision(write: () -> Boolean): Boolean {
+        val snapshot = chatState.value
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+            snapshot.sessionId, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return false
+        try {
+            if (chatState.value.sessionId != snapshot.sessionId || !write()) return false
+            reconcileDiaryDecision()
+            return true
+        } finally { lease.close() }
+    }
+
+    private fun reconcileDiaryDecision() {
+        val snapshot = chatState.value
+        if (snapshot.usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT) return
+        LocalChatPostTurnJobOwner.cancel()
+        chatState.update { current ->
+            if (current.sessionId != snapshot.sessionId) return@update current
+            val singleContext = current.chat.chatContext.withExperience(current.sessionId, listOf(current.sessionId))
+            val singleDecisions = persistence.diaryStore.decisionsForExperience(
+                chatRelationshipSubjectKey(current.chat.galleryId, current.chat.personaId), singleContext,
+            )
+            val groupContext = current.chat.groupChat.context.withExperience(current.sessionId, listOf(current.sessionId))
+            val groupDecisions = current.chat.groupChat.members.flatMap { member ->
+                persistence.diaryStore.decisionsForExperience(
+                    chatRelationshipSubjectKey(member.galleryId, member.personaId), groupContext,
+                )
+            }
+            current.copy(chat = current.chat.copy(
+                chatState = reconcileDiaryState(current.chat.chatState, singleDecisions),
+                chatContext = reconcileDiaryContext(singleContext, singleDecisions).rebaseGeneration(),
+                groupChat = current.chat.groupChat.copy(
+                    context = reconcileDiaryContext(groupContext, groupDecisions).rebaseGeneration(),
+                    members = current.chat.groupChat.members.map { member ->
+                        member.copy(chatState = persistence.diaryStore.reconcileState(
+                            chatRelationshipSubjectKey(member.galleryId, member.personaId), member.chatState, groupContext,
+                        ))
+                    },
+                ),
+                replySuggestions = emptyList(),
+            ))
+        }
+        val target = chatState.value
+        appendChatDomainStateCommit(sessionStorage.eventLogs.get(target.sessionId), target, "diary-decision-reconciled")
+        sessionStorage.enqueueCurrentSnapshot(target.sessionId)
+    }
     internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
     internal fun <T> importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T = persistence.diaryStore.importForTransfer(subjectKey, personaName, entries, commit)
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = execution.send(text, attachments)

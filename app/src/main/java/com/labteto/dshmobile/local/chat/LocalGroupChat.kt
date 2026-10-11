@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.serialization.Serializable
 
@@ -23,6 +24,8 @@ data class LocalGroupChatState(
     val mode: LocalChatMode = LocalChatMode.SINGLE,
     val members: List<LocalGroupChatMember> = emptyList(),
     val turnCursor: Int = 0,
+    /** Last publicly speaking member, independent of roster position. */
+    val activeSpeakerId: String? = null,
     /** Shared physical scene/continuity for the whole group conversation. */
     val context: ChatContextState = ChatContextState(),
     /** Public scene premise shared with every group member in this conversation. */
@@ -151,6 +154,7 @@ internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMembe
 internal fun groupChatResponders(
     input: String,
     members: List<LocalGroupChatMember>,
+    activeSpeakerId: String? = null,
 ): List<LocalGroupChatMember> {
     if (members.isEmpty()) return emptyList()
     val distinct = members.distinctBy(LocalGroupChatMember::galleryId)
@@ -165,7 +169,7 @@ internal fun groupChatResponders(
     return if (groupChatWantsMultipleReplies(input)) {
         distinct.take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
     } else {
-        distinct.take(1)
+        listOfNotNull(distinct.firstOrNull { it.galleryId == activeSpeakerId } ?: distinct.first())
     }
 }
 

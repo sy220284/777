@@ -1139,7 +1139,7 @@
     <string name="persona_gallery_delete_story_hint">只删除这条故事线及其中的归档对白，人物主档案会保留。</string>
     <string name="persona_gallery_delete_story">删除这条故事</string>
     <string name="persona_gallery_continue_story">继续这条故事</string>
-    <string name="persona_gallery_start_fresh_story">用这个人物开启新故事</string>
+    <string name="persona_gallery_start_fresh_story">用这个人物开启独立新故事</string>
     <string name="persona_gallery_untitled_story">未命名故事</string>
 
 
@@ -1963,7 +1963,7 @@
     <string name="work_capability_readiness_device_missing">当前未激活，请检查系统授权</string>
     <string name="work_capability_configure_device">前往设备权限设置</string>
     <string name="chat_diary_edit_title">纠正日记</string>
-    <string name="chat_diary_edit_hint">只修改当前角色的日记总结，不改写原对话。修改会影响后续日记召回。</string>
+    <string name="chat_diary_edit_hint">保留原对话，纠正这段经历的记录，并清除由错误记录形成的当前误解和待续事项。人物后续反应仍由人设与当前交流决定。</string>
     <string name="chat_diary_edit_event">实际发生的事</string>
     <string name="chat_diary_deactivate">停用这条记忆</string>
     <string name="chat_diary_deactivate_hint">确认停用？今后的日记召回将不再使用它，原始对话和历史修改记录会保留。</string>

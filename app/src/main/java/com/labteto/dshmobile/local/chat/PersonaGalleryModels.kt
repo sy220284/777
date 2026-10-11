@@ -52,19 +52,19 @@ data class PersonaGalleryStory(
             }
         }
         val userExcerpt = history.asReversed().asSequence()
-            .filter { it.role == "user" }
-            .map { "用户：${it.content.trim().take(500)}" }
+            .filter { it.role == "user" || it.role == "assistant" }
+            .map { "${if (it.role == "user") "用户" else personaName}：${it.content.trim().take(500)}" }
             .filter { it.length > 3 }
-            .take(6)
+            .take(12)
             .toList()
             .asReversed()
             .joinToString("\n")
             .takeLast(2_000)
         if (userExcerpt.isNotBlank()) {
-            appendLine("已保存故事的近期用户表达与事件：\n$userExcerpt")
+            appendLine("已保存故事的近期双方表达与事件：\n$userExcerpt")
         }
         if (history.any { it.role == "assistant" }) {
-            appendLine("角色旧回复已归档，不作为新会话台词重复注入。")
+            appendLine("角色历史表达只说明当时发生过的交流，后续修正与当前背景优先。")
         }
     }.trim()
 }

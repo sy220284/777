@@ -119,17 +119,7 @@ internal class CharacterRuntimeProjector(
         val full = complete.joinToString("\n\n")
         if (estimateModelTokens(full) <= STABLE_PERSONA_TOKEN_BUDGET) return full
 
-        // Reuse the removed mode/decision budget for the actual character. Reserve each
-        // section's heading before clipping bodies, so a long biography cannot erase voice
-        // or knowledge information placed later in the card.
-        val framingTokens = estimateModelTokens(heading) + sections.sumOf { (title, _) ->
-            estimateModelTokens("\n\n【$title】\n") + 1
-        }
-        val bodyBudget = (STABLE_PERSONA_TOKEN_BUDGET - framingTokens).coerceAtLeast(0)
-        val budgets = allocateCharacterContextBudget(sections.map { it.second }, bodyBudget)
-        return (listOf(heading) + sections.mapIndexed { index, (title, text) ->
-            "【$title】\n${takeWithinModelTokenBudget(text.trim(), budgets[index])}"
-        }).joinToString("\n\n")
+        return packCharacterSections(heading, sections, STABLE_PERSONA_TOKEN_BUDGET)
     }
 
     private fun momentPrompt(persona: PersonaProfile, state: ChatCharacterState): String {
@@ -234,19 +224,8 @@ internal class CharacterRuntimeProjector(
                     ?.let { "；来源：${it.take(80)}" }.orEmpty()
                 "${fact.category}（${status}${viewpoint}${evidence}）：${fact.content}"
         }
-        val selected = mutableListOf<String>()
-        var remaining = 500 - estimateModelTokens("【本轮相关人物事实】\n")
-        for (fact in facts) {
-            if (remaining <= 0) break
-            // Keep space for a related experience when the first match is a long biography.
-            val allowance = if (selected.isEmpty() && facts.size > 1) remaining / 2 else remaining
-            val excerpt = takeWithinModelTokenBudget(fact, allowance)
-            if (excerpt.isNotBlank()) {
-                selected += excerpt
-                remaining -= estimateModelTokens(excerpt + "\n")
-            }
-        }
-        return "【本轮相关人物事实】\n" + selected.joinToString("\n")
+        val selected = packCompleteCharacterUnits(facts, 500 - estimateModelTokens("【本轮相关人物事实】\n"))
+        return if (selected.isEmpty()) "" else "【本轮相关人物事实】\n${selected.joinToString("\n")}"
     }
 
     /**

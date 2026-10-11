@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -159,23 +160,20 @@ private fun buildRequestOnlyContinuity(
     older: List<JsonObject>,
     currentFacts: List<String>,
 ): JsonObject? {
-    val userEvents = older.asSequence()
-        .filter { it["role"]?.jsonPrimitive?.contentOrNull == "user" }
-        .mapNotNull { (it["content"] as? JsonPrimitive)?.contentOrNull }
-        .map(::normalizeChatContinuityText)
-        .filter(String::isNotBlank)
-        .filter { event ->
-            currentFacts.none { fact -> historicalFactSupersededByCurrent(event, fact) }
-        }
-        .distinct()
-        .toList()
-        .takeLast(8)
-    if (userEvents.isEmpty()) return null
+    val events = older.mapNotNull { message ->
+        val role = message["role"]?.jsonPrimitive?.contentOrNull
+        val content = chatHistoryText(message)?.let(::normalizeChatContinuityText)
+            ?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        if (role != "user" && role != "assistant") return@mapNotNull null
+        if (currentFacts.any { historicalFactSupersededByCurrent(content, it) }) return@mapNotNull null
+        "${if (role == "user") "用户" else "人物"}：$content"
+    }.takeLast(16)
+    if (events.isEmpty()) return null
 
     val summary = buildString {
         appendLine("<chat-continuity>")
-        appendLine("较早用户表达与事件，仅用于保持连续：")
-        userEvents.forEach { appendLine("- ${it.take(500)}") }
+        appendLine("较早双方表达与共同事件；人物当时的承诺、拒绝和决定属于经历，当前有效事实优先：")
+        events.forEach { appendLine("- ${it.take(500)}") }
         append("</chat-continuity>")
     }
     return buildJsonObject {
@@ -230,3 +228,11 @@ private fun historicalFactSupersededByCurrent(
     historical: String,
     current: String,
 ): Boolean = ChatContextAssembler.factConflicts(historical, current)
+
+internal fun chatHistoryText(message: JsonObject): String? = when (val content = message["content"]) {
+    is JsonPrimitive -> content.contentOrNull
+    is JsonArray -> content.mapNotNull { part ->
+        (part as? JsonObject)?.get("text")?.let { (it as? JsonPrimitive)?.contentOrNull }
+    }.joinToString("\n").takeIf(String::isNotBlank)
+    else -> null
+}

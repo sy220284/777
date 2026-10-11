@@ -55,10 +55,9 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                     .takeUnless {
                         it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色"
                     },
-                subjectKey = chatRelationshipSubjectKey(
-                    snapshot.chat.galleryId,
-                    snapshot.chat.personaId,
-                ),
+                subjectKey = scopedRelationshipSubjectKey(chatRelationshipSubjectKey(
+                    snapshot.chat.galleryId, snapshot.chat.personaId,
+                ), snapshot.chat.chatContext.experienceId.ifBlank { snapshot.sessionId }),
             )
         }.onFailure { error ->
             if (error is CancellationException) throw error
@@ -108,7 +107,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
 
         val conversation = if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
             else snapshot.chat.chatContext
-        val recallQuery = ChatMemorySelector.recallQuery(query, conversation) ?: return ""
+        val recallQuery = ChatMemorySelector.recallQuery(query, conversation).orEmpty()
         val searchDiary = shouldSearchDiary(recallQuery)
 
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
@@ -120,6 +119,12 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
+        val corrections = persistence.diaryStore.decisionsForExperience(subjectKey,
+            conversation.withExperience(snapshot.sessionId, listOf(snapshot.sessionId)))
+            .filter { it.active && it.revisions.lastOrNull()?.userCorrected == true }
+            .sortedByDescending(ChatDiaryEntry::updatedAt)
+        val correctionText = packCompleteCharacterUnits(corrections.map { "用户已纠正的经历：${it.event}" }, 180)
+        if (correctionText.isNotEmpty()) blocks += correctionText.joinToString("\n")
 
         run {
             val relationshipKinds = setOf(
@@ -143,6 +148,8 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                         currentSubjectKey = subjectKey,
                         currentLineageId = snapshot.lineageId,
                         subjectLabel = subjectLabel,
+                        experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
+                        sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
                     )
                 },
             ).distinctBy { it.id }
@@ -181,15 +188,18 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
                 maxItems = diaryRecallItemLimit(recallQuery),
+                experienceId = conversation.experienceId.ifBlank { snapshot.sessionId },
+                sourceSessionIds = (conversation.experienceSessionIds + snapshot.sessionId).toSet(),
             )
             if (diary.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine("【相关人物日记｜角色自己的长期经历】")
                         appendLine(diaryRecallUsageInstruction(groupAudience))
-                        diary.forEach { entry ->
-                            appendLine(renderRecalledChatDiary(entry, groupAudience))
-                        }
+                        packCompleteCharacterUnits(
+                            diary.map { renderRecalledChatDiary(it, groupAudience) },
+                            (budget.diaryTokens - 100).coerceAtLeast(0),
+                        ).forEach(::appendLine)
                     }.trim(),
                     budget.diaryTokens,
                 )

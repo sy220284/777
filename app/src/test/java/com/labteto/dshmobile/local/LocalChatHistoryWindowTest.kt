@@ -40,7 +40,7 @@ class LocalChatHistoryWindowTest {
         )
         assertTrue(bounded29.any { it.toString().contains("<chat-continuity>") })
         assertEquals(23, bounded29.size)
-        assertFalse(bounded29.joinToString("\n").contains("角色回复0"))
+        assertTrue(bounded29.joinToString("\n").contains("角色回复0"))
         assertTrue(bounded29.joinToString("\n").contains("用户事件0"))
 
         val history30 = history29 + message("assistant", "第30条消息")
@@ -104,7 +104,7 @@ class LocalChatHistoryWindowTest {
     }
 
     @Test
-    fun requestCheckpointKeepsUserEventsButDropsOldRoleWording() {
+    fun requestCheckpointKeepsBothSidesOfSharedEvents() {
         val history = buildList {
             add(message("system", "系统"))
             repeat(15) { index ->
@@ -121,7 +121,7 @@ class LocalChatHistoryWindowTest {
         val text = bounded.joinToString("\n") { it.toString() }
 
         assertTrue(text.contains("用户事件0"))
-        assertFalse(text.contains("角色旧回复0"))
+        assertTrue(text.contains("角色旧回复0"))
         assertTrue(text.contains("用户事件14"))
         assertTrue(text.contains("角色旧回复14"))
         assertTrue(text.contains("<chat-continuity>"))

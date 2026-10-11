@@ -26,8 +26,15 @@ internal fun relationshipMemoryMatchesSubject(
     currentSubjectKey: String?,
     currentLineageId: String?,
     subjectLabel: String?,
+    experienceId: String = "",
+    sourceSessionIds: Set<String> = emptySet(),
 ): Boolean {
     if (memory.kind == MemoryKind.RELATIONSHIP_PREFERENCE && memory.subjectKey == null) return true
+    if (experienceId.isNotBlank()) {
+        if (memory.subjectKey == scopedRelationshipSubjectKey(currentSubjectKey, experienceId)) return true
+        // Old character-wide records require an actual source from this story.
+        if (memory.sourceMessages.none { it.sessionId in sourceSessionIds }) return false
+    }
     if (memory.subjectKey != null) {
         return currentSubjectKey != null && memory.subjectKey == currentSubjectKey
     }

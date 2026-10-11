@@ -39,11 +39,11 @@ internal fun shouldSearchDiary(query: String): Boolean {
     if (RESET_HINTS.any(text::contains)) return false
     if (shouldRecallDiary(text)) return true
     val core = text.replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
-    return core.length >= 6
+    return core.length >= 2
 }
 
 internal fun diaryRecallItemLimit(query: String): Int =
-    if (isExplicitDiaryRecall(query)) 3 else 1
+    if (isExplicitDiaryRecall(query)) 6 else 4
 
 internal fun isExplicitDiaryRecall(query: String): Boolean {
     val text = query.trim().lowercase()
@@ -69,6 +69,11 @@ internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boole
             ChatDiaryDisclosure.PUBLIC -> "已公开或用户已允许公开的经历"
         }}")
         appendLine("- 事件：${entry.event}")
+        if (entry.subjectiveInferred && (entry.feeling.isNotBlank() || entry.innerThought.isNotBlank())) {
+            appendLine("  心理记录来源：后台对当时情境的推测，尚未确认")
+        } else if (entry.subjectiveEvidence.isNotBlank()) {
+            appendLine("  当时表达：${entry.subjectiveEvidence}")
+        }
         entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
         entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
         entry.relationshipMeaning.takeIf(String::isNotBlank)?.let { appendLine("  关系意义：$it") }

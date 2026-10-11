@@ -86,6 +86,7 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 snapshot = chatBranchLastContext(selected),
                 legacyState = snapshot?.first,
                 previousGeneration = state.chat.chatContext.generation,
+                experienceContext = state.chat.chatContext,
             ).boundDurablePending(eventLog, "direct")
             val selectedChatState = (snapshot?.first ?: state.chat.chatState)
                 .withoutLegacyConversationContext()

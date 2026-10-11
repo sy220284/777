@@ -6,7 +6,7 @@ internal object ChatDiarySupersessionPolicy {
         candidate: ChatDiaryEntry,
     ): Boolean {
         if (!existing.active || existing.id == candidate.id) return false
-        if (existing.subjectKey != candidate.subjectKey) return false
+        if (existing.subjectKey != candidate.subjectKey || existing.experienceId != candidate.experienceId) return false
         if (existing.supersededBy != null || existing.supersessionRetained) return false
         // Two different named companions may have independent appointments of the
         // same kind. A new "见面" cancellation alone must not erase the other plan.

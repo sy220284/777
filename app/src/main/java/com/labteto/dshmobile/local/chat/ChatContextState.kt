@@ -23,6 +23,10 @@ data class ChatContextState(
     /** Recent deterministic hard-scene transitions. Raw transcript remains the canonical history. */
     val sceneEvents: List<ChatSceneEvent> = emptyList(),
     val generation: Long = 0L,
+    /** Shared past belongs to this story; independent stories never reuse its identity. */
+    val experienceId: String = "",
+    /** Legacy diaries are admitted only through the original sessions of this story. */
+    val experienceSessionIds: List<String> = emptyList(),
 )
 
 @Serializable
@@ -199,12 +203,14 @@ internal fun restoreBranchContext(
     snapshot: ChatContextState?,
     legacyState: ChatCharacterState?,
     previousGeneration: Long,
+    experienceContext: ChatContextState = ChatContextState(),
 ): ChatContextState =
-    snapshot?.rebaseGeneration()
+    (snapshot?.rebaseGeneration()
         ?: legacyState?.let { state ->
             ChatContextState().withLegacyFallback(state).rebaseGeneration()
         }
-        ?: ChatContextState(generation = previousGeneration + 1L)
+        ?: ChatContextState(generation = previousGeneration + 1L))
+        .withExperience(experienceContext.experienceId, experienceContext.experienceSessionIds)
 
 internal fun ChatContextState.pendingForRequest(limit: Int = 6): List<ChatPendingTurn> =
     pendingTurns

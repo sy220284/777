@@ -169,11 +169,14 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     snapshot = branchParentContext,
                     legacyState = baseState,
                     previousGeneration = previousGeneration,
+                    experienceContext = if (state.chat.groupChat.enabled) state.chat.groupChat.context else state.chat.chatContext,
                 ).boundDurablePending(
                     eventLog,
                     if (state.chat.groupChat.enabled) "group" else "direct",
                 )
-                val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity)
+                val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity,
+                    experienceId = recoveredBaseContext.experienceId,
+                    experienceSessionIds = recoveredBaseContext.experienceSessionIds)
                 val editedModelMessage = editedChatUserModelMessage(
                     eventLog = eventLog,
                     originalMessageId = messageId,
@@ -420,6 +423,7 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                         snapshot = chatBranchParentContext(branches, messageId),
                         legacyState = baseState,
                         previousGeneration = state.chat.chatContext.generation,
+                        experienceContext = state.chat.chatContext,
                     ).boundDurablePending(eventLog, "direct")
                     chatState.update { current ->
                         if (current.sessionId != state.sessionId) current else current.copy(

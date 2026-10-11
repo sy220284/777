@@ -68,7 +68,7 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊发言编排与点名",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊接话延续与点名",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalGroupChatTest.kt#explicitMentionRoutesOnlyToNamedCharacter"

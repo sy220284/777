@@ -24,8 +24,6 @@ internal fun resolveLocalGroupChatMembers(
         )
         val previous = previousMembers.firstOrNull { it.galleryId == entry.id }
         val restoredState = previous?.chatState
-            ?: entry.groupChatState.takeIf { it.updatedAt > 0L }
-            ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
             ?: ChatCharacterState()
         LocalGroupChatMember(
             galleryId = entry.id,

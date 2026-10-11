@@ -189,10 +189,15 @@ internal fun normalizeChatReplySuggestionPayload(root: JsonObject): JsonObject {
 internal fun normalizeChatDiaryDelta(raw: JsonObject): JsonObject {
     val fields = raw.toMutableMap()
     listOf("event", "feeling", "innerThought", "relationshipMeaning",
-        "unresolvedEcho", "disclosure").forEach { key ->
+        "unresolvedEcho", "disclosure", "subjectiveEvidence").forEach { key ->
         fields[key]?.let { value ->
             if (value !is JsonPrimitive || !value.isString) fields.remove(key)
         }
+    }
+    fields["recallAnchors"]?.let { value ->
+        val array = value as? JsonArray
+        if (array == null) fields.remove("recallAnchors")
+        else fields["recallAnchors"] = JsonArray(array.filterIsInstance<JsonPrimitive>().filter { it.isString })
     }
     fields["importance"]?.let { value ->
         val score = (value as? JsonPrimitive)?.intOrNull
