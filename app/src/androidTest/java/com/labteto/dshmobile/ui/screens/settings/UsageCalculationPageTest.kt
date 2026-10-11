@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -11,6 +15,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.TokenUsageAggregate
+import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -30,6 +36,41 @@ class UsageCalculationPageTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun modelSwitcherUpdatesHeroAndKeepsModelsSeparated() {
+        val analytics = TokenUsageAnalyticsSnapshot(
+            byModel = mapOf(
+                "MiniMax-M3" to TokenUsageAnalyticsSnapshot(
+                    tracked = TokenUsageAggregate(inputTokens = 400, outputTokens = 50),
+                ),
+                "deepseek-chat" to TokenUsageAnalyticsSnapshot(
+                    tracked = TokenUsageAggregate(inputTokens = 40, outputTokens = 10),
+                ),
+            ),
+        )
+        compose.setContent {
+            DshTheme {
+                var selected by remember { mutableStateOf<String?>(null) }
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    UsageCalculationPage(
+                        usage = DeepSeekUsageSnapshot(inputTokens = 440, outputTokens = 60),
+                        onOpenPricing = {},
+                        analytics = analytics,
+                        configuredModels = listOf("MiniMax-M3", "deepseek-chat", "never-used"),
+                        selectedModel = selected,
+                        onSelectModel = { selected = it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("全部模型 ▾").performClick()
+        compose.onNodeWithText("MiniMax-M3").performClick()
+        compose.onNodeWithText("450").assertExists()
+        compose.onNodeWithText("MiniMax-M3 ▾").performClick()
+        compose.onNodeWithText("never-used").performClick()
+        compose.onNodeWithText("0").assertExists()
     }
 
     @Test
