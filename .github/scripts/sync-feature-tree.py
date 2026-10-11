@@ -260,6 +260,51 @@ def test():
     assert leaves(model) == ["A / 甲", "B / 丙", "B / 丁"]
 
 
+    # 完整模拟从「新增登记→改名/移入新父级→删除」的三轮真实文件同步。
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / MD).parent.mkdir(parents=True)
+        fixture = fence + "text\n ROOT\n├─ A\n│  └─ 旧功能\n└─ B\n   └─ 已有能力\n" + fence + "\n"
+        (root / MD).write_text(fixture, encoding="utf-8")
+        initial, _ = parse(fixture)
+        init_html = '<script>const data=' + json.dumps(
+            to_html(initial, {}, {}), ensure_ascii=False, separators=(",", ":")
+        ) + ';const tree=1;</script>'
+        (root / HTML).write_text(init_html, encoding="utf-8")
+        test_matrix = {"version": 2, "items": [
+            {"path": "A / 旧功能", "state": "automated_partial", "evidence": ["test.kt#test"]}
+        ]}
+        (root / MATRIX).write_text(json.dumps(test_matrix, ensure_ascii=False), encoding="utf-8")
+        source = root / "app/src/main/java/sample/Feature.kt"
+        source.parent.mkdir(parents=True)
+        def mark(path):
+            payload = json.dumps({"id": "feature.first", "path": path}, ensure_ascii=False)
+            source.write_text("// FEATURE_TREE: " + payload + "\nclass Entry {}\n", encoding="utf-8")
+        def write_outputs(outputs):
+            for filename, value in outputs.items():
+                (root / filename).write_text(value, encoding="utf-8")
+
+        mark("A / 旧功能")
+        write_outputs(generate(root))
+        assert json.loads((root / REG).read_text(encoding="utf-8"))["nodes"][0]["source"].endswith("Feature.kt")
+        assert generate(root)[MD] == (root / MD).read_text(encoding="utf-8")
+        mark("B / 新功能")
+        renamed = generate(root)
+        renamed_tree, _ = parse(renamed[MD])
+        assert find(renamed_tree, ["A", "旧功能"]) is None
+        assert find(renamed_tree, ["B", "新功能"]) is not None
+        assert json.loads(renamed[MATRIX])["items"][0]["path"] == "B / 新功能"
+        assert "新功能" in renamed[HTML] and "旧功能" not in renamed[HTML]
+        write_outputs(renamed)
+        source.write_text("class Entry {}\n", encoding="utf-8")
+        removed = generate(root)
+        removed_tree, _ = parse(removed[MD])
+        assert find(removed_tree, ["B", "新功能"]) is None
+        assert json.loads(removed[MATRIX])["items"] == []
+        assert json.loads(removed[REG])["nodes"] == []
+
+
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
     cli.add_argument("--check", action="store_true")
