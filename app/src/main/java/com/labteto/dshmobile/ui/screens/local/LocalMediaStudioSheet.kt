@@ -65,6 +65,10 @@ internal fun LocalMediaStudioSheetContent(
     val scope = rememberCoroutineScope()
     val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
     val videoTasks by viewModel.videoTasks.collectAsState()
+    val generatedResults by viewModel.generatedResults.collectAsState()
+    var showHistory by remember { mutableStateOf(false) }
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    var historyError by remember { mutableStateOf<String?>(null) }
     var mode by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
@@ -351,6 +355,100 @@ internal fun LocalMediaStudioSheetContent(
                 color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             error?.let { Text(stringResource(R.string.minimax_media_error, it),
                 color = colors.labelPrimary, style = DsType.caption11.withReadingWeight()) }
+        }
+        if (generatedResults.isNotEmpty()) {
+            DsButton(
+                text = stringResource(R.string.media_studio_history, generatedResults.size),
+                onClick = { showHistory = !showHistory },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showHistory) {
+                Text(stringResource(R.string.media_studio_temporary_links_notice),
+                    color = colors.labelSecondary,
+                    style = DsType.caption11.withReadingWeight())
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(232.dp),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                ) {
+                    items(generatedResults.asReversed(), key = { it.id }) { asset ->
+                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Text(
+                                stringResource(
+                                    R.string.media_studio_history_item,
+                                    asset.provider,
+                                    asset.model,
+                                    if (asset.kind == LocalMediaKind.SPEECH.name) "语音" else "图片",
+                                ),
+                                color = colors.labelPrimary,
+                                style = DsType.caption11.withReadingWeight(),
+                            )
+                            val file = viewModel.resultFile(asset)
+                            val mime = when (file?.extension?.lowercase()) {
+                                "png" -> "image/png"
+                                "jpg", "jpeg" -> "image/jpeg"
+                                "webp" -> "image/webp"
+                                "mp3" -> "audio/mpeg"
+                                else -> "application/octet-stream"
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                if (file != null) {
+                                    DsButton(
+                                        text = stringResource(R.string.media_studio_view_result),
+                                        size = DsButtonSize.Small,
+                                        onClick = { viewMediaFile(context, file, mime) { historyError = it } },
+                                    )
+                                    DsButton(
+                                        text = stringResource(R.string.media_studio_share),
+                                        size = DsButtonSize.Small,
+                                        variant = DsButtonVariant.Ghost,
+                                        onClick = { shareMediaFile(context, file, mime) { historyError = it } },
+                                    )
+                                } else if (asset.remoteUrl != null) {
+                                    DsButton(
+                                        text = stringResource(R.string.media_studio_open_temporary_link),
+                                        size = DsButtonSize.Small,
+                                        onClick = { openMediaUrl(context, asset.remoteUrl) { historyError = it } },
+                                    )
+                                } else {
+                                    Text(stringResource(R.string.media_studio_result_missing),
+                                        style = DsType.caption11.withReadingWeight(),
+                                        color = colors.labelSecondary)
+                                }
+                                DsButton(
+                                    text = stringResource(R.string.media_studio_delete_record),
+                                    size = DsButtonSize.Small,
+                                    variant = DsButtonVariant.Ghost,
+                                    onClick = { pendingDeleteId = asset.id },
+                                )
+                            }
+                            if (pendingDeleteId == asset.id) {
+                                Text(stringResource(R.string.media_studio_confirm_delete),
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.labelSecondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                                    DsButton(text = stringResource(R.string.media_studio_delete_confirm),
+                                        size = DsButtonSize.Small, onClick = {
+                                            scope.launch {
+                                                try {
+                                                    viewModel.removeResult(asset.id)
+                                                    pendingDeleteId = null
+                                                } catch (failure: Exception) {
+                                                    historyError = failure.message.orEmpty()
+                                                }
+                                            }
+                                        })
+                                    DsButton(text = stringResource(R.string.media_studio_delete_cancel),
+                                        size = DsButtonSize.Small, variant = DsButtonVariant.Ghost,
+                                        onClick = { pendingDeleteId = null })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            historyError?.let { Text(it, color = colors.labelPrimary,
+                style = DsType.caption11.withReadingWeight()) }
         }
     }
 }
