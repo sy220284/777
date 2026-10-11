@@ -30,6 +30,7 @@ internal class ChatInteractionStateReducer {
                 assistantMessage = assistantMessage,
                 rawState = rawState,
                 stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
+                descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
                 significance = significance,
             )
         }
@@ -201,6 +202,7 @@ internal class ChatInteractionStateReducer {
         assistantMessage: String,
         rawState: JsonObject?,
         stageQuote: String,
+        descriptionQuote: String,
         significance: String,
     ): ChatCharacterState {
         val rawDynamics = rawState?.get("dynamics")?.let { runCatching { it.jsonObject }.getOrNull() }
@@ -226,8 +228,11 @@ internal class ChatInteractionStateReducer {
         val relationshipDescription = when {
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
             requestedStage != previous.dynamics.stage -> previous.relationshipState
-            rawState?.containsKey("relationshipState") == true ->
-                value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
+            rawState?.containsKey("relationshipState") == true &&
+                groundedRelationshipDescription(
+                    description = value.relationshipState, evidence = descriptionQuote,
+                    userMessage = userMessage, assistantMessage = assistantMessage,
+                ) -> value.relationshipState.trim().take(120)
             else -> previous.relationshipState
         }
         val merged = value.copy(
@@ -373,6 +378,28 @@ internal class ChatInteractionStateReducer {
         val clearlyRepaired = Regex("复合|和好|修复关系").containsMatchIn(quote)
         if (clearlySeparated && proposedStage != "SEPARATED") return false
         if (clearlyRepaired && proposedStage != "REPAIRING") return false
+        return true
+    }
+
+    /**
+     * Natural-language relation descriptions cannot bypass a failed milestone transition.
+     * Fine-grained changes need a literal, non-hypothetical current-turn quotation;
+     * major milestones must be represented by the separately validated stage event.
+     */
+    private fun groundedRelationshipDescription(
+        description: String,
+        evidence: String,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val value = description.trim()
+        val quote = evidence.trim()
+        if (value.isBlank() || quote.length < 4 ||
+            !(userMessage.contains(quote) || assistantMessage.contains(quote))) return false
+        val milestone = Regex("结婚|订婚|离婚|分手|复合|同居|情侣|恋人|恋爱|交往|确定关系|在一起|暧昧期|约会中|矛盾期|分开")
+        if (milestone.containsMatchIn(value)) return false
+        val rejected = Regex("如果|假如|要是|梦见|听说|希望|打算|计划|没有|还没|尚未|并未|不是|不会|吗\\?|吗？")
+        if (rejected.containsMatchIn(quote) || quote.contains('?') || quote.contains('？')) return false
         return true
     }
 
