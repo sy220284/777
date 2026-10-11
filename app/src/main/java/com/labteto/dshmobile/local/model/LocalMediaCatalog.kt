@@ -44,6 +44,7 @@ object LocalMediaCatalog {
                 LocalMediaProvider.QWEN -> listOf(
                     offer(LocalMediaKind.IMAGE, "qwen-image-3.0", "Qwen Image 3.0"),
                     offer(LocalMediaKind.IMAGE, "qwen-image-plus", "Qwen Image Plus"),
+                    offer(LocalMediaKind.VIDEO, "wan2.6-t2v", "Wan 2.6 Text-to-Video"),
                 )
                 LocalMediaProvider.GEMINI -> listOf(
                     offer(LocalMediaKind.IMAGE, "gemini-3.1-flash-image", "Gemini 3.1 Flash Image"),
