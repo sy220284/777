@@ -9,7 +9,6 @@ internal fun localAutomationFeatureUiContribution(
     onCreateViaChat: (String) -> Unit,
     actions: LocalAutomationFeatureUiActions,
     onTaskModeChange: (AutomationMode?) -> Unit,
-    onResetNavigation: () -> Unit,
     onPopFeature: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
