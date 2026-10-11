@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalModelPreset
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProtocol
