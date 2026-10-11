@@ -739,6 +739,29 @@ def test():
         assert json.loads(rejected[REVIEW])["pending_changes"]
         assert find(parse(rejected[MD])[0], ["B", "新功能"]) is None
 
+        # 已删除但历史有证据的旧功能：审批源真实存在历史档案，实际入口已消失。
+        historical_url = (
+            "https://github.com/example/repo/blob/123abc/"
+            "app/src/main/java/sample/LegacyDead.kt#L1"
+        )
+        (root / EVIDENCE).write_text(
+            "| 层级 | 功能完整路径 | 证据 | 代码 |\\n"
+            "| 3 | B / 已有能力 | 专属源码路径已核 | "
+            "[旧实现](" + historical_url + ") |\\n", encoding="utf-8"
+        )
+        approval = {"version": 1, "approvals": [{
+            "path": "B / 已有能力",
+            "source": "app/src/main/java/sample/LegacyDead.kt",
+            "symbol": "LegacyDead", "reason": "已经撤销原有功能入口",
+        }]}
+        (root / RETIREMENTS).write_text(json.dumps(approval, ensure_ascii=False), encoding="utf-8")
+        legacy = generate(root)
+        assert find(parse(legacy[MD])[0], ["B", "已有能力"]) is None
+        assert len(json.loads(legacy[REVIEW])["approved_legacy_retirements"]) == 1
+        assert len(json.loads(legacy[REVIEW])["obsolete_historical_evidence"]) == 1
+        write_outputs(legacy)
+        assert generate(root)[MD] == (root / MD).read_text(encoding="utf-8")
+
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
