@@ -49,7 +49,7 @@ internal object LocalWorkspaceToolGuide {
         return try {
             readme.writeText(
                 "# 工作区工具\n\n" +
-                    "系统维护的最新工具与环境指南：\`.dsh/tools/$MANAGED_GUIDE\`。\n" +
+                    "系统维护的最新工具与环境指南：.dsh/tools/$MANAGED_GUIDE。\n" +
                     "本 README 可自由补充项目专属脚本，不会被 777 覆盖。\n",
             )
             true
