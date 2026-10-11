@@ -2029,5 +2029,33 @@
     <string name="minimax_quota_hours_minutes">%1$d小时%2$d分钟</string>
     <string name="minimax_quota_minutes">%1$d分钟</string>
     <string name="minimax_quota_under_one_minute">不到1分钟</string>
+    <string name="minimax_media_entry">MiniMax 创作</string>
+    <string name="minimax_media_title">MiniMax 多模态创作</string>
+    <string name="minimax_media_notice">使用当前 MiniMax 账户；图片、视频和语音可能按独立额度或按量计费。</string>
+    <string name="minimax_media_image">图片</string>
+    <string name="minimax_media_video">视频</string>
+    <string name="minimax_media_speech">配音</string>
+    <string name="minimax_media_asr">转写</string>
+    <string name="minimax_media_prompt">描述想生成的内容</string>
+    <string name="minimax_media_speech_input">输入要朗读的文字</string>
+    <string name="minimax_media_create_image">生成图片</string>
+    <string name="minimax_media_open_image">查看／保存图片</string>
+    <string name="minimax_media_start_video">开始生成视频</string>
+    <string name="minimax_media_task_id">任务编号：%1$s</string>
+    <string name="minimax_media_check_video">查询视频进度</string>
+    <string name="minimax_media_video_success">视频已生成</string>
+    <string name="minimax_media_video_failed">视频生成失败</string>
+    <string name="minimax_media_video_processing">正在生成视频</string>
+    <string name="minimax_media_video_queued">视频任务等待处理</string>
+    <string name="minimax_media_open_video">查看／下载视频</string>
+    <string name="minimax_media_voice_id">音色编号</string>
+    <string name="minimax_media_create_speech">生成配音</string>
+    <string name="minimax_media_share_speech">分享／保存配音文件</string>
+    <string name="minimax_media_pick_audio">选择本机录音转写</string>
+    <string name="minimax_media_insert_text">插入聊天输入框</string>
+    <string name="minimax_media_copy_text">复制文字</string>
+    <string name="minimax_media_running">MiniMax 正在处理请求…</string>
+    <string name="minimax_media_error">操作失败：%1$s</string>
+    <string name="minimax_media_invalid_url">服务商返回的链接不是安全的 HTTPS 地址</string>
 </resources>
 
