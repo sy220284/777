@@ -158,6 +158,9 @@ internal fun CharacterBehaviorTuningDialog(
                 onValueChange = { draft = draft.copy(samplingTemperaturePosition = it) },
                 enabled = !saving,
             )
+        } else {
+            Text(stringResource(R.string.local_composer_temperature_unavailable),
+                style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         }
         evolution.lastMajorMilestone.takeIf(String::isNotBlank)?.let {
             Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
