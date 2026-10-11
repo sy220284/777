@@ -22,6 +22,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -93,8 +94,10 @@ internal fun LocalStreamingChatTurn(
  * empty loading cards when a work timeline exists.
  */
 internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?): String {
-    val committed = lastDurableNarrative?.trim().orEmpty()
-    val candidate = draft.trim()
+    // A previous session or a nonconforming provider may embed tagged thinking in content.
+    // Hide only leading tagged thinking while preserving the raw event and model replay.
+    val committed = visibleAssistantText(lastDurableNarrative.orEmpty()).trim()
+    val candidate = visibleAssistantText(draft).trim()
     if (candidate.isEmpty()) return ""
     if (committed.isEmpty()) return candidate
     if (committed.startsWith(candidate)) return ""
