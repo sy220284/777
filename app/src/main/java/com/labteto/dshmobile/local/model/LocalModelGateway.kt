@@ -68,7 +68,7 @@ class LocalModelGateway @Inject constructor(
         require(profile.authKind == LocalModelAuthKind.API_KEY) {
             "套餐授权模型请通过应用内账户同步获取，不支持 API Key 模型目录查询"
         }
-        val endpoint = LocalModelPresets.find(profile.model, profile.baseUrl)?.modelsEndpoint
+        val endpoint = officialModelCatalogEndpoint(profile)
             ?: error("该模型来源没有已验证的官方模型目录接口；不可把密钥发送到猜测的 URL")
         val target = URI(endpoint)
         val profileUri = URI(normalizeModelBaseUrl(profile.baseUrl))
@@ -402,4 +402,20 @@ internal fun resolveLocalModelProtocol(
     LocalModelAuthKind.API_KEY ->
         profile?.protocol
             ?: LocalModelPresets.protocolFor(model, baseUrl)
+}
+
+/**
+ * A saved official MiniMax endpoint may use CN, China-alias or international hosts.
+ * Use that exact verified host for discovery instead of sending a key to the preset's
+ * different regional host. Other providers use their pinned preset endpoint.
+ */
+internal fun officialModelCatalogEndpoint(profile: LocalModelProfile): String? {
+    if (profile.authKind != LocalModelAuthKind.API_KEY) return null
+    val preset = LocalModelPresets.find(profile.model, profile.baseUrl) ?: return null
+    if (preset.provider == "MiniMax" && LocalMiniMaxPolicy.isOfficial(profile.baseUrl)) {
+        val host = runCatching { URI(normalizeModelBaseUrl(profile.baseUrl)).host }.getOrNull()
+            ?: return null
+        return "https://$host/v1/models"
+    }
+    return preset.modelsEndpoint
 }
