@@ -48,6 +48,7 @@ class PersonaImmersionPolicyTest {
         )
 
         assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，没有真实身体，所以没法抱你。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "作为AI语言模型，我无法抱你。"))
         assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "现实中我无法真正触碰你，只能陪你聊聊天。"))
         assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有真实的感情，不能真正理解你的难过。"))
     }
