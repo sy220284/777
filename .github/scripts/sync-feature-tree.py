@@ -569,5 +569,7 @@ if __name__ == "__main__":
         if args.check and stale:
             sys.exit(1)
     except (OSError, ValueError, AssertionError, KeyError, TypeError) as error:
+        import traceback
+        traceback.print_exc()
         print("功能树自动维护失败: " + str(error), file=sys.stderr)
         sys.exit(1)
