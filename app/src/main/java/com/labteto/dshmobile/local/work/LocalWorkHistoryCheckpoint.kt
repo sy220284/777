@@ -44,6 +44,7 @@ internal data class LocalWorkCheckpoint(
     val artifacts: List<String>,
     val tools: List<String>,
     val toolCallIds: List<String> = emptyList(),
+    val hasTypedToolReferences: Boolean = true,
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
         put("version", 5)
@@ -115,6 +116,7 @@ internal data class LocalWorkCheckpoint(
                 artifacts = list("artifacts"),
                 tools = list("tools"),
                 toolCallIds = list("tool_call_ids"),
+                hasTypedToolReferences = value.containsKey("tool_call_ids"),
             )
         }
     }
