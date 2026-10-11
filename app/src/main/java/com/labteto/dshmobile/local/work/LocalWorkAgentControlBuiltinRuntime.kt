@@ -133,7 +133,10 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                                     ids.joinToString("\n")
                             },
                             onFailure = { error ->
-                                "官方模型目录查询未成功：${error.message?.take(200) ?: error.javaClass.simpleName}"
+                                "官方模型目录查询未成功（${when (error) {
+                                    is IllegalArgumentException -> "配置或接口不受支持"
+                                    else -> "服务商拒绝、响应异常或网络故障"
+                                }}）。可在应用中核对该档案权限与官方接口。 "
                             },
                         )
                     "$catalog\n\n【指定配置的官方模型目录】\n$providerModels"
