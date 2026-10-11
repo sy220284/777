@@ -271,6 +271,7 @@ object LocalModelPresets {
             ),
             imageInputSupported = true,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
+            contextWindowTokens = 1_000_000,
         ),
         LocalModelPreset(
             provider = "MiniMax",
@@ -279,6 +280,7 @@ object LocalModelPresets {
             capabilities = setOf(LocalModelCapability.TEXT),
             imageInputSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
+            contextWindowTokens = 204_800,
         ),
         LocalModelPreset(
             provider = "MiniMax",
@@ -287,6 +289,7 @@ object LocalModelPresets {
             capabilities = setOf(LocalModelCapability.TEXT),
             imageInputSupported = false,
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
+            contextWindowTokens = 204_800,
         ),
         LocalModelPreset(
             provider = "Kimi Code",
@@ -568,6 +571,16 @@ object LocalModelPresets {
         val normalizedModel = model.trim()
         val normalizedBaseUrl = runCatching { normalizeModelBaseUrl(baseUrl) }.getOrNull()
             ?: return null
+        if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
+            val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
+            if (native != null) return native.copy(baseUrl = normalizedBaseUrl)
+            if (normalizedModel.equals("MiniMax-M3.1-Flash-Preview", true)) {
+                return entries.first { it.model == "MiniMax-M3" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+            }
+            if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
+                return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+            }
+        }
         return entries.firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
                 normalizeModelBaseUrl(preset.baseUrl) == normalizedBaseUrl
@@ -636,6 +649,7 @@ object LocalModelPresets {
             "Google Gemini" -> LocalModelTemperatureRange(
                 0.0, 2.0, 1.0, omitAtChatDefault = true,
             )
+            "MiniMax" -> LocalModelTemperatureRange(0.0, 2.0, 1.0)
             // Others require a model-specific confirmed range or a fixed-value/unsupported rule.
             else -> null
         }

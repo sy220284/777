@@ -1,0 +1,49 @@
+package com.labteto.dshmobile.local.model
+
+import com.labteto.dshmobile.local.LocalModelException
+import java.net.URI
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/** Official MiniMax compatibility contract; shared by controls and both wire protocols. */
+internal object LocalMiniMaxPolicy {
+    fun isOfficial(baseUrl: String): Boolean = runCatching {
+        URI(normalizeModelBaseUrl(baseUrl)).host?.lowercase() in
+            setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
+    }.getOrDefault(false)
+
+    fun requireSuccessfulResponse(root: JsonObject) {
+        val status = root["base_resp"] as? JsonObject ?: return
+        val code = status["status_code"]?.jsonPrimitive?.intOrNull ?: return
+        if (code != 0) throw LocalModelException("MINIMAX_API_$code",
+            "MiniMax 请求失败（$code）：${status["status_msg"]?.jsonPrimitive?.contentOrNull ?: "请检查账户和请求配置"}", false)
+    }
+
+    fun selection(model: String): LocalReasoningSelection? = when (model.lowercase()) {
+        "minimax-m3" -> LocalReasoningSelection("high", "none")
+        "minimax-m3.1-flash-preview" -> LocalReasoningSelection("high", "low", maxEffort = "max")
+        else -> null // M2.x always thinks; an off switch would be misleading.
+    }
+
+    fun writeThinking(builder: JsonObjectBuilder, model: String, effort: String?, anthropic: Boolean) {
+        if (effort == null) return
+        when (model.lowercase()) {
+            "minimax-m3" -> builder.put("thinking", buildJsonObject {
+                put("type", if (effort == "none") "disabled" else "adaptive")
+            })
+            "minimax-m3.1-flash-preview" -> {
+                require(effort in setOf("low", "medium", "high", "xhigh", "max")) {
+                    "MiniMax M3.1 必须保留思考，请选择基础思考或更高档位"
+                }
+                builder.put("thinking", buildJsonObject { put("type", "adaptive") })
+                if (anthropic) builder.put("output_config", buildJsonObject { put("effort", effort) })
+                else builder.put("reasoning_effort", effort)
+            }
+        }
+    }
+}

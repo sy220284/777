@@ -53,6 +53,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         temperature: Double?,
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit = {},
+        reasoningEffort: String? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         require(route.bearerToken.isNotBlank()) { "当前模型 API Key 为空" }
         require(route.model.isNotBlank()) { "当前模型名称为空" }
@@ -68,10 +69,12 @@ internal class AnthropicMessagesClient @Inject constructor(
             messages = messages,
             tools = tools,
             temperature = temperature,
+            reasoningEffort = reasoningEffort,
         )
         val wirePayload = payload.toString().toByteArray(Charsets.UTF_8)
-        if (wirePayload.size > 32_000_000) {
-            throw LocalModelException("MODEL_REQUEST_TOO_LARGE", "Anthropic 请求超过 32 MB，请减少图片或历史内容", false)
+        val maxRequestBytes = if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) 64_000_000 else 32_000_000
+        if (wirePayload.size > maxRequestBytes) {
+            throw LocalModelException("MODEL_REQUEST_TOO_LARGE", "模型请求超过 ${maxRequestBytes / 1_000_000} MB，请减少图片或历史内容", false)
         }
         val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
@@ -153,6 +156,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         messages: List<LocalCanonicalMessage>,
         tools: List<LocalCanonicalToolDefinition>,
         temperature: Double?,
+        reasoningEffort: String? = null,
     ): JsonObject {
         val system = messages
             .filter { it.role == LocalCanonicalRole.SYSTEM || it.role == LocalCanonicalRole.DEVELOPER }
@@ -161,7 +165,10 @@ internal class AnthropicMessagesClient @Inject constructor(
             .joinToString("\n\n") { it.text }
         return buildJsonObject {
             put("model", route.model)
-            put("max_tokens", DEFAULT_MAX_TOKENS)
+            put("max_tokens", route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS)
+            if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                LocalMiniMaxPolicy.writeThinking(this, route.model, reasoningEffort, anthropic = true)
+            }
             put("stream", true)
             if (system.isNotBlank()) put("system", system)
             put("messages", mergeAdjacentTurns(buildJsonArray {
@@ -335,6 +342,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     .getOrElse { cause ->
                         throw protocolError("Anthropic SSE 包含无法解析的数据帧", requestId, cause)
                     }
+                LocalMiniMaxPolicy.requireSuccessfulResponse(event)
                 when (event["type"]?.jsonPrimitive?.contentOrNull) {
                     "message_start" -> {
                         if (sawMessageStart) throw protocolError("重复 message_start", requestId)

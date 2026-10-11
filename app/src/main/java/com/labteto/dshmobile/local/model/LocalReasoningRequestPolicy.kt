@@ -31,6 +31,9 @@ internal object LocalReasoningRequestPolicy {
             profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
             model in setOf("deepseek-flash", "deepseek-v4-pro")
         ) return LocalReasoningSelection("high", "none", "low", "max")
+        if (profile.authKind == LocalModelAuthKind.API_KEY && LocalMiniMaxPolicy.isOfficial(profile.baseUrl) &&
+            profile.protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.ANTHROPIC_MESSAGES)
+        ) return LocalMiniMaxPolicy.selection(model)
         if (host != "api.openai.com") return null
         if (profile.protocol !in setOf(
             LocalModelProtocol.CHAT_COMPLETIONS,

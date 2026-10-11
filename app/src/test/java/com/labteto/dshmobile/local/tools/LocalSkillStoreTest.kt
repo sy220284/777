@@ -22,7 +22,7 @@ class LocalSkillStoreTest {
     @Test
     fun bundledSkillsAreRealInvocableInstructions() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
-        val all = store.presets()
+        val all = store.presets().filterNot { it.id in LocalMiniMaxSkillCatalog.entries.map { item -> item.id } }
         assertEquals(8, all.size)
         assertTrue(all.all { it.installed })
         assertEquals(8, all.map { it.id }.distinct().size)
