@@ -299,8 +299,9 @@ class SettingsViewModel @Inject constructor(
     suspend fun usageGroupDetail(
         kind: TokenUsageGroupKind,
         key: String,
+        modelFilter: String? = null,
     ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
-        settingsData.usageGroupDetail(kind, key)
+        settingsData.usageGroupDetail(kind, key, modelFilter)
     }
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
