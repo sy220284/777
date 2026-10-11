@@ -86,6 +86,15 @@ def delete(root, path):
     if node is None or node["children"]:
         raise ValueError("禁止删除不存在或含子功能的节点: " + " / ".join(path))
     parent["children"].remove(node)
+    # 删除/迁走最后一个叶节点时，顺带清理已空的旧分类，防止死节点残留。
+    ancestors = path[:-1]
+    while ancestors:
+        empty = find(root, ancestors)
+        owner = find(root, ancestors[:-1])
+        if empty is None or empty["children"]:
+            break
+        owner["children"].remove(empty)
+        ancestors = ancestors[:-1]
 
 
 def add(root, path):
@@ -314,6 +323,7 @@ def test():
         renamed = generate(root)
         renamed_tree, _ = parse(renamed[MD])
         assert find(renamed_tree, ["A", "旧功能"]) is None
+        assert find(renamed_tree, ["A"]) is None  # 退役分类不得留下空壳
         assert find(renamed_tree, ["B", "新功能"]) is not None
         assert json.loads(renamed[MATRIX])["items"][0]["path"] == "B / 新功能"
         assert "新功能" in renamed[HTML] and "旧功能" not in renamed[HTML]
