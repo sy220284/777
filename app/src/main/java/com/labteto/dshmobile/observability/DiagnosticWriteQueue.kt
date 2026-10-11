@@ -13,6 +13,7 @@ internal class DiagnosticWriteQueue<T>(
     private val important: (T) -> Boolean,
     private val capacity: Int = 4_096,
     private val batchSize: Int = 128,
+    private val scheduleRetry: ((Runnable) -> Unit)? = null,
 ) {
     init {
         require(capacity > 0 && batchSize > 0)
@@ -48,7 +49,15 @@ internal class DiagnosticWriteQueue<T>(
                     pending.addLast(entry)
                     if (!priority) ordinaryCount++
                 } else if (priority) {
-                    pending.removeFirst()
+                    // Keep the first failure (root cause) as well as the newest failure.
+                    val iterator = pending.iterator()
+                    iterator.next()
+                    if (iterator.hasNext()) {
+                        iterator.next()
+                        iterator.remove()
+                    } else {
+                        pending.removeFirst()
+                    }
                     pending.addLast(entry)
                 }
                 // When full of failures, an incoming ordinary message is discarded.
@@ -111,7 +120,17 @@ internal class DiagnosticWriteQueue<T>(
                     }
                     inFlight = emptyList()
                     writeError = error.javaClass.simpleName
-                    draining = false
+                    draining = scheduleRetry != null
+                }
+                if (scheduleRetry != null) {
+                    try {
+                        scheduleRetry.invoke(Runnable { drain() })
+                    } catch (scheduleError: Exception) {
+                        synchronized(gate) {
+                            draining = false
+                            writeError = scheduleError.javaClass.simpleName
+                        }
+                    }
                 }
                 return
             }
