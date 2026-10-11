@@ -204,8 +204,32 @@ def proof(root, marker, earlier):
     if marker.get("action") == "retire":
         if earlier is None or marker.get("path") != earlier["path"]:
             return "退役项必须对应已登记功能的原完整路径"
-        if len(CHINESE.findall(marker.get("reason", ""))) < 2:
-            return "退役必须说明中文原因"
+        if len(CHINESE.findall(marker.get("reason", ""))) < 4:
+            return "退役必须说明至少四个汉字的原因"
+        symbol = earlier.get("entry")
+        if not symbol:
+            return "原登记缺少可核查的实现入口，禁止直接退役"
+        prod = root / "app"
+        declaration = re.compile(SYMBOL % re.escape(symbol))
+        mention = re.compile(r"\b" + re.escape(symbol) + r"\b")
+        for file in prod.rglob("*"):
+            if not file.is_file() or file.suffix not in {".kt", ".java"}:
+                continue
+            relative = file.relative_to(root).as_posix()
+            if "/src/main/" in "/" + relative and declaration.search(
+                file.read_text(encoding="utf-8", errors="replace")
+            ):
+                return "其他生产源码仍声明旧实现入口，禁止退役"
+            if ("/src/test/" in "/" + relative or "/src/androidTest/" in "/" + relative) and mention.search(
+                file.read_text(encoding="utf-8", errors="replace")
+            ):
+                return "测试代码仍使用旧实现入口，禁止退役"
+        matrix_file = root / MATRIX
+        if matrix_file.exists() and any(
+            item["path"] == earlier["path"]
+            for item in json.loads(matrix_file.read_text(encoding="utf-8"))["items"]
+        ):
+            return "旧功能还有测试验收映射，须先将测试迁移到接管功能或完成审核"
         return None
     if marker.get("action", "upsert") != "upsert":
         return "操作类型无效"
@@ -498,6 +522,30 @@ def generate(root):
             old_paths[item["path"]] = None
     for ident, item in sorted(valid.items()):
         was = older.get(ident)
+        # 保持名称路径唯一。撞上现有节点会让两个产品功能误合并。
+        target = parts(item["path"])
+        source_path = parts(was["path"]) if was else (
+            parts(item["previous_path"]) if item.get("previous_path") else None
+        )
+        exists = find(model, target)
+        if exists is not None and target != source_path and (
+            not was or target != parts(was["path"])
+        ):
+            pending.append({"id": ident, "path": item["path"],
+                            "status": "拒绝自动合并现有节点",
+                            "reason": "目标功能路径已经存在；请先逐项核实合并/拆分及测试归属"})
+            if was and find(model, parts(was["path"])) is None:
+                add(model, parts(was["path"]))
+            continue
+        if not was and source_path is not None:
+            historical, existing = historical_code_evidence(root, [])
+            matches = [x for x in historical + existing if x["path"] == item["previous_path"]]
+            known_sources = {x for e in matches for x in e["historical_production_sources"]}
+            if not known_sources or item["source"] not in known_sources:
+                pending.append({"id": ident, "path": item["path"],
+                                "status": "旧节点身份待核实",
+                                "reason": "previous_path 缺少相同源码文件的历史证据，不能接管任意旧功能"})
+                continue
         if was and was["path"] != item["path"]:
             if find(model, parts(was["path"])):
                 delete(model, parts(was["path"]))
@@ -642,7 +690,7 @@ def generate(root):
             ), "test_reference_count": evidence_counts.get(path, 0)}
             for path in all_leaves
         ],
-        "source_verified_registrations": len(valid),
+        "source_verified_registrations": len(registry_nodes),
         "explicit_retirements": len(retired),
         "changes_applied": [{"previous": previous, "current": current}
                             for previous, current in sorted(old_paths.items())],
@@ -660,13 +708,18 @@ def generate(root):
         ),
     }
     index["source_snapshot"] = snap
-    index["verified_registrations"] = sorted(valid)
+    index["verified_registrations"] = sorted(registry_nodes)
     index["unverified_changes_count"] = len(pending)
     index["obsolete_historical_evidence_count"] = len(historical_gaps)
     index["current_tree_outdated_source_count"] = len(current_source_gaps)
+    # 未获准的迁移保留旧身份，且不将未写入的新增登记误记为确认。
+    rejected_ids = {x.get("id") for x in pending}
+    registry_nodes = {
+        **{ident: older[ident] for ident in rejected_ids if ident in older},
+        **{ident: item for ident, item in valid.items() if ident not in rejected_ids},
+    }
     normalized = [{k: v for k, v in item.items() if k not in {"previous_path", "action", "reason"}}
-                  for item in sorted(valid.values(), key=lambda v: v["id"])
-                  if (root / item["source"]).is_file()]
+                  for item in sorted(registry_nodes.values(), key=lambda v: v["id"])]
     return {
         MD: md, HTML: html, MATRIX: matrix_text,
         REG: json.dumps({"version": 1, "nodes": normalized}, ensure_ascii=False, indent=2) + "\n",
