@@ -372,7 +372,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun explicitCurrentBoundaryIsOneShotAndDoesNotRequireRepetition() {
+    fun trackerRecordsActualExpressionsAndUserDraftRespectsExplicitBoundaries() {
         val persona = PersonaProfile(
             name = "阿青",
             portrait = "嘴硬心软",
@@ -390,7 +390,8 @@ class ChatInteractionPlannerTest {
             assistantMessage = "好。",
         )
 
-        assertTrue(plannerPrompt.contains("一次表达即生效，不要求重复"))
+        assertTrue(plannerPrompt.contains("人物实际表达"))
+        assertFalse(plannerPrompt.contains("一次表达即生效，不要求重复"))
         assertTrue(suggestionsPrompt.contains("一次即生效"))
     }
 
