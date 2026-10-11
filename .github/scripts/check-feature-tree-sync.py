@@ -62,6 +62,30 @@ def inspect():
     if md_paths != html_paths or len(set(html_paths)) != len(html_paths):
         raise ValueError("Markdown、HTML 功能节点未逐条一致或存在重复")
 
+    # 独立重读历史台账，确认已移出功能、缺失生产代码和报告结果逐条一致。
+    old_evidence = DOCS / "FEATURE-CODE-EVIDENCE.zh-CN.md"
+    historical_dropped, suspicious_current = [], []
+    if old_evidence.is_file():
+        pattern = re.compile(
+            r"https://github\.com/[^/]+/[^/]+/blob/[^/]+/"
+            r"(app/src/(?:main|test|androidTest)/[^\s)#]+?\.(?:kt|java))(?:#|[)])"
+        )
+        for line in old_evidence.read_text(encoding="utf-8").splitlines():
+            if not line.startswith("| "):
+                continue
+            cols = [x.strip() for x in line.strip("|").split("|")]
+            if len(cols) < 4 or not cols[0].isdigit() or " / " not in cols[1]:
+                continue
+            candidate = cols[1]
+            prod = sorted(set(
+                path for path in pattern.findall(cols[3])
+                if "/src/main/" in "/" + path
+            ))
+            absent = [p for p in prod if not (ROOT / p).is_file()]
+            if candidate not in leaf_paths:
+                historical_dropped.append((candidate, prod, absent))
+            elif absent:
+                suspicious_current.append((candidate, prod, absent))
     index = json.loads(INDEX.read_text(encoding="utf-8"))
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
     registry = json.loads(REG.read_text(encoding="utf-8"))
@@ -80,6 +104,37 @@ def inspect():
     sha = digest.hexdigest()[:12]
     if index["source_snapshot"] != sha or review["snapshot"] != sha:
         raise ValueError("生成文件绑定的 SHA 与实际源码不同")
+    recorded_historical = [
+        (x["path"], x["historical_production_sources"], x["missing_production_sources"])
+        for x in review.get("obsolete_historical_evidence", [])
+    ]
+    recorded_current = [
+        (x["path"], x["historical_production_sources"], x["missing_production_sources"])
+        for x in review.get("current_tree_outdated_sources", [])
+    ]
+    if (recorded_historical != historical_dropped
+        or recorded_current != suspicious_current
+        or review.get("obsolete_historical_evidence_count") != len(historical_dropped)
+        or review.get("current_tree_outdated_source_count") != len(suspicious_current)
+        or index.get("obsolete_historical_evidence_count") != len(historical_dropped)
+        or index.get("current_tree_outdated_source_count") != len(suspicious_current)):
+        raise ValueError("历史功能退役疑点与源码现存情况不一致")
+    # 经审批自动移除的旧功能，再次检查身份与不存在的生产入口。
+    retirements_path = DOCS / "FEATURE-TREE-RETIREMENTS.json"
+    config = json.loads(retirements_path.read_text(encoding="utf-8")) if retirements_path.is_file() else {"version": 1, "approvals": []}
+    if config.get("version") != 1:
+        raise ValueError("功能退役审批记录版本不合法")
+    approved_paths = set()
+    for entry in review.get("approved_legacy_retirements", []):
+        name = entry["path"]
+        if name not in [v["path"] for v in config["approvals"]]:
+            raise ValueError("报告凭空引入退役审批结果")
+        if name in leaf_paths:
+            raise ValueError("已批准退役的功能仍留在现行树")
+        approved_paths.add(name)
+    for candidate in review.get("legacy_retirements_requiring_review", []):
+        if candidate["path"] not in [v["path"] for v in config["approvals"]]:
+            raise ValueError("退役未批准项没有真实审核请求")
     if review["feature_nodes"] != len(html_paths) or review["functional_leaves"] != len(leaf_paths):
         raise ValueError("复核报告记录的功能节点数量有误")
     actual_evidence = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
@@ -154,6 +209,7 @@ def inspect():
         raise ValueError("已核实身份与索引不一致")
     if len(review["pending_changes"]) != index["unverified_changes_count"]:
         raise ValueError("未确认候选计数不一致")
+    print(f"历史功能核对：现行树外旧项 {len(historical_dropped)} 项，现行功能中失效源码来源 {len(suspicious_current)} 项。")
     print(f"功能树二次独立复核通过：扫描 {files} 个代码/配置文件，生产 {sources} 个，"
           f"功能节点 {len(html_paths)}、叶节点 {len(leaf_paths)}，"
           f"已登记源证据 {len(ids)}、待确认变更 {len(review['pending_changes'])}。"
