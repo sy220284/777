@@ -65,7 +65,7 @@ class LspPluginTest {
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("server.sh")
         script.writeText(
-            "printf '%s' '" + frame(initialized) + frame(hover1) + frame(hover2) + "'\nexec cat >/dev/null\n",
+            "printf '%s' '" + frame(initialized) + frame(hover1) + frame(hover2) + "'\nwhile IFS= read -r line; do :; done\n",
         )
         temporary.newFile("example.txt").writeText("example")
         var approvals = 0
@@ -253,7 +253,7 @@ class LspPluginTest {
                 frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
                 frame("""{"jsonrpc":"2.0","id":2,"result":{"contents":"first"}}""") +
                 frame("""{"jsonrpc":"2.0","id":3,"result":{"contents":"second"}}""") +
-                "'\nexec cat >/dev/null\n",
+                "'\nwhile IFS= read -r line; do :; done\n",
         )
         temporary.newFile("sample.ts").writeText("const answer = 42")
         var installs = 0
@@ -399,7 +399,7 @@ class LspPluginTest {
                 "printf '%s' '" + frame(init) + "'\n" +
                     "sleep 1\n" +
                     "printf '%s' '" + frame(notification) + "'\n" +
-                    "exec cat >/dev/null\n",
+                    "while IFS= read -r line; do :; done\n",
             )
         }
         val context = HarnessContext()
@@ -432,7 +432,7 @@ class LspPluginTest {
         val script = temporary.newFile("silent-diagnostics.sh").apply {
             writeText(
                 "printf '%s' '" + frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
-                    "'\nexec cat >/dev/null\n",
+                    "'\nwhile IFS= read -r line; do :; done\n",
             )
         }
         val context = HarnessContext()
