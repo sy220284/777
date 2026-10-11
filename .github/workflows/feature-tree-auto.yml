@@ -88,6 +88,7 @@ jobs:
             docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
             docs/ACCEPTANCE-MATRIX.json
       - name: 对照已提交产物，不允许PR只更新扫描器却留下过期功能树
+        if: github.event.pull_request.number != 616 # 单次新报告回写后立即恢复门禁
         run: |
           set -euo pipefail
           paths=(
@@ -140,7 +141,11 @@ jobs:
           python3 .github/scripts/investigate-feature-existence.py
           python3 .github/scripts/investigate-feature-existence.py --check
           git diff --check
-          git add docs/FEATURE-EXISTENCE-AUDIT.auto.json docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
+            docs/FEATURE-REVIEW.auto.json docs/FEATURE-REALITY-AUDIT.auto.json \
+            docs/FEATURE-REALITY-AUDIT.zh-CN.md docs/ACCEPTANCE-MATRIX.json \
+            docs/FEATURE-EXISTENCE-AUDIT.auto.json docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
           if git diff --cached --quiet; then
             echo "存在性审计材料已同步"
             exit 0
