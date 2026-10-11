@@ -107,11 +107,13 @@ internal class LocalWorkTurnToolRuntime(
         binding: LocalWorkRunBinding,
         call: LocalToolCall,
         allowMutation: Boolean = true,
+        stillCurrent: () -> Boolean = { true },
     ): AgentToolResult = execution.executeScoped(
         original = call,
         sessionId = binding.sessionId,
         allowMutation = allowMutation,
         planModeEnabled = binding.state.value.work.planMode,
+        beforeExecution = stillCurrent,
         approval = { normalized, tool, summary ->
             approve(binding, normalized, summary, tool)
         },
@@ -126,12 +128,13 @@ internal class LocalWorkTurnToolRuntime(
         val parallel = calls.size > 1 && calls.all { isParallel(it.name) }
         if (!parallel) {
             return calls.map { call ->
-                call to if (superseded()) workSteeredToolResult(call) else execute(binding, call, allowMutation)
+                call to if (superseded()) workSteeredToolResult(call)
+                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
             }
         }
         return isolatedParallelMap(calls) { call ->
             call to if (superseded()) workSteeredToolResult(call)
-                else execute(binding, call, allowMutation)
+                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
