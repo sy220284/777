@@ -115,4 +115,30 @@ class AutomaticLanguageServerResolverTest {
         )
         assertTrue(resolver.resolve("src/main.rs").isEmpty())
     }
+
+    @Test fun nearestProjectServerWinsOverSharedComponent() {
+        val root = temporary.root
+        val shared = listOf("node", "/private/components/typescript/cli.mjs", "--stdio")
+        val project = File(root, "src/node_modules/typescript-language-server/lib/cli.mjs")
+            .apply { parentFile!!.mkdirs(); writeText("project server") }
+        val resolver = AutomaticLanguageServerResolver(
+            root = root,
+            commandAvailable = { it == "node" },
+            installedCommand = { shared },
+        )
+        assertEquals(listOf("node", project.absolutePath, "--stdio"),
+            resolver.resolve("src/packages/example.ts"))
+        assertEquals(shared, resolver.resolve("other.ts"))
+    }
+
+    @Test fun pythonWorkspacePyrightUsesNodeWithoutPathWrapper() {
+        val script = File(temporary.root, "node_modules/pyright/langserver.index.js")
+            .apply { parentFile!!.mkdirs(); writeText("python server") }
+        val resolver = AutomaticLanguageServerResolver(
+            temporary.root, commandAvailable = { it == "node" },
+        )
+        assertEquals(listOf("node", script.absolutePath, "--stdio"),
+            resolver.resolve("scripts/report.py"))
+    }
+
 }

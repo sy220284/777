@@ -62,9 +62,16 @@ internal class LocalToolCompositionRoot @Inject constructor(
         baseEnvironment = bundledRuntimeManager::environment,
     )
     private val preferences = LocalHarnessPreferences.from(context)
+    private val languageServerComponents = OnDemandLanguageServerManager(
+        home = File(context.noBackupFilesDir, "local-harness/lsp-components"),
+        commandAvailable = process::isCommandAvailable,
+        resolveCommand = process::resolveCommand,
+        processEnvironment = { process.processEnvironment() },
+    )
     private val languageServerResolver = AutomaticLanguageServerResolver(
         root = File(workspace.path),
         commandAvailable = process::isCommandAvailable,
+        installedCommand = languageServerComponents::installedCommand,
         legacyCommand = {
             parseLanguageServerCommand(
                 preferences.getString("language_server_command", "").orEmpty(),
@@ -98,6 +105,22 @@ internal class LocalToolCompositionRoot @Inject constructor(
             runtimeProcess = process,
             runtimeTerminal = terminal,
             languageServerCommand = languageServerResolver::resolve,
+            canInstallLanguageServer = { path ->
+                languageServerResolver.managedHint(path)
+                    ?.let { languageServerComponents.componentFor(it) } != null
+            },
+            installLanguageServer = { path ->
+                languageServerComponents.ensureInstalled(languageServerResolver.managedHint(path))
+            },
+            languageServerStatus = {
+                languageServerComponents.status("probe.ts") + "；" +
+                    languageServerComponents.status("probe.py")
+            },
+            uninstallLanguageServer = { id ->
+                OnDemandLanguageServerManager.Component.entries
+                    .firstOrNull { it.id == id }
+                    ?.let(languageServerComponents::uninstall) ?: false
+            },
             resourceScheduler = runtimeStateStore.resourceScheduler,
             routeProvider = {
                 val current = runtimeStateStore.state.value

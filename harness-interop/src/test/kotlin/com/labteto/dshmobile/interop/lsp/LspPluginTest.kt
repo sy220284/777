@@ -24,11 +24,18 @@ import org.junit.rules.TemporaryFolder
 class LspPluginTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun defaultInitializeCapabilitiesEnablePushDiagnostics() {
+        val textDocument = DEFAULT_LSP_CLIENT_CAPABILITIES["textDocument"] as? JsonObject
+        assertTrue("客户端必须声明 textDocument 能力", textDocument != null)
+        assertTrue("TypeScript 语言服务器依赖此声明才推送诊断",
+            textDocument?.get("publishDiagnostics") is JsonObject)
+    }
+
     @Test fun registersHiddenAutomaticSemanticTools() = runTest {
         val context = HarnessContext()
         val plugin = LspPlugin(temporary.root, Json, { emptyList() })
         plugin.install(context)
-        assertEquals(9, context.tools.names().size)
+        assertEquals(10, context.tools.names().size)
         assertFalse("lsp_start" in context.tools.names())
         assertFalse("lsp_stop" in context.tools.names())
         assertTrue("lsp_implementation" in context.tools.names())
@@ -65,7 +72,7 @@ class LspPluginTest {
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val script = temporary.newFile("server.sh")
         script.writeText(
-            "printf '%s' '" + frame(initialized) + frame(hover1) + frame(hover2) + "'\nexec cat >/dev/null\n",
+            "printf '%s' '" + frame(initialized) + frame(hover1) + frame(hover2) + "'\nwhile IFS= read -r line; do :; done\n",
         )
         temporary.newFile("example.txt").writeText("example")
         var approvals = 0
@@ -241,5 +248,223 @@ class LspPluginTest {
             runCatching { plugin.uninstall(context) }
         }
     }
+
+
+    @Test fun onDemandInstallationOccursOnlyOnFirstSemanticQueryAndRequiresApproval() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        fun frame(json: String) =
+            "Content-Length: " + json.toByteArray().size + "\r\n\r\n" + json
+        val server = temporary.newFile("on-demand-server.sh")
+        server.writeText(
+            "printf '%s' '" +
+                frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
+                frame("""{"jsonrpc":"2.0","id":2,"result":{"contents":"first"}}""") +
+                frame("""{"jsonrpc":"2.0","id":3,"result":{"contents":"second"}}""") +
+                "'\nwhile IFS= read -r line; do :; done\n",
+        )
+        temporary.newFile("sample.ts").writeText("const answer = 42")
+        var installs = 0
+        var approvals = 0
+        var installed = emptyList<String>()
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { installed },
+            canInstallOnDemand = { it?.endsWith(".ts") == true },
+            installOnDemand = {
+                installs++
+                listOf("/bin/sh", server.absolutePath).also { installed = it }
+            },
+        )
+        plugin.install(context)
+        try {
+            val status = context.tools.execute("lsp_status", JsonObject(emptyMap()))
+            assertFalse(status.isError)
+            assertEquals(0, installs)
+            assertEquals(0, approvals)
+            withTimeout(5_000) {
+                val scope = ToolContext(approval = { approvals++; true })
+                val first = context.tools.execute("lsp_hover",
+                    buildJsonObject { put("path", "sample.ts") }, context = scope)
+                val second = context.tools.execute("lsp_hover",
+                    buildJsonObject { put("path", "sample.ts") }, context = scope)
+                assertTrue(first.content.contains("first"))
+                assertTrue(second.content.contains("second"))
+            }
+            assertEquals(1, installs)
+            assertEquals(2, approvals) // download + first process launch
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+    @Test fun rejectingDownloadNeverExecutesInstaller() = runTest {
+        temporary.newFile("sample.py").writeText("a = 1")
+        var installs = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            canInstallOnDemand = { true },
+            installOnDemand = { installs++; listOf("node", "server.js") },
+        )
+        plugin.install(context)
+        try {
+            val result = context.tools.execute(
+                "lsp_hover",
+                buildJsonObject { put("path", "sample.py") },
+                context = ToolContext(approval = { false }),
+            )
+            assertTrue(result.isError)
+            assertEquals(0, installs)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+
+    @Test fun readOnlySubagentAndPlanModeCannotDownloadComponents() = runTest {
+        temporary.newFile("check.py").writeText("value = 1")
+        var installs = 0
+        var approvals = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            canInstallOnDemand = { true },
+            installOnDemand = { installs++; listOf("node", "server.js") },
+        )
+        plugin.install(context)
+        try {
+            for (scope in listOf(
+                ToolContext(allowMutation = false, approval = { approvals++; true }),
+                ToolContext(attributes = mapOf("plan_mode" to true),
+                    approval = { approvals++; true }),
+            )) {
+                val result = context.tools.execute(
+                    "lsp_hover",
+                    buildJsonObject { put("path", "check.py") },
+                    context = scope,
+                )
+                assertTrue(result.isError)
+            }
+            assertEquals(0, installs)
+            assertEquals(0, approvals)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+
+    @Test fun componentRemovalRequiresApprovalAndCallsManagedUninstaller() = runTest {
+        var removed = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            managedStatus = { "typescript 6.0.1 已安装" },
+            uninstallOnDemand = { id -> removed++; id == "typescript" },
+        )
+        plugin.install(context)
+        try {
+            val status = context.tools.execute("lsp_status", JsonObject(emptyMap()))
+            assertTrue(status.content.contains("typescript 6.0.1 已安装"))
+            assertEquals(0, removed)
+            val rejected = context.tools.execute(
+                "lsp_uninstall_component",
+                buildJsonObject { put("component", "typescript") },
+                context = ToolContext(approval = { false }),
+            )
+            assertTrue(rejected.isError)
+            assertEquals(0, removed)
+            val ok = context.tools.execute(
+                "lsp_uninstall_component",
+                buildJsonObject { put("component", "typescript") },
+                context = ToolContext(approval = { true }),
+            )
+            assertFalse(ok.isError)
+            assertEquals(1, removed)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+
+    @Test fun diagnosticsCanArriveAfterInitializeWithoutPendingRequest() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        val file = temporary.newFile("late.ts").apply { writeText("const value: string = 123;\n") }
+        val uri = file.toURI().toString()
+        // Real TypeScript servers can publish file:/// while Java File.toURI gives file:/.
+        val publishedUri = java.net.URI("file", "", file.toURI().path, null).toString()
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
+        val init = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
+        val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$publishedUri","version":1,"diagnostics":[{"message":"Type number is not assignable to string","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
+        val script = temporary.newFile("delayed-diagnostics.sh").apply {
+            writeText(
+                "printf '%s' '" + frame(init) + "'\n" +
+                    "sleep 1\n" +
+                    "printf '%s' '" + frame(notification) + "'\n" +
+                    "while IFS= read -r line; do :; done\n",
+            )
+        }
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { listOf("/bin/sh", script.absolutePath) },
+        )
+        plugin.install(context)
+        try {
+            withTimeout(7_000) {
+                val result = context.tools.execute(
+                    "lsp_diagnostics",
+                    buildJsonObject { put("path", "late.ts") },
+                    context = ToolContext(approval = { true }),
+                )
+                assertFalse(result.isError)
+                assertTrue(result.content.contains("\"published\":true"))
+                assertTrue(result.content.contains("not assignable"))
+            }
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+    @Test fun diagnosticsTimeoutNeverClaimsAnEmptyErrorListIsFinal() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        temporary.newFile("waiting.ts").writeText("const a = 1")
+        fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
+        val script = temporary.newFile("silent-diagnostics.sh").apply {
+            writeText(
+                "printf '%s' '" + frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
+                    "'\nwhile IFS= read -r line; do :; done\n",
+            )
+        }
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root, json = Json,
+            command = { listOf("/bin/sh", script.absolutePath) },
+        )
+        plugin.install(context)
+        try {
+            withTimeout(7_000) {
+                val result = context.tools.execute(
+                    "lsp_diagnostics",
+                    buildJsonObject { put("path", "waiting.ts") },
+                    context = ToolContext(approval = { true }),
+                )
+                assertFalse(result.isError)
+                assertTrue(result.content.contains("timeout_waiting_for_publish"))
+                assertTrue(result.content.contains("\"published\":false"))
+            }
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
 
 }

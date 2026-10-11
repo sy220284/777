@@ -4,7 +4,10 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.File
+import java.net.URI
 import java.util.ArrayDeque
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
@@ -21,9 +24,17 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+/** Advertise push diagnostics; TypeScript Language Server suppresses them otherwise. */
+internal val DEFAULT_LSP_CLIENT_CAPABILITIES: JsonObject = buildJsonObject {
+    put("textDocument", buildJsonObject {
+        put("publishDiagnostics", buildJsonObject { })
+    })
+}
 
 class LspProcessClient(
     private val command: List<String>,
@@ -35,11 +46,19 @@ class LspProcessClient(
     private val ids = AtomicLong(1L)
     private val mutex = Mutex()
     private val pendingNotifications = ArrayDeque<JsonObject>()
+    private val messagesLock = Object()
+    private val writeLock = Any()
+    private val pendingReplies = mutableMapOf<String, CompletableFuture<JsonObject>>()
+    private val earlyReplies = linkedMapOf<String, JsonObject>()
+    private val latestDiagnostics = mutableMapOf<String, Pair<Long, JsonObject>>()
+    private var diagnosticSerial = 0L
+    private var readerFailure: Throwable? = null
+    private var readerThread: Thread? = null
     private var process: Process? = null
     private var input: BufferedInputStream? = null
     private var output: BufferedOutputStream? = null
 
-    suspend fun initialize(rootUri: String?, capabilities: JsonObject = JsonObject(emptyMap())): JsonObject {
+    suspend fun initialize(rootUri: String?, capabilities: JsonObject = DEFAULT_LSP_CLIENT_CAPABILITIES): JsonObject {
         val params = buildJsonObject {
             put("processId", JsonNull)
             if (rootUri != null) put("rootUri", rootUri) else put("rootUri", JsonNull)
@@ -139,7 +158,9 @@ class LspProcessClient(
                 put("params", params)
             }
             val writer = checkNotNull(output) { "LSP 输出流未就绪" }
-            LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
+            synchronized(writeLock) {
+                LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
+            }
         }
     }
 
@@ -166,9 +187,45 @@ class LspProcessClient(
         }
     }
 
-    fun drainNotifications(): List<JsonObject> = synchronized(pendingNotifications) {
+    fun drainNotifications(): List<JsonObject> = synchronized(messagesLock) {
         buildList {
             while (pendingNotifications.isNotEmpty()) add(pendingNotifications.removeFirst())
+        }
+    }
+
+    /** Record a revision before didOpen/didChange so an old push cannot masquerade as new. */
+    fun isLive(): Boolean = process?.isAlive == true &&
+        synchronized(messagesLock) { readerFailure == null }
+
+    fun diagnosticRevision(uri: String): Long = synchronized(messagesLock) {
+        latestDiagnostics[diagnosticUriKey(uri)]?.first ?: 0L
+    }
+
+    /**
+     * Responses and server notifications have a single reader. Notifications can arrive while
+     * no request is pending; await the relevant URI/version instead of pumping unrelated requests.
+     */
+    suspend fun awaitPublishedDiagnostics(
+        uri: String,
+        sinceRevision: Long,
+        version: Int,
+        timeoutMillis: Long = 4_000L,
+    ): JsonObject? = boundedIo {
+        val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
+        synchronized(messagesLock) {
+            while (true) {
+                val pair = latestDiagnostics[diagnosticUriKey(uri)]
+                if (pair != null && pair.first > sinceRevision) {
+                    val publishedVersion = pair.second["version"]?.jsonPrimitive?.intOrNull
+                    if (publishedVersion == null || publishedVersion >= version) return@boundedIo pair.second
+                }
+                readerFailure?.let { throw IllegalStateException("语言服务消息流中断", it) }
+                val remaining = (deadline - System.nanoTime()) / 1_000_000L
+                if (remaining <= 0) return@boundedIo null
+                messagesLock.wait(maxOf(1L, remaining))
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
         }
     }
 
@@ -179,6 +236,17 @@ class LspProcessClient(
         process = null
         input = null
         output = null
+        synchronized(messagesLock) {
+            val stopped = IllegalStateException("LSP 连接已关闭")
+            readerFailure = stopped
+            pendingReplies.values.forEach { it.completeExceptionally(stopped) }
+            pendingReplies.clear()
+            earlyReplies.clear()
+            latestDiagnostics.clear()
+            messagesLock.notifyAll()
+        }
+        readerThread?.interrupt()
+        readerThread = null
     }
 
     private suspend fun requestMessage(method: String, params: JsonObject): JsonObject = mutex.withLock {
@@ -210,32 +278,33 @@ class LspProcessClient(
     }
 
     private fun requestBlocking(method: String, params: JsonObject): JsonObject {
-            ensureStarted()
-            val id = ids.getAndIncrement()
-            val payload = buildJsonObject {
-                put("jsonrpc", "2.0")
-                put("id", id)
-                put("method", method)
-                put("params", params)
+        ensureStarted()
+        val id = ids.getAndIncrement().toString()
+        val payload = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", id.toLong())
+            put("method", method)
+            put("params", params)
+        }
+        val future = CompletableFuture<JsonObject>()
+        synchronized(messagesLock) {
+            readerFailure?.let { throw IllegalStateException("语言服务已断开", it) }
+            earlyReplies.remove(id)?.let(future::complete)
+            if (!future.isDone) pendingReplies[id] = future
+        }
+        try {
+            synchronized(writeLock) {
+                LspFraming.write(checkNotNull(output) { "LSP 输出流未就绪" },
+                    json.encodeToString(JsonObject.serializer(), payload))
             }
-            val writer = checkNotNull(output) { "LSP 输出流未就绪" }
-            val reader = checkNotNull(input) { "LSP 输入流未就绪" }
-            LspFraming.write(writer, json.encodeToString(JsonObject.serializer(), payload))
-            while (true) {
-                val message = json.parseToJsonElement(LspFraming.read(reader)).jsonObject
-                val messageIdElement = message["id"]
-                val messageId = messageIdElement?.jsonPrimitive?.content
-                if (messageId == id.toString()) return message
-                if (messageIdElement != null && messageId != null && message["method"] != null) {
-                    LspFraming.write(writer, buildJsonObject {
-                        put("jsonrpc", "2.0"); put("id", messageIdElement)
-                        put("error", buildJsonObject { put("code", -32601); put("message", "Client method unsupported") })
-                    }.toString())
-                } else synchronized(pendingNotifications) {
-                    if (pendingNotifications.size >= 256) pendingNotifications.removeFirst()
-                    pendingNotifications.addLast(message)
-                }
+            return try {
+                future.get()
+            } catch (error: ExecutionException) {
+                throw IllegalStateException("LSP 请求失败：$method", error.cause ?: error)
             }
+        } finally {
+            synchronized(messagesLock) { pendingReplies.remove(id) }
+        }
     }
 
     @Synchronized private fun ensureStarted() {
@@ -249,9 +318,79 @@ class LspProcessClient(
             .apply { environment().putAll(environmentProvider()) }
             .start()
         process = next
-        input = BufferedInputStream(next.inputStream)
+        val reader = BufferedInputStream(next.inputStream)
+        input = reader
         output = BufferedOutputStream(next.outputStream)
+        synchronized(messagesLock) { readerFailure = null }
+        readerThread = Thread({
+            try {
+                while (!Thread.currentThread().isInterrupted) {
+                    val message = json.parseToJsonElement(LspFraming.read(reader)).jsonObject
+                    val id = message["id"]?.jsonPrimitive?.content
+                    if (id != null && message["method"] == null) {
+                        val reply = synchronized(messagesLock) {
+                            val pending = pendingReplies.remove(id)
+                            if (pending == null) {
+                                if (earlyReplies.size >= 32) earlyReplies.remove(earlyReplies.keys.first())
+                                earlyReplies[id] = message
+                            }
+                            pending
+                        }
+                        reply?.complete(message)
+                    } else if (id != null && message["method"] != null) {
+                        // A server-initiated request must not wedge the JSON-RPC transport.
+                        val unsupported = buildJsonObject {
+                            put("jsonrpc", "2.0")
+                            put("id", message["id"] ?: JsonNull)
+                            put("error", buildJsonObject {
+                                put("code", -32601)
+                                put("message", "Client method unsupported")
+                            })
+                        }
+                        synchronized(writeLock) {
+                            LspFraming.write(checkNotNull(output), unsupported.toString())
+                        }
+                    } else {
+                        synchronized(messagesLock) {
+                            if (pendingNotifications.size >= 256) pendingNotifications.removeFirst()
+                            pendingNotifications.addLast(message)
+                            if (message["method"]?.jsonPrimitive?.content == "textDocument/publishDiagnostics") {
+                                val params = message["params"] as? JsonObject
+                                val uri = params?.get("uri")?.jsonPrimitive?.content
+                                if (uri != null && params != null) {
+                                    diagnosticSerial++
+                                    latestDiagnostics[diagnosticUriKey(uri)] = diagnosticSerial to params
+                                    messagesLock.notifyAll()
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error: Throwable) {
+                synchronized(messagesLock) {
+                    readerFailure = error
+                    pendingReplies.values.forEach { it.completeExceptionally(error) }
+                    pendingReplies.clear()
+                    messagesLock.notifyAll()
+                }
+            }
+        }, "lsp-json-rpc-reader").apply { isDaemon = true; start() }
     }
+
+    /**
+     * Some language servers normalize Java file:/path URIs into file:///path when publishing
+     * diagnostics. The document identity must survive that equivalent serialization.
+     */
+    private fun diagnosticUriKey(value: String): String = runCatching {
+        val parsed = URI(value).normalize()
+        if (parsed.scheme.equals("file", ignoreCase = true) &&
+            parsed.host.isNullOrEmpty() && parsed.path.startsWith("/")
+        ) {
+            URI("file", "", parsed.path, null).toASCIIString()
+        } else {
+            parsed.toASCIIString()
+        }
+    }.getOrDefault(value)
 
     private fun positionParams(uri: String, line: Int, character: Int): JsonObject =
         buildJsonObject {
