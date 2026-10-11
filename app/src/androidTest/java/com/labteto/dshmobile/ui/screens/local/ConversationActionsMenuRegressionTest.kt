@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasClickAction
@@ -53,5 +56,28 @@ class ConversationActionsMenuRegressionTest {
         compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
         compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
         compose.runOnIdle { assertEquals(1, deleted) }
+    }
+
+    @Test
+    fun deletionConfirmationKeepsOriginalSessionTargetAfterRecomposition() {
+        var currentSession by mutableStateOf("original")
+        var deletedSession: String? = null
+        compose.setContent {
+            val sessionAtComposition = currentSession
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false,
+                    onTogglePin = {},
+                    onRename = {},
+                    onDelete = { deletedSession = sessionAtComposition },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("对话操作").performClick()
+        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.runOnIdle { currentSession = "different" }
+        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.runOnIdle { assertEquals("original", deletedSession) }
     }
 }
