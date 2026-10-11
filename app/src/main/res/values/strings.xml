@@ -1371,9 +1371,9 @@
     <string name="local_attachment_file">文件</string>
     <string name="local_run_agents">智能体 %1$d</string>
 
-    <string name="local_character_tuning_open">角色调节</string>
-    <string name="local_character_tuning_title">角色调节</string>
-    <string name="local_character_tuning_subtitle">调节角色在当前故事里的相处方式，不会改写已经发生的关系和共同经历。</string>
+    <string name="local_character_tuning_open">采样设置</string>
+    <string name="local_character_tuning_title">采样设置</string>
+    <string name="local_character_tuning_subtitle">人物依照人设与聊天背景回应；这里只调节模型采样温度。</string>
     <string name="local_character_tuning_preset_title">相处模式</string>
     <string name="local_character_tuning_preset_natural">自然相处</string>
     <string name="local_character_tuning_preset_slow">慢热</string>
