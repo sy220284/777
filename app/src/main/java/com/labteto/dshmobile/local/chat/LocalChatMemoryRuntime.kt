@@ -6,10 +6,12 @@ import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -58,6 +60,11 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                     snapshot.chat.personaId,
                 ),
             )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            AppLog.warn("ChatMemory",
+                "failure=true operation=capture_relationship_memory " +
+                    "session_id=${snapshot.sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
         }.getOrNull() ?: return
 
         sessionStorage.eventLogs.get(snapshot.sessionId).append("memory/auto", buildJsonObject {
@@ -159,6 +166,9 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         val diaryReady = !searchDiary || runCatching {
             memoryProjection.recoverPendingDiaryInvalidations()
         }.onFailure { error ->
+            AppLog.warn("ChatMemory",
+                "failure=true operation=recover_diary_invalidations " +
+                    "session_id=${snapshot.sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
             runtimeStateStore.projection.publishError("关联日记清理待恢复，本轮暂不使用日记：${error.message}")
         }.isSuccess
         if (searchDiary && diaryReady) {

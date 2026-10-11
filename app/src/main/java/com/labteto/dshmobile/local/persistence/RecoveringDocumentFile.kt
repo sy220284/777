@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.persistence
 
 import java.io.File
+import com.labteto.dshmobile.observability.AppLog
 
 internal enum class RecoveringDocumentFailurePolicy { FAIL_CLOSED, RECREATE_DEFAULT }
 
@@ -21,6 +22,8 @@ internal class RecoveringDocumentFile(
             return it
         }
         decodeFile(backup, decode)?.let {
+            AppLog.warn("RecoveringDocument",
+                "failure=true operation=recover_document_from_backup file=${file.name.take(80)} status=recovered")
             if (file.isFile) quarantineCorrupt(file)
             DurableFileCommit.replace(file, backup.readBytes())
             DurableFileCommit.delete(recoveryRequired)
@@ -35,7 +38,11 @@ internal class RecoveringDocumentFile(
         }
         if (file.isFile) quarantineCorrupt(file)
         if (backup.isFile) quarantineCorrupt(backup)
-        if (failurePolicy == RecoveringDocumentFailurePolicy.RECREATE_DEFAULT) return defaultValue()
+        if (failurePolicy == RecoveringDocumentFailurePolicy.RECREATE_DEFAULT) {
+            AppLog.warn("RecoveringDocument",
+                "failure=true operation=recreate_corrupt_document file=${file.name.take(80)} status=recreated")
+            return defaultValue()
+        }
         error("持久数据已损坏且备份不可用；损坏数据已隔离，需恢复后才能继续：${file.path}")
     }
 
@@ -67,7 +74,13 @@ internal class RecoveringDocumentFile(
 
     private fun <T> decodeFile(source: File, decode: (String) -> T): T? {
         if (!source.isFile) return null
-        return runCatching { decode(source.readText()) }.getOrNull()
+        return runCatching { decode(source.readText()) }
+            .onFailure { error ->
+                AppLog.warn("RecoveringDocument",
+                    "failure=true operation=decode_durable_document file=${file.name.take(80)} " +
+                        "source=${if (source == file) "primary" else "backup"} " +
+                        "cause_type=${error.javaClass.simpleName}")
+            }.getOrNull()
     }
 
     private fun hasLegacyQuarantine(): Boolean = root.listFiles().orEmpty().any {
