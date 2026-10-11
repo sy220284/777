@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "c5993f59d261",
+  "snapshot": "47af1a2c35aa",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1309,
   "production_sources_scanned": 781,
@@ -1105,7 +1105,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "integrated_character_profile",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 1,
+        "explanation": "确有16类规范人物资料与运行时投影；作为人物档案子能力存在，没有独立模块或入口。可在应用现有聊天/人设链路使用的静态证据成立，实际交互待设备验证。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
@@ -1118,7 +1126,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "active_sampling_subfeature",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
@@ -1131,7 +1147,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "retired_controller_compatibility",
+        "availability": "legacy_fields_decodable_active_controls_retired",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
@@ -1144,7 +1168,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "cross_component_invariant",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
@@ -1375,7 +1407,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "partial_expression_guidance",
+        "availability": "partial_scope_code_and_tests_present",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 3,
+        "test_methods_confirmed": 1,
+        "explanation": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
@@ -6868,7 +6908,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "shared_tool_pipeline",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
+      }
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 错误、超时、取消与结果恢复",
@@ -7450,7 +7498,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "composite_bundled_runtimes",
+        "availability": "code_and_instrumentation_sources_present_device_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 4,
+        "test_methods_confirmed": 3,
+        "explanation": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
@@ -7921,7 +7977,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 1,
+        "explanation": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
@@ -7934,7 +7998,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
@@ -7947,7 +8019,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 1,
+        "explanation": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 测试数据来源与固定版本校验",
@@ -7981,7 +8061,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
@@ -7994,7 +8082,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
@@ -8007,7 +8103,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
@@ -8020,7 +8124,15 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
-      "workflow_evidence": []
+      "workflow_evidence": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 3,
+        "explanation": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 发布与升级 / 发行版本和变更记录",
@@ -8583,7 +8695,15 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "integrated_character_profile",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 1,
+        "explanation": "确有16类规范人物资料与运行时投影；作为人物档案子能力存在，没有独立模块或入口。可在应用现有聊天/人设链路使用的静态证据成立，实际交互待设备验证。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
@@ -8596,7 +8716,15 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "active_sampling_subfeature",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
@@ -8608,7 +8736,15 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "retired_controller_compatibility",
+        "availability": "legacy_fields_decodable_active_controls_retired",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
@@ -8620,7 +8756,15 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatMemoryBinding.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "cross_component_invariant",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。"
+      }
     },
     {
       "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
@@ -8632,7 +8776,15 @@
         "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "partial_expression_guidance",
+        "availability": "partial_scope_code_and_tests_present",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 3,
+        "test_methods_confirmed": 1,
+        "explanation": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。"
+      }
     },
     {
       "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
@@ -8645,7 +8797,15 @@
         "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "shared_tool_pipeline",
+        "availability": "code_and_tests_present_execution_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 2,
+        "test_methods_confirmed": 2,
+        "explanation": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
@@ -8660,7 +8820,15 @@
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
       "existing_candidate_symbols": [
         "AndroidRuntimePlugin"
-      ]
+      ],
+      "followup": {
+        "kind": "composite_bundled_runtimes",
+        "availability": "code_and_instrumentation_sources_present_device_unverified",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 4,
+        "test_methods_confirmed": 3,
+        "explanation": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
@@ -8674,7 +8842,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 1,
+        "explanation": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
@@ -8688,7 +8864,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
@@ -8702,7 +8886,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 1,
+        "explanation": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
@@ -8716,7 +8908,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
@@ -8730,7 +8930,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
@@ -8744,7 +8952,15 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 2,
+        "explanation": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
+      }
     },
     {
       "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
@@ -8758,11 +8974,22 @@
         ".github/scripts/check-test-quality.py"
       ],
       "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
-      "existing_candidate_symbols": []
+      "existing_candidate_symbols": [],
+      "followup": {
+        "kind": "test_suite_not_product_feature",
+        "availability": "test_cases_declared_not_verified_executed",
+        "separate_product_entry": false,
+        "production_sources_confirmed": 0,
+        "test_methods_confirmed": 3,
+        "explanation": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
+      }
     }
   ],
+  "followup_investigated_descriptions": 14,
+  "followup_production_or_compatibility": 7,
+  "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "7a6e6bc94dd0",
+    "baseline": "c5993f59d261",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
