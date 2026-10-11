@@ -7,21 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatStyleGuardTest {
-    @Test fun detectsAndScrubsBlacklistedPhrases() {
+    @Test fun characterSpeechPassesWithoutAnApplicationStyleBlacklist() {
         val text = "我理解你的感受。如果你愿意的话，我们可以继续聊。"
-        val violations = ChatStyleGuard.violations(text)
-
-        assertTrue("我理解你的感受" in violations)
-        assertTrue("如果你愿意的话" in violations)
-
-        val scrubbed = ChatStyleGuard.scrub(text)
-        assertFalse(ChatStyleGuard.bannedPhrases.any { it in scrubbed })
-    }
-
-    @Test fun builtInScrubDropsWholeBadSentenceInsteadOfLeavingFragments() {
-        val scrubbed = ChatStyleGuard.scrub("听起来你今天很开心。那就笑一个。")
-        assertEquals("那就笑一个。", scrubbed)
-        assertFalse("今天很开心" in scrubbed)
+        assertTrue(ChatStyleGuard.violations(text).isEmpty())
+        assertEquals(text, ChatStyleGuard.filterLiteral(text, ChatStyleGuard.activePhrases()))
+        assertEquals(text, ChatStyleGuard.scrub(text))
     }
 
     @Test fun personaSpecificBanIsAlsoEnforced() {
@@ -72,7 +62,7 @@ class ChatStyleGuardTest {
             personaPhrases = listOf("角色禁用词"),
             enabled = true,
         )
-        assertTrue("我理解你的感受" in phrases)
+        assertFalse("我理解你的感受" in phrases)
         assertTrue("自定义词" in phrases)
         assertTrue("角色禁用词" in phrases)
     }
