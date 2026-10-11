@@ -450,6 +450,8 @@ internal fun LocalConversationSurface(
             listState = listState,
             sessionId = state.sessionId,
             tailIndex = transcriptLastListIndex,
+            tailKey = if (showStreamingTail) "work-streaming:${state.sessionId}"
+                else transcriptItems.lastOrNull()?.key.orEmpty(),
             isReady = transcriptInitialPositionReady,
             isCatchingUp = workTailFollowing,
         )
