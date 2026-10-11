@@ -31,13 +31,13 @@ class CharacterEvolutionTest {
         assertEquals(50, evolution.initiativeBaseline)
         assertEquals(50, evolution.opennessBaseline)
         assertEquals(50, evolution.securityBaseline)
-        assertEquals(1, evolution.initiativeMomentum)
-        assertEquals(1, evolution.opennessMomentum)
-        assertEquals(1, evolution.securityMomentum)
+        assertEquals(0, evolution.initiativeMomentum)
+        assertEquals(0, evolution.opennessMomentum)
+        assertEquals(0, evolution.securityMomentum)
     }
 
     @Test
-    fun repeatedMinorSignalsGraduallyMoveLongTermBaseline() {
+    fun repeatedMinorSignalsDoNotManufacturePersonalityWeights() {
         var previous = baselineState()
         repeat(3) {
             val current = strongerState(previous)
@@ -45,14 +45,14 @@ class CharacterEvolutionTest {
             previous = current.copy(evolution = evolution)
         }
 
-        assertEquals(51, previous.evolution.initiativeBaseline)
-        assertEquals(51, previous.evolution.opennessBaseline)
-        assertEquals(51, previous.evolution.securityBaseline)
-        assertEquals(3, previous.evolution.observationCount)
+        assertEquals(50, previous.evolution.initiativeBaseline)
+        assertEquals(50, previous.evolution.opennessBaseline)
+        assertEquals(50, previous.evolution.securityBaseline)
+        assertEquals(0, previous.evolution.observationCount)
     }
 
     @Test
-    fun majorExperienceMovesOnlyABoundedStepAndRecordsMilestone() {
+    fun majorExperienceRecordsTheEventWithoutChangingPersonalityWeights() {
         val previous = baselineState().copy(
             evolution = CharacterEvolutionState(
                 initiativeBaseline = 50,
@@ -69,9 +69,9 @@ class CharacterEvolutionTest {
 
         val evolution = evolveCharacterEvolution(previous, current, "MAJOR")
 
-        assertEquals(53, evolution.initiativeBaseline)
-        assertEquals(53, evolution.opennessBaseline)
-        assertEquals(53, evolution.securityBaseline)
+        assertEquals(50, evolution.initiativeBaseline)
+        assertEquals(50, evolution.opennessBaseline)
+        assertEquals(50, evolution.securityBaseline)
         assertEquals("一起熬过一次很难的危机", evolution.lastMajorMilestone)
     }
 
@@ -160,21 +160,11 @@ class CharacterEvolutionTest {
     }
 
     @Test
-    fun evolutionContextMakesLongTermLayerDistinctFromImmediateState() {
-        val evolution = CharacterEvolutionState(
-            initiativeBaseline = 58,
-            opennessBaseline = 63,
-            securityBaseline = 71,
-            observationCount = 6,
-            lastMajorMilestone = "一起解决过一次重大误会",
-        )
-        val prompt = buildString { appendCharacterEvolutionContext(evolution) }
-
-        assertTrue(prompt.contains("【长期人物演变】"))
-        assertTrue(prompt.contains("长期主动=58/100"))
-        assertTrue(prompt.contains("表达开放=63/100"))
-        assertTrue(prompt.contains("关系安全感=71/100"))
-        assertTrue(prompt.contains("基础人设、硬约束与用户纠正优先"))
+    fun evolutionSummaryDescribesAnExperienceRatherThanAReactionPolicy() {
+        val evolution = CharacterEvolutionState(initiativeBaseline = 90, opennessBaseline = 90,
+            lastMajorMilestone = "一起解决过一次重大误会")
+        assertEquals("最近共同经历：一起解决过一次重大误会", characterEvolutionSummary(evolution))
+        assertEquals(null, characterEvolutionSummary(CharacterEvolutionState(observationCount = 99)))
     }
 
     @Test
