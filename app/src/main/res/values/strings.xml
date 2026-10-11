@@ -2086,5 +2086,7 @@
     <string name="media_studio_confirm_delete">确定删除这项成果？本机文件会一并删除。</string>
     <string name="media_studio_delete_confirm">确认删除</string>
     <string name="media_studio_delete_cancel">取消</string>
+    <string name="media_studio_video_archive">视频生成任务档案（%1$d）</string>
+    <string name="media_studio_video_account_unavailable">原创作账户未配置或身份已变化；任务保留在本机，但不能用其他账户查询。</string>
 </resources>
 
