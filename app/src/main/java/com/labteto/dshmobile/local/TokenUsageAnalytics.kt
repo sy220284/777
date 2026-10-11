@@ -212,6 +212,10 @@ data class TokenUsageAnalyticsSnapshot(
     val sessions: List<TokenUsageGroupSummary> = emptyList(),
     val tasks: List<TokenUsageGroupSummary> = emptyList(),
     val recentRecords: List<TokenUsageRecord> = emptyList(),
+    /** Per-model views use the same arithmetic and detail projections as the combined view. */
+    val byModel: Map<String, TokenUsageAnalyticsSnapshot> = emptyMap(),
+    /** Older versions may have pruned records before per-model lifetime totals were introduced. */
+    val modelHistoryPartial: Boolean = false,
 )
 
 enum class TokenUsageGroupKind {
@@ -468,6 +472,16 @@ class TokenUsageAnalyticsStore @Inject constructor(
                 tracked = lifetime.tracked,
                 chat = detail.chat.copy(aggregate = lifetime.chat),
                 work = detail.work.copy(aggregate = lifetime.work),
+                byModel = (detail.byModel.keys + lifetime.models.keys).associateWith { model ->
+                    val retained = detail.byModel[model] ?: TokenUsageAnalyticsSnapshot()
+                    val lifetimeModel = lifetime.models[model]
+                    if (lifetimeModel == null) retained else retained.copy(
+                        tracked = lifetimeModel.tracked,
+                        chat = retained.chat.copy(aggregate = lifetimeModel.chat),
+                        work = retained.work.copy(aggregate = lifetimeModel.work),
+                    )
+                },
+                modelHistoryPartial = lifetime.modelHistoryPartial,
             )
         }
     }
@@ -482,6 +496,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
             return
         }
         database.migrate(legacy)
+        database.backfillModelTotalsIfNeeded()
         lifetime = database.lifetimeTotals()
         database.enforceRetention()
         rebuildAccumulator()
@@ -599,7 +614,11 @@ internal fun aggregateTokenUsageRecords(
 }.snapshot()
 
 /** Bounded by the retained request window in the store; updates do not reread the archive. */
-internal class TokenUsageAccumulator(private val zone: ZoneId) {
+internal class TokenUsageAccumulator(
+    private val zone: ZoneId,
+    private val collectModels: Boolean = true,
+) {
+    private val models = linkedMapOf<String, TokenUsageAccumulator>()
     private val total = MutableTokenAggregate()
     private val chat = MutableTokenAggregate()
     private val work = MutableTokenAggregate()
@@ -624,6 +643,11 @@ internal class TokenUsageAccumulator(private val zone: ZoneId) {
 
     fun add(raw: TokenUsageRecord) {
         val record = raw.normalizedForAccounting()
+        if (collectModels) {
+            models.getOrPut(record.model.trim().ifEmpty { "未知模型" }) {
+                TokenUsageAccumulator(zone, collectModels = false)
+            }.add(record)
+        }
         if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
         total.add(record)
         val epochDay = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate().toEpochDay()
@@ -743,6 +767,7 @@ internal class TokenUsageAccumulator(private val zone: ZoneId) {
             tasks = taskGroups.values.map(MutableGroup::freeze)
                 .sortedByDescending(TokenUsageGroupSummary::lastUsedAt),
             recentRecords = recent.toList().asReversed(),
+            byModel = models.mapValues { (_, accumulator) -> accumulator.snapshot() },
         )
     }
 }
