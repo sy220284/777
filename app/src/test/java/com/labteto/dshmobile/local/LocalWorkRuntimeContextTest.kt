@@ -28,6 +28,11 @@ class LocalWorkRuntimeContextTest {
             model = "gpt-5.6-luna",
             baseUrl = "https://api.openai.com/v1",
             profile = profile,
+            configuredProfiles = listOf(profile, LocalModelProfile(
+                id = "secondary-route", model = "MiniMax-M3",
+                baseUrl = "https://api.minimaxi.com/v1", provider = "MiniMax",
+                credentialRef = "secret-key-reference",
+            )),
         )
 
         assertTrue(context.contains("777 本机 Harness · 工作模式"))
@@ -36,6 +41,9 @@ class LocalWorkRuntimeContextTest {
         assertTrue(context.contains("模型提供方：OpenAI"))
         assertTrue(context.contains("认证来源：ChatGPT 套餐"))
         assertTrue(context.contains("模型协议：RESPONSES"))
+        assertTrue(context.contains("已保存模型档案"))
+        assertTrue(context.contains("MiniMax-M3（profileId=secondary-route）"))
+        assertFalse(context.contains("secret-key-reference"))
         assertTrue(context.contains("environment_info"))
         assertTrue(context.contains("读取工作区文件使用 read"))
         assertTrue(context.contains("用户规则：完成后复查。"))

@@ -14,6 +14,7 @@ internal fun withWorkRuntimeContext(
     model: String,
     baseUrl: String,
     profile: LocalModelProfile?,
+    configuredProfiles: List<LocalModelProfile> = emptyList(),
 ): String {
     val routedModel = model.takeIf(String::isNotBlank) ?: profile?.model.orEmpty()
     val protocol = profile?.let {
@@ -24,9 +25,19 @@ internal fun withWorkRuntimeContext(
         appendLine("- 产品：777 本机 Harness · 工作模式")
         appendLine("- 工作区：$workspacePath")
         appendLine("- 当前路由模型：$routedModel")
+        if (configuredProfiles.isNotEmpty()) {
+            val shown = configuredProfiles.take(16).joinToString("；") { saved ->
+                "${saved.model.take(64)}（profileId=${saved.id.take(100)}）"
+            }
+            appendLine("- 已保存模型档案（不包含密钥，凭据是否有效请调用 list_subagent_models）：$shown")
+            if (configuredProfiles.size > 16) appendLine("- 另有 ${configuredProfiles.size - 16} 个模型档案，请使用 list_subagent_models 获取完整实时清单。")
+        }
         profile?.provider?.takeIf(String::isNotBlank)?.let { appendLine("- 模型提供方：$it") }
         profile?.let { appendLine("- 认证来源：${it.sourceLabel()}") }
         protocol?.let { appendLine("- 模型协议：${it.name}") }
+        appendLine("- 模型配置和 API Key 由应用统一管理；模型可使用已配置凭据发起授权请求，但不会收到原始密钥或账户令牌，也无需在 shell 环境变量或 mmx CLI 中寻找。")
+        appendLine("- 可直接使用始终可见的 list_subagent_models 查询全部已配置模型、凭据状态、profileId 与模型能力；如需查询指定 API Key 在官方服务商的模型目录，传 include_provider_models=true 和 profile_id。目录只代表服务商返回的模型，不等于已通过调用验证或自动保存为可切换路由。")
+        appendLine("- 多模态模型输入能力不等于图片、视频、语音生成 API 的授权或已提供智能体工具；媒体功能必须使用宿主应用实际注册的入口验证，不能因为找不到 CLI 就断言应用内的原生接口不可用。")
         appendLine("- 本轮请求实际附带的工具定义是当前工具可用性的权威事实源。")
         appendLine("- 所有已注册扩展均可按需发现；新的插件或 MCP 工具在注册后自动进入能力目录。当前工具表未提供某项能力时，主动用 capability_search 搜索任务所需能力并在下一模型步骤调用，不要求用户提供内部工具名。")
         appendLine("- 用户要求能力自检或询问有哪些工具时，使用 capability_search 搜索『能力目录』读取实时注册表；不要将本轮未选用误判为未注册、未连接或故障。")

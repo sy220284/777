@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -110,8 +111,38 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ),
                 ),
             )
-            "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
-                "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
+            "list_subagent_models" -> {
+                val saved = modelGateway.configuredProfiles()
+                val readyIds = modelGateway.availableProfiles().mapTo(mutableSetOf()) { it.id }
+                val catalog = renderAgentModelCatalog(
+                    profiles = saved,
+                    credentialReadyIds = readyIds,
+                    activeProfileId = snapshot.modelState.modelSelection.activeProfile?.id,
+                    workerProfileId = snapshot.modelState.modelSelection.workerProfile?.id,
+                )
+                if (!args.boolean("include_provider_models", false)) {
+                    catalog
+                } else {
+                    val profileId = args.optionalString("profile_id")?.takeIf(String::isNotBlank)
+                        ?: error("查询官方模型目录必须指定本机已保存的 profile_id")
+                    require(profileId in readyIds) { "所选模型没有就绪的本机凭据，请在设置中重新连接" }
+                    val providerModels = runCatching { modelGateway.discoverProviderModelIds(profileId) }
+                        .fold(
+                            onSuccess = { ids ->
+                                if (ids.isEmpty()) "服务商返回的模型列表为空"
+                                else "服务商返回 ${ids.size} 个模型（仅目录可见，不能据此认定调用权限）：\n" +
+                                    ids.joinToString("\n")
+                            },
+                            onFailure = { error ->
+                                if (error is CancellationException) throw error
+                                "官方模型目录查询未成功（${when (error) {
+                                    is IllegalArgumentException -> "配置或接口不受支持"
+                                    else -> "服务商拒绝、响应异常或网络故障"
+                                }}）。可在应用中核对该档案权限与官方接口。 "
+                            },
+                        )
+                    "$catalog\n\n【指定配置的官方模型目录】\n$providerModels"
+                }
             }
             "list_agents" -> jobs.listAgents(run.sessionId)
             "send_message" -> persistentJobs.sendMessage(

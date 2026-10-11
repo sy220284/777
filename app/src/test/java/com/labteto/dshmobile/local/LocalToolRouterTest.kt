@@ -181,6 +181,7 @@ class LocalToolRouterTest {
         assertTrue("read" in coreNames)
         assertTrue("bash" in coreNames)
         assertTrue("subagent" in coreNames)
+        assertTrue("list_subagent_models" in coreNames)
         assertTrue("session_event_search" in coreNames)
         assertTrue("workflow" !in coreNames)
         assertTrue("environment_info" !in coreNames)
