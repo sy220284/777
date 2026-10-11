@@ -134,10 +134,8 @@ internal class CharacterRuntimeProjector(
             ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
                 ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
-        state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { lines += "关系里还没过去的事：${it.take(180)}" }
-        state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
-            lines += "你们之间还在延续的小东西：${it.joinToString("；").take(260)}"
-        }
+        // Relationship facts and shared objects belong to ChatRelationshipEngine.prompt.
+        // Do not render the same state twice into one request.
         state.unresolvedThreads.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
             lines += "还没做完/说完：${it.joinToString("；").take(260)}"
         }
