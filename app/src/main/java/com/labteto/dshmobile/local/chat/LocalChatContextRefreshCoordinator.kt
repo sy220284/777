@@ -486,7 +486,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             candidate = plan.state.continuity,
             pendingTurns = pending,
         )
-        val deterministicState = plan.state.withoutLegacyConversationContext()
+        val deterministicState = plan.state.bindStateObservationSources(pending).withoutLegacyConversationContext()
         val lease = LocalSessionRuntimeRegistry.tryAcquire(expectedSessionId, LocalSessionRuntimeKind.MAINTENANCE)
         if (lease == null) {
             scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "session-busy")
