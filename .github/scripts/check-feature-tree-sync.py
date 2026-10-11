@@ -165,6 +165,39 @@ def inspect():
         expected = actual_evidence.get(item["path"], 0)
         if item.get("test_reference_count") != expected:
             raise ValueError("逐功能测试证据数量不一致: " + item["path"])
+    # 复查分级来源：测试引用和源码存废是两种独立证据。
+    recomputed_grades = {}
+    for item in reported:
+        for field in ("existing_production_sources", "missing_production_sources",
+                      "named_symbols"):
+            if not isinstance(item.get(field), list):
+                raise ValueError("逐项证据缺少 " + field)
+        for src in item["existing_production_sources"]:
+            if not (ROOT / src).is_file():
+                raise ValueError("声明现存的生产源码已经不存在: " + src)
+        for src in item["missing_production_sources"]:
+            if (ROOT / src).exists():
+                raise ValueError("声明已删除的生产源码实际仍存在: " + src)
+        for symbol in item["named_symbols"]:
+            actual = any(re.search(
+                r"(?:fun|class|object|interface|val|var|enum\s+class)\s+" +
+                re.escape(symbol["symbol"]) + r"\b",
+                (ROOT / src).read_text(encoding="utf-8", errors="replace"),
+            ) for src in item["existing_production_sources"])
+            if actual != symbol["declaration_found"]:
+                raise ValueError("历史具名入口核实结果和当前代码不一致")
+        grade = item["verification"]
+        recomputed_grades[grade] = recomputed_grades.get(grade, 0) + 1
+        if grade.startswith("真实测试") and not item["test_reference_count"]:
+            raise ValueError("没有真实测试证据却声称有可执行测试")
+        if grade.startswith("具名源码声明") and not any(
+            x["declaration_found"] for x in item["named_symbols"]
+        ):
+            raise ValueError("没有源码声明却声称具名入口已经核查")
+    if review.get("evidence_grade_summary") != recomputed_grades:
+        raise ValueError("全量分级统计与逐功能证据不一致")
+    if review.get("observed_code_delta") != index.get("observed_delta"):
+        raise ValueError("功能变化报告与扫描索引不一致")
     def check_display(node, stack):
         for child in node["children"]:
             path = stack + [child["name"]]
