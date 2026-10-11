@@ -31,7 +31,9 @@ internal fun localChatFeatureUiContribution(
             LocalFeatureDrawerEntry.GROUP_CHAT to {
                 val establishedSessionId = findEstablishedGroupChatSession(sessions)?.id
                 if (establishedSessionId != null) {
-                    if (onSwitchSession(establishedSessionId)) onCloseDrawer()
+                    if (onSwitchSession(establishedSessionId) && establishedSessionId == surface.sessionId) {
+                        onCloseDrawer()
+                    }
                 } else {
                     onOpenGroupSetup()
                     onCloseDrawer()
