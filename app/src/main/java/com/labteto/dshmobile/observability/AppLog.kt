@@ -7,6 +7,8 @@ import java.util.UUID
 import java.util.ArrayDeque
 import java.util.Base64
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 data class AppLogEntry(
     val timestampMillis: Long,
@@ -57,13 +59,21 @@ object AppLog {
     private val lock = Any()
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
-    private val persistenceExecutor = Executors.newSingleThreadExecutor { runnable ->
+    private data class QueuedEntry(val generation: Long, val entry: AppLogEntry)
+    private val persistenceGeneration = AtomicLong(0L)
+    private val persistenceExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "777-app-log").apply { isDaemon = true }
     }
     private val pendingWrites = DiagnosticWriteQueue(
         executor = persistenceExecutor,
-        writer = ::persistBatch,
-        important = { entry: AppLogEntry -> entry.isDiagnosticFailure() },
+        writer = { batch: List<QueuedEntry> ->
+            synchronized(persistenceLock) {
+                val generation = persistenceGeneration.get()
+                persistBatch(batch.filter { it.generation == generation }.map { it.entry })
+            }
+        },
+        important = { pending: QueuedEntry -> pending.entry.isDiagnosticFailure() },
+        scheduleRetry = { work -> persistenceExecutor.schedule(work, 15L, TimeUnit.SECONDS) },
     )
     private val processInstanceId = UUID.randomUUID().toString().substringBefore('-')
     private val processStartedAtMillis = System.currentTimeMillis()
@@ -160,14 +170,15 @@ object AppLog {
     fun exportForDiagnostics(): AppLogExport = synchronized(persistenceLock) {
         val persisted = readPersistedUnsafe()
         val pending = pendingWrites.snapshot()
-        val merged = (persisted.entries + pending.outstanding + snapshot())
+        val currentPending = pending.outstanding.filter { it.generation == persistenceGeneration.get() }
+        val merged = (persisted.entries + currentPending.map { it.entry } + snapshot())
             .distinct()
             .sortedBy(AppLogEntry::timestampMillis)
         AppLogExport(
             entries = merged.takeLast(MAX_EXPORT_ENTRIES),
             malformedRows = persisted.malformedRows,
             readFailure = persisted.failure,
-            pendingRows = pending.outstanding.size,
+            pendingRows = currentPending.size,
             overflowRows = pending.overflow,
             writeFailure = pending.writeError,
             truncated = merged.size > MAX_EXPORT_ENTRIES,
@@ -178,6 +189,8 @@ object AppLog {
 
     fun clear() {
         synchronized(persistenceLock) {
+            // Invalidate batches already picked up by the writer but not yet committed.
+            persistenceGeneration.incrementAndGet()
             pendingWrites.clearPending()
             synchronized(lock) { entries.clear() }
             persistentFile?.let { file ->
@@ -193,6 +206,7 @@ object AppLog {
         throwable: Throwable?,
         synchronous: Boolean = false,
     ) {
+        val generation = persistenceGeneration.get()
         val entry = AppLogEntry(
             timestampMillis = System.currentTimeMillis(),
             level = level,
@@ -207,21 +221,28 @@ object AppLog {
             throwableCauseChain = throwable?.let(::summarizeCauseChain),
         )
         synchronized(lock) {
-            while (entries.size >= MAX_ENTRIES) entries.removeFirst()
-            entries.addLast(entry)
+            if (generation == persistenceGeneration.get()) {
+                while (entries.size >= MAX_ENTRIES) entries.removeFirst()
+                entries.addLast(entry)
+            }
         }
         if (synchronous) {
             // Fatal diagnostics also need the preceding buffered events for cause reconstruction.
             runCatching {
                 synchronized(persistenceLock) {
-                    val preceding = pendingWrites.snapshot().outstanding.takeLast(MAX_EXPORT_ENTRIES)
-                    persistBatch(preceding + entry)
+                    if (generation == persistenceGeneration.get()) {
+                        val preceding = pendingWrites.snapshot().outstanding
+                            .filter { it.generation == generation }
+                            .map { it.entry }
+                            .takeLast(MAX_EXPORT_ENTRIES)
+                        persistBatch(preceding + entry)
+                    }
                 }
             }.onFailure { failure ->
                     runCatching { Log.e("AppLog", "Fatal diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
                 }
         } else if (persistentFile != null) {
-            pendingWrites.offer(entry)
+            pendingWrites.offer(QueuedEntry(generation, entry))
         }
     }
 
@@ -233,6 +254,7 @@ object AppLog {
         }.take(1_000)
 
     private fun persistBatch(batch: List<AppLogEntry>) {
+        if (batch.isEmpty()) return
         val file = persistentFile ?: return
         synchronized(persistenceLock) {
             try {
