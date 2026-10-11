@@ -174,6 +174,16 @@ def audit():
     if [{k: x[k] for k in ("symbol", "source")} for x in screens] != idx["candidate_ui_screens"]:
         raise ValueError("独立Compose入口扫描与现行工作流矛盾")
     tools = builtin_tools()
+    # Find all production HarnessPlugin implementers without assuming the four
+    # enumerated providers are the entire tool system.
+    plugins = sorted(
+        [{"class": match.group(1), "source": file}
+         for file, body in sources.items() if "HarnessPlugin" in body
+         for match in re.finditer(r"\bclass\s+([A-Za-z_]\w*Plugin)\s*\(", body)],
+        key=lambda item: (item["source"], item["class"]),
+    )
+    audited_providers = set(PROVIDERS.values())
+    other_plugins = [item for item in plugins if item["source"] not in audited_providers]
     all_methods = set()
     for item in matrix["items"]:
         if item["path"] not in leaves:
@@ -214,6 +224,10 @@ def audit():
                  "registered_builtin_tools": tools,
                  "builtin_tool_count": len(tools),
                  "plugin_counts": dict(sorted(Counter(x["provider"] for x in tools).items())),
+                 "production_harness_plugin_implementations": plugins,
+                 "plugin_implementation_count": len(plugins),
+                 "other_plugin_implementations_not_tool_enumerated": other_plugins,
+                 "enumeration_scope": "Four explicit tool registration providers only; other internal/static or dynamic tool providers are not counted",
                  "third_party_dynamic_mcp_tools_not_included": True},
         "tests": {"mapped_tree_leaves": len(matrix["items"]), "unique_test_method_refs": len(all_methods),
                   "android_test_methods_in_matrix": sum("/src/androidTest/" in x for x in all_methods),
@@ -243,7 +257,8 @@ def render_md(data):
         "",
         f"- 产品所有权：{code['module_count']}个模块，{code['route_count']}条具名路由。",
         f"- Compose入口候选：{len(code['compose_candidates'])}个，其中以Screen结尾的{code['compose_named_screens']}个，辅助组件{code['compose_support_components']}个。",
-        f"- 四类内置插件声明的具名工具：{code['builtin_tool_count']}个；动态第三方MCP工具未覆盖。",
+        f"- 四类内置插件声明的具名工具：{code['builtin_tool_count']}个；此数仅覆盖四类可枚举注册，不是App所有工具的总量。",
+        f"- 直接可静态发现的HarnessPlugin实现：{code['plugin_implementation_count']}个；其中另有{len(code['other_plugin_implementations_not_tool_enumerated'])}个插件实现未纳入四类工具计数，第三方MCP工具同样未列举。",
         "",
         "## 与实际功能树对照",
         "",
