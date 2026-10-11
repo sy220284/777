@@ -688,6 +688,63 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun correctionAfterApprovalButBeforeExecutionRejectsStaleWriteWithoutSideEffect() = runBlocking {
+        var executed = false
+        var corrected = false
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.ALWAYS,
+            ) {
+                executed = true
+                ToolResult("should not execute")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("tool-old", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "work",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ ->
+                corrected = true
+                true
+            },
+            beforeExecution = { !corrected },
+        )
+        assertEquals("WORK_TOOL_SUPERSEDED", result.errorCode)
+        assertTrue(result.isError)
+        assertFalse(result.retryable)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertFalse(executed)
+    }
+
+    @Test
+    fun unchangedSamplingGenerationStillExecutesApprovedWriteOnce() = runBlocking {
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.ALWAYS,
+            ) {
+                executed++
+                ToolResult("ok")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("tool-current", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "work",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ -> true },
+            beforeExecution = { true },
+        )
+        assertFalse(result.isError)
+        assertEquals(1, executed)
+    }
+
+    @Test
     fun scopedExecutionUsesOwningSessionInsteadOfForegroundSession() = runBlocking {
         var observedSessionId = ""
         val registry = ToolRegistry().apply {
