@@ -8,6 +8,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Prepares the Node runtime that ships inside the APK.
@@ -33,27 +35,31 @@ class BundledNodeRuntime @Inject constructor(
     private var prepared = false
 
     suspend fun prepare() = withContext(Dispatchers.IO) {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
-            ?: return@withContext
-        val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
-        require(version.isNotBlank()) { "内置 Node 版本信息为空" }
+        // Multiple runtime instances may be created by startup, instrumentation and recovery.
+        // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
+        prepareMutex.withLock {
+            val abi = Build.SUPPORTED_ABIS.firstOrNull(SUPPORTED_ABIS::contains)
+                ?: return@withLock
+            val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(version.isNotBlank()) { "内置 Node 版本信息为空" }
 
-        val versionRoot = File(runtimeHome, "$version/$abi")
-        val libraryDir = File(versionRoot, "lib")
-        BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, version, abi)
+            val versionRoot = File(runtimeHome, "$version/$abi")
+            val libraryDir = File(versionRoot, "lib")
+            BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, version, abi)
 
-        val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
-        require(nativeNode.isFile && nativeNode.canExecute()) {
-            "内置 Node 可执行文件未从 APK 提取：${nativeNode.path}"
+            val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
+            require(nativeNode.isFile && nativeNode.canExecute()) {
+                "内置 Node 可执行文件未从 APK 提取：${nativeNode.path}"
+            }
+
+            BundledRuntimeInstallation.linkExecutable(nativeNode, File(binDir, "node"))
+
+            BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
+
+            activeLibraryDir = libraryDir
+            runtimeVersion = version
+            prepared = true
         }
-
-        BundledRuntimeInstallation.linkExecutable(nativeNode, File(binDir, "node"))
-
-        BundledRuntimeInstallation.removeOldVersions(runtimeHome, version)
-
-        activeLibraryDir = libraryDir
-        runtimeVersion = version
-        prepared = true
     }
 
     fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
@@ -76,6 +82,7 @@ class BundledNodeRuntime @Inject constructor(
     }
 
     private companion object {
+        private val prepareMutex = Mutex()
         const val ASSET_ROOT = "runtime/node"
         const val VERSION_ASSET = "$ASSET_ROOT/node-version.txt"
         const val NATIVE_NODE_NAME = "libdsh_node.so"
