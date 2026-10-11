@@ -16,6 +16,7 @@ INDEX = Path("docs/FEATURE-SOURCE-INDEX.auto.json")
 REVIEW = Path("docs/FEATURE-REVIEW.auto.json")
 EVIDENCE = Path("docs/FEATURE-CODE-EVIDENCE.zh-CN.md")
 RETIREMENTS = Path("docs/FEATURE-TREE-RETIREMENTS.json")
+LEGACY_IDENTITIES = Path("docs/FEATURE-TREE-LEGACY-IDENTITIES.json")
 import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
@@ -398,6 +399,104 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
     return result
 
 
+def historical_identity_review(root, leafpaths, entries):
+    """静态身份台账只用于溯源；缺失入口进入待核，不授权任何语义修改。"""
+    manifest = root / LEGACY_IDENTITIES
+    if not manifest.is_file():
+        return {}, [], []
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    if data.get("version") != 1 or not isinstance(data.get("bindings"), list):
+        raise ValueError("静态功能身份登记格式无效")
+    paths = set(leafpaths)
+    identities = {}
+    known_ids, known_paths, known_symbols = set(), set(), set()
+    stale = []
+    for item in data["bindings"]:
+        if not isinstance(item, dict):
+            raise ValueError("静态身份记录格式无效")
+        ident, path, source, entry = (
+            item.get("id"), item.get("path"), item.get("source"), item.get("entry")
+        )
+        if not isinstance(ident, str) or not re.fullmatch(r"existing\.\d{4,}", ident):
+            raise ValueError("静态身份缺少稳定 existing.NNNN 编号")
+        if ident in known_ids or path in known_paths:
+            raise ValueError("静态身份重复编号或重复中文功能路径")
+        known_ids.add(ident)
+        known_paths.add(path)
+        if not isinstance(path, str) or not CHINESE.search(parts(path)[-1]):
+            raise ValueError("静态身份的产品名称必须为中文")
+        if not isinstance(source, str) or not re.fullmatch(
+            r"[^./][\w./-]*/src/main/[\w./-]+\.(?:kt|java)", source
+        ) or ".." in Path(source).parts:
+            raise ValueError("静态身份登记无效的生产源码路径")
+        if not isinstance(entry, str) or not re.fullmatch(r"[A-Za-z_]\w*", entry):
+            raise ValueError("静态身份登记缺少入口符号")
+        if item.get("evidence") != "static_declaration_only":
+            raise ValueError("静态身份不能冒充已通过运行验收")
+        if item.get("owner") not in OWNER_IDS | {"SHARED"}:
+            raise ValueError("静态身份归属标识无效")
+        if (source, entry) in known_symbols:
+            raise ValueError("同一源码符号对应多个功能，应保持待人工判定")
+        known_symbols.add((source, entry))
+        candidate = {"id": ident, "path": path, "source": source, "entry": entry,
+                     "owner": item["owner"], "verification": "静态源码声明，未授权自动变更"}
+        if path not in paths:
+            candidate["problem"] = "稳定身份关联的功能路径已不在现行树；可能改名或退役"
+        elif not (root / source).is_file():
+            candidate["problem"] = "源码文件已消失；须核实迁移"
+        elif not re.search(
+            SYMBOL % re.escape(entry),
+            (root / source).read_text(encoding="utf-8", errors="replace")
+        ):
+            candidate["problem"] = "具名入口在原文件已消失；须核实替代实现"
+        if "problem" in candidate:
+            stale.append(candidate)
+        identities[path] = candidate
+    # 尚不能唯一证明一个符号对应一个功能的历史线索单独汇总。
+    bindings_by_entry = {}
+    for evidence in entries:
+        symbols = [x["symbol"] for x in evidence.get("named_symbols", [])
+                   if x.get("declaration_found")]
+        for symbol in symbols:
+            for source in evidence.get("existing_production_sources", []):
+                bindings_by_entry.setdefault((source, symbol), []).append(evidence["path"])
+    ambiguous = sorted({
+        path for pair, candidates in bindings_by_entry.items()
+        if len(candidates) > 1 for path in candidates
+    })
+    return identities, stale, ambiguous
+
+
+def classify_unproven_features(entries):
+    """55项空证据仅分类和提出需验证的实际领域，不凭词语相似度确认能力。"""
+    results = []
+    for record in entries:
+        if record["verification"] != "没有可确认的现行入口证据":
+            continue
+        path = record["path"]
+        if "构建与持续集成" in path or "测试与语义验证" in path:
+            area, route = "持续集成与测试", ".github/workflows/ 与 .github/scripts/、各模块 src/test"
+        elif "语言服务器能力" in path:
+            area, route = "语言服务器", "app/local/lsp、harness-interop/lsp"
+        elif "Android 设备工具" in path or "原生设备能力" in path:
+            area, route = "设备权限与虚拟显示", "harness-device-android/src/main"
+        elif "终端运行环境" in path or "Android 本机运行时" in path:
+            area, route = "本机终端与执行环境", "harness-runtime-android/src/main"
+        elif "会话事实源" in path or "历史与投影" in path or "恢复与维护" in path:
+            area, route = "共享会话身份与恢复", "harness-core/src/main/session、app/local/session"
+        elif "人物状态与关系" in path or "聊天质量" in path:
+            area, route = "聊天人物与连续性", "app/local/chat"
+        elif "发布与升级" in path:
+            area, route = "构建发布", ".github/workflows/release.yml、app/local/update"
+        else:
+            area, route = "共享工具或其他能力", "检查对应产品模块与共享运行目录"
+        results.append({"path": path, "issue": "缺少可确认的现行源码入口",
+                        "domain": area, "inspect": route,
+                        "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+                        "existing_candidate_symbols": [x["symbol"] for x in record.get("named_symbols", [])]})
+    return results
+
+
 def observed_code_delta(root, current, source_snapshot):
     """输出本次可确定的路由/界面变化；下次相同快照必须幂等。"""
     file = root / INDEX
@@ -755,6 +854,17 @@ def generate(root):
     old, html_match = original_html(html)
     evidence_counts = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
     evidence = legacy_leaf_evidence(root, all_leaves, matrix)
+    identities, stale_identities, ambiguous_identities = historical_identity_review(
+        root, all_leaves, evidence
+    )
+    unresolved_features = classify_unproven_features(evidence)
+    for record in evidence:
+        binding = identities.get(record["path"])
+        if binding is not None:
+            record["identity_id"] = binding["id"]
+            record["identity_status"] = (
+                "待复核入口变化" if binding.get("problem") else "静态声明已核，尚未授权自动改树"
+            )
     evidence_by_path = {entry["path"]: entry for entry in evidence}
     structure = to_html(model, old, {v["path"]: v for v in valid.values()
                                     if (root / v["source"]).is_file()})
@@ -845,6 +955,10 @@ def generate(root):
         "existing_executable_test_mappings": len(matrix["items"]),
         "leaf_evidence": evidence,
         "evidence_grade_summary": categories,
+        "tracked_legacy_identities": len(identities),
+        "stale_legacy_identities": stale_identities,
+        "ambiguous_named_entry_paths": ambiguous_identities,
+        "unproven_feature_triage": unresolved_features,
         "observed_code_delta": delta,
         "source_verified_registrations": len(registry_nodes),
         "explicit_retirements": len(retired),
@@ -865,6 +979,8 @@ def generate(root):
     }
     index["source_snapshot"] = snap
     index["observed_delta"] = delta
+    index["tracked_legacy_identities"] = len(identities)
+    index["unproven_feature_count"] = len(unresolved_features)
     index["verified_registrations"] = sorted(registry_nodes)
     index["unverified_changes_count"] = len(pending)
     index["obsolete_historical_evidence_count"] = len(historical_gaps)
