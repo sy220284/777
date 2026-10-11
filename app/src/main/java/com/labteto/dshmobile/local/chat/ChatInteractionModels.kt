@@ -91,23 +91,22 @@ data class ChatCharacterState(
     val recentVerbalTags: List<String> = emptyList(),
     val recentAddressTerms: List<String> = emptyList(),
     val interactionCooldowns: Map<String, Int> = emptyMap(),
-    /** Per-field age in completed turns. Used to expire short-lived roleplay state. */
+    /** Decode-only ages from the retired turn-count expiry controller. */
     val transientAges: Map<String, Int> = emptyMap(),
-    /** Open-thread age keyed by normalized thread text. */
+    /** Decode-only open-thread ages; elapsed turns no longer resolve unfinished events. */
     val unresolvedThreadAges: Map<String, Int> = emptyMap(),
     val updatedAt: Long = 0L,
 )
 
 internal fun ChatCharacterState.canonicalizeLegacyCharacterState(): ChatCharacterState {
     val migratedImpression = currentUserImpression.ifBlank { recentImpression }
-    return if (recentImpression.isBlank() && migratedImpression == currentUserImpression) {
-        this
-    } else {
-        copy(
-            currentUserImpression = migratedImpression,
-            recentImpression = "",
-        )
-    }
+    return copy(
+        currentUserImpression = migratedImpression,
+        recentImpression = "",
+        interactionCooldowns = emptyMap(),
+        transientAges = emptyMap(),
+        unresolvedThreadAges = emptyMap(),
+    )
 }
 
 @Serializable
