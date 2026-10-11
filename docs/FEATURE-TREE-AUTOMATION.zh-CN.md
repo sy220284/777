@@ -108,6 +108,23 @@ GitHub Actions「自动维护功能树」在 `main` 更新、定时任务、手�
 
 共享源码引用经逐文件符号复算后发现 **41 组**真实的“同一声明支持多项功能”关系，涉及 **91 项**功能。这是跨功能共用源代码的审查范围，不代表 91 个实现错误，也不表明应该强制拆分。相比上一轮的 74 项，新证据扩充后可识别的共享关系也更多，统计口径以当前报告的 `ambiguous_named_entry_groups` 为准。所有缺入口证据功能继续保留在功能树中，并维护可追踪的排查路线。生成 HTML 为每一项展示可用的静态身份、源码级别、工程作业数量和未执行仪表测试数量。
 
+## 独立代码级审计（第四阶段）
+
+新增 `.github/scripts/audit-feature-reality.py`，在功能树生成器和已有二次独立校验器之外，再建立一套**直接从真实源码重算**的功能实况盘点。此程序不导入 `sync-feature-tree.py`、不套用已生成的统计数字；它从 Markdown 和 HTML 各自展开完整树，重算生产文件和指纹、产品路由与所有权、Compose 页面候选、内置工具注册、HarnessPlugin 实现、测试方法引用与 444 条逐项源码证据，并和原工作流对照。
+
+结果保存为 `docs/FEATURE-REALITY-AUDIT.auto.json`（逐项关联及完整代码入口清单）和 `docs/FEATURE-REALITY-AUDIT.zh-CN.md`（独立审计中文结论）。它给出：
+
+- **产品功能路由数**（实际功能目录中一对一归属的路由）；
+- **具名 Compose 页面和支撑组件数量**（避免把含 Screen 一词的辅助浮层当成独立页面）；
+- **四个明确注册工具插件的具名工具数**及真实代码发现的其他插件，实现覆盖范围不完整时明确标注；
+- **按第一层产品／第二层共享／第三层平台划分的末级功能描述数**；
+- **有明确静态源码／测试／CI 作业证据、仅有文件存在线索、没有确认入口的条目数**；
+- **真实代码测试方法数及其单元／仪表来源**，不将“测试方法存在”混同“执行成功”。
+
+这些计数具有不同统计单位。结构树内一项功能可能共享多个源码入口，一个工具也可能承担多个子功能；工作流无法仅用静态代码精确推导全部“独立可运行产品功能”的总数。**不得把末级描述数、路由数、工具注册数或测试方法数单独解释为实际已验收功能数。**
+
+CI 和主线维护任务都执行这套独立盘点，并验证输出与源码、树、注册结果相符。任何发现的源码缺失、树节点冲突、工具注册异常或独立统计不守恒都会导致校验失败，不再以单纯汇总结果自证正确。
+
 ## 本地/CI 校验
 
 ```bash
@@ -116,6 +133,9 @@ python3 .github/scripts/sync-feature-tree.py --preview
 python3 .github/scripts/sync-feature-tree.py
 python3 .github/scripts/sync-feature-tree.py --check
 python3 .github/scripts/check-feature-tree-sync.py
+python3 .github/scripts/audit-feature-reality.py --self-test
+python3 .github/scripts/audit-feature-reality.py
+python3 .github/scripts/audit-feature-reality.py --check
 python3 .github/scripts/check-acceptance-matrix.py
 ```
 
