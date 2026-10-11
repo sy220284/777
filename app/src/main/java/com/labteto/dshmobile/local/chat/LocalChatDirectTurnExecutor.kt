@@ -236,11 +236,6 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                         toolsOverride = JsonArray(emptyList()),
                         allowImageGeneration = true,
                         publishPreviewEnabled = false,
-                        streamFilterPhrases = ChatStyleGuard.activePhrases(
-                        customPhrases = snapshot.chat.chatStyleGuardCustomPhrases,
-                        personaPhrases = turnContext.persona.bannedPhrases,
-                        enabled = snapshot.chat.chatStyleGuardEnabled,
-                    ),
                     persistOverflowHistory = true,
                     requestLog = eventLog,
                     temperature = snapshot.chat.chatState.behaviorTuning.roleplayTemperature(
