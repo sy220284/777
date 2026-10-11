@@ -1,0 +1,942 @@
+{
+  "version": 1,
+  "purpose": "稳定身份仅用于源码锚点跟踪；已核查声明存在，尚未授权业务变更",
+  "bindings": [
+    {
+      "id": "existing.0001",
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 密钥安全存储",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/security/KeystorePreferenceSecretStore.kt",
+      "entry": "KeystorePreferenceSecretStore",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0002",
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt",
+      "entry": "LocalToolActivityProjectionRuntime",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0003",
+      "path": "第二层｜共享运行能力 / 共享交互 / 后台结果到前台状态同步",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
+      "entry": "LocalRuntimeStateStore",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0004",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型目录与能力识别",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+      "entry": "availableProfiles",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0005",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 一次运行固定真实模型路由",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+      "entry": "profileForRun",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0006",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 流式文本、思考和工具调用",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+      "entry": "completeStreaming",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0007",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 系统／开发者／动态提示词分层",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt",
+      "entry": "withChatTurnContext",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0008",
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Prompt 缓存指纹与连续性",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt",
+      "entry": "withEphemeralContext",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0009",
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 成本与汇总统计",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "aggregateTokenUsageRecords",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0010",
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 输入、输出、推理和缓存细分",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridge.kt",
+      "entry": "LocalTokenUsageContextBridge",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0011",
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 初始化失败状态投影",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt",
+      "entry": "start",
+      "owner": "SHARED",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0012",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 连接凭据管理",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "entry": "configureGitHubCredential",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0013",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具执行轨迹和失败状态",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt",
+      "entry": "localToolActivityProjectionEvents",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0014",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
+      "entry": "ToolCapabilityStatus",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0015",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 保留技能原始调用标识",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "entry": "readDocument",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0016",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 大技能完整读取与损坏隔离",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "entry": "readModelSkill",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0017",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能包附属文件安装与安全校验",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+      "entry": "LocalSkillPackageImporter",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0018",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能文档和元数据解析",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/files/LocalSkillMetadata.kt",
+      "entry": "parseLocalSkillMetadata",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0019",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "entry": "LocalPresetSkillCatalog",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0020",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能名称修改",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "entry": "updateDocument",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0021",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 文件预览与 PDF 渲染",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalPdfRenderer.kt",
+      "entry": "renderLocalPdfForModel",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0022",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部工具发现及动态注册",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "entry": "installStartup",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0023",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / HTTP 与标准输入输出连接",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "entry": "connectMcpStdio",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0024",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / MCP 服务器接入和管理",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "entry": "mcpServers",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0025",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
+      "entry": "validateTarget",
+      "owner": "TOOLS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0026",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 创建和切换工作会话",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+      "entry": "send",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0027",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 回复重新生成和质量检查",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+      "entry": "regenerateReply",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0028",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 任务执行模式与续轮",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+      "entry": "setPlanMode",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0029",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 从真实成功工具调用识别成果",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "entry": "writeToolArtifact",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0030",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 方案生成与阶段拆解",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt",
+      "entry": "exitWorkPlanMode",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0031",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 计划展示和人工审阅",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt",
+      "entry": "commitApprovedWorkPlan",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0032",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 任务进度与阶段状态投影",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+      "entry": "historyPageForUi",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0033",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
+      "entry": "resolveWorkGoalUpdate",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0034",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
+      "entry": "latestFrom",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0035",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "startMember",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0036",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "hasFreshTaskResult",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0037",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "reconcileMemberOutcomes",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0038",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "spawn",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0039",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "createMember",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0040",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员执行输出展开",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "renderMemberStatus",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0041",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "LocalAgentSwarmLaunchEntry",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0042",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "LocalAgentTeamStatusBar",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0043",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "TeamTaskRow",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0044",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUi.kt",
+      "entry": "TeamMemberWorksite",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0045",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "writeScopeWarnings",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0046",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "updateTask",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0047",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "dependenciesReady",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0048",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamReducer.kt",
+      "entry": "validateTaskTransition",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0049",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 成员状态与子任务运行事实关联",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamActivityProjection.kt",
+      "entry": "LocalAgentTeamActivityProjection",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0050",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "releaseOwnedTasks",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0051",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamProjectionRuntime.kt",
+      "entry": "project",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0052",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队事件记录及任务板重建",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
+      "entry": "project",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0053",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionCoordinator.kt",
+      "entry": "answerQuestion",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0054",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 工作任务与计划、审批的联系",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
+      "entry": "run",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0055",
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 自动工作任务执行入口",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt",
+      "entry": "prepareSession",
+      "owner": "WORK",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0056",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 对话分支及历史回滚",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatBranchCoordinator.kt",
+      "entry": "selectVariant",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0057",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 回复重生成与版本切换",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
+      "entry": "regenerateReply",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0058",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 连续消息与排队发送",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatQueueRuntime.kt",
+      "entry": "startNextIfIdle",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0059",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 人物选择与对话启动",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnCoordinator.kt",
+      "entry": "prepareProfile",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0060",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息生成与流式展示",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnCoordinator.kt",
+      "entry": "prepare",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0061",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息修改后重发",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
+      "entry": "editAndResendUserMessage",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0062",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 用户回复建议",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCoordinator.kt",
+      "entry": "generate",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0063",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 回复质量补救与修订预算",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatReplyRepairBudget.kt",
+      "entry": "ChatReplyRepairBudget",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0064",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色沉浸感与原设约束",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatReplyImmersionGuard.kt",
+      "entry": "ChatReplyImmersionGuard",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0065",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 聊天后状态及关系更新",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommit.kt",
+      "entry": "appendChatPostTurnCommit",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0066",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 上下文和人物事实组装",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatContextAssembler.kt",
+      "entry": "assemble",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0067",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 网页背景信息引入",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt",
+      "entry": "forInput",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0068",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员选择和管理",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt",
+      "entry": "LocalGroupChatMember",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0069",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记相关性召回",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt",
+      "entry": "search",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0070",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集历史、合并与转移",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
+      "entry": "loadStoryHistory",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0071",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 预置人物及预置目录",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt",
+      "entry": "list",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0072",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与16类可扩展人物事实",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+      "entry": "CharacterFactCategories",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0073",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4自由与深度编辑、事实核验和AI补全",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+      "entry": "captureExplicitCorrection",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0074",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物生活状态与主动性",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt",
+      "entry": "evolveCharacterEvolution",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0075",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 用户互动习惯",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt",
+      "entry": "CharacterEvolutionState",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0076",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 用户活跃情况判断",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt",
+      "entry": "evaluateChatSilenceTrigger",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0077",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 主动消息归属与恢复",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatProactivePolicy.kt",
+      "entry": "proactiveConversationFocus",
+      "owner": "CHAT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0078",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
+      "entry": "LocalSessionStorageCard",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0079",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 运行环境信息",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsRuntime.kt",
+      "entry": "environmentInfo",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0080",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
+      "entry": "listActive",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0081",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型表现全局上限、模型参数、推理模式和上下文长度",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelPerformanceStore.kt",
+      "entry": "constrainEffort",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0082",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 主智能体与子智能体模型配置",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfileStore.kt",
+      "entry": "LocalModelProfileStore",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0083",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "ThemePreference",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0084",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DsTheme",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0085",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Type.kt",
+      "entry": "dsTypography",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0086",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "TokenUsageDailyBucket",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0087",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 按会话、任务和请求追溯",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "groupDetail",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0088",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "TokenPromptBreakdown",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0089",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "forMode",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0090",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "TokenUsageAggregate",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0091",
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 主代理／子代理消耗区分",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "entry": "TokenUsageAgentSummary",
+      "owner": "SETTINGS",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0092",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "rename",
+      "owner": "PROJECT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0093",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "activeProjectId",
+      "owner": "PROJECT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0094",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "LocalProjectFeatureRuntime",
+      "owner": "PROJECT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0095",
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/project/LocalProjectFeatureRuntime.kt",
+      "entry": "instructionsFor",
+      "owner": "PROJECT",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0096",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt",
+      "entry": "summaries",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0097",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "entry": "localSendRejectMessage",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0098",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt",
+      "entry": "DsBottomSheet",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0099",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DshTheme",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0100",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt",
+      "entry": "DsButton",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0101",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt",
+      "entry": "DsThemeTokens",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0102",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 导航转场和加载状态",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
+      "entry": "pushFeature",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0103",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt",
+      "entry": "localFeatureRestoreStack",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0104",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 更新提示、下载与安装",
+      "source": "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt",
+      "entry": "downloadVerifyAndLaunch",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0105",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 前台服务与后台状态通知",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalExecutionService.kt",
+      "entry": "onStartCommand",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0106",
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 完成、审批和提问通知",
+      "source": "app/src/main/java/com/labteto/dshmobile/notify/DshNotifications.kt",
+      "entry": "ensureChannels",
+      "owner": "SHELL",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0107",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 后台任务调度",
+      "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
+      "entry": "scheduleOnce",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0108",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 模型路由及工作执行契约",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationRecovery.kt",
+      "entry": "LocalWorkAutomationRecoveryPlan",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0109",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 定时发起聊天和会话归属",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationPolicy.kt",
+      "entry": "normalizeProactiveMinGapMinutes",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0110",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 角色主动互动任务",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationPolicy.kt",
+      "entry": "LocalChatAutomationPolicy",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0111",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 用户活跃情况限制",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationPolicy.kt",
+      "entry": "normalizeProactiveMaxUnanswered",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0112",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / Webhook 接收和校验",
+      "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
+      "entry": "WebhookController",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0113",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 时间、触发条件的编辑和确认",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
+      "entry": "parseAutomationPlan",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0114",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 自然语言生成任务计划",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
+      "entry": "plan",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0115",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务启用、停用与暂停",
+      "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
+      "entry": "pauseTask",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0116",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 手动执行和执行记录",
+      "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
+      "entry": "runTaskNow",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    },
+    {
+      "id": "existing.0117",
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
+      "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationDocumentStore.kt",
+      "entry": "AutomationDocumentStore",
+      "owner": "AUTOMATION",
+      "evidence": "static_declaration_only"
+    }
+  ]
+}
