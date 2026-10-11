@@ -28,6 +28,29 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
+/** Official endpoints can return a business error body even when HTTP transport succeeded. */
+internal object LocalMediaApiResponse {
+    fun checked(root: JsonObject): JsonObject {
+        val error = root["error"] as? JsonObject
+        val nestedCode = error?.get("code")?.jsonPrimitive?.contentOrNull
+        val code = root["code"]?.jsonPrimitive?.contentOrNull ?: nestedCode
+        val reason = error?.get("message")?.jsonPrimitive?.contentOrNull
+            ?: root["message"]?.jsonPrimitive?.contentOrNull
+        if (error != null || code != null) {
+            val label = code?.take(80)?.let { " ($it)" }.orEmpty()
+            throw IllegalStateException("创作服务返回错误$label：${reason?.take(320) ?: "请检查模型和账户权限"}")
+        }
+        return root
+    }
+
+    fun imageExtension(mime: String): String = when (mime.lowercase()) {
+        "image/png" -> "png"
+        "image/jpeg", "image/jpg" -> "jpg"
+        "image/webp" -> "webp"
+        else -> error("生成服务返回了不支持的图片格式：${mime.take(80)}")
+    }
+}
+
 internal data class LocalMediaVideoWireStatus(val state: String, val downloadUrl: String? = null)
 
 internal object QwenWanTaskResult {
@@ -132,10 +155,15 @@ internal class LocalMediaApiClient @Inject constructor(
                     ?.get("content")?.jsonObject?.get("parts")?.jsonArray
                     ?: error("Gemini 未返回图片")
                 val inline = parts.firstNotNullOfOrNull { part ->
-                    (part as? JsonObject)?.get("inlineData")?.jsonObject
-                        ?.get("data")?.jsonPrimitive?.contentOrNull
+                    (part as? JsonObject)?.get("inlineData") as? JsonObject
                 } ?: error("Gemini 未返回图片数据")
-                LocalMediaImageResult(file = saveEncodedImage(inline))
+                val encoded = inline["data"]?.jsonPrimitive?.contentOrNull
+                    ?: error("Gemini 未返回图片字节")
+                val extension = LocalMediaApiResponse.imageExtension(
+                    inline["mimeType"]?.jsonPrimitive?.contentOrNull
+                        ?: error("Gemini 图片响应缺少 MIME 类型")
+                )
+                LocalMediaImageResult(file = saveEncodedImage(encoded, extension))
             }
             LocalMediaProvider.MINIMAX -> error("MiniMax 图片由官方原生适配器处理")
         }
@@ -266,7 +294,7 @@ internal class LocalMediaApiClient @Inject constructor(
         withCancellableHttpResponse(http.newCall(request)) { response ->
             if (!response.isSuccessful) error("创作服务请求失败（HTTP ${response.code}）")
             val payload = response.body?.string() ?: error("创作服务未返回数据")
-            json.parseToJsonElement(payload).jsonObject
+            LocalMediaApiResponse.checked(json.parseToJsonElement(payload).jsonObject)
         }
     }
 
@@ -284,8 +312,8 @@ internal class LocalMediaApiClient @Inject constructor(
         File(File(context.cacheDir, "media-studio").apply { mkdirs() },
             "created-${UUID.randomUUID()}.$extension")
 
-    private suspend fun saveEncodedImage(encoded: String): File = withContext(Dispatchers.IO) {
-        val file = outputFile("png")
+    private suspend fun saveEncodedImage(encoded: String, extension: String = "png"): File = withContext(Dispatchers.IO) {
+        val file = outputFile(extension)
         try {
             file.writeBytes(Base64.decode(encoded, Base64.DEFAULT))
             check(file.length() > 0) { "生成图片为空" }
