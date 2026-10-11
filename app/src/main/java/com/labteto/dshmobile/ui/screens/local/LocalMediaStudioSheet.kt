@@ -206,12 +206,18 @@ internal fun LocalMediaStudioSheetContent(
                             onClick = { openMediaUrl(context, url) { error = it } })
                     }
                     image?.file?.let { file ->
+                        val mime = when (file.extension.lowercase()) {
+                            "png" -> "image/png"
+                            "jpg", "jpeg" -> "image/jpeg"
+                            "webp" -> "image/webp"
+                            else -> "application/octet-stream"
+                        }
                         DsButton(text = stringResource(R.string.media_studio_view_image),
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = { viewMediaFile(context, file, "image/png") { error = it } })
+                            onClick = { viewMediaFile(context, file, mime) { error = it } })
                         DsButton(text = stringResource(R.string.media_studio_share_image),
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = { shareMediaFile(context, file, "image/png") { error = it } })
+                            onClick = { shareMediaFile(context, file, mime) { error = it } })
                     }
                 }
                 LocalMediaKind.VIDEO -> {
