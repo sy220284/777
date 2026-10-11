@@ -222,6 +222,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
+    val exportSuccess = stringResource(R.string.settings_export_diagnostics_success)
+    val exportPartial = stringResource(R.string.settings_export_diagnostics_partial)
     val storageExported = stringResource(R.string.settings_local_session_storage_exported)
     val storageExportFailed = stringResource(R.string.settings_local_session_storage_export_failed)
     val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
@@ -233,8 +235,13 @@ fun SettingsScreen(
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         stream.write(report.toByteArray(Charsets.UTF_8))
+                        stream.flush()
                     } ?: error("无法打开导出文件")
                 }
+                val integrity = report.lineSequence()
+                    .firstOrNull { it.startsWith("日志完整性：") }
+                    ?.removePrefix("日志完整性：")
+                toast.second(if (integrity == "正常") exportSuccess else exportPartial)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

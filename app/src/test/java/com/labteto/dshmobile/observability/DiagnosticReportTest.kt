@@ -93,4 +93,25 @@ class DiagnosticReportTest {
         assertEquals(1, entries.count(AppLogEntry::isDiagnosticFailure))
     }
 
+    @Test
+    fun newEventIdentitySurvivesPersistedEncodingAndOlderFormatsRemainReadable() {
+        val event = AppLogEntry(123L, "E", "Crash", "operation=uncaught_exception",
+            eventId = "process-123:9")
+        val persisted = AppLog.encodeEntry(event)
+        assertEquals("process-123:9", AppLog.decodeEntry(persisted)?.eventId)
+        val legacyElevenColumns = persisted.substringBeforeLast('\t')
+        assertEquals(null, AppLog.decodeEntry(legacyElevenColumns)?.eventId)
+        assertEquals(event.message, AppLog.decodeEntry(legacyElevenColumns)?.message)
+    }
+
+    @Test
+    fun recoveryAndNormalJournalDeduplicateByEventId() {
+        val a = AppLogEntry(111L, "E", "Crash", "operation=crash", eventId = "pid:1")
+        val b = a.copy(timestampMillis = 112L)
+        val c = AppLogEntry(113L, "I", "Resume", "operation=restore", eventId = "pid:2")
+        val result = deduplicateDiagnosticEntries(listOf(a, b, c))
+        assertEquals(2, result.size)
+        assertEquals(listOf("pid:1", "pid:2"), result.map { it.eventId })
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.observability
 
 import android.util.Log
+import android.util.AtomicFile
 import com.labteto.dshmobile.BuildConfig
 import java.io.File
 import java.util.UUID
@@ -22,6 +23,7 @@ data class AppLogEntry(
     val processInstanceId: String? = null,
     val processStartedAtMillis: Long? = null,
     val throwableCauseChain: String? = null,
+    val eventId: String? = null,
 )
 
 /**
@@ -40,6 +42,8 @@ data class AppLogExport(
     val overflowRows: Long = 0,
     val writeFailure: String? = null,
     val truncated: Boolean = false,
+    val emergencyRows: Int = 0,
+    val emergencyFailure: String? = null,
 ) {
     val integrity: String get() = buildList {
         if (malformedRows > 0) add("损坏行=$malformedRows")
@@ -48,6 +52,8 @@ data class AppLogExport(
         if (overflowRows > 0) add("拥塞丢弃=$overflowRows")
         writeFailure?.let { add("写入失败=$it") }
         if (truncated) add("超过近期导出容量，已截取最新记录")
+        if (emergencyRows > 0) add("崩溃现场待恢复=$emergencyRows")
+        emergencyFailure?.let { add("崩溃现场读取失败=$it") }
     }.let { if (it.isEmpty()) "正常" else it.joinToString("；") }
 }
 
@@ -61,6 +67,8 @@ object AppLog {
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
     private data class QueuedEntry(val generation: Long, val entry: AppLogEntry)
     private val persistenceGeneration = AtomicLong(0L)
+    private val eventSequence = AtomicLong(0L)
+    private val emergencyLock = Any()
     private val persistenceExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "777-app-log").apply { isDaemon = true }
     }
@@ -75,7 +83,7 @@ object AppLog {
         important = { pending: QueuedEntry -> pending.entry.isDiagnosticFailure() },
         scheduleRetry = { work -> persistenceExecutor.schedule(work, 15L, TimeUnit.SECONDS) },
     )
-    private val processInstanceId = UUID.randomUUID().toString().substringBefore('-')
+    private val processInstanceId = UUID.randomUUID().toString()
     private val processStartedAtMillis = System.currentTimeMillis()
 
     @Volatile
@@ -87,6 +95,88 @@ object AppLog {
     fun configurePersistence(file: File) {
         persistentFile = file
         runCatching { file.parentFile?.mkdirs() }
+        // Recovery runs on the writer thread before subsequent new log batches.
+        // Startup never waits for disk repair or an unreadable emergency file.
+        runCatching {
+            persistenceExecutor.execute {
+                runCatching { recoverEmergency(file) }.onFailure { error ->
+                    runCatching {
+                        Log.e("AppLog", "Crash recovery failed", sanitizedThrowableForLogcat(error))
+                    }
+                }
+            }
+        }
+    }
+
+    private data class EmergencyRead(
+        val entries: List<AppLogEntry> = emptyList(),
+        val malformedRows: Int = 0,
+        val failure: String? = null,
+    )
+
+    private fun emergencyFile(file: File): AtomicFile =
+        AtomicFile(File(file.parentFile, "app-crash-recovery.tsv"))
+
+    private fun readEmergency(file: File): EmergencyRead {
+        val atomicFile = emergencyFile(file)
+        val base = atomicFile.baseFile
+        if (!base.exists() && !File(base.path + ".bak").exists()) return EmergencyRead()
+        return try {
+            val entries = mutableListOf<AppLogEntry>()
+            var malformed = 0
+            atomicFile.openRead().bufferedReader(Charsets.UTF_8).use { reader ->
+                reader.forEachLine { line ->
+                    val item = decodeEntry(line)
+                    if (item == null) malformed++ else entries.add(item)
+                }
+            }
+            EmergencyRead(entries, malformed)
+        } catch (error: Exception) {
+            EmergencyRead(failure = error.javaClass.simpleName)
+        }
+    }
+
+    private fun recoverEmergency(file: File) = synchronized(persistenceLock) {
+        synchronized(emergencyLock) {
+            val recovery = readEmergency(file)
+            if (recovery.failure != null || recovery.malformedRows > 0) {
+                throw java.io.IOException(
+                    "Invalid crash recovery: read=${recovery.failure} malformed=${recovery.malformedRows}",
+                )
+            }
+            if (recovery.entries.isNotEmpty()) {
+                val persistedIds = readPersistedUnsafe().entries.mapNotNull { it.eventId }.toHashSet()
+                persistBatch(recovery.entries.filter { it.eventId == null || it.eventId !in persistedIds })
+                // Delete only after a successful append; event IDs also make later
+                // recovery attempts idempotent at export time.
+                emergencyFile(file).delete()
+            }
+        }
+    }
+
+    private fun persistEmergency(crash: AppLogEntry) {
+        val file = persistentFile ?: return
+        // A fatal handler must never wait for a regular disk batch, rotate a large log,
+        // or scan the full durable history. Save bounded and already-redacted evidence.
+        val recent = snapshot()
+        val queued = pendingWrites.snapshot().outstanding
+            .filter { it.generation == persistenceGeneration.get() }
+            .map { it.entry }
+        val critical = (recent + queued).filter(AppLogEntry::isDiagnosticFailure).takeLast(32)
+        val evidence = deduplicateDiagnosticEntries(critical + recent.takeLast(24) + listOf(crash))
+            .sortedBy(AppLogEntry::timestampMillis)
+        synchronized(emergencyLock) {
+            val target = emergencyFile(file)
+            val output = target.startWrite()
+            try {
+                output.write(evidence.joinToString("\n", postfix = "\n", transform = ::encodeEntry)
+                    .toByteArray(Charsets.UTF_8))
+                target.finishWrite(output)
+            } catch (error: Exception) {
+                target.failWrite(output)
+                throw error
+            }
+        }
     }
 
     /** Preserve fatal failures before Android terminates the process. Delegate to its original handler. */
@@ -169,11 +259,12 @@ object AppLog {
     /** Snapshot disk + pending + in-flight rows under one disk lock; no queue-drain wait. */
     fun exportForDiagnostics(): AppLogExport = synchronized(persistenceLock) {
         val persisted = readPersistedUnsafe()
+        val emergency = synchronized(emergencyLock) { persistentFile?.let(::readEmergency) ?: EmergencyRead() }
         val pending = pendingWrites.snapshot()
         val currentPending = pending.outstanding.filter { it.generation == persistenceGeneration.get() }
-        val merged = (persisted.entries + currentPending.map { it.entry } + snapshot())
-            .distinct()
-            .sortedBy(AppLogEntry::timestampMillis)
+        val merged = deduplicateDiagnosticEntries(
+            persisted.entries + emergency.entries + currentPending.map { it.entry } + snapshot(),
+        ).sortedWith(compareBy(AppLogEntry::timestampMillis, { it.eventId.orEmpty() }))
         AppLogExport(
             entries = merged.takeLast(MAX_EXPORT_ENTRIES),
             malformedRows = persisted.malformedRows,
@@ -182,6 +273,8 @@ object AppLog {
             overflowRows = pending.overflow,
             writeFailure = pending.writeError,
             truncated = merged.size > MAX_EXPORT_ENTRIES,
+            emergencyRows = emergency.entries.size,
+            emergencyFailure = emergency.failure ?: if (emergency.malformedRows > 0) "损坏行=${emergency.malformedRows}" else null,
         )
     }
 
@@ -219,6 +312,7 @@ object AppLog {
             processInstanceId = processInstanceId,
             processStartedAtMillis = processStartedAtMillis,
             throwableCauseChain = throwable?.let(::summarizeCauseChain),
+            eventId = "$processInstanceId:${eventSequence.incrementAndGet()}",
         )
         synchronized(lock) {
             if (generation == persistenceGeneration.get()) {
@@ -227,20 +321,11 @@ object AppLog {
             }
         }
         if (synchronous) {
-            // Fatal diagnostics also need the preceding buffered events for cause reconstruction.
-            runCatching {
-                synchronized(persistenceLock) {
-                    if (generation == persistenceGeneration.get()) {
-                        val preceding = pendingWrites.snapshot().outstanding
-                            .filter { it.generation == generation }
-                            .map { it.entry }
-                            .takeLast(MAX_EXPORT_ENTRIES)
-                        persistBatch(preceding + entry)
-                    }
+            runCatching { persistEmergency(entry) }.onFailure { failure ->
+                runCatching {
+                    Log.e("AppLog", "Fatal diagnostic persistence failed", sanitizedThrowableForLogcat(failure))
                 }
-            }.onFailure { failure ->
-                    runCatching { Log.e("AppLog", "Fatal diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
-                }
+            }
         } else if (persistentFile != null) {
             pendingWrites.offer(QueuedEntry(generation, entry))
         }
@@ -311,7 +396,7 @@ object AppLog {
         return PersistedRead(tail.toList(), malformed, failure)
     }
 
-    private fun encodeEntry(entry: AppLogEntry): String = listOf(
+    internal fun encodeEntry(entry: AppLogEntry): String = listOf(
         entry.timestampMillis.toString(),
         entry.level,
         encode(entry.tag),
@@ -323,11 +408,12 @@ object AppLog {
         encode(entry.processInstanceId.orEmpty()),
         entry.processStartedAtMillis?.toString().orEmpty(),
         encode(entry.throwableCauseChain.orEmpty()),
+        encode(entry.eventId.orEmpty()),
     ).joinToString("\t")
 
-    private fun decodeEntry(line: String): AppLogEntry? {
+    internal fun decodeEntry(line: String): AppLogEntry? {
         val parts = line.split('\t')
-        if (parts.size != 6 && parts.size != 10 && parts.size != 11) return null
+        if (parts.size != 6 && parts.size != 10 && parts.size != 11 && parts.size != 12) return null
         return runCatching {
             AppLogEntry(
                 timestampMillis = parts[0].toLong(),
@@ -341,6 +427,7 @@ object AppLog {
                 processInstanceId = parts.getOrNull(8)?.let(::decode)?.takeIf(String::isNotBlank),
                 processStartedAtMillis = parts.getOrNull(9)?.toLongOrNull(),
                 throwableCauseChain = parts.getOrNull(10)?.let(::decode)?.takeIf(String::isNotBlank),
+                eventId = parts.getOrNull(11)?.let(::decode)?.takeIf(String::isNotBlank),
             )
         }.getOrNull()
     }
@@ -351,6 +438,10 @@ object AppLog {
     private fun decode(value: String): String =
         String(Base64.getDecoder().decode(value), Charsets.UTF_8)
 }
+
+/** New records have stable IDs; older 6/10/11-column records use structural identity. */
+internal fun deduplicateDiagnosticEntries(entries: List<AppLogEntry>): List<AppLogEntry> =
+    entries.distinctBy { it.eventId ?: it.copy(eventId = null) }
 
 /** A warning with an explicit failure marker is still a real diagnostic failure. */
 internal fun AppLogEntry.isDiagnosticFailure(): Boolean {

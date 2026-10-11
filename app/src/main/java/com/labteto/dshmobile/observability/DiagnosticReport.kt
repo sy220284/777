@@ -20,6 +20,11 @@ object DiagnosticReport {
         }
         val recent = entries.takeLast(MAX_REPORT_ENTRIES)
         val failures = recent.filter(AppLogEntry::isDiagnosticFailure)
+        val repeated = failures.groupBy { entry ->
+            listOf(entry.tag, entry.throwableType.orEmpty(),
+                entry.message.substringAfter("operation=", "").substringBefore(" "),
+                entry.throwableCauseChain.orEmpty().substringBefore(":")).joinToString("|")
+        }.values.filter { it.size > 1 }
         return buildString {
             appendLine("777 运行诊断 · ${timestamp.format(Date())}")
             appendLine("系统版本：Android API $androidApi")
@@ -37,7 +42,22 @@ object DiagnosticReport {
                 append(timestamp.format(Date(entry.timestampMillis)))
                 append(" ").append(entry.level).append("/").append(entry.tag.take(64))
                 append(" ").append(sanitizeDiagnosticText(entry.message).replace("\n", " ").take(800))
+                entry.eventId?.let { append(" event_id=").append(it) }
                 entry.throwableCauseChain?.let { append(" cause_chain=").append(sanitizeDiagnosticText(it).replace("\n", " ").take(1_000)) }
+                appendLine()
+            }
+
+            appendLine("重复异常汇总（同一组件、操作及异常类型）：")
+            repeated.forEach { matches ->
+                val first = matches.first()
+                append("operation=").append(
+                    first.message.substringAfter("operation=", "unknown").substringBefore(" ").take(100),
+                )
+                append(" component=").append(first.tag.take(64))
+                append(" type=").append(first.throwableType ?: "unknown")
+                append(" count=").append(matches.size)
+                append(" first=").append(timestamp.format(Date(matches.first().timestampMillis)))
+                append(" last=").append(timestamp.format(Date(matches.last().timestampMillis)))
                 appendLine()
             }
 
@@ -76,6 +96,7 @@ object DiagnosticReport {
                 entry.throwableCauseChain?.let { chain ->
                     append(" cause_chain=").append(sanitizeDiagnosticText(chain).replace("\n", " ").take(1_000))
                 }
+                entry.eventId?.let { append(" event_id=").append(it) }
                 append(" build=").append(entry.appVersion ?: "legacy/unknown")
                 append(" process=").append(entry.processInstanceId ?: "legacy")
                 appendLine()
