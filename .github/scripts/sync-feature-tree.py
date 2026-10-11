@@ -349,6 +349,17 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
         if any(r["path"] == name for r in registered.values()):
             pending.append({"path": name, "reason": "当前源码仍显式登记此功能"})
             continue
+        historical, _ = historical_code_evidence(root, [name])
+        source_history = set()
+        for evidence in historical:
+            if evidence["path"] == name:
+                source_history.update(evidence["historical_production_sources"])
+        for old in previous.values():
+            if old["path"] == name:
+                source_history.add(old["source"])
+        if source not in source_history:
+            pending.append({"path": name, "reason": "审批的旧生产源码找不到历史源码台账或稳定登记依据"})
+            continue
         declaration = re.compile(SYMBOL % re.escape(symbol))
         if any(declaration.search(text) for text in code_contents):
             pending.append({"path": name, "reason": "生产源码仍存在原入口声明，可能已经迁移"})
@@ -490,11 +501,28 @@ def generate(root):
         add(model, parts(item["path"]))
     for old in deleted:
         prune_empty(model, old)
+    matrix_text = (root / MATRIX).read_text(encoding="utf-8")
+    matrix = json.loads(matrix_text)
+    legacy_approved, legacy_pending = approved_legacy_retirements(
+        root, model, registered, older, matrix
+    )
+    for result in legacy_approved:
+        if result["status"] != "入口消失、测试映射已清理，批准删除":
+            continue
+        path = parts(result["path"])
+        delete(model, path)
+        old_paths[result["path"]] = None
+        prune_empty(model, path)
+        for ident in list(valid):
+            if valid[ident]["path"] == result["path"]:
+                valid.pop(ident)
     all_leaves = leaves(model)
     if len(all_leaves) != len(set(all_leaves)):
         raise ValueError("功能树叶节点存在重复路径")
-    matrix_text = (root / MATRIX).read_text(encoding="utf-8")
-    matrix = json.loads(matrix_text)
+    historical_gaps, current_source_gaps = historical_code_evidence(root, all_leaves)
+    pending.extend({
+        "path": item["path"], "status": "待复核，禁止移除旧功能", "reason": item["reason"]
+    } for item in legacy_pending)
     ranks = {name: i for i, name in enumerate(all_leaves)}
     if old_paths:
         updated = []
@@ -568,6 +596,16 @@ def generate(root):
         '未经证明的新增与退役变化不会直接写入节点；验收仍以真实测试和设备执行为准。</p>',
         html, count=1, flags=re.S,
     )
+    # 对已经退出当前功能树的历史来源进行单独审计，不再冒充现行能力。
+    html = re.sub(
+        r'<p class="sub">本图按照代码快照 .*?</p>',
+        f'<p class="sub">本图依据源码内容指纹 {snap} 复核；'
+        f'历史台账中 {len(historical_gaps)} 项已不在现行树内，'
+        f'当前树有 {len(current_source_gaps)} 项引用过时源码路径。'
+        '未确认替代实现之前不依据单个文件缺失判断退役。'
+        '<a href="FEATURE-REVIEW.auto.json">查看逐项反向核查结果</a>。</p>',
+        html, count=1, flags=re.S,
+    )
     # 旧版写死的功能数和核查结论不得被冒充当前扫描事实。
     html = re.sub(
         r'<p class="sub">源码核查级别：.*?</p>',
@@ -599,6 +637,12 @@ def generate(root):
         "changes_applied": [{"previous": previous, "current": current}
                             for previous, current in sorted(old_paths.items())],
         "pending_changes": pending,
+        "obsolete_historical_evidence_count": len(historical_gaps),
+        "obsolete_historical_evidence": historical_gaps,
+        "current_tree_outdated_source_count": len(current_source_gaps),
+        "current_tree_outdated_sources": current_source_gaps,
+        "approved_legacy_retirements": legacy_approved,
+        "legacy_retirements_requiring_review": legacy_pending,
         "verification_limits": (
             "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；"
             "无法据此证明测试在真实设备或服务上的行为完整。"
@@ -608,6 +652,8 @@ def generate(root):
     index["source_snapshot"] = snap
     index["verified_registrations"] = sorted(valid)
     index["unverified_changes_count"] = len(pending)
+    index["obsolete_historical_evidence_count"] = len(historical_gaps)
+    index["current_tree_outdated_source_count"] = len(current_source_gaps)
     normalized = [{k: v for k, v in item.items() if k not in {"previous_path", "action", "reason"}}
                   for item in sorted(valid.values(), key=lambda v: v["id"])
                   if (root / item["source"]).is_file()]
