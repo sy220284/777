@@ -13,6 +13,8 @@ HTML = Path("docs/FEATURE-TREE.zh-CN.html")
 MATRIX = Path("docs/ACCEPTANCE-MATRIX.json")
 REG = Path("docs/FEATURE-TREE-SOURCE-REGISTRY.json")
 INDEX = Path("docs/FEATURE-SOURCE-INDEX.auto.json")
+REVIEW = Path("docs/FEATURE-REVIEW.auto.json")
+import subprocess
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
 DATA = re.compile(r"(const data=)(\{.*?\})(;const tree=)", re.S)
@@ -172,6 +174,9 @@ def scan(root):
             if ident in markers:
                 raise ValueError("功能 ID 重复: " + ident)
             markers[ident] = {"id": ident, "path": fullpath, "source": path}
+            for key in ("entry", "owner", "test", "action", "reason"):
+                if key in entry:
+                    markers[ident][key] = entry[key]
             if "previous_path" in entry:
                 markers[ident]["previous_path"] = " / ".join(parts(entry["previous_path"]))
     return markers, {
@@ -184,6 +189,110 @@ def scan(root):
         "semantic_registration_count": len(markers),
         "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
     }
+
+
+
+OWNER_IDS = {"SHELL", "CHAT", "WORK", "PROJECT", "AUTOMATION", "TOOLS", "SETTINGS"}
+CHINESE = re.compile(r"[\u3400-\u9fff]")
+SYMBOL = r"(?:fun|class|object|interface|val|var|enum\s+class)\s+%s\b"
+
+
+def proof(root, marker, earlier):
+    """核实独立的源码事实；不能把静态匹配冒充已通过的行为验收。"""
+    if marker.get("action") == "retire":
+        if earlier is None or marker.get("path") != earlier["path"]:
+            return "退役项必须对应已登记功能的原完整路径"
+        if len(CHINESE.findall(marker.get("reason", ""))) < 2:
+            return "退役必须说明中文原因"
+        return None
+    if marker.get("action", "upsert") != "upsert":
+        return "操作类型无效"
+    if not CHINESE.search(parts(marker["path"])[-1]):
+        return "功能末级名称必须为中文"
+    if marker.get("owner") not in OWNER_IDS:
+        return "功能归属不是架构登记的七个所有权模块"
+    symbol = marker.get("entry", "")
+    if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", symbol):
+        return "缺少明确的生产入口符号 entry"
+    file = root / marker["source"]
+    content = file.read_text(encoding="utf-8", errors="replace")
+    if not re.search(SYMBOL % re.escape(symbol), content):
+        return "源码没有声明对应的真实入口 " + symbol
+    test_ref = marker.get("test", "")
+    if not isinstance(test_ref, str) or "#" not in test_ref:
+        return "缺少真实测试方法 test"
+    test_path, method = test_ref.rsplit("#", 1)
+    if not (test_path.endswith(".kt") and ("/src/test/" in "/" + test_path
+            or "/src/androidTest/" in "/" + test_path)):
+        return "测试必须指向现有 Kotlin 测试目录"
+    test_file = root / test_path
+    if not test_file.is_file():
+        return "指定测试文件不存在"
+    test_content = test_file.read_text(encoding="utf-8", errors="replace")
+    if not re.search(r"@Test\s+(?:fun\s+)" + re.escape(method) + r"\s*\(", test_content):
+        return "不存在该 @Test 方法"
+    if symbol not in test_content:
+        return "测试源码没有直接引用所登记的生产入口符号"
+    return None
+
+
+def checked_registration(root, current, previous):
+    verified, pending, retired = {}, [], {}
+    for ident, item in sorted(current.items()):
+        old = previous.get(ident)
+        problem = proof(root, item, old)
+        if problem:
+            pending.append({"id": ident, "path": item["path"],
+                            "status": "待复核，未写入功能树", "reason": problem})
+        elif item.get("action") == "retire":
+            retired[ident] = item
+        else:
+            verified[ident] = item
+    for ident, item in previous.items():
+        if ident not in current:
+            pending.append({"id": ident, "path": item["path"],
+                            "status": "待复核，未删除功能树",
+                            "reason": "源码登记消失，无法单凭文件删除证明功能已退役；需明确退役声明"})
+            verified[ident] = item
+        elif ident not in verified and ident not in retired:
+            # 有问题的变更不能自动撤销历史登记或旧功能。
+            verified[ident] = item
+    return verified, retired, pending
+
+
+def snapshot(root):
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "--short=12", "HEAD"],
+            stderr=subprocess.DEVNULL, text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "本地模拟"
+
+
+def validate_view(root_model, html_text):
+    old, _ = original_html(html_text)
+    mdpaths = []
+    def walk(node, path):
+        for child in node["children"]:
+            here = path + [clean(child["name"])]
+            mdpaths.append(" / ".join(here))
+            walk(child, here)
+    walk(root_model, [])
+    found = DATA.search(html_text)
+    html_model = json.loads(found.group(2))
+    htmlpaths = []
+    def walk_html(node, path):
+        here = path + [node["name"]] if node.get("depth") else path
+        if here:
+            htmlpaths.append(" / ".join(here))
+        for child in node["children"]:
+            walk_html(child, here)
+    walk_html(html_model, [])
+    if mdpaths != htmlpaths:
+        raise ValueError("HTML/Markdown 节点、层级或顺序不一致，拒绝写入")
+    return len(mdpaths)
+
 
 
 def original_html(html):
