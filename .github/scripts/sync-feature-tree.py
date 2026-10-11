@@ -783,6 +783,12 @@ def generate(root):
         '源码登记通过不等于真实运行验收；<a href="FEATURE-REVIEW.auto.json">查看完整复核结果</a>。</p>',
         html, count=1, flags=re.S,
     )
+    # 未获准的迁移保留旧身份，且不将未写入的新增登记误记为确认。
+    rejected_ids = {x.get("id") for x in pending}
+    registry_nodes = {
+        **{ident: older[ident] for ident in rejected_ids if ident in older},
+        **{ident: item for ident, item in valid.items() if ident not in rejected_ids},
+    }
     node_count = validate_view(model, html)
     evidence = legacy_leaf_evidence(root, all_leaves, matrix)
     categories = {}
@@ -824,12 +830,6 @@ def generate(root):
     index["unverified_changes_count"] = len(pending)
     index["obsolete_historical_evidence_count"] = len(historical_gaps)
     index["current_tree_outdated_source_count"] = len(current_source_gaps)
-    # 未获准的迁移保留旧身份，且不将未写入的新增登记误记为确认。
-    rejected_ids = {x.get("id") for x in pending}
-    registry_nodes = {
-        **{ident: older[ident] for ident in rejected_ids if ident in older},
-        **{ident: item for ident, item in valid.items() if ident not in rejected_ids},
-    }
     normalized = [{k: v for k, v in item.items() if k not in {"previous_path", "action", "reason"}}
                   for item in sorted(registry_nodes.values(), key=lambda v: v["id"])]
     return {
