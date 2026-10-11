@@ -22,7 +22,7 @@ internal object LocalWorkspaceToolGuide {
         if (!destination.createNewFile()) return false
         return try {
             context.assets.open(GUIDE_ASSET).use { source ->
-                destination.outputStream().use(source::copyTo)
+                destination.outputStream().use { output -> source.copyTo(output) }
             }
             true
         } catch (error: Exception) {
