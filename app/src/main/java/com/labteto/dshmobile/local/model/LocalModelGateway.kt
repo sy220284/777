@@ -1,6 +1,15 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.core.net.withCancellableHttpResponse
+import java.net.URI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.currentCoroutineContext
@@ -15,6 +24,7 @@ class LocalModelGateway @Inject constructor(
     private val credentials: LocalModelCredentialResolver,
     private val adapters: LocalModelAdapterRegistry,
     private val routes: LocalModelRouteCatalog,
+    private val http: OkHttpClient,
 ) {
     val activeProfileState = credentials.activeProfile
     val invalidatedChatGptAccounts = credentials.invalidatedChatGptAccounts
@@ -38,8 +48,59 @@ class LocalModelGateway @Inject constructor(
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
         credentials.hasCredential(profile)
 
+    /** All locally saved route metadata, including disconnected/expired credential bindings. */
+    fun configuredProfiles(): List<LocalModelProfile> = routes.profiles()
+
     suspend fun availableProfiles(): List<LocalModelProfile> =
-        routes.profiles().filter { credentials.hasCredential(it) }
+        configuredProfiles().filter { credentials.hasCredential(it) }
+
+    /**
+     * Optional authenticated provider inventory. The model chooses a saved profileId; the app
+     * resolves its key internally. Only a known preset's pinned official HTTPS /models URL may
+     * receive credentials, never an arbitrary URL passed by an agent or a custom proxy.
+     *
+     * The provider's list is an account-visible catalog, NOT proof of inference entitlement;
+     * discovered IDs also do not become runnable routes until configured.
+     */
+    suspend fun discoverProviderModelIds(profileId: String): List<String> {
+        val profile = configuredProfiles().firstOrNull { it.id == profileId }
+            ?: error("模型配置已不存在，请刷新模型清单")
+        require(profile.authKind == LocalModelAuthKind.API_KEY) {
+            "套餐授权模型请通过应用内账户同步获取，不支持 API Key 模型目录查询"
+        }
+        val endpoint = LocalModelPresets.find(profile.model, profile.baseUrl)?.modelsEndpoint
+            ?: error("该模型来源没有已验证的官方模型目录接口；不可把密钥发送到猜测的 URL")
+        val target = URI(endpoint)
+        val profileUri = URI(normalizeModelBaseUrl(profile.baseUrl))
+        require(target.scheme.equals("https", true) && target.port == -1 &&
+            target.rawUserInfo == null && target.host != null &&
+            target.host.equals(profileUri.host, ignoreCase = true) &&
+            profileUri.scheme.equals("https", true) && profileUri.rawUserInfo == null
+        ) { "模型目录地址与已保存的官方模型来源不一致，拒绝携带凭据请求" }
+        val bearerToken = credentials.resolve(profile.model, profile.baseUrl, profile).bearerToken
+        val request = Request.Builder()
+            .url(endpoint)
+            .header("Authorization", "Bearer $bearerToken")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        return withContext(Dispatchers.IO) {
+            withCancellableHttpResponse(http.newCall(request)) { response ->
+                check(response.isSuccessful) { "服务商模型目录查询失败（HTTP ${response.code}）" }
+                val body = response.body ?: error("服务商模型目录没有响应体")
+                check(body.contentLength() <= 524288) { "服务商模型目录响应超过 512 KiB" }
+                val raw = response.peekBody(524289).string()
+                check(raw.length <= 524288) { "服务商模型目录响应超过 512 KiB" }
+                val list = kotlinx.serialization.json.Json.parseToJsonElement(raw)
+                    .jsonObject["data"]?.jsonArray
+                    ?: error("服务商未返回标准 data 模型列表；请在设置中检查该服务商接口")
+                list.mapNotNull { item ->
+                    (item as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
+                        ?.takeIf { it.isNotBlank() && it.length <= 128 }
+                }.distinct().sorted()
+            }
+        }
+    }
 
     suspend fun profileForRun(selection: String? = null): LocalModelProfile {
         val inherited = currentCoroutineContext()[LocalModelRunContext]?.profile
