@@ -455,7 +455,7 @@ internal fun LocalMediaStudioSheetContent(
                                     R.string.media_studio_history_item,
                                     asset.provider,
                                     asset.model,
-                                    if (asset.kind == LocalMediaKind.SPEECH.name) "语音" else "图片",
+                                    if (asset.kind == LocalMediaKind.SPEECH.name) stringResource(R.string.media_studio_kind_speech) else stringResource(R.string.media_studio_kind_image),
                                 ),
                                 color = colors.labelPrimary,
                                 style = DsType.caption11.withReadingWeight(),
