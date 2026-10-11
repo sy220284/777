@@ -55,6 +55,9 @@ jobs:
               f"- 自动批准的结构变更：{len(result['changes_applied'])}；待核实声明：{len(result['pending_changes'])}",
               f"- 现行树外历史项：{result['obsolete_historical_evidence_count']}；现行树失效来源：{result['current_tree_outdated_source_count']}",
               f"- 路由变化：新增 {len(delta.get('added_routes', []))}，移除 {len(delta.get('removed_routes', []))}",
+              f"- 静态追踪身份：{result.get('tracked_legacy_identities', 0)} 项；真实共享入口歧义 {len(result.get('ambiguous_named_entry_paths', []))} 项",
+              f"- 工程 CI 作业静态证据：{result.get('workflow_evidence_features', 0)} 项；有声明但尚无成功执行记录的仪表测试：{result.get('declared_unexecuted_test_methods', 0)} 项",
+              f"- 无确认入口的功能：{len(result.get('unproven_feature_triage', []))} 项，维持待核实状态",
               "- 生成文件随产物上传；静态源码检查不能代替真实运行验收。",
           ]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
