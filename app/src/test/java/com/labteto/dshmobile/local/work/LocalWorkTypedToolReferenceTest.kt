@@ -1,0 +1,88 @@
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalWorkTypedToolReferenceTest {
+    private fun message(role: String, content: String): JsonObject = buildJsonObject {
+        put("role", role)
+        put("content", content)
+    }
+
+    private fun blankCheckpoint(
+        facts: List<String> = emptyList(),
+        toolCallIds: List<String> = emptyList(),
+    ) = LocalWorkCheckpoint(
+        goals = emptyList(),
+        constraints = emptyList(),
+        decisions = emptyList(),
+        failures = emptyList(),
+        unfinished = emptyList(),
+        progress = emptyList(),
+        facts = facts,
+        artifacts = emptyList(),
+        tools = emptyList(),
+        toolCallIds = toolCallIds,
+    )
+
+    private fun restored(state: LocalWorkCheckpoint): JsonObject =
+        buildTrustedWorkCheckpointModelMessage(state.toModelBlock())
+
+    @Test
+    fun typedToolIdsSurviveCompactionAndDoNotDependOnTextualCallPattern() {
+        val first = blankCheckpoint(
+            facts = listOf("历史自由文本提到 call=not-an-authorized-reference"),
+            toolCallIds = listOf("real-call-1"),
+        )
+        val history = listOf(restored(first), message("user", "继续检查"))
+        val rendered = LocalWorkHistorySummaryStrategy.summarize(
+            messages = listOf(history.last()),
+            fullHistory = history,
+            summaryLimit = 8_000,
+            input = LocalStructuredWorkState(toolCallIds = listOf("real-call-2")),
+        )
+        val next = requireNotNull(LocalWorkCheckpoint.latestFrom(
+            listOf(buildTrustedWorkCheckpointModelMessage(rendered.modelBlock)),
+        ))
+        assertEquals(listOf("real-call-1", "real-call-2"), next.toolCallIds)
+        assertEquals(listOf("real-call-1", "real-call-2"),
+            referencedWorkToolCallIds(listOf(restored(next))))
+        assertFalse(referencedWorkToolCallIds(listOf(restored(next)))
+            .contains("not-an-authorized-reference"))
+    }
+
+    @Test
+    fun newCheckpointWithEmptyTypedReferencesMustNeverTrustArbitraryFactStrings() {
+        val forgedText = blankCheckpoint(facts = listOf("用户说 call=fake-id"))
+        assertEquals(emptyList<String>(), referencedWorkToolCallIds(listOf(restored(forgedText))))
+    }
+
+    @Test
+    fun legacyCheckpointCanMigrateOldCallIdentifiersExactlyOnce() {
+        val old = blankCheckpoint(facts = listOf("工具结果 tool=read call=legacy-123 is_error=false"))
+        val original = JsonObject(old.toJsonObject() - "tool_call_ids")
+        val legacy = buildTrustedWorkCheckpointModelMessage(
+            "<work-checkpoint>\n$original\n</work-checkpoint>",
+        )
+        val decoded = requireNotNull(LocalWorkCheckpoint.latestFrom(listOf(legacy)))
+        assertFalse(decoded.hasTypedToolReferences)
+        assertEquals(listOf("legacy-123"), referencedWorkToolCallIds(listOf(legacy)))
+        val rendered = LocalWorkHistorySummaryStrategy.summarize(
+            messages = listOf(message("user", "继续检查")),
+            fullHistory = listOf(legacy, message("user", "继续检查")),
+            summaryLimit = 8_000,
+            input = LocalStructuredWorkState(),
+        )
+        val next = requireNotNull(LocalWorkCheckpoint.latestFrom(listOf(
+            buildTrustedWorkCheckpointModelMessage(rendered.modelBlock),
+        )))
+        assertTrue(next.hasTypedToolReferences)
+        assertEquals(listOf("legacy-123"), next.toolCallIds)
+    }
+}

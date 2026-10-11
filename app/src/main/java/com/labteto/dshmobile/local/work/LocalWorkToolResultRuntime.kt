@@ -24,15 +24,9 @@ internal class LocalWorkToolResultRuntime(
         // Reference protection is derived from existing Work history/checkpoints, never a
         // separate authority for task facts. Eviction still honors private storage budgets.
         val snapshot = history.snapshot()
-        val recentCallIds = snapshot.takeLast(80).mapNotNull { message ->
-            message["tool_call_id"]?.jsonPrimitive?.contentOrNull
-        }
-        val referencedIds = LocalWorkCheckpoint.latestFrom(snapshot)?.facts.orEmpty()
-            .mapNotNull { fact ->
-                Regex("""(?:^|\s)call=([^\s]+)""").find(fact)?.groupValues?.getOrNull(1)
-            }
+        val referencedIds = referencedWorkToolCallIds(snapshot)
         toolOutputStore.retainActiveReferences(
-            binding.sessionId, recentCallIds + referencedIds,
+            binding.sessionId, referencedIds,
         )
         val budget = adaptiveToolResultBudget(
             base = runtimeStateStore.historyBudgetFor(
@@ -53,4 +47,23 @@ internal class LocalWorkToolResultRuntime(
             },
         ).text
     }
+}
+
+/**
+ * Existing checkpoint facts remain readable for legacy sessions only. New checkpoints use
+ * tool_call_ids, where human-readable text cannot manufacture a retention reference.
+ */
+internal fun referencedWorkToolCallIds(snapshot: List<kotlinx.serialization.json.JsonObject>): List<String> {
+    val recent = snapshot.takeLast(80).mapNotNull { message ->
+        message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+    }
+    val checkpoint = LocalWorkCheckpoint.latestFrom(snapshot)
+    val checkpointIds = if (checkpoint?.hasTypedToolReferences == true) {
+        checkpoint.toolCallIds
+    } else {
+        checkpoint?.facts.orEmpty().mapNotNull { fact ->
+            Regex("""(?:^|\s)call=([^\s]+)""").find(fact)?.groupValues?.getOrNull(1)
+        }
+    }
+    return (recent + checkpointIds).filter(String::isNotBlank).distinct()
 }
