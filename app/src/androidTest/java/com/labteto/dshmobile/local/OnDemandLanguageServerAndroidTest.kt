@@ -27,6 +27,7 @@ class OnDemandLanguageServerAndroidTest {
                 baseEnvironment = nodeRuntime::environment,
             )
             val home = File(context.noBackupFilesDir, "lsp-android-smoke")
+            if (home.exists()) check(home.deleteRecursively())
             val manager = OnDemandLanguageServerManager(
                 home = home,
                 commandAvailable = runtime::isCommandAvailable,
@@ -34,8 +35,7 @@ class OnDemandLanguageServerAndroidTest {
                 processEnvironment = { runtime.processEnvironment() },
             )
             assertTrue(runtime.isCommandAvailable("node"))
-            assertTrue(manager.installedCommand("probe.ts").isEmpty() ||
-                manager.installedCommand("probe.ts").isNotEmpty())
+            assertTrue(manager.installedCommand("probe.ts").isEmpty())
             val command = manager.ensureInstalled("probe.ts")
             assertTrue(command.isNotEmpty())
             assertEquals(command, manager.ensureInstalled("probe.ts"))
