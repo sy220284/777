@@ -282,14 +282,28 @@ internal fun LocalConversationSurface(
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
-    val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
+    val showEmptyWorkbench = transcriptItems.isEmpty() &&
+        (state.usageMode == LocalUsageMode.WORK ||
+            (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))
+    val showEmptyGroupSetup = transcriptItems.isEmpty() &&
+        state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
+        state.groupChat.members.size < 2
+    val planReview = state.pendingQuestion
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.let(::localPlanReviewOf)
     val showStreamingTail = shouldShowWorkStreamingTail(
         running = state.running,
         usageMode = state.usageMode,
         lastItem = transcriptItems.lastOrNull(),
     )
-    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
-        (if (showStreamingTail) 1 else 0)
+    val transcriptLastListIndex = localTranscriptLastListIndex(
+        transcriptItemCount = transcriptItems.size,
+        showPagingRow = showTranscriptPagingRow,
+        showEmptyWorkbench = showEmptyWorkbench,
+        showEmptyGroupSetup = showEmptyGroupSetup,
+        showPlanReview = planReview != null,
+        showStreamingTail = showStreamingTail,
+    )
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -663,7 +677,7 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
-                if (transcriptItems.isEmpty() && (state.usageMode == LocalUsageMode.WORK || (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))) {
+                if (showEmptyWorkbench) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
@@ -672,12 +686,7 @@ internal fun LocalConversationSurface(
                         }
                     }
                 }
-                if (
-                    transcriptItems.isEmpty() &&
-                    state.usageMode == LocalUsageMode.CHAT &&
-                    state.groupChat.enabled &&
-                    state.groupChat.members.size < 2
-                ) {
+                if (showEmptyGroupSetup) {
                     item {
                         DsCard {
                             Text(
@@ -693,9 +702,6 @@ internal fun LocalConversationSurface(
                         }
                     }
                 }
-                val planReview = state.pendingQuestion
-                    ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-                    ?.let(::localPlanReviewOf)
                 planReview?.let { review ->
                     item(key = "pending-plan-review") {
                         LocalPlanReviewCard(
