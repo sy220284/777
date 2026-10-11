@@ -110,9 +110,7 @@ class LspPlugin(
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "LSP",
-                        discoveryKeywords = if (name == "lsp_uninstall_component") {
-                            setOf("卸载语言服务器", "移除语言组件", "lsp_uninstall")
-                        } else LSP_DISCOVERY_KEYWORDS,
+                        discoveryKeywords = discoveryKeywordsFor(name),
                         requirements = if (name == "lsp_uninstall_component") {
                             listOf("需用户审批；卸载前会停止当前运行的语言服务")
                         } else listOf(
@@ -423,9 +421,24 @@ class LspPlugin(
     }
 
     companion object {
-        private val LSP_DISCOVERY_KEYWORDS = setOf(
-            "lsp", "语言服务器", "代码", "定义", "引用", "符号", "重命名", "诊断", "卸载", "hover", "implementation",
-        )
+        /**
+         * Use per-operation intent. The former shared "代码/定义/引用/诊断"
+         * keywords activated every semantic tool for a single ordinary code request.
+         * capability_search still indexes the LSP family and tool descriptions.
+         */
+        private fun discoveryKeywordsFor(name: String): Set<String> = when (name) {
+            "lsp_status" -> setOf("语言服务器状态", "代码智能状态", "lsp状态", "lsp_status")
+            "lsp_uninstall_component" -> setOf("卸载语言服务器", "移除语言组件", "lsp_uninstall")
+            "lsp_definition" -> setOf("跳转定义", "查找定义", "定位定义", "函数定义", "方法定义")
+            "lsp_references" -> setOf("查找引用", "引用关系", "被谁调用", "调用关系", "调用位置")
+            "lsp_hover" -> setOf("类型信息", "类型推断", "变量类型", "悬停说明", "类型说明")
+            "lsp_implementation" -> setOf("接口实现", "实现类", "实现位置", "查找实现")
+            "lsp_symbols" -> setOf("文件符号", "函数列表", "类列表", "成员列表", "代码结构")
+            "lsp_workspace_symbols" -> setOf("工作区符号", "全局符号", "跨文件符号", "整个项目符号")
+            "lsp_rename_preview" -> setOf("符号重命名", "批量改名", "重命名预览", "跨文件改名")
+            "lsp_diagnostics" -> setOf("代码诊断", "错误诊断", "检查代码", "类型错误", "静态检查", "代码报错")
+            else -> setOf(name)
+        }
         private val names = listOf(
             "lsp_status",
             "lsp_uninstall_component",
