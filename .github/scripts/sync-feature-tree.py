@@ -111,17 +111,30 @@ def leaves(root):
 
 
 def scan(root):
-    markers, screens, routes, count = {}, [], [], 0
+    markers, screens, routes = {}, [], []
+    production, tested, scanned = 0, 0, 0
+    workflow_files = []
+    code_suffixes = {".kt", ".java", ".kts", ".py", ".sh", ".ts", ".tsx",
+                     ".js", ".jsx", ".xml", ".yml", ".yaml", ".gradle", ".toml"}
     for file in sorted(root.rglob("*")):
-        if not file.is_file() or file.suffix not in {".kt", ".java"}:
+        if not file.is_file():
             continue
         path = file.relative_to(root).as_posix()
-        if "/src/main/" not in "/" + path or any(
-            v in {".git", ".gradle", "build"} for v in file.relative_to(root).parts
-        ):
+        if any(part in {".git", ".gradle", "build", "node_modules", ".venv", "__pycache__"}
+               for part in file.relative_to(root).parts):
             continue
-        count += 1
+        if file.suffix not in code_suffixes and file.name not in {"gradlew"}:
+            continue
+        scanned += 1
+        if path.startswith(".github/workflows/") and file.suffix in {".yml", ".yaml"}:
+            workflow_files.append(path)
         text = file.read_text(encoding="utf-8", errors="replace")
+        is_production = ("/src/main/" in "/" + path and file.suffix in {".kt", ".java"})
+        if "/src/test/" in "/" + path or "/src/androidTest/" in "/" + path:
+            tested += 1
+        if not is_production:
+            continue
+        production += 1
         if file.name == "LocalFeatureCatalog.kt":
             match = re.search(r"enum class LocalFeatureRoute\s*\{([^}]*)\}", text, re.S)
             if match:
@@ -131,7 +144,12 @@ def scan(root):
                 r"@Composable\s+(?:(?:internal|private|public)\s+)?fun\s+(\w*Screen\w*)\s*\(", text
             ):
                 screens.append({"symbol": item.group(1), "source": path})
-        for tag in TAG.finditer(text):
+        candidate_lines = [line for line in text.splitlines()
+                           if re.match(r"^\s*//\s*FEATURE_TREE\s*:", line)]
+        matches = list(TAG.finditer(text))
+        if len(candidate_lines) != len(matches):
+            raise ValueError(f"{path}: FEATURE_TREE 注释语法错误，禁止将其视为已删除")
+        for tag in matches:
             try:
                 entry = json.loads(tag.group(1))
                 ident = entry["id"]
@@ -146,8 +164,11 @@ def scan(root):
             if "previous_path" in entry:
                 markers[ident]["previous_path"] = " / ".join(parts(entry["previous_path"]))
     return markers, {
-        "version": 1, "scope": "all_production_kotlin_java",
-        "production_source_count": count, "registered_routes": routes,
+        "version": 1, "scope": "repository_code_and_all_production_sources",
+        "repository_code_file_count": scanned,
+        "production_source_count": production, "test_code_file_count": tested,
+        "workflow_files": workflow_files,
+        "registered_routes": routes,
         "candidate_ui_screens": sorted(screens, key=lambda x: (x["symbol"], x["source"])),
         "semantic_registration_count": len(markers),
         "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
