@@ -43,7 +43,7 @@ internal class ChatInteractionStateReducer {
             significance, userMessage, assistantMessage,
         )
         return decoded.copy(
-            state = applyInteractionPerformance(
+            state = observeCharacterStateChanges(previous = agedPrevious, current = applyInteractionPerformance(
                 state = applyInteractionIntent(
                     state = evolvedState,
                     previous = agedPrevious,
@@ -52,7 +52,7 @@ internal class ChatInteractionStateReducer {
                 previous = agedPrevious,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
-            ),
+            ), quotations = decoded.stateEvidence, userMessage = userMessage, assistantMessage = assistantMessage),
             turnSignificance = significance,
         )
     }
@@ -237,7 +237,7 @@ internal class ChatInteractionStateReducer {
                 value.physicalState.trim().take(120)
             } else previous.physicalState,
             mood = if (rawState?.containsKey("mood") == true) {
-                value.mood.trim().take(80).ifBlank { previous.mood }
+                value.mood.trim().take(80).ifBlank { "自然" }
             } else previous.mood,
             relationshipState = relationshipDescription,
             currentFocus = if (rawState?.containsKey("currentFocus") == true) {
@@ -537,10 +537,6 @@ internal class ChatInteractionStateReducer {
         else -> "熟悉中"
     }
 private companion object {
-        const val ACTION_COOLDOWN_TURNS = 3
-        const val POSE_COOLDOWN_TURNS = 3
-        const val VERBAL_COOLDOWN_TURNS = 3
-        const val ADDRESS_COOLDOWN_TURNS = 2
         const val RECENT_ACTION_LIMIT = 6
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
@@ -552,10 +548,7 @@ private companion object {
             "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",
             "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
         )
-        val TOPIC_RESET_REQUEST = Regex(
-            """^(?:嗯|好|那|行|唉|算了[，,])?[，,。\s]*(?:(?:我们|咱们|我想(?:要)?|我希望|要不|不如)[\s]*)?(?:先[\s]*)?(?:换个话题|先不聊这个|不聊这个|别提这个|别再提(?:这个)?|到此为止)""",
-        )
-        const val THREAD_TTL = 6
+
     }
 }
 
