@@ -14,6 +14,7 @@ internal fun withWorkRuntimeContext(
     model: String,
     baseUrl: String,
     profile: LocalModelProfile?,
+    configuredProfiles: List<LocalModelProfile> = emptyList(),
 ): String {
     val routedModel = model.takeIf(String::isNotBlank) ?: profile?.model.orEmpty()
     val protocol = profile?.let {
@@ -24,6 +25,13 @@ internal fun withWorkRuntimeContext(
         appendLine("- 产品：777 本机 Harness · 工作模式")
         appendLine("- 工作区：$workspacePath")
         appendLine("- 当前路由模型：$routedModel")
+        if (configuredProfiles.isNotEmpty()) {
+            val shown = configuredProfiles.take(16).joinToString("；") { saved ->
+                "${saved.model.take(64)}（profileId=${saved.id.take(100)}）"
+            }
+            appendLine("- 已保存模型档案（不包含密钥，凭据是否有效请调用 list_subagent_models）：$shown")
+            if (configuredProfiles.size > 16) appendLine("- 另有 ${configuredProfiles.size - 16} 个模型档案，请使用 list_subagent_models 获取完整实时清单。")
+        }
         profile?.provider?.takeIf(String::isNotBlank)?.let { appendLine("- 模型提供方：$it") }
         profile?.let { appendLine("- 认证来源：${it.sourceLabel()}") }
         protocol?.let { appendLine("- 模型协议：${it.name}") }
