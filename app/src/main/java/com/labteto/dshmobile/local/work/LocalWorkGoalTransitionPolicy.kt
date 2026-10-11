@@ -11,14 +11,16 @@ import kotlinx.serialization.json.put
 internal fun resolveWorkGoalTransition(
     current: LocalGoal,
     candidate: LocalGoal,
-    todos: List<LocalTodoItem>,
+    work: LocalWorkState,
 ): RuntimeStateTransition<LocalGoal> =
     RuntimeStateTransitionPolicy<LocalGoal> { runtimeOwned, proposed ->
-        val openTodos = todos.count { it.status == "pending" || it.status == "in_progress" }
-        if (proposed.status == "completed" && openTodos > 0) {
+        // Check the proposed goal status, not its previous status: a blocked goal must
+        // be allowed to become completed when all actual obligations have cleared.
+        val evidence = localWorkCompletionEvidence(work.copy(goal = proposed))
+        if (proposed.status == "completed" && !evidence.readyForGoalCompletion) {
             rejectRuntimeStateTransition(
                 runtimeOwned,
-                "仍有 $openTodos 项任务未完成，先更新任务清单后再标记目标完成。",
+                "目标尚不能标记完成：" + evidence.userReasons.joinToString("；"),
             )
         } else {
             acceptRuntimeStateTransition(proposed)
@@ -34,14 +36,19 @@ internal fun resolveWorkGoalUpdate(
 ): LocalGoal {
     val current = snapshot.goal ?: error("当前会话没有目标")
     val candidate = current.copy(status = status, note = note?.take(2_000))
-    val transition = resolveWorkGoalTransition(current, candidate, snapshot.todos)
+    val transition = resolveWorkGoalTransition(current, candidate, snapshot)
     if (!transition.accepted) {
         eventLog.append("goal/transition-rejected", buildJsonObject {
             put("from_status", current.status)
             put("to_status", status)
-            put("open_todos", snapshot.todos.count {
-                it.status == "pending" || it.status == "in_progress"
-            })
+            val evidence = localWorkCompletionEvidence(snapshot.copy(goal = candidate))
+            put("open_todos", evidence.openTodos)
+            put("open_team_tasks", evidence.openTeamTasks)
+            put("active_team_members", evidence.activeTeamMembers)
+            put("pending_team_messages", evidence.pendingTeamMessages)
+            put("team_rebuilding", evidence.teamRebuilding)
+            put("pending_approval", evidence.pendingApproval)
+            put("pending_question", evidence.pendingQuestion)
             transition.reason?.let { put("reason", it) }
         })
         error(transition.reason ?: "目标状态变更被运行时拒绝")
