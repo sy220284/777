@@ -198,6 +198,42 @@ def inspect():
         raise ValueError("全量分级统计与逐功能证据不一致")
     if review.get("observed_code_delta") != index.get("observed_delta"):
         raise ValueError("功能变化报告与扫描索引不一致")
+    # 单独复核手工补录的跨模块证据：来源、符号和LSP工具分支必须真实存在。
+    explicit_file = DOCS / "FEATURE-TREE-EXPLICIT-EVIDENCE.json"
+    explicit = (json.loads(explicit_file.read_text(encoding="utf-8"))
+                if explicit_file.is_file() else {"version": 1, "items": []})
+    if explicit.get("version") != 1 or not isinstance(explicit.get("items"), list):
+        raise ValueError("跨模块人工源码证据格式不正确")
+    explicit_keys = set()
+    evidence_by_name = {item["path"]: item for item in reported}
+    for item in explicit["items"]:
+        name = item["path"]
+        if name in explicit_keys or name not in evidence_by_name:
+            raise ValueError("人工核实重复或涉及不存在的产品功能")
+        explicit_keys.add(name)
+        review_item = evidence_by_name[name]
+        if review_item.get("explicit_source_anchor") is not True:
+            raise ValueError("人工核实记录没有进入最终逐功能证据")
+        if review_item.get("explicit_static_scope") != item["scope"]:
+            raise ValueError("静态审核范围与源码证据不一致")
+        for record in item["sources"]:
+            source = record["path"]
+            file = ROOT / source
+            if not file.is_file() or source not in review_item["existing_production_sources"]:
+                raise ValueError("人工确认的真实源码在报告中失效")
+            code = file.read_text(encoding="utf-8", errors="replace")
+            for symbol in record["symbols"]:
+                if not re.search(r"(?:fun|class|object|interface|val|var|enum\s+class)\s+" +
+                                 re.escape(symbol) + r"\b", code):
+                    raise ValueError("人工确认的源码声明已不存在: " + symbol)
+                if not any(x["symbol"] == symbol and x["declaration_found"]
+                           for x in review_item["named_symbols"]):
+                    raise ValueError("人工确认的具名符号没有保存在证据中")
+            for literal in record.get("literals", []):
+                if literal not in code:
+                    raise ValueError("工具映射分支已经消失: " + literal)
+    if {r["path"] for r in reported if r.get("explicit_source_anchor")} != explicit_keys:
+        raise ValueError("存在没有真实人工源文件依据的强化证据等级")
     # 不依赖扫描器的身份声明：重新验证静态 ID、路径、原始文件和真实 Kotlin/Java 声明。
     identities_file = DOCS / "FEATURE-TREE-LEGACY-IDENTITIES.json"
     manifest = (json.loads(identities_file.read_text(encoding="utf-8"))
