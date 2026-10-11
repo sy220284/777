@@ -53,6 +53,82 @@ class ChatInteractionPlannerTest {
 
 
     @Test
+    fun legacyRelationshipScoresAndPersonalityMetricsArePreservedButNotModified() {
+        val saved = ChatCharacterState(
+            initiative = 84,
+            shareDesire = 21,
+            dynamics = RelationshipDynamics(
+                stage = "AMBIGUOUS", warmth = 75, trust = 63,
+                reciprocity = 42, tension = 68, stability = 39,
+                unresolvedConflict = "昨天的误会",
+            ),
+            userPattern = UserChatPattern(
+                replyLength = "long", directness = 88, playfulness = 25,
+                initiative = 64, emojiStyle = "常用表情", preferredTone = "直白",
+            ),
+        )
+        val patch = """{"state":{"mood":"开心","initiative":0,"shareDesire":100,
+            "dynamics":{"warmth":0,"trust":100,"reciprocity":100,"tension":0,"stability":0},
+            "userPattern":{"replyLength":"short","directness":0,"playfulness":100,
+                "initiative":100,"emojiStyle":"不用表情","preferredTone":"夸张"}},
+            "turnSignificance":"MINOR"}"""
+        val result = planner.parse(patch, saved, userMessage = "你好", assistantMessage = "你好")!!
+        assertEquals("开心", result.state.mood)
+        assertEquals(saved.initiative, result.state.initiative)
+        assertEquals(saved.shareDesire, result.state.shareDesire)
+        assertEquals(saved.dynamics, result.state.dynamics)
+        assertEquals(saved.userPattern, result.state.userPattern)
+        val normalized = normalizeChatPostTurnPatch(
+            Json.parseToJsonElement(patch).jsonObject,
+        )
+        val state = normalized["state"]!!.jsonObject
+        assertFalse(state.containsKey("initiative"))
+        assertFalse(state.containsKey("shareDesire"))
+        assertFalse(state.containsKey("userPattern"))
+        assertFalse(state["dynamics"]!!.jsonObject.containsKey("warmth"))
+    }
+
+    @Test
+    fun groundedNaturalRelationshipStatementCanAdvanceWithoutRetiredStageTriggerPhrases() {
+        val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val statement = "我们决定成为彼此最重要的伴侣"
+        val patch = """{"state":{"dynamics":{"stage":"COMMITTED"}},"stateEvidence":{"dynamics.stage":"我们决定成为彼此最重要的伴侣"},"turnSignificance":"MAJOR"}"""
+        val next = planner.parse(patch, previous, userMessage = statement, assistantMessage = "好")!!
+        assertEquals("COMMITTED", next.state.dynamics.stage)
+
+        val unrelated = planner.parse(patch, previous, userMessage = "我朋友说" + statement,
+            assistantMessage = "哦")!!
+        assertEquals("FAMILIAR", unrelated.state.dynamics.stage)
+        val fabricated = planner.parse(patch, previous, userMessage = "我们今天吃过饭了",
+            assistantMessage = "嗯")!!
+        assertEquals("FAMILIAR", fabricated.state.dynamics.stage)
+        val wrongDirection = planner.parse(
+            """{"state":{"dynamics":{"stage":"COMMITTED"}},"stateEvidence":{"dynamics.stage":"我们分手了"},"turnSignificance":"MAJOR"}""",
+            previous, userMessage = "我们分手了", assistantMessage = "好",
+        )!!
+        assertEquals("FAMILIAR", wrongDirection.state.dynamics.stage)
+    }
+
+    @Test
+    fun retiredScoresCannotEnterRuntimePromptsAndReplySuggestionsRemainAvailable() {
+        val persona = PersonaProfile(name = "阿青")
+        val state = ChatCharacterState(
+            initiative = 87,
+            shareDesire = 91,
+            dynamics = RelationshipDynamics(warmth = 77, trust = 78),
+            userPattern = UserChatPattern(directness = 95, playfulness = 90, initiative = 93),
+        )
+        val postPrompt = planner.prompt(persona, state, "你好", "你好")
+        val suggestionPrompt = planner.suggestionsPrompt(persona, state, "你好", "你好")
+        listOf("warmth/trust", "userPattern(", "用户习惯：", "主动欲").forEach {
+            assertFalse(postPrompt.contains(it))
+        }
+        assertFalse(suggestionPrompt.contains("用户习惯："))
+        assertTrue(suggestionPrompt.contains("最近对话") || suggestionPrompt.contains("用户："))
+        assertTrue(postPrompt.contains("更新人物隐藏状态"))
+    }
+
+    @Test
     fun confirmedDatingExpressionsAdvanceRelationshipWithoutRigidKeywordRejection() {
         val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
         val patch = """{"state":{"dynamics":{"stage":"DATING"}},"turnSignificance":"MAJOR"}"""
@@ -233,10 +309,10 @@ class ChatInteractionPlannerTest {
     @Test
     fun invalidStateCannotBeMaskedBySuggestionsOrUnusableDiary() {
         val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
-        val withSuggestion = """{"state":{"initiative":"略升"},
+        val withSuggestion = """{"state":{"mood":42},
             "suggestions":[{"label":"聊聊","text":"你好"}],"turnSignificance":"MINOR"}"""
         assertEquals("state_patch_unusable", parser.parseFailureKind(withSuggestion))
-        val withoutPerspective = """{"state":{"initiative":"略升"},
+        val withoutPerspective = """{"state":{"mood":42},
             "diaryDelta":{"event":"今天发生了一件重要的事情","importance":4},
             "turnSignificance":"MINOR"}"""
         assertEquals("state_patch_unusable", parser.parseFailureKind(withoutPerspective))
@@ -255,12 +331,12 @@ class ChatInteractionPlannerTest {
     @Test
     fun invalidStateCannotSilentlyAdvancePendingTurnCursor() {
         val parser = ChatInteractionPlanParser(Json { ignoreUnknownKeys = true })
-        val bad = """{"state":{"initiative":"略升","dynamics":{"facts":["无来源文字"]}},"turnSignificance":"MINOR"}"""
+        val bad = """{"state":{"mood":42,"dynamics":{"facts":["无来源文字"]}},"turnSignificance":"MINOR"}"""
         assertEquals(null, parser.parsePlan(bad))
         assertEquals("state_patch_unusable", parser.parseFailureKind(bad))
         assertNotNull(parser.parsePlan("""{"state":{},"turnSignificance":"NONE"}"""))
         assertNotNull(parser.parsePlan(
-            """{"state":{"initiative":"略升"},"diaryDelta":{"event":"真正发生的事情","importance":4,"feeling":"当时很开心"},"turnSignificance":"MINOR"}""",
+            """{"state":{"mood":42},"diaryDelta":{"event":"真正发生的事情","importance":4,"feeling":"当时很开心"},"turnSignificance":"MINOR"}""",
         ))
     }
 
@@ -314,6 +390,48 @@ class ChatInteractionPlannerTest {
         assertTrue(state.internalConflict.isBlank())
         assertTrue(state.immediateConcern.isBlank())
         assertTrue(state.unresolvedThreads.isEmpty())
+    }
+
+    @Test
+    fun retiredModeFromSavedStoryCannotAppearInAuxiliaryPromptOrResumeState() {
+        val legacy = ChatCharacterState(
+            mood = "疲倦",
+            interactionIntent = "STRATEGIST",
+            interactionIntentStrength = 3,
+            interactionIntensity = 2,
+            recentVerbalTags = listOf("直球"),
+        )
+        val migrated = legacy.canonicalizeLegacyCharacterState()
+        assertEquals(ChatInteractionIntent.NORMAL.name, migrated.interactionIntent)
+        assertEquals(0, migrated.interactionIntentStrength)
+        assertEquals(0, migrated.interactionIntensity)
+        assertEquals("疲倦", migrated.mood)
+        assertEquals(listOf("直球"), migrated.recentVerbalTags)
+
+        val suggestion = planner.suggestionsPrompt(
+            PersonaProfile(name = "阿青"), legacy, "你好", "好",
+        )
+        assertFalse(suggestion.contains("STRATEGIST"))
+        assertTrue(suggestion.contains("人物当前情绪=疲倦"))
+
+        val resumed = planner.applyDeterministicInteractionState(legacy, "", "好")
+        assertEquals(ChatInteractionIntent.NORMAL.name, resumed.interactionIntent)
+        assertEquals(0, resumed.interactionIntentStrength)
+        assertEquals(0, resumed.interactionIntensity)
+
+        val active = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+        )
+        assertEquals(active, active.canonicalizeLegacyCharacterState())
+
+        val unrelatedStoredState = ChatCharacterState(
+            interactionIntent = "FUTURE_MODE",
+            interactionIntentStrength = 4,
+            interactionIntensity = 3,
+        )
+        assertEquals(unrelatedStoredState, unrelatedStoredState.canonicalizeLegacyCharacterState())
     }
 
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
@@ -436,10 +554,10 @@ class ChatInteractionPlannerTest {
         assertNotNull(result)
         val plan = result!!
         assertEquals("有点不爽", plan.state.mood)
-        assertEquals(65, plan.state.initiative)
-        assertEquals(35, plan.state.shareDesire)
-        assertEquals(95, plan.state.dynamics.warmth)
-        assertEquals(95, plan.state.dynamics.trust)
+        assertEquals(50, plan.state.initiative)
+        assertEquals(50, plan.state.shareDesire)
+        assertEquals(50, plan.state.dynamics.warmth)
+        assertEquals(50, plan.state.dynamics.trust)
         assertEquals(2, plan.state.unresolvedThreads.size)
         assertEquals(4, plan.suggestions.size)
         assertEquals(plan.suggestions.map { it.text }.distinct().size, plan.suggestions.size)
@@ -456,6 +574,51 @@ class ChatInteractionPlannerTest {
         val plan = planner.parse(payload, previous)!!
         assertEquals(1, plan.suggestions.size)
         assertEquals("那你继续说，我听着。", plan.suggestions.single().text)
+    }
+
+    @Test
+    fun unverifiedRelationDescriptionCannotBypassStageValidation() {
+        val previous = ChatCharacterState(relationshipState = "熟悉中",
+            dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val unverified = """{"state":{"relationshipState":"已经结婚",
+            "dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        val rejected = planner.parse(unverified, previous,
+            userMessage = "我们今天吃了饭", assistantMessage = "挺开心的")!!
+        assertEquals("FAMILIAR", rejected.state.dynamics.stage)
+        assertEquals("熟悉中", rejected.state.relationshipState)
+        val bypass = planner.parse("""{"state":{"relationshipState":"已经结婚"},
+            "stateEvidence":{"relationshipState":"我们今天吃了饭"},
+            "turnSignificance":"MAJOR"}""", previous,
+            userMessage = "我们今天吃了饭", assistantMessage = "挺开心的")!!
+        assertEquals("FAMILIAR", bypass.state.dynamics.stage)
+        assertEquals("熟悉中", bypass.state.relationshipState)
+        val ungrounded = planner.parse("""{"state":{"relationshipState":"相处变得更自在"},
+            "turnSignificance":"MINOR"}""", previous,
+            userMessage = "今天好热", assistantMessage = "嗯")!!
+        assertEquals("熟悉中", ungrounded.state.relationshipState)
+        val grounded = planner.parse("""{"state":{"relationshipState":"相处变得更自在"},
+            "stateEvidence":{"relationshipState":"我们相处变得更自在了"},
+            "turnSignificance":"MINOR"}""", previous,
+            userMessage = "我们相处变得更自在了", assistantMessage = "是啊")!!
+        assertEquals("相处变得更自在", grounded.state.relationshipState)
+        assertEquals("FAMILIAR", grounded.state.dynamics.stage)
+    }
+
+    @Test
+    fun acceptedRelationshipStageAndDescriptionShareTheSameSourcedTransition() {
+        val previous = ChatCharacterState(relationshipState = "熟悉中",
+            dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val next = planner.parse("""{"state":{"dynamics":{"stage":"COMMITTED"},
+            "relationshipState":"随意描述"},
+            "stateEvidence":{"dynamics.stage":"我们确认关系，在一起了"},
+            "turnSignificance":"MAJOR"}""", previous,
+            userMessage = "我们确认关系，在一起了", assistantMessage = "好")!!.state
+        assertEquals("COMMITTED", next.dynamics.stage)
+        assertEquals("稳定关系", next.relationshipState)
+        val obs = next.stateObservations.associateBy { it.field }
+        assertEquals("FAMILIAR", obs["dynamics.stage"]?.previousValue)
+        assertEquals("COMMITTED", obs["dynamics.stage"]?.value)
+        assertEquals("熟悉中", obs["relationshipState"]?.previousValue)
     }
 
     @Test
@@ -592,7 +755,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun userPatternChangesGradually() {
+    fun retiredUserPatternScoresCannotBeRewritten() {
         val previous = ChatCharacterState(
             userPattern = UserChatPattern(
                 replyLength = "short",
@@ -619,14 +782,16 @@ class ChatInteractionPlannerTest {
 
         val plan = planner.parse(payload, previous)!!
 
-        assertEquals("long", plan.state.userPattern.replyLength)
-        assertEquals(50, plan.state.userPattern.directness)
-        assertEquals(50, plan.state.userPattern.playfulness)
-        assertEquals(50, plan.state.userPattern.initiative)
+        assertEquals("short", plan.state.userPattern.replyLength)
+        assertEquals(40, plan.state.userPattern.directness)
+        assertEquals(40, plan.state.userPattern.playfulness)
+        assertEquals(40, plan.state.userPattern.initiative)
+        assertEquals("", plan.state.userPattern.emojiStyle)
+        assertEquals("", plan.state.userPattern.preferredTone)
     }
 
     @Test
-    fun observedMessageLengthGroundsReplyLengthProfile() {
+    fun retiredMessageLengthProfileIsNotUpdatedByBackgroundModel() {
         val previous = ChatCharacterState(
             userPattern = UserChatPattern(
                 replyLength = "long",
@@ -654,9 +819,7 @@ class ChatInteractionPlannerTest {
             userMessage = "嗯，行",
         )!!
 
-        assertEquals("short", plan.state.userPattern.replyLength)
-        assertEquals(4, plan.state.userPattern.observedTurns)
-        assertTrue(plan.state.userPattern.averageMessageChars < 20)
+        assertEquals(previous.userPattern, plan.state.userPattern)
     }
 
     @Test
@@ -1390,14 +1553,14 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun numericStringsCanBeNormalizedWithoutGuessingQualitativeConflict() {
+    fun retiredNumericFieldsAreIgnoredAndMalformedConflictCannotClearHistory() {
         val result = planner.parse(
-            """{"state":{"initiative":"62","dynamics":{"unresolvedConflict":[]}},"turnSignificance":"MINOR"}""",
+            """{"state":{"mood":"自然","initiative":"62","dynamics":{"unresolvedConflict":[]}},"turnSignificance":"MINOR"}""",
             previous = ChatCharacterState(initiative = 50, dynamics = RelationshipDynamics(unresolvedConflict = "保留")),
             userMessage = "好的",
             assistantMessage = "收到",
         )!!
-        assertEquals(62, result.state.initiative)
+        assertEquals(50, result.state.initiative)
         assertEquals("保留", result.state.dynamics.unresolvedConflict)
     }
 

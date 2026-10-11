@@ -8,55 +8,28 @@ import org.junit.Test
 class ChatRelationshipEngineTest {
     private val engine = ChatRelationshipEngine()
 
+
+
     @Test
-    fun ordinaryRelationshipEmotionStaysImmersive() {
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("她今天又没回我，烦死了"),
+    fun retiredStrategistStateInStoredConversationFallsBackToNormal() {
+        val oldState = ChatCharacterState(
+            interactionIntent = "STRATEGIST",
+            interactionIntentStrength = 1,
         )
         assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("陪我聊会儿"),
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("她什么意思", oldState),
         )
         assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("她最近有点冷淡，真烦"),
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("她什么意思", oldState),
+        )
+        assertEquals(
+            engine.prompt("她什么意思", oldState),
+            engine.prompt("/军师 她什么意思", oldState),
         )
     }
 
-    @Test
-    fun onlyAnExplicitCommandChangesTheRequestedCapability() {
-        assertEquals(ChatRelationshipView.STRATEGIST, engine.classify("/军师 她最近为什么冷淡"))
-        assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/reply 这句怎么回"))
-        listOf("军师，她最近为什么突然冷淡", "帮我分析我们现在什么阶段", "她为什么突然冷淡",
-            "你喜欢我吗", "她说刚下班，这句怎么回", "/strategybook").forEach {
-            assertEquals(ChatRelationshipView.IMMERSIVE, engine.classify(it))
-        }
-    }
-
-    @Test
-    fun workAndFictionLanguageDoNotTriggerRelationshipRouting() {
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("他为什么不回邮件"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("小说里他为什么不回消息"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("这个角色他为什么突然不回消息"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("帮我回客户邮件，告诉他明天给结果"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("这个客户关系怎么样，为什么最近不推进"),
-        )
-    }
 
     @Test
     fun scenarioKeywordsDoNotChooseTheCharactersAttitude() {
@@ -202,9 +175,26 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun relationshipContextAppearsOnlyForActualFactsAndHasNoCommandRouting() {
+        val empty = ChatCharacterState()
+        assertEquals("", engine.prompt("今天怎么样", empty))
+        assertEquals("", engine.prompt("/reply", empty))
+        val recorded = ChatCharacterState(dynamics = RelationshipDynamics(
+            facts = listOf(RelationshipEvidence("师父答应下周带我练剑", confidence = 95, source = "dialogue")),
+            sharedObjects = listOf("一起修好的木剑"),
+        ))
+        val text = engine.prompt("今天做什么", recorded)
+        assertTrue(text.contains("人物关系与共同经历"))
+        assertTrue(text.contains("师父答应下周带我练剑"))
+        assertTrue(text.contains("一起修好的木剑"))
+        assertFalse(text.contains("回复草稿"))
+        assertEquals(text, engine.prompt("/reply", recorded))
+    }
+
+    @Test
     fun ordinaryChatHasNoInjectedRelationshipBias() {
         val prompt = engine.prompt("今天工作有点累", ChatCharacterState())
-        assertTrue(prompt.contains("相处背景"))
+        assertTrue(prompt.isEmpty())
         assertFalse(prompt.contains("互动倾向"))
         assertFalse(prompt.contains("互动变化"))
     }
@@ -310,6 +300,23 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun analysisOfQuotedIntimacyDoesNotBecomeAnIntimateActionRequest() {
+        listOf(
+            "她说亲我一下是什么意思？",
+            "帮我分析一下她说亲我一下",
+            "分析一下这句过来抱住我",
+            "她让我亲她一下，这该怎么判断？",
+        ).forEach { input ->
+            assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent(input))
+            assertEquals(0, nextInteractionIntensity(input))
+        }
+        assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            classifyExplicitInteractionIntent("别分析了，过来亲我一下"),
+        )
+    }
+
+    @Test
     fun interactionIntentAvoidsKeywordFalsePositives() {
         assertEquals(
             ChatInteractionIntent.NORMAL,
@@ -350,7 +357,7 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun strategistPromptDoesNotDuplicateDynamicRelationshipState() {
+    fun formerStrategistCommandDoesNotAddInstructionsOrDiscardRelationshipFacts() {
         val state = ChatCharacterState(
             dynamics = RelationshipDynamics(
                 stage = "AMBIGUOUS",
@@ -385,7 +392,10 @@ class ChatRelationshipEngineTest {
 
         val prompt = engine.prompt("/strategy 她什么意思", state)
 
-        assertTrue(prompt.contains("用户显式调用关系分析"))
+        assertEquals(engine.prompt("她什么意思", state), prompt)
+        assertFalse(prompt.contains("用户显式调用关系分析"))
+        assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent("帮我分析"))
+        assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent("什么意思"))
         assertTrue(prompt.contains("对方上周主动约过一次"))
         assertTrue(prompt.contains("对方可能在观察用户是否稳定"))
         assertTrue(prompt.contains("她平时是否也会主动约朋友"))

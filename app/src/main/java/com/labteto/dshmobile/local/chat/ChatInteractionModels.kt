@@ -62,6 +62,8 @@ data class ChatContinuityState(
 data class ChatStateObservation(
     val field: String = "",
     val value: String = "",
+    /** Historical value used when a sourced relationship transition is later invalidated. */
+    val previousValue: String = "",
     val basis: String = "",
     /** A quoted expression or a contextual interpretation, never an objective user fact. */
     val interpretation: Boolean = true,
@@ -114,9 +116,15 @@ data class ChatCharacterState(
 
 internal fun ChatCharacterState.canonicalizeLegacyCharacterState(): ChatCharacterState {
     val migratedImpression = currentUserImpression.ifBlank { recentImpression }
+    // Only the retired strategist state belongs to this migration.
+    // Preserve unrelated stored values rather than discarding unknown future states.
+    val retiredStrategist = interactionIntent == "STRATEGIST"
     return copy(
         currentUserImpression = migratedImpression,
         recentImpression = "",
+        interactionIntent = if (retiredStrategist) ChatInteractionIntent.NORMAL.name else interactionIntent,
+        interactionIntentStrength = if (retiredStrategist) 0 else interactionIntentStrength,
+        interactionIntensity = if (retiredStrategist) 0 else interactionIntensity,
         interactionCooldowns = emptyMap(),
         transientAges = emptyMap(),
         unresolvedThreadAges = emptyMap(),

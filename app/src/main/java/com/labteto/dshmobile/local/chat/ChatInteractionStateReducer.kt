@@ -29,6 +29,9 @@ internal class ChatInteractionStateReducer {
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 rawState = rawState,
+                stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
+                descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
+                significance = significance,
             )
         }
         val continuityState = mergeSceneAndContinuity(
@@ -115,18 +118,19 @@ internal class ChatInteractionStateReducer {
         userMessage: String,
         assistantMessage: String,
     ): ChatCharacterState {
+        val restored = previous.canonicalizeLegacyCharacterState()
         val intentState = if (userMessage.isBlank()) {
-            previous
+            restored
         } else {
             applyInteractionIntent(
-                state = previous,
-                previous = previous,
+                state = restored,
+                previous = restored,
                 userMessage = userMessage,
             )
         }
         return applyInteractionPerformance(
             state = intentState,
-            previous = previous,
+            previous = restored,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
@@ -197,9 +201,11 @@ internal class ChatInteractionStateReducer {
         userMessage: String,
         assistantMessage: String,
         rawState: JsonObject?,
+        stageQuote: String,
+        descriptionQuote: String,
+        significance: String,
     ): ChatCharacterState {
         val rawDynamics = rawState?.get("dynamics")?.let { runCatching { it.jsonObject }.getOrNull() }
-        val rawPattern = rawState?.get("userPattern")?.let { runCatching { it.jsonObject }.getOrNull() }
         val dynamics = if (rawDynamics == null) {
             previous.dynamics
         } else {
@@ -209,26 +215,24 @@ internal class ChatInteractionStateReducer {
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 raw = rawDynamics,
+                stageQuote = stageQuote,
+                significance = significance,
             )
         }
-        val pattern = if (rawPattern == null && userMessage.isBlank()) {
-            previous.userPattern
-        } else {
-            sanitizeUserPattern(
-                value = value.userPattern,
-                previous = previous.userPattern,
-                userMessage = userMessage,
-                raw = rawPattern,
-            )
-        }
+        // Retired user-profile data is only retained for loading saved stories.
+        // The optional reply drafts rely on actual recent dialogue, not numeric personas.
+        val pattern = previous.userPattern
         val requestedStage = if (rawDynamics?.containsKey("stage") == true) {
             normalizeStage(value.dynamics.stage)
         } else previous.dynamics.stage
         val relationshipDescription = when {
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
             requestedStage != previous.dynamics.stage -> previous.relationshipState
-            rawState?.containsKey("relationshipState") == true ->
-                value.relationshipState.trim().take(120).ifBlank { previous.relationshipState }
+            rawState?.containsKey("relationshipState") == true &&
+                groundedRelationshipDescription(
+                    description = value.relationshipState, evidence = descriptionQuote,
+                    userMessage = userMessage, assistantMessage = assistantMessage,
+                ) -> value.relationshipState.trim().take(120)
             else -> previous.relationshipState
         }
         val merged = value.copy(
@@ -264,12 +268,9 @@ internal class ChatInteractionStateReducer {
                     .take(3)
                     .toList()
             } else previous.unresolvedThreads,
-            initiative = if (rawState?.containsKey("initiative") == true) {
-                bounded(value.initiative, previous.initiative, 15)
-            } else previous.initiative,
-            shareDesire = if (rawState?.containsKey("shareDesire") == true) {
-                bounded(value.shareDesire, previous.shareDesire, 15)
-            } else previous.shareDesire,
+            // Retired personality drive scores are decoded for older stories only.
+            initiative = previous.initiative,
+            shareDesire = previous.shareDesire,
             dynamics = dynamics,
             evolution = previous.evolution,
             userPattern = pattern,
@@ -349,19 +350,79 @@ internal class ChatInteractionStateReducer {
         }
     }
 
+    /**
+     * Accept a grounded, explicitly described relationship event even when its wording is
+     * absent from the old fixed trigger list. The quote must occur verbatim in this turn.
+     * Do not allow questions, hypotheticals, negation, third-party events or conflicting
+     * explicit directions to be promoted into our relationship state.
+     */
+    private fun groundedRelationshipChangeQuote(
+        proposedStage: String,
+        rawQuote: String,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val quote = rawQuote.trim().take(180)
+        // New free-form stage evidence must come from the user's actual utterance,
+        // not an assistant's speculation or a quoted third-party report.
+        val quoteIndex = userMessage.indexOf(quote)
+        if (quote.length < 6 || quoteIndex < 0) return false
+        val prefix = userMessage.take(quoteIndex).substringAfterLast('。').substringAfterLast('！')
+            .substringAfterLast('？').takeLast(48)
+        if (Regex("朋友|同事|室友|别人|他们|她们|前任|听说|说过|转述|如果|假如|要是|梦见|计划|希望").containsMatchIn(prefix)) return false
+        if (!Regex("我们|咱们|你和我|我和你|我们俩|我与你|你与我|你我").containsMatchIn(quote)) return false
+        if (!Regex("关系|伴侣|恋|约会|暧昧|婚|在一起|分开|冷战|和好|喜欢|相爱|分手|彼此|承诺").containsMatchIn(quote)) return false
+        if (Regex("如果|假如|要是|希望|计划|打算|梦见|听说|没有|还没|尚未|并未|不会|不想|不要|不是|前任|朋友|同事|室友|他们|她们|别人").containsMatchIn(quote)) return false
+        if (quote.contains('？') || quote.contains('?') || quote.endsWith("吗")) return false
+        val clearlySeparated = Regex("分手|结束关系|分开了|离婚").containsMatchIn(quote)
+        val clearlyRepaired = Regex("复合|和好|修复关系").containsMatchIn(quote)
+        if (clearlySeparated && proposedStage != "SEPARATED") return false
+        if (clearlyRepaired && proposedStage != "REPAIRING") return false
+        return true
+    }
+
+    /**
+     * Natural-language relation descriptions cannot bypass a failed milestone transition.
+     * Fine-grained changes need a literal, non-hypothetical current-turn quotation;
+     * major milestones must be represented by the separately validated stage event.
+     */
+    private fun groundedRelationshipDescription(
+        description: String,
+        evidence: String,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val value = description.trim()
+        val quote = evidence.trim()
+        if (value.isBlank() || quote.length < 4 ||
+            !(userMessage.contains(quote) || assistantMessage.contains(quote))) return false
+        // A random genuine quotation ("we had dinner") is not itself evidence
+        // for the model to invent a new relationship conclusion.
+        if (!Regex("关系|相处|彼此|互相|信任|熟悉|亲近|友谊|和解|合作|疏远|默契|隔阂|羁绊|我们之间|我们俩").containsMatchIn(quote)) return false
+        val milestone = Regex("结婚|已婚|婚姻|配偶|订婚|离婚|分手|复合|同居|情侣|恋人|恋爱|交往|确定关系|在一起|暧昧期|约会中|矛盾期|冷战|分开|男朋友|女朋友")
+        if (milestone.containsMatchIn(value)) return false
+        val rejected = Regex("如果|假如|要是|梦见|听说|希望|打算|计划|没有|还没|尚未|并未|不是|不会|吗\\?|吗？")
+        if (rejected.containsMatchIn(quote) || quote.contains('?') || quote.contains('？')) return false
+        return true
+    }
+
     private fun sanitizeDynamics(
         value: RelationshipDynamics,
         previous: RelationshipDynamics,
         userMessage: String,
         assistantMessage: String,
         raw: JsonObject,
+        stageQuote: String,
+        significance: String,
     ): RelationshipDynamics {
         val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
         // Check that an explicit relationship event supports the requested target stage.
         // Unrelated words (e.g. "我的前任结婚了") cannot advance our relationship.
         val explicitStageEvidence = relationshipStageEventSupports(
             candidateStage, userMessage, assistantMessage,
-        )
+        ) || (significance == "MAJOR" && groundedRelationshipChangeQuote(
+            candidateStage, stageQuote, userMessage, assistantMessage,
+        ))
         val stage = when {
             candidateStage == previous.stage -> previous.stage
             explicitStageEvidence -> candidateStage
@@ -370,11 +431,12 @@ internal class ChatInteractionStateReducer {
 
         return RelationshipDynamics(
             stage = stage,
-            warmth = if (raw.containsKey("warmth")) value.warmth.coerceIn(0, 100) else previous.warmth,
-            trust = if (raw.containsKey("trust")) value.trust.coerceIn(0, 100) else previous.trust,
-            reciprocity = if (raw.containsKey("reciprocity")) value.reciprocity.coerceIn(0, 100) else previous.reciprocity,
-            tension = if (raw.containsKey("tension")) value.tension.coerceIn(0, 100) else previous.tension,
-            stability = if (raw.containsKey("stability")) value.stability.coerceIn(0, 100) else previous.stability,
+            // Historical diagnostic scores are retained for decoding, not recomputed or fed back.
+            warmth = previous.warmth,
+            trust = previous.trust,
+            reciprocity = previous.reciprocity,
+            tension = previous.tension,
+            stability = previous.stability,
             unresolvedConflict = if (raw.containsKey("unresolvedConflict")) {
                 value.unresolvedConflict.trim().take(240)
             } else previous.unresolvedConflict,
@@ -421,58 +483,6 @@ internal class ChatInteractionStateReducer {
         )
     }
 
-    private fun sanitizeUserPattern(
-        value: UserChatPattern,
-        previous: UserChatPattern,
-        userMessage: String,
-        raw: JsonObject?,
-    ): UserChatPattern {
-        val measuredLength = userMessage.trim().length
-        val hasObservation = measuredLength > 0
-        val previousWeight = previous.observedTurns.coerceIn(0, 19)
-        val averageChars = if (hasObservation) {
-            if (previousWeight == 0) {
-                measuredLength
-            } else {
-                ((previous.averageMessageChars * previousWeight) + measuredLength) / (previousWeight + 1)
-            }
-        } else {
-            previous.averageMessageChars
-        }
-        val measuredReplyLength = when {
-            !hasObservation -> null
-            averageChars < 20 -> "short"
-            averageChars < 80 -> "medium"
-            else -> "long"
-        }
-        val modelLength = value.replyLength.trim().lowercase()
-            .takeIf { raw?.containsKey("replyLength") == true && it in ALLOWED_REPLY_LENGTHS }
-        val length = measuredReplyLength ?: modelLength ?: previous.replyLength
-
-        return value.copy(
-            replyLength = length,
-            directness = if (raw?.containsKey("directness") == true) {
-                bounded(value.directness, previous.directness, 10)
-            } else previous.directness,
-            playfulness = if (raw?.containsKey("playfulness") == true) {
-                bounded(value.playfulness, previous.playfulness, 10)
-            } else previous.playfulness,
-            initiative = if (raw?.containsKey("initiative") == true) {
-                bounded(value.initiative, previous.initiative, 10)
-            } else previous.initiative,
-            emojiStyle = if (raw?.containsKey("emojiStyle") == true) {
-                value.emojiStyle.trim().take(120)
-            } else previous.emojiStyle,
-            preferredTone = if (raw?.containsKey("preferredTone") == true) {
-                value.preferredTone.trim().take(120)
-            } else previous.preferredTone,
-            observedTurns = if (hasObservation) (previous.observedTurns + 1).coerceAtMost(1000)
-                else previous.observedTurns,
-            averageMessageChars = averageChars.coerceIn(0, 2_000),
-            updatedAt = System.currentTimeMillis(),
-        )
-    }
-
     private fun mergeEvidence(
         previous: List<RelationshipEvidence>,
         incoming: List<RelationshipEvidence>,
@@ -513,9 +523,6 @@ internal class ChatInteractionStateReducer {
         return merged.values.toList().takeLast(limit)
     }
 
-    private fun bounded(value: Int, previous: Int, maxDelta: Int): Int =
-        value.coerceIn(previous - maxDelta, previous + maxDelta).coerceIn(0, 100)
-
     private fun normalizeSignificance(raw: String): String =
         raw.trim().uppercase().takeIf { it in ALLOWED_SIGNIFICANCE } ?: "MINOR"
 
@@ -541,7 +548,6 @@ private companion object {
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
         const val RECENT_ADDRESS_LIMIT = 4
-        val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
         val ALLOWED_STAGES = setOf(

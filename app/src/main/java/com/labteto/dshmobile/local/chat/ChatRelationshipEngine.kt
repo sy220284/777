@@ -3,18 +3,11 @@ package com.labteto.dshmobile.local.chat
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal enum class ChatRelationshipView {
-    IMMERSIVE,
-    STRATEGIST,
-    REPLY_COACH,
-}
-
 internal enum class ChatInteractionIntent {
     NORMAL,
     FLIRTING,
     INTIMATE,
     RELATIONSHIP_PROGRESS,
-    STRATEGIST,
 }
 
 internal fun chineseSuggestiveFlirtingScore(input: String): Int {
@@ -45,12 +38,16 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
 
-    if (STRATEGIST_INTENT_HINTS.any { text.contains(it) }) {
-        return ChatInteractionIntent.STRATEGIST
-    }
-
     val nonInteractionContext = NON_INTERACTION_INTENT_HINTS.any { text.contains(it) }
     if (NEGATED_INTIMACY_HINTS.any { text.contains(it) }) {
+        return ChatInteractionIntent.NORMAL
+    }
+    // A question quoting an intimate action is not itself a request to perform it.
+    // This distinction is independent of the removed strategist response mode.
+    val question = text.trimEnd('？', '?', '。', '！', '!', '啊', '呀', '呢', '吗')
+    if (text.startsWith("帮我分析") || text.startsWith("分析一下") ||
+        question.endsWith("什么意思") || question.endsWith("怎么判断")
+    ) {
         return ChatInteractionIntent.NORMAL
     }
     val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
@@ -157,9 +154,7 @@ internal fun nextInteractionIntensity(
     val explicit = classifyExplicitInteractionIntent(input)
     val resolved = resolveChatInteractionIntent(input, previous)
     return when (resolved) {
-        ChatInteractionIntent.NORMAL,
-        ChatInteractionIntent.STRATEGIST,
-        -> 0
+        ChatInteractionIntent.NORMAL -> 0
         ChatInteractionIntent.RELATIONSHIP_PROGRESS ->
             maxOf(1, previous.interactionIntensity.coerceAtMost(2))
         ChatInteractionIntent.INTIMATE -> 5
@@ -316,7 +311,6 @@ private val PROACTIVE_INTIMACY_HINTS = listOf(
 private val RELATIONSHIP_PROGRESS_HINTS = listOf(
     "在一起吧", "做我女朋友", "做我男朋友", "确定关系", "正式交往", "同居吧", "结婚吧",
 )
-private val STRATEGIST_INTENT_HINTS = listOf("帮我分析", "分析一下", "军师", "怎么判断", "什么意思")
 private val NON_INTERACTION_INTENT_HINTS = listOf(
     "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
     "小说", "剧情", "台词", "设定", "翻译",
@@ -341,52 +335,34 @@ private val NEGATED_INTIMACY_HINTS = listOf(
 )
 
 /**
- * Relationship cognition core for Chat mode.
- *
- * HeartFlow contributes persona continuity and gradual relationship change.
- * Goutoujunshi contributes evidence discipline, strategist routing and actionable reply coaching.
- * This layer keeps those semantics independent from any external Skill runtime.
+ * Projects verified relationship context only. It neither routes slash commands nor
+ * chooses how the character should respond. Missing relationship facts produce no prompt.
  */
 @Singleton
 class ChatRelationshipEngine @Inject constructor() {
-
-    internal fun classify(input: String): ChatRelationshipView {
-        val text = input.trim().lowercase()
-        if (STRATEGY_COMMANDS.any { text == it || text.startsWith("$it ") }) {
-            return ChatRelationshipView.STRATEGIST
+    @Suppress("UNUSED_PARAMETER")
+    fun prompt(input: String, state: ChatCharacterState): String {
+        val lines = mutableListOf<String>()
+        val status = state.relationshipState.trim()
+        if (status.isNotBlank() && status !in setOf("熟悉中", "熟悉", "刚认识", "初识")) {
+            lines += "当前关系：${status.take(120)}"
         }
-        if (REPLY_COACH_COMMANDS.any { text == it || text.startsWith("$it ") }) {
-            return ChatRelationshipView.REPLY_COACH
-        }
-        return ChatRelationshipView.IMMERSIVE
-    }
-
-    fun prompt(input: String, state: ChatCharacterState): String = buildString {
-        appendLine("【双方已有的相处背景】")
-        appendLine("当前关系：${state.relationshipState}")
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)
-            ?.let { appendLine("尚未解决的事：$it") }
-        state.dynamics.facts.takeLast(8).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { appendLine("已有事实：${it.joinToString("；") { fact -> fact.text }}") }
-        state.dynamics.hypotheses.takeLast(5).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { appendLine("尚未确认的印象：${it.joinToString("；") { fact -> fact.text }}") }
-        state.dynamics.unknowns.takeLast(5).takeIf(List<String>::isNotEmpty)
-            ?.let { appendLine("仍未知：${it.joinToString("；")}") }
-        state.dynamics.sharedMoments.takeLast(6).takeIf(List<String>::isNotEmpty)
-            ?.let { appendLine("共同经历：${it.joinToString("；")}") }
-        when (classify(input)) {
-            ChatRelationshipView.IMMERSIVE -> Unit
-            ChatRelationshipView.STRATEGIST -> appendLine(
-                "【用户显式调用关系分析】根据用户的问题分析已有信息。",
-            )
-            ChatRelationshipView.REPLY_COACH -> appendLine(
-                "【用户显式调用回复建议】提供用户可直接发送的回复草稿。",
-            )
+            ?.let { lines += "尚未解决的事：${it.take(240)}" }
+        state.dynamics.facts.takeLast(8).forEach { fact ->
+            lines += "已有事实：${fact.text}"
         }
-    }.trim()
-
-    private companion object {
-        val STRATEGY_COMMANDS = listOf("/strategy", "/analyze", "/debrief", "/军师", "/分析")
-        val REPLY_COACH_COMMANDS = listOf("/reply", "/回复建议")
+        state.dynamics.hypotheses.takeLast(5).forEach { impression ->
+            lines += "尚未确认的印象：${impression.text}"
+        }
+        state.dynamics.unknowns.takeLast(5).takeIf(List<String>::isNotEmpty)
+            ?.let { lines += "仍未知：${it.joinToString("；")}" }
+        state.dynamics.sharedMoments.takeLast(6).forEach { event ->
+            lines += "共同经历：$event"
+        }
+        state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)
+            ?.let { lines += "共同物与约定：${it.joinToString("；")}" }
+        if (lines.isEmpty()) return ""
+        return (listOf("【人物关系与共同经历】") + lines).joinToString("\n")
     }
 }

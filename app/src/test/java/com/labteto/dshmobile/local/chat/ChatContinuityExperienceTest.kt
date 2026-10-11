@@ -132,6 +132,35 @@ class ChatContinuityExperienceTest {
         assertEquals(reconciled, reconcileDiaryState(reconciled, listOf(corrected)))
     }
 
+    @Test fun correctedRelationEventRestoresBothStageAndDescriptionWithoutTouchingOtherHistory() {
+        val source = entry("wrong-relationship").copy(event = "误认双方已经确认关系")
+        val revised = ChatDiaryRevision("双方还在互相了解，没有确认恋爱关系",
+            sources = source.sources, updatedAt = 2, userCorrected = true)
+        val correction = source.copy(event = revised.event,
+            revisions = ChatDiaryEntryPolicy.revisionsOf(source) + revised)
+        val state = ChatCharacterState(
+            mood = "平静", relationshipState = "稳定关系",
+            dynamics = RelationshipDynamics(stage = "COMMITTED", sharedMoments = listOf("昨天一起散步"),
+                facts = listOf(RelationshipEvidence("误认双方已经确认关系", confidence = 95, source = "dialogue"),
+                    RelationshipEvidence("昨天一起散步", confidence = 95, source = "dialogue"))),
+            stateObservations = listOf(
+                ChatStateObservation(field = "dynamics.stage", value = "COMMITTED",
+                    previousValue = "FAMILIAR", interpretation = true,
+                    sourceUserMessageId = "user-a", sourceAssistantMessageId = "reply-a"),
+                ChatStateObservation(field = "relationshipState", value = "稳定关系",
+                    previousValue = "熟悉中", interpretation = true,
+                    sourceUserMessageId = "user-a", sourceAssistantMessageId = "reply-a"),
+            ),
+        )
+        val resolved = reconcileDiaryState(state, listOf(correction))
+        assertEquals("FAMILIAR", resolved.dynamics.stage)
+        assertEquals("熟悉中", resolved.relationshipState)
+        assertEquals(listOf("昨天一起散步"), resolved.dynamics.sharedMoments)
+        assertEquals(listOf("昨天一起散步"), resolved.dynamics.facts.map { it.text })
+        assertEquals("平静", resolved.mood)
+        assertEquals(resolved, reconcileDiaryState(resolved, listOf(correction)))
+    }
+
     @Test fun correctionSurvivesStoreReloadAndLateBackgroundCannotRecreateIt() {
         val root = Files.createTempDirectory("diary-correction").toFile()
         try {

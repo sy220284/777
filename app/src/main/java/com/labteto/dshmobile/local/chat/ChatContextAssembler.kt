@@ -242,8 +242,12 @@ internal object ChatContextAssembler {
         val stripped = text.trim()
             .removePrefix("-")
             .trim()
+            // Long-term records carry a person qualifier; only the selected person's
+            // records are supplied by the recall owner. Compare the fact payload rather
+            // than its storage label against the active story's fact projection.
+            .replace(Regex("""^关系对象[：:=][^｜\n]{1,80}｜"""), "")
             .replace(
-                Regex("""^(?:关注|近期印象|目标|行动|内在拉扯|在意|未完话题|未解冲突|已确认事实|事实|共同经历|关系状态|关系对象|用户关系偏好)[：:=]\s*"""),
+                Regex("""^(?:关注|近期印象|目标|行动|内在拉扯|在意|未完话题|未解冲突|已确认事实|已有事实|尚未确认的印象|仍未知|当前关系|共同物与约定|事实|共同经历|关系状态|关系对象|用户关系偏好)[：:=]\s*"""),
                 "",
             )
         return stripped.lowercase()

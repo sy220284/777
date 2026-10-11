@@ -19,10 +19,6 @@ internal class ChatInteractionPromptBuilder {
         state.internalConflict.takeIf(String::isNotBlank)?.let { appendLine("此刻拉扯：$it") }
         state.immediateConcern.takeIf(String::isNotBlank)?.let { appendLine("脑中挂着：$it") }
         if (state.unresolvedThreads.isNotEmpty()) appendLine("未完：${state.unresolvedThreads.joinToString("；")}")
-        appendLine(
-            "用户习惯：长度=${state.userPattern.replyLength}｜直接=${state.userPattern.directness}｜" +
-                "玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
-        )
         if (state.dynamics.facts.isNotEmpty()) {
             appendLine("关系事实：${state.dynamics.facts.joinToString("；") { it.text }}")
         }
@@ -61,7 +57,7 @@ internal class ChatInteractionPromptBuilder {
             "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
                 "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression；" +
                 "dynamics(stage,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments,sharedObjects)；" +
-                "userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。",
+                "continuity(recentEvents,decisions,unfinished)。",
         )
         appendLine("dynamics.unresolvedConflict 为字符串，无冲突写空字符串。")
         appendLine("dynamics.facts/hypotheses 必须是对象数组，每项含 text(字符串)、confidence(整数)、source(字符串)；没有可核实的新证据就省略这些字段，禁止用字符串数组替代。")
@@ -72,8 +68,10 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- currentUserImpression 是人物长期主观印象，只在有新证据时修正；允许不完整和犯错，但不能把猜测升级为用户事实，也不按轮数自动消失。")
         appendLine("- sharedObjects 只保存双方真实建立、未来可能自然回调的小物件、共同梗、未完成小约定；普通名词不写入。")
         appendLine("- 生活状态记录已经发生的事情；人物的习惯资料不等于此刻已经做过的事。")
-        appendLine("- stage 描述实际关系事件，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
-        appendLine("- warmth/trust/reciprocity/tension/stability 只是派生诊断；共同经历、共同物、明确事件和真实行为证据优先，禁止仅凭数值推动人物选择或关系跨级。")
+        appendLine("- stage 只描述有明确证据的实际关系事件，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
+        appendLine("- 重大关系变化只通过 dynamics.stage 及其本轮真实对话证据确认，relationshipState 不可独立写入结婚、分手、恋爱等阶段结论。")
+        appendLine("- 发生关系阶段变化时必须在 stateEvidence 的 dynamics.stage 填写本轮真实对话原文片段；非阶段性的相处描述更新须提供 stateEvidence.relationshipState 的真实关系语句。不能引用假设、第三人或否定句，也不能凭单个关键词猜测。")
+        appendLine("- 废弃的关系数值与人物主动评分不再生成；以共同经历、明确事件和真实行为证据描述关系。")
         appendLine("- evolution 与 lifeState 为兼容与事件投影字段，模型不输出。")
         appendLine("- 情绪、身体状态、当前安排与未完事项由本轮实际事件更新；省略字段保留原值，已结束的状态显式清空。scene 和 interaction* 由系统维护，不输出。")
         appendLine("- 重新核对上一状态是否仍然成立；已经说开、完成、撤销或纠正的事项更新为当前版本。状态值为空字符串表示结束，mood为空或自然表示已无特定情绪；dynamics.unresolvedConflict为空表示矛盾已解。不要仅因聊了几轮清除状态，也不要把已解事项永久保留。")
@@ -94,8 +92,7 @@ internal class ChatInteractionPromptBuilder {
         appendReplySuggestionPersonaContext(persona)
         appendLine(
             "当前关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
-                "人物当前情绪=${state.mood}｜用户习惯：长度=${state.userPattern.replyLength}｜" +
-                "直接=${state.userPattern.directness}｜玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
+                "人物当前情绪=${state.mood}",
         )
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { appendLine("人物目前对用户的印象：$it") }
         if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
@@ -133,7 +130,7 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 最新1～2轮和当前状态优先；已结束、拒绝或被纠正的话题不得复活。")
         appendLine("- 建议服务于用户自己的表达，不照搬人物语言风格资料，也不替用户表演对方性格。")
         appendLine("- 用户明确纠正和当前上下文决定承接节奏；模糊表达要结合前后行为与关系语境理解，不把单个模糊推辞自动解释为关系拒绝；针对当前行为的清晰明确停止、退出或拒绝继续一次即生效。")
-        appendLine("- 直接承接人物最后一句，贴合用户表达习惯和当前关系。")
+        appendLine("- 直接承接人物最后一句，按最近对话中真实的用户表达和当前关系自然写作，不使用旧画像评分。")
         appendLine("- 不用同义改写凑数，不虚构事实，不替用户作重大决定。")
         appendLine("- 现实关系建议不得包含跟踪、胁迫、欺骗操控或绕过明确拒绝。")
     }.trim()

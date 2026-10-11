@@ -15,11 +15,22 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
     val invalid = state.stateObservations.filter { observation ->
         observation.interpretation && dependsOnDecision(observation) && currentValues[observation.field] == observation.value
     }.mapTo(hashSetOf(), ChatStateObservation::field)
+    // Restore a sourced stage transition to its recorded prior value when its source is
+    // corrected. Unrelated relationship history remains untouched.
+    val revertedStage = state.stateObservations.firstOrNull {
+        it.field == "dynamics.stage" && it.field in invalid
+    }?.previousValue?.takeIf { it in setOf(
+        "NEW", "FAMILIAR", "AMBIGUOUS", "DATING", "COMMITTED",
+        "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
+    ) }
+    val priorDescription = state.stateObservations.firstOrNull {
+        it.field == "relationshipState" && it.field in invalid
+    }?.previousValue?.takeIf(String::isNotBlank)
     // Legacy states lack source IDs. Only exact old derived values may be withdrawn.
     val old = decisions.flatMap { entry ->
         val revisions = ChatDiaryEntryPolicy.revisionsOf(entry)
         (if (entry.active) revisions.dropLast(1) else revisions).flatMap { revision ->
-            listOf(revision.feeling, revision.innerThought, revision.relationshipMeaning, revision.unresolvedEcho)
+            listOf(revision.event, revision.feeling, revision.innerThought, revision.relationshipMeaning, revision.unresolvedEcho)
         }
     }.filter(String::isNotBlank).toSet()
     fun withdrawn(field: String, value: String) = field in invalid ||
@@ -39,10 +50,27 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
             }
         }
     }
+    fun relationLabel(stage: String): String = when (stage) {
+        "NEW" -> "刚认识"
+        "FAMILIAR" -> "熟悉中"
+        "AMBIGUOUS" -> "暧昧期"
+        "DATING" -> "约会中"
+        "COMMITTED" -> "稳定关系"
+        "CONFLICT" -> "矛盾期"
+        "COOLING" -> "降温期"
+        "SEPARATED" -> "已分开"
+        "REPAIRING" -> "修复中"
+        else -> state.relationshipState
+    }
     return state.copy(
         physicalState = state.physicalState.takeUnless { withdrawn("physicalState", it) }.orEmpty(),
         mood = state.mood.takeUnless { withdrawn("mood", it) } ?: "自然",
-        relationshipState = state.relationshipState.takeUnless { withdrawn("relationshipState", it) } ?: "熟悉中",
+        relationshipState = when {
+            revertedStage != null -> priorDescription ?: relationLabel(revertedStage)
+            withdrawn("relationshipState", state.relationshipState) ->
+                priorDescription ?: relationLabel(state.dynamics.stage)
+            else -> state.relationshipState
+        },
         currentFocus = state.currentFocus.takeUnless { withdrawn("currentFocus", it) }.orEmpty(),
         currentUserImpression = state.currentUserImpression.takeUnless { withdrawn("currentUserImpression", it) }.orEmpty(),
         activeGoal = state.activeGoal.takeUnless { withdrawn("activeGoal", it) }.orEmpty(),
@@ -51,7 +79,10 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
         immediateConcern = state.immediateConcern.takeUnless { withdrawn("immediateConcern", it) }.orEmpty(),
         unresolvedThreads = state.unresolvedThreads.filterNot(::withdrawnThread),
         dynamics = state.dynamics.copy(
+            stage = revertedStage ?: state.dynamics.stage,
             unresolvedConflict = state.dynamics.unresolvedConflict.takeUnless { withdrawn("dynamics.unresolvedConflict", it) }.orEmpty(),
+            facts = state.dynamics.facts.filterNot { it.text in old },
+            hypotheses = state.dynamics.hypotheses.filterNot { it.text in old },
             sharedMoments = state.dynamics.sharedMoments.filterNot(old::contains),
             sharedObjects = state.dynamics.sharedObjects.filterNot(old::contains),
         ),
