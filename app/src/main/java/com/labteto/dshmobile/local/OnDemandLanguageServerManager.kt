@@ -6,7 +6,6 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.Dispatchers
@@ -131,7 +130,7 @@ internal class OnDemandLanguageServerManager(
     private fun ensureNpm(): File {
         val cli = File(home, "bootstrap/npm-11.6.2/package/bin/npm-cli.js")
         if (cli.isFile && cli.length() > 0L) return cli
-        val parent = checkNotNull(cli.parentFile).parentFile!!.parentFile!!
+        val parent = File(home, "bootstrap")
         check(parent.isDirectory || parent.mkdirs()) { "无法创建 npm 暂存目录" }
         val archive = File(parent, "npm-11.6.2.tgz.part")
         val extracted = File(parent, ".npm-stage")
@@ -198,7 +197,7 @@ internal class OnDemandLanguageServerManager(
     private companion object {
         // npm 11.6.2 registry dist.integrity, pinned independently of the network.
         const val NPM_SHA512 =
-            "ee22b335fcbc95662cdf3ab8a053daf045d9cf9c6df6040d28965abb707512b2c16fa6c5efc049d34c7d38e390cebd14f697919e6e5dd9353e7b3312550"
+            "ee22b335fcbc95662cdf3ab8a053daf045d9cf9c6df6040d28965abb707512b2c16fa6c5eec049d34c74f78f390cebd14f697919eadb97756564d4f9eccc4954"
         const val MAX_TARBALL_BYTES = 24L * 1024 * 1024
         const val MAX_UNPACKED_BYTES = 90L * 1024 * 1024
 
