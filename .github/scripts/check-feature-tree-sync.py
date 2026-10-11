@@ -198,13 +198,20 @@ def inspect():
         raise ValueError("全量分级统计与逐功能证据不一致")
     if review.get("observed_code_delta") != index.get("observed_delta"):
         raise ValueError("功能变化报告与扫描索引不一致")
+    by_path = {x["path"]: x for x in reported}
     def check_display(node, stack):
         for child in node["children"]:
             path = stack + [child["name"]]
             if not child["children"]:
-                expected = actual_evidence.get(" / ".join(path), 0)
+                current = " / ".join(path)
+                expected = actual_evidence.get(current, 0)
+                info = by_path[current]
                 if child.get("testCount", 0) != expected:
                     raise ValueError("HTML 逐项测试证据标注不一致")
+                if (child.get("evidenceLevel") != info["verification"] or
+                    child.get("sourceCount") != len(info["existing_production_sources"]) or
+                    child.get("missingSourceCount") != len(info["missing_production_sources"])):
+                    raise ValueError("HTML 展示的源码证据状态与复核台账不一致")
             check_display(child, path)
     check_display(data, [])
     paths = [item["path"] for item in matrix["items"]]
