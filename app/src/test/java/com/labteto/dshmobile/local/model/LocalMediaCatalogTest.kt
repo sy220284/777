@@ -29,11 +29,11 @@ class LocalMediaCatalogTest {
         val openAI = profile("gpt-6", "https://api.openai.com/v1")
         val gemini = profile("gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/openai")
         val all = LocalMediaCatalog.offers(listOf(qwen, openAI, gemini))
-        assertEquals(setOf(LocalMediaKind.IMAGE), all.filter { it.provider == LocalMediaProvider.QWEN }.map { it.kind }.toSet())
+        assertEquals(setOf(LocalMediaKind.IMAGE, LocalMediaKind.VIDEO), all.filter { it.provider == LocalMediaProvider.QWEN }.map { it.kind }.toSet())
         assertEquals(setOf(LocalMediaKind.IMAGE), all.filter { it.provider == LocalMediaProvider.GEMINI }.map { it.kind }.toSet())
         assertEquals(setOf(LocalMediaKind.IMAGE, LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE),
             all.filter { it.provider == LocalMediaProvider.OPENAI }.map { it.kind }.toSet())
-        assertFalse(all.any { it.provider != LocalMediaProvider.MINIMAX && it.kind == LocalMediaKind.VIDEO })
+        assertTrue(all.any { it.provider == LocalMediaProvider.QWEN && it.kind == LocalMediaKind.VIDEO && it.model == "wan2.6-t2v" })
         assertTrue(all.any { it.model == "gpt-image-2.5-flare" })
         assertTrue(all.any { it.model == "qwen-image-3.0" })
         assertTrue(all.any { it.model == "gemini-3.1-flash-image" })
