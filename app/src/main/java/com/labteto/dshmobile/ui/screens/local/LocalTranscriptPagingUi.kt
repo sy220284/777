@@ -229,6 +229,21 @@ private fun LazyListState.isAtWorkTimelineBottom(): Boolean {
     return tail.offset + tail.size - info.viewportEndOffset <= 72
 }
 
+/** Counts every item actually emitted before the transcript tail in LazyColumn. */
+internal fun localTranscriptLastListIndex(
+    transcriptItemCount: Int,
+    showPagingRow: Boolean,
+    showEmptyWorkbench: Boolean,
+    showEmptyGroupSetup: Boolean,
+    showPlanReview: Boolean,
+    showStreamingTail: Boolean,
+): Int = transcriptItemCount +
+    (if (showPagingRow) 1 else 0) +
+    (if (showEmptyWorkbench) 1 else 0) +
+    (if (showEmptyGroupSetup) 1 else 0) +
+    (if (showPlanReview) 1 else 0) +
+    (if (showStreamingTail) 1 else 0) - 1
+
 internal fun LazyListState.conversationViewportExtent(): Int {
     val info = layoutInfo
     return info.viewportEndOffset - info.viewportStartOffset
