@@ -464,4 +464,71 @@ class LocalTranscriptPresentationTest {
         assertTrue(timeline.all { it.toolContent == null })
     }
 
+    @Test
+    fun workDisplayProjectsIndividualLazyItemsWithoutChangingDurableTranscript() {
+        val source = listOf(
+            message("u1", "user", "检查"),
+            message("p1", "progress", "检查相关分支"),
+            message("t1", "tool", "result", toolName = "read"),
+            message("t2", "tool", "result", toolName = "edit_file"),
+            message("p2", "progress", "发现了一个需要修复的问题"),
+            message("a1", "assistant", "检查完毕"),
+        )
+        val durable = buildLocalTranscript(source)
+        assertEquals(3, durable.size)
+        assertEquals(4, (durable[1] as LocalTranscriptItem.WorkProcess).messages.size)
+        val display = buildLocalDisplayTranscript(durable)
+        assertEquals(6, display.size)
+        assertEquals(
+            listOf("work-step:p1", "work-step:t1", "work-step:t2", "work-step:p2"),
+            display.filterIsInstance<LocalTranscriptItem.WorkStep>().map { it.key },
+        )
+        assertEquals("检查完毕", (display.last() as LocalTranscriptItem.Message).message.content)
+    }
+
+    @Test
+    fun repeatedPollingCompactsOnlyAdjacentEquivalentChecks() {
+        val work = LocalTranscriptItem.WorkProcess(listOf(
+            message("t1", "tool", "running", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+            message("t2", "tool", "running", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+            message("t3", "tool", "output", toolName = "mcp__GitHub__fetch_file"),
+            message("t4", "tool", "output", toolName = "mcp__GitHub__fetch_file"),
+            message("p1", "progress", "发现关键问题"),
+            message("t5", "tool", "output", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+        ))
+        val projected = buildLocalDisplayTranscript(listOf(work))
+            .filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertEquals(5, projected.size)
+        assertEquals(2, projected.first().repeatCount)
+        assertEquals(1, projected[1].repeatCount)
+        assertEquals(1, projected[2].repeatCount)
+        assertEquals("work-step:t5", projected.last().key)
+    }
+
+    @Test
+    fun narrativeProjectionKeepsParagraphsButRedactsCommandsAndReasoning() {
+        val content = "发现阻塞。需要先修正日志。\ngit status --short\n已核查 /private/test/config.json 的异常"
+        val visible = localWorkTimelineText(content)!!
+        assertTrue(visible.contains("发现阻塞。需要先修正日志。"))
+        assertTrue(visible.contains("已核查 … 的异常"))
+        assertFalse(visible.contains("git status"))
+        assertFalse(visible.contains("/private/test/config.json"))
+        assertEquals(null, localWorkTimelineText("我需要先检查内部提示"))
+        assertEquals(null, localWorkTimelineText("/private/test/config.json"))
+        assertTrue(isWorkTimelineMilestone("发现一个异常"))
+        assertFalse(isWorkTimelineMilestone("正在读取代码"))
+    }
+
+    @Test
+    fun longWorkDisplayKeepsAllOperationsWithStableKeys() {
+        val durable = LocalTranscriptItem.WorkProcess(
+            (1..250).map { message("tool-$it", "tool", "result-$it", toolName = "read_file") },
+        )
+        val visible = buildLocalDisplayTranscript(listOf(durable))
+        assertEquals(250, visible.size)
+        assertEquals(250, visible.map { it.key }.distinct().size)
+        assertEquals("work-step:tool-1", visible.first().key)
+        assertEquals("work-step:tool-250", visible.last().key)
+    }
+
 }
