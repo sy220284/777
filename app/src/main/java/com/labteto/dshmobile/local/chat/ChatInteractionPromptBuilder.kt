@@ -36,6 +36,9 @@ internal class ChatInteractionPromptBuilder {
         if (state.dynamics.sharedObjects.isNotEmpty()) {
             appendLine("共同物/共同梗/未完成小约定：${state.dynamics.sharedObjects.joinToString("；")}")
         }
+        state.stateObservations.takeLast(4).forEach { observation ->
+            appendLine("上一状态依据（${observation.field}，${if (observation.interpretation) "对话归纳" else "原文表达"}）：${observation.basis}")
+        }
         if (state.scene.sceneTime.isNotBlank() || state.scene.location.isNotBlank()) {
             appendLine(
                 "当前硬场景：时间=${state.scene.sceneTime.ifBlank { "未知" }}｜地点=${state.scene.location.ifBlank { "未知" }}",
@@ -53,7 +56,7 @@ internal class ChatInteractionPromptBuilder {
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
+        appendLine("输出：{\"state\":{仅写变化字段},\"stateEvidence\":{\"变化字段名\":\"支持变化的本轮原文\"},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
         appendLine(
             "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
                 "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression；" +
@@ -73,6 +76,8 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- warmth/trust/reciprocity/tension/stability 只是派生诊断；共同经历、共同物、明确事件和真实行为证据优先，禁止仅凭数值推动人物选择或关系跨级。")
         appendLine("- evolution 与 lifeState 为兼容与事件投影字段，模型不输出。")
         appendLine("- 情绪、身体状态、当前安排与未完事项由本轮实际事件更新；省略字段保留原值，已结束的状态显式清空。scene 和 interaction* 由系统维护，不输出。")
+        appendLine("- 重新核对上一状态是否仍然成立；已经说开、完成、撤销或纠正的事项更新为当前版本。状态值为空字符串表示结束，mood为空或自然表示已无特定情绪；dynamics.unresolvedConflict为空表示矛盾已解。不要仅因聊了几轮清除状态，也不要把已解事项永久保留。")
+        appendLine("- stateEvidence引用实际对话，嵌套字段用dynamics.unresolvedConflict等完整字段名；不编造引文。人物的主观理解与用户事实分开，未知情绪不补写。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
