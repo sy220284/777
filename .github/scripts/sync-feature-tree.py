@@ -1130,6 +1130,8 @@ def generate(root):
                     if "followup" in item:
                         child["followupKind"] = item["followup"]["kind"]
                         child["followupAvailability"] = item["followup"]["availability"]
+                        child["followupSourceCount"] = item["followup"]["production_sources_confirmed"]
+                        child["followupTestMethodCount"] = item["followup"]["test_methods_confirmed"]
                     if "identity_id" in item:
                         child["identityId"] = item["identity_id"]
                         child["identityStatus"] = item["identity_status"]
