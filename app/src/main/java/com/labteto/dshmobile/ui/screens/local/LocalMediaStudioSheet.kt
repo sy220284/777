@@ -55,8 +55,7 @@ import kotlinx.coroutines.launch
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
     preferredProfileId: String?,
-    videoTaskId: String,
-    videoRouteId: String,
+    videoTasks: Map<String, String>,
     onVideoTaskChange: (String, String) -> Unit,
     onInsertTranscript: (String) -> Unit,
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
@@ -223,7 +222,8 @@ internal fun LocalMediaStudioSheetContent(
                                 videoLink = null
                             }
                         } })
-                    if (selected.id == videoRouteId && videoTaskId.isNotBlank()) {
+                    val videoTaskId = videoTasks[selected.id].orEmpty()
+                    if (videoTaskId.isNotBlank()) {
                         Text(stringResource(R.string.minimax_media_task_id, videoTaskId),
                             color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
                         DsButton(text = stringResource(R.string.minimax_media_check_video),
