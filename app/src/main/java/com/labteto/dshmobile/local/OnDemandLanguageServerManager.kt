@@ -117,6 +117,12 @@ internal class OnDemandLanguageServerManager(
             File(stage, ".ready").writeText(component.id + "@" + component.version)
             if (finalDir.exists()) check(finalDir.deleteRecursively()) { "旧组件目录无法清理" }
             check(stage.renameTo(finalDir)) { "组件安装提交失败" }
+            // A newer pinned version replaces the old one only after successful installation.
+            parent.listFiles().orEmpty()
+                .filter { it.isDirectory && it.name.startsWith(component.id + "-") && it != finalDir }
+                .forEach { old -> if (!old.deleteRecursively()) {
+                    AppLog.warn("LspInstaller", "stale component cleanup failed: " + old.name)
+                } }
             AppLog.info("LspInstaller", "installed " + component.id + "@" + component.version)
         } catch (error: Exception) {
             AppLog.failure("LspInstaller", "install_" + component.id, error)
@@ -190,8 +196,10 @@ internal class OnDemandLanguageServerManager(
     }
 
     internal fun uninstall(component: Component): Boolean {
-        val dir = installedDirectory(component)
-        return !dir.exists() || dir.deleteRecursively()
+        val parent = File(home, "components")
+        return parent.listFiles().orEmpty()
+            .filter { it.isDirectory && it.name.startsWith(component.id + "-") }
+            .all(File::deleteRecursively)
     }
 
     companion object {
