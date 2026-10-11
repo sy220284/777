@@ -4,7 +4,6 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
-import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -20,6 +19,7 @@ import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -208,8 +208,4 @@ internal fun parallelToolFailure(
  * a third-party tool can claim READ_ONLY while writing a remote session or seeking approval.
  * Write and agent-control calls retain their existing exclusive, ordered execution path.
  */
-internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean =
-    tool != null &&
-        tool.access == ToolAccess.READ_ONLY &&
-        tool.approvalPolicy == ToolApprovalPolicy.NEVER &&
-        tool.metadata.parallelReadSafe
+internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean = isParallelSafeReadTool(tool)
