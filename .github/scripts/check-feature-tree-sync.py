@@ -436,7 +436,9 @@ def inspect():
                     child.get("workflowJobCount") != len(info.get("workflow_evidence", [])) or
                     child.get("unrunTestCount") != len(info.get("explicit_test_candidates", [])) or
                     child.get("followupKind") != info.get("followup", {}).get("kind") or
-                    child.get("followupAvailability") != info.get("followup", {}).get("availability")):
+                    child.get("followupAvailability") != info.get("followup", {}).get("availability") or
+                    child.get("followupSourceCount") != info.get("followup", {}).get("production_sources_confirmed") or
+                    child.get("followupTestMethodCount") != info.get("followup", {}).get("test_methods_confirmed")):
                     raise ValueError("HTML 展示的源码/CI作业/未执行测试证据与复核台账不一致")
             check_display(child, path)
     check_display(data, [])
