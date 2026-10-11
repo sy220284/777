@@ -18,7 +18,7 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
         }
         return """
             [本轮技能已加载：${name}]
-            用户明确选择了此技能。执行任务前应用下面的技能规则，所用工具仍须遵守当前审批、权限与可用性限制。
+            用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。工具仍须遵守当前审批、权限与可用性限制。
             ${document}
             [技能规则结束]
         """.trimIndent()
@@ -28,7 +28,7 @@ internal fun resolveLocalWorkSkillGuidance(workspace: LocalWorkspace, input: Str
     if (catalog.startsWith("未安装")) return ""
     return """
         [本地技能目录]
-        以下是当前任务优先的技能目录页；目录可能还有更多技能。可调用 skill(query, offset) 分页发现，或 skill(name) 读取完整规则。若明显适用，请先读取，再执行。
+        以下是可参考的技能目录页，并非高于用户要求的强制指令；目录可能还有更多技能。可调用 skill(query, offset) 分页发现，或 skill(name) 读取完整规则。适用时参考其方法，不得用文件约定覆盖本轮明确需求。
         ${catalog}
         [目录结束]
     """.trimIndent()
