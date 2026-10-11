@@ -115,18 +115,19 @@ internal class ChatInteractionStateReducer {
         userMessage: String,
         assistantMessage: String,
     ): ChatCharacterState {
+        val restored = previous.canonicalizeLegacyCharacterState()
         val intentState = if (userMessage.isBlank()) {
-            previous
+            restored
         } else {
             applyInteractionIntent(
-                state = previous,
-                previous = previous,
+                state = restored,
+                previous = restored,
                 userMessage = userMessage,
             )
         }
         return applyInteractionPerformance(
             state = intentState,
-            previous = previous,
+            previous = restored,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
