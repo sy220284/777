@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -289,7 +291,6 @@ internal fun LocalConversationSurface(
     )
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
         (if (showStreamingTail) 1 else 0)
-    var previousTranscriptTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -439,21 +440,29 @@ internal fun LocalConversationSurface(
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
+    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
-        enabled = showStreamingTail,
+        enabled = showStreamingTail && !workTailFollowing.value,
     )
-
-    LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
-        if (transcriptItems.isNotEmpty()) {
-            // Compare against the PREVIOUS tail: a burst may append many individual Work
-            // rows at once, and comparing with the new tail would incorrectly stop follow.
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val wasNearTail = previousTranscriptTailIndex < 0 ||
-                lastVisible >= previousTranscriptTailIndex - 2
-            previousTranscriptTailIndex = transcriptLastListIndex
-            if (wasNearTail) {
-                listState.animateScrollToItem(transcriptLastListIndex)
+    if (state.usageMode == LocalUsageMode.WORK) {
+        LocalWorkTimelineAutoScroller(
+            listState = listState,
+            sessionId = state.sessionId,
+            tailIndex = transcriptLastListIndex,
+            isReady = transcriptInitialPositionReady,
+            isCatchingUp = workTailFollowing,
+        )
+    } else {
+        // Chat mode retains its established scrolling behavior.
+        var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
+        LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
+            if (transcriptItems.isNotEmpty()) {
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val wasNearTail = previousChatTailIndex < 0 ||
+                    lastVisible >= previousChatTailIndex - 2
+                previousChatTailIndex = transcriptLastListIndex
+                if (wasNearTail) listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
     }
@@ -750,12 +759,20 @@ internal fun LocalConversationSurface(
                         }
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkStep -> WorkTimelineStepRow(
-                            message = transcriptItem.message,
-                            repeatCount = transcriptItem.repeatCount,
-                            active = state.running && transcriptItem.message.role != "tool" &&
-                                transcriptItem.key == transcriptItems.lastOrNull()?.key,
-                        )
+                        is LocalTranscriptItem.WorkStep -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(
+                                fadeInSpec = tween(durationMillis = 180),
+                                placementSpec = tween(durationMillis = 220),
+                                fadeOutSpec = null,
+                            ),
+                        ) {
+                            WorkTimelineStepRow(
+                                message = transcriptItem.message,
+                                repeatCount = transcriptItem.repeatCount,
+                                active = state.running && transcriptItem.message.role != "tool" &&
+                                    transcriptItem.key == transcriptItems.lastOrNull()?.key,
+                            )
+                        }
                     }
                 }
                 if (showStreamingTail) {
