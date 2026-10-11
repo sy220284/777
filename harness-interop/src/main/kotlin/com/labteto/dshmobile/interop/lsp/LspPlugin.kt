@@ -114,7 +114,8 @@ class LspPlugin(
                         requirements = if (name == "lsp_uninstall_component") {
                             listOf("需用户审批；卸载前会停止当前运行的语言服务")
                         } else listOf(
-                            "项目需能自动检测到可运行的语言服务器；首次启动外部语言服务进程需要人工审批",
+                            "TypeScript/JavaScript 和 Python 可在首次语义查询时经授权按需下载安装；其他语言需已有兼容的本地语言服务器",
+                            "语言服务器首次启动需独立进程审批；状态查询及能力发现不会触发下载",
                         ),
                     ),
                     executor = HarnessToolExecutor { toolContext, input, _ ->
@@ -386,13 +387,13 @@ class LspPlugin(
         val description = when (name) {
             "lsp_status" -> "查看当前项目代码智能状态、已安装的语言服务器组件；不触发下载"
             "lsp_uninstall_component" -> "卸载本机已安装的代码智能组件；需用户审批，再次使用时重新下载"
-            "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
-            "lsp_references" -> "查询代码引用；需要时自动启动匹配的语言服务器"
-            "lsp_hover" -> "查询代码类型与说明；需要时自动启动匹配的语言服务器"
-            "lsp_implementation" -> "查询接口/抽象成员的实现位置；需要时自动启动匹配的语言服务器"
-            "lsp_workspace_symbols" -> "按关键词查询整个工作区的代码符号；需要时自动启动语言服务器"
+            "lsp_definition" -> "查询函数、变量和符号的精确定义位置；TypeScript/Python 首次使用可经授权下载语言服务"
+            "lsp_references" -> "查找符号的跨文件引用与调用关系；TypeScript/Python 首次使用可经授权下载语言服务"
+            "lsp_hover" -> "查询变量、函数的类型与悬停说明；需要时启动本地语言服务器"
+            "lsp_implementation" -> "查询接口和抽象成员的具体实现位置；需要时启动本地语言服务器"
+            "lsp_workspace_symbols" -> "按关键词查询工作区全局代码符号；需要时启动或经授权下载语言服务器"
             "lsp_rename_preview" -> "计算重命名 WorkspaceEdit，只返回修改预览，不直接写文件"
-            "lsp_diagnostics" -> "同步当前文件并读取语言服务器诊断；published=false 仅表示本次未收到诊断发布"
+            "lsp_diagnostics" -> "分析当前文件的语义和类型错误，查询本地语言服务器诊断；published=false 表示本次尚未收到诊断发布"
             else -> "列出文件中的代码符号；需要时自动启动匹配的语言服务器"
         }
         val properties = buildJsonObject {
