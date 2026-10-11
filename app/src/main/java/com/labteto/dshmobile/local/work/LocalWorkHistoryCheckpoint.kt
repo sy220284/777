@@ -19,6 +19,7 @@ internal data class LocalStructuredWorkState(
     val constraints: List<String> = emptyList(),
     val decisions: List<String> = emptyList(),
     val decisionEpoch: Long = 0L,
+    val constraintEpoch: Long = 0L,
     val failures: List<String> = emptyList(),
     val unfinished: List<String> = emptyList(),
     val progress: List<String> = emptyList(),
@@ -33,6 +34,8 @@ internal data class LocalWorkCheckpoint(
     val constraints: List<String>,
     val decisions: List<String>,
     val decisionEpoch: Long = 0L,
+    val constraintEpoch: Long = 0L,
+    val userDecisionsVerified: Boolean = false,
     val failures: List<String>,
     val unfinished: List<String>,
     val progress: List<String>,
@@ -41,12 +44,14 @@ internal data class LocalWorkCheckpoint(
     val tools: List<String>,
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
-        put("version", 3)
+        put("version", 4)
         put("goals", JsonArray(goals.map(::JsonPrimitive)))
         put("plan", JsonArray(plan.map(::JsonPrimitive)))
         put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
         put("decisions", JsonArray(decisions.map(::JsonPrimitive)))
         put("decision_epoch", decisionEpoch)
+        put("constraint_epoch", constraintEpoch)
+        put("user_decisions_verified", userDecisionsVerified)
         put("failures", JsonArray(failures.map(::JsonPrimitive)))
         put("unfinished", JsonArray(unfinished.map(::JsonPrimitive)))
         put("progress", JsonArray(progress.map(::JsonPrimitive)))
@@ -98,6 +103,8 @@ internal data class LocalWorkCheckpoint(
                 constraints = list("constraints"),
                 decisions = list("decisions"),
                 decisionEpoch = value["decision_epoch"]?.jsonPrimitive?.longOrNull ?: 0L,
+                constraintEpoch = value["constraint_epoch"]?.jsonPrimitive?.longOrNull ?: 0L,
+                userDecisionsVerified = value["user_decisions_verified"]?.jsonPrimitive?.contentOrNull == "true",
                 failures = list("failures"),
                 unfinished = list("unfinished"),
                 progress = list("progress"),
