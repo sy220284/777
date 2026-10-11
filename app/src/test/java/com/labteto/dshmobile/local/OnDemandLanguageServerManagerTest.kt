@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import java.io.File
+import java.util.zip.GZIPOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -70,4 +71,49 @@ class OnDemandLanguageServerManagerTest {
         File(folder, ".ready").writeText("wrong")
         assertTrue(manager().installedCommand("code.py").isEmpty())
     }
+
+    private fun sampleTar(filename: String, type: Char, payload: ByteArray): File {
+        val tar = File(temp.root, "sample-" + System.nanoTime() + ".tgz")
+        fun field(target: ByteArray, offset: Int, length: Int, value: String) {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            require(bytes.size <= length)
+            bytes.copyInto(target, offset)
+        }
+        val header = ByteArray(512)
+        field(header, 0, 100, filename)
+        field(header, 124, 12, payload.size.toString(8).padStart(11, '0'))
+        header[156] = type.code.toByte()
+        GZIPOutputStream(tar.outputStream()).use { stream ->
+            stream.write(header)
+            stream.write(payload)
+            stream.write(ByteArray(((512 - payload.size % 512) % 512) + 1024))
+        }
+        return tar
+    }
+
+    @Test fun archiveExtractionRejectsParentTraversal() {
+        val archive = sampleTar("../outside.txt", '0', "bad".toByteArray())
+        val dest = File(temp.root, "extract").apply { mkdirs() }
+        assertTrue(runCatching {
+            OnDemandLanguageServerManager.extractVerifiedTar(archive, dest)
+        }.isFailure)
+        assertFalse(File(temp.root, "outside.txt").exists())
+    }
+
+    @Test fun archiveExtractionRejectsSymlinksAndSpecialEntries() {
+        val archive = sampleTar("package/link", '2', byteArrayOf())
+        val dest = File(temp.root, "extract").apply { mkdirs() }
+        assertTrue(runCatching {
+            OnDemandLanguageServerManager.extractVerifiedTar(archive, dest)
+        }.isFailure)
+        assertFalse(File(dest, "package/link").exists())
+    }
+
+    @Test fun archiveExtractionAcceptsOrdinaryPackageFiles() {
+        val archive = sampleTar("package/bin/cli.js", '0', "hello".toByteArray())
+        val dest = File(temp.root, "extract").apply { mkdirs() }
+        OnDemandLanguageServerManager.extractVerifiedTar(archive, dest)
+        assertEquals("hello", File(dest, "package/bin/cli.js").readText())
+    }
+
 }
