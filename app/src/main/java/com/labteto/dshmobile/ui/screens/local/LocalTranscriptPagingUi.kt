@@ -150,7 +150,9 @@ internal fun LocalWorkTimelineAutoScroller(
             isReaderPaused.value = false
         }
     }
-    LaunchedEffect(sessionId, listState) {
+    // The collector must restart with the actual drag state; otherwise a captured
+    // stale false could resume following while the reader is still touching the list.
+    LaunchedEffect(sessionId, listState, readerDragging) {
         snapshotFlow { listState.isAtWorkTimelineBottom() }
             .distinctUntilChanged()
             .collect { atBottom ->
