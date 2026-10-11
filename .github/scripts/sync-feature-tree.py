@@ -474,7 +474,7 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
                 if len(cols) < 4 or cols[1] != name:
                     continue
                 source_history.update(HISTORICAL_LINK.findall(cols[3]))
-                for label in re.findall(r"\\[([^]]+)\\]\\(https://github\\.com/[^)]+\\)", cols[3]):
+                for label in re.findall(r"\[([^\]]+)\]\(https://github\.com/[^)]+\)", cols[3]):
                     if " · " in label:
                         named_history.add(label.rsplit(" · ", 1)[-1].strip())
         for old in previous.values():
