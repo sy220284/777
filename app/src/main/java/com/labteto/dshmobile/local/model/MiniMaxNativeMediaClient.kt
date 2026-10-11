@@ -27,6 +27,8 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 
+internal data class MiniMaxVoice(val id: String, val name: String)
+
 internal data class MiniMaxVideoStatus(val state: String, val downloadUrl: String? = null)
 
 /** Native Android transport for provider-owned media features. No CLI, Node, shell or secret duplication. */
@@ -51,6 +53,20 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             ?.firstOrNull()?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.startsWith("https://") }
             ?: error("MiniMax 图片接口未返回有效的 HTTPS 图片地址")
+    }
+
+    suspend fun systemVoices(profile: LocalModelProfile): List<MiniMaxVoice> {
+        val root = post(profile, "/v1/get_voice", buildJsonObject { put("voice_type", "system") })
+        return root["system_voice"]?.jsonArray?.mapNotNull { item ->
+            val record = item as? JsonObject ?: return@mapNotNull null
+            val id = record["voice_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            MiniMaxVoice(
+                id = id,
+                name = record["voice_name"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf(String::isNotBlank) ?: id,
+            )
+        } ?: emptyList()
     }
 
     suspend fun synthesizeSpeech(profile: LocalModelProfile, text: String, voice: String): File {
