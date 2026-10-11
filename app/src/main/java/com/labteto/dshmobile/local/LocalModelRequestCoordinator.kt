@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
+import com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
@@ -456,7 +457,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+                canRetryModelAttemptAfterOutput(error, attemptStreamChars)
             },
             backoffMillis = { failedAttempt, error ->
                 (error as? LocalModelException)?.providerRetryAfterMs
