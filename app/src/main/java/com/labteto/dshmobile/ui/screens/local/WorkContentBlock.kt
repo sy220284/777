@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,9 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationStatusRes
@@ -34,7 +33,7 @@ internal fun userFacingWorkToolProvider(toolName: String?): String? {
     }
 }
 
-/** Compact, user-readable work milestone. Raw tools and commands stay in Run Center. */
+/** A readable chronological step, with optional explanation instead of a hidden disclosure. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     val action = if (node.failed) {
@@ -42,42 +41,63 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
     } else stringResource(agentOperationLabelRes(node.kind))
     val provider = userFacingWorkToolProvider(node.toolName)
     val summary = node.summary ?: if (provider != null) "$provider · $action" else action
+    val label = if (provider != null && node.summary != null &&
+        !summary.contains(provider, ignoreCase = true)
+    ) "$provider · $summary" else summary
     val colors = DsTheme.colors
-    Row(
+
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {
-        when {
-            node.failed -> Icon(
-                FeatherIcons.AlertTriangle,
-                contentDescription = null,
-                tint = colors.error,
-                modifier = Modifier.size(18.dp),
-            )
-            running -> WorkOperationIcon(node.kind, running = true)
-            else -> Icon(
-                FeatherIcons.CheckCircle,
-                contentDescription = null,
-                tint = colors.labelSecondary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Text(
-            summary,
-            modifier = Modifier.weight(1f),
-            style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
-                .withReadingWeight().copy(fontFamily = FontFamily.Default),
-            color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
-                else colors.labelSecondary,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (node.failed) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            when {
+                node.failed -> Icon(
+                    FeatherIcons.AlertTriangle,
+                    contentDescription = null,
+                    tint = colors.error,
+                    modifier = Modifier.size(18.dp),
+                )
+                node.count > 0 -> WorkOperationIcon(node.kind, running = running)
+                running -> WorkOperationIcon(node.kind, running = true)
+                else -> Icon(
+                    FeatherIcons.CheckCircle,
+                    contentDescription = null,
+                    tint = colors.labelSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             Text(
-                stringResource(agentOperationStatusRes(running = false, failed = true)),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.error,
+                label,
+                modifier = Modifier.weight(1f),
+                style = (if (node.summary != null) DsType.mdSmall else DsType.small13)
+                    .withReadingWeight().copy(fontFamily = FontFamily.Default),
+                color = if (node.failed) colors.error else if (node.summary != null) colors.labelPrimary
+                    else colors.labelSecondary,
+            )
+            if (node.failed) {
+                Text(
+                    stringResource(agentOperationStatusRes(running = false, failed = true)),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.error,
+                )
+            } else if (node.count > 1) {
+                Text(
+                    stringResource(R.string.local_work_process_operation_count, node.count),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+        }
+        node.detail?.let { detail ->
+            Text(
+                detail,
+                modifier = Modifier.padding(start = 18.dp + DsSpacing.small),
+                style = DsType.small13.withReadingWeight(),
+                color = if (node.failed) colors.error else colors.labelSecondary,
             )
         }
     }

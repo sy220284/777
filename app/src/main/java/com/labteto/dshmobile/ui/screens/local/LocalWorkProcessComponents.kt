@@ -1,38 +1,21 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
@@ -40,14 +23,8 @@ import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
-import com.labteto.dshmobile.ui.agentOperationLabelRes
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
-import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -57,8 +34,8 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 5
 internal const val LOCAL_WORK_PROCESS_SUMMARY_LIMIT = 260
+internal const val LOCAL_WORK_PROCESS_NOTE_LIMIT = 1200
 
 private val WORK_PROCESS_WHITESPACE = Regex("\\s+")
 private val WORK_PROCESS_TECHNICAL_LINE = Regex(
@@ -73,6 +50,7 @@ private val WORK_PROCESS_PRIVATE_NARRATION = Regex(
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
+    val detail: String? = null,
     val operationKinds: List<AgentOperationKind> = emptyList(),
     val failed: Boolean = false,
     val count: Int = 0,
@@ -92,13 +70,46 @@ internal fun localWorkProcessSummary(content: String): String? {
     return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
 
+
+/**
+ * A progress message is public narration, not private reasoning. Keep its short action
+ * on the first line and put an optional, bounded explanation beneath that action.
+ * Raw command lines, paths and provider-specific thinking tags never enter the timeline.
+ */
+internal fun localWorkProcessNarration(content: String): Pair<String, String?>? {
+    val visible = visibleAssistantText(content).trim()
+    if (visible.isEmpty() || WORK_PROCESS_PRIVATE_NARRATION.containsMatchIn(visible)) return null
+    val compact = WORK_PROCESS_WHITESPACE.replace(
+        visible.lineSequence()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && !WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(it) }
+            .joinToString(" "),
+        " ",
+    )
+    if (compact.isBlank()) return null
+    val readable = WORK_PROCESS_PATH.replace(compact, "…")
+    val sentenceEnd = readable.indexOfFirst { it == '。' || it == '！' || it == '？' || it == '!' || it == '?' }
+    val leadLength = if (sentenceEnd in 12..95 && sentenceEnd + 1 < readable.length) {
+        sentenceEnd + 1
+    } else {
+        minOf(readable.length, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
+    }
+    val summary = truncateWithoutSplittingSurrogatePair(
+        readable.take(leadLength), LOCAL_WORK_PROCESS_SUMMARY_LIMIT,
+    )
+    val note = truncateWithoutSplittingSurrogatePair(
+        readable.drop(leadLength).trim(), LOCAL_WORK_PROCESS_NOTE_LIMIT,
+    ).takeIf(String::isNotBlank)
+    return summary to note
+}
+
 internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<LocalWorkProcessNode> {
     if (messages.isEmpty()) return emptyList()
     val nodes = mutableListOf<LocalWorkProcessNode>()
 
     fun appendSummary(content: String) {
-        localWorkProcessSummary(content)?.let { summary ->
-            nodes += LocalWorkProcessNode(summary = summary)
+        localWorkProcessNarration(content)?.let { (summary, detail) ->
+            nodes += LocalWorkProcessNode(summary = summary, detail = detail)
         }
     }
 
@@ -134,6 +145,7 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
                     operationKinds = (previous.operationKinds + node.operationKinds).distinct(),
                     failed = previous.failed || node.failed,
                     count = previous.count + node.count,
+                    toolName = previous.toolName ?: node.toolName,
                 )
             }
             node.summary != null && previous?.summary == null && result.isNotEmpty() -> {
@@ -146,6 +158,7 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
                     operationKinds = (tools.flatMap { it.operationKinds } + node.operationKinds).distinct(),
                     failed = tools.any { it.failed } || node.failed,
                     count = tools.sumOf { it.count } + node.count,
+                    toolName = tools.firstOrNull { !it.toolName.isNullOrBlank() }?.toolName ?: node.toolName,
                 )
             }
             else -> result += node.copy(toolContent = null)
@@ -161,32 +174,11 @@ internal fun semanticWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<L
 internal fun conversationWorkProcessNodes(nodes: List<LocalWorkProcessNode>): List<LocalWorkProcessNode> =
     semanticWorkProcessNodes(nodes)
 
-internal fun visibleWorkProcessNodes(
-    nodes: List<LocalWorkProcessNode>,
-    showAll: Boolean,
-    collapsedLimit: Int = LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT,
-): List<LocalWorkProcessNode> {
-    if (showAll || nodes.size <= collapsedLimit.coerceAtLeast(1)) return nodes
-    val limit = collapsedLimit.coerceAtLeast(1)
-    val recent = nodes.takeLast(limit)
-    val failed = nodes.indexOfLast { it.failed }
-    if (failed < 0 || failed >= nodes.size - limit) return recent
-    // Show a hidden failed milestone alongside the newest steps.
-    return listOf(nodes[failed]) + nodes.takeLast((limit - 1).coerceAtLeast(0))
-}
-
-internal fun workProcessFocus(nodes: List<LocalWorkProcessNode>): LocalWorkProcessNode =
-    nodes.lastOrNull { it.failed } ?: nodes.last()
-
-internal fun workProcessStatus(
-    nodes: List<LocalWorkProcessNode>,
-    running: Boolean,
-): DsStatus = when {
-    running -> DsStatus.Running
-    nodes.any(LocalWorkProcessNode::failed) -> DsStatus.Warning
-    else -> DsStatus.Done
-}
-
+/**
+ * Work messages are shown in event order, without a disclosure header or a five-step window.
+ * Historic steps remain readable when the run completes; the final answer stays a separate
+ * transcript item. Long-running sessions are already paged by the transcript owner.
+ */
 @Composable
 internal fun WorkProcessRow(
     messages: List<LocalHarnessMessage>,
@@ -194,11 +186,11 @@ internal fun WorkProcessRow(
 ) {
     if (messages.isEmpty()) return
 
-    val colors = DsTheme.colors
-    val backgroundState = LocalAppBackgroundState.current
-    val nodes = remember(messages) { buildWorkProcessNodes(messages) }
+    val nodes = remember(messages) {
+        conversationWorkProcessNodes(buildWorkProcessNodes(messages))
+    }
     if (nodes.isEmpty()) {
-        // Do not render private reasoning; keep a visible thinking state until progress arrives.
+        // Thinking content is private; report only that the agent is thinking.
         if (messages.any { it.role == "reasoning" }) {
             Row(
                 modifier = Modifier.fillMaxWidth()
@@ -216,175 +208,29 @@ internal fun WorkProcessRow(
         }
         return
     }
-    val processStatus = workProcessStatus(nodes, running)
+
+    val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
     val processSurface = if (backgroundState.hasImage) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
             region = BackgroundRegion.MIDDLE,
         )
-    } else {
-        Color.Transparent
-    }
-
-    // Keep the timeline lightweight by default, even while Work is running.
-    // Full tool activity remains one tap away rather than flooding the conversation.
-    var expanded by remember(messages.first().id) { mutableStateOf(false) }
-    var manuallyToggled by remember(messages.first().id) { mutableStateOf(false) }
-    var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
-    // Automatically fold only if the reader has not chosen their own disclosure state.
-    LaunchedEffect(messages.first().id, running) {
-        if (!manuallyToggled) expanded = false
-    }
-    // Keep event order, but merge tool outcomes into their immediately preceding narration.
-    val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
-    val firstReasoningTimestamp = messages.firstOrNull {
-        it.role == "reasoning" && it.createdAt > 0L
-    }?.createdAt
-    val firstProgressTimestamp = messages.firstOrNull {
-        (it.role == "progress" || it.role == "tool") && it.createdAt > 0L
-    }?.createdAt
-    // Persisted event timestamps must be present and ordered. Unknown durations stay hidden.
-    val thinkingSeconds = if (firstReasoningTimestamp != null && firstProgressTimestamp != null) {
-        (firstProgressTimestamp - firstReasoningTimestamp)
-            .takeIf { it in 1_000L..600_000L }
-            ?.div(1_000L)
-    } else null
-    val latestNode = if (running) semanticNodes.last() else workProcessFocus(semanticNodes)
-    // The heading represents overall state; the detailed narration belongs exclusively
-    // to the step below. Repeating the active summary breaks reading and accessibility.
-    val headerLabel = when {
-        processStatus == DsStatus.Warning || processStatus == DsStatus.Failed ->
-            stringResource(R.string.local_work_process_warning)
-        running -> stringResource(R.string.local_work_process_running)
-        thinkingSeconds != null -> stringResource(R.string.local_work_thought_seconds, thinkingSeconds)
-        messages.any { it.role == "reasoning" } -> stringResource(R.string.local_work_thought)
-        else -> stringResource(R.string.local_work_process)
-    }
-    val collapsedSummary = (
-        if (processStatus == DsStatus.Warning || processStatus == DsStatus.Failed)
-            workProcessFocus(semanticNodes).summary
-        else null
-    ) ?: semanticNodes.lastOrNull { it.summary != null }?.summary
-    val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
-    val collapsedHiddenCount = (semanticNodes.size - visibleWorkProcessNodes(semanticNodes, false).size).coerceAtLeast(0)
-    val disclosureState = stringResource(
-        if (expanded) R.string.common_state_expanded else R.string.common_state_collapsed,
-    )
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 90f else 0f,
-        animationSpec = DsAnimations.chevron,
-        label = "workProcessChevron",
-    )
+    } else Color.Transparent
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
             .padding(horizontal = DsSpacing.small)
             .clip(DsShapes.block)
             .background(processSurface)
             .padding(horizontal = DsSpacing.xsmall),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = DsSpacing.touchTarget)
-                .clip(DsShapes.row)
-                .clickable(role = Role.Button) {
-                    manuallyToggled = true
-                    expanded = !expanded
-                }
-                .semantics { stateDescription = disclosureState }
-                .padding(horizontal = DsSpacing.xsmall, vertical = DsSpacing.xsmall),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            when {
-                processStatus == DsStatus.Warning || processStatus == DsStatus.Failed -> Icon(
-                    imageVector = FeatherIcons.AlertTriangle,
-                    contentDescription = null,
-                    tint = colors.error,
-                    modifier = Modifier.size(18.dp),
-                )
-                processStatus == DsStatus.Running -> WorkOperationIcon(
-                    kind = latestNode.kind, running = true,
-                )
-                else -> Icon(
-                    imageVector = FeatherIcons.CheckCircle,
-                    contentDescription = null,
-                    tint = colors.labelSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Text(
-                headerLabel,
-                modifier = Modifier.weight(1f),
-                style = DsType.small13.withReadingWeight(),
-                color = if (processStatus == DsStatus.Warning || processStatus == DsStatus.Failed) {
-                    colors.error
-                } else colors.labelSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        nodes.forEachIndexed { index, node ->
+            WorkContentBlock(
+                node = node,
+                running = running && !node.failed && index == nodes.lastIndex,
             )
-            Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = stringResource(
-                    if (expanded) R.string.local_work_process_collapse else R.string.local_work_process_expand,
-                ),
-                tint = colors.labelTertiary,
-                modifier = Modifier
-                    .size(18.dp)
-                    .graphicsLayer { rotationZ = chevronRotation },
-            )
-        }
-
-        if (!expanded && !collapsedSummary.isNullOrBlank()) {
-            Text(
-                collapsedSummary,
-                modifier = Modifier.padding(
-                    start = DsSpacing.medium,
-                    end = DsSpacing.small,
-                    bottom = DsSpacing.xsmall,
-                ),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
-            exit = shrinkVertically(DsAnimations.expand) + fadeOut(DsAnimations.fade),
-        ) {
-            Column(
-                modifier = Modifier.padding(start = DsSpacing.xsmall, top = DsSpacing.xsmall),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                visibleNodes.forEachIndexed { index, node ->
-                    // One semantic stage per visible row. Tool results are attached to their
-                    // preceding narration, instead of showing a duplicate generic tool title.
-                    WorkContentBlock(
-                        node = node,
-                        running = running && !node.failed &&
-                            index == visibleNodes.lastIndex &&
-                            semanticNodes.last() == node,
-                    )
-                }
-                if (collapsedHiddenCount > 0) {
-                    DsButton(
-                        text = if (showAllNodes) {
-                            stringResource(R.string.local_work_process_show_recent)
-                        } else {
-                            stringResource(R.string.local_work_process_show_more, collapsedHiddenCount)
-                        },
-                        onClick = { showAllNodes = !showAllNodes },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
         }
     }
 }

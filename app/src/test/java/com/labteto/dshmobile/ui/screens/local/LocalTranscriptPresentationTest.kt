@@ -198,18 +198,6 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun hiddenFailedMilestoneRemainsVisibleInRecentSteps() {
-        val nodes = listOf(
-            LocalWorkProcessNode(summary = "初始化", failed = true),
-            *List(8) { LocalWorkProcessNode(summary = "阶段$it") }.toTypedArray(),
-        )
-        val visible = visibleWorkProcessNodes(nodes, showAll = false, collapsedLimit = 5)
-        assertEquals(5, visible.size)
-        assertTrue(visible.first().failed)
-        assertEquals("阶段7", visible.last().summary)
-    }
-
-    @Test
     fun legacyMiniMaxThinkingDoesNotShowAsWorkProgressOrInlinePreview() {
         assertEquals(null, localWorkProcessSummary("<think>用户要看仓库更新，先按系统提示检查目录"))
         assertEquals("已确认新提交", localWorkProcessSummary("<think>内部分析</think>已确认新提交"))
@@ -226,14 +214,6 @@ class LocalTranscriptPresentationTest {
         assertEquals("", inlineWorkPreviewText("已有内容", "已有内容"))
         assertEquals("", inlineWorkPreviewText("已有", "已有内容"))
         assertEquals("不同阶段", inlineWorkPreviewText("不同阶段", "已有内容"))
-    }
-
-    @Test
-    fun collapsedFocusKeepsLatestFailureEvenWhenLaterStageSucceeds() {
-        val failed = LocalWorkProcessNode(summary = "校验文件", failed = true)
-        val later = LocalWorkProcessNode(summary = "已读取其他文件")
-        assertEquals(failed, workProcessFocus(listOf(failed, later)))
-        assertEquals(later, workProcessFocus(listOf(later)))
     }
 
     @Test
@@ -351,39 +331,6 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun workProcessAggregateStatusKeepsFailureVisibleAfterRunStops() {
-        val failed = LocalWorkProcessNode(
-            operationKinds = listOf(AgentOperationKind.Execute),
-            failed = true,
-            count = 1,
-        )
-        val completed = LocalWorkProcessNode(
-            operationKinds = listOf(AgentOperationKind.Search),
-            count = 1,
-        )
-
-        assertEquals(DsStatus.Running, workProcessStatus(listOf(failed, completed), running = true))
-        assertEquals(DsStatus.Warning, workProcessStatus(listOf(failed, completed), running = false))
-        assertEquals(DsStatus.Done, workProcessStatus(listOf(completed), running = false))
-    }
-
-    @Test
-    fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
-        val nodes = (1..12).map { index ->
-            LocalWorkProcessNode(
-                operationKinds = listOf(AgentOperationKind.Generic),
-                count = index,
-            )
-        }
-        val recent = visibleWorkProcessNodes(nodes, showAll = false)
-        val all = visibleWorkProcessNodes(nodes, showAll = true)
-        assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
-        assertEquals(8, recent.first().count)
-        assertEquals(12, recent.last().count)
-        assertEquals(12, all.size)
-    }
-
-    @Test
     fun visibleDialogueQuotaIgnoresBackgroundWorkMessages() {
         val messages = buildList {
             repeat(10) { turn ->
@@ -479,4 +426,43 @@ class LocalTranscriptPresentationTest {
             content = "说明：[NETWORK_ERROR] 是错误代码", createdAt = 1L, toolName = "read_file", toolIsError = false)))
         assertEquals(DsStatus.Done, workProcessStatus(nodes, running = false))
     }
+    @Test
+    fun workTimelineNarrationKeepsStageSummaryAndOptionalExplanatoryText() {
+        val note = localWorkProcessNarration(
+            "已经找到造成页面卡住的核心问题。需要修正执行流展示顺序，避免阶段成果再次被隐藏。"
+        )
+        assertEquals("已经找到造成页面卡住的核心问题。", note?.first)
+        assertEquals("需要修正执行流展示顺序，避免阶段成果再次被隐藏。", note?.second)
+        assertEquals(null, localWorkProcessNarration("git status --short"))
+        assertEquals(null, localWorkProcessNarration("我需要先检查内部提示"))
+        assertEquals(null, localWorkProcessNarration("/private/secret/config.json"))
+    }
+
+    @Test
+    fun narrativeDetailsOmitCommandLinesAndPrivatePaths() {
+        val note = localWorkProcessNarration(
+            "已经完成第一轮核查，发现了一个重要问题。\ngit status --short\n详见 /private/secret/file.txt 的异常记录。"
+        )
+        assertEquals("已经完成第一轮核查，发现了一个重要问题。", note?.first)
+        assertEquals("详见 … 的异常记录。", note?.second)
+        assertTrue(note?.second?.contains("git status") == false)
+        assertTrue(note?.second?.contains("/private/secret") == false)
+    }
+
+    @Test
+    fun workTimelinePreservesAllStagesAndProviderForMergedToolResult() {
+        val messages = (1..9).flatMap { index ->
+            listOf(
+                message("p$index", "progress", "阶段$index 已核查"),
+                message("t$index", "tool", "result", toolName = "mcp__GitHub__fetch"),
+            )
+        }
+        val timeline = conversationWorkProcessNodes(buildWorkProcessNodes(messages))
+        assertEquals(9, timeline.size)
+        assertEquals("阶段1 已核查", timeline.first().summary)
+        assertEquals("阶段9 已核查", timeline.last().summary)
+        assertEquals("GitHub", userFacingWorkToolProvider(timeline.first().toolName))
+        assertTrue(timeline.all { it.toolContent == null })
+    }
+
 }
