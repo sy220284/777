@@ -87,6 +87,51 @@ class AppLogStressTest {
     }
 
     @Test
+    fun overflowRetainsOriginalFailureAndMostRecentFailure() {
+        val scheduled = ArrayDeque<Runnable>()
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { _: List<Int> -> },
+            important = { it < 0 },
+            capacity = 3,
+        )
+        queue.offer(-1)
+        queue.offer(-2)
+        queue.offer(-3)
+        queue.offer(-4)
+        queue.offer(-5)
+        assertEquals(listOf(-1, -4, -5), queue.snapshot().outstanding)
+        assertEquals(2L, queue.snapshot().overflow)
+    }
+
+    @Test
+    fun failedBatchRetriesWithoutAnotherLogEntry() {
+        val scheduled = ArrayDeque<Runnable>()
+        val retries = ArrayDeque<Runnable>()
+        val written = mutableListOf<Int>()
+        var failure = true
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { batch: List<Int> ->
+                if (failure) throw java.io.IOException("write failed")
+                written.addAll(batch)
+            },
+            important = { it < 0 },
+            scheduleRetry = { retries.addLast(it) },
+        )
+        queue.offer(-42)
+        scheduled.removeFirst().run()
+        assertEquals(listOf(-42), queue.snapshot().outstanding)
+        assertEquals(1, retries.size)
+        assertEquals("IOException", queue.snapshot().writeError)
+        failure = false
+        retries.removeFirst().run()
+        assertEquals(listOf(-42), written)
+        assertTrue(queue.snapshot().outstanding.isEmpty())
+        assertEquals(null, queue.snapshot().writeError)
+    }
+
+    @Test
     fun inMemoryLogIsSanitizedBeforeExportAndKeepsOriginalThrowableType() {
         AppLog.clear()
         AppLog.warn(
