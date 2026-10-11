@@ -28,6 +28,13 @@ import kotlinx.serialization.json.put
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/** Advertise push diagnostics; TypeScript Language Server suppresses them otherwise. */
+internal val DEFAULT_LSP_CLIENT_CAPABILITIES: JsonObject = buildJsonObject {
+    put("textDocument", buildJsonObject {
+        put("publishDiagnostics", buildJsonObject { })
+    })
+}
+
 class LspProcessClient(
     private val command: List<String>,
     private val json: Json,
@@ -50,7 +57,7 @@ class LspProcessClient(
     private var input: BufferedInputStream? = null
     private var output: BufferedOutputStream? = null
 
-    suspend fun initialize(rootUri: String?, capabilities: JsonObject = JsonObject(emptyMap())): JsonObject {
+    suspend fun initialize(rootUri: String?, capabilities: JsonObject = DEFAULT_LSP_CLIENT_CAPABILITIES): JsonObject {
         val params = buildJsonObject {
             put("processId", JsonNull)
             if (rootUri != null) put("rootUri", rootUri) else put("rootUri", JsonNull)
