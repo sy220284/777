@@ -8,28 +8,32 @@ on:
   workflow_dispatch:
   pull_request:
 
+# PR 只读验证；主线维护单独授予写入令牌。
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: feature-tree-auto-maintenance
-  cancel-in-progress: false
+  group: feature-tree-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  sync:
+  audit:
+    name: PR 只读扫描及证据复核
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - name: 获取完整主线
+      - name: 获取待审核源码（禁用凭据保留）
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          persist-credentials: true
-      - name: 扫描全量源码与同步两种功能树
+          persist-credentials: false
+      - name: 全量预审、功能树生成与独立门禁
         run: |
           set -euo pipefail
-          python3 -m py_compile .github/scripts/sync-feature-tree.py
+          python3 -m py_compile .github/scripts/sync-feature-tree.py .github/scripts/check-feature-tree-sync.py
           python3 .github/scripts/sync-feature-tree.py --self-test
           python3 .github/scripts/sync-feature-tree.py --preview
           python3 .github/scripts/sync-feature-tree.py
@@ -37,8 +41,27 @@ jobs:
           python3 .github/scripts/check-feature-tree-sync.py
           python3 .github/scripts/check-acceptance-matrix.py
           git diff --check
-      - name: 上传本次扫描及复核后的文件
-        if: github.event_name == 'pull_request'
+      - name: 本轮证据及待处理差异摘要
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result=json.loads(Path("docs/FEATURE-REVIEW.auto.json").read_text(encoding="utf-8"))
+          delta=result.get("observed_code_delta", {})
+          rows=[
+              "### 全量功能树扫描结果",
+              f"- 生产源码：{result['production_sources_scanned']}；现有末级功能：{result['functional_leaves']}",
+              f"- 自动批准的结构变更：{len(result['changes_applied'])}；待核实声明：{len(result['pending_changes'])}",
+              f"- 现行树外历史项：{result['obsolete_historical_evidence_count']}；现行树失效来源：{result['current_tree_outdated_source_count']}",
+              f"- 路由变化：新增 {len(delta.get('added_routes', []))}，移除 {len(delta.get('removed_routes', []))}",
+              "- 生成文件随产物上传；静态源码检查不能代替真实运行验收。",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(rows)+"\n")
+          PY
+      - name: 上传待审核版本的完整扫描产物
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: feature-tree-reviewed
@@ -50,8 +73,34 @@ jobs:
             docs/FEATURE-SOURCE-INDEX.auto.json
             docs/FEATURE-REVIEW.auto.json
             docs/ACCEPTANCE-MATRIX.json
-      - name: 自动创建或更新维护 PR
-        if: github.event_name != 'pull_request'
+
+  maintain:
+    name: 主线单一维护 PR
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: 固定检出 main（即使手动从其他分支触发）
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: 全量扫描并独立复核，失败则停止写入
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/sync-feature-tree.py .github/scripts/check-feature-tree-sync.py
+          python3 .github/scripts/sync-feature-tree.py --self-test
+          python3 .github/scripts/sync-feature-tree.py --preview
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-feature-tree-sync.py
+          python3 .github/scripts/check-acceptance-matrix.py
+          git diff --check
+      - name: 提交复核结果到单一维护分支
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -60,21 +109,19 @@ jobs:
             docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json \
             docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
           if git diff --cached --quiet; then
-            echo "功能树和当前代码一致，无需提交"
+            echo "已是最新：无需自动提交"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "自动同步功能树与生产源码登记"
-          # 只维护机器人分支，不直接向 main 追加未触发 CI 的文档提交。
-          # 主线发布要求最终 SHA 有真实 CI 证据。
+          git commit -m "自动维护功能树、代码变更线索及证据分级"
           git fetch origin refs/heads/automation/feature-tree-maintenance:refs/remotes/origin/automation/feature-tree-maintenance || true
           git push --force-with-lease origin HEAD:refs/heads/automation/feature-tree-maintenance
           PR_NUMBER="$(gh pr list --base main --head automation/feature-tree-maintenance --state open --json number --jq '.[0].number // empty')"
           if [ -z "$PR_NUMBER" ]; then
             gh pr create --base main --head automation/feature-tree-maintenance \
-              --title "自动更新功能树与源码索引" \
-              --body "全仓库生产代码扫描生成。包含功能声明新增、删除、改名、迁移或源码候选变化；Markdown、交互树和验收索引同步。请以实际代码与检查结果复核，源码候选不视作功能完成。"
+              --title "自动复核更新中文功能树与源码证据" \
+              --body "来自 main 的全仓库真实代码扫描，先进行双重独立复核，再更新中文功能树、交互树及功能证据索引。候选变化需要审核；代码存在不等于功能已验收。"
           else
-            echo "已复用自动维护 PR #$PR_NUMBER"
+            echo "复用功能树维护 PR #$PR_NUMBER"
           fi
