@@ -226,12 +226,14 @@ internal fun WorkProcessRow(
         Color.Transparent
     }
 
-    var expanded by remember(messages.first().id) { mutableStateOf(running) }
+    // Keep the timeline lightweight by default, even while Work is running.
+    // Full tool activity remains one tap away rather than flooding the conversation.
+    var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var manuallyToggled by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
     // Automatically fold only if the reader has not chosen their own disclosure state.
     LaunchedEffect(messages.first().id, running) {
-        if (!manuallyToggled) expanded = running
+        if (!manuallyToggled) expanded = false
     }
     // Keep event order, but merge tool outcomes into their immediately preceding narration.
     val semanticNodes = remember(nodes) { conversationWorkProcessNodes(nodes) }
@@ -258,6 +260,11 @@ internal fun WorkProcessRow(
         messages.any { it.role == "reasoning" } -> stringResource(R.string.local_work_thought)
         else -> stringResource(R.string.local_work_process)
     }
+    val collapsedSummary = (
+        if (processStatus == DsStatus.Warning || processStatus == DsStatus.Failed)
+            workProcessFocus(semanticNodes).summary
+        else null
+    ) ?: semanticNodes.lastOrNull { it.summary != null }?.summary
     val visibleNodes = visibleWorkProcessNodes(semanticNodes, showAllNodes)
     val collapsedHiddenCount = (semanticNodes.size - visibleWorkProcessNodes(semanticNodes, false).size).coerceAtLeast(0)
     val disclosureState = stringResource(
@@ -331,6 +338,20 @@ internal fun WorkProcessRow(
             )
         }
 
+        if (!expanded && !collapsedSummary.isNullOrBlank()) {
+            Text(
+                collapsedSummary,
+                modifier = Modifier.padding(
+                    start = DsSpacing.medium,
+                    end = DsSpacing.small,
+                    bottom = DsSpacing.xsmall,
+                ),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically(DsAnimations.expand) + fadeIn(DsAnimations.fade),
