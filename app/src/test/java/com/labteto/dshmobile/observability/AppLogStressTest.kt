@@ -71,6 +71,22 @@ class AppLogStressTest {
     }
 
     @Test
+    fun normalLogStormCannotEvictOnlyFailureRecords() {
+        val scheduled = ArrayDeque<Runnable>()
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { _: List<Int> -> },
+            important = { it < 0 },
+            capacity = 2,
+        )
+        queue.offer(-1)
+        queue.offer(-2)
+        queue.offer(100)
+        assertEquals(listOf(-1, -2), queue.snapshot().outstanding)
+        assertEquals(1L, queue.snapshot().overflow)
+    }
+
+    @Test
     fun inMemoryLogIsSanitizedBeforeExportAndKeepsOriginalThrowableType() {
         AppLog.clear()
         AppLog.warn(

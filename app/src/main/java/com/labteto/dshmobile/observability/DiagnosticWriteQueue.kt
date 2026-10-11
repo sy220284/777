@@ -43,10 +43,13 @@ internal class DiagnosticWriteQueue<T>(
                         break
                     }
                 }
-                if (!removed) pending.removeFirst()
+                // A routine debug/info row must never evict an outstanding failure.
+                if (!removed && important(entry)) pending.removeFirst()
                 overflow++
+                if (removed || important(entry)) pending.addLast(entry)
+            } else {
+                pending.addLast(entry)
             }
-            pending.addLast(entry)
             if (draining) false else {
                 draining = true
                 true
