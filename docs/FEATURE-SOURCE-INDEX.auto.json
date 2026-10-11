@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1313,
-  "production_source_count": 783,
-  "test_code_file_count": 411,
+  "repository_code_file_count": 1318,
+  "production_source_count": 785,
+  "test_code_file_count": 414,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -165,7 +165,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/AutomaticLanguageServer.kt",
-      "sha256": "d69ad1e0c8347121"
+      "sha256": "574200a476754b62"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
@@ -241,11 +241,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "33001b928f26db60"
+      "sha256": "b406bfac15a6a378"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "sha256": "f6d39caa6e027d0b"
+      "sha256": "65da8b99c52cc872"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
@@ -254,6 +254,10 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt",
       "sha256": "d6056d854d67e55d"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt",
+      "sha256": "015af45fc915b9a5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
@@ -936,6 +940,10 @@
       "sha256": "769a08d830aad11f"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt",
+      "sha256": "e9823790603a878f"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/interaction/LocalApprovalPreferences.kt",
       "sha256": "e2bcff475ab80e5b"
     },
@@ -1253,7 +1261,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
-      "sha256": "98b8bc99540b0ab4"
+      "sha256": "cfa103cb54716d3c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/ModelAdmissionSafety.kt",
@@ -1665,7 +1673,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
-      "sha256": "51a37d238b2a8fa8"
+      "sha256": "9d3837ce866367e2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt",
@@ -1765,7 +1773,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
-      "sha256": "9c485aab9ac4dfd9"
+      "sha256": "baeb5dd03df6c069"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSandboxBoundary.kt",
@@ -3153,11 +3161,11 @@
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
-      "sha256": "f37be73d43f53abd"
+      "sha256": "648cdf1e909b9bec"
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
-      "sha256": "5d993f36a40501e8"
+      "sha256": "87d42b4284ef485e"
     },
     {
       "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
@@ -3205,13 +3213,23 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d05b9adc0570",
+  "source_snapshot": "8d1daeaebdc9",
   "observed_delta": {
-    "baseline": "92b450422afd",
-    "added_production_files": [],
+    "baseline": "d05b9adc0570",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt"
+    ],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionRestorer.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/AutomaticLanguageServer.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+      "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
