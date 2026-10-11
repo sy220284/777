@@ -440,9 +440,11 @@ internal fun LocalConversationSurface(
         anchoredViewportExtent = composerTailViewportAnchor,
     )
     val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
-        enabled = showStreamingTail && !workTailFollowing.value,
+        enabled = showStreamingTail && !workTailFollowing.value &&
+            (state.usageMode != LocalUsageMode.WORK || !workReaderPaused.value),
     )
     if (state.usageMode == LocalUsageMode.WORK) {
         LocalWorkTimelineAutoScroller(
@@ -453,6 +455,7 @@ internal fun LocalConversationSurface(
                 else transcriptItems.lastOrNull()?.key.orEmpty(),
             isReady = transcriptInitialPositionReady,
             isCatchingUp = workTailFollowing,
+            isReaderPaused = workReaderPaused,
         )
     } else {
         // Chat mode retains its established scrolling behavior.
