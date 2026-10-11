@@ -97,5 +97,14 @@ internal class LocalMiniMaxThinkingTextSplitter {
  * Presentation compatibility for older persisted assistant text which predates MiniMax splitting.
  * No mutation of the raw session event, tool record or provider replay payload occurs here.
  */
-internal fun visibleAssistantText(text: String): String =
-    LocalMiniMaxThinkingTextSplitter.splitComplete(text).content
+internal fun visibleAssistantText(text: String): String {
+    // Fast path matters while Compose re-renders growing assistant streams: almost all
+    // providers already return plain text, which needs no reparsing or copying.
+    val first = text.indexOfFirst { !it.isWhitespace() }
+    if (first < 0) return text
+    val head = text.substring(first, minOf(text.length, first + 7))
+    if (!head.startsWith("<think>", ignoreCase = true) &&
+        !"<think>".startsWith(head, ignoreCase = true)
+    ) return text
+    return LocalMiniMaxThinkingTextSplitter.splitComplete(text).content
+}
