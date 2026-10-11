@@ -107,7 +107,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
 
         val conversation = if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
             else snapshot.chat.chatContext
-        val recallQuery = ChatMemorySelector.recallQuery(query, conversation).orEmpty()
+        val recallQuery = ChatMemorySelector.recallQuery(query, conversation) ?: return ""
         val searchDiary = shouldSearchDiary(recallQuery)
 
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
@@ -119,13 +119,6 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
-        val corrections = persistence.diaryStore.decisionsForExperience(subjectKey,
-            conversation.withExperience(snapshot.sessionId, listOf(snapshot.sessionId)))
-            .filter { it.active && it.revisions.lastOrNull()?.userCorrected == true }
-            .sortedByDescending(ChatDiaryEntry::updatedAt)
-        val correctionText = packCompleteCharacterUnits(corrections.map { "用户已纠正的经历：${it.event}" }, 180)
-        if (correctionText.isNotEmpty()) blocks += correctionText.joinToString("\n")
-
         run {
             val relationshipKinds = setOf(
                 MemoryKind.RELATIONSHIP_FACT,
@@ -142,6 +135,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 allowedKinds = relationshipKinds,
                 maxItems = 4,
                 maxChars = (budget.factTokens * 3).coerceAtLeast(720),
+                additionalLineageIds = conversation.experienceSessionIds.toSet(),
                 recordFilter = { memory ->
                     relationshipMemoryMatchesSubject(
                         memory = memory,

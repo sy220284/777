@@ -13,7 +13,7 @@
 
 | 功能描述 | 独立产品入口 | 代码层判断 |
 |---|---|---|
-| 16类人物资料持续可见 | 未发现单独入口 | integrated_character_profile；code_and_tests_present_execution_unverified |
+| 16类人物资料按完整事实取用 | 未发现单独入口 | integrated_character_profile；code_and_tests_present_execution_unverified |
 | 模型温度独立采样 | 未发现单独入口 | active_sampling_subfeature；code_and_tests_present_execution_unverified |
 | 历史调参兼容读取，退出反应控制 | 未发现单独入口 | retired_controller_compatibility；legacy_fields_decodable_active_controls_retired |
 | 共同经历与采样设置分离 | 未发现单独入口 | cross_component_invariant；code_and_tests_present_execution_unverified |
@@ -40,7 +40,7 @@
 | V4事实字段规范与旧消费者一致性校验 | canonicalV4 | 4 | 2 | 尚未发现 |
 | 明确点名与一般提及分离，允许成员自然沉默 | LocalGroupChatState | 15 | 10 | 是 |
 | 关系推进、阶段与变化 | CharacterEvolutionState | 2 | 3 | 是 |
-| 日记人工纠正、停用与并发版本核验 | listActive | 7 | 8 | 是 |
+| 日记纠正、停用与当前状态同步 | ChatDiaryStore | 6 | 9 | 是 |
 | 日记来源会话及消息标识与跳转 | CharacterDiaryScreen | 1 | 1 | 尚未发现 |
 | 同源长期事实变动触发派生日记失效 | recoverPendingDiaryInvalidations | 3 | 0 | 是 |
 | 未完成日记清理的重启补偿与召回隔离 | captureAutoMemoryDirective | 5 | 0 | 尚未发现 |
@@ -58,7 +58,7 @@
 | 文件修改与补丁应用 | resolve | 39 | 33 | 是 |
 | 成果来源调用与事件序号可追溯 | projectLocalWorkArtifacts | 3 | 2 | 尚未发现 |
 | 成果首次创建和当前内容哈希对照 | localWorkFileSha256 | 2 | 3 | 是 |
-| 从原任务内容优化指令 | complete | 61 | 33 | 是 |
+| 从原任务内容优化指令 | complete | 62 | 33 | 是 |
 | 工具和插件清单 | refresh | 23 | 6 | 是 |
 | 分类浏览、配置和状态展示 | refresh | 23 | 6 | 是 |
 | 工具安装和管理入口 | refresh | 23 | 6 | 是 |
@@ -73,9 +73,9 @@
 | 长输出分页读取 | resolve | 39 | 33 | 是 |
 | GitHub 工具调用 | githubConfigured | 8 | 1 | 是 |
 | 高权限调用审批 | metadata | 50 | 13 | 是 |
-| 网页搜索 | request | 122 | 46 | 是 |
-| 网页抓取与页面正文获取 | request | 122 | 46 | 是 |
-| HTTP 请求 | request | 122 | 46 | 是 |
+| 网页搜索 | request | 122 | 47 | 是 |
+| 网页抓取与页面正文获取 | request | 122 | 47 | 是 |
+| HTTP 请求 | request | 122 | 47 | 是 |
 | 图片理解和视觉模型调用 | install | 17 | 11 | 是 |
 | 截图和媒体附件处理 | install | 17 | 11 | 是 |
 | 图像分析缓存 | LocalVisionAnalysisCache | 1 | 1 | 尚未发现 |
@@ -83,9 +83,9 @@
 | 自动、手动和默认审批 | metadata | 50 | 13 | 是 |
 | ChatGPT 账户授权登录 | summary | 51 | 18 | 尚未发现 |
 | ChatGPT 套餐模型目录与账号状态 | parseChatGptPlanModels | 1 | 1 | 尚未发现 |
-| 推理档位及温度上限对多入口的约束 | current | 198 | 38 | 是 |
+| 推理档位及温度上限对多入口的约束 | current | 199 | 38 | 是 |
 | 长期事实来源关联与显式纠正停用 | LocalMemorySettingsCard | 1 | 0 | 尚未发现 |
-| 长期事实修改后的来源失效待办 | remember | 64 | 6 | 是 |
+| 长期事实修改后的来源失效待办 | remember | 64 | 7 | 是 |
 | 自定义聊天背景 | WallpaperSurfaceLevel | 37 | 0 | 尚未发现 |
 | 任务相关配置状态与执行授权分开提示 | project | 26 | 29 | 是 |
 | 无障碍与通知监听实时服务状态提示 | refresh | 23 | 6 | 尚未发现 |
@@ -95,19 +95,19 @@
 | 状态投影注册、版本和事件水位 | fileFor | 2 | 0 | 尚未发现 |
 | 工具活动只读投影 | snapshot | 142 | 49 | 是 |
 | 持久会话登记与摘要投影索引分工 | summaries | 27 | 8 | 是 |
-| 批次投影和中断后重建 | request | 122 | 46 | 尚未发现 |
+| 批次投影和中断后重建 | request | 122 | 47 | 尚未发现 |
 | 单个会话备份损坏不阻断其他会话 | summaries | 27 | 8 | 是 |
-| Anthropic 消息协议 | complete | 61 | 33 | 尚未发现 |
-| DeepSeek 兼容协议 | complete | 61 | 33 | 尚未发现 |
+| Anthropic 消息协议 | complete | 62 | 33 | 尚未发现 |
+| DeepSeek 兼容协议 | complete | 62 | 33 | 尚未发现 |
 | ChatGPT 套餐专用协议分流 | refresh | 23 | 6 | 尚未发现 |
 | ChatGPT OAuth 授权回调 | ChatGptOAuthCallbackServer | 1 | 3 | 尚未发现 |
 | 运行中配置变化隔离 | LocalModelRunContext | 5 | 1 | 尚未发现 |
 | 连接健康诊断和重试约束 | LocalModelConnectionTester | 2 | 0 | 尚未发现 |
-| 模型路由的推理及温度上限统一生效 | complete | 61 | 33 | 是 |
+| 模型路由的推理及温度上限统一生效 | complete | 62 | 33 | 是 |
 | 请求封装和入场校验 | snapshot | 142 | 49 | 尚未发现 |
 | 图片等多模态输入 | prepareLocalMultimodalMessages | 4 | 2 | 尚未发现 |
 | 记忆库只读分类投影 | memoryVaultFolders | 1 | 1 | 尚未发现 |
-| 来源失效待办持久化及清理确认 | remember | 64 | 6 | 是 |
+| 来源失效待办持久化及清理确认 | remember | 64 | 7 | 是 |
 | 按来源精准失效派生日记并幂等恢复 | recoverPendingDiaryInvalidations | 3 | 0 | 是 |
 | 在线更新检测 | UpdateChecker | 1 | 2 | 尚未发现 |
 | 增量补丁下载与校验 | downloadVerifyAndLaunch | 1 | 0 | 是 |

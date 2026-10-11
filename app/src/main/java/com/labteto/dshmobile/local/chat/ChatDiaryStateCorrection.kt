@@ -11,7 +11,10 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
                 (observation.sourceAssistantMessageId.isNotBlank() && source.assistantMessageId == observation.sourceAssistantMessageId)
         }
     }
-    val invalid = state.stateObservations.filter(::dependsOnDecision).mapTo(hashSetOf(), ChatStateObservation::field)
+    val currentValues = characterStateObservationValues(state)
+    val invalid = state.stateObservations.filter { observation ->
+        observation.interpretation && dependsOnDecision(observation) && currentValues[observation.field] == observation.value
+    }.mapTo(hashSetOf(), ChatStateObservation::field)
     // Legacy states lack source IDs. Only exact old derived values may be withdrawn.
     val old = decisions.flatMap { entry ->
         val revisions = ChatDiaryEntryPolicy.revisionsOf(entry)
@@ -19,7 +22,23 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
             listOf(revision.feeling, revision.innerThought, revision.relationshipMeaning, revision.unresolvedEcho)
         }
     }.filter(String::isNotBlank).toSet()
-    fun withdrawn(field: String, value: String) = field in invalid || (value.isNotBlank() && value in old)
+    fun withdrawn(field: String, value: String) = field in invalid ||
+        (state.stateObservations.none { it.field == field } && value.isNotBlank() && value in old &&
+            decisions.any { state.updatedAt <= it.updatedAt })
+    fun withdrawnThread(text: String): Boolean {
+        if (text in old) return true
+        if ("unresolvedThreads" !in invalid) return false
+        val terms = ChatDiaryEntryPolicy.queryTerms(text)
+        if (terms.isEmpty()) return false
+        return decisions.any { entry ->
+            val oldEvents = ChatDiaryEntryPolicy.revisionsOf(entry).let { if (entry.active) it.dropLast(1) else it }
+            oldEvents.any { revision ->
+                val anchors = ChatDiaryEntryPolicy.queryTerms(revision.event + " " + revision.unresolvedEcho)
+                val shared = terms.count(anchors::contains)
+                shared >= 2 && shared * 2 >= terms.size
+            }
+        }
+    }
     return state.copy(
         physicalState = state.physicalState.takeUnless { withdrawn("physicalState", it) }.orEmpty(),
         mood = state.mood.takeUnless { withdrawn("mood", it) } ?: "自然",
@@ -30,13 +49,13 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
         currentAgenda = state.currentAgenda.takeUnless { withdrawn("currentAgenda", it) }.orEmpty(),
         internalConflict = state.internalConflict.takeUnless { withdrawn("internalConflict", it) }.orEmpty(),
         immediateConcern = state.immediateConcern.takeUnless { withdrawn("immediateConcern", it) }.orEmpty(),
-        unresolvedThreads = if ("unresolvedThreads" in invalid) emptyList() else state.unresolvedThreads.filterNot(old::contains),
+        unresolvedThreads = state.unresolvedThreads.filterNot(::withdrawnThread),
         dynamics = state.dynamics.copy(
             unresolvedConflict = state.dynamics.unresolvedConflict.takeUnless { withdrawn("dynamics.unresolvedConflict", it) }.orEmpty(),
             sharedMoments = state.dynamics.sharedMoments.filterNot(old::contains),
             sharedObjects = state.dynamics.sharedObjects.filterNot(old::contains),
         ),
-        stateObservations = state.stateObservations.filterNot(::dependsOnDecision),
+        stateObservations = state.stateObservations.filterNot { it.field in invalid },
     )
 }
 

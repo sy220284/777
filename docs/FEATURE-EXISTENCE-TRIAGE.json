@@ -4,7 +4,7 @@
   "limits": "独立存在按是否具有产品级单独入口；静态可到达与真实能用须结合设备/模型运行验证，单元或仪表测试方法的存在不能视为通过",
   "items": [
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
       "kind": "integrated_character_profile",
       "independent": false,
       "availability": "code_and_tests_present_execution_unverified",

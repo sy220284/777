@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "c0efb2f2023e",
+  "source_snapshot": "f4cb6646bb21",
   "tree": {
     "nodes_excluding_root": 541,
     "leaf_descriptions": 444,
@@ -833,7 +833,7 @@
     "no_confirmed_entry": 14,
     "stable_static_identities": 117,
     "unproven_paths": [
-      "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
       "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
@@ -1260,7 +1260,7 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 独立故事经历隔离与同故事延续",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "named_code_declaration",
       "static_identity": null,
@@ -1390,7 +1390,7 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊发言编排与点名",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊接话延续与点名",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "test_method_mapping",
       "static_identity": null,
@@ -1511,7 +1511,7 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料按完整事实取用",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "no_code_entry",
       "static_identity": null,
@@ -1627,7 +1627,7 @@
       "unrun_instrumentation_tests": 0
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记人工纠正、停用与并发版本核验",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记纠正、停用与当前状态同步",
       "layer": "第一层｜产品功能与界面",
       "evidence_level": "historical_file_only",
       "static_identity": null,

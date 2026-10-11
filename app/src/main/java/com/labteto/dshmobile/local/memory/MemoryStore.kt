@@ -324,6 +324,7 @@ class MemoryStore internal constructor(
         allowedKinds: Set<MemoryKind> = MemoryKind.values().toSet(),
         maxItems: Int = DEFAULT_MAX_ITEMS,
         maxChars: Int = DEFAULT_MAX_CHARS,
+        additionalLineageIds: Set<String> = emptySet(),
         recordFilter: (MemoryRecord) -> Boolean = { true },
     ): List<MemoryRecord> {
         val boundedItems = maxItems.coerceIn(1, 20)
@@ -345,7 +346,8 @@ class MemoryStore internal constructor(
                 when (it.scope) {
                     MemoryScope.GLOBAL -> true
                     MemoryScope.PROJECT -> projectId != null && it.projectId == projectId
-                    MemoryScope.LINEAGE -> lineageId != null && it.lineageId == lineageId
+                    MemoryScope.LINEAGE -> (lineageId != null && it.lineageId == lineageId) ||
+                        (it.lineageId != null && it.lineageId in additionalLineageIds)
                 }
             }
             .map { record ->

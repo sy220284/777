@@ -21,7 +21,7 @@ class ChatContinuityExperienceTest {
     @Test fun independentStoriesDoNotRecallOrSupersedeEachOther() {
         val old = entry("old")
         val other = entry("other", "story-b", "海边的约定取消了")
-        val results = ChatDiaryRecallEngine.search(listOf(old, other), "还记得以前的事吗", "gallery:a", false, 6,
+        val results = ChatDiaryRecallEngine.search(listOf(old, other), "你还记得以前吗", "gallery:a", false, 6,
             experienceId = "story-b", sourceSessionIds = setOf("session-b"))
         assertEquals(listOf("other"), results.map(ChatDiaryEntry::id))
         assertFalse(ChatDiarySupersessionPolicy.supersedes(old, other))
@@ -41,6 +41,23 @@ class ChatContinuityExperienceTest {
         assertEquals(listOf("session-a", "next-session"), continued.experienceSessionIds)
         assertEquals(continued, json.decodeFromString(ChatContextState.serializer(),
             json.encodeToString(ChatContextState.serializer(), continued)))
+    }
+
+    @Test fun selectedStoryCanRecallPreviousSessionLineageWithoutOpeningOtherStories() {
+        val root = Files.createTempDirectory("story-lineage").toFile()
+        try {
+            val memory = com.labteto.dshmobile.local.memory.MemoryStore(root, json)
+            val old = memory.remember("明晚九点一起去海边", com.labteto.dshmobile.local.memory.MemoryScope.LINEAGE,
+                lineageId = "session-a", subjectKey = "gallery:a/experience:story-a")
+            memory.remember("明晚九点一起去海边", com.labteto.dshmobile.local.memory.MemoryScope.LINEAGE,
+                lineageId = "session-b", subjectKey = "gallery:a/experience:story-b")
+            val recalled = memory.search("海边", setOf(com.labteto.dshmobile.local.memory.MemoryScope.LINEAGE),
+                null, "new-session", additionalLineageIds = setOf("session-a"),
+                recordFilter = { relationshipMemoryMatchesSubject(it, "gallery:a", "new-session", "阿青", "story-a") })
+            assertEquals(listOf(old.id), recalled.map { it.id })
+            assertTrue(memory.search("海边", setOf(com.labteto.dshmobile.local.memory.MemoryScope.LINEAGE),
+                null, "new-session").isEmpty())
+        } finally { root.deleteRecursively() }
     }
 
     @Test fun ordinaryGroupReplyContinuesActualSpeakerAndExplicitAddressCanSwitch() {
@@ -105,7 +122,8 @@ class ChatContinuityExperienceTest {
         val state = ChatCharacterState(mood = "委屈", activeGoal = "准备自己的演出", currentUserImpression = "他故意失约",
             dynamics = RelationshipDynamics(unresolvedConflict = "用户还欠我解释"),
             stateObservations = listOf(ChatStateObservation(field = "currentUserImpression", value = "他故意失约",
-                sourceUserMessageId = "user-a", sourceAssistantMessageId = "reply-a")))
+                sourceUserMessageId = "user-a", sourceAssistantMessageId = "reply-a"),
+                ChatStateObservation(field = "mood", value = "委屈", interpretation = false, sourceUserMessageId = "user-a")))
         val reconciled = reconcileDiaryState(state, listOf(corrected))
         assertEquals("", reconciled.currentUserImpression)
         assertEquals("", reconciled.dynamics.unresolvedConflict)

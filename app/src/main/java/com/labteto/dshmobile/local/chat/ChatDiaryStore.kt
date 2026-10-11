@@ -31,7 +31,9 @@ internal class ChatDiaryStore(
             }
         ) return null
         document.entries.firstOrNull { entry ->
-            entry.subjectKey == request.subjectKey && entry.experienceId == request.experienceId &&
+            entry.subjectKey == request.subjectKey &&
+                diaryMatchesExperience(entry, request.experienceId,
+                    (request.experienceSessionIds + request.sourceSessionId).toSet()) &&
                 (!entry.active || entry.revisions.lastOrNull()?.userCorrected == true) &&
                 entry.sources.any { source -> source.sessionId == request.sourceSessionId &&
                     ((source.userMessageId.isNotBlank() && source.userMessageId in request.sourceUserMessageIds) ||

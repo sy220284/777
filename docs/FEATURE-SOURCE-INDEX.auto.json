@@ -69,7 +69,7 @@
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
     }
   ],
-  "semantic_registration_count": 4,
+  "semantic_registration_count": 0,
   "production_file_fingerprints": [
     {
       "path": "app/src/main/java/com/github/sisong/HPatch.kt",
@@ -393,7 +393,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
-      "sha256": "76c2aca4a6a077f4"
+      "sha256": "03e1bca32edfe4f7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt",
@@ -473,11 +473,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStateCorrection.kt",
-      "sha256": "a3d26a05af8bba28"
+      "sha256": "c63e3ac5dfcb5f22"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt",
-      "sha256": "eec35125b91d435c"
+      "sha256": "00b2a57725b482c8"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiarySupersessionPolicy.kt",
@@ -497,7 +497,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExperienceScope.kt",
-      "sha256": "5c876995fb30a586"
+      "sha256": "d9f8c7f7e191bf04"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
@@ -573,7 +573,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
-      "sha256": "746082fa1a49085e"
+      "sha256": "daa1d6748c98fee5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStyleGuard.kt",
@@ -673,7 +673,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
-      "sha256": "37e44539edd788b1"
+      "sha256": "8337b60bfc8674ac"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatModels.kt",
@@ -789,7 +789,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt",
-      "sha256": "6bbe416c26e222c2"
+      "sha256": "6f8c385519842b64"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatExecutionOwner.kt",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt",
-      "sha256": "5e13eece97d3a7c1"
+      "sha256": "9243cdc87a09cfa7"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryVaultProjection.kt",
@@ -3205,17 +3205,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "c0efb2f2023e",
+  "source_snapshot": "f4cb6646bb21",
   "observed_delta": {
-    "baseline": "5e1093644f43",
+    "baseline": "395cca0f8962",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterContextBudget.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStateCorrection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExperienceScope.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -3229,7 +3226,7 @@
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 2,
   "verified_registrations": [],
-  "unverified_changes_count": 4,
+  "unverified_changes_count": 0,
   "obsolete_historical_evidence_count": 11,
   "current_tree_outdated_source_count": 0
 }
