@@ -79,7 +79,7 @@ fun DsConversationComposer(
             ),
         shape = DsShapes.composer,
         color = surfaceColor,
-        border = BorderStroke(1.dp, colors.borderL2),
+        border = BorderStroke(1.dp, colors.borderL1),
         shadowElevation = shadowElevation,
     ) {
         Column(

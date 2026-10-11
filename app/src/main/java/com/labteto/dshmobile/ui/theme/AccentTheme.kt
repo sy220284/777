@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 777 的交互色卡。默认蓝是当前默认，历史传统色继续作为显式可选外观。
+ * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
  *
  * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
@@ -18,8 +18,9 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** 默认蓝为默认交互色；旧版持久化默认 "celadon" 在 [of] 中迁移为默认蓝。 */
+    /** 流体杏为默认交互色；旧版默认 "celadon" 在 [of] 中跟随当前默认。 */
     val ALL = listOf(
+        AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C), onLight = Color(0xFF3A342D), onDark = Color(0xFF3A342D)),
         AccentPalette("default_blue", "默认蓝", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
         AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
         AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
@@ -47,6 +48,9 @@ fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)
     val hover = accent.copy(alpha = 0.85f)
     return copy(
+        brandPrimary = accent,
+        onBrandPrimary = on,
+        buttonPrimaryHover = hover,
         accent = accent,
         onAccent = on,
         accentTertiary = tertiary,

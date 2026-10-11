@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -85,6 +88,7 @@ data class AppBackgroundState(
     val adaptiveContrast: Boolean = true,
     val darkTheme: Boolean = false,
     val surfaceTransparency: Float = 0.5f,
+    val fluidGlass: Boolean = false,
 ) {
     val hasImage: Boolean get() = image != null
 
@@ -135,7 +139,7 @@ data class AppBackgroundState(
         level: WallpaperSurfaceLevel,
         region: BackgroundRegion = BackgroundRegion.ALL,
     ): Color {
-        if (!hasImage) return base
+        if (!hasImage) return if (fluidGlass) fluidSurfaceColor(base, level, darkTheme) else base
         if (level == WallpaperSurfaceLevel.PAGE) return Color.Transparent
 
         val (minAlpha, maxAlpha, fallbackAlpha) = when (level) {
@@ -207,6 +211,7 @@ fun AppBackgroundHost(
     surfaceBase: Color = Color.Transparent,
     surfaceTransparency: Float = 0.5f,
     modifier: Modifier = Modifier,
+    fluidGlass: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val loaded = rememberBackground(path)
@@ -216,12 +221,14 @@ fun AppBackgroundHost(
         adaptiveContrast = adaptiveEnabled,
         darkTheme = darkTheme,
         surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
+        fluidGlass = fluidGlass,
     )
     CompositionLocalProvider(
         LocalAppBackground provides loaded?.image,
         LocalAppBackgroundState provides state,
     ) {
-        Box(modifier.fillMaxSize()) {
+        Box(modifier.fillMaxSize().background(surfaceBase)) {
+            if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme)
             loaded?.let { background ->
                 Image(
                     bitmap = background.image,
@@ -240,6 +247,41 @@ fun AppBackgroundHost(
             content()
         }
     }
+}
+
+/** Static radial light fields: no bitmap, blur layer or perpetual animation. */
+@Composable
+private fun FluidGlassBackdrop(dark: Boolean) {
+    Canvas(Modifier.fillMaxSize()) {
+        val opacity = if (dark) 0.10f else 0.38f
+        val extent = maxOf(size.width, size.height)
+        drawRect(Brush.radialGradient(
+            colors = listOf(Color(0xFFE8A87C).copy(alpha = opacity), Color.Transparent),
+            center = Offset(size.width * 0.06f, size.height * 0.08f), radius = extent * 0.72f,
+        ))
+        drawRect(Brush.radialGradient(
+            colors = listOf(Color(0xFF7FBFA8).copy(alpha = opacity), Color.Transparent),
+            center = Offset(size.width * 0.98f, size.height * 0.36f), radius = extent * 0.65f,
+        ))
+        drawRect(Brush.radialGradient(
+            colors = listOf(Color(0xFFB9A0D4).copy(alpha = opacity * 0.45f), Color.Transparent),
+            center = Offset(size.width * 0.24f, size.height * 0.92f), radius = extent * 0.55f,
+        ))
+    }
+}
+
+/** Mobile floating surfaces need a strong veil because they overlay real page content. */
+internal fun fluidSurfaceColor(base: Color, level: WallpaperSurfaceLevel, dark: Boolean): Color {
+    if (level == WallpaperSurfaceLevel.PAGE || level == WallpaperSurfaceLevel.CHROME) return Color.Transparent
+    val alpha = when (level) {
+        WallpaperSurfaceLevel.CARD -> if (dark) 0.72f else 0.62f
+        WallpaperSurfaceLevel.INPUT -> 0.82f
+        WallpaperSurfaceLevel.FLOATING -> 0.82f
+        WallpaperSurfaceLevel.SHEET, WallpaperSurfaceLevel.DRAWER,
+        WallpaperSurfaceLevel.DIALOG, WallpaperSurfaceLevel.MENU -> 0.96f
+        WallpaperSurfaceLevel.PAGE, WallpaperSurfaceLevel.CHROME -> 0f
+    }
+    return base.copy(alpha = alpha)
 }
 
 /**

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -21,6 +22,10 @@ import androidx.compose.ui.unit.dp
  * for genuine loading or a genuinely live running state; completed and failed states settle immediately.
  */
 object DsAnimations {
+    private val fluidEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+    val modal: FiniteAnimationSpec<Float> = tween(280, easing = fluidEase)
+    val progress: FiniteAnimationSpec<Float> = tween(340, easing = fluidEase)
+    val pushOffset: Dp = 20.dp
     /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
     val fastSpring = spring<Float>(
         dampingRatio = Spring.DampingRatioNoBouncy,
@@ -34,10 +39,7 @@ object DsAnimations {
     )
 
     /** Press feedback on buttons, pills and icon buttons. */
-    val pressScale = spring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessHigh,
-    )
+    val pressScale: AnimationSpec<Float> = tween(80, easing = fluidEase)
 
     /**
      * Disclosure and dock expansion. Deliberately springy-but-unbouncy: content growing downward
@@ -61,7 +63,7 @@ object DsAnimations {
     val chevron: AnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
 
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
-    val tabSwap: FiniteAnimationSpec<Float> = tween(150, easing = FastOutSlowInEasing)
+    val tabSwap: FiniteAnimationSpec<Float> = tween(380, easing = fluidEase)
 
     /** Sliding indicator used by compact segmented controls. It settles instead of gliding mechanically. */
     val segmentSlide: FiniteAnimationSpec<Dp> = spring(
@@ -70,7 +72,7 @@ object DsAnimations {
     )
 
     /** Subtle surface feedback for selectable rows and tabs. */
-    val interactionColor: FiniteAnimationSpec<Color> = tween(120, easing = FastOutSlowInEasing)
+    val interactionColor: FiniteAnimationSpec<Color> = tween(140, easing = fluidEase)
 
     /** Item placement inside a lazy list when rows are inserted, removed, or reordered. */
     val listItem: FiniteAnimationSpec<IntOffset> = spring(
@@ -82,10 +84,10 @@ object DsAnimations {
     val fade: FiniteAnimationSpec<Float> = tween(fadeDuration, easing = FastOutSlowInEasing)
 
     /** Panel slide-in, faster than the platform default so it keeps up with a drag. */
-    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
+    val panelSlide: FiniteAnimationSpec<IntOffset> = tween(380, easing = fluidEase)
 
     /** Full-page hierarchy transition. Short enough to preserve direct manipulation on a phone. */
-    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
+    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(480, easing = fluidEase)
 
     /** Page opacity settles slightly before geometry so navigation never feels floaty. */
     val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
@@ -95,15 +97,15 @@ object DsAnimations {
      * slightly broader generic page motion while navigation pages use a calmer spatial grammar.
      */
     val featurePageForward: FiniteAnimationSpec<IntOffset> =
-        tween(210, easing = FastOutSlowInEasing)
+        tween(480, easing = fluidEase)
 
     /** Feature hierarchy pop mirrors push but settles a touch faster. */
     val featurePageBackward: FiniteAnimationSpec<IntOffset> =
-        tween(200, easing = FastOutSlowInEasing)
+        tween(380, easing = fluidEase)
 
     /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
     val featurePagePeer: FiniteAnimationSpec<IntOffset> =
-        tween(160, easing = FastOutSlowInEasing)
+        tween(380, easing = fluidEase)
 
     /** Incoming page opacity: finishes before the larger geometry motion. */
     val featurePageEnterFade: FiniteAnimationSpec<Float> =
@@ -126,7 +128,7 @@ object DsAnimations {
     val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
-    const val scaleDuration = 100
+    const val scaleDuration = 80
 
     /** Fade animation duration for opacity changes */
     const val fadeDuration = 150

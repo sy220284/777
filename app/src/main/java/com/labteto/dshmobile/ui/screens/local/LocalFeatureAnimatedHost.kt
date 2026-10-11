@@ -31,6 +31,7 @@ internal fun LocalFeatureAnimatedHost(
     val predictiveBackMaxOffsetPx = with(LocalDensity.current) {
         DsAnimations.predictiveBackMaxOffset.toPx()
     }
+    val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
 
     AnimatedContent(
@@ -43,30 +44,30 @@ internal fun LocalFeatureAnimatedHost(
             when {
                 targetState.size > initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageForward) { width -> width / 9 } +
+                        slideInHorizontally(DsAnimations.featurePageForward) { pushOffset } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageForward) { width -> -width / 18 } +
+                        slideOutHorizontally(DsAnimations.featurePageForward) { -pushOffset / 2 } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }
 
                 targetState.size < initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageBackward) { width -> -width / 18 } +
+                        slideInHorizontally(DsAnimations.featurePageBackward) { -pushOffset / 2 } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageBackward) { width -> width / 9 } +
+                        slideOutHorizontally(DsAnimations.featurePageBackward) { pushOffset } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }
 
                 else -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePagePeer) { width -> width / 64 } +
+                        slideInHorizontally(DsAnimations.featurePagePeer) { pushOffset / 4 } +
                             fadeIn(DsAnimations.featurePageEnterFade)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePagePeer) { width -> -width / 96 } +
+                        slideOutHorizontally(DsAnimations.featurePagePeer) { -pushOffset / 4 } +
                             fadeOut(DsAnimations.featurePageExitFade),
                     )
                 }

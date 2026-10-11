@@ -69,13 +69,13 @@ fun DsSegmented(
     val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier
-            .clip(DsShapes.pillFull)
+            .clip(DsShapes.row)
             .background(colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.hoverSolid))
             // Outlined as well as filled, because the fill alone cannot be trusted to show. The
             // track's grey is a step off `bgLayer1`, but in dark mode it is the *same* colour as
             // `bgLayer2` — so on a sheet the fill vanishes and the control collapses back into the
             // row of bare words this component exists to stop being.
-            .border(1.dp, colors.borderL2, DsShapes.pillFull)
+            .border(1.dp, colors.borderL2, DsShapes.row)
             .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -116,8 +116,8 @@ private fun DsSegment(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .heightIn(min = DsSpacing.touchTarget)
-            .clip(DsShapes.pillFull)
-            .background(colors.accentTertiary.copy(alpha = emphasis))
+            .clip(DsShapes.row)
+            .background(colors.bgLayer1.copy(alpha = emphasis))
             .selectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
     ) {

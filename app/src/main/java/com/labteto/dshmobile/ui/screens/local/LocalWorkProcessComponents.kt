@@ -211,7 +211,7 @@ internal fun WorkProcessRow(
 
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val processSurface = if (backgroundState.hasImage) {
+    val processSurface = if (backgroundState.hasImage || backgroundState.fluidGlass) {
         colors.wallpaperSurface(
             level = WallpaperSurfaceLevel.CARD,
             region = BackgroundRegion.MIDDLE,
@@ -257,7 +257,7 @@ internal fun WorkOperationIcon(
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = if (running) DsTheme.colors.accent else DsTheme.colors.labelSecondary,
+        tint = if (running) DsTheme.colors.success else DsTheme.colors.labelSecondary,
         modifier = Modifier.size(18.dp),
     )
 }

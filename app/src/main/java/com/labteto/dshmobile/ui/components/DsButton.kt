@@ -90,7 +90,7 @@ fun DsButton(
         DsButtonVariant.Info -> colors.bgModulePlatform to colors.labelPrimary
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
-        DsButtonVariant.Danger -> colors.error to colors.onAccent
+        DsButtonVariant.Danger -> colors.error to colors.onError
     }
     val background = when {
         !enabled -> when (variant) {
@@ -98,7 +98,7 @@ fun DsButton(
             else -> fill.copy(alpha = 0.4f)
         }
         hovered -> when (variant) {
-            DsButtonVariant.Primary -> colors.buttonInfoHover
+            DsButtonVariant.Primary -> colors.buttonPrimaryHover
             DsButtonVariant.Info -> colors.hoverSolid
             DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.hover
             DsButtonVariant.Danger -> lerp(colors.error, Color.Black, 0.15f)

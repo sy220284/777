@@ -522,6 +522,31 @@
         }
       ],
       "scope": "Python运行时准备和执行入口以及Android仪表测试源码存在，真实设备测试结果需另核"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
+          "symbols": [
+            "localSettingsFeatureUiContribution"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt",
+          "symbols": [
+            "MiniMaxQuotaPage"
+          ]
+        }
+      ],
+      "scope": "侧边栏入口由设置功能统一负责，额度页与账户查询源码存在；测试方法直接引用导航入口，真实账户及设备效果待验证。",
+      "tests": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt",
+          "method": "quotaDrawerOpensQuotaDirectlyAndClosesDrawer",
+          "references": "localSettingsFeatureUiContribution"
+        }
+      ]
     }
   ]
 }

@@ -10,6 +10,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import com.labteto.dshmobile.ui.theme.DsAnimations
 
 /** A deeper page enters from the right; returning restores that page's saved UI state. */
@@ -22,6 +23,7 @@ fun <T> DsHierarchyPage(
     content: @Composable (T) -> Unit,
 ) {
     val pages = rememberSaveableStateHolder()
+    val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
     AnimatedContent(
         targetState = page,
         modifier = modifier,
@@ -32,9 +34,9 @@ fun <T> DsHierarchyPage(
                 depth(targetState) < depth(initialState) -> -1
                 else -> 0
             }
-            ((slideInHorizontally(DsAnimations.featurePageForward) { it * direction / 9 } +
+            ((slideInHorizontally(DsAnimations.featurePageForward) { pushOffset * direction } +
                 fadeIn(DsAnimations.featurePageEnterFade)) togetherWith
-                (slideOutHorizontally(DsAnimations.featurePageBackward) { -it * direction / 18 } +
+                (slideOutHorizontally(DsAnimations.featurePageBackward) { -pushOffset * direction / 2 } +
                     fadeOut(DsAnimations.featurePageExitFade))).using(SizeTransform(clip = false))
         },
         label = "hierarchyPage",

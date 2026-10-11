@@ -104,6 +104,7 @@ internal fun DrawerQuickActions(
     onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
+    onMiniMaxQuota: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -161,6 +162,13 @@ internal fun DrawerQuickActions(
                     onClick = onTools,
                 )
             }
+        onMiniMaxQuota?.let { openQuota ->
+            DrawerQuickAction(
+                icon = FeatherIcons.CreditCard,
+                title = stringResource(R.string.minimax_quota_title),
+                onClick = openQuota,
+            )
+        }
     }
 }
 

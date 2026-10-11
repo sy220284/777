@@ -2011,6 +2011,10 @@
     <string name="usage_model_all">全部模型</string>
     <string name="usage_model_history_partial">部分早期请求明细已过保存期，单模型历史累计可能不完整；全部模型累计保持不变。</string>
     <string name="usage_deepseek_cost_label">DeepSeek估算费用</string>
+    <string name="minimax_quota_shared">通用额度</string>
+    <string name="minimax_quota_interval_label">本周期</string>
+    <string name="minimax_quota_weekly_label">本周</string>
+    <string name="minimax_quota_reset_after">%1$s后重置</string>
     <string name="minimax_quota_title">MiniMax 套餐额度</string>
     <string name="minimax_quota_entry_hint">查询当前账户的官方剩余额度或余额</string>
     <string name="minimax_quota_model">当前模型：%1$s</string>
