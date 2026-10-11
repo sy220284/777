@@ -255,6 +255,7 @@ internal class LocalToolExecutionCoordinator(
         allowMutation: Boolean,
         planModeEnabled: Boolean,
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
+        beforeExecution: () -> Boolean = { true },
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
@@ -319,6 +320,9 @@ internal class LocalToolExecutionCoordinator(
                         granted
                     },
                     onExecutionStarted = { admittedTool ->
+                        // A new correction can arrive while awaiting approval or resource admission.
+                        // Reject the stale call before entering its executor, with no side effect.
+                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         // The registry calls this only after schema checks and user approval.
                         // Waiting for approval must never hold a filesystem read/write lease.
                         executionLease = workspaceReadWriteGate.acquire(admittedTool)
@@ -331,6 +335,15 @@ internal class LocalToolExecutionCoordinator(
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
             return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
+        } catch (superseded: LocalToolSampleSuperseded) {
+            return AgentToolResult(
+                content = "用户已要求立即调整，本次旧工具调用尚未开始执行：" + call.name,
+                isError = true,
+                errorCode = "WORK_TOOL_SUPERSEDED",
+                retryable = false,
+                sideEffect = AgentToolSideEffect.NONE,
+                recoveryHint = "读取最新已提交的用户要求，不要重复执行旧调用。",
+            )
         } catch (error: LocalWebException) {
             return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,
                 cause = error, sessionId = sessionId)
@@ -474,3 +487,6 @@ internal data class LocalToolExecutionIdentity(
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/** Work-owned revision guard rejected a stale call before it entered the registered executor. */
+internal class LocalToolSampleSuperseded : IllegalStateException("Work model sample superseded by user")
