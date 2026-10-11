@@ -727,19 +727,32 @@ def generate(root):
     )
     old, html_match = original_html(html)
     evidence_counts = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
+    evidence = legacy_leaf_evidence(root, all_leaves, matrix)
+    evidence_by_path = {entry["path"]: entry for entry in evidence}
     structure = to_html(model, old, {v["path"]: v for v in valid.values()
                                     if (root / v["source"]).is_file()})
     def annotate(node, stack):
         for child in node["children"]:
             path = stack + [child["name"]]
             full = " / ".join(path)
-            if not child["children"] and full in evidence_counts:
-                child["testCount"] = evidence_counts[full]
+            if not child["children"]:
+                if full in evidence_counts:
+                    child["testCount"] = evidence_counts[full]
+                if full in evidence_by_path:
+                    item = evidence_by_path[full]
+                    child["evidenceLevel"] = item["verification"]
+                    child["sourceCount"] = len(item["existing_production_sources"])
+                    child["missingSourceCount"] = len(item["missing_production_sources"])
             annotate(child, path)
     annotate(structure, [])
     dataset = json.dumps(structure, ensure_ascii=False, separators=(",", ":"))
     html = html[:html_match.start(2)] + dataset + html[html_match.end(2):]
     # 替换过期的主线/PR 快照说明，避免历史提交号伪装为最新。
+    html = re.sub(
+        r'(<div class="head">.*?<p class="sub">).*?(</p>)',
+        lambda match: match.group(1) + f'按架构 3.0 的实际功能归属展示 · 当前源码内容指纹 {snap}' + match.group(2),
+        html, count=1, flags=re.S,
+    )
     html = re.sub(r'(<p class="sub">按架构 3\.0 的真实所有权展开.*?)</p>',
                   f'<p class="sub">按架构 3.0 的实际功能归属展示 · 当前源码快照 {snap}</p>',
                   html, count=1)
@@ -790,7 +803,6 @@ def generate(root):
         **{ident: item for ident, item in valid.items() if ident not in rejected_ids},
     }
     node_count = validate_view(model, html)
-    evidence = legacy_leaf_evidence(root, all_leaves, matrix)
     categories = {}
     for e in evidence:
         categories[e["verification"]] = categories.get(e["verification"], 0) + 1
