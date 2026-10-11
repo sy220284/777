@@ -336,8 +336,8 @@ def inspect():
                 if not declaration.get("declaration_found"):
                     continue
                 symbol = declaration["symbol"]
-                if re.search(r"(?:fun|class|object|interface|val|var|enum\\s+class)\\s+" +
-                             re.escape(symbol) + r"\\b", cached_code[src]):
+                if re.search(r"(?:fun|class|object|interface|val|var|enum\s+class)\s+" +
+                             re.escape(symbol) + r"\b", cached_code[src]):
                     ambiguous_keys.setdefault((src, symbol), set()).add(record["path"])
     groups = [
         {"source": source, "symbol": symbol, "features": sorted(members)}
