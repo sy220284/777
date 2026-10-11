@@ -35,7 +35,9 @@ internal fun lspExtensionFailure(toolName: String, error: Exception): ToolResult
     val message = error.message.orEmpty()
     val code = when {
         message.contains("未检测到可运行的语言服务器") -> "LSP_SERVER_UNAVAILABLE"
-        message.contains("拒绝启动") || message.contains("拒绝下载") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
+        message.contains("拒绝下载") -> "LSP_INSTALL_DECLINED"
+        message.contains("下载安装失败") -> "LSP_INSTALL_FAILED"
+        message.contains("拒绝启动") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
         message.contains("启动失败") || error is IOException -> "LSP_START_FAILED"
         error is IllegalArgumentException -> "LSP_INPUT_INVALID"
         else -> "LSP_REQUEST_FAILED"
@@ -43,6 +45,8 @@ internal fun lspExtensionFailure(toolName: String, error: Exception): ToolResult
     val hint = when (code) {
         "LSP_SERVER_UNAVAILABLE" -> "当前可继续使用 read、grep、glob 和编译测试；如支持按需安装，可批准首次下载。"
         "LSP_START_APPROVAL_REQUIRED" -> "返回当前会话批准语言服务器首次启动，再重新执行查询。"
+        "LSP_INSTALL_DECLINED" -> "已取消本次语言服务器下载；可以继续使用文件搜索与编译测试。"
+        "LSP_INSTALL_FAILED" -> "语言服务器下载或部署失败；检查网络和存储后重试，原有代码工具仍可使用。"
         "LSP_START_FAILED" -> "核对可执行文件、运行环境和启动命令；修复后重新查询可再次启动。"
         "LSP_INPUT_INVALID" -> "检查路径、大小、语言类型和工具查询参数。"
         else -> "检查语言服务器状态；此次调用停止，下次查询会按需重新启动。"
@@ -231,7 +235,13 @@ class LspPlugin(
             if (!approval(installApprovalTool(relativePath))) {
                 error("用户拒绝下载语言服务器")
             }
-            installOnDemand(relativePath)
+            try {
+                installOnDemand(relativePath)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw IllegalStateException("语言服务器下载安装失败：" + error.message, error)
+            }
         } else detected
         require(configured.isNotEmpty()) {
             "当前文件/项目未检测到可运行的语言服务器；请继续使用 read、grep、glob、编译或测试完成分析"
