@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "c96a8ed97096",
+  "snapshot": "a2b3463e41ed",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1351,
   "production_sources_scanned": 789,
@@ -8989,22 +8989,10 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "bf8f52dc4c82",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelBudgetPolicy.kt"
-    ],
+    "baseline": "c96a8ed97096",
+    "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfiles.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalExecutionService.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolRouter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionBudget.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

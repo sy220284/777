@@ -64,6 +64,22 @@ class WordTest(unittest.TestCase):
         self.assertNotEqual(0,self.run_tool('replace',self.doc,output,'--old','不存在','--new','新内容').returncode)
         self.assertFalse(output.exists())
 
+class SpreadsheetTest(unittest.TestCase):
+    def test_real_xlsx_with_chinese_and_numeric_cells(self):
+        tool = ASSETS / 'minimax-xlsx/scripts/mobile_xlsx.py'
+        with tempfile.TemporaryDirectory() as d:
+            source = Path(d)/'data.json'; output = Path(d)/'sheet.xlsx'
+            source.write_text(json.dumps({'rows':[['项目','数量'],['测试 & 中文',2],['合计',2]]}))
+            run = subprocess.run([sys.executable,str(tool),'create',str(source),str(output)],capture_output=True,text=True)
+            self.assertEqual(0,run.returncode,run.stderr)
+            result = subprocess.run([sys.executable,str(tool),'read',str(output)],capture_output=True,text=True)
+            self.assertEqual(0,result.returncode,result.stderr)
+            cells = json.loads(result.stdout)['sheets'][0]['cells']
+            self.assertEqual('测试 & 中文',cells[2]['value']); self.assertEqual('2',cells[5]['value'])
+            with zipfile.ZipFile(output) as z:
+                self.assertIn('_rels/.rels',z.namelist())
+                self.assertNotIn(b'<!--',z.read('xl/workbook.xml'))
+
 class PresentationTest(unittest.TestCase):
     def test_real_pptx_generation_and_mobile_preview(self):
         module = os.environ['MOBILE_PPTX_MODULE']
@@ -82,5 +98,6 @@ class PresentationTest(unittest.TestCase):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--word-only',action='store_true'); args = parser.parse_args()
     loader = unittest.TestLoader(); suite = loader.loadTestsFromTestCase(WordTest)
+    suite.addTests(loader.loadTestsFromTestCase(SpreadsheetTest))
     if not args.word_only: suite.addTests(loader.loadTestsFromTestCase(PresentationTest))
     if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful(): sys.exit(1)

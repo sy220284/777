@@ -34,7 +34,7 @@
 
 退出 Android、iOS、React Native、Flutter、PDF 桌面制作、GIF 贴纸六项预置。对应工具链不在 APK 中；不再把它们呈现为手机可执行技能。
 
-Word 使用内置 Python 标准库创建、读取、替换及结构校验 DOCX。PPT 使用项目内 PptxGenJS 4.0.1 生成文件，并以 Python 检查真实包结构。两者提供 HTML 内容预览，预览不代表 Office 最终排版。Excel 使用现有 Python OOXML 脚本，退出 LibreOffice 重算。前端和着色器使用手机 HTML 预览；全栈使用 Node/Python，退出桌面容器依赖。媒体和音乐通过服务端 API 完成，歌单使用用户提供的资料，退出桌面播放器和应用扫描。
+Word 使用内置 Python 标准库创建、读取、替换及结构校验 DOCX。PPT 使用项目内 PptxGenJS 4.0.1 生成文件，并以 Python 检查真实包结构。两者提供 HTML 内容预览，预览不代表 Office 最终排版。Excel 新增标准库创建与读取脚本，修正模板注释兼容问题，退出 pandas 读取与 LibreOffice 重算。前端和着色器使用手机 HTML 预览；全栈使用 Node/Python，退出桌面容器依赖。媒体和音乐通过服务端 API 完成，歌单使用用户提供的资料，退出桌面播放器和应用扫描。
 
 升级时将六项旧技能完整移至 `.dsh/retired-skills/minimax-mobile-v2`，退出活动目录，保留用户修改及附件。保留技能仅更新未修改的旧预置入口；尊重用户编辑和删除，新手机资源按需补齐。迁移标记最后写入，失败可以重试。安装仍由 LocalSkillStore 唯一负责，SKILL.md 最后发布。
 
