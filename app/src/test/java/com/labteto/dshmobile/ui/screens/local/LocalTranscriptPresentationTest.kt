@@ -531,4 +531,60 @@ class LocalTranscriptPresentationTest {
         assertEquals("work-step:tool-250", visible.last().key)
     }
 
+    @Test
+    fun timelineTailIndexIncludesPendingPlanReviewAndHistoryLoadingRows() {
+        assertEquals(
+            12,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 11, showPagingRow = true,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = true, showStreamingTail = false,
+            ),
+        )
+        assertEquals(
+            13,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 11, showPagingRow = true,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = true, showStreamingTail = true,
+            ),
+        )
+    }
+
+    @Test
+    fun timelineTailIndexIncludesEmptyStateAndDoesNotInventItems() {
+        assertEquals(
+            1,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = true, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = true,
+            ),
+        )
+        assertEquals(
+            2,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = true,
+                showEmptyWorkbench = true, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = true,
+            ),
+        )
+        assertEquals(
+            0,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = false, showEmptyGroupSetup = true,
+                showPlanReview = false, showStreamingTail = false,
+            ),
+        )
+        assertEquals(
+            -1,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = false,
+            ),
+        )
+    }
+
 }
