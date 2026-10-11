@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -98,7 +99,9 @@ internal class LocalWorkTurnToolRuntime(
         binding: LocalWorkRunBinding,
     ): List<String> = schemas.names(schemas(policy, binding))
 
-    internal fun isParallel(name: String): Boolean = name in PARALLEL_SUBAGENT_TOOLS
+    internal fun isParallel(name: String): Boolean =
+        name in PARALLEL_SUBAGENT_TOOLS ||
+            isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
 
     internal suspend fun execute(
         binding: LocalWorkRunBinding,
@@ -199,3 +202,14 @@ internal fun parallelToolFailure(
         readOnly = access != null && LocalToolPolicy.isReadOnlyInvocation(call.name, access, call.arguments),
         executionStarted = null)
 }
+
+/**
+ * Shared-read admission is opt-in rather than inferred from READ_ONLY/NETWORK access:
+ * a third-party tool can claim READ_ONLY while writing a remote session or seeking approval.
+ * Write and agent-control calls retain their existing exclusive, ordered execution path.
+ */
+internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean =
+    tool != null &&
+        tool.access == ToolAccess.READ_ONLY &&
+        tool.approvalPolicy == ToolApprovalPolicy.NEVER &&
+        tool.metadata.parallelReadSafe
