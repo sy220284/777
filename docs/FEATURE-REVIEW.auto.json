@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "4264300c01ab",
+  "snapshot": "5bdb390dff5f",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1307,
   "production_sources_scanned": 781,
