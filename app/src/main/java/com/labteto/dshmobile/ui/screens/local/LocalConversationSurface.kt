@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.local.presentation.canUseMiniMaxNativeMedia
+
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1207,7 +1209,7 @@ internal fun LocalConversationSurface(
                         onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
                     )
                 }
-                if (activeModelProfile?.model?.startsWith("MiniMax-", ignoreCase = true) == true) {
+                if (activeModelProfile?.canUseMiniMaxNativeMedia() == true) {
                     item {
                         DsQuickActionTile(
                             icon = FeatherIcons.Image,
@@ -1253,7 +1255,7 @@ internal fun LocalConversationSurface(
         }
     }
 
-    if (showMiniMaxStudio && activeModelProfile?.model?.startsWith("MiniMax-", ignoreCase = true) == true) {
+    if (showMiniMaxStudio && activeModelProfile?.canUseMiniMaxNativeMedia() == true) {
         DsBottomSheet(
             title = stringResource(R.string.minimax_media_title),
             onDismiss = { showMiniMaxStudio = false },
