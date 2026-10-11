@@ -53,6 +53,42 @@ class ChatInteractionPlannerTest {
 
 
     @Test
+    fun legacyRelationshipScoresAndPersonalityMetricsArePreservedButNotModified() {
+        val saved = ChatCharacterState(
+            initiative = 84,
+            shareDesire = 21,
+            dynamics = RelationshipDynamics(
+                stage = "AMBIGUOUS", warmth = 75, trust = 63,
+                reciprocity = 42, tension = 68, stability = 39,
+                unresolvedConflict = "昨天的误会",
+            ),
+            userPattern = UserChatPattern(
+                replyLength = "long", directness = 88, playfulness = 25,
+                initiative = 64, emojiStyle = "常用表情", preferredTone = "直白",
+            ),
+        )
+        val patch = """{"state":{"mood":"开心","initiative":0,"shareDesire":100,
+            "dynamics":{"warmth":0,"trust":100,"reciprocity":100,"tension":0,"stability":0},
+            "userPattern":{"replyLength":"short","directness":0,"playfulness":100,
+                "initiative":100,"emojiStyle":"不用表情","preferredTone":"夸张"}},
+            "turnSignificance":"MINOR"}"""
+        val result = planner.parse(patch, saved, userMessage = "你好", assistantMessage = "你好")!!
+        assertEquals("开心", result.state.mood)
+        assertEquals(saved.initiative, result.state.initiative)
+        assertEquals(saved.shareDesire, result.state.shareDesire)
+        assertEquals(saved.dynamics, result.state.dynamics)
+        assertEquals(saved.userPattern, result.state.userPattern)
+        val normalized = normalizeChatPostTurnPatch(
+            Json.parseToJsonElement(patch).jsonObject,
+        )
+        val state = normalized["state"]!!.jsonObject
+        assertFalse(state.containsKey("initiative"))
+        assertFalse(state.containsKey("shareDesire"))
+        assertFalse(state.containsKey("userPattern"))
+        assertFalse(state["dynamics"]!!.jsonObject.containsKey("warmth"))
+    }
+
+    @Test
     fun groundedNaturalRelationshipStatementCanAdvanceWithoutRetiredStageTriggerPhrases() {
         val previous = ChatCharacterState(dynamics = RelationshipDynamics(stage = "FAMILIAR"))
         val statement = "我们决定成为彼此最重要的伴侣"
