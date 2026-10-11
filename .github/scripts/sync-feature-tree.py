@@ -376,7 +376,7 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
             if declaration.search(body):
                 pending.append({"path": name, "reason": "历史生产源码仍含原入口"})
                 continue
-        if any(re.search(r"\\b" + re.escape(symbol) + r"\\b", t) for t in test_contents):
+        if any(re.search(r"\b" + re.escape(symbol) + r"\b", t) for t in test_contents):
             pending.append({"path": name, "reason": "Kotlin/Java 测试源码仍引用旧入口，不能判定已退役"})
             continue
         test_references = [
