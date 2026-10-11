@@ -90,4 +90,32 @@ class WorkConversationFlowTest {
         compose.waitForIdle()
         compose.onNodeWithText("我先检查当前消息流。").assertDoesNotExist()
     }
+    @Test fun workDisplayRendersSeparateStepsAndMilestones() {
+        val durable = LocalTranscriptItem.WorkProcess(listOf(
+            LocalHarnessMessage("p1", "progress", "开始检查当前配置", createdAt = 1L),
+            LocalHarnessMessage("t1", "tool", "/private/output",
+                toolName = "mcp__GitHub__fetch_file", toolIsError = false, createdAt = 2L),
+            LocalHarnessMessage("p2", "progress", "发现两个需要处理的问题。", createdAt = 3L),
+            LocalHarnessMessage("t2", "tool", "private error",
+                toolName = "mcp__Figma__use_figma", toolIsError = true, createdAt = 4L),
+        ))
+        val steps = buildLocalDisplayTranscript(listOf(durable))
+            .filterIsInstance<LocalTranscriptItem.WorkStep>()
+        compose.setContent {
+            DshTheme {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    items(steps.size) { index ->
+                        val step = steps[index]
+                        WorkTimelineStepRow(step.message, step.repeatCount)
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("开始检查当前配置").assertExists()
+        compose.onNodeWithText("GitHub ·", substring = true).assertExists()
+        compose.onNodeWithText("发现两个需要处理的问题。").assertExists()
+        compose.onNodeWithText("private error", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("/private/output", substring = true).assertDoesNotExist()
+    }
+
 }
