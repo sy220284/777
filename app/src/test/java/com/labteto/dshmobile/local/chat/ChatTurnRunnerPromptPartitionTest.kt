@@ -23,6 +23,19 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
+    fun expressionPreferenceMissesPreserveTheExactCompletedReply() = runTest {
+        val runner = ChatTurnRunner(ChatPersonaStore(File(temporary.root, "preference.json"), json),
+            ChatRelationshipEngine(), CharacterLoreEngine())
+        val reply = LocalModelReply(message = JsonObject(emptyMap()),
+            content = "亲爱的，你刚才问的我还没想好。", reasoning = null, toolCalls = emptyList())
+        val events = mutableListOf<String>()
+        val result = runner.finalizeReply(PersonaProfile(name = "阿青", bannedPhrases = listOf("亲爱的")),
+            reply, recordUsage = {}, onGuardEvent = { action, _ -> events += action })
+        assertSame(reply, result)
+        assertEquals(listOf("preference-miss"), events)
+    }
+
+    @Test
     fun stablePersonaFactsStaySeparateFromPerTurnState() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas.json"), json),
