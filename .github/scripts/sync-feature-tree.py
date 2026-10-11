@@ -14,7 +14,7 @@ MATRIX = Path("docs/ACCEPTANCE-MATRIX.json")
 REG = Path("docs/FEATURE-TREE-SOURCE-REGISTRY.json")
 INDEX = Path("docs/FEATURE-SOURCE-INDEX.auto.json")
 REVIEW = Path("docs/FEATURE-REVIEW.auto.json")
-import subprocess
+import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
 DATA = re.compile(r"(const data=)(\{.*?\})(;const tree=)", re.S)
@@ -261,13 +261,20 @@ def checked_registration(root, current, previous):
 
 
 def snapshot(root):
-    try:
-        return subprocess.check_output(
-            ["git", "-C", str(root), "rev-parse", "--short=12", "HEAD"],
-            stderr=subprocess.DEVNULL, text=True,
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "本地模拟"
+    # 采用源码内容指纹：生成文档提交会改变 Git SHA，但不会导致无穷重新生成。
+    digest = hashlib.sha256()
+    skips = {".git", ".gradle", "build", "node_modules", ".venv", "__pycache__"}
+    suffixes = {".kt", ".java", ".kts", ".py", ".sh", ".ts", ".tsx",
+                ".js", ".jsx", ".xml", ".yml", ".yaml", ".gradle", ".toml"}
+    for file in sorted(root.rglob("*")):
+        if not file.is_file() or any(x in skips for x in file.relative_to(root).parts):
+            continue
+        if file.suffix not in suffixes and file.name != "gradlew":
+            continue
+        digest.update(file.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(file.read_bytes()).digest())
+    return digest.hexdigest()[:12]
 
 
 def validate_view(root_model, html_text):
@@ -393,7 +400,7 @@ def generate(root):
     model["name"] = "777 神言神语（当前生产代码功能树）"
     md = md[:block.start(2)] + render(model) + md[block.end(2):]
     header = (
-        f"代码核对基准：当前检出的 Git 提交 \x60{snap}\x60。扫描后确认的功能变更写入功能树；"
+        f"代码核对基准：本次全量扫描的源码内容指纹 \x60{snap}\x60。扫描后确认的功能变更写入功能树；"
         "证据不足的候选变化保留待核实，不能视为已交付。\n\n"
         "说明：本图展示已登记的产品功能及归属。历史功能仍需按真实调用链逐项验收；"
         "源码符号、路由和测试存在仅构成局部证据，不证明全部功能可用。"
@@ -552,6 +559,7 @@ if __name__ == "__main__":
     cli = argparse.ArgumentParser()
     cli.add_argument("--check", action="store_true")
     cli.add_argument("--self-test", action="store_true")
+    cli.add_argument("--preview", action="store_true")
     args = cli.parse_args()
     try:
         test()
@@ -559,6 +567,12 @@ if __name__ == "__main__":
             print("功能树同步器自测通过")
             sys.exit(0)
         output = generate(ROOT)
+        if args.preview:
+            review = json.loads(output[REVIEW])
+            print(f"复核预览：扫描 {review['code_files_scanned']} 个代码文件，"
+                  f"节点 {review['feature_nodes']} 项，自动核定变更 {len(review['changes_applied'])} 项，"
+                  f"待核实 {len(review['pending_changes'])} 项。预览未修改文件。")
+            sys.exit(0)
         stale = []
         for file, content in output.items():
             target = ROOT / file
