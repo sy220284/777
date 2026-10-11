@@ -28,7 +28,7 @@ class LspPluginTest {
         val context = HarnessContext()
         val plugin = LspPlugin(temporary.root, Json, { emptyList() })
         plugin.install(context)
-        assertEquals(9, context.tools.names().size)
+        assertEquals(10, context.tools.names().size)
         assertFalse("lsp_start" in context.tools.names())
         assertFalse("lsp_stop" in context.tools.names())
         assertTrue("lsp_implementation" in context.tools.names())
@@ -345,6 +345,41 @@ class LspPluginTest {
             }
             assertEquals(0, installs)
             assertEquals(0, approvals)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+
+    @Test fun componentRemovalRequiresApprovalAndCallsManagedUninstaller() = runTest {
+        var removed = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            managedStatus = { "typescript 6.0.1 已安装" },
+            uninstallOnDemand = { id -> removed++; id == "typescript" },
+        )
+        plugin.install(context)
+        try {
+            val status = context.tools.execute("lsp_status", JsonObject(emptyMap()))
+            assertTrue(status.content.contains("typescript 6.0.1 已安装"))
+            assertEquals(0, removed)
+            val rejected = context.tools.execute(
+                "lsp_uninstall_component",
+                buildJsonObject { put("component", "typescript") },
+                context = ToolContext(approval = { false }),
+            )
+            assertTrue(rejected.isError)
+            assertEquals(0, removed)
+            val ok = context.tools.execute(
+                "lsp_uninstall_component",
+                buildJsonObject { put("component", "typescript") },
+                context = ToolContext(approval = { true }),
+            )
+            assertFalse(ok.isError)
+            assertEquals(1, removed)
         } finally {
             plugin.uninstall(context)
         }
