@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.model.LocalModelBudgetPolicies
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
 
@@ -69,9 +70,12 @@ internal fun localHistoryBudgetFor(
     }
 
     val routed = routedContextBudget(model, baseUrl, contextWindowTokensOverride)
+    // MiniMax long-context routes may retain a larger active history in both Chat and Work.
+    // Keep an independent, memory-safe character ceiling; token headroom stays model-derived.
+    val historyScale = scale * LocalModelBudgetPolicies.forRoute(model, baseUrl).historyCharScale
     return LocalHistoryBudget(
-        maxHistoryChars = (base.maxHistoryChars * scale).toInt().coerceAtLeast(180_000),
-        tailChars = (base.tailChars * scale).toInt().coerceAtLeast(80_000),
+        maxHistoryChars = (base.maxHistoryChars * historyScale).toInt().coerceIn(180_000, 1_600_000),
+        tailChars = (base.tailChars * historyScale).toInt().coerceIn(80_000, 800_000),
         maxSummaryChars = (base.maxSummaryChars * scale).toInt().coerceAtLeast(8_000),
         maxToolResultChars = (base.maxToolResultChars * scale).toInt().coerceAtLeast(24_000),
         maxHistoryTokens = routed?.messageBudgetTokens,

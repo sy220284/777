@@ -92,6 +92,24 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun extensionAlternationGlobMatchesWithoutRegexSyntaxErrors() {
+        workspace.write("README.md", "a")
+        workspace.write("config/settings.json", "{}")
+        workspace.write("config/settings.yaml", "key: value")
+        workspace.write("notes.txt", "text")
+        workspace.write("image.png", "bytes")
+        val result = workspace.glob("**/*.{md,json,yaml,yml,txt}")
+        assertTrue(result.contains("README.md"))
+        assertTrue(result.contains("config/settings.json"))
+        assertTrue(result.contains("config/settings.yaml"))
+        assertTrue(result.contains("notes.txt"))
+        assertFalse(result.contains("image.png"))
+        // A malformed brace expression is treated as literal instead of throwing
+        // PatternSyntaxException into the Work session.
+        workspace.glob("**/*.{md,")
+    }
+
+    @Test
     fun doubleStarSlashAlsoMatchesTopLevelFiles() {
         workspace.write("AGENT_GUARDRAILS.md", "top-level")
         workspace.write("nested/AGENT_GUARDRAILS.md", "nested")

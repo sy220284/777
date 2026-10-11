@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.documentedContextWindowTokens
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.LocalModelBudgetPolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.operationalInputLimitTokens
@@ -23,9 +24,11 @@ import kotlinx.coroutines.delay
  * Estimated exposure only bounds concurrently pending requests and never enters user token accounting.
  */
 internal class LocalWorkExecutionBudget(
-    private val pendingLimitTokens: Long = DEFAULT_PENDING_LIMIT_TOKENS,
-    private val maxRequests: Int = DEFAULT_MAX_REQUESTS,
+    pendingLimitTokens: Long = DEFAULT_PENDING_LIMIT_TOKENS,
+    maxRequests: Int = DEFAULT_MAX_REQUESTS,
 ) {
+    private var pendingLimitTokens: Long = pendingLimitTokens
+    private var maxRequests: Int = maxRequests
     private var reportedExposureTokens: Long = 0L
     private var uncertainExposureTokens: Long = 0L
     private var pendingExposureTokens: Long = 0L
@@ -84,7 +87,13 @@ internal class LocalWorkExecutionBudget(
      * shared across slices so parallel usage is still bounded.
      */
     @Synchronized
-    fun beginExecutionSlice(): Boolean {
+    fun beginExecutionSlice(policy: LocalModelBudgetPolicy? = null): Boolean {
+        // A newly selected model owns the next slice; outstanding leases retain their original
+        // slice identities. Pending exposure and usage never reset across a route change.
+        policy?.let {
+            maxRequests = it.workRequestsPerSlice.coerceIn(1, 512)
+            pendingLimitTokens = it.pendingWorkTokens.coerceAtLeast(DEFAULT_PENDING_LIMIT_TOKENS)
+        }
         currentSlice += 1
         admittedRequests = 0
         reservedInSlice = 0

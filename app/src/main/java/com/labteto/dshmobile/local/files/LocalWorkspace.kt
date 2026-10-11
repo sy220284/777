@@ -745,7 +745,25 @@ class LocalWorkspace(
                     } else output.append("[^/]*")
                 }
                 '?' -> output.append("[^/]")
-                '.', '(', ')', '+', '|', '^', '$', '@', '%' -> output.append('\\').append(char)
+                '{' -> {
+                    // Support the common extension alternation **/*.{md,json,yaml} without
+                    // handing raw braces to Regex (where they mean a numeric repetition).
+                    val closing = glob.indexOf('}', index + 1)
+                    val alternatives = if (closing >= 0) {
+                        glob.substring(index + 1, closing).split(',')
+                    } else emptyList()
+                    if (alternatives.size > 1 && alternatives.all { it.isNotEmpty() && '{' !in it && '}' !in it }) {
+                        output.append("(?:")
+                        alternatives.forEachIndexed { alternativeIndex, value ->
+                            if (alternativeIndex > 0) output.append('|')
+                            output.append(Regex.escape(value))
+                        }
+                        output.append(')')
+                        index = closing
+                    } else output.append("\\{")
+                }
+                '.', '(', ')', '+', '|', '^', '$', '@', '%', '}', '[', ']', '\\' ->
+                    output.append('\\').append(char)
                 else -> output.append(char)
             }
             index++
