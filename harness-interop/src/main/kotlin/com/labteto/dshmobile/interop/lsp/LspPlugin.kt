@@ -157,8 +157,9 @@ class LspPlugin(
             return ToolResult("代码智能组件已卸载：" + component + "；需要时可重新下载")
         }
         if (name == "lsp_status") {
-            if (clients.isNotEmpty()) {
-                return ToolResult("代码智能已启动 ${clients.size} 个语言服务；" + managedStatus())
+            val liveCount = clients.values.count { it.client.isLive() }
+            if (liveCount > 0) {
+                return ToolResult("代码智能已初始化 $liveCount 个语言服务；" + managedStatus())
             }
             val detected = runCatching { command(null) }.getOrDefault(emptyList())
             return ToolResult(
@@ -270,7 +271,13 @@ class LspPlugin(
         val resolved = commandResolver(configured)
         require(resolved.isNotEmpty()) { "语言服务器解析后的命令不能为空" }
         val key = resolved.joinToString("\\u0000")
-        clients[key]?.let { return it }
+        clients[key]?.let { cached ->
+            if (cached.client.isLive()) return cached
+            cached.client.close()
+            cached.lease?.close()
+            clients.remove(key)
+            versions.remove(key)
+        }
 
         val approval = context.approval
             ?: error("首次启动代码智能进程需要人工审批")
