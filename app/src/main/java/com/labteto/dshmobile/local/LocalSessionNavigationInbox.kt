@@ -1,11 +1,13 @@
 package com.labteto.dshmobile.local
 
 import java.util.concurrent.atomic.AtomicReference
+import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 
 /** Latest tap wins across the mode tabs and conversation history. */
 internal sealed interface LocalSessionNavigationRequest {
     data class Mode(val value: LocalUsageMode) : LocalSessionNavigationRequest
     data class Session(val id: String) : LocalSessionNavigationRequest
+    data class ChatDomain(val command: LocalSessionDomainModeCommand) : LocalSessionNavigationRequest
 }
 
 internal class LocalSessionNavigationInbox {
