@@ -12,10 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-/** A failing recurrence keeps running; only repeat notifications are throttled. */
-internal fun shouldNotifyAutomationFailure(streak: Int): Boolean =
-    streak == 1 || (streak > 1 && streak % 5 == 0)
-
 /**
  * Owns Automation Worker terminal settlement after the runtime execution has finished.
  *
@@ -207,12 +203,14 @@ internal class AutomationWorkerSettlementCoordinator(
             return
         }
 
+        var autoPaused = false
         var committedNext: Long? = null
         val updated = store.updateIf(
             id,
             predicate = { it.scheduleGeneration == requestedGeneration },
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()
+            autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
             val chained = usesChainedAutomationScheduling(current)
             committedNext = if (chained) {
                 nextAnchoredAutomationRun(current, finished)
@@ -223,7 +221,11 @@ internal class AutomationWorkerSettlementCoordinator(
             }
             current.copy(
                 workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
-                status = automationFailureStatus(current),
+                status = when {
+                    autoPaused -> AutomationStatus.PAUSED
+                    current.recurringMinutes == null -> AutomationStatus.FAILED
+                    else -> AutomationStatus.SCHEDULED
+                },
                 nextRunAt = committedNext ?: current.nextRunAt,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                 failureStreak = nextFailureStreak,
@@ -241,19 +243,24 @@ internal class AutomationWorkerSettlementCoordinator(
         }
         if (updated == null) return
 
-        // Notify on the first failure and periodically thereafter, without pausing the schedule.
-        // Every failure remains visible in receipts and the task's consecutive failure count.
-        if (shouldNotifyAutomationFailure(updated.failureStreak)) {
-            maybeNotify(
-                task = updated,
-                titleRes = R.string.tasks_notification_failed,
-                sessionId = sessionId,
-            )
-        }
-        if (usesChainedAutomationScheduling(updated) &&
-            committedNext != null && updated.status == AutomationStatus.SCHEDULED
-        ) {
-            scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
+        maybeNotify(
+            task = updated,
+            titleRes = R.string.tasks_notification_failed,
+            sessionId = sessionId,
+        )
+        when {
+            autoPaused -> {
+                store.withCurrentGeneration(id, requestedGeneration) {
+                    WorkManager.getInstance(context)
+                        .cancelUniqueWork(HarnessAutomationScheduler.workName(id, requestedGeneration))
+                    WorkManager.getInstance(context)
+                        .cancelUniqueWork(HarnessAutomationScheduler.manualWorkName(id))
+                }
+            }
+            usesChainedAutomationScheduling(updated) &&
+                committedNext != null &&
+                updated.status == AutomationStatus.SCHEDULED ->
+                scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
     }
 
