@@ -72,6 +72,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfo
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.presentation.LocalWorkTemperatureControls
@@ -703,7 +704,9 @@ internal fun LocalConversationSurface(
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> Column {
                             LocalMessageRow(
-                                message = transcriptItem.message,
+                                message = if (transcriptItem.message.role == "assistant")
+                                    transcriptItem.message.copy(content = visibleAssistantText(transcriptItem.message.content))
+                                else transcriptItem.message,
                                 chatMode = state.usageMode == LocalUsageMode.CHAT,
                                 workspacePath = state.workspacePath,
                                 skillDisplayNames = skillDisplayNames,
