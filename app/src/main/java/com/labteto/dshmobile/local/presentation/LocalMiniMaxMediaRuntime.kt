@@ -2,10 +2,17 @@ package com.labteto.dshmobile.local.presentation
 
 import android.net.Uri
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.MiniMaxNativeMediaClient
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+fun LocalModelProfile.canUseMiniMaxNativeMedia(): Boolean =
+    authKind == LocalModelAuthKind.API_KEY &&
+        model.startsWith("MiniMax-", ignoreCase = true) &&
+        LocalMiniMaxPolicy.isOfficial(baseUrl)
 
 data class LocalMiniMaxVideoStatus(val state: String, val downloadUrl: String?)
 
