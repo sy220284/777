@@ -325,6 +325,13 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
         for p in sorted((root / "app").rglob("*"))
         if p.is_file() and p.suffix in {".kt", ".java"} and "/src/main/" in "/" + p.relative_to(root).as_posix()
     ] if records else []
+    test_contents = [
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in sorted((root / "app").rglob("*"))
+        if p.is_file() and p.suffix in {".kt", ".java"}
+        and ("/src/test/" in "/" + p.relative_to(root).as_posix()
+             or "/src/androidTest/" in "/" + p.relative_to(root).as_posix())
+    ] if records else []
     seen = set()
     for item in records:
         if not isinstance(item, dict):
@@ -369,6 +376,9 @@ def approved_legacy_retirements(root, model, registered, previous, matrix):
             if declaration.search(body):
                 pending.append({"path": name, "reason": "历史生产源码仍含原入口"})
                 continue
+        if any(re.search(r"\\b" + re.escape(symbol) + r"\\b", t) for t in test_contents):
+            pending.append({"path": name, "reason": "Kotlin/Java 测试源码仍引用旧入口，不能判定已退役"})
+            continue
         test_references = [
             x for x in matrix["items"] if x["path"] == name
         ]
