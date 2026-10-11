@@ -19,21 +19,8 @@ import kotlinx.serialization.json.put
  * streaming gate and the final durable reply so the user never sees one answer and stores another.
  */
 internal object ChatStyleGuard {
-    val bannedPhrases: List<String> = listOf(
-        "我理解你的感受",
-        "听起来你",
-        "如果你愿意的话",
-        "值得注意的是",
-        "需要说明的是",
-        "总体而言",
-        "综合来看",
-        "以下是",
-        "首先、其次、最后",
-        "希望这些对你有帮助",
-        "如果还有问题随时告诉我",
-        "我会一直在这里",
-        "谢谢你愿意和我分享",
-    )
+    // Only the user's explicit phrase choices participate in filtering.
+    val bannedPhrases: List<String> = emptyList()
 
     fun activePhrases(
         customPhrases: List<String> = emptyList(),
