@@ -15,6 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.runBlocking
@@ -348,6 +352,59 @@ class LocalConversationScrollBehaviorTest {
         compose.runOnIdle {
             assertEquals(11, listState.firstVisibleItemIndex)
             assertFalse(listState.layoutInfo.visibleItemsInfo.any { it.index == 12 })
+        }
+    }
+
+    @Test
+    fun fingerScrollPausesFollowingUntilReaderReturnsToBottom() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(24)
+        val catchingUp = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().testTag("work-timeline-scroll"),
+                    ) {
+                        items(rows.intValue, key = { "finger-step-$it" }) { index ->
+                            Text("finger-step-$index", Modifier.fillMaxWidth().height(64.dp))
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "gesture-priority",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "finger-step-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = catchingUp,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(20) } }
+        compose.waitForIdle()
+        compose.onNodeWithTag("work-timeline-scroll").performTouchInput { swipeDown() }
+        compose.waitForIdle()
+        var historyIndex = -1
+        compose.runOnIdle {
+            assertTrue(readerPaused.value)
+            historyIndex = listState.firstVisibleItemIndex
+            assertTrue(historyIndex < 20)
+        }
+        compose.runOnIdle { rows.intValue = 28 }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(historyIndex, listState.firstVisibleItemIndex) }
+
+        compose.runOnIdle { runBlocking { listState.scrollToItem(24) } }
+        compose.waitForIdle()
+        compose.runOnIdle { assertFalse(readerPaused.value) }
+        compose.runOnIdle { rows.intValue = 29 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 28 })
         }
     }
 
