@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """独立验证生成结果与仓库事实：校验失败则不得提交功能树。"""
 import json
+import hashlib
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -66,8 +66,16 @@ def inspect():
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
     registry = json.loads(REG.read_text(encoding="utf-8"))
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
-    sha = subprocess.check_output(["git", "rev-parse", "--short=12", "HEAD"],
-                                  cwd=ROOT, text=True).strip()
+    digest = hashlib.sha256()
+    for path in sorted(ROOT.rglob("*")):
+        if not path.is_file() or any(x in SKIP for x in path.relative_to(ROOT).parts):
+            continue
+        if path.suffix not in CODE and path.name != "gradlew":
+            continue
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\\0".replace(b"\\0", bytes([0])))
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    sha = digest.hexdigest()[:12]
     if index["source_snapshot"] != sha or review["snapshot"] != sha:
         raise ValueError("生成文件绑定的 SHA 与实际源码不同")
     if review["feature_nodes"] != len(html_paths) or review["functional_leaves"] != len(leaf_paths):
