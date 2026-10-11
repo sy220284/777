@@ -50,6 +50,23 @@ jobs:
             docs/FEATURE-SOURCE-INDEX.auto.json
             docs/FEATURE-REVIEW.auto.json
             docs/ACCEPTANCE-MATRIX.json
+      - name: 一次性写回 PR 616 的本次完整历史退役审计
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 616 && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
+            docs/FEATURE-REVIEW.auto.json docs/ACCEPTANCE-MATRIX.json
+          if git diff --cached --quiet; then
+            echo "退役审计及功能树已是最新，无需写入"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "全量复核已移除旧功能并刷新中文功能树及审计结果"
+          git push origin HEAD:refs/heads/"$TARGET_BRANCH"
       - name: 自动创建或更新维护 PR
         if: github.event_name != 'pull_request'
         env:
