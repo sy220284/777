@@ -14,7 +14,6 @@ internal data class LocalModelRequestOptions(
     val maxAttemptsOverride: Int? = null,
     val allowContextOverflowRecovery: Boolean = true,
     val persistOverflowHistory: Boolean = false,
-    val streamFilterPhrases: List<String> = emptyList(),
     val requestLog: LocalSessionEventLog? = null,
     val temperature: Double? = null,
     val profile: LocalModelProfile? = null,
