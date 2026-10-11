@@ -12,6 +12,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+/** A failing recurrence keeps running; only repeat notifications are throttled. */
+internal fun shouldNotifyAutomationFailure(streak: Int): Boolean =
+    streak == 1 || (streak > 1 && streak % 5 == 0)
+
 /**
  * Owns Automation Worker terminal settlement after the runtime execution has finished.
  *
@@ -239,7 +243,7 @@ internal class AutomationWorkerSettlementCoordinator(
 
         // Notify on the first failure and periodically thereafter, without pausing the schedule.
         // Every failure remains visible in receipts and the task's consecutive failure count.
-        if (updated.failureStreak == 1 || updated.failureStreak % 5 == 0) {
+        if (shouldNotifyAutomationFailure(updated.failureStreak)) {
             maybeNotify(
                 task = updated,
                 titleRes = R.string.tasks_notification_failed,
