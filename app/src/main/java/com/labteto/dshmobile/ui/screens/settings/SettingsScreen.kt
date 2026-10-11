@@ -66,6 +66,8 @@ import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -111,6 +113,7 @@ enum class SettingsDestination {
     MODELS,
     MODEL_PERFORMANCE,
     MODEL_USAGE,
+    MINIMAX_QUOTA,
     PRICING,
     USAGE,
     USAGE_LOG,
@@ -132,6 +135,7 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.MODELS,
     SettingsDestination.MODEL_PERFORMANCE,
     SettingsDestination.MODEL_USAGE,
+    SettingsDestination.MINIMAX_QUOTA,
     SettingsDestination.MEMORY,
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
@@ -211,6 +215,11 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
+    val selectedMiniMaxProfile = localHarness.modelSelection.activeProfile?.takeIf { profile ->
+        profile.authKind == LocalModelAuthKind.API_KEY &&
+            profile.model.startsWith("MiniMax-", ignoreCase = true) &&
+            LocalMiniMaxPolicy.isOfficial(profile.baseUrl)
+    }
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
@@ -305,6 +314,11 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    LaunchedEffect(page, selectedMiniMaxProfile?.id) {
+        if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) {
+            page = SettingsDestination.ROOT
+        }
+    }
     LaunchedEffect(page, memorySourceSessionId, memorySourceMessageId, showAllMemories) {
         if (page == SettingsDestination.MEMORY || page == SettingsDestination.MEMORY_MANAGEMENT) {
             val focus = page == SettingsDestination.MEMORY_MANAGEMENT && !showAllMemories
@@ -333,6 +347,7 @@ fun SettingsScreen(
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_PERFORMANCE -> stringResource(R.string.settings_model_performance_title)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
+        SettingsDestination.MINIMAX_QUOTA -> "MiniMax 套餐额度"
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
         SettingsDestination.USAGE_LOG -> stringResource(R.string.usage_log_title)
@@ -434,6 +449,16 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                                 compact = true,
                             )
+                            if (selectedMiniMaxProfile != null) {
+                                AppSettingsDivider()
+                                AppSettingsRow(
+                                    icon = FeatherIcons.CreditCard,
+                                    title = "MiniMax 套餐额度",
+                                    subtitle = "查看当前账户的官方剩余配额或余额",
+                                    onClick = { page = SettingsDestination.MINIMAX_QUOTA },
+                                    compact = true,
+                                )
+                            }
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,
@@ -711,6 +736,12 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
                                 onClick = { page = SettingsDestination.USAGE },
                             )
+                        }
+                    }
+
+                    SettingsDestination.MINIMAX_QUOTA -> {
+                        selectedMiniMaxProfile?.let { profile ->
+                            MiniMaxQuotaPage(profile = profile, viewModel = viewModel)
                         }
                     }
 
