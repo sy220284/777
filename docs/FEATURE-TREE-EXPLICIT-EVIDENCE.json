@@ -402,8 +402,7 @@
         {
           "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
           "symbols": [
-            "observeCharacterStateChanges",
-            "bindStateObservationSources"
+            "observeCharacterStateChanges"
           ]
         },
         {
