@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -197,4 +198,65 @@ class LocalConversationScrollBehaviorTest {
             assertEquals(10, listState.firstVisibleItemIndex)
         }
     }
+    @Test
+    fun newWorkStepsFollowAtBottomPauseInHistoryAndResumeAfterReturning() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val catchingUp = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "work-$it" }) { index ->
+                            Text("work-$index", Modifier.fillMaxWidth().height(64.dp))
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "work-test",
+                        tailIndex = rows.intValue - 1, tailKey = "work-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = catchingUp,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(9) } }
+        compose.waitForIdle()
+
+        // A single incoming operation glides into the bottom viewport.
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 12 })
+            assertFalse(catchingUp.value)
+        }
+
+        // Reading prior history stops the movement even when several events land at once.
+        compose.runOnIdle { runBlocking { listState.scrollToItem(2) } }
+        compose.waitForIdle()
+        compose.runOnIdle { rows.intValue = 16 }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(2, listState.firstVisibleItemIndex) }
+
+        // User scrolls back to the newest item. Following resumes on the next update.
+        compose.runOnIdle { runBlocking { listState.scrollToItem(13) } }
+        compose.waitForIdle()
+        compose.runOnIdle { rows.intValue = 17 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 16 })
+        }
+    }
+
+    @Test
+    fun workTimelineAutoFollowDoesNotTreatLargeParagraphTopAsBottom() {
+        assertTrue(shouldFollowNewWorkStep(10, 10, 10, false, false))
+        assertTrue(shouldFollowNewWorkStep(10, 10, null, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 600, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 7, null, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 0, true, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 0, false, true))
+    }
+
 }
