@@ -1,0 +1,1864 @@
+{
+  "version": 1,
+  "source_snapshot": "c5993f59d261",
+  "scope": "previously_14_unproven_plus_76_file_only_description_traces",
+  "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
+  "summary": {
+    "previously_unproven_investigated": 14,
+    "resolved_existing_code_or_compatibility": 7,
+    "resolved_test_only_coverage_descriptions": 7,
+    "explicitly_retired_controller_compatibility": 1,
+    "partial_scope_descriptions": 1,
+    "weak_source_entries_traced": 76,
+    "weak_source_with_named_class_or_object": 53,
+    "weak_source_referenced_by_other_production": 52,
+    "weak_source_referenced_by_tests": 33,
+    "weak_source_reused_across_tree_leaves": 49,
+    "runtime_verified_usable_count": null
+  },
+  "unproven_manual_investigation": [
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "structural_kind": "integrated_character_profile",
+      "separate_product_entry": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+          "symbol": "CharacterFactCategories"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
+          "symbol": "CharacterRuntimeProjector"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterFactsV4Test.kt",
+          "method": "v4IdentityFactsAndSourcesRoundTrip"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "确有16类规范人物资料与运行时投影；作为人物档案子能力存在，没有独立模块或入口。可在应用现有聊天/人设链路使用的静态证据成立，实际交互待设备验证。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
+      "structural_kind": "active_sampling_subfeature",
+      "separate_product_entry": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
+          "symbol": "CharacterBehaviorTuningDialog"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "composerAndPersonaShareOneStoredTemperaturePosition"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialogTest.kt",
+          "method": "expressionVariationDisplaysMappedChatTemperature"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
+      "structural_kind": "retired_controller_compatibility",
+      "separate_product_entry": false,
+      "availability": "legacy_fields_decodable_active_controls_retired",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt",
+          "symbol": "resolveCharacterBehaviorTuning"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "legacyBehaviorAxesNoLongerRepresentAnActiveSetting"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "retiredParametersDoNotChangeTheActiveSamplingSignature"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
+      "structural_kind": "cross_component_invariant",
+      "separate_product_entry": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatMemoryBinding.kt",
+          "symbol": "relationshipMemoryMatchesSubject"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt",
+          "method": "boundRelationshipMemoryOnlyMatchesItsCharacter"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "oldTuningCannotOverwriteCharacterContext"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "structural_kind": "partial_expression_guidance",
+      "separate_product_entry": false,
+      "availability": "partial_scope_code_and_tests_present",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+          "symbol": "renderChatExpressionPreferences"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStyleGuard.kt",
+          "symbol": "ChatStyleGuard"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatTurnRunner.kt",
+          "symbol": "ChatTurnRunner"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/ChatStyleGuardTest.kt",
+          "method": "explicitPreferencesEnterGenerationAndMissesRemainDiagnostic"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
+      "structural_kind": "shared_tool_pipeline",
+      "separate_product_entry": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+          "symbol": "LocalToolOutputStore"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+          "symbol": "LocalToolCatalog"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalToolOutputStoreTest.kt",
+          "method": "storesAndPagesSingleLineOutputByUtf8ByteRange"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalModelToolCallContractTest.kt",
+          "method": "nonStreamingAndHistoryRejectAbsentOrMalformedArgumentsAndIdentity"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
+      "structural_kind": "composite_bundled_runtimes",
+      "separate_product_entry": false,
+      "availability": "code_and_instrumentation_sources_present_device_unverified",
+      "production_declarations": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt",
+          "symbol": "LocalBundledRuntimeManager"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
+          "symbol": "BundledNodeRuntime"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
+          "symbol": "BundledPythonRuntime"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbol": "BundledGitRuntime"
+        }
+      ],
+      "test_methods_declared": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledNodeRuntimeTest.kt",
+          "method": "bundledNodeRunsJavaScriptAndChildProcessOnAndroid16"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledPythonRuntimeTest.kt",
+          "method": "bundledPythonRunsStdlibAndAndroidShellOnAndroid16"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledGitRuntimeTest.kt",
+          "method": "bundledGitRunsCoreRepositoryWorkflowOnAndroid16"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt",
+          "method": "rebuildingStatusDoesNotPretendToRecruitMembers"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/tools/LocalSkillDisplayNameDocumentTest.kt",
+          "method": "editingExistingSkillUpdatesOnlyDisplayNameInItsSourceFile"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+          "method": "existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/ReferenceConformanceTest.kt",
+          "method": "nativeCoreMatchesPinnedOfficialGoldenCases"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreCorruptionTest.kt",
+          "method": "registrySurvivesDeletionAndCanRecoverFromCorruptionWithoutLosingSessions"
+        },
+        {
+          "path": "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreConcurrencyTest.kt",
+          "method": "backupRecoveryCannotOverwriteAConcurrentNewerWrite"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "agentTeamProjectionInWorkSessionDoesNotHideOtherChatGroupOrWorkSessions"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "reopenedSessionAndHistoryAuthorizationIgnoreNestedAgentTeamProjectionFiles"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt",
+          "method": "editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowserRegressionTest.kt",
+          "method": "installedPluginDetailsOpenAndCanReturnToConversation"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
+      "structural_kind": "test_suite_not_product_feature",
+      "separate_product_entry": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "production_declarations": [],
+      "test_methods_declared": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt",
+          "method": "requirementLinkMustMatchSameTaskPositionAndText"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersionTest.kt",
+          "method": "eventTimeHashTracksExactFileVersionAndDetectsLaterEdit"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+          "method": "userFactCorrectionInvalidatesOnlyRelatedGeneratedDiaryAfterColdRestart"
+        }
+      ],
+      "can_use_without_runtime_test": null,
+      "conclusion": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。",
+      "verification": "真实生产声明或测试方法通过再次读取核实；没有设备/模型执行结论"
+    }
+  ],
+  "weak_evidence_code_traces": [
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 会话列表和历史读取按单会话故障隔离",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
+      ],
+      "primary_declaration": "LocalSessionRepository",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionCoordinatorTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4事实字段规范与旧消费者一致性校验",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 明确点名与一般提及分离，允许成员自然沉默",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChat.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 关系推进、阶段与变化",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记人工纠正、停用与并发版本核验",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt"
+      ],
+      "primary_declaration": "ChatDiaryStore",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 6,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryTransferStore.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersistence.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommit.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalTimelineRewriteTransaction.kt"
+      ],
+      "test_file_symbol_reference_count": 8,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryInvalidationTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/ChatDiaryStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/LocalChatPostTurnCommitTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记来源会话及消息标识与跳转",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 同源长期事实变动触发派生日记失效",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt"
+      ],
+      "primary_declaration": "LocalChatMemoryProjectionPort",
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 3,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 未完成日记清理的重启补偿与召回隔离",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt"
+      ],
+      "primary_declaration": "LocalChatMemoryRuntime",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 3,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色独立记忆与群聊发言上下文约束",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt"
+      ],
+      "primary_declaration": "LocalChatRuntime",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 自主选择公开历史对话和消息来源",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 加载更早分页、筛选并保留已选消息",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 交接摘要携带来源会话、消息编号与节选",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 选中附件使用受限路径和 SHA-256 引用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalWorkHandoffMaterials.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 模型、MCP、插件和设备当前能力提示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
+      ],
+      "primary_declaration": "LocalTaskCapabilityReadiness",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTaskCapabilityReadinessTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 团队未结消息和失败成员的完成声明复核",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt"
+      ],
+      "primary_declaration": "LocalWorkCompletionClaimGuard",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuardTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付要求与真实成果事件来源绑定",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalRequirementEvidence.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付成果当前版本及证据变化提示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作目录与文件浏览",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      ],
+      "primary_declaration": "LocalWorkspace",
+      "source_file_shared_by_tree_descriptions": 7,
+      "other_production_symbol_reference_count": 8,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 5,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillPackageImporterTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/ManagedProcessAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件预览和分享",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      ],
+      "primary_declaration": "LocalWorkspace",
+      "source_file_shared_by_tree_descriptions": 7,
+      "other_production_symbol_reference_count": 8,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 5,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillPackageImporterTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/ManagedProcessAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件修改与补丁应用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      ],
+      "primary_declaration": "LocalWorkspace",
+      "source_file_shared_by_tree_descriptions": 7,
+      "other_production_symbol_reference_count": 8,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 5,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillPackageImporterTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/ManagedProcessAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果来源调用与事件序号可追溯",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactProjection.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果首次创建和当前内容哈希对照",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersion.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 从原任务内容优化指令",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt"
+      ],
+      "primary_declaration": "AutomationPlanningService",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalAutomationPlanningFacade.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 分类浏览、配置和状态展示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具安装和管理入口",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 已安装技能读取和调用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能创建与编辑",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 上传 SKILL.md 与 ZIP 技能包",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / Work 对话创建并写入技能目录",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能中文显示名称",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 新技能创建时填写中文名",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt"
+      ],
+      "primary_declaration": "LocalSkillManager",
+      "source_file_shared_by_tree_descriptions": 9,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 输入框与历史消息显示中文名",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessMessageComponents.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / JSON 结构查询",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      ],
+      "primary_declaration": "LocalWorkspace",
+      "source_file_shared_by_tree_descriptions": 7,
+      "other_production_symbol_reference_count": 8,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 5,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillPackageImporterTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/ManagedProcessAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 长输出分页读取",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt"
+      ],
+      "primary_declaration": "LocalWorkspace",
+      "source_file_shared_by_tree_descriptions": 7,
+      "other_production_symbol_reference_count": 8,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/attachment/LocalAttachmentImporter.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalShellTool.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 5,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillPackageImporterTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkSkillActivationTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/ManagedProcessAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 工具调用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+      ],
+      "primary_declaration": "LocalPluginComposition",
+      "source_file_shared_by_tree_descriptions": 5,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 高权限调用审批",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
+      ],
+      "primary_declaration": "LocalToolPolicy",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 9,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolRouterTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页搜索",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
+      ],
+      "primary_declaration": "LocalWebProvider",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 4,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页抓取与页面正文获取",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
+      ],
+      "primary_declaration": "LocalWebProvider",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 4,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / HTTP 请求",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
+      ],
+      "primary_declaration": "LocalWebProvider",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 4,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatWebContextProvider.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTools.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      ],
+      "primary_declaration": "LocalVisionPlugin",
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalVisionPluginTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 截图和媒体附件处理",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      ],
+      "primary_declaration": "LocalVisionPlugin",
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalVisionPluginTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图像分析缓存",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionAnalysisCache.kt"
+      ],
+      "primary_declaration": "LocalVisionAnalysisCache",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalVisionAnalysisCacheTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 副作用识别",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
+      ],
+      "primary_declaration": "LocalToolPolicy",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 9,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolRouterTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 自动、手动和默认审批",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
+      ],
+      "primary_declaration": "LocalToolPolicy",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 9,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolPolicyTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolRouterTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 账户授权登录",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt"
+      ],
+      "primary_declaration": "ChatGptAuthCoordinator",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/ChatGptSettingsController.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 套餐模型目录与账号状态",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptModelCatalog.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 推理档位及温度上限对多入口的约束",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelPerformanceStore.kt"
+      ],
+      "primary_declaration": "LocalModelPerformanceStore",
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 5,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfiles.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalReasoningModeStore.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalModelPerformanceControls.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalReasoningControls.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelGatewayRoutingTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/LocalModelPerformanceLimitsTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实来源关联与显式纠正停用",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实修改后的来源失效待办",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
+      ],
+      "primary_declaration": "MemoryStore",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 20,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterLoreEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRelationshipHydrator.kt"
+      ],
+      "test_file_symbol_reference_count": 6,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTimelineMemoryRecoveryTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 自定义聊天背景",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/theme/AppBackground.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 任务相关配置状态与执行授权分开提示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
+      ],
+      "primary_declaration": "LocalTaskCapabilityReadiness",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTaskCapabilityReadinessTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt"
+      ],
+      "primary_declaration": "DeviceCapabilitiesController",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 屏幕共享和录制逐次系统授权提示",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalTaskCapabilityReadiness.kt"
+      ],
+      "primary_declaration": "LocalTaskCapabilityReadiness",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheet.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTaskCapabilityReadinessTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalWorkCapabilitySheetRegressionTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 消息／工具／上下文表面记录",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
+      ],
+      "primary_declaration": "LocalSessionEventLog",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 72,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelHistoryProjection.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentHistoryEvents.kt"
+      ],
+      "test_file_symbol_reference_count": 47,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRunCoordinatorTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAttachmentMaintenanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalAutomationChatRecoveryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContextRefreshRaceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatContinuitySourceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatEditSupportTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalChatTimelineRollbackTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 请求证据重建与摘要校验",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalRequestReconstruction.kt"
+      ],
+      "primary_declaration": "LocalRequestReconstruction",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 状态投影注册、版本和事件水位",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionProjectionCheckpoints.kt"
+      ],
+      "primary_declaration": "LocalSessionProjectionCheckpoints",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 工具活动只读投影",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolActivityProjection.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 持久会话登记与摘要投影索引分工",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
+      ],
+      "primary_declaration": "LocalSessionRepository",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionCoordinatorTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 批次投影和中断后重建",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionArchiveMaintenance.kt"
+      ],
+      "primary_declaration": "LocalSessionArchiveMaintenance",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 3,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 单个会话备份损坏不阻断其他会话",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
+      ],
+      "primary_declaration": "LocalSessionRepository",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionCoordinatorTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/OfflineCrossFeatureAcceptanceTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / Anthropic 消息协议",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/AnthropicMessagesClient.kt"
+      ],
+      "primary_declaration": "AnthropicMessagesClient",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAdapter.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/AnthropicMessagesClientTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / DeepSeek 兼容协议",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
+      ],
+      "primary_declaration": "DeepSeekClient",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelAdapter.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/DeepSeekClientTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalModelToolCallContractTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/ModelProtocolContractTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / ChatGPT 套餐专用协议分流",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptSessionManager.kt"
+      ],
+      "primary_declaration": "ChatGptSessionManager",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelCredentialResolver.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptRefreshLifecycleAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / ChatGPT OAuth 授权回调",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptOAuthCallbackServer.kt"
+      ],
+      "primary_declaration": "ChatGptOAuthCallbackServer",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 3,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthorizationRecoveryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptOAuthCallbackServerTest.kt",
+        "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 运行中配置变化隔离",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRunContext.kt"
+      ],
+      "primary_declaration": "LocalModelRunContext",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 5,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalPersistentJobRecoveryCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalSubagentRunner.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionCoordinator.kt"
+      ],
+      "test_file_symbol_reference_count": 1,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 连接健康诊断和重试约束",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelConnectionTester.kt"
+      ],
+      "primary_declaration": "LocalModelConnectionTester",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 2,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptPlanConnectionTester.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型路由的推理及温度上限统一生效",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelGateway.kt"
+      ],
+      "primary_declaration": "LocalModelGateway",
+      "source_file_shared_by_tree_descriptions": 4,
+      "other_production_symbol_reference_count": 26,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求封装和入场校验",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/ModelAdmissionSafety.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 图片等多模态输入",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 记忆库只读分类投影",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryVaultProjection.kt"
+      ],
+      "primary_declaration": null,
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 0,
+      "other_production_reference_samples": [],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 来源失效待办持久化及清理确认",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt"
+      ],
+      "primary_declaration": "MemoryStore",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 20,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterLoreEngine.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRelationshipHydrator.kt"
+      ],
+      "test_file_symbol_reference_count": 6,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/local/LocalMemoryToolsTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/LocalTimelineRewriteTransactionTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/chat/MemoryDiaryInvalidationRecoveryTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/memory/MemoryStoreTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkTimelineMemoryRecoveryTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 按来源精准失效派生日记并幂等恢复",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryProjectionPort.kt"
+      ],
+      "primary_declaration": "LocalChatMemoryProjectionPort",
+      "source_file_shared_by_tree_descriptions": 2,
+      "other_production_symbol_reference_count": 3,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 在线更新检测",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/update/UpdateChecker.kt"
+      ],
+      "primary_declaration": "UpdateChecker",
+      "source_file_shared_by_tree_descriptions": 1,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/AppViewModel.kt"
+      ],
+      "test_file_symbol_reference_count": 2,
+      "test_reference_samples": [
+        "app/src/test/java/com/labteto/dshmobile/update/UpdateCheckerTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/update/UpdatePayloadTransferTest.kt"
+      ],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 增量补丁下载与校验",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt"
+      ],
+      "primary_declaration": "UpdateInstaller",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/AppViewModel.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 安全安装和失败反馈",
+      "file_sources": [
+        "app/src/main/java/com/labteto/dshmobile/update/UpdateInstaller.kt"
+      ],
+      "primary_declaration": "UpdateInstaller",
+      "source_file_shared_by_tree_descriptions": 3,
+      "other_production_symbol_reference_count": 1,
+      "other_production_reference_samples": [
+        "app/src/main/java/com/labteto/dshmobile/ui/AppViewModel.kt"
+      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
+      "separate_product_entry": null,
+      "availability": "source_code_present_actual_invocation_not_proven",
+      "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索"
+    }
+  ],
+  "limits": [
+    "本检查只证明源码声明、其他代码的符号引用、测试文件与@Test方法确实存在",
+    "变量名、类引用和源码文件共享无法独立证明行为可达或用户确实能调用",
+    "所有涉及设备、模型、账号与第三方服务的功能必须保留真实验收步骤",
+    "旧版行为控制已退出，新版温度采样仍可作为人物设置子功能",
+    "工程回归测试节点应与产品功能数量分开统计"
+  ]
+}
