@@ -17,7 +17,10 @@ internal object ChatMemorySelector {
             .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
         val unresolved = context.continuity.unfinished.takeLast(2)
         val referents = if (text in LOW_INFORMATION_REPLIES ||
-            IMPLICIT_CONTINUITY_HINTS.any(text::contains)) ongoing + unresolved else emptyList()
+            IMPLICIT_CONTINUITY_HINTS.any(text::contains)) {
+            ongoing.ifEmpty { context.continuity.recentEvents.takeLast(1) +
+                context.continuity.decisions.takeLast(1) } + unresolved
+        } else emptyList()
         return (listOf(text) + referents).filter(String::isNotBlank).distinct()
             .joinToString(" ").takeLast(1_200)
     }
