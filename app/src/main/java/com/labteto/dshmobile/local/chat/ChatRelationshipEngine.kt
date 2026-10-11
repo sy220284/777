@@ -344,7 +344,7 @@ class ChatRelationshipEngine @Inject constructor() {
     fun prompt(input: String, state: ChatCharacterState): String {
         val lines = mutableListOf<String>()
         val status = state.relationshipState.trim()
-        if (status.isNotBlank() && status != "熟悉中") {
+        if (status.isNotBlank() && status !in setOf("熟悉中", "熟悉", "刚认识", "初识")) {
             lines += "当前关系：${status.take(120)}"
         }
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)
