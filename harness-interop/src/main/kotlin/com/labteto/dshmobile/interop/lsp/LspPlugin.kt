@@ -231,6 +231,9 @@ class LspPlugin(
             throw IllegalStateException("语言服务器自动检测失败：${error.message ?: error::class.java.simpleName}", error)
         }
         val configured = if (detected.isEmpty() && canInstallOnDemand(relativePath)) {
+            check(context.allowMutation && context.attributes["plan_mode"] != true) {
+                "只读任务或计划模式不允许下载组件；请由可写主任务先完成安装"
+            }
             val approval = context.approval ?: error("首次下载语言服务器需要人工审批")
             if (!approval(installApprovalTool(relativePath))) {
                 error("用户拒绝下载语言服务器")
