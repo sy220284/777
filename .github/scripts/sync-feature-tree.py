@@ -921,6 +921,9 @@ def generate(root):
                     child["evidenceLevel"] = item["verification"]
                     child["sourceCount"] = len(item["existing_production_sources"])
                     child["missingSourceCount"] = len(item["missing_production_sources"])
+                    if "identity_id" in item:
+                        child["identityId"] = item["identity_id"]
+                        child["identityStatus"] = item["identity_status"]
             annotate(child, path)
     annotate(structure, [])
     dataset = json.dumps(structure, ensure_ascii=False, separators=(",", ":"))
