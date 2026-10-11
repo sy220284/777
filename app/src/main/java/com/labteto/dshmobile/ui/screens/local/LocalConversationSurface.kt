@@ -289,6 +289,7 @@ internal fun LocalConversationSurface(
     )
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
         (if (showStreamingTail) 1 else 0)
+    var previousTranscriptTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -445,8 +446,13 @@ internal fun LocalConversationSurface(
 
     LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
         if (transcriptItems.isNotEmpty()) {
+            // Compare against the PREVIOUS tail: a burst may append many individual Work
+            // rows at once, and comparing with the new tail would incorrectly stop follow.
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            if (lastVisible >= transcriptLastListIndex - 2) {
+            val wasNearTail = previousTranscriptTailIndex < 0 ||
+                lastVisible >= previousTranscriptTailIndex - 2
+            previousTranscriptTailIndex = transcriptLastListIndex
+            if (wasNearTail) {
                 listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
