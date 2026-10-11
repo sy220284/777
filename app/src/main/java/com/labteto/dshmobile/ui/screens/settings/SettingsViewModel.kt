@@ -122,17 +122,17 @@ class SettingsViewModel @Inject constructor(
      * revoked, and does not outlive the process, so a remembered URI would produce a background that
      * silently disappears later — indistinguishable, from the outside, from the feature being broken.
      */
-    fun setBackgroundImage(uri: Uri) {
+    fun setBackgroundImage(uri: Uri, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val stored = try {
-                importBackgroundImage(uri)
+            try {
+                val stored = importBackgroundImage(uri)
+                hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "import_background_image", error)
-                return@launch
+                onError("背景图片设置失败，请重新选择图片；若仍失败，可导出诊断日志")
             }
-            hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
         }
     }
 
@@ -146,9 +146,15 @@ class SettingsViewModel @Inject constructor(
     private suspend fun importBackgroundImage(uri: Uri): String = withContext(Dispatchers.IO) {
         val directory = File(appContext.filesDir, APP_BACKGROUND_DIR).apply { mkdirs() }
         val target = File(directory, APP_BACKGROUND_FILE)
-        val source = appContext.contentResolver.openInputStream(uri)
-            ?: error("Cannot open the picked image")
-        source.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+        val staging = File.createTempFile("background-", ".part", directory)
+        try {
+            val source = appContext.contentResolver.openInputStream(uri)
+                ?: error("Cannot open the picked image")
+            source.use { input -> staging.outputStream().use { output -> input.copyTo(output) } }
+            check(staging.renameTo(target)) { "Cannot replace the background image" }
+        } finally {
+            staging.delete()
+        }
         target.absolutePath
     }
 
