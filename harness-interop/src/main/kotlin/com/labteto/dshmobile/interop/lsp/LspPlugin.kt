@@ -169,7 +169,7 @@ class LspPlugin(
                         "当前项目未检测到可运行的语言服务器；代码任务会继续使用文件读取、搜索与编译/测试能力"
                     }
                 } else {
-                    "已检测到可用语言服务器，将在首次语义查询时按需启动"
+                    "发现语言服务器候选，需完成实际 LSP 初始化和语义查询才算可用"
                 } + "; " + managedStatus(),
             )
         }
@@ -196,6 +196,7 @@ class LspPlugin(
         val text = file.readText()
 
         return runWithClient(active) {
+            val diagnosticsBeforeChange = active.client.diagnosticRevision(uri)
             if (version == 1) active.client.didOpen(uri, language, version, text)
             else active.client.didChange(uri, version, text)
             clientVersions[uri] = version
@@ -216,25 +217,20 @@ class LspPlugin(
                     active.client.rename(uri, line, character, newName)
                 }
                 "lsp_diagnostics" -> {
-                    val triggerError = try {
-                        active.client.documentSymbols(uri)
-                        null
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        error
-                    }
-                    val notifications = active.client.drainNotifications()
-                    val published = notifications.filter { notification ->
-                        notification["method"]?.jsonPrimitive?.contentOrNull == "textDocument/publishDiagnostics" &&
-                            notification["params"]?.jsonObject?.get("uri")?.jsonPrimitive?.contentOrNull == uri
-                    }
-                    val latest = published.lastOrNull()?.get("params")?.jsonObject
+                    // Publish is asynchronous. A documentSymbol response cannot guarantee the
+                    // server has published diagnostics for the latest document version.
+                    val latest = active.client.awaitPublishedDiagnostics(
+                        uri = uri,
+                        sinceRevision = diagnosticsBeforeChange,
+                        version = version,
+                    )
                     return@runWithClient ToolResult(
                         buildJsonObject {
                             put("published", latest != null)
+                            put("state", if (latest == null) "timeout_waiting_for_publish" else "published")
                             put("diagnostics", latest?.get("diagnostics") ?: buildJsonArray { })
-                            triggerError?.message?.let { put("pump_warning", it.take(1_000)) }
+                            put("uri", uri)
+                            put("version", version)
                         }.toString(),
                     )
                 }
