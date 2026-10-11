@@ -447,6 +447,9 @@ internal class LocalWorkAgentTurnExecutor(
                             binding = binding,
                             call = call.toLocalToolCall(),
                             allowMutation = true,
+                            stillCurrent = {
+                                binding.steeringRevision.value == latestAcceptedSamplingRevision
+                            },
                         )
                     }
                 },
