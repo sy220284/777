@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
@@ -65,6 +66,10 @@ private val WORK_PROCESS_TECHNICAL_LINE = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val WORK_PROCESS_PATH = Regex("(?:[A-Za-z]:)?(?:[\\\\/][A-Za-z0-9_.-]+){2,}")
+private val WORK_PROCESS_PRIVATE_NARRATION = Regex(
+    "^(?:用户要(?:我)?|用户希望我|根据系统提示|按系统提示|先按系统提示|我需要先|我现在看到了|现在我看到了|先检查系统提示)",
+    RegexOption.IGNORE_CASE,
+)
 
 internal data class LocalWorkProcessNode(
     val summary: String? = null,
@@ -79,8 +84,10 @@ internal data class LocalWorkProcessNode(
 }
 
 internal fun localWorkProcessSummary(content: String): String? {
-    val compact = WORK_PROCESS_WHITESPACE.replace(content.trim(), " ")
-    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact)) return null
+    val compact = WORK_PROCESS_WHITESPACE.replace(visibleAssistantText(content).trim(), " ")
+    if (compact.isBlank() || WORK_PROCESS_TECHNICAL_LINE.containsMatchIn(compact) ||
+        WORK_PROCESS_PRIVATE_NARRATION.containsMatchIn(compact)
+    ) return null
     val readable = WORK_PROCESS_PATH.replace(compact, "…")
     return truncateWithoutSplittingSurrogatePair(readable, LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
 }
