@@ -5,6 +5,8 @@ import android.net.Uri
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspaceToolGuide
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.MAX_ATTACHMENT_BYTES
@@ -41,6 +43,11 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             userRoots = localSharedStorageRoots(),
         ),
     )
+
+    init {
+        runCatching { LocalWorkspaceToolGuide.ensure(context, File(workspace.path)) }
+            .onFailure { AppLog.failure("WorkspaceToolGuide", "create_readme", it) }
+    }
 
     private val attachmentImporter = LocalAttachmentImporter(
         context = context,

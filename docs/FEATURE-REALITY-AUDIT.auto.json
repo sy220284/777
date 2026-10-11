@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "8dad1fa41481",
+  "source_snapshot": "99748fc3115c",
   "tree": {
     "nodes_excluding_root": 541,
     "leaf_descriptions": 444,
@@ -12,7 +12,7 @@
     }
   },
   "code": {
-    "production_files": 782,
+    "production_files": 783,
     "module_count": 7,
     "module_names": [
       "SHELL",
@@ -647,6 +647,11 @@
       },
       {
         "provider": "lsp",
+        "name": "lsp_uninstall_component",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
+      },
+      {
+        "provider": "lsp",
         "name": "lsp_workspace_symbols",
         "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
       },
@@ -756,13 +761,13 @@
         "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
       }
     ],
-    "builtin_tool_count": 132,
+    "builtin_tool_count": 133,
     "plugin_counts": {
       "automation": 4,
       "device": 31,
       "github": 3,
       "local_builtin_catalog": 64,
-      "lsp": 9,
+      "lsp": 10,
       "mcp_management": 5,
       "runtime": 7,
       "vision": 4,

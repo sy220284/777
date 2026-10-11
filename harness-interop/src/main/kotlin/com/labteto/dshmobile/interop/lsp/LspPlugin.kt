@@ -35,14 +35,22 @@ internal fun lspExtensionFailure(toolName: String, error: Exception): ToolResult
     val message = error.message.orEmpty()
     val code = when {
         message.contains("未检测到可运行的语言服务器") -> "LSP_SERVER_UNAVAILABLE"
+        message.contains("首次下载语言服务器需要人工审批") -> "LSP_INSTALL_APPROVAL_REQUIRED"
+        message.contains("只读任务或计划模式不允许下载组件") -> "LSP_INSTALL_NOT_ALLOWED"
+        message.contains("拒绝下载") -> "LSP_INSTALL_DECLINED"
+        message.contains("下载安装失败") -> "LSP_INSTALL_FAILED"
         message.contains("拒绝启动") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
         message.contains("启动失败") || error is IOException -> "LSP_START_FAILED"
         error is IllegalArgumentException -> "LSP_INPUT_INVALID"
         else -> "LSP_REQUEST_FAILED"
     }
     val hint = when (code) {
-        "LSP_SERVER_UNAVAILABLE" -> "安装匹配的语言服务器；当前仍可使用 read、grep、glob 和编译测试。"
+        "LSP_SERVER_UNAVAILABLE" -> "当前可继续使用 read、grep、glob 和编译测试；如支持按需安装，可批准首次下载。"
         "LSP_START_APPROVAL_REQUIRED" -> "返回当前会话批准语言服务器首次启动，再重新执行查询。"
+        "LSP_INSTALL_APPROVAL_REQUIRED" -> "首次下载需要明确批准；可返回主任务确认安装。"
+        "LSP_INSTALL_NOT_ALLOWED" -> "只读子任务和计划模式不可安装组件；可继续使用现有文件搜索，或在主任务中安装。"
+        "LSP_INSTALL_DECLINED" -> "已取消本次语言服务器下载；可以继续使用文件搜索与编译测试。"
+        "LSP_INSTALL_FAILED" -> "语言服务器下载或部署失败；检查网络和存储后重试，原有代码工具仍可使用。"
         "LSP_START_FAILED" -> "核对可执行文件、运行环境和启动命令；修复后重新查询可再次启动。"
         "LSP_INPUT_INVALID" -> "检查路径、大小、语言类型和工具查询参数。"
         else -> "检查语言服务器状态；此次调用停止，下次查询会按需重新启动。"
@@ -71,6 +79,10 @@ class LspPlugin(
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environment: () -> Map<String, String> = { emptyMap() },
     private val resourceScheduler: HarnessResourceScheduler? = null,
+    private val canInstallOnDemand: (String?) -> Boolean = { false },
+    private val installOnDemand: suspend (String?) -> List<String> = { emptyList() },
+    private val managedStatus: () -> String = { "" },
+    private val uninstallOnDemand: (String) -> Boolean = { false },
 ) : HarnessPlugin {
     override val id = "local-language-server"
 
@@ -91,14 +103,19 @@ class LspPlugin(
                 HarnessTool(
                     name = name,
                     schema = schemaFor(name),
-                    access = ToolAccess.READ_ONLY,
-                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    access = if (name == "lsp_uninstall_component") ToolAccess.PROCESS else ToolAccess.READ_ONLY,
+                    approvalPolicy = if (name == "lsp_uninstall_component") {
+                        ToolApprovalPolicy.ALWAYS
+                    } else ToolApprovalPolicy.NEVER,
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "LSP",
-                        discoveryKeywords = LSP_DISCOVERY_KEYWORDS,
-                        requirements = listOf(
-                            "项目需能自动检测到可运行的语言服务器；首次启动外部语言服务进程需要人工审批",
+                        discoveryKeywords = discoveryKeywordsFor(name),
+                        requirements = if (name == "lsp_uninstall_component") {
+                            listOf("需用户审批；卸载前会停止当前运行的语言服务")
+                        } else listOf(
+                            "TypeScript/JavaScript 和 Python 可在首次语义查询时经授权按需下载安装；其他语言需已有兼容的本地语言服务器",
+                            "语言服务器首次启动需独立进程审批；状态查询及能力发现不会触发下载",
                         ),
                     ),
                     executor = HarnessToolExecutor { toolContext, input, _ ->
@@ -129,17 +146,32 @@ class LspPlugin(
         input: JsonObject,
         context: ToolContext,
     ): ToolResult {
+        if (name == "lsp_uninstall_component") {
+            val component = input["component"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            require(component in setOf("typescript", "pyright")) { "未知组件：仅支持 typescript、pyright" }
+            // Only release processes belonging to this component; keep other languages live.
+            closeClientsGracefully { handle ->
+                handle.command.any { it.contains("/components/" + component + "-") }
+            }
+            check(uninstallOnDemand(component)) { "组件卸载失败：" + component }
+            return ToolResult("代码智能组件已卸载：" + component + "；需要时可重新下载")
+        }
         if (name == "lsp_status") {
-            if (clients.isNotEmpty()) {
-                return ToolResult("代码智能已启动 ${clients.size} 个语言服务")
+            val liveCount = clients.values.count { it.client.isLive() }
+            if (liveCount > 0) {
+                return ToolResult("代码智能已初始化 $liveCount 个语言服务；" + managedStatus())
             }
             val detected = runCatching { command(null) }.getOrDefault(emptyList())
             return ToolResult(
                 if (detected.isEmpty()) {
-                    "当前项目未检测到可运行的语言服务器；代码任务会继续使用文件读取、搜索与编译/测试能力"
+                    if (canInstallOnDemand(null)) {
+                        "语言服务器尚未安装；首次语义查询会询问是否按需下载"
+                    } else {
+                        "当前项目未检测到可运行的语言服务器；代码任务会继续使用文件读取、搜索与编译/测试能力"
+                    }
                 } else {
-                    "已检测到可用语言服务器，将在首次语义查询时按需启动"
-                },
+                    "发现语言服务器候选，需完成实际 LSP 初始化和语义查询才算可用"
+                } + "; " + managedStatus(),
             )
         }
 
@@ -165,6 +197,7 @@ class LspPlugin(
         val text = file.readText()
 
         return runWithClient(active) {
+            val diagnosticsBeforeChange = active.client.diagnosticRevision(uri)
             if (version == 1) active.client.didOpen(uri, language, version, text)
             else active.client.didChange(uri, version, text)
             clientVersions[uri] = version
@@ -185,25 +218,20 @@ class LspPlugin(
                     active.client.rename(uri, line, character, newName)
                 }
                 "lsp_diagnostics" -> {
-                    val triggerError = try {
-                        active.client.documentSymbols(uri)
-                        null
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        error
-                    }
-                    val notifications = active.client.drainNotifications()
-                    val published = notifications.filter { notification ->
-                        notification["method"]?.jsonPrimitive?.contentOrNull == "textDocument/publishDiagnostics" &&
-                            notification["params"]?.jsonObject?.get("uri")?.jsonPrimitive?.contentOrNull == uri
-                    }
-                    val latest = published.lastOrNull()?.get("params")?.jsonObject
+                    // Publish is asynchronous. A documentSymbol response cannot guarantee the
+                    // server has published diagnostics for the latest document version.
+                    val latest = active.client.awaitPublishedDiagnostics(
+                        uri = uri,
+                        sinceRevision = diagnosticsBeforeChange,
+                        version = version,
+                    )
                     return@runWithClient ToolResult(
                         buildJsonObject {
                             put("published", latest != null)
+                            put("state", if (latest == null) "timeout_waiting_for_publish" else "published")
                             put("diagnostics", latest?.get("diagnostics") ?: buildJsonArray { })
-                            triggerError?.message?.let { put("pump_warning", it.take(1_000)) }
+                            put("uri", uri)
+                            put("version", version)
                         }.toString(),
                     )
                 }
@@ -217,9 +245,25 @@ class LspPlugin(
         relativePath: String?,
         context: ToolContext,
     ): ClientHandle {
-        val configured = runCatching { command(relativePath) }.getOrElse { error ->
+        val detected = runCatching { command(relativePath) }.getOrElse { error ->
             throw IllegalStateException("语言服务器自动检测失败：${error.message ?: error::class.java.simpleName}", error)
         }
+        val configured = if (detected.isEmpty() && canInstallOnDemand(relativePath)) {
+            check(context.allowMutation && context.attributes["plan_mode"] != true) {
+                "只读任务或计划模式不允许下载组件；请由可写主任务先完成安装"
+            }
+            val approval = context.approval ?: error("首次下载语言服务器需要人工审批")
+            if (!approval(installApprovalTool(relativePath))) {
+                error("用户拒绝下载语言服务器")
+            }
+            try {
+                installOnDemand(relativePath)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw IllegalStateException("语言服务器下载安装失败：" + error.message, error)
+            }
+        } else detected
         require(configured.isNotEmpty()) {
             "当前文件/项目未检测到可运行的语言服务器；请继续使用 read、grep、glob、编译或测试完成分析"
         }
@@ -227,7 +271,13 @@ class LspPlugin(
         val resolved = commandResolver(configured)
         require(resolved.isNotEmpty()) { "语言服务器解析后的命令不能为空" }
         val key = resolved.joinToString("\\u0000")
-        clients[key]?.let { return it }
+        clients[key]?.let { cached ->
+            if (cached.client.isLive()) return cached
+            cached.client.close()
+            cached.lease?.close()
+            clients.remove(key)
+            versions.remove(key)
+        }
 
         val approval = context.approval
             ?: error("首次启动代码智能进程需要人工审批")
@@ -263,6 +313,19 @@ class LspPlugin(
         return ClientHandle(key, resolved, next, lease).also { clients[key] = it }
     }
 
+    private fun installApprovalTool(relativePath: String?): HarnessTool = HarnessTool(
+        name = "lsp_install",
+        schema = functionToolSchema(
+            name = "lsp_install",
+            description = "从 npm 官方源按需下载安装语言服务器及依赖：" + (relativePath ?: "当前项目"),
+        ),
+        access = ToolAccess.NETWORK,
+        approvalPolicy = ToolApprovalPolicy.ALWAYS,
+        exposure = ToolExposure.INTERNAL,
+        metadata = ToolMetadata(family = "LSP"),
+        executor = HarnessToolExecutor { _, _, _ -> ToolResult("代码智能组件安装已批准") },
+    )
+
     private fun startApprovalTool(resolved: List<String>): HarnessTool = HarnessTool(
         name = "lsp_start",
         schema = functionToolSchema(
@@ -292,10 +355,14 @@ class LspPlugin(
         throw error
     }
 
-    private suspend fun closeClientsGracefully() {
-        val current = clients.values.toList()
-        clients.clear()
-        versions.clear()
+    private suspend fun closeClientsGracefully(
+        shouldClose: (ClientHandle) -> Boolean = { true },
+    ) {
+        val current = clients.values.filter(shouldClose)
+        current.forEach { handle ->
+            clients.remove(handle.key)
+            versions.remove(handle.key)
+        }
         var cancellation: CancellationException? = null
         for (handle in current) {
             try {
@@ -321,18 +388,21 @@ class LspPlugin(
 
     private fun schemaFor(name: String): JsonObject {
         val description = when (name) {
-            "lsp_status" -> "查看当前项目代码智能状态；语言服务器由 777 自动检测并按需启动"
-            "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
-            "lsp_references" -> "查询代码引用；需要时自动启动匹配的语言服务器"
-            "lsp_hover" -> "查询代码类型与说明；需要时自动启动匹配的语言服务器"
-            "lsp_implementation" -> "查询接口/抽象成员的实现位置；需要时自动启动匹配的语言服务器"
-            "lsp_workspace_symbols" -> "按关键词查询整个工作区的代码符号；需要时自动启动语言服务器"
+            "lsp_status" -> "查看当前项目代码智能状态、已安装的语言服务器组件；不触发下载"
+            "lsp_uninstall_component" -> "卸载本机已安装的代码智能组件；需用户审批，再次使用时重新下载"
+            "lsp_definition" -> "查询函数、变量和符号的精确定义位置；TypeScript/Python 首次使用可经授权下载语言服务"
+            "lsp_references" -> "查找符号的跨文件引用与调用关系；TypeScript/Python 首次使用可经授权下载语言服务"
+            "lsp_hover" -> "查询变量、函数的类型与悬停说明；需要时启动本地语言服务器"
+            "lsp_implementation" -> "查询接口和抽象成员的具体实现位置；需要时启动本地语言服务器"
+            "lsp_workspace_symbols" -> "按关键词查询工作区全局代码符号；需要时启动或经授权下载语言服务器"
             "lsp_rename_preview" -> "计算重命名 WorkspaceEdit，只返回修改预览，不直接写文件"
-            "lsp_diagnostics" -> "同步当前文件并读取语言服务器诊断；published=false 仅表示本次未收到诊断发布"
+            "lsp_diagnostics" -> "分析当前文件的语义和类型错误，查询本地语言服务器诊断；published=false 表示本次尚未收到诊断发布"
             else -> "列出文件中的代码符号；需要时自动启动匹配的语言服务器"
         }
         val properties = buildJsonObject {
-            if (name == "lsp_workspace_symbols") {
+            if (name == "lsp_uninstall_component") {
+                put("component", buildJsonObject { put("type", "string") })
+            } else if (name == "lsp_workspace_symbols") {
                 put("query", buildJsonObject { put("type", "string") })
             } else if (name != "lsp_status") {
                 put("path", buildJsonObject { put("type", "string") })
@@ -345,6 +415,7 @@ class LspPlugin(
             }
         }
         val required = when (name) {
+            "lsp_uninstall_component" -> setOf("component")
             "lsp_workspace_symbols" -> setOf("query")
             "lsp_rename_preview" -> setOf("path", "new_name")
             "lsp_status" -> emptySet()
@@ -354,11 +425,27 @@ class LspPlugin(
     }
 
     companion object {
-        private val LSP_DISCOVERY_KEYWORDS = setOf(
-            "lsp", "语言服务器", "代码", "定义", "引用", "符号", "重命名", "诊断", "hover", "implementation",
-        )
+        /**
+         * Use per-operation intent. The former shared "代码/定义/引用/诊断"
+         * keywords activated every semantic tool for a single ordinary code request.
+         * capability_search still indexes the LSP family and tool descriptions.
+         */
+        private fun discoveryKeywordsFor(name: String): Set<String> = when (name) {
+            "lsp_status" -> setOf("语言服务器状态", "代码智能状态", "lsp状态", "lsp_status")
+            "lsp_uninstall_component" -> setOf("卸载语言服务器", "移除语言组件", "lsp_uninstall")
+            "lsp_definition" -> setOf("跳转定义", "查找定义", "定位定义", "函数定义", "方法定义")
+            "lsp_references" -> setOf("查找引用", "引用关系", "被谁调用", "调用关系", "调用位置")
+            "lsp_hover" -> setOf("类型信息", "类型推断", "变量类型", "悬停说明", "类型说明")
+            "lsp_implementation" -> setOf("接口实现", "实现类", "实现位置", "查找实现")
+            "lsp_symbols" -> setOf("文件符号", "函数列表", "类列表", "成员列表", "代码结构")
+            "lsp_workspace_symbols" -> setOf("工作区符号", "全局符号", "跨文件符号", "整个项目符号")
+            "lsp_rename_preview" -> setOf("符号重命名", "批量改名", "重命名预览", "跨文件改名")
+            "lsp_diagnostics" -> setOf("代码诊断", "错误诊断", "检查代码", "类型错误", "静态检查", "代码报错")
+            else -> setOf(name)
+        }
         private val names = listOf(
             "lsp_status",
+            "lsp_uninstall_component",
             "lsp_definition",
             "lsp_references",
             "lsp_hover",
