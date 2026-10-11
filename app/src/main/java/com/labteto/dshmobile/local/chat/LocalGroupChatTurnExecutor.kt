@@ -773,9 +773,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     }
 
                     val content = generated.content
-                    if (content == GROUP_CHAT_SILENT_TOKEN &&
-                        groupMemberMayStaySilent(input, generated.member, index)
-                    ) {
+                    if (content == GROUP_CHAT_SILENT_TOKEN) {
                         // Listening is an intentional choice, never a failed delivery or
                         // a fabricated public utterance.
                         eventLog.append("group/agent-silent", buildJsonObject {
