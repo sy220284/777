@@ -2002,5 +2002,9 @@
     <string name="local_delivery_link_save_failed">关联未保存：来源、文件版本或存储状态已变化，请刷新后重试</string>
     <string name="local_work_handoff_return_source">返回来源聊天</string>
     <string name="local_work_handoff_source_removed">原聊天会话已不存在；当前工作与已保存的交接摘要仍可继续使用。</string>
+    <string name="usage_model_filter_label">模型消耗</string>
+    <string name="usage_model_all">全部模型</string>
+    <string name="usage_model_history_partial">部分早期请求明细已过保存期，单模型历史累计可能不完整；全部模型累计保持不变。</string>
+    <string name="usage_deepseek_cost_label">DeepSeek估算费用</string>
 </resources>
 
