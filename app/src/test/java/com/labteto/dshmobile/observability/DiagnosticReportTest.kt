@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.observability
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -78,4 +79,18 @@ class DiagnosticReportTest {
         assertFalse(text.contains("rawcookie"))
         assertTrue(text.count { it == '<' } >= 4)
     }
+    @Test
+    fun warningFailuresAppearInSummaryWhileCancellationAndRecoveryDoNot() {
+        val entries = listOf(
+            AppLogEntry(1, "W", "Tool", "failure=true operation=execute_tool code=E_NETWORK"),
+            AppLogEntry(2, "W", "Tool", "operation=execute_tool_cancelled code=TASK_CANCELLED"),
+            AppLogEntry(3, "W", "Jobs", "status=recovered"),
+        )
+        val report = DiagnosticReport.build(entries, "环境", androidApi = 36, logIntegrity = "损坏行=2")
+        assertTrue(report.contains("异常与关联操作（1 条"))
+        assertTrue(report.contains("日志完整性：损坏行=2"))
+        assertTrue(report.contains("failure=true operation=execute_tool"))
+        assertEquals(1, entries.count(AppLogEntry::isDiagnosticFailure))
+    }
+
 }

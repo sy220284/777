@@ -393,7 +393,7 @@ internal class LocalToolExecutionCoordinator(
                 else -> "根据工具返回内容检查前置条件；确认状态后再决定下一步。"
             }
         }
-        AppLog.warn("LocalToolExecution", "operation=execute_tool session_id=$sessionId call_id=${call.id} tool=${call.name} code=$errorCode retryable=$retryable side_effect=$mutationMayHaveSideEffect")
+        AppLog.warn("LocalToolExecution", "failure=true operation=execute_tool session_id=$sessionId call_id=${call.id} tool=${call.name} code=$errorCode retryable=$retryable side_effect=$mutationMayHaveSideEffect")
         return AgentToolResult(
             content = result.content,
             isError = true,
@@ -427,7 +427,7 @@ internal class LocalToolExecutionCoordinator(
                 requestId = call.id,
             )
         } else {
-            AppLog.warn("LocalToolExecution", "operation=execute_tool tool=${call.name} call_id=${call.id} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
+            AppLog.warn("LocalToolExecution", "failure=true operation=execute_tool tool=${call.name} call_id=${call.id} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
         }
         return result
     }

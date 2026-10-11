@@ -9,17 +9,23 @@ import java.util.TimeZone
 
 /** Shareable diagnostic bundle. Log text is bounded and redacted before export. */
 object DiagnosticReport {
-    fun build(entries: List<AppLogEntry>, environment: String, androidApi: Int = Build.VERSION.SDK_INT): String {
+    fun build(
+        entries: List<AppLogEntry>,
+        environment: String,
+        androidApi: Int = Build.VERSION.SDK_INT,
+        logIntegrity: String = "正常",
+    ): String {
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
         val recent = entries.takeLast(MAX_REPORT_ENTRIES)
-        val failures = recent.filter { it.level == "E" || (it.level == "W" && it.throwableType != null) }
+        val failures = recent.filter(AppLogEntry::isDiagnosticFailure)
         return buildString {
             appendLine("777 运行诊断 · ${timestamp.format(Date())}")
             appendLine("系统版本：Android API $androidApi")
             appendLine("应用版本：${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）；构建类型：${BuildConfig.BUILD_TYPE}")
-            appendLine("日志条数：${entries.size}；警告：${entries.count { it.level == "W" }}；错误：${entries.count { it.level == "E" }}")
+            appendLine("日志条数：${entries.size}；警告：${entries.count { it.level == "W" }}；异常：${failures.size}")
+            appendLine("日志完整性：$logIntegrity")
             appendLine("环境概要：")
             environment.lineSequence()
                 .takeWhile { it != "最近诊断：" }

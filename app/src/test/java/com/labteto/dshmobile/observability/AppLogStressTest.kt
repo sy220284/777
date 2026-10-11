@@ -1,8 +1,7 @@
 package com.labteto.dshmobile.observability
 
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Executor
+import java.util.ArrayDeque
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -10,29 +9,65 @@ import org.junit.Test
 
 class AppLogStressTest {
     @Test
-    fun persistenceQueueStaysBoundedDuringLogStorm() {
-        val executor = createAppLogPersistenceExecutor(maxQueued = 2)
-        val started = CountDownLatch(1)
-        val release = CountDownLatch(1)
-        val persisted = AtomicInteger()
-        try {
-            executor.execute {
-                started.countDown()
-                release.await(5, TimeUnit.SECONDS)
-            }
-            assertTrue(started.await(5, TimeUnit.SECONDS))
+    fun persistenceQueueBatchesWithoutRunningDiskWorkOnProducer() {
+        val scheduled = ArrayDeque<Runnable>()
+        val written = mutableListOf<Int>()
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { batch: List<Int> -> written.addAll(batch) },
+            important = { it < 0 },
+            capacity = 2_000,
+            batchSize = 100,
+        )
+        repeat(1_000) { queue.offer(it) }
+        assertEquals(1, scheduled.size)
+        assertTrue(written.isEmpty())
+        assertEquals(1_000, queue.snapshot().outstanding.size)
+        scheduled.removeFirst().run()
+        assertEquals((0..999).toList(), written)
+        assertEquals(0, queue.snapshot().outstanding.size)
+    }
 
-            repeat(1_000) {
-                executor.execute { persisted.incrementAndGet() }
-            }
+    @Test
+    fun failedBatchStaysExportableAndCanRetryLater() {
+        val scheduled = ArrayDeque<Runnable>()
+        val written = mutableListOf<Int>()
+        var diskBroken = true
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { batch: List<Int> ->
+                if (diskBroken) throw java.io.IOException("disk broken")
+                written.addAll(batch)
+            },
+            important = { it < 0 },
+            capacity = 10,
+        )
+        queue.offer(-1)
+        scheduled.removeFirst().run()
+        assertEquals(listOf(-1), queue.snapshot().outstanding)
+        assertEquals("IOException", queue.snapshot().writeError)
+        diskBroken = false
+        queue.offer(2)
+        scheduled.removeFirst().run()
+        assertEquals(listOf(-1, 2), written)
+        assertEquals(null, queue.snapshot().writeError)
+    }
 
-            assertTrue(executor.queue.size <= 2)
-        } finally {
-            release.countDown()
-            executor.shutdown()
-            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS))
-            assertEquals(1_000, persisted.get())
-        }
+    @Test
+    fun overflowPreservesFailureAndReportsMissingRows() {
+        val scheduled = ArrayDeque<Runnable>()
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { _: List<Int> -> },
+            important = { it < 0 },
+            capacity = 3,
+        )
+        repeat(3) { queue.offer(it) }
+        queue.offer(-1)
+        val state = queue.snapshot()
+        assertEquals(3, state.outstanding.size)
+        assertTrue(state.outstanding.contains(-1))
+        assertEquals(1L, state.overflow)
     }
 
     @Test
@@ -73,7 +108,12 @@ class AppLogStressTest {
     @Test
     fun persistenceQueueRejectsInvalidCapacity() {
         assertThrows(IllegalArgumentException::class.java) {
-            createAppLogPersistenceExecutor(0)
+            DiagnosticWriteQueue(
+                executor = Executor { },
+                writer = { _: List<Int> -> },
+                important = { false },
+                capacity = 0,
+            )
         }
     }
 

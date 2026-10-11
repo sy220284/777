@@ -6,9 +6,7 @@ import java.io.File
 import java.util.UUID
 import java.util.ArrayDeque
 import java.util.Base64
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 
 data class AppLogEntry(
     val timestampMillis: Long,
@@ -32,18 +30,23 @@ data class AppLogEntry(
  * update or process restart.
  */
 
-internal fun createAppLogPersistenceExecutor(maxQueued: Int = 1_024): ThreadPoolExecutor {
-    require(maxQueued > 0) { "日志持久化队列容量必须大于 0" }
-    return ThreadPoolExecutor(
-        1,
-        1,
-        0L,
-        TimeUnit.MILLISECONDS,
-        ArrayBlockingQueue(maxQueued),
-        { runnable -> Thread(runnable, "777-app-log").apply { isDaemon = true } },
-        // Never silently discard diagnostics under load: the caller drains overflow work.
-        ThreadPoolExecutor.CallerRunsPolicy(),
-    )
+data class AppLogExport(
+    val entries: List<AppLogEntry>,
+    val malformedRows: Int = 0,
+    val readFailure: String? = null,
+    val pendingRows: Int = 0,
+    val overflowRows: Long = 0,
+    val writeFailure: String? = null,
+    val truncated: Boolean = false,
+) {
+    val integrity: String get() = buildList {
+        if (malformedRows > 0) add("损坏行=$malformedRows")
+        readFailure?.let { add("读取失败=$it") }
+        if (pendingRows > 0) add("待写入=$pendingRows（已包含在报告中）")
+        if (overflowRows > 0) add("拥塞丢弃=$overflowRows")
+        writeFailure?.let { add("写入失败=$it") }
+        if (truncated) add("超过近期导出容量，已截取最新记录")
+    }.let { if (it.isEmpty()) "正常" else it.joinToString("；") }
 }
 
 object AppLog {
@@ -54,7 +57,14 @@ object AppLog {
     private val lock = Any()
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
-    private val persistenceExecutor = createAppLogPersistenceExecutor()
+    private val persistenceExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "777-app-log").apply { isDaemon = true }
+    }
+    private val pendingWrites = DiagnosticWriteQueue(
+        executor = persistenceExecutor,
+        writer = ::persistBatch,
+        important = { entry: AppLogEntry -> entry.isDiagnosticFailure() },
+    )
     private val processInstanceId = UUID.randomUUID().toString().substringBefore('-')
     private val processStartedAtMillis = System.currentTimeMillis()
 
@@ -63,9 +73,6 @@ object AppLog {
 
     @Volatile
     private var crashHandlerInstalled = false
-
-    @Volatile
-    private var lastPersistenceFailure: String? = null
 
     fun configurePersistence(file: File) {
         persistentFile = file
@@ -149,34 +156,31 @@ object AppLog {
 
     fun snapshot(): List<AppLogEntry> = synchronized(lock) { entries.toList() }
 
-    /** Includes the sanitized tail from previous processes and de-duplicates current-process rows. */
-    fun exportSnapshot(): List<AppLogEntry> {
-        val merged = readPersisted() + snapshot()
-        return merged
-            .distinctBy {
-                listOf(
-                    it.timestampMillis.toString(),
-                    it.level,
-                    it.tag,
-                    it.message,
-                    it.throwableType.orEmpty(),
-                    it.throwableMessage.orEmpty(),
-                    it.appVersion.orEmpty(),
-                    it.appVersionCode?.toString().orEmpty(),
-                    it.processInstanceId.orEmpty(),
-                    it.processStartedAtMillis?.toString().orEmpty(),
-                    it.throwableCauseChain.orEmpty(),
-                ).joinToString("\u0000")
-            }
+    /** Snapshot disk + pending + in-flight rows under one disk lock; no queue-drain wait. */
+    fun exportForDiagnostics(): AppLogExport = synchronized(persistenceLock) {
+        val persisted = readPersistedUnsafe()
+        val pending = pendingWrites.snapshot()
+        val merged = (persisted.entries + pending.outstanding + snapshot())
+            .distinct()
             .sortedBy(AppLogEntry::timestampMillis)
-            .takeLast(MAX_EXPORT_ENTRIES)
+        AppLogExport(
+            entries = merged.takeLast(MAX_EXPORT_ENTRIES),
+            malformedRows = persisted.malformedRows,
+            readFailure = persisted.failure,
+            pendingRows = pending.outstanding.size,
+            overflowRows = pending.overflow,
+            writeFailure = pending.writeError,
+            truncated = merged.size > MAX_EXPORT_ENTRIES,
+        )
     }
 
+    fun exportSnapshot(): List<AppLogEntry> = exportForDiagnostics().entries
+
     fun clear() {
-        synchronized(lock) { entries.clear() }
-        val file = persistentFile ?: return
-        persistenceExecutor.execute {
-            synchronized(persistenceLock) {
+        synchronized(persistenceLock) {
+            pendingWrites.clearPending()
+            synchronized(lock) { entries.clear() }
+            persistentFile?.let { file ->
                 runCatching { if (file.exists()) file.writeText("") }
             }
         }
@@ -206,7 +210,14 @@ object AppLog {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
             entries.addLast(entry)
         }
-        if (synchronous) persistNow(entry) else persistAsync(entry)
+        if (synchronous) {
+            runCatching { persistBatch(listOf(entry)) }
+                .onFailure { failure ->
+                    runCatching { Log.e("AppLog", "Fatal diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
+                }
+        } else if (persistentFile != null) {
+            pendingWrites.offer(entry)
+        }
     }
 
     private fun summarizeCauseChain(error: Throwable): String =
@@ -216,57 +227,61 @@ object AppLog {
             if (reason.isNullOrBlank()) kind else "$kind: $reason"
         }.take(1_000)
 
-    private fun persistNow(entry: AppLogEntry) {
+    private fun persistBatch(batch: List<AppLogEntry>) {
         val file = persistentFile ?: return
         synchronized(persistenceLock) {
-            runCatching {
+            try {
                 file.parentFile?.mkdirs()
                 rotateIfNeeded(file)
-                file.appendText(encodeEntry(entry) + "\n")
-            }.onFailure { failure ->
-                // The storage path itself failed; report through memory/logcat without recursively writing.
-                val reason = failure.javaClass.simpleName
-                synchronized(lock) {
-                    if (lastPersistenceFailure != reason) {
-                        lastPersistenceFailure = reason
-                        val warning = AppLogEntry(
-                            timestampMillis = System.currentTimeMillis(),
-                            level = "E",
-                            tag = "AppLog",
-                            message = "operation=persist_diagnostic_log status=failed cause_type=$reason",
-                            throwableType = reason,
-                            throwableMessage = failure.message?.let(::sanitizeDiagnosticText)?.take(200),
-                        )
-                        while (entries.size >= MAX_ENTRIES) entries.removeFirst()
-                        entries.addLast(warning)
-                    }
-                }
-                runCatching { Log.e("AppLog", "Diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
-            }.onSuccess { lastPersistenceFailure = null }
+                file.appendText(batch.joinToString(separator = "\n", postfix = "\n", transform = ::encodeEntry))
+            } catch (failure: Exception) {
+                runCatching { Log.e("AppLog", "Diagnostic batch persistence failed", sanitizedThrowableForLogcat(failure)) }
+                throw failure
+            }
         }
-    }
-
-    private fun persistAsync(entry: AppLogEntry) {
-        val file = persistentFile ?: return
-        persistenceExecutor.execute { persistNow(entry) }
     }
 
     private fun rotateIfNeeded(file: File) {
         if (!file.exists() || file.length() < MAX_PERSISTED_BYTES) return
-        val tail = file.useLines { sequence -> sequence.toList().takeLast(ROTATED_ENTRIES) }
+        val tail = ArrayDeque<String>(ROTATED_ENTRIES)
+        file.useLines { lines ->
+            lines.forEach { line ->
+                if (tail.size >= ROTATED_ENTRIES) tail.removeFirst()
+                tail.addLast(line)
+            }
+        }
         file.writeText(tail.joinToString(separator = "\n", postfix = if (tail.isEmpty()) "" else "\n"))
     }
 
-    private fun readPersisted(): List<AppLogEntry> {
-        val file = persistentFile ?: return emptyList()
-        return synchronized(persistenceLock) {
-            runCatching {
-                if (!file.isFile) return@runCatching emptyList()
+    private data class PersistedRead(
+        val entries: List<AppLogEntry>,
+        val malformedRows: Int,
+        val failure: String?,
+    )
+
+    private fun readPersistedUnsafe(): PersistedRead {
+        val file = persistentFile ?: return PersistedRead(emptyList(), 0, null)
+        val tail = ArrayDeque<AppLogEntry>(MAX_EXPORT_ENTRIES)
+        var malformed = 0
+        var failure: String? = null
+        try {
+            if (file.isFile) {
                 file.useLines { lines ->
-                    lines.mapNotNull(::decodeEntry).toList().takeLast(MAX_EXPORT_ENTRIES)
+                    lines.forEach { line ->
+                        val entry = decodeEntry(line)
+                        if (entry == null) {
+                            malformed++
+                        } else {
+                            if (tail.size >= MAX_EXPORT_ENTRIES) tail.removeFirst()
+                            tail.addLast(entry)
+                        }
+                    }
                 }
-            }.getOrDefault(emptyList())
+            }
+        } catch (error: Exception) {
+            failure = error.javaClass.simpleName
         }
+        return PersistedRead(tail.toList(), malformed, failure)
     }
 
     private fun encodeEntry(entry: AppLogEntry): String = listOf(
@@ -308,6 +323,16 @@ object AppLog {
 
     private fun decode(value: String): String =
         String(Base64.getDecoder().decode(value), Charsets.UTF_8)
+}
+
+/** A warning with an explicit failure marker is still a real diagnostic failure. */
+internal fun AppLogEntry.isDiagnosticFailure(): Boolean {
+    if (level == "E" || throwableType != null) return true
+    if (level != "W") return false
+    if (message.contains("code=TASK_CANCELLED") || message.contains("operation=execute_tool_cancelled")) return false
+    return message.contains("failure=true") || message.contains("status=failed") ||
+        message.contains("status=corrupt") || message.contains("error_code=") ||
+        message.contains("失败") || message.contains("异常")
 }
 
 private fun sanitizedThrowableForLogcat(throwable: Throwable): Throwable {
