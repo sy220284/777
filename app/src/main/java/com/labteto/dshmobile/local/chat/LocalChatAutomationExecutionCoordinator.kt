@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -102,6 +103,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
             bypassProactivePolicy = policy.bypassProactivePolicy,
         )
     } catch (timeout: TimeoutCancellationException) {
+        AppLog.warn("ChatAutomation", "failure=true operation=run_scheduled_chat " +
+            "session_id=${targetSessionId.take(80)} cause_type=TimeoutCancellationException")
         val detail = "定时互动执行超时，已停止本轮任务"
         LocalChatAutomationResult(
             sessionId = targetSessionId,
@@ -120,6 +123,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
             detail = detail,
         )
     } catch (error: Exception) {
+        AppLog.warn("ChatAutomation", "failure=true operation=run_scheduled_chat " +
+            "session_id=${targetSessionId.take(80)} cause_type=${error.javaClass.simpleName}")
         val detail = "定时互动失败：" + (error.message ?: error::class.java.simpleName)
         LocalChatAutomationResult(
             sessionId = targetSessionId,
