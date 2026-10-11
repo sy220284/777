@@ -54,7 +54,9 @@ class ConversationActionsMenuRegressionTest {
 
         compose.onNodeWithContentDescription("对话操作").performClick()
         compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
-        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        // The dialog surface and its confirm button both expose the title in merged semantics.
+        // Select the actionable confirmation node, not the outer scroll container.
+        compose.onAllNodes(hasText("删除会话") and hasClickAction()).onLast().performClick()
         compose.runOnIdle { assertEquals(1, deleted) }
     }
 
@@ -77,7 +79,7 @@ class ConversationActionsMenuRegressionTest {
         compose.onNodeWithContentDescription("对话操作").performClick()
         compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
         compose.runOnIdle { currentSession = "different" }
-        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.onAllNodes(hasText("删除会话") and hasClickAction()).onLast().performClick()
         compose.runOnIdle { assertEquals("original", deletedSession) }
     }
 }
