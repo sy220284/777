@@ -258,7 +258,8 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         text: String,
         attachments: List<LocalImportedAttachment>,
     ): LocalSendResult {
-        val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
+        val prepared = prepareLocalSend(text, attachments, allowSteeringDirective = true)
+            ?: return LocalSendResult.Empty
         return sendPrepared(prepared)
     }
 
