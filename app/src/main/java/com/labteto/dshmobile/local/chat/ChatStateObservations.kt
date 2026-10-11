@@ -17,6 +17,7 @@ internal fun observeCharacterStateChanges(
             (userMessage.contains(it) || assistantMessage.contains(it)) }
         observations[field] = ChatStateObservation(
             field = field, value = value,
+            previousValue = oldValues[field].orEmpty(),
             basis = (quote ?: listOf(userMessage, assistantMessage)
                 .filter(String::isNotBlank).joinToString("\n").takeLast(400)).take(400),
             interpretation = quote == null,
@@ -46,4 +47,5 @@ internal fun characterStateObservationValues(state: ChatCharacterState): Map<Str
     "immediateConcern" to state.immediateConcern,
     "unresolvedThreads" to state.unresolvedThreads.joinToString("；"),
     "dynamics.unresolvedConflict" to state.dynamics.unresolvedConflict,
+    "dynamics.stage" to state.dynamics.stage,
 )
