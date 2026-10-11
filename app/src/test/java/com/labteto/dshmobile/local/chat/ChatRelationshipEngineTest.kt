@@ -25,11 +25,15 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun onlyAnExplicitCommandChangesTheRequestedCapability() {
-        assertEquals(ChatRelationshipView.STRATEGIST, engine.classify("/军师 她最近为什么冷淡"))
+    fun replyCoachingRequiresAnExplicitCommandAndStrategistCommandsAreRemoved() {
         assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/reply 这句怎么回"))
-        listOf("军师，她最近为什么突然冷淡", "帮我分析我们现在什么阶段", "她为什么突然冷淡",
-            "你喜欢我吗", "她说刚下班，这句怎么回", "/strategybook").forEach {
+        assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/回复建议 这句怎么回"))
+        listOf(
+            "/军师 她最近为什么冷淡", "/strategy 她什么意思", "/analyze 关系怎么样",
+            "/debrief 复盘一下", "/分析 这句话", "/strategybook",
+            "军师，她最近为什么突然冷淡", "帮我分析我们现在什么阶段",
+            "她为什么突然冷淡", "你喜欢我吗", "她说刚下班，这句怎么回",
+        ).forEach {
             assertEquals(ChatRelationshipView.IMMERSIVE, engine.classify(it))
         }
     }
@@ -350,7 +354,7 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun strategistPromptDoesNotDuplicateDynamicRelationshipState() {
+    fun formerStrategistCommandDoesNotAddInstructionsOrDiscardRelationshipFacts() {
         val state = ChatCharacterState(
             dynamics = RelationshipDynamics(
                 stage = "AMBIGUOUS",
@@ -385,7 +389,10 @@ class ChatRelationshipEngineTest {
 
         val prompt = engine.prompt("/strategy 她什么意思", state)
 
-        assertTrue(prompt.contains("用户显式调用关系分析"))
+        assertEquals(engine.prompt("她什么意思", state), prompt)
+        assertFalse(prompt.contains("用户显式调用关系分析"))
+        assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent("帮我分析"))
+        assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent("什么意思"))
         assertTrue(prompt.contains("对方上周主动约过一次"))
         assertTrue(prompt.contains("对方可能在观察用户是否稳定"))
         assertTrue(prompt.contains("她平时是否也会主动约朋友"))
