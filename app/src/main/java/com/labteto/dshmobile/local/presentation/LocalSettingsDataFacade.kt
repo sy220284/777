@@ -29,7 +29,8 @@ class LocalSettingsDataFacade @Inject internal constructor(
     internal val usageRevision: StateFlow<Long> = usage.analyticsRevision
     internal suspend fun refreshDeepSeekPricing() = pricing.refreshFromOfficial()
     internal fun usageSnapshot(): TokenUsageAnalyticsSnapshot = usage.analyticsSnapshot()
-    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? = usage.analyticsGroupDetail(kind, key)
+    internal fun usageGroupDetail(kind: TokenUsageGroupKind, key: String, modelFilter: String? = null): TokenUsageGroupDetail? =
+        usage.analyticsGroupDetail(kind, key, modelFilter = modelFilter)
     internal fun usageRecord(requestId: String): TokenUsageRecord? = usage.analyticsRecord(requestId)
 
     internal fun memories(scopes: Set<MemoryScope>, projectId: String?, lineageId: String?): List<MemoryRecord> =
