@@ -45,6 +45,20 @@ def first_declared_source(owned_files: list[str], contents: dict[str, str]) -> s
             return stem
     return None
 
+def source_symbols(source: str) -> list[str]:
+    """Include Kotlin top-level/extension functions; no claim of reachability."""
+    declared = re.findall(
+        r"\b(?:class|object|interface|enum\s+class)\s+([A-Za-z_]\w*)\b", source
+    )
+    declared += re.findall(
+        r"\bfun\s+(?:(?:[A-Za-z_]\w*|[A-Za-z_]\w*<[^>]+>)\.)?([A-Za-z_]\w*)\s*\(",
+        source,
+    )
+    excluded = {"invoke", "get", "set", "read", "write", "open", "close",
+                "list", "save", "load", "status", "update", "copy",
+                "create", "delete", "run", "start", "stop", "init"}
+    return sorted({value for value in declared if len(value) >= 7 and value not in excluded})
+
 def analyze():
     baseline = json.loads(REVIEW.read_text(encoding="utf-8"))
     manifest = json.loads(EXISTENCE.read_text(encoding="utf-8"))
@@ -107,27 +121,39 @@ def analyze():
             if path not in prod:
                 raise ValueError("弱证据指向已经消失的源码文件：" + path)
         main_symbol = first_declared_source(sources, prod)
-        used_by = []
-        tested_by = []
-        if main_symbol:
-            expression = re.compile(r"\b" + re.escape(main_symbol) + r"\b")
+        owned_symbols = sorted({name for src in sources for name in source_symbols(prod[src])})
+        # Named class has priority; for Kotlin extension/file-level code also
+        # sample distinctive functions. Every hit is only a text reference.
+        candidates = ([main_symbol] if main_symbol else []) + [
+            name for name in owned_symbols if name != main_symbol
+        ]
+        traces = []
+        for symbol in candidates[:90]:
+            pattern = re.compile(r"\b" + re.escape(symbol) + r"\b")
             used_by = [p for p, body in prod.items()
-                       if p not in sources and expression.search(body)]
-            tested_by = [p for p, body in tests.items() if expression.search(body)
-                         and "@Test" in body]
+                       if p not in sources and pattern.search(body)]
+            tested_by = [p for p, body in tests.items() if "@Test" in body and pattern.search(body)]
+            if used_by or tested_by:
+                traces.append((symbol, used_by, tested_by))
+        traces.sort(key=lambda x: (len(x[1]) > 0, len(x[2]) > 0, len(x[1]) + len(x[2]), len(x[0])), reverse=True)
+        chosen = traces[0] if traces else (main_symbol, [], [])
+        chosen_name, used_by, tested_by = chosen
         shared_paths = sorted({path for src in sources for path in grouped_source[src]})
         weak.append({
             "path": r["path"],
             "file_sources": sources,
             "primary_declaration": main_symbol,
+            "other_named_declarations_in_source": owned_symbols[:24],
+            "best_static_cross_file_symbol": chosen_name,
             "source_file_shared_by_tree_descriptions": len(shared_paths),
+            "source_is_shared_in_feature_tree": len(shared_paths) > 1,
             "other_production_symbol_reference_count": len(used_by),
             "other_production_reference_samples": used_by[:7],
             "test_file_symbol_reference_count": len(tested_by),
             "test_reference_samples": tested_by[:7],
             "separate_product_entry": None,
             "availability": "source_code_present_actual_invocation_not_proven",
-            "verification": "源文件及主要类声明直接核实；其他源码/测试的符号命中仅是静态引用线索",
+            "verification": "源码中类/对象及Kotlin具名方法已读取；跨文件文本引用仍非编译解析调用链或实际运行验证",
         })
     summary = {
         "previously_unproven_investigated": len(resolved),
@@ -137,6 +163,7 @@ def analyze():
         "partial_scope_descriptions": sum(x["structural_kind"] == "partial_expression_guidance" for x in resolved),
         "weak_source_entries_traced": len(weak),
         "weak_source_with_named_class_or_object": sum(x["primary_declaration"] is not None for x in weak),
+        "weak_source_with_distinctive_named_declarations": sum(bool(x["other_named_declarations_in_source"]) for x in weak),
         "weak_source_referenced_by_other_production": sum(x["other_production_symbol_reference_count"] > 0 for x in weak),
         "weak_source_referenced_by_tests": sum(x["test_file_symbol_reference_count"] > 0 for x in weak),
         "weak_source_reused_across_tree_leaves": sum(x["source_file_shared_by_tree_descriptions"] > 1 for x in weak),
@@ -173,8 +200,9 @@ def render(data: dict) -> str:
         f"{s['resolved_test_only_coverage_descriptions']}项实质为工程回归测试范围。",
         f"- 已确认退出主动使用的旧控制器：{s['explicitly_retired_controller_compatibility']}项，仅保留数据兼容；"
         f"部分实现范围尚不完整的描述：{s['partial_scope_descriptions']}项。",
-        f"- 文件级弱证据：{s['weak_source_entries_traced']}项；有可直接定位的主要类/对象声明"
-        f"{s['weak_source_with_named_class_or_object']}项、"
+        f"- 文件级弱证据：{s['weak_source_entries_traced']}项；有与文件名对应的主要类/对象声明"
+        f"{s['weak_source_with_named_class_or_object']}项，能够发现其他具名声明的"
+        f"{s['weak_source_with_distinctive_named_declarations']}项；"
         f"在其他生产文件发现同名符号引用{s['weak_source_referenced_by_other_production']}项、"
         f"在测试文件发现同名符号{s['weak_source_referenced_by_tests']}项。",
         f"- {s['weak_source_reused_across_tree_leaves']}项弱证据条目与其他树叶共用同一生产文件。"
