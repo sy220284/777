@@ -12,11 +12,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * User-configurable output filter for chat mode.
+ * Explicit expression-preference diagnostics and lossless media-aware text replacement.
  *
- * The master switch lives in settings. When it is off, callers should bypass this gate completely
- * and expose the model stream as-is. When it is on, the same literal phrase set is used by the
- * streaming gate and the final durable reply so the user never sees one answer and stores another.
+ * Preferences are supplied before generation. Diagnostics never delete completed speech.
  */
 internal object ChatStyleGuard {
     // Only the user's explicit phrase choices participate in filtering.
@@ -56,60 +54,6 @@ internal object ChatStyleGuard {
             .distinct()
             .filter { phrase -> phrase in text }
             .toList()
-
-    /**
-     * Literal filtering used by the streaming path and final persisted answer.
-     *
-     * This intentionally does not ask the model for a second rewrite. It removes only configured
-     * phrases and keeps all other generated text intact.
-     */
-    fun filterLiteral(text: String, phrases: Collection<String>): String {
-        var result = text
-        phrases.asSequence()
-            .map(String::trim)
-            .filter(String::isNotBlank)
-            .distinct()
-            .sortedByDescending(String::length)
-            .forEach { phrase -> result = result.replace(phrase, "") }
-        return result.ifBlank { "……" }
-    }
-
-    /**
-     * Legacy deterministic scrub kept for compatibility with older callers and tests.
-     * New real-time chat uses [filterLiteral] so streamed and durable text stay identical.
-     */
-    fun scrub(
-        text: String,
-        extraBannedPhrases: List<String> = emptyList(),
-        builtInEnabled: Boolean = true,
-    ): String {
-        val builtIn = if (builtInEnabled) {
-            bannedPhrases.map(String::trim).filter(String::isNotBlank).distinct()
-        } else {
-            emptyList()
-        }
-        var result = CHAT_SENTENCE.findAll(text)
-            .map { it.value }
-            .filterNot { segment ->
-                segment.isNotBlank() && builtIn.any { phrase -> phrase in segment }
-            }
-            .joinToString("")
-
-        extraBannedPhrases
-            .map(String::trim)
-            .filter(String::isNotBlank)
-            .distinct()
-            .forEach { phrase -> result = result.replace(phrase, "") }
-
-        return result
-            .replace(Regex("""(^|[。！？!?\n])[\s，、；：,:;]+""")) { match ->
-                match.groupValues[1]
-            }
-            .replace(Regex("[ \\t]{2,}"), " ")
-            .replace(Regex("\\n{3,}"), "\n\n")
-            .trim()
-            .ifBlank { "……" }
-    }
 
     fun withContent(reply: LocalModelReply, content: String): LocalModelReply {
         // Most replies pass the guard unchanged. Preserve their original block boundaries and
@@ -171,5 +115,4 @@ internal object ChatStyleGuard {
         )
     }
 
-    private val CHAT_SENTENCE = Regex("[^。！？!?\\n]+[。！？!?]*|\\n+")
 }
