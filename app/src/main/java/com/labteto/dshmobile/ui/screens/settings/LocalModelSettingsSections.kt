@@ -188,17 +188,16 @@ internal fun LocalModelSettingsCard(
                         )
                         val creatorKinds = LocalMediaCatalog.offers(listOf(profile)).map { it.kind }.distinct()
                         if (creatorKinds.isNotEmpty()) {
+                            val creativeLabels = mapOf(
+                                LocalMediaKind.IMAGE to stringResource(R.string.media_studio_capability_image),
+                                LocalMediaKind.VIDEO to stringResource(R.string.media_studio_capability_video),
+                                LocalMediaKind.SPEECH to stringResource(R.string.media_studio_capability_speech),
+                                LocalMediaKind.TRANSCRIBE to stringResource(R.string.media_studio_capability_transcribe),
+                            )
                             Text(
                                 stringResource(
                                     R.string.media_studio_model_capabilities,
-                                    creatorKinds.joinToString(" · ") { kind ->
-                                        when (kind) {
-                                            LocalMediaKind.IMAGE -> "图片生成"
-                                            LocalMediaKind.VIDEO -> "视频生成"
-                                            LocalMediaKind.SPEECH -> "语音合成"
-                                            LocalMediaKind.TRANSCRIBE -> "录音转写"
-                                        }
-                                    },
+                                    creatorKinds.joinToString(" · ") { kind -> creativeLabels.getValue(kind) },
                                 ),
                                 style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelSecondary,
