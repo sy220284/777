@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URI
 import java.util.UUID
@@ -26,6 +25,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 
 internal data class MiniMaxVideoStatus(val state: String, val downloadUrl: String? = null)
 
@@ -55,6 +55,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
 
     suspend fun synthesizeSpeech(profile: LocalModelProfile, text: String, voice: String): File {
         require(text.isNotBlank()) { "请输入配音文本" }
+        require(text.length <= 10_000) { "MiniMax 单次配音最多支持 10000 字符" }
         require(voice.isNotBlank()) { "请选择音色" }
         val root = post(profile, "/v1/t2a_v2", buildJsonObject {
             put("model", "speech-2.8-hd")
@@ -89,29 +90,44 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
     }
 
     suspend fun transcribe(profile: LocalModelProfile, uri: Uri): String {
-        val audio = withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                val out = ByteArrayOutputStream()
-                val chunk = ByteArray(8192)
-                var count: Int
-                while (input.read(chunk).also { count = it } >= 0) {
-                    if (out.size() + count > MAX_ASR_FILE_BYTES) {
-                        error("录音文件超过 MiniMax 识别的 50 MB 上限")
+        // SAF files may be 50 MB: stage to private cache instead of copying into the app heap.
+        val stage = withContext(Dispatchers.IO) {
+            val file = File.createTempFile("minimax-asr-", ".audio", context.cacheDir)
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output ->
+                        val chunk = ByteArray(8192)
+                        var total = 0L
+                        while (true) {
+                            val n = input.read(chunk)
+                            if (n < 0) break
+                            total += n
+                            check(total <= MAX_ASR_FILE_BYTES) {
+                                "录音文件超过 MiniMax 识别的 50 MB 上限"
+                            }
+                            output.write(chunk, 0, n)
+                        }
                     }
-                    out.write(chunk, 0, count)
-                }
-                out.toByteArray()
-            } ?: error("无法读取选中的录音")
+                } ?: error("无法读取选中的录音")
+                require(file.length() > 0) { "录音文件为空" }
+                file
+            } catch (failure: Throwable) {
+                file.delete()
+                throw failure
+            }
         }
-        require(audio.isNotEmpty()) { "录音文件为空" }
-        val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("model", "asr-1.0")
-            .addFormDataPart("response_format", "json")
-            .addFormDataPart("file", "recording", audio.toRequestBody("application/octet-stream".toMediaType()))
-            .build()
-        val root = requestJson(profile, "/v1/speech_to_text", multipart)
-        return root["text"]?.jsonPrimitive?.contentOrNull
-            ?: error("MiniMax 未返回识别文字")
+        return try {
+            val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
+                .addFormDataPart("model", "asr-1.0")
+                .addFormDataPart("response_format", "json")
+                .addFormDataPart("file", "recording", stage.asRequestBody("application/octet-stream".toMediaType()))
+                .build()
+            val root = requestJson(profile, "/v1/speech_to_text", multipart)
+            root["text"]?.jsonPrimitive?.contentOrNull
+                ?: error("MiniMax 未返回识别文字")
+        } finally {
+            stage.delete()
+        }
     }
 
     suspend fun startVideo(profile: LocalModelProfile, prompt: String): String {
