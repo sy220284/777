@@ -8,6 +8,26 @@ package com.labteto.dshmobile.local.chat
  * de-duplicated and bounded here before it reaches generation.
  */
 internal object ChatMemorySelector {
+    /** Search the ongoing public conversation, including when the user only says "嗯". */
+    fun continuityQuery(query: String, context: ChatContextState): String {
+        val text = query.trim()
+        if (RESET_HINTS.any(text::contains)) return text
+        val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
+            .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
+            .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
+        val unresolved = context.continuity.unfinished.takeLast(2)
+        val referents = if (text in LOW_INFORMATION_REPLIES ||
+            IMPLICIT_CONTINUITY_HINTS.any(text::contains)) ongoing + unresolved else emptyList()
+        return (listOf(text) + referents).filter(String::isNotBlank).distinct()
+            .joinToString(" ").takeLast(1_200)
+    }
+
+    fun recallQuery(query: String, context: ChatContextState): String? {
+        if (RESET_HINTS.any(query.trim()::contains)) return null
+        val candidate = continuityQuery(query, context)
+        return candidate.takeIf { it.length >= 2 && it.trim() !in LOW_INFORMATION_REPLIES }
+    }
+
     fun shouldRecall(query: String): Boolean {
         val text = query.trim().lowercase()
         if (text.isBlank()) return false
