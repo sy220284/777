@@ -107,7 +107,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             audio[i] = ((high shl 4) or low).toByte()
         }
         return withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "minimax-media").apply { mkdirs() }
+            val dir = File(context.filesDir, "media-studio").apply { mkdirs() }
             val file = File(dir, "voice-${UUID.randomUUID()}.mp3")
             file.writeBytes(audio)
             file
