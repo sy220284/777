@@ -142,7 +142,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                     // concurrent authority able to contradict an already-active state.
                     val currentStateKnown = viewerSubjectKey == null &&
                         snapshot.chat.chatState.updatedAt != 0L &&
-                        (snapshot.chat.chatState.relationshipState != "熟悉中" ||
+                        (snapshot.chat.chatState.relationshipState !in setOf("熟悉中", "熟悉", "刚认识", "初识") ||
                             snapshot.chat.chatState.dynamics.stage != "FAMILIAR")
                     (memory.kind != MemoryKind.RELATIONSHIP_STATE || !currentStateKnown) &&
                     relationshipMemoryMatchesSubject(
