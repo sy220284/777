@@ -783,7 +783,8 @@ def test():
                 payload.update({"entry": "Entry", "owner": "CHAT",
                                 "test": "app/src/test/java/sample/FeatureTest.kt#entryWorks"})
             source.write_text("// FEATURE_TREE: " + json.dumps(payload, ensure_ascii=False) +
-                              "\nclass Entry {}\n", encoding="utf-8")
+                              ("\n" if action == "retire" else "\nclass Entry {}\n"),
+                              encoding="utf-8")
         def write_outputs(outputs):
             for filename, value in outputs.items():
                 (root / filename).write_text(value, encoding="utf-8")
@@ -807,6 +808,12 @@ def test():
         assert find(parse(tentative[MD])[0], ["B", "新功能"]) is not None
         assert json.loads(tentative[REVIEW])["pending_changes"]
         mark("B / 新功能", action="retire")
+        blocked = generate(root)
+        assert find(parse(blocked[MD])[0], ["B", "新功能"]) is not None
+        assert any("测试" in p["reason"] for p in json.loads(blocked[REVIEW])["pending_changes"])
+        # 退役前相关测试必须退出，并从验收映射解绑。
+        test_file.write_text("class FeatureTest {}\n", encoding="utf-8")
+        (root / MATRIX).write_text(json.dumps({"version": 2, "items": []}), encoding="utf-8")
         removed = generate(root)
         removed_tree, _ = parse(removed[MD])
         assert find(removed_tree, ["B", "新功能"]) is None
