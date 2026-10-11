@@ -75,10 +75,10 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.dynamicPrompt.contains("【此刻】"))
         assertTrue(context.dynamicPrompt.contains("身体：刚下班，有点累"))
         assertTrue(context.dynamicPrompt.contains("正在做：在收拾桌上的东西"))
-        assertTrue(context.dynamicPrompt.contains("【本轮模式】"))
-        assertTrue(context.dynamicPrompt.contains("不是台词模板"))
-        assertTrue(context.dynamicPrompt.contains("用户明确纠正（硬约束）"))
-        assertTrue(context.dynamicPrompt.contains("脑内推理可以比说出口完整"))
+        assertFalse(context.dynamicPrompt.contains("【本轮模式】"))
+        assertTrue(context.stablePrompt.contains("人物修订资料"))
+        assertTrue(context.stablePrompt.contains("嘴硬但会服软"))
+        assertFalse(context.dynamicPrompt.contains("脑内推理"))
         assertFalse(context.dynamicPrompt.contains("【角色表达解释】"))
         assertTrue(context.dynamicPrompt.contains("情绪：不高兴"))
         assertTrue(context.dynamicPrompt.contains("你目前怎么看对方：还记得刚才的争执"))
@@ -114,7 +114,7 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
-    fun genericRestraintStaysAFreeModeSignalInsteadOfHardcodedExpressionRecipe() {
+    fun personalityIsAvailableWithoutAReplyRecipe() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas-restraint.json"), json),
             relationshipEngine = ChatRelationshipEngine(),
@@ -131,12 +131,12 @@ class ChatTurnRunnerPromptPartitionTest {
         )
 
         assertFalse(context.dynamicPrompt.contains("【角色表达解释】"))
-        assertTrue(context.dynamicPrompt.contains("【本轮模式】"))
-        assertTrue(context.dynamicPrompt.contains("表达："))
+        assertFalse(context.dynamicPrompt.contains("【本轮模式】"))
+        assertTrue(context.stablePrompt.contains("克制谨慎，表达含蓄"))
     }
 
     @Test
-    fun continuationInputIsInjectedIntoGenerationPrompt() {
+    fun continuationKeepsSceneBackgroundWithoutAReactionDirective() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas-continuation.json"), json),
             relationshipEngine = ChatRelationshipEngine(),
@@ -150,8 +150,8 @@ class ChatTurnRunnerPromptPartitionTest {
             userInput = "继续",
         )
 
-        assertTrue(context.dynamicPrompt.contains("【继续】"))
-        assertTrue(context.dynamicPrompt.contains("不无过渡跳时、换场或加人"))
+        assertTrue(context.dynamicPrompt.contains("地点=院子"))
+        assertFalse(context.dynamicPrompt.contains("只推进下一拍"))
     }
 
 }
