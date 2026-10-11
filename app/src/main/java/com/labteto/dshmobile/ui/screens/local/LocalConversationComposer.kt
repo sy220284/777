@@ -106,6 +106,7 @@ internal fun LocalConversationComposer(
     var focused by remember { mutableStateOf(false) }
     var capabilityPanel by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+    var steerCurrentRun by remember(state.sessionId) { mutableStateOf(false) }
     LaunchedEffect(state.running) { if (state.running) capabilityPanel = null }
 
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
@@ -165,10 +166,16 @@ internal fun LocalConversationComposer(
             // The Work owner reports an explicit rejection rather than sending it as Chat.
             onSendTeam(input, attachments.toList())
         } else {
-            onSend(input, attachments.toList())
+            onSend(
+                if (state.usageMode == LocalUsageMode.WORK && state.running && steerCurrentRun) {
+                    "/steer " + input
+                } else input,
+                attachments.toList(),
+            )
         }
         if (!result.accepted) return
         capabilityPanel = null
+        steerCurrentRun = false
         onClearTeamDispatch()
         onInputChange("")
         onClearAttachments()
@@ -297,6 +304,30 @@ internal fun LocalConversationComposer(
                     onClick = onClearTeamDispatch,
                     iconSize = 16.dp,
                     tint = colors.labelSecondary,
+                )
+            }
+        }
+        if (state.usageMode == LocalUsageMode.WORK && state.running && !teamDispatchSelected) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DsPill(
+                    text = stringResource(R.string.local_work_next_turn),
+                    selected = !steerCurrentRun,
+                    onClick = { steerCurrentRun = false },
+                )
+                DsPill(
+                    text = stringResource(R.string.local_work_steer_now),
+                    selected = steerCurrentRun,
+                    onClick = { steerCurrentRun = true },
+                )
+                Text(
+                    text = stringResource(R.string.local_work_steer_boundary),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
