@@ -5,7 +5,6 @@ import javax.inject.Singleton
 
 internal enum class ChatRelationshipView {
     IMMERSIVE,
-    STRATEGIST,
     REPLY_COACH,
 }
 
@@ -14,7 +13,6 @@ internal enum class ChatInteractionIntent {
     FLIRTING,
     INTIMATE,
     RELATIONSHIP_PROGRESS,
-    STRATEGIST,
 }
 
 internal fun chineseSuggestiveFlirtingScore(input: String): Int {
@@ -44,10 +42,6 @@ internal fun isInteractionResetIntent(input: String): Boolean {
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
-
-    if (STRATEGIST_INTENT_HINTS.any { text.contains(it) }) {
-        return ChatInteractionIntent.STRATEGIST
-    }
 
     val nonInteractionContext = NON_INTERACTION_INTENT_HINTS.any { text.contains(it) }
     if (NEGATED_INTIMACY_HINTS.any { text.contains(it) }) {
@@ -157,9 +151,7 @@ internal fun nextInteractionIntensity(
     val explicit = classifyExplicitInteractionIntent(input)
     val resolved = resolveChatInteractionIntent(input, previous)
     return when (resolved) {
-        ChatInteractionIntent.NORMAL,
-        ChatInteractionIntent.STRATEGIST,
-        -> 0
+        ChatInteractionIntent.NORMAL -> 0
         ChatInteractionIntent.RELATIONSHIP_PROGRESS ->
             maxOf(1, previous.interactionIntensity.coerceAtMost(2))
         ChatInteractionIntent.INTIMATE -> 5
@@ -316,7 +308,6 @@ private val PROACTIVE_INTIMACY_HINTS = listOf(
 private val RELATIONSHIP_PROGRESS_HINTS = listOf(
     "在一起吧", "做我女朋友", "做我男朋友", "确定关系", "正式交往", "同居吧", "结婚吧",
 )
-private val STRATEGIST_INTENT_HINTS = listOf("帮我分析", "分析一下", "军师", "怎么判断", "什么意思")
 private val NON_INTERACTION_INTENT_HINTS = listOf(
     "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
     "小说", "剧情", "台词", "设定", "翻译",
@@ -344,17 +335,14 @@ private val NEGATED_INTIMACY_HINTS = listOf(
  * Relationship cognition core for Chat mode.
  *
  * HeartFlow contributes persona continuity and gradual relationship change.
- * Goutoujunshi contributes evidence discipline, strategist routing and actionable reply coaching.
- * This layer keeps those semantics independent from any external Skill runtime.
+ * Relationship facts and uncertain impressions remain visible without choosing a response strategy.
+ * Explicit reply coaching remains independent from the ordinary character conversation.
  */
 @Singleton
 class ChatRelationshipEngine @Inject constructor() {
 
     internal fun classify(input: String): ChatRelationshipView {
         val text = input.trim().lowercase()
-        if (STRATEGY_COMMANDS.any { text == it || text.startsWith("$it ") }) {
-            return ChatRelationshipView.STRATEGIST
-        }
         if (REPLY_COACH_COMMANDS.any { text == it || text.startsWith("$it ") }) {
             return ChatRelationshipView.REPLY_COACH
         }
@@ -376,9 +364,6 @@ class ChatRelationshipEngine @Inject constructor() {
             ?.let { appendLine("共同经历：${it.joinToString("；")}") }
         when (classify(input)) {
             ChatRelationshipView.IMMERSIVE -> Unit
-            ChatRelationshipView.STRATEGIST -> appendLine(
-                "【用户显式调用关系分析】根据用户的问题分析已有信息。",
-            )
             ChatRelationshipView.REPLY_COACH -> appendLine(
                 "【用户显式调用回复建议】提供用户可直接发送的回复草稿。",
             )
@@ -386,7 +371,6 @@ class ChatRelationshipEngine @Inject constructor() {
     }.trim()
 
     private companion object {
-        val STRATEGY_COMMANDS = listOf("/strategy", "/analyze", "/debrief", "/军师", "/分析")
         val REPLY_COACH_COMMANDS = listOf("/reply", "/回复建议")
     }
 }
