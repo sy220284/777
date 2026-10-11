@@ -290,7 +290,9 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     fun switchSession(sessionId: String): Boolean {
-        if (sessionCoordinator.summaries().none { it.id == sessionId }) return false
+        if (sessionId != currentSessionId() &&
+            state.value.sessions.none { it.id == sessionId }
+        ) return false
         navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
         continueQueuedNavigation()
         return true
@@ -299,15 +301,16 @@ internal class LocalSessionLifecycleCoordinator(
     private fun startSessionSwitch(sessionId: String): Boolean {
         if (state.value.loading) return false
         if (sessionId == currentSessionId()) return true
-        if (sessionCoordinator.summaries().none { it.id == sessionId }) return false
+        if (state.value.sessions.none { it.id == sessionId }) return false
         // The visible Chat run is cancelled; detached Work runs keep their ownership.
         val cancelVisibleChatRun = navigationBusy()
         if (!beginTransition()) return false
         state.update { it.copy(loading = true) }
         scope.launch {
-            transitionMutex.withLock {
-                try {
-                    if (sessionCoordinator.summaries().none { it.id == sessionId }) {
+            try {
+                transitionMutex.withLock {
+                    try {
+                        if (sessionCoordinator.summaries().none { it.id == sessionId }) {
                         state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
                         return@withLock
                     }
@@ -316,13 +319,16 @@ internal class LocalSessionLifecycleCoordinator(
                     activateSession(sessionId, null)
                     loadSession(sessionId)
                     restartInterruptedSafeJobs()
-                } finally {
-                    endTransition()
-                    state.update { it.copy(loading = false) }
+                    } finally {
+                        endTransition()
+                        state.update { it.copy(loading = false) }
+                    }
                 }
+                startNextQueuedTurnIfIdle()?.start()
+            } finally {
+                // Even a failed restore must not strand a newer navigation tap.
+                continueQueuedNavigation()
             }
-            continueQueuedNavigation()
-            startNextQueuedTurnIfIdle()?.start()
         }
         return true
     }
