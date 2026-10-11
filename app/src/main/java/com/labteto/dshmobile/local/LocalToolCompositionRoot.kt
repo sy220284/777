@@ -112,6 +112,15 @@ internal class LocalToolCompositionRoot @Inject constructor(
             installLanguageServer = { path ->
                 languageServerComponents.ensureInstalled(languageServerResolver.managedHint(path))
             },
+            languageServerStatus = {
+                languageServerComponents.status("probe.ts") + "；" +
+                    languageServerComponents.status("probe.py")
+            },
+            uninstallLanguageServer = { id ->
+                OnDemandLanguageServerManager.Component.entries
+                    .firstOrNull { it.id == id }
+                    ?.let(languageServerComponents::uninstall) ?: false
+            },
             resourceScheduler = runtimeStateStore.resourceScheduler,
             routeProvider = {
                 val current = runtimeStateStore.state.value
