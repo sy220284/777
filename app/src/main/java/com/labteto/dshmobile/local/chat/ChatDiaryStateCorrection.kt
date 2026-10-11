@@ -24,7 +24,7 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
         "CONFLICT", "COOLING", "SEPARATED", "REPAIRING",
     ) }
     val priorDescription = state.stateObservations.firstOrNull {
-        it.field == "relationshipState" && (it.field in invalid || revertedStage != null)
+        it.field == "relationshipState" && it.field in invalid
     }?.previousValue?.takeIf(String::isNotBlank)
     // Legacy states lack source IDs. Only exact old derived values may be withdrawn.
     val old = decisions.flatMap { entry ->
@@ -50,23 +50,25 @@ internal fun reconcileDiaryState(state: ChatCharacterState, entries: List<ChatDi
             }
         }
     }
+    fun relationLabel(stage: String): String = when (stage) {
+        "NEW" -> "刚认识"
+        "FAMILIAR" -> "熟悉中"
+        "AMBIGUOUS" -> "暧昧期"
+        "DATING" -> "约会中"
+        "COMMITTED" -> "稳定关系"
+        "CONFLICT" -> "矛盾期"
+        "COOLING" -> "降温期"
+        "SEPARATED" -> "已分开"
+        "REPAIRING" -> "修复中"
+        else -> state.relationshipState
+    }
     return state.copy(
         physicalState = state.physicalState.takeUnless { withdrawn("physicalState", it) }.orEmpty(),
         mood = state.mood.takeUnless { withdrawn("mood", it) } ?: "自然",
         relationshipState = when {
-            revertedStage != null -> priorDescription ?: when (revertedStage) {
-                "NEW" -> "刚认识"
-                "FAMILIAR" -> "熟悉中"
-                "AMBIGUOUS" -> "暧昧期"
-                "DATING" -> "约会中"
-                "COMMITTED" -> "稳定关系"
-                "CONFLICT" -> "矛盾期"
-                "COOLING" -> "降温期"
-                "SEPARATED" -> "已分开"
-                "REPAIRING" -> "修复中"
-                else -> state.relationshipState
-            }
-            withdrawn("relationshipState", state.relationshipState) -> priorDescription ?: "熟悉中"
+            revertedStage != null -> priorDescription ?: relationLabel(revertedStage)
+            withdrawn("relationshipState", state.relationshipState) ->
+                priorDescription ?: relationLabel(state.dynamics.stage)
             else -> state.relationshipState
         },
         currentFocus = state.currentFocus.takeUnless { withdrawn("currentFocus", it) }.orEmpty(),
