@@ -231,6 +231,9 @@ internal fun LocalConversationSurface(
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
+    var showMiniMaxStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var miniMaxVideoTaskId by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var miniMaxVideoOwnerProfileId by rememberSaveable(state.sessionId) { mutableStateOf("") }
     var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -1204,6 +1207,19 @@ internal fun LocalConversationSurface(
                         onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
                     )
                 }
+                if (activeModelProfile?.model?.startsWith("MiniMax-", ignoreCase = true) == true) {
+                    item {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Image,
+                            label = stringResource(R.string.minimax_media_entry),
+                            modifier = Modifier.width(96.dp),
+                            onClick = {
+                                showAttachmentPicker = false
+                                showMiniMaxStudio = true
+                            },
+                        )
+                    }
+                }
             }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
                 DsSheetChoiceRow(
@@ -1234,6 +1250,31 @@ internal fun LocalConversationSurface(
                     },
                 )
             }
+        }
+    }
+
+    if (showMiniMaxStudio && activeModelProfile?.model?.startsWith("MiniMax-", ignoreCase = true) == true) {
+        DsBottomSheet(
+            title = stringResource(R.string.minimax_media_title),
+            onDismiss = { showMiniMaxStudio = false },
+            scrollable = true,
+        ) {
+            MiniMaxMediaSheetContent(
+                profile = activeModelProfile,
+                videoTaskId = if (miniMaxVideoOwnerProfileId == activeModelProfile.id) miniMaxVideoTaskId else "",
+                onVideoTaskIdChange = { newId ->
+                    miniMaxVideoOwnerProfileId = activeModelProfile.id
+                    miniMaxVideoTaskId = newId
+                },
+                onInsertTranscript = { transcription ->
+                    val previous = drafts[state.sessionId].orEmpty()
+                    drafts.putBoundedLocalDraft(
+                        state.sessionId,
+                        listOf(previous, transcription).filter(String::isNotBlank).joinToString("\n\n"),
+                    )
+                    showMiniMaxStudio = false
+                },
+            )
         }
     }
 
