@@ -29,6 +29,8 @@ internal class ChatInteractionStateReducer {
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 rawState = rawState,
+                stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
+                significance = significance,
             )
         }
         val continuityState = mergeSceneAndContinuity(
@@ -198,9 +200,10 @@ internal class ChatInteractionStateReducer {
         userMessage: String,
         assistantMessage: String,
         rawState: JsonObject?,
+        stageQuote: String,
+        significance: String,
     ): ChatCharacterState {
         val rawDynamics = rawState?.get("dynamics")?.let { runCatching { it.jsonObject }.getOrNull() }
-        val rawPattern = rawState?.get("userPattern")?.let { runCatching { it.jsonObject }.getOrNull() }
         val dynamics = if (rawDynamics == null) {
             previous.dynamics
         } else {
@@ -210,18 +213,13 @@ internal class ChatInteractionStateReducer {
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 raw = rawDynamics,
+                stageQuote = stageQuote,
+                significance = significance,
             )
         }
-        val pattern = if (rawPattern == null && userMessage.isBlank()) {
-            previous.userPattern
-        } else {
-            sanitizeUserPattern(
-                value = value.userPattern,
-                previous = previous.userPattern,
-                userMessage = userMessage,
-                raw = rawPattern,
-            )
-        }
+        // Only measured message length remains active. Legacy model-scored profiles stay
+        // readable in old stories but are never updated from speculative model output.
+        val pattern = measureUserMessageLength(previous.userPattern, userMessage)
         val requestedStage = if (rawDynamics?.containsKey("stage") == true) {
             normalizeStage(value.dynamics.stage)
         } else previous.dynamics.stage
@@ -265,12 +263,9 @@ internal class ChatInteractionStateReducer {
                     .take(3)
                     .toList()
             } else previous.unresolvedThreads,
-            initiative = if (rawState?.containsKey("initiative") == true) {
-                bounded(value.initiative, previous.initiative, 15)
-            } else previous.initiative,
-            shareDesire = if (rawState?.containsKey("shareDesire") == true) {
-                bounded(value.shareDesire, previous.shareDesire, 15)
-            } else previous.shareDesire,
+            // Retired personality drive scores are decoded for older stories only.
+            initiative = previous.initiative,
+            shareDesire = previous.shareDesire,
             dynamics = dynamics,
             evolution = previous.evolution,
             userPattern = pattern,
@@ -350,19 +345,48 @@ internal class ChatInteractionStateReducer {
         }
     }
 
+    /**
+     * Accept a grounded, explicitly described relationship event even when its wording is
+     * absent from the old fixed trigger list. The quote must occur verbatim in this turn.
+     * Do not allow questions, hypotheticals, negation, third-party events or conflicting
+     * explicit directions to be promoted into our relationship state.
+     */
+    private fun groundedRelationshipChangeQuote(
+        proposedStage: String,
+        rawQuote: String,
+        userMessage: String,
+        assistantMessage: String,
+    ): Boolean {
+        val quote = rawQuote.trim().take(180)
+        if (quote.length < 6 || !(userMessage.contains(quote) || assistantMessage.contains(quote))) return false
+        if (!Regex("我们|咱们|你和我|我和你|我们俩|我与你|你与我|你我").containsMatchIn(quote)) return false
+        if (!Regex("关系|伴侣|恋|约会|暧昧|婚|在一起|分开|冷战|和好|喜欢|相爱|分手|彼此|承诺").containsMatchIn(quote)) return false
+        if (Regex("如果|假如|要是|希望|计划|打算|梦见|听说|没有|还没|尚未|并未|不会|不想|不要|不是|前任|朋友|同事|室友|他们|她们|别人").containsMatchIn(quote)) return false
+        if (quote.contains('？') || quote.contains('?') || quote.endsWith("吗")) return false
+        val clearlySeparated = Regex("分手|结束关系|分开了|离婚").containsMatchIn(quote)
+        val clearlyRepaired = Regex("复合|和好|修复关系").containsMatchIn(quote)
+        if (clearlySeparated && proposedStage != "SEPARATED") return false
+        if (clearlyRepaired && proposedStage != "REPAIRING") return false
+        return true
+    }
+
     private fun sanitizeDynamics(
         value: RelationshipDynamics,
         previous: RelationshipDynamics,
         userMessage: String,
         assistantMessage: String,
         raw: JsonObject,
+        stageQuote: String,
+        significance: String,
     ): RelationshipDynamics {
         val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
         // Check that an explicit relationship event supports the requested target stage.
         // Unrelated words (e.g. "我的前任结婚了") cannot advance our relationship.
         val explicitStageEvidence = relationshipStageEventSupports(
             candidateStage, userMessage, assistantMessage,
-        )
+        ) || (significance == "MAJOR" && groundedRelationshipChangeQuote(
+            candidateStage, stageQuote, userMessage, assistantMessage,
+        ))
         val stage = when {
             candidateStage == previous.stage -> previous.stage
             explicitStageEvidence -> candidateStage
@@ -371,11 +395,12 @@ internal class ChatInteractionStateReducer {
 
         return RelationshipDynamics(
             stage = stage,
-            warmth = if (raw.containsKey("warmth")) value.warmth.coerceIn(0, 100) else previous.warmth,
-            trust = if (raw.containsKey("trust")) value.trust.coerceIn(0, 100) else previous.trust,
-            reciprocity = if (raw.containsKey("reciprocity")) value.reciprocity.coerceIn(0, 100) else previous.reciprocity,
-            tension = if (raw.containsKey("tension")) value.tension.coerceIn(0, 100) else previous.tension,
-            stability = if (raw.containsKey("stability")) value.stability.coerceIn(0, 100) else previous.stability,
+            // Historical diagnostic scores are retained for decoding, not recomputed or fed back.
+            warmth = previous.warmth,
+            trust = previous.trust,
+            reciprocity = previous.reciprocity,
+            tension = previous.tension,
+            stability = previous.stability,
             unresolvedConflict = if (raw.containsKey("unresolvedConflict")) {
                 value.unresolvedConflict.trim().take(240)
             } else previous.unresolvedConflict,
@@ -422,53 +447,23 @@ internal class ChatInteractionStateReducer {
         )
     }
 
-    private fun sanitizeUserPattern(
-        value: UserChatPattern,
+    private fun measureUserMessageLength(
         previous: UserChatPattern,
         userMessage: String,
-        raw: JsonObject?,
     ): UserChatPattern {
         val measuredLength = userMessage.trim().length
-        val hasObservation = measuredLength > 0
-        val previousWeight = previous.observedTurns.coerceIn(0, 19)
-        val averageChars = if (hasObservation) {
-            if (previousWeight == 0) {
-                measuredLength
-            } else {
-                ((previous.averageMessageChars * previousWeight) + measuredLength) / (previousWeight + 1)
-            }
-        } else {
-            previous.averageMessageChars
-        }
-        val measuredReplyLength = when {
-            !hasObservation -> null
-            averageChars < 20 -> "short"
-            averageChars < 80 -> "medium"
-            else -> "long"
-        }
-        val modelLength = value.replyLength.trim().lowercase()
-            .takeIf { raw?.containsKey("replyLength") == true && it in ALLOWED_REPLY_LENGTHS }
-        val length = measuredReplyLength ?: modelLength ?: previous.replyLength
-
-        return value.copy(
-            replyLength = length,
-            directness = if (raw?.containsKey("directness") == true) {
-                bounded(value.directness, previous.directness, 10)
-            } else previous.directness,
-            playfulness = if (raw?.containsKey("playfulness") == true) {
-                bounded(value.playfulness, previous.playfulness, 10)
-            } else previous.playfulness,
-            initiative = if (raw?.containsKey("initiative") == true) {
-                bounded(value.initiative, previous.initiative, 10)
-            } else previous.initiative,
-            emojiStyle = if (raw?.containsKey("emojiStyle") == true) {
-                value.emojiStyle.trim().take(120)
-            } else previous.emojiStyle,
-            preferredTone = if (raw?.containsKey("preferredTone") == true) {
-                value.preferredTone.trim().take(120)
-            } else previous.preferredTone,
-            observedTurns = if (hasObservation) (previous.observedTurns + 1).coerceAtMost(1000)
-                else previous.observedTurns,
+        if (measuredLength == 0) return previous
+        val weight = previous.observedTurns.coerceIn(0, 19)
+        val averageChars = if (weight == 0) measuredLength
+            else ((previous.averageMessageChars * weight) + measuredLength) / (weight + 1)
+        // Keep actual observations for the optional reply drafts, never personality scores.
+        return previous.copy(
+            replyLength = when {
+                averageChars < 20 -> "short"
+                averageChars < 80 -> "medium"
+                else -> "long"
+            },
+            observedTurns = (previous.observedTurns + 1).coerceAtMost(1000),
             averageMessageChars = averageChars.coerceIn(0, 2_000),
             updatedAt = System.currentTimeMillis(),
         )
@@ -542,7 +537,6 @@ private companion object {
         const val RECENT_POSE_LIMIT = 4
         const val RECENT_VERBAL_LIMIT = 6
         const val RECENT_ADDRESS_LIMIT = 4
-        val ALLOWED_REPLY_LENGTHS = setOf("short", "medium", "long", "mixed")
         val ALLOWED_SIGNIFICANCE = setOf("NONE", "MINOR", "MAJOR")
         val FACT_SOURCES = setOf("user", "observed", "dialogue", "explicit")
         val ALLOWED_STAGES = setOf(
