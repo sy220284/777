@@ -2074,5 +2074,7 @@
     <string name="media_studio_model_capabilities">已接入创作接口：%1$s（账户权限以实际调用为准）</string>
     <string name="media_studio_view_image">查看生成图片</string>
     <string name="media_studio_previous_video_tasks">当前模型已提交的视频任务</string>
+    <string name="media_studio_video_submitting">正在向服务商提交生成任务，请勿重复操作</string>
+    <string name="media_studio_video_unknown">提交结果未确认：可能已经产生费用，请先核实服务商后台，不要盲目重试</string>
 </resources>
 
