@@ -24,6 +24,13 @@ import org.junit.rules.TemporaryFolder
 class LspPluginTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun defaultInitializeCapabilitiesEnablePushDiagnostics() {
+        val textDocument = DEFAULT_LSP_CLIENT_CAPABILITIES["textDocument"] as? JsonObject
+        assertTrue("客户端必须声明 textDocument 能力", textDocument != null)
+        assertTrue("TypeScript 语言服务器依赖此声明才推送诊断",
+            textDocument?.get("publishDiagnostics") is JsonObject)
+    }
+
     @Test fun registersHiddenAutomaticSemanticTools() = runTest {
         val context = HarnessContext()
         val plugin = LspPlugin(temporary.root, Json, { emptyList() })
