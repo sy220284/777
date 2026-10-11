@@ -60,7 +60,7 @@ internal class CharacterRuntimeProjector(
         return CharacterRuntimeProjection(
             stablePrompt = stablePrompt(activePersona),
             dynamicPrompt = listOf(
-                takeWithinModelTokenBudget(momentPrompt(activePersona, runtimeState), MOMENT_TOKEN_BUDGET),
+                momentPrompt(activePersona, runtimeState),
                 renderCharacterLifePrompt(runtimeState.lifeState),
                 renderChatContextForModel(context),
                 relevantBackgroundPrompt(activePersona, userInput),
@@ -136,6 +136,7 @@ internal class CharacterRuntimeProjector(
         val lines = mutableListOf<String>()
         state.physicalState.takeIf(String::isNotBlank)?.let { lines += "身体：${it.take(140)}" }
         state.mood.takeUnless { it.isBlank() || it == "自然" }?.let { lines += "情绪：${it.take(100)}" }
+        state.activeGoal.takeIf(String::isNotBlank)?.let { lines += "当前目标：${it.take(180)}" }
         state.currentAgenda.takeIf(String::isNotBlank)?.let { lines += "正在做：${it.take(180)}" }
         state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
         state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
@@ -152,7 +153,11 @@ internal class CharacterRuntimeProjector(
         }
         return buildString {
             appendLine("【此刻】")
-            lines.forEach(::appendLine)
+            val budgets = allocateCharacterContextBudget(lines,
+                MOMENT_TOKEN_BUDGET - estimateModelTokens("【此刻】\n") - lines.size)
+            lines.forEachIndexed { index, line ->
+                appendLine(takeWithinModelTokenBudget(line, budgets[index]))
+            }
         }.trim()
     }
 
