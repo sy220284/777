@@ -7,11 +7,20 @@ import com.labteto.dshmobile.local.model.LocalMediaImageResult
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
+import com.labteto.dshmobile.local.model.LocalMediaVideoTaskStore
+import com.labteto.dshmobile.local.model.LocalMediaVideoTask
+import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxNativeMediaClient
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 data class LocalMediaImage(val url: String? = null, val file: File? = null)
 data class LocalMediaVoice(val id: String, val name: String)
@@ -25,7 +34,12 @@ data class LocalMediaVideoStatus(val state: String, val downloadUrl: String?)
 class LocalMediaCreationRuntime @Inject internal constructor(
     private val miniMax: MiniMaxNativeMediaClient,
     private val api: LocalMediaApiClient,
+    private val videoStore: LocalMediaVideoTaskStore,
 ) {
+    // The provider request belongs to the media capability, not a disposable Compose sheet.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
+
     fun models(profiles: List<LocalModelProfile>): List<LocalMediaOffer> = LocalMediaCatalog.offers(profiles)
 
     suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImage {
@@ -68,25 +82,61 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
 
-    suspend fun startVideo(offer: LocalMediaOffer, prompt: String): String {
+    /** Persist before submitting the request. Never retry if provider acceptance is uncertain. */
+    fun createVideo(offer: LocalMediaOffer, prompt: String): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO)
-        return when (offer.provider) {
-            LocalMediaProvider.MINIMAX -> miniMax.startVideo(offer.profile, prompt)
-            LocalMediaProvider.QWEN -> api.startVideo(offer, prompt)
-            else -> error("此服务商尚未接入视频生成")
+        require(prompt.isNotBlank()) { "请填写视频描述" }
+        val task = videoStore.begin(offer)
+        scope.launch {
+            try {
+                val externalId = when (offer.provider) {
+                    LocalMediaProvider.MINIMAX -> miniMax.startVideo(offer.profile, prompt)
+                    LocalMediaProvider.QWEN -> api.startVideo(offer, prompt)
+                    else -> error("此服务商尚未接入视频生成")
+                }
+                videoStore.submitted(task.id, externalId)
+            } catch (cancelled: CancellationException) {
+                videoStore.unknown(task.id, "视频请求被取消，服务商是否接收尚未确认，请勿盲目重试")
+                throw cancelled
+            } catch (failure: Exception) {
+                videoStore.unknown(task.id, failure.message ?: "视频任务提交结果无法确认")
+            }
         }
+        return task
     }
 
-    suspend fun videoStatus(offer: LocalMediaOffer, taskId: String): LocalMediaVideoStatus {
+    /** Read-only provider query using exactly the original account route. */
+    suspend fun refreshVideo(offer: LocalMediaOffer, taskId: String) {
         validate(offer, LocalMediaKind.VIDEO)
-        return when (offer.provider) {
-            LocalMediaProvider.MINIMAX -> miniMax.videoStatus(offer.profile, taskId).let {
-                LocalMediaVideoStatus(it.state, it.downloadUrl)
+        val record = videoStore.find(taskId) ?: error("视频任务不存在或已删除")
+        require(record.belongsTo(offer)) { "任务所属模型账户已变化，请先恢复原配置" }
+        require(record.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
+            "此任务当前没有可查询的服务商任务编号"
+        }
+        val externalId = record.providerTaskId ?: error("服务商未确认任务编号")
+        try {
+            val status = when (offer.provider) {
+                LocalMediaProvider.MINIMAX -> miniMax.videoStatus(offer.profile, externalId).let {
+                    LocalMediaVideoStatus(it.state, it.downloadUrl)
+                }
+                LocalMediaProvider.QWEN -> api.videoStatus(offer, externalId).let {
+                    LocalMediaVideoStatus(it.state, it.downloadUrl)
+                }
+                else -> error("此服务商尚未接入视频任务查询")
             }
-            LocalMediaProvider.QWEN -> api.videoStatus(offer, taskId).let {
-                LocalMediaVideoStatus(it.state, it.downloadUrl)
+            val phase = when (status.state) {
+                "Queueing" -> LocalMediaVideoPhase.QUEUED
+                "Processing" -> LocalMediaVideoPhase.PROCESSING
+                "Success" -> LocalMediaVideoPhase.SUCCEEDED
+                "Failed" -> LocalMediaVideoPhase.FAILED
+                else -> error("不认识的视频任务状态：${status.state}")
             }
-            else -> error("此服务商尚未接入视频任务查询")
+            videoStore.checked(record.id, phase, status.downloadUrl)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            videoStore.queryFailure(record.id, failure.message ?: "任务进度检查失败")
+            throw failure
         }
     }
 
