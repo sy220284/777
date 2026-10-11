@@ -19,6 +19,7 @@ RETIREMENTS = Path("docs/FEATURE-TREE-RETIREMENTS.json")
 LEGACY_IDENTITIES = Path("docs/FEATURE-TREE-LEGACY-IDENTITIES.json")
 EXPLICIT_EVIDENCE = Path("docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json")
 WORKFLOW_EVIDENCE = Path("docs/FEATURE-TREE-WORKFLOW-EVIDENCE.json")
+EXISTENCE_TRIAGE = Path("docs/FEATURE-EXISTENCE-TRIAGE.json")
 import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
@@ -1077,7 +1078,32 @@ def generate(root):
         root, all_leaves, evidence
     )
     unresolved_features = classify_unproven_features(evidence, root)
+    followup = {}
+    followup_file = root / EXISTENCE_TRIAGE
+    if followup_file.is_file():
+        followup_json = json.loads(followup_file.read_text(encoding="utf-8"))
+        if followup_json.get("version") != 1 or not isinstance(followup_json.get("items"), list):
+            raise ValueError("功能存在性专项核查登记格式错误")
+        expected = {x["path"] for x in unresolved_features}
+        for entry in followup_json["items"]:
+            key = entry.get("path")
+            if not isinstance(key, str) or key in followup or key not in expected:
+                raise ValueError("存在性核查记录重复或不在源证据待核清单")
+            followup[key] = {
+                "kind": entry["kind"],
+                "availability": entry["availability"],
+                "separate_product_entry": entry["independent"],
+                "production_sources_confirmed": len(entry["source"]),
+                "test_methods_confirmed": len(entry["test"]),
+                "explanation": entry["conclusion"],
+            }
+        if set(followup) != expected:
+            raise ValueError("存在性核查必须覆盖全部未纳入旧历史源码证据的条目")
+        for item in unresolved_features:
+            item["followup"] = followup[item["path"]]
     for record in evidence:
+        if record["path"] in followup:
+            record["followup"] = followup[record["path"]]
         binding = identities.get(record["path"])
         if binding is not None:
             record["identity_id"] = binding["id"]
@@ -1101,6 +1127,9 @@ def generate(root):
                     child["missingSourceCount"] = len(item["missing_production_sources"])
                     child["workflowJobCount"] = len(item.get("workflow_evidence", []))
                     child["unrunTestCount"] = len(item.get("explicit_test_candidates", []))
+                    if "followup" in item:
+                        child["followupKind"] = item["followup"]["kind"]
+                        child["followupAvailability"] = item["followup"]["availability"]
                     if "identity_id" in item:
                         child["identityId"] = item["identity_id"]
                         child["identityStatus"] = item["identity_status"]
@@ -1186,6 +1215,9 @@ def generate(root):
         "ambiguous_named_entry_paths": ambiguous_identities,
         "ambiguous_named_entry_groups": ambiguous_source_anchors(root, evidence),
         "unproven_feature_triage": unresolved_features,
+        "followup_investigated_descriptions": len(followup),
+        "followup_production_or_compatibility": sum(x["production_sources_confirmed"] > 0 for x in followup.values()),
+        "followup_test_only_descriptions": sum(x["production_sources_confirmed"] == 0 for x in followup.values()),
         "observed_code_delta": delta,
         "source_verified_registrations": len(registry_nodes),
         "explicit_retirements": len(retired),
@@ -1208,6 +1240,7 @@ def generate(root):
     index["observed_delta"] = delta
     index["tracked_legacy_identities"] = len(identities)
     index["unproven_feature_count"] = len(unresolved_features)
+    index["followup_investigated_descriptions"] = len(followup)
     index["workflow_evidence_features"] = sum(bool(v.get("workflow_evidence")) for v in evidence)
     index["declared_unexecuted_test_methods"] = sum(len(v.get("explicit_test_candidates", [])) for v in evidence)
     index["verified_registrations"] = sorted(registry_nodes)
