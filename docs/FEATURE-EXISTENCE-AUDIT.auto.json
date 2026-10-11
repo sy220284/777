@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "22d5b79ba369",
+  "source_snapshot": "8a5847b7e909",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -13,7 +13,7 @@
     "weak_source_with_named_class_or_object": 53,
     "weak_source_with_distinctive_named_declarations": 76,
     "weak_source_referenced_by_other_production": 76,
-    "weak_source_referenced_by_tests": 68,
+    "weak_source_referenced_by_tests": 67,
     "weak_source_reused_across_tree_leaves": 49,
     "weak_source_without_external_or_test_symbol_reference": 0,
     "runtime_verified_usable_count": null
@@ -2046,7 +2046,7 @@
       "best_static_cross_file_symbol": "metadata",
       "source_file_shared_by_tree_descriptions": 3,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 52,
+      "other_production_symbol_reference_count": 51,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
@@ -2383,7 +2383,7 @@
       "best_static_cross_file_symbol": "metadata",
       "source_file_shared_by_tree_descriptions": 3,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 52,
+      "other_production_symbol_reference_count": 51,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
@@ -2432,7 +2432,7 @@
       "best_static_cross_file_symbol": "metadata",
       "source_file_shared_by_tree_descriptions": 3,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 52,
+      "other_production_symbol_reference_count": 51,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
@@ -2559,7 +2559,7 @@
       "best_static_cross_file_symbol": "current",
       "source_file_shared_by_tree_descriptions": 2,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 204,
+      "other_production_symbol_reference_count": 203,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt",
@@ -2569,15 +2569,15 @@
         "app/src/main/java/com/labteto/dshmobile/automation/WebhookListener.kt",
         "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt"
       ],
-      "test_file_symbol_reference_count": 40,
+      "test_file_symbol_reference_count": 39,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/connection/RetiredRemoteUpgradeAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalModelProfileStoreAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/components/MobileLayoutRegressionTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalComposerReasoningRegressionTest.kt",
-        "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPageRegressionTest.kt",
-        "app/src/test/java/com/labteto/dshmobile/automation/OfflineAutomationAcceptanceTest.kt"
+        "app/src/test/java/com/labteto/dshmobile/automation/OfflineAutomationAcceptanceTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/DeepSeekBillingTest.kt"
       ],
       "separate_product_entry": null,
       "static_integration_hint": "candidate_external_source_reference",
@@ -2677,14 +2677,12 @@
         "BackgroundAnalysis",
         "BackgroundRegion",
         "BackgroundRegionStats",
-        "FluidGlassBackdrop",
         "LoadedBackground",
         "PixelSample",
         "WallpaperSurfaceLevel",
         "adaptiveGlobalVeil",
         "adjustedSurfaceAlpha",
         "analyzeBackground",
-        "fluidSurfaceColor",
         "rememberBackground",
         "resolveWallpaperAlpha",
         "rootSurface",
@@ -2704,10 +2702,8 @@
         "app/src/main/java/com/labteto/dshmobile/ui/components/DsDeliverableCard.kt",
         "app/src/main/java/com/labteto/dshmobile/ui/components/DsSegmented.kt"
       ],
-      "test_file_symbol_reference_count": 1,
-      "test_reference_samples": [
-        "app/src/test/java/com/labteto/dshmobile/ui/theme/FluidGlassReadabilityTest.kt"
-      ],
+      "test_file_symbol_reference_count": 0,
+      "test_reference_samples": [],
       "separate_product_entry": null,
       "static_integration_hint": "candidate_external_source_reference",
       "source_uniqueness_hint": "source_associated_with_one_tree_leaf",
@@ -2912,7 +2908,7 @@
       "best_static_cross_file_symbol": "surface",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 61,
+      "other_production_symbol_reference_count": 60,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/connection/AppSettings.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",

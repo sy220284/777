@@ -42,7 +42,7 @@ internal object LocalToolPolicy {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
         "job_list", "job_output", "job_kill", "json_query", "environment_info",
         "todo_write", "create_goal", "get_goal", "update_goal",
-        "skill", "subagent_fork", "list_subagent_models", "list_agents", "send_message",
+        "skill", "subagent_fork", "list_agents", "send_message",
         "interrupt_agent", "workflow", "team_members", "team_member_status",
         "team_create_member", "team_start_member", "team_spawn", "team_send_message",
         "team_messages", "team_wait_for_message", "team_task_create", "team_task_get",
@@ -53,7 +53,7 @@ internal object LocalToolPolicy {
         "session_event_trace", "session_event_read", "present" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
         "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
-        "ask_user_question", "subagent", "session_event_search" -> ToolExposure.CORE
+        "ask_user_question", "subagent", "list_subagent_models", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
     }
 
@@ -167,7 +167,7 @@ internal object LocalToolPolicy {
             "skill" -> setOf("技能", "skill")
             "subagent" -> setOf("子代理", "只读代理", "继承上下文", "并行代理", "subagent")
             "subagent_fork" -> setOf("可写子代理", "继承权限", "fork", "代理写入")
-            "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表")
+            "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表", "模型配置", "密钥可用模型")
             "list_agents", "send_message", "interrupt_agent" -> setOf("代理", "agent", "子任务", "消息", "中断")
             "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
             "team_members", "team_member_status", "team_create_member", "team_start_member",

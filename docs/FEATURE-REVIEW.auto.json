@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "22d5b79ba369",
+  "snapshot": "8a5847b7e909",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1375,
+  "code_files_scanned": 1369,
   "production_sources_scanned": 800,
-  "feature_nodes": 542,
-  "functional_leaves": 445,
+  "feature_nodes": 541,
+  "functional_leaves": 444,
   "existing_executable_test_mappings": 128,
   "leaf_evidence": [
     {
@@ -5432,38 +5432,6 @@
       "identity_status": "静态声明已核，尚未授权自动改树"
     },
     {
-      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
-      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
-      "test_reference_count": 0,
-      "historical_grade": null,
-      "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
-        "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt"
-      ],
-      "missing_production_sources": [],
-      "named_symbols": [
-        {
-          "symbol": "localSettingsFeatureUiContribution",
-          "declaration_found": true
-        },
-        {
-          "symbol": "MiniMaxQuotaPage",
-          "declaration_found": true
-        }
-      ],
-      "explicit_source_anchor": true,
-      "explicit_static_scope": "侧边栏入口由设置功能统一负责，额度页与账户查询源码存在；测试方法直接引用导航入口，真实账户及设备效果待验证。",
-      "explicit_test_candidates": [
-        {
-          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt",
-          "method": "quotaDrawerOpensQuotaDirectlyAndClosesDrawer",
-          "references": "localSettingsFeatureUiContribution",
-          "status": "仅发现测试源码，未验证CI是否执行通过"
-        }
-      ],
-      "workflow_evidence": []
-    },
-    {
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
       "verification": "具名源码声明存在（静态，待调用链复核）",
       "test_reference_count": 0,
@@ -8261,12 +8229,12 @@
     "具名源码声明存在（静态，待调用链复核）": 210,
     "历史生产文件仍存在（待入口复核）": 73,
     "没有可确认的现行入口证据": 14,
-    "具名源码及仪表测试声明存在（静态，未执行）": 3,
+    "具名源码及仪表测试声明存在（静态，未执行）": 2,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 3,
+  "declared_unexecuted_test_methods": 2,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [],
   "ambiguous_named_entry_paths": [
@@ -9021,28 +8989,75 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "4c9cfc98af44",
+    "baseline": "bf8f52dc4c82",
     "added_production_files": [
       "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
       "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
       "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaDocument.kt",
       "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaResultStore.kt",
       "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaVideoTaskStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelBudgetPolicy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
       "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MiniMaxQuotaPage.kt"
     ],
-    "removed_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMiniMaxMediaRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaSheet.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaViewModel.kt"
-    ],
+    "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatContextAssembler.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStateCorrection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionModels.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanner.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPromptBuilder.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionStateReducer.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPostTurnPatchNormalizer.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatRelationshipEngine.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatMemoryRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspaceToolGuide.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/DeepSeekBilling.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelProfiles.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalRecoverableToolResultProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalToolHistoryProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalWorkRuntimeContext.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalHarnessUiState.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsDataFacade.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeInstallation.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalExecutionService.kt",
       "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
       "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolFailure.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolRouter.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/usage/TokenUsageDatabase.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalStructuredWorkStateProjection.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionBudget.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistorySummaryStrategy.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStateCueExtractor.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkToolResultRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt",
       "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -9050,7 +9065,7 @@
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 2,
+  "source_verified_registrations": 1,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [],
