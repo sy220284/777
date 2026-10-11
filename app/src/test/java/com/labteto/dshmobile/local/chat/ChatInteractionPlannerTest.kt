@@ -83,7 +83,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun firstPersonTopicSwitchClearsOldTopicButQuotationAndNegationDoNot() {
+    fun topicSwitchWordsDoNotInventResolutionOfExistingEvents() {
         val previous = ChatCharacterState(
             currentFocus = "未解决的旧话题",
             currentAgenda = "继续旧讨论",
@@ -92,9 +92,9 @@ class ChatInteractionPlannerTest {
         val patch = """{"state":{},"turnSignificance":"NONE"}"""
         listOf("我想换个话题", "我们先换个话题", "我想先不聊这个", "我希望换个话题").forEach { user ->
             val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
-            assertEquals("", state.currentFocus)
-            assertEquals("", state.currentAgenda)
-            assertTrue(state.unresolvedThreads.isEmpty())
+            assertEquals(previous.currentFocus, state.currentFocus)
+            assertEquals(previous.currentAgenda, state.currentAgenda)
+            assertEquals(previous.unresolvedThreads, state.unresolvedThreads)
         }
         listOf("我不想换个话题", "昨天他说我想换个话题").forEach { user ->
             val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
