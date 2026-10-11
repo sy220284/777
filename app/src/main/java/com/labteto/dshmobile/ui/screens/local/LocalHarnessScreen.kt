@@ -836,7 +836,7 @@ fun LocalHarnessScreen(
                 onNewSingle = {
                     if (viewModel.createSingleChatSession()) {
                         showNewSessionMode = false
-                        resetFeatureNavigation()
+                        // The settled session observer owns navigation reset.
                     }
                 },
             )
@@ -848,7 +848,7 @@ fun LocalHarnessScreen(
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
                         showNewSessionMode = false
-                        resetFeatureNavigation()
+                        // The settled session observer owns navigation reset.
                     }
                 },
             )
@@ -874,7 +874,7 @@ fun LocalHarnessScreen(
                 val created = viewModel.createGroupChatSession(ids)
                 if (created) {
                     showGroupSetup = false
-                    resetFeatureNavigation()
+                    // Wait for the committed group session before resetting feature navigation.
                 }
                 created
             },
