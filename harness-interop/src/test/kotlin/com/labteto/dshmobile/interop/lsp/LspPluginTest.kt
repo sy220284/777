@@ -398,9 +398,11 @@ class LspPluginTest {
         Assume.assumeTrue(File("/bin/sh").isFile)
         val file = temporary.newFile("late.ts").apply { writeText("const value: string = 123;\n") }
         val uri = file.toURI().toString()
+        // Real TypeScript servers can publish file:/// while Java File.toURI gives file:/.
+        val publishedUri = java.net.URI("file", "", file.toURI().path, null).toString()
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val init = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
-        val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$uri","version":1,"diagnostics":[{"message":"Type number is not assignable to string","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
+        val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$publishedUri","version":1,"diagnostics":[{"message":"Type number is not assignable to string","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
         val script = temporary.newFile("delayed-diagnostics.sh").apply {
             writeText(
                 "printf '%s' '" + frame(init) + "'\n" +
