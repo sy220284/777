@@ -29,26 +29,33 @@ internal class DiagnosticWriteQueue<T>(
     private var inFlight: List<T> = emptyList()
     private var draining = false
     private var overflow = 0L
+    private var ordinaryCount = 0
     private var writeError: String? = null
 
     fun offer(entry: T) {
+        val priority = important(entry)
         val start = synchronized(gate) {
             if (pending.size >= capacity) {
-                val expendable = pending.iterator()
-                var removed = false
-                while (expendable.hasNext()) {
-                    if (!important(expendable.next())) {
-                        expendable.remove()
-                        removed = true
-                        break
+                if (ordinaryCount > 0) {
+                    val expendable = pending.iterator()
+                    while (expendable.hasNext()) {
+                        if (!important(expendable.next())) {
+                            expendable.remove()
+                            ordinaryCount--
+                            break
+                        }
                     }
+                    pending.addLast(entry)
+                    if (!priority) ordinaryCount++
+                } else if (priority) {
+                    pending.removeFirst()
+                    pending.addLast(entry)
                 }
-                // A routine debug/info row must never evict an outstanding failure.
-                if (!removed && important(entry)) pending.removeFirst()
+                // When full of failures, an incoming ordinary message is discarded.
                 overflow++
-                if (removed || important(entry)) pending.addLast(entry)
             } else {
                 pending.addLast(entry)
+                if (!priority) ordinaryCount++
             }
             if (draining) false else {
                 draining = true
@@ -74,6 +81,7 @@ internal class DiagnosticWriteQueue<T>(
     /** Only used by the test/maintenance clear path. The disk lock must be held by the caller. */
     fun clearPending() = synchronized(gate) {
         pending.clear()
+        ordinaryCount = 0
         overflow = 0L
         writeError = null
     }
@@ -86,14 +94,21 @@ internal class DiagnosticWriteQueue<T>(
                     return
                 }
                 buildList {
-                    repeat(minOf(batchSize, pending.size)) { add(pending.removeFirst()) }
+                    repeat(minOf(batchSize, pending.size)) {
+                        val item = pending.removeFirst()
+                        if (!important(item)) ordinaryCount--
+                        add(item)
+                    }
                 }.also { inFlight = it }
             }
             try {
                 writer(batch)
             } catch (error: Exception) {
                 synchronized(gate) {
-                    batch.asReversed().forEach(pending::addFirst)
+                    batch.asReversed().forEach { item ->
+                        pending.addFirst(item)
+                        if (!important(item)) ordinaryCount++
+                    }
                     inFlight = emptyList()
                     writeError = error.javaClass.simpleName
                     draining = false

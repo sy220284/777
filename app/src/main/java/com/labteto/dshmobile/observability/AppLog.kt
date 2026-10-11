@@ -211,8 +211,13 @@ object AppLog {
             entries.addLast(entry)
         }
         if (synchronous) {
-            runCatching { persistBatch(listOf(entry)) }
-                .onFailure { failure ->
+            // Fatal diagnostics also need the preceding buffered events for cause reconstruction.
+            runCatching {
+                synchronized(persistenceLock) {
+                    val preceding = pendingWrites.snapshot().outstanding.takeLast(MAX_EXPORT_ENTRIES)
+                    persistBatch(preceding + entry)
+                }
+            }.onFailure { failure ->
                     runCatching { Log.e("AppLog", "Fatal diagnostic persistence failed", sanitizedThrowableForLogcat(failure)) }
                 }
         } else if (persistentFile != null) {

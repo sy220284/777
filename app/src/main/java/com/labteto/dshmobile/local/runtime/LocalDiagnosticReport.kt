@@ -69,21 +69,25 @@ internal fun appendLocalDiagnosticDetails(
         cursor = nextCursor
     }
     val logDiagnostics = eventLog.diagnostics()
+    val sessionComplete = logDiagnostics.malformedRows == 0 &&
+        logDiagnostics.segmentReadFailures == 0 && logDiagnostics.archiveFailures == 0
+    appendLine(if (sessionComplete) "会话事件完整性：正常" else "会话事件完整性：存在损坏或读取失败，请检查下列计数")
     appendLine(
         "持久事件：导出最近 ${events.size} 条；latest_sequence=$latestSequence；" +
             "malformed_rows=${logDiagnostics.malformedRows} " +
             "segment_read_failures=${logDiagnostics.segmentReadFailures} " +
             "archive_failures=${logDiagnostics.archiveFailures}",
     )
+    val exportKeysByType = HashMap<String, List<String>>()
     events.forEach { event ->
         append("event seq=").append(event.sequence)
         append(" at=").append(event.createdAt)
         append(" feature=").append(event.type.substringBefore('/'))
         append(" type=").append(event.type)
         append(" payload_chars=").append(event.data.toString().length)
-        (DIAGNOSTIC_EVENT_KEYS + DIAGNOSTIC_EVENT_TYPE_KEYS[event.type].orEmpty())
-            .distinct()
-            .forEach { key ->
+        exportKeysByType.getOrPut(event.type) {
+            (DIAGNOSTIC_EVENT_KEYS + DIAGNOSTIC_EVENT_TYPE_KEYS[event.type].orEmpty()).distinct()
+        }.forEach { key ->
             event.data[key]?.toString()?.let { value ->
                 append(" ").append(key).append("=")
                 append(
