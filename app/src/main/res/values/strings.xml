@@ -1157,9 +1157,9 @@
 
     <string name="settings_page_chat">聊天</string>
     <string name="settings_chat_subtitle">流式过滤、过滤词与命中记录</string>
-    <string name="settings_chat_style_guard">聊天流式安全过滤</string>
-    <string name="settings_chat_style_guard_hint">开启后，在流式显示前拦截内置、自定义和当前角色的禁用表达；关闭后不做本地输出审查，模型内容直接流式显示。</string>
-    <string name="settings_chat_filter_disabled_notice">当前已关闭本地输出审查：模型内容会直接流式显示。角色卡中的用语约束仍会作为提示词提供给模型，但不会在输出后过滤或重写。</string>
+    <string name="settings_chat_style_guard">自定义表达过滤</string>
+    <string name="settings_chat_style_guard_hint">按你添加的过滤词和人物作者填写的禁用表达过滤流式回复。</string>
+    <string name="settings_chat_filter_disabled_notice">自定义表达过滤已关闭，回复中的用词保留模型原文。</string>
     <string name="settings_chat_builtin_filters_title">内置过滤词（%1$d）</string>
     <string name="settings_chat_custom_filters_title">自定义过滤词（%1$d）</string>
     <string name="settings_chat_custom_filter_hint">输入要追加过滤的词或短语</string>
