@@ -528,7 +528,16 @@ def generate(root):
             parts(item["previous_path"]) if item.get("previous_path") else None
         )
         exists = find(model, target)
-        if exists is not None and target != source_path and (
+        historical_match = []
+        if not was:
+            historic_removed, historic_current = historical_code_evidence(root, [])
+            historical_match = [x for x in historic_removed + historic_current
+                                if x["path"] == item["path"]]
+        allowed_adoption = (not was and exists is not None and
+                            not exists["children"] and
+                            any(item["source"] in x["historical_production_sources"]
+                                for x in historical_match))
+        if exists is not None and not allowed_adoption and target != source_path and (
             not was or target != parts(was["path"])
         ):
             pending.append({"id": ident, "path": item["path"],
@@ -556,6 +565,13 @@ def generate(root):
                 delete(model, parts(item["previous_path"]))
                 deleted.append(parts(item["previous_path"]))
                 old_paths[item["previous_path"]] = item["path"]
+        # 新功能不能把既有末级功能变成分类节点而不经人工审核。
+        parent = find(model, target[:-1])
+        if parent is not None and not parent["children"] and len(target) > 1:
+            pending.append({"id": ident, "path": item["path"],
+                            "status": "原末级功能不能直接变为分类",
+                            "reason": "需审核新父子层级与原功能测试的归属"})
+            continue
         add(model, parts(item["path"]))
     for old in deleted:
         prune_empty(model, old)
