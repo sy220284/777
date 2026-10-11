@@ -121,7 +121,7 @@ class LocalExecutionService : Service() {
         runCatching {
             val manager = getSystemService(android.app.NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification(null))
-        }
+        }.onFailure { AppLog.failure("LocalExecutionService", "update_foreground_notification", it) }
         return START_STICKY
     }
 
@@ -174,7 +174,10 @@ class LocalExecutionService : Service() {
 
     private fun postCompletion(sessionId: String, outcome: String) {
         scope.launch {
-            if (!runCatching { hostsStore.settingsOnce().notifyLocalJobs }.getOrDefault(true)) {
+            if (!runCatching { hostsStore.settingsOnce().notifyLocalJobs }
+                    .onFailure { AppLog.failure("LocalExecutionService", "read_notification_setting", it,
+                        sessionId = sessionId) }
+                    .getOrDefault(true)) {
                 return@launch
             }
             val failed = outcome == OUTCOME_FAILED

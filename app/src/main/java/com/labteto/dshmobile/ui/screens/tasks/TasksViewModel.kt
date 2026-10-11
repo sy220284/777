@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tasks
 import androidx.lifecycle.ViewModel
+import com.labteto.dshmobile.observability.AppLog
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
@@ -145,7 +146,8 @@ class TasksViewModel @Inject constructor(
             quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
             proactiveMinGapMinutes, proactiveMaxUnanswered, notify,
         )
-    }.getOrDefault(false).also { if (it) refresh() }
+    }.onFailure { AppLog.failure("TaskScheduling", "update_scheduled_task", it) }
+        .getOrDefault(false).also { if (it) refresh() }
     fun createAt(
         prompt: String,
         firstRunAt: Long,
@@ -215,7 +217,8 @@ class TasksViewModel @Inject constructor(
                 )
             }
             refresh()
-        }.isSuccess
+        }.onFailure { AppLog.failure("TaskScheduling", "create_scheduled_task", it) }
+            .isSuccess
     }
     fun updateChatPolicy(
         task: AutomationTask,
@@ -239,7 +242,8 @@ class TasksViewModel @Inject constructor(
             proactiveMaxUnanswered = proactiveMaxUnanswered,
             notify = notify,
         )
-    }.getOrDefault(false).also { if (it) refresh() }
+    }.onFailure { AppLog.failure("TaskScheduling", "update_chat_policy", it) }
+        .getOrDefault(false).also { if (it) refresh() }
 
     private fun canPlanChat(snapshot: LocalHarnessTaskState): Boolean =
         snapshot.usageMode == LocalUsageMode.CHAT &&
