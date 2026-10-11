@@ -1165,7 +1165,7 @@
 
 
     <string name="settings_page_chat">聊天</string>
-    <string name="settings_chat_subtitle">表达偏好与最近未遵循记录</string>
+    <string name="settings_chat_subtitle">避用表达与人物表达偏好</string>
     <string name="settings_chat_style_guard">表达偏好</string>
     <string name="settings_chat_style_guard_hint">把你填写的避用表达交给模型参考，回复原文完整保留。</string>
     <string name="settings_chat_filter_disabled_notice">表达偏好已关闭，回复中的用词保留模型原文。</string>
@@ -1178,6 +1178,8 @@
     <string name="settings_chat_persona_filters_title">当前人物的避用表达（%1$d）</string>
     <string name="settings_chat_persona_filters_empty">当前人物没有填写额外表达偏好。</string>
     <string name="settings_chat_guard_hits_title">最近未遵循的表达偏好</string>
+    <string name="settings_chat_guard_hits_show">查看最近诊断（%1$d）</string>
+    <string name="settings_chat_guard_hits_hide">收起最近诊断（%1$d）</string>
     <string name="settings_chat_guard_hits_empty">最近没有未遵循记录。</string>
     <string name="settings_chat_guard_hits_clear">清空记录</string>
     <string name="local_mode_intro_chat">和你创建的人物自然聊天，延续之前的故事和彼此的关系。</string>

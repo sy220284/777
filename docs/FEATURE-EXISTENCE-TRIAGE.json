@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "snapshot_scope": "14个旧报告无确认入口条目的人工源码和测试溯源",
+  "limits": "独立存在按是否具有产品级单独入口；静态可到达与真实能用须结合设备/模型运行验证，单元或仪表测试方法的存在不能视为通过",
+  "items": [
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "kind": "integrated_character_profile",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+          "symbol": "CharacterFactCategories"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterRuntimeProjector.kt",
+          "symbol": "CharacterRuntimeProjector"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterFactsV4Test.kt",
+          "method": "v4IdentityFactsAndSourcesRoundTrip"
+        }
+      ],
+      "conclusion": "确有16类规范人物资料与运行时投影；作为人物档案子能力存在，没有独立模块或入口。可在应用现有聊天/人设链路使用的静态证据成立，实际交互待设备验证。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
+      "kind": "active_sampling_subfeature",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialog.kt",
+          "symbol": "CharacterBehaviorTuningDialog"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "composerAndPersonaShareOneStoredTemperaturePosition"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterBehaviorTuningDialogTest.kt",
+          "method": "expressionVariationDisplaysMappedChatTemperature"
+        }
+      ],
+      "conclusion": "采样温度使用独立存储字段，人物编辑与聊天共用；属于正在使用的模型设置，能否被每一种模型接受需要连接真实模型验证。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
+      "kind": "retired_controller_compatibility",
+      "independent": false,
+      "availability": "legacy_fields_decodable_active_controls_retired",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt",
+          "symbol": "resolveCharacterBehaviorTuning"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "legacyBehaviorAxesNoLongerRepresentAnActiveSetting"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "retiredParametersDoNotChangeTheActiveSamplingSignature"
+        }
+      ],
+      "conclusion": "历史控制轴仍能反序列化；旧反应控制已退出主动功能，只保留数据兼容。功能树应标注退役兼容，不能计作独立活跃控制器。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
+      "kind": "cross_component_invariant",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatMemoryBinding.kt",
+          "symbol": "relationshipMemoryMatchesSubject"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+          "symbol": "CharacterBehaviorTuning"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/ChatMemoryBindingTest.kt",
+          "method": "boundRelationshipMemoryOnlyMatchesItsCharacter"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningTest.kt",
+          "method": "oldTuningCannotOverwriteCharacterContext"
+        }
+      ],
+      "conclusion": "角色记忆归属与温度字段由不同组件维护，是隔离性质，不存在专门可点击的单项功能。"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "kind": "partial_expression_guidance",
+      "independent": false,
+      "availability": "partial_scope_code_and_tests_present",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+          "symbol": "renderChatExpressionPreferences"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStyleGuard.kt",
+          "symbol": "ChatStyleGuard"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatTurnRunner.kt",
+          "symbol": "ChatTurnRunner"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/ChatStyleGuardTest.kt",
+          "method": "explicitPreferencesEnterGenerationAndMissesRemainDiagnostic"
+        }
+      ],
+      "conclusion": "偏好提示注入及答复诊断链路存在；不能据此证明作者偏好拥有独立设置入口，亦无法证明重复诊断覆盖所有语境。回复后不执行硬删文本。"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
+      "kind": "shared_tool_pipeline",
+      "independent": false,
+      "availability": "code_and_tests_present_execution_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+          "symbol": "LocalToolOutputStore"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
+          "symbol": "LocalToolCatalog"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalToolOutputStoreTest.kt",
+          "method": "storesAndPagesSingleLineOutputByUtf8ByteRange"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalModelToolCallContractTest.kt",
+          "method": "nonStreamingAndHistoryRejectAbsentOrMalformedArgumentsAndIdentity"
+        }
+      ],
+      "conclusion": "工具输出留存与工具调用参数验证各有实际代码和测试，是共享工具执行链路中的两个能力；没有专用独立产品页面。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
+      "kind": "composite_bundled_runtimes",
+      "independent": false,
+      "availability": "code_and_instrumentation_sources_present_device_unverified",
+      "source": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt",
+          "symbol": "LocalBundledRuntimeManager"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
+          "symbol": "BundledNodeRuntime"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
+          "symbol": "BundledPythonRuntime"
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbol": "BundledGitRuntime"
+        }
+      ],
+      "test": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledNodeRuntimeTest.kt",
+          "method": "bundledNodeRunsJavaScriptAndChildProcessOnAndroid16"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledPythonRuntimeTest.kt",
+          "method": "bundledPythonRunsStdlibAndAndroidShellOnAndroid16"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledGitRuntimeTest.kt",
+          "method": "bundledGitRunsCoreRepositoryWorkflowOnAndroid16"
+        }
+      ],
+      "conclusion": "Node/Python/Git有各自运行时安装代码，通过共享运行时管理器组合供工具链使用；拥有三项Android设备测试源码，但目前无此PR对应设备通过证据。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/LocalAgentTeamUiRegressionTest.kt",
+          "method": "rebuildingStatusDoesNotPretendToRecruitMembers"
+        }
+      ],
+      "conclusion": "这是团队工作界面的回归测试描述，不构成单独提供给用户的一项功能；测试方法存在，是否实际通过取决于CI设备任务。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/ui/screens/tools/LocalSkillDisplayNameDocumentTest.kt",
+          "method": "editingExistingSkillUpdatesOnlyDisplayNameInItsSourceFile"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalSkillStoreTest.kt",
+          "method": "existingCustomSkillReadsChineseHeadingAndRefreshesAfterRename"
+        }
+      ],
+      "conclusion": "技能编辑属于已有技能能力，本条对应回归验证。测试代码存在，无法当成新增的独立产品功能。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "reference-validation/src/test/kotlin/com/labteto/dshmobile/reference/ReferenceConformanceTest.kt",
+          "method": "nativeCoreMatchesPinnedOfficialGoldenCases"
+        }
+      ],
+      "conclusion": "官方固定样本比对用例存在，归属工程验证；具体金样本来源、测试执行结果应另查，不能作为单独业务功能。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreCorruptionTest.kt",
+          "method": "registrySurvivesDeletionAndCanRecoverFromCorruptionWithoutLosingSessions"
+        },
+        {
+          "path": "harness-core/src/test/kotlin/com/labteto/dshmobile/harness/session/VersionedSessionStoreConcurrencyTest.kt",
+          "method": "backupRecoveryCannotOverwriteAConcurrentNewerWrite"
+        }
+      ],
+      "conclusion": "持久会话属于共享能力；本条是其兼容/损坏/并发回归集合，测试代码存在但需要对应CI任务实际通过。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "agentTeamProjectionInWorkSessionDoesNotHideOtherChatGroupOrWorkSessions"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/LocalSessionRepositoryTest.kt",
+          "method": "reopenedSessionAndHistoryAuthorizationIgnoreNestedAgentTeamProjectionFiles"
+        }
+      ],
+      "conclusion": "多类型会话与历史隔离测试存在；本条为跨模块回归集合，不能计作独立产品入口。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryCorrectionRegressionTest.kt",
+          "method": "editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter"
+        },
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/PluginInventoryBrowserRegressionTest.kt",
+          "method": "installedPluginDetailsOpenAndCanReturnToConversation"
+        }
+      ],
+      "conclusion": "日记纠正与工具能力状态分属两个现有界面，本条是合并的设备回归范围，必须单独核查两个UI。"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
+      "kind": "test_suite_not_product_feature",
+      "independent": false,
+      "availability": "test_cases_declared_not_verified_executed",
+      "source": [],
+      "test": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalRequirementEvidenceProjectionTest.kt",
+          "method": "requirementLinkMustMatchSameTaskPositionAndText"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkArtifactVersionTest.kt",
+          "method": "eventTimeHashTracksExactFileVersionAndDetectsLaterEdit"
+        },
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/V4DeliveryMemoryOfflineAcceptanceTest.kt",
+          "method": "userFactCorrectionInvalidatesOnlyRelatedGeneratedDiaryAfterColdRestart"
+        }
+      ],
+      "conclusion": "对应交付要求、成果版本和记忆来源三个既有能力的跨模块回归集合；独立测试源码存在，执行成功待确认。"
+    }
+  ]
+}
