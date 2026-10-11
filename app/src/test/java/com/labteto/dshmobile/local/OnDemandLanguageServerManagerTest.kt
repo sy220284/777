@@ -116,4 +116,16 @@ class OnDemandLanguageServerManagerTest {
         assertEquals("hello", File(dest, "package/bin/cli.js").readText())
     }
 
+
+    @Test fun uninstallRemovesEveryVersionButKeepsUnrelatedLanguages() {
+        val root = File(temp.root, "private/components").apply { mkdirs() }
+        val old = File(root, "typescript-5.3.0").apply { mkdirs() }
+        val current = File(root, "typescript-6.0.1").apply { mkdirs() }
+        val python = File(root, "pyright-1.1.410").apply { mkdirs() }
+        assertTrue(manager().uninstall(OnDemandLanguageServerManager.Component.TYPESCRIPT))
+        assertFalse(old.exists())
+        assertFalse(current.exists())
+        assertTrue(python.isDirectory)
+    }
+
 }
