@@ -135,8 +135,8 @@ def inspect():
         approval = next(x for x in config["approvals"] if x["path"] == name)
         symbol = approval["symbol"]
         live_entry = re.compile(
-            r"(?:fun|class|object|interface|val|var|enum\\s+class)\\s+" +
-            re.escape(symbol) + r"\\b"
+            r"(?:fun|class|object|interface|val|var|enum\s+class)\s+" +
+            re.escape(symbol) + r"\b"
         )
         for file in (ROOT / "app").rglob("*"):
             if not file.is_file() or file.suffix not in {".kt", ".java"}:
@@ -147,7 +147,7 @@ def inspect():
             )):
                 raise ValueError("二次复核发现退役符号仍有现存生产声明: " + name)
             if ("/src/test/" in "/" + relative or "/src/androidTest/" in "/" + relative):
-                if re.search(r"\\b" + re.escape(symbol) + r"\\b",
+                if re.search(r"\b" + re.escape(symbol) + r"\b",
                              file.read_text(encoding="utf-8", errors="replace")):
                     raise ValueError("二次复核发现退役符号仍在测试中使用: " + name)
         if any(x["path"] == name for x in matrix["items"]):
