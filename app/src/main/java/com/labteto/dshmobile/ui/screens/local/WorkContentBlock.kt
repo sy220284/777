@@ -85,6 +85,12 @@ internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.error,
                 )
+            } else if (running) {
+                Text(
+                    stringResource(agentOperationStatusRes(running = true, failed = false)),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.accent,
+                )
             } else if (node.count > 1) {
                 Text(
                     stringResource(R.string.local_work_process_operation_count, node.count),
