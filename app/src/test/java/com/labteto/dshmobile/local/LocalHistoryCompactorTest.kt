@@ -74,7 +74,7 @@ class LocalHistoryCompactorTest {
     fun ordinaryOldPlanMentionNeverRevokesExistingDecisions() {
         val old = LocalWorkCheckpoint(
             goals = emptyList(), constraints = emptyList(),
-            decisions = listOf("保留 GitHub 审核环节"), failures = emptyList(),
+            decisions = listOf("保留 GitHub 审核环节"), userDecisionsVerified = true, failures = emptyList(),
             unfinished = emptyList(), progress = emptyList(),
             artifacts = emptyList(), tools = emptyList(),
         )
@@ -207,7 +207,7 @@ class LocalHistoryCompactorTest {
         assertTrue(compaction.summary.contains("较早工作检查点"))
         assertTrue(compaction.summary.contains("目标与需求："))
         assertTrue(compaction.summary.contains("约束与边界："))
-        assertTrue(compaction.summary.contains("关键决定与阶段结论："))
+        assertFalse(compaction.summary.contains("关键决定与阶段结论："))
         assertTrue(compaction.summary.contains("失败尝试与风险："))
         assertTrue(compaction.summary.contains("未完成事项："))
         assertTrue(compaction.summary.contains("完成无限会话分页"))
@@ -243,7 +243,8 @@ class LocalHistoryCompactorTest {
         val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(compaction.messages))
         assertTrue(checkpoint.goals.any { it.contains("恢复链") })
         assertTrue(checkpoint.constraints.any { it.contains("保持旧会话兼容") })
-        assertTrue(checkpoint.decisions.any { it.contains("Session Event") })
+        assertFalse(checkpoint.decisions.any { it.contains("Session Event") })
+        assertTrue(checkpoint.progress.any { it.contains("Session Event") })
         assertTrue(checkpoint.failures.any { it.contains("重复副作用") })
         assertTrue(checkpoint.unfinished.any { it.contains("恢复测试") })
         assertTrue(checkpoint.artifacts.contains("app/src/main/Test.kt"))
@@ -332,7 +333,8 @@ class LocalHistoryCompactorTest {
         val next = requireNotNull(LocalWorkCheckpoint.latestFrom(compaction.messages))
         assertTrue(next.constraints.contains("必须保留完整功能"))
         assertTrue(next.constraints.contains("PR 标题使用中文"))
-        assertTrue(next.decisions.contains("旧历史按需召回"))
+        assertFalse(next.decisions.contains("旧历史按需召回"))
+        assertTrue(next.progress.any { it.contains("未核验方案") && it.contains("旧历史按需召回") })
         assertTrue(next.failures.any { it.contains("二次增长") })
         assertTrue(next.unfinished.contains("完成 Android 回归"))
         assertTrue(next.artifacts.contains("token-usage-report-20261003.md"))
