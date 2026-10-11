@@ -69,6 +69,18 @@ class ChatContextAssemblerTest {
     }
 
     @Test
+    fun sharedRelationshipEventIsNotRepeatedFromHistoricalMemory() {
+        val context = ChatContextAssembler.assemble(
+            dynamicPrompt = "【人物关系与共同经历】\n已有事实：周末答应带我去看烟花\n共同经历：昨天一起散步",
+            relationshipMemory = "【本轮相关长期事实】\n- 关系对象：阿青｜周末答应带我去看烟花\n- 关系对象：阿青｜以前一起参加舞会",
+            userInput = "我们周末去哪",
+        )
+        assertEquals(1, Regex("周末答应带我去看烟花").findAll(context).count())
+        assertTrue(context.contains("以前一起参加舞会"))
+        assertTrue(context.contains("昨天一起散步"))
+    }
+
+    @Test
     fun assemblerDropsMemoryThatDuplicatesCurrentState() {
         val context = ChatContextAssembler.assemble(
             dynamicPrompt = "【当前状态】\n关注：昨天的争执",
