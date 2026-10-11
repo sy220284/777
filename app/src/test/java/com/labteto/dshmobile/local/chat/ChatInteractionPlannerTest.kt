@@ -710,7 +710,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun observedMessageLengthGroundsReplyLengthProfile() {
+    fun retiredMessageLengthProfileIsNotUpdatedByBackgroundModel() {
         val previous = ChatCharacterState(
             userPattern = UserChatPattern(
                 replyLength = "long",
@@ -738,9 +738,7 @@ class ChatInteractionPlannerTest {
             userMessage = "嗯，行",
         )!!
 
-        assertEquals("short", plan.state.userPattern.replyLength)
-        assertEquals(4, plan.state.userPattern.observedTurns)
-        assertTrue(plan.state.userPattern.averageMessageChars < 20)
+        assertEquals(previous.userPattern, plan.state.userPattern)
     }
 
     @Test
