@@ -826,10 +826,16 @@ internal fun LocalConversationSurface(
                 onClick = { target ->
                     scrollHint.hide()
                     scope.launch {
-                        listState.animateScrollToItem(
-                            if (target == ConversationScrollTarget.START) 0
-                            else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0),
-                        )
+                        val targetIndex = if (target == ConversationScrollTarget.START) 0
+                            else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)
+                        listState.animateScrollToItem(targetIndex)
+                        // A long final reply can fill more than one viewport: the
+                        // "latest" shortcut must reach its bottom, not its first line.
+                        if (target == ConversationScrollTarget.LATEST &&
+                            state.usageMode == LocalUsageMode.WORK
+                        ) {
+                            listState.alignWorkTimelineTailAfterScroll(targetIndex)
+                        }
                     }
                 },
             )
