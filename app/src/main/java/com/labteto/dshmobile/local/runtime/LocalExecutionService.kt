@@ -18,6 +18,7 @@ import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -175,8 +176,13 @@ class LocalExecutionService : Service() {
     private fun postCompletion(sessionId: String, outcome: String) {
         scope.launch {
             if (!runCatching { hostsStore.settingsOnce().notifyLocalJobs }
-                    .onFailure { AppLog.failure("LocalExecutionService", "read_notification_setting", it,
-                        sessionId = sessionId) }
+                    .onFailure { failure ->
+                        // A cancelled lifecycle scope is expected when the service stops.
+                        if (failure !is CancellationException) {
+                            AppLog.failure("LocalExecutionService", "read_notification_setting", failure,
+                                sessionId = sessionId)
+                        }
+                    }
                     .getOrDefault(true)) {
                 return@launch
             }
