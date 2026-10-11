@@ -2,12 +2,10 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.quality.LocalOutputQualityResult
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -20,42 +18,11 @@ internal object LocalWorkCompletionClaimGuard {
         if (text.isBlank()) return LocalOutputQualityResult(text)
         val corrected = correctGlobalCompletionClaims(text)
         if (corrected == text) return LocalOutputQualityResult(text)
-        val findings = mutableListOf<String>()
-        val openTodos = workState.todos.count { it.status == "pending" || it.status == "in_progress" }
-        val openTeamTasks = workState.team.tasks.count {
-            it.status == "pending" || it.status == "in_progress"
-        }
-        val activeTeamMembers = workState.team.members.count {
-            it.phase == "provisioning" || it.activity == "running" || it.activity == "stopping"
-        }
-        val pendingTeamMessages = maxOf(
-            workState.team.pendingMessageCount,
-            workState.team.members.sumOf { it.pendingMessageCount },
-        )
-        val failedTeamMembers = workState.team.failedMemberCount.takeIf { count ->
-            count > 0 && (workState.team.tasks.isEmpty() ||
-                workState.team.tasks.any { it.status !in setOf("completed", "deleted") })
-        } ?: 0
-        val teamFailure = !workState.team.failure.isNullOrBlank()
-        if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
-        if (openTeamTasks > 0) findings += "完成声明与未完成 Agent Team 任务冲突"
-        if (activeTeamMembers > 0) findings += "完成声明与仍在运行的 Agent Team 成员冲突"
-        if (pendingTeamMessages > 0) findings += "完成声明与待投递 Agent Team 消息冲突"
-        if (failedTeamMembers > 0) findings += "完成声明与失败的 Agent Team 成员冲突"
-        if (teamFailure) findings += "完成声明与 Agent Team 异常状态冲突"
-        if (workState.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
-        if (findings.isEmpty()) return LocalOutputQualityResult(text)
+        val evidence = localWorkCompletionEvidence(workState)
+        if (evidence.readyForGoalCompletion) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
-            text = truthfulIncompleteDeliveryText(
-                openTodos = openTodos,
-                blockedGoal = workState.goal?.status == "blocked",
-                openTeamTasks = openTeamTasks,
-                activeTeamMembers = activeTeamMembers,
-                pendingTeamMessages = pendingTeamMessages,
-                failedTeamMembers = failedTeamMembers,
-                teamFailure = teamFailure,
-            ) + "\n\n" + corrected,
-            findings = findings,
+            text = truthfulIncompleteDeliveryText(evidence) + "\n\n" + corrected,
+            findings = evidence.findings,
             changed = true,
         )
     }
@@ -117,40 +84,14 @@ internal fun guardWorkCompletionDelivery(
         state.work.team.failure?.let { put("team_failure", it) }
         state.work.goal?.status?.let { put("goal_status", it) }
     })
-    val guardedMessage = JsonObject(reply.message + ("content" to JsonPrimitive(result.text)))
-    val guardedCanonical = reply.canonicalMessage?.copy(
-        content = reply.canonicalMessage.content
-            .filterNot { it is LocalCanonicalContent.Text } +
-            LocalCanonicalContent.Text(result.text),
-    )
-    return reply.copy(
-        message = guardedMessage,
-        content = result.text,
-        canonicalMessage = guardedCanonical,
-    )
+    // User-visible correction is a presentation projection. Preserve the provider's original
+    // message and canonical content for diagnostic replay and truthful model history.
+    return reply.copy(content = result.text)
 }
 
-private fun truthfulIncompleteDeliveryText(
-    openTodos: Int,
-    blockedGoal: Boolean,
-    openTeamTasks: Int,
-    activeTeamMembers: Int,
-    pendingTeamMessages: Int,
-    failedTeamMembers: Int,
-    teamFailure: Boolean,
-): String {
-    val reasons = buildList {
-        if (openTodos > 0) add("仍有 " + openTodos + " 项任务未完成")
-        if (openTeamTasks > 0) add("Agent Team 仍有 " + openTeamTasks + " 项任务未完成")
-        if (activeTeamMembers > 0) add("仍有 " + activeTeamMembers + " 个智能体在执行")
-        if (pendingTeamMessages > 0) add("仍有 " + pendingTeamMessages + " 条 Team 消息待投递")
-        if (failedTeamMembers > 0) add("仍有 " + failedTeamMembers + " 个 Agent Team 成员失败")
-        if (teamFailure) add("Agent Team 当前存在异常状态")
-        if (blockedGoal) add("目标仍处于阻塞状态")
-    }
-    return "当前尚未完成：" + reasons.joinToString("；") +
+private fun truthfulIncompleteDeliveryText(evidence: LocalWorkCompletionEvidence): String =
+    "当前尚未完成：" + evidence.userReasons.joinToString("；") +
         "。现有进度已保留，完成状态将在剩余事项实际闭环后确认。"
-}
 
 internal fun recordWorkCompletionQuality(
     text: String,

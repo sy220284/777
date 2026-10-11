@@ -175,7 +175,7 @@ class LocalWorkCompletionClaimGuardTest {
     }
 
     @Test
-    fun deliveryGuardReplacesFalseCompletionAcrossVisibleAndCanonicalReply() {
+    fun deliveryGuardCorrectsVisibleTextWithoutTamperingWithOriginalReply() {
         val root = kotlin.io.path.createTempDirectory("work-completion-guard-").toFile()
         try {
             val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
@@ -205,12 +205,13 @@ class LocalWorkCompletionClaimGuardTest {
             assertTrue(guarded.content.orEmpty().startsWith("当前尚未完成："))
             assertTrue(guarded.content.orEmpty().contains("仍有 1 项任务未完成"))
             assertFalse(guarded.content.orEmpty().contains("可以交付"))
-            assertEquals(guarded.content, guarded.message["content"]?.jsonPrimitive?.contentOrNull)
+            // The visible corrective projection must NOT overwrite the model's actual reply.
+            assertEquals("任务完成，可以交付。", guarded.message["content"]?.jsonPrimitive?.contentOrNull)
             val canonicalText = guarded.canonicalMessage?.content
                 ?.filterIsInstance<LocalCanonicalContent.Text>()
                 ?.singleOrNull()
                 ?.text
-            assertEquals(guarded.content, canonicalText)
+            assertEquals("任务完成，可以交付。", canonicalText)
             val event = log.snapshot().last()
             assertEquals("work/output-quality", event.type)
             assertEquals(true, event.data["delivery_blocked"]?.jsonPrimitive?.content?.toBoolean())
