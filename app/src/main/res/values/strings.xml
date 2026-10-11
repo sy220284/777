@@ -2002,5 +2002,32 @@
     <string name="local_delivery_link_save_failed">关联未保存：来源、文件版本或存储状态已变化，请刷新后重试</string>
     <string name="local_work_handoff_return_source">返回来源聊天</string>
     <string name="local_work_handoff_source_removed">原聊天会话已不存在；当前工作与已保存的交接摘要仍可继续使用。</string>
+    <string name="minimax_quota_title">MiniMax 套餐额度</string>
+    <string name="minimax_quota_entry_hint">查询当前账户的官方剩余额度或余额</string>
+    <string name="minimax_quota_model">当前模型：%1$s</string>
+    <string name="minimax_quota_disclaimer">数据来自 MiniMax 官方账户接口，与本机模型 Token 消耗分别统计。</string>
+    <string name="minimax_quota_loading">查询中…</string>
+    <string name="minimax_quota_refresh">刷新额度</string>
+    <string name="minimax_quota_querying">正在查询当前账户额度…</string>
+    <string name="minimax_quota_error">查询失败：%1$s</string>
+    <string name="minimax_quota_balance_title">按量付费账户余额</string>
+    <string name="minimax_quota_balance_available">可用金额：%1$s</string>
+    <string name="minimax_quota_balance_cash">现金余额：%1$s</string>
+    <string name="minimax_quota_balance_voucher">代金券：%1$s</string>
+    <string name="minimax_quota_balance_credit">信用额度：%1$s</string>
+    <string name="minimax_quota_empty">当前账户没有返回套餐额度数据。</string>
+    <string name="minimax_quota_interval">本周期：%1$s</string>
+    <string name="minimax_quota_weekly">本周：%1$s</string>
+    <string name="minimax_quota_interval_reset">本周期重置：%1$s后</string>
+    <string name="minimax_quota_weekly_reset">每周重置：%1$s后</string>
+    <string name="minimax_quota_not_in_plan">不在当前套餐内</string>
+    <string name="minimax_quota_unlimited">不限额</string>
+    <string name="minimax_quota_remaining_count">剩余 %1$d / %2$d</string>
+    <string name="minimax_quota_remaining_percent">剩余 %1$s%%</string>
+    <string name="minimax_quota_unknown">服务商未提供可确认的剩余额度</string>
+    <string name="minimax_quota_days_hours">%1$d天%2$d小时</string>
+    <string name="minimax_quota_hours_minutes">%1$d小时%2$d分钟</string>
+    <string name="minimax_quota_minutes">%1$d分钟</string>
+    <string name="minimax_quota_under_one_minute">不到1分钟</string>
 </resources>
 
