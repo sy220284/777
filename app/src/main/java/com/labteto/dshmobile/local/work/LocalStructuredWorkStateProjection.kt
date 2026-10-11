@@ -41,6 +41,7 @@ internal fun structuredWorkState(
     val failures = linkedSetOf<String>()
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
+    val toolCallIds = linkedSetOf<String>()
     val artifacts = linkedSetOf<String>()
     sessionProjection.structuredEventSnapshot(eventLog)
         .state
@@ -79,6 +80,7 @@ internal fun structuredWorkState(
                     val name = event.data.stringValue("name") ?: event.data.stringValue("tool_name")
                     val callId = event.data.stringValue("id") ?: event.data.stringValue("call_id")
                     name?.let(tools::add)
+                    callId?.let(toolCallIds::add)
                     buildString {
                         append("工具调用")
                         name?.let { append(" tool=").append(it) }
@@ -94,6 +96,7 @@ internal fun structuredWorkState(
                     val errorCode = event.data.stringValue("error_code") ?: event.data.stringValue("code")
                     val isError = event.data.stringValue("is_error")
                     name?.let(tools::add)
+                    callId?.let(toolCallIds::add)
                     buildString {
                         append("工具结果")
                         name?.let { append(" tool=").append(it) }
@@ -151,6 +154,7 @@ internal fun structuredWorkState(
         facts = facts.toList().takeLast(MAX_STRUCTURED_FACTS),
         artifacts = artifacts.toList().takeLast(MAX_STRUCTURED_ARTIFACTS),
         tools = tools.toList().takeLast(MAX_STRUCTURED_TOOLS),
+        toolCallIds = toolCallIds.toList().takeLast(MAX_STRUCTURED_TOOL_CALL_IDS),
     )
 }
 
@@ -222,3 +226,5 @@ private const val MAX_STRUCTURED_FACTS = 12
 private const val MAX_STRUCTURED_ARTIFACTS = 8
 private const val MAX_STRUCTURED_TOOLS = 12
 private const val MAX_STRUCTURED_IDENTIFIER_CHARS = 240
+
+private const val MAX_STRUCTURED_TOOL_CALL_IDS = 32
