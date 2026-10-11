@@ -116,7 +116,8 @@ internal class LocalToolExecutionCoordinator(
                 gitHubConfigured()
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                AppLog.failure("LocalToolExecution", "check_github_tool_availability", error)
                 false
             }
         } else false
@@ -324,11 +325,14 @@ internal class LocalToolExecutionCoordinator(
             )
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
-            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted)
+            AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
+            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
         } catch (error: LocalWebException) {
-            return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted)
+            return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,
+                cause = error, sessionId = sessionId)
         } catch (error: LocalModelException) {
-            return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted)
+            return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted,
+                cause = error, sessionId = sessionId)
         } catch (error: Exception) {
             val code = when {
                 error is java.io.FileNotFoundException ||
@@ -349,7 +353,7 @@ internal class LocalToolExecutionCoordinator(
             }
             return thrownFailure(
                 call, registered, code, error.message ?: error::class.java.simpleName,
-                executionStarted, error::class.java.simpleName,
+                executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
             )
         } finally {
             if (serializedMutation) workspaceMutationMutex.unlock()
@@ -389,7 +393,7 @@ internal class LocalToolExecutionCoordinator(
                 else -> "根据工具返回内容检查前置条件；确认状态后再决定下一步。"
             }
         }
-        AppLog.warn("LocalToolExecution", "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable")
+        AppLog.warn("LocalToolExecution", "operation=execute_tool session_id=$sessionId call_id=${call.id} tool=${call.name} code=$errorCode retryable=$retryable side_effect=$mutationMayHaveSideEffect")
         return AgentToolResult(
             content = result.content,
             isError = true,
@@ -408,11 +412,23 @@ internal class LocalToolExecutionCoordinator(
         message: String,
         executionStarted: Boolean,
         exceptionType: String? = null,
+        cause: Throwable? = null,
+        sessionId: String? = null,
     ): AgentToolResult {
         val result = localToolFailure(code, message,
             readOnly = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments),
             executionStarted = executionStarted)
-        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
+        if (cause != null) {
+            AppLog.failure(
+                "LocalToolExecution",
+                "execute_tool tool=${call.name} code=$code started=$executionStarted retryable=${result.retryable}",
+                cause,
+                sessionId = sessionId,
+                requestId = call.id,
+            )
+        } else {
+            AppLog.warn("LocalToolExecution", "operation=execute_tool tool=${call.name} call_id=${call.id} code=$code started=$executionStarted retryable=${result.retryable} exception_type=${exceptionType ?: "unknown"}")
+        }
         return result
     }
 

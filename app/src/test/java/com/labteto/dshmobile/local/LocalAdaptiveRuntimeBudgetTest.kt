@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalKernelState
+import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
 import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
 import com.labteto.dshmobile.local.runtime.adaptiveToolResultBudget
 import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
@@ -59,6 +61,32 @@ class LocalAdaptiveRuntimeBudgetTest {
         )
 
         assertTrue(limit >= 32)
+    }
+
+    @Test
+    fun foregroundStepExtenderContinuesBeyondFiveHundredTwelveWhenProgressIsReal() {
+        var emitted = 0
+        val extender = localForegroundStepLimitExtender(
+            enabled = true,
+            configuredBase = 32,
+            task = "继续完整任务并核验结果",
+            kernelState = { LocalKernelState(contextChars = 30_000, contextBudgetChars = 500_000) },
+            pressure = { HarnessResourcePressure.LOW },
+            onExtended = { emitted++ },
+            canExtend = { true },
+        )!!
+        assertTrue(requireNotNull(extender.extend(512, 512)) > 512)
+        assertEquals(1, emitted)
+        val stopped = localForegroundStepLimitExtender(
+            enabled = true,
+            configuredBase = 32,
+            task = "无继续进展",
+            kernelState = { LocalKernelState() },
+            pressure = { HarnessResourcePressure.HIGH },
+            onExtended = { },
+            canExtend = { false },
+        )!!
+        assertEquals(null, stopped.extend(512, 512))
     }
 
     @Test

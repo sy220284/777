@@ -203,14 +203,12 @@ internal class AutomationWorkerSettlementCoordinator(
             return
         }
 
-        var autoPaused = false
         var committedNext: Long? = null
         val updated = store.updateIf(
             id,
             predicate = { it.scheduleGeneration == requestedGeneration },
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()
-            autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
             val chained = usesChainedAutomationScheduling(current)
             committedNext = if (chained) {
                 nextAnchoredAutomationRun(current, finished)
@@ -221,11 +219,7 @@ internal class AutomationWorkerSettlementCoordinator(
             }
             current.copy(
                 workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
-                status = when {
-                    autoPaused -> AutomationStatus.PAUSED
-                    current.recurringMinutes == null -> AutomationStatus.FAILED
-                    else -> AutomationStatus.SCHEDULED
-                },
+                status = automationFailureStatus(current),
                 nextRunAt = committedNext ?: current.nextRunAt,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                 failureStreak = nextFailureStreak,
@@ -248,19 +242,10 @@ internal class AutomationWorkerSettlementCoordinator(
             titleRes = R.string.tasks_notification_failed,
             sessionId = sessionId,
         )
-        when {
-            autoPaused -> {
-                store.withCurrentGeneration(id, requestedGeneration) {
-                    WorkManager.getInstance(context)
-                        .cancelUniqueWork(HarnessAutomationScheduler.workName(id, requestedGeneration))
-                    WorkManager.getInstance(context)
-                        .cancelUniqueWork(HarnessAutomationScheduler.manualWorkName(id))
-                }
-            }
-            usesChainedAutomationScheduling(updated) &&
-                committedNext != null &&
-                updated.status == AutomationStatus.SCHEDULED ->
-                scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
+        if (usesChainedAutomationScheduling(updated) &&
+            committedNext != null && updated.status == AutomationStatus.SCHEDULED
+        ) {
+            scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
     }
 
@@ -275,7 +260,11 @@ internal class AutomationWorkerSettlementCoordinator(
             hostsStore.settingsOnce().notifyLocalJobs
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            com.labteto.dshmobile.observability.AppLog.failure(
+                "AutomationWorkerSettlement", "read_notification_preference", error,
+                sessionId = sessionId,
+            )
             true
         }
         currentCoroutineContext().ensureActive()

@@ -34,10 +34,14 @@ internal class LocalRuntimeJobOwner internal constructor(
     internal fun observe(observer: (List<LocalJobInfo>) -> Unit) {
         observers += observer
         runCatching { observer(manager.snapshotInfos()) }
+            .onFailure { AppLog.failure("LocalRuntimeJobOwner", "observe_job_snapshot", it) }
     }
 
     private fun publish(snapshot: List<LocalJobInfo>) {
-        observers.forEach { observer -> runCatching { observer(snapshot) } }
+        observers.forEach { observer ->
+            runCatching { observer(snapshot) }
+                .onFailure { AppLog.failure("LocalRuntimeJobOwner", "publish_job_snapshot", it) }
+        }
     }
 
     companion object {

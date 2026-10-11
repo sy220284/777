@@ -90,7 +90,7 @@ class AutomationReceiptTest {
     }
 
     @Test
-    fun chatRecurringTaskAutoPausesAfterThirdFailure() {
+    fun recurringChatTaskKeepsScheduleAfterRepeatedFailures() {
         val task = AutomationTask(
             id = "chat",
             prompt = "主动来找我",
@@ -101,13 +101,12 @@ class AutomationReceiptTest {
             targetSessionId = "session",
         )
 
-        assertFalse(shouldAutoPauseChatAutomation(task, 1))
-        assertFalse(shouldAutoPauseChatAutomation(task, 2))
-        assertTrue(shouldAutoPauseChatAutomation(task, 3))
+        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(task))
+        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(task.copy(failureStreak = 100)))
     }
 
     @Test
-    fun workAndOneShotTasksDoNotUseChatAutoPausePolicy() {
+    fun recurringWorkKeepsScheduleAndOneShotFailureEnds() {
         val work = AutomationTask(
             id = "work",
             prompt = "task",
@@ -124,8 +123,8 @@ class AutomationReceiptTest {
             targetSessionId = "session",
         )
 
-        assertFalse(shouldAutoPauseChatAutomation(work, 3))
-        assertFalse(shouldAutoPauseChatAutomation(oneShotChat, 3))
+        assertEquals(AutomationStatus.SCHEDULED, automationFailureStatus(work))
+        assertEquals(AutomationStatus.FAILED, automationFailureStatus(oneShotChat))
     }
 
     @Test

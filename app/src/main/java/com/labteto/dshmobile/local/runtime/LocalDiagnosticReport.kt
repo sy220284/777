@@ -45,6 +45,8 @@ internal fun appendLocalDiagnosticDetails(
         append(" process=").append(entry.processInstanceId ?: "legacy")
         append(" process_started_at=").append(entry.processStartedAtMillis ?: -1L)
         entry.throwableType?.takeIf(String::isNotBlank)?.let { append(" throwable=").append(it.take(64)) }
+        entry.message.substringAfter("operation=", "").substringBefore(' ').takeIf(String::isNotBlank)
+            ?.let { append(" operation=").append(sanitizeDiagnosticText(it).take(100)) }
         appendLine()
     }
     appendLine()
@@ -210,6 +212,9 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "total_tokens",
     "provider_code",
     "provider_param",
+    "status",
+    "retry_after_ms",
+    "cause_detail",
     "model",
     "provider",
     "profile_id",
@@ -299,7 +304,7 @@ private val DIAGNOSTIC_EVENT_TYPE_KEYS = mapOf(
 )
 
 private const val EVENT_PAGE_SIZE = 200
-private const val MAX_DIAGNOSTIC_APP_LOGS = 800
+private const val MAX_DIAGNOSTIC_APP_LOGS = 2_000
 private const val MAX_DIAGNOSTIC_EVENTS = 3_000
 private const val MAX_DIAGNOSTIC_TOKEN_RECORDS = 2_000
 private const val MAX_DIAGNOSTIC_FIELD_CHARS = 320

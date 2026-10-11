@@ -493,7 +493,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             "LocalModelRequest",
                             buildString {
                                 append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
-                                append("model=${snapshot.modelState.model} step=$step attempt=${event.attempt} ")
+                                append("model=${snapshot.modelState.model} step=$step attempt=${event.attempt} request_uid=$requestUid ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 preProviderMs?.let { append("pre_provider_ms=$it ") }
                                 providerExecutionMs?.let { append("provider_execution_ms=$it ") }
@@ -514,6 +514,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 providerError?.providerCode?.let { append("provider_code=$it ") }
                                 append("detail=${event.reason.take(800)}")
                             },
+                            providerError,
                         )
                         if (!failureContextDiagnosticLogged) {
                             runCatching {
@@ -554,6 +555,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.requestId?.let { put("request_id", it) }
                                 error.providerCode?.let { put("provider_code", it) }
                                 error.providerParam?.let { put("provider_param", it) }
+                                error.cause?.let { cause ->
+                                    put("cause_type", cause.javaClass.simpleName)
+                                    cause.message?.let { put("cause_detail", it.take(800)) }
+                                }
                             }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
