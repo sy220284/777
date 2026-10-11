@@ -18,10 +18,10 @@ class ChatDiaryRecallPolicyTest {
     @Test
     fun groupRecallSelectsRelevantIndividualMemoryWithoutBroadcasting() {
         val instruction = diaryRecallUsageInstruction(groupAudience = true)
-        assertTrue(instruction.contains("按当前问题关联性选取"))
-        assertTrue(instruction.contains("其他成员不会自动获得此人物的完整记忆"))
-        assertTrue(instruction.contains("只能听到实际说出口的话"))
-        assertTrue(instruction.contains("不得作为当前有效事实回潮"))
+        assertTrue(instruction.contains("当前人物自己的经历和感受"))
+        assertTrue(instruction.contains("猜测属于人物主观认识"))
+        assertTrue(instruction.contains("其他成员的所知以实际公开发言和事件为准"))
+        assertTrue(instruction.contains("旧版本属于历史"))
     }
 
     @Test
