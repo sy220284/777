@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.LocalModelReply
-import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
-import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +23,6 @@ class ChatTurnRunner @Inject constructor(
     loreEngine: CharacterLoreEngine,
 ) {
     private val runtimeProjector = CharacterRuntimeProjector(relationshipEngine, loreEngine)
-    private val outputQualityPipeline = LocalOutputQualityPipeline(listOf(CharacterReplyAnomalyGuard))
     fun prepare(
         personaId: String,
         state: ChatCharacterState = ChatCharacterState(),
@@ -52,7 +49,6 @@ class ChatTurnRunner @Inject constructor(
                 """
                 【对话连续性摘要｜已发生】
                 ${it.take(MAX_STORY_CONTEXT_CHARS)}
-                以上只用于衔接当前对话；除非用户追问，不主动复述旧内容。
                 """.trimIndent()
             }.orEmpty()
             return ChatTurnContext(
@@ -61,7 +57,6 @@ class ChatTurnRunner @Inject constructor(
                 dynamicPrompt = listOf(
                     renderChatContextForModel(context),
                     continuationPrompt,
-                    renderChatTurnModeForModel(userInput),
                 ).filter(String::isNotBlank).joinToString("\n\n"),
             )
         }
@@ -92,7 +87,7 @@ class ChatTurnRunner @Inject constructor(
         recordUsage(reply)
         if (reply.toolCalls.isNotEmpty()) return reply
 
-        var content = reply.content.orEmpty()
+        val content = reply.content.orEmpty()
         if (guardEnabled) {
             val phrases = ChatStyleGuard.activePhrases(
                 customPhrases = additionalBannedPhrases,
@@ -101,8 +96,7 @@ class ChatTurnRunner @Inject constructor(
             )
             val violations = ChatStyleGuard.violations(content, phrases)
             if (violations.isNotEmpty()) {
-                onGuardEvent("filter", violations)
-                content = ChatStyleGuard.filterLiteral(content, phrases)
+                onGuardEvent("preference-miss", violations)
             }
         }
 
@@ -112,15 +106,7 @@ class ChatTurnRunner @Inject constructor(
             // Similar wording can be a requested promise or confirmation; preserve meaning.
         }
 
-        if (guardEnabled && !persona.isUnboundChatPersona()) {
-            val quality = outputQualityPipeline.inspect(content, LocalOutputQualityContext())
-            if (quality.findings.isNotEmpty()) {
-                onGuardEvent("anomaly-filter", quality.findings.take(4))
-                content = quality.text
-            }
-        }
-
-        return if (content == reply.content.orEmpty()) reply else ChatStyleGuard.withContent(reply, content)
+        return reply
     }
 
     private companion object {

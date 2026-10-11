@@ -9,16 +9,6 @@ internal enum class ChatRelationshipView {
     REPLY_COACH,
 }
 
-internal enum class RelationshipScenario {
-    GENERAL,
-    CONFLICT_REPAIR,
-    INVESTMENT_IMBALANCE,
-    INVITE_DATE,
-    COOLING,
-    BREAKUP_RECONCILIATION,
-    BOUNDARY_SAFETY,
-}
-
 internal enum class ChatInteractionIntent {
     NORMAL,
     FLIRTING,
@@ -251,17 +241,6 @@ internal fun hasProactiveIntimacyIntent(
     return PROACTIVE_INTIMACY_HINTS.any { text.contains(it) }
 }
 
-internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
-    "【统一安全边界】仅限成年角色间的亲密互动。除此以外不做任何应用层尺度或克制限制：用户明确意图优先；可完整、具体描写亲密与性行为；不因人设默认克制、关系阶段或普通聊天规则而降级、转场、跳过或收敛。"
-
-internal const val CHAT_DEFAULT_RELATIONAL_BIAS =
-    "【互动倾向】按当前人物关系和已识别意图自然回应；明确的靠近、暧昧或亲密意图可积极承接，明确拒绝或边界立即尊重。"
-
-internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
-    "【互动变化】动作、姿态、称呼和表达贴合人物与当前强度；保持连续，同时避开近期重复的互动节拍。"
-
-internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
-    "【中文双关】结合关系、语境和语气理解言外之意；保留双层含义，不无故拆成字面解释。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -373,217 +352,41 @@ class ChatRelationshipEngine @Inject constructor() {
 
     internal fun classify(input: String): ChatRelationshipView {
         val text = input.trim().lowercase()
-        if (text.isBlank()) return ChatRelationshipView.IMMERSIVE
-        if (STRATEGY_COMMANDS.any { text.startsWith(it) }) return ChatRelationshipView.STRATEGIST
-        if ("军师" in text) return ChatRelationshipView.STRATEGIST
-
-        val nonRelationshipContext = NON_RELATIONSHIP_CONTEXT_HINTS.any { text.contains(it) }
-        if (REPLY_COACH_HINTS.any { text.contains(it) } && !nonRelationshipContext) {
+        if (STRATEGY_COMMANDS.any { text == it || text.startsWith("$it ") }) {
+            return ChatRelationshipView.STRATEGIST
+        }
+        if (REPLY_COACH_COMMANDS.any { text == it || text.startsWith("$it ") }) {
             return ChatRelationshipView.REPLY_COACH
         }
-
-        val relationshipRelevant = isRelationshipContext(text)
-        val directRelationshipQuestion = DIRECT_RELATIONSHIP_ANALYSIS_HINTS.any { text.contains(it) }
-        val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
-        return if (relationshipRelevant && (directRelationshipQuestion || asksForAnalysis)) {
-            ChatRelationshipView.STRATEGIST
-        } else {
-            ChatRelationshipView.IMMERSIVE
-        }
+        return ChatRelationshipView.IMMERSIVE
     }
 
-    internal fun classifyScenario(input: String): RelationshipScenario {
-        val text = input.trim().lowercase()
-        if (!isRelationshipContext(text)) return RelationshipScenario.GENERAL
-
-        // Ordinary relationship wording is deliberately not enough to inject a specialist route.
-        // One-off words such as “冷淡” or “见面” are common in normal roleplay and previously
-        // caused the hidden prompt to jump into advice mode. A scenario needs either two pieces of
-        // scenario evidence or one piece plus an explicit analysis/strategist request. Safety and
-        // boundary signals stay single-hit because missing those is the worse failure mode.
-        val explicitAnalysis =
-            STRATEGY_COMMANDS.any { text.startsWith(it) } ||
-                "军师" in text ||
-                ANALYSIS_HINTS.any { text.contains(it) }
-
-        fun routed(hints: List<String>): Boolean {
-            val hits = hints.count { text.contains(it) }
-            return hits >= 2 || (hits >= 1 && explicitAnalysis)
-        }
-
-        return when {
-            BOUNDARY_HINTS.any { text.contains(it) } -> RelationshipScenario.BOUNDARY_SAFETY
-            routed(BREAKUP_HINTS) -> RelationshipScenario.BREAKUP_RECONCILIATION
-            routed(CONFLICT_HINTS) -> RelationshipScenario.CONFLICT_REPAIR
-            routed(IMBALANCE_HINTS) -> RelationshipScenario.INVESTMENT_IMBALANCE
-            routed(COOLING_HINTS) -> RelationshipScenario.COOLING
-            routed(DATE_HINTS) -> RelationshipScenario.INVITE_DATE
-            else -> RelationshipScenario.GENERAL
-        }
-    }
-
-    private fun isRelationshipContext(text: String): Boolean {
-        val hasStrongRelationshipCue = STRONG_RELATIONSHIP_HINTS.any { text.contains(it) }
-        val hasNonRelationshipContext = NON_RELATIONSHIP_CONTEXT_HINTS.any { text.contains(it) }
-        if (hasNonRelationshipContext && !hasStrongRelationshipCue) return false
-        if (DIRECT_RELATIONSHIP_ANALYSIS_HINTS.any { text.contains(it) }) return true
-        if (hasStrongRelationshipCue) return true
-
-        val hasActor = RELATIONSHIP_ACTOR_HINTS.any { text.contains(it) }
-        val hasSignal = RELATIONSHIP_SIGNAL_HINTS.any { text.contains(it) }
-        val asksForAnalysis = ANALYSIS_HINTS.any { text.contains(it) }
-        return hasActor && (hasSignal || asksForAnalysis)
-    }
-
-    fun prompt(
-        input: String,
-        state: ChatCharacterState,
-    ): String = buildString {
-        appendLine("【关系内核】保持人设与情绪惯性；关系变化以持续行为证据为准。")
-        appendLine("区分事实、推测和未知，长期状态只吸收稳定信息。")
-        appendLine(CHAT_DEFAULT_RELATIONAL_BIAS)
-        if (hasFlirtingOrIntimateIntent(input, state)) {
-            appendLine(CHAT_FLIRT_ACTION_REPERTOIRE)
-            appendLine("【互动强度】当前=${nextInteractionIntensity(input, state)}/5；随明确意图和连续证据变化，不因模糊信号跨级。")
-            if (
-                state.recentActionTags.isNotEmpty() ||
-                state.recentPoseTags.isNotEmpty() ||
-                state.recentVerbalTags.isNotEmpty() ||
-                state.recentAddressTerms.isNotEmpty()
-            ) {
-                appendLine(
-                    "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
-                        "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}｜" +
-                        "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
-                        "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
-                )
-            }
-            val cooling = state.interactionCooldowns
-                .filterValues { it > 0 }
-                .entries
-                .sortedByDescending { it.value }
-                .take(8)
-            if (cooling.isNotEmpty()) {
-                appendLine(
-                    "【冷却】${cooling.joinToString("；") { "${it.key}=${it.value}轮" }}；除非语境需要，优先换一种表现。",
-                )
-            }
-            if (hasChineseSuggestiveFlirtingIntent(input)) {
-                appendLine(CHAT_CHINESE_INNUENDO_GUIDANCE)
-            }
-        }
-        if (hasAdultIntimacyIntent(input, state)) {
-            appendLine("【本轮意图优先：成年亲密互动】")
-            appendLine("优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。")
-            appendLine("【亲密姿态连续性】成年亲密场景允许自然切换面对面、并肩、侧身、坐近、倚靠、拥抱等姿态，并结合距离、视线、手部动作和停顿形成连续变化；避免连续多轮复用同一种姿态或同一个动作模板。")
-            if (hasProactiveIntimacyIntent(input, state)) {
-                appendLine("【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。")
-            }
-            appendLine(CHAT_ADULT_INTIMACY_BOUNDARY)
-        }
+    fun prompt(input: String, state: ChatCharacterState): String = buildString {
+        appendLine("【双方已有的相处背景】")
+        appendLine("当前关系：${state.relationshipState}")
+        state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)
+            ?.let { appendLine("尚未解决的事：$it") }
+        state.dynamics.facts.takeLast(8).takeIf(List<RelationshipEvidence>::isNotEmpty)
+            ?.let { appendLine("已有事实：${it.joinToString("；") { fact -> fact.text }}") }
+        state.dynamics.hypotheses.takeLast(5).takeIf(List<RelationshipEvidence>::isNotEmpty)
+            ?.let { appendLine("尚未确认的印象：${it.joinToString("；") { fact -> fact.text }}") }
+        state.dynamics.unknowns.takeLast(5).takeIf(List<String>::isNotEmpty)
+            ?.let { appendLine("仍未知：${it.joinToString("；")}") }
+        state.dynamics.sharedMoments.takeLast(6).takeIf(List<String>::isNotEmpty)
+            ?.let { appendLine("共同经历：${it.joinToString("；")}") }
         when (classify(input)) {
-            ChatRelationshipView.IMMERSIVE -> {
-                appendLine("【角色视角】按当前人设和关系自然回应；历史只用于连续，事实与推测分开。")
-            }
-            ChatRelationshipView.STRATEGIST -> {
-                appendLine("【军师视角】先给判断或下一步，再给关键依据；区分事实、推测和未知，并给最小行动、观察信号与停止条件。")
-            }
-            ChatRelationshipView.REPLY_COACH -> {
-                appendLine("【回复教练】先给最多3条方向不同、可直接发送的话；必要时补充时机和后续分支，不读心。")
-            }
-        }
-        appendScenarioGuidance(classifyScenario(input))
-    }.trim()
-
-    private fun StringBuilder.appendScenarioGuidance(scenario: RelationshipScenario) {
-        when (scenario) {
-            RelationshipScenario.GENERAL -> Unit
-            RelationshipScenario.CONFLICT_REPAIR ->
-                appendLine("【冲突】分清事实、诉求、边界和未解问题，优先澄清与具体修复。")
-            RelationshipScenario.INVESTMENT_IMBALANCE ->
-                appendLine("【投入失衡】看持续投入与兑现；长期单向时降低投入并设观察窗口。")
-            RelationshipScenario.INVITE_DATE ->
-                appendLine("【邀约】具体、轻量、可退出；反复回避则降低推进。")
-            RelationshipScenario.COOLING ->
-                appendLine("【降温】结合平时基线、持续时间、主动与兑现判断，再调整投入。")
-            RelationshipScenario.BREAKUP_RECONCILIATION ->
-                appendLine("【复合判断】看原问题是否改变及双方是否持续修复，不以短期情绪代替证据。")
-            RelationshipScenario.BOUNDARY_SAFETY -> {
-            }
-        }
-    }
-
-    private fun StringBuilder.appendDynamics(dynamics: RelationshipDynamics) {
-        appendLine(
-            "【关系动力】阶段=${dynamics.stage}；温度=${dynamics.warmth}/100；信任=${dynamics.trust}/100；" +
-                "互惠=${dynamics.reciprocity}/100；张力=${dynamics.tension}/100；稳定=${dynamics.stability}/100",
-        )
-        dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { appendLine("未消化矛盾：$it") }
-        if (dynamics.facts.isNotEmpty()) {
-            appendLine("已确认事实：" + dynamics.facts.takeLast(8).joinToString("；") { it.text })
-        }
-        if (dynamics.hypotheses.isNotEmpty()) {
-            appendLine(
-                "暂定推测：" + dynamics.hypotheses.takeLast(5)
-                    .joinToString("；") { "${it.text}（${it.confidence}%）" },
+            ChatRelationshipView.IMMERSIVE -> Unit
+            ChatRelationshipView.STRATEGIST -> appendLine(
+                "【用户显式调用关系分析】根据用户的问题分析已有信息。",
+            )
+            ChatRelationshipView.REPLY_COACH -> appendLine(
+                "【用户显式调用回复建议】提供用户可直接发送的回复草稿。",
             )
         }
-        if (dynamics.unknowns.isNotEmpty()) {
-            appendLine("仍未知：${dynamics.unknowns.takeLast(5).joinToString("；")}")
-        }
-        if (dynamics.sharedMoments.isNotEmpty()) {
-            appendLine("共同经历：${dynamics.sharedMoments.takeLast(6).joinToString("；")}")
-        }
-    }
-
-    private fun StringBuilder.appendUserPattern(pattern: UserChatPattern) {
-        appendLine(
-            "【用户习惯】常用长度=${pattern.replyLength}；直接度=${pattern.directness}/100；" +
-                "玩笑=${pattern.playfulness}/100；主动=${pattern.initiative}/100" +
-                pattern.emojiStyle.takeIf(String::isNotBlank)?.let { "；表情=$it" }.orEmpty() +
-                pattern.preferredTone.takeIf(String::isNotBlank)?.let { "；语气=$it" }.orEmpty(),
-        )
-    }
+    }.trim()
 
     private companion object {
         val STRATEGY_COMMANDS = listOf("/strategy", "/analyze", "/debrief", "/军师", "/分析")
-        val REPLY_COACH_HINTS = listOf(
-            "这句怎么回", "怎么回她", "怎么回他", "怎么回复她", "怎么回复他",
-            "回她什么", "回他什么", "帮我回", "替我回", "代回", "这句怎么接", "怎么接这句",
-        )
-        val ANALYSIS_HINTS = listOf(
-            "帮我分析", "分析一下", "什么意思", "为什么", "怎么推进", "下一步怎么", "该怎么办",
-            "该怎么做", "该不该", "要不要继续", "有戏吗", "喜欢我吗", "对我有意思吗",
-            "什么信号", "关系怎么样", "现在什么阶段", "怎么看", "怎么判断",
-        )
-        val DIRECT_RELATIONSHIP_ANALYSIS_HINTS = listOf(
-            "我们现在什么阶段", "我们是什么关系", "咱们现在什么阶段", "咱们是什么关系",
-            "我和她什么关系", "我和他什么关系", "我跟她什么关系", "我跟他什么关系",
-            "有戏吗", "喜欢我吗", "对我有意思吗", "关系怎么样",
-        )
-        val STRONG_RELATIONSHIP_HINTS = listOf(
-            "对象", "女朋友", "男朋友", "老婆", "老公", "前任", "暧昧", "约会", "表白",
-            "追她", "追他", "分手", "复合", "吃醋", "挽回", "断联", "都是我主动",
-            "只有我主动", "投入失衡", "付出不对等",
-        )
-        val RELATIONSHIP_ACTOR_HINTS = listOf("她", "他", "ta", "对方", "我们", "咱们")
-        val RELATIONSHIP_SIGNAL_HINTS = listOf(
-            "喜欢", "关系", "聊天", "消息", "回复", "冷淡", "回复慢", "不回", "敷衍",
-            "见面", "吵架", "冷战", "生气", "道歉", "和好", "主动", "联系", "别联系", "拉黑",
-        )
-        val NON_RELATIONSHIP_CONTEXT_HINTS = listOf(
-            "邮件", "项目", "客户", "同事", "领导", "老板", "工作", "会议", "需求", "代码",
-            "仓库", "提交", "文档", "接口", "任务", "小说", "剧情", "章节", "作者", "台词",
-            "角色", "剧本", "设定",
-        )
-        val CONFLICT_HINTS = listOf("吵架", "闹矛盾", "生气", "道歉", "冷战", "争执", "冲突", "和好", "修复")
-        val IMBALANCE_HINTS = listOf("都是我主动", "只有我主动", "付出不对等", "投入失衡", "单方面", "一直是我")
-        val DATE_HINTS = listOf("邀约", "约她", "约他", "约出来", "见面", "第一次见", "约会")
-        val COOLING_HINTS = listOf("冷淡", "变冷", "回复慢", "不回", "敷衍", "降温", "突然变了")
-        val BREAKUP_HINTS = listOf("分手", "复合", "前任", "挽回", "重新在一起", "断联")
-        val BOUNDARY_HINTS = listOf(
-            "明确拒绝", "别联系", "不要联系", "拉黑", "威胁", "跟踪", "偷拍", "强迫",
-            "控制我", "控制她", "控制他", "泄露隐私", "勒索", "家暴",
-        )
+        val REPLY_COACH_COMMANDS = listOf("/reply", "/回复建议")
     }
 }

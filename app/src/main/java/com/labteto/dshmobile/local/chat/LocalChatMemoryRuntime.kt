@@ -106,9 +106,10 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         if (subjectKey.isNullOrBlank()) return ""
         if (viewerSubjectKey == null && snapshot.chat.chatPersona.isUnboundChatPersona()) return ""
 
-        val recallFacts = ChatMemorySelector.shouldRecall(query)
-        val searchDiary = shouldSearchDiary(query)
-        if (!recallFacts && !searchDiary) return ""
+        val conversation = if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
+            else snapshot.chat.chatContext
+        val recallQuery = ChatMemorySelector.recallQuery(query, conversation) ?: return ""
+        val searchDiary = shouldSearchDiary(recallQuery)
 
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
             ?: snapshot.chat.chatPersona.name
@@ -120,7 +121,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
 
-        if (recallFacts) {
+        run {
             val relationshipKinds = setOf(
                 MemoryKind.RELATIONSHIP_FACT,
                 MemoryKind.RELATIONSHIP_STATE,
@@ -128,8 +129,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
             )
             val recalled = memoryStore.search(
                 query = ChatMemorySelector.semanticQuery(
-                    query, subjectLabel,
-                    if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context else snapshot.chat.chatContext,
+                    recallQuery, "", conversation,
                 ),
                 allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
                 projectId = null,
@@ -151,9 +151,9 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                     buildString {
                         appendLine(
                             if (groupAudience) {
-                                "【本轮相关精确事实｜允许带入群聊】这些是已有事实记忆，可自然用于当前角色在群聊中的判断和表达。"
+                                "【本轮相关精确事实｜当前人物所知】这些事实属于当前人物；其他群成员的所知以实际公开事件为准。"
                             } else {
-                                "【本轮相关长期事实】仅用于补足当前输入缺失的信息。"
+                                "【本轮相关长期事实】"
                             },
                         )
                         recalled.forEach { appendLine("- ${it.content}") }
@@ -176,20 +176,17 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 // Use only recent public user evidence to resolve demonstratives such as
                 // "after that"; private thoughts never become search terms.
                 query = ChatMemorySelector.semanticQuery(
-                    query, "",
-                    if (snapshot.chat.groupChat.enabled) snapshot.chat.groupChat.context
-                    else snapshot.chat.chatContext,
+                    recallQuery, "", conversation,
                 ),
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
-                maxItems = diaryRecallItemLimit(query),
+                maxItems = diaryRecallItemLimit(recallQuery),
             )
             if (diary.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine("【相关人物日记｜角色自己的长期经历】")
                         appendLine(diaryRecallUsageInstruction(groupAudience))
-                        appendLine("当前输入和当前状态优先。")
                         diary.forEach { entry ->
                             appendLine(renderRecalledChatDiary(entry, groupAudience))
                         }
@@ -201,7 +198,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
 
         return takeWithinModelTokenBudget(
             blocks.filter(String::isNotBlank).joinToString("\n\n") +
-                if (blocks.isEmpty()) "" else "\n\n与本轮冲突时以本轮为准；不要为了展示记忆而主动回顾。",
+                if (blocks.isEmpty()) "" else "\n\n已被明确修正的旧版本仅属于历史；人物日记中的感受和猜测属于人物主观认识。",
             budget.totalTokens,
         )
     }

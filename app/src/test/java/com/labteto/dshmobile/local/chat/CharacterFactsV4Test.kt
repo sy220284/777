@@ -69,7 +69,22 @@ class CharacterFactsV4Test {
                 "你和阿宁参观灯塔时知道什么？", null)
         val prompt = projection.stablePrompt + projection.dynamicPrompt
         assertTrue(prompt.contains("叶澜和阿宁曾经参观灯塔"))
-        assertFalse(prompt.contains("叶澜认为未来也许要换工作"))
+        assertFalse(projection.stablePrompt.contains("叶澜认为未来也许要换工作"))
+        assertFalse(projection.dynamicPrompt.contains("叶澜认为未来也许要换工作"))
+    }
+
+    @Test fun uncertainVoiceAndBiographyDoNotBecomeStableAuthoredPersona() {
+        val persona = PersonaProfile(name = "阿岚", coreIdentity = "药师", facts = listOf(
+            CharacterFact("voice", CharacterFactCategories.VOICE_STYLE, "尚未确认的秘密口吻",
+                provenance = CharacterFactProvenance.INFERRED),
+            CharacterFact("bio", CharacterFactCategories.BIOGRAPHY, "未核实的兄长事故",
+                provenance = CharacterFactProvenance.UNVERIFIED),
+        ))
+        val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(), "兄长事故发生了什么？", null)
+        assertFalse(view.stablePrompt.contains("秘密口吻"))
+        assertFalse(view.stablePrompt.contains("兄长事故"))
+        assertTrue(view.dynamicPrompt.contains("尚未核实，不当作既定事实"))
     }
 
     @Test fun uncertainCoreFactsStayOutOfStableIdentityButRemainDiscoverableWithWarning() {
@@ -206,7 +221,7 @@ class CharacterFactsV4Test {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
         fun stage(value: String) = projector.project(
             persona, ChatCharacterState(), ChatContextState(storyStage = value),
-            "你现在每天在做什么？", null,
+            "你现在夜里会整理密信吗？", null,
         )
         val early = stage("")
         val late = stage("act-2")
@@ -216,6 +231,8 @@ class CharacterFactsV4Test {
         assertFalse((early.stablePrompt + early.dynamicPrompt).contains("隐藏旧版生活"))
         assertTrue(late.stablePrompt.contains("格外谨慎"))
         assertTrue(late.dynamicPrompt.contains("那封密信"))
+        assertTrue(late.dynamicPrompt.contains("尚未核实，不当作既定事实"))
+        assertFalse(late.dynamicPrompt.contains("【已有生活事件】"))
     }
 
     @Test fun aiEnrichmentAddsDistinctFactsAlongsideProtectedUserEdit() {

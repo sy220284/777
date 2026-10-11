@@ -543,7 +543,6 @@ fun SettingsScreen(
                         }
                     }
                     SettingsDestination.CHAT -> {
-                        val builtInFilters = viewModel.chatStyleGuardBuiltInPhrases
                         val customFilters = localHarness.chatStyleGuardCustomPhrases
                         val personaFilters = localHarness.chatPersona.bannedPhrases
                             .map(String::trim)
@@ -572,13 +571,6 @@ fun SettingsScreen(
                                     color = colors.labelSecondary,
                                 )
                             }
-
-                            Text(
-                                stringResource(R.string.settings_chat_builtin_filters_title, builtInFilters.size),
-                                style = DsType.small13Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
-                            )
-                            builtInFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
 
                             Text(
                                 stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),

@@ -37,79 +37,41 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun lifeRuntimeAdvancesWithElapsedTimeWithoutInventingNewFacts() {
-        val previousZone = java.util.TimeZone.getDefault()
-        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
-        try {
-            val persona = PersonaProfile(
-                name = "叶澜",
-                lifeContext = "白天在出版社工作；晚上会整理插画稿；周末会去看外婆。",
-            )
-            val first = advanceCharacterLife(
-                persona = persona,
-                state = ChatCharacterState(currentAgenda = "手里还有一版封面没交"),
-                now = 12L * 60L * 60L * 1_000L,
-            )
-            val second = advanceCharacterLife(
-                persona = persona,
-                state = ChatCharacterState(
-                    currentAgenda = "手里还有一版封面没交",
-                    lifeState = first,
-                ),
-                now = 18L * 60L * 60L * 1_000L,
-            )
-
-            assertNotEquals(first.currentBeat, second.currentBeat)
-            assertTrue(second.activeEvents.any { it.summary.contains("封面") })
-            assertTrue(second.activeEvents.all { it.summary in persona.lifeContext || !it.source.equals("persona") })
-        } finally {
-            java.util.TimeZone.setDefault(previousZone)
-        }
+    fun aPhoneClockDoesNotSelectTheCharactersCurrentActivity() {
+        val persona = PersonaProfile(lifeContext = "白天在出版社工作；晚上整理插画；周末看外婆")
+        val first = advanceCharacterLife(persona, ChatCharacterState(currentAgenda = "封面尚未交付"), now = 1L)
+        val later = advanceCharacterLife(persona, ChatCharacterState(currentAgenda = "封面尚未交付",
+            lifeState = first), now = 900_000_000L)
+        assertEquals("", later.currentBeat)
+        assertEquals(listOf("封面尚未交付"), later.activeEvents.map { it.summary })
+        assertEquals(first.activeEvents.single().startedAt, later.activeEvents.single().startedAt)
     }
 
     @Test
-    fun attentionAndModePreferCharacterSpecificFocusWithoutLockingReplyShape() {
-        val persona = PersonaProfile(
-            name = "叶澜",
-            portrait = "做插画，思路灵动，偶尔会从一个细节联想到别处。",
-            attentionBiases = listOf("画画和构图的细节"),
-            perceptionBlindSpots = listOf("容易忽略别人拐弯表达的情绪"),
-        )
-        val state = ChatCharacterState(
-            physicalState = "刚下班，很累",
-            lifeState = CharacterLifeState(currentBeat = "晚上会整理插画稿"),
-        )
-        val input = "我妈刚才又催我回家，不过我今天画了一张新的构图，线条终于顺了。"
-        val attention = resolveCharacterAttention(persona, state, input)
-        val mode = resolveCharacterMode(persona, state, input, attention)
-
-        assertTrue(attention.noticed.any { it.contains("画") || it.contains("构图") || it.contains("线条") })
-        assertTrue(mode.focus.isNotEmpty())
-        assertTrue(mode.vector.association > 50)
-        assertTrue(renderCharacterModePrompt(mode).contains("不是台词模板"))
+    fun aShortGreetingStillReceivesTheCharactersPerceptionAndVoice() {
+        val persona = PersonaProfile(name = "叶澜", portrait = "做插画，思路灵动",
+            attentionBiases = listOf("留意构图和线条"), voiceSamples = listOf("等下，这片影子像只鸟。"))
+        val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(physicalState = "很累"), ChatContextState(), "嗯", null)
+        assertTrue(view.stablePrompt.contains("留意构图和线条"))
+        assertTrue(view.stablePrompt.contains("这片影子像只鸟"))
+        assertTrue(view.dynamicPrompt.contains("身体：很累"))
+        assertTrue(!view.dynamicPrompt.contains("压缩"))
     }
 
     @Test
-    fun realResponsibilitiesAffectCharacterChoiceWithoutOverwritingIdentity() {
-        val committed = PersonaProfile(name = "叶澜", coreIdentity = "书店店主",
-            facts = listOf(
-                CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
-                    "答应员工的值班不能随便取消", provenance = CharacterFactProvenance.USER_CREATED),
-                CharacterFact("duty", CharacterFactCategories.LIFE_GRAVITY,
-                    "周末负责书店开门", provenance = CharacterFactProvenance.CANON),
-            ))
-        val state = ChatCharacterState(currentAgenda = "今天还要安排书店值班")
-        val grounded = renderCharacterDecisionPrompt(committed, state, "周末陪我去远足可以吗？")
-        assertTrue(grounded.contains("值班"))
-        assertTrue(grounded.contains("书店开门"))
-        assertTrue(grounded.contains("接受、商量、拒绝或改变主意"))
-        assertTrue(renderCharacterDecisionPrompt(committed, state, "早安").isBlank())
-
-        val uncertain = committed.copy(facts = listOf(CharacterFact(
-            "speculation", CharacterFactCategories.LIMITS_AND_COSTS,
-            "可能永远不敢出门", provenance = CharacterFactProvenance.INFERRED,
-        )))
-        assertTrue(renderCharacterDecisionPrompt(uncertain, ChatCharacterState(), "陪我去远足可以吗？").isBlank())
+    fun responsibilitiesAreBackgroundWithoutADecisionRecipe() {
+        val persona = PersonaProfile(name = "叶澜", coreIdentity = "书店店主", facts = listOf(
+            CharacterFact("values", CharacterFactCategories.VALUES_AND_TRADEOFFS,
+                "看重对员工的承诺", provenance = CharacterFactProvenance.USER_CREATED),
+            CharacterFact("duty", CharacterFactCategories.LIFE_GRAVITY,
+                "周末负责书店开门", provenance = CharacterFactProvenance.CANON)))
+        val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(), "陪我远足好吗", null)
+        assertTrue(view.stablePrompt.contains("周末负责书店开门"))
+        assertTrue(view.stablePrompt.contains("看重对员工的承诺"))
+        assertTrue(!view.dynamicPrompt.contains("接受、商量、拒绝"))
+        assertTrue(!view.dynamicPrompt.contains("本轮人物的现实取舍"))
     }
 
     @Test
@@ -128,174 +90,73 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun bundledPersonaRunsLifeAndModeWithoutScriptedGrowthGoals() {
+    fun aSharedExperienceDoesNotReweightThePresetPersonality() {
         val persona = requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona
-        assertTrue(persona.mutableTraits.isEmpty())
-        val previous = ChatCharacterState(initiative = 42, shareDesire = 42)
-        val current = previous.copy(initiative = 76, shareDesire = 69)
-        val evolved = evolveCharacterEvolution(
-            persona = persona,
-            previous = previous,
-            current = current,
-            significance = "MAJOR",
-            userMessage = "今天一起完成了重要的事情",
-            assistantMessage = "这次经历我会记住。",
-        )
-        assertTrue(evolved.observationCount > previous.evolution.observationCount)
-        // V4 trusted habits may now seed runtime trait slots, but an unrelated
-        // milestone must not silently change any long-term tendency.
-        assertTrue(evolved.traitStates.values.all {
-            it.evidenceCount == 0 && it.currentWeight == it.baseline
-        })
-        val attention = resolveCharacterAttention(persona, current, "神里家的祭典筹备进行得怎么样？")
-        assertTrue(attention.noticed.isNotEmpty())
-        assertTrue(resolveCharacterMode(persona, current, "神里家的祭典筹备进行得怎么样？", attention).focus.isNotEmpty())
+        val previous = ChatCharacterState()
+        val current = previous.copy(dynamics = previous.dynamics.copy(sharedMoments = listOf("一起筹备祭典")))
+        val evolution = evolveCharacterEvolution(persona, previous, current, "MAJOR", "祭典结束了", "一起筹备祭典")
+        assertEquals("一起筹备祭典", evolution.lastMajorMilestone)
+        assertEquals(previous.evolution.initiativeBaseline, evolution.initiativeBaseline)
+        assertEquals(previous.evolution.traitStates, evolution.traitStates)
+        assertEquals(persona, requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona)
     }
 
     @Test
-    fun v4HabitsEvolveAcrossSeveralRelevantEventsWithoutModifyingCanonFacts() {
-        val habit = CharacterFact(
-            id = "habit", category = CharacterFactCategories.PREFERENCES_AND_HABITS,
-            content = "愿意求助", provenance = CharacterFactProvenance.USER_CREATED,
-        )
-        val future = CharacterFact("future", CharacterFactCategories.SUBJECTIVE_BELIEFS,
-            "相信密探", temporalScope = "act-3", provenance = CharacterFactProvenance.CANON)
-        val unverified = CharacterFact("guess", CharacterFactCategories.SUBJECTIVE_BELIEFS,
-            "渴望离开", provenance = CharacterFactProvenance.UNVERIFIED)
-        val anotherPersonsBelief = CharacterFact("observer", CharacterFactCategories.SUBJECTIVE_BELIEFS,
-            "怀疑所有同事", perspective = "阿紫", provenance = CharacterFactProvenance.CANON)
-        val persona = PersonaProfile(name = "阿青",
-            facts = listOf(habit, future, unverified, anotherPersonsBelief))
-        assertTrue(persona.mutableTraits.isEmpty())
-        var state = ChatCharacterState()
-        listOf(
-            "这回我愿意求助，你能帮我看看吗？",
-            "遇到麻烦时，我愿意求助并一起想办法。",
-            "我逐渐发现愿意求助也是自己的选择。",
-        ).forEach { reply ->
-            val evolved = evolveCharacterEvolution(
-                persona = persona, previous = state, current = state,
-                significance = "MINOR", userMessage = "需要帮忙就说。", assistantMessage = reply,
-            )
-            state = state.copy(evolution = evolved)
-        }
-        val trace = state.evolution.traitStates.getValue("愿意求助")
-        assertEquals(3, trace.evidenceCount)
-        assertTrue(trace.currentWeight > trace.baseline)
-        assertTrue("相信密探" !in state.evolution.traitStates)
-        assertTrue("渴望离开" !in state.evolution.traitStates)
-        assertTrue("怀疑所有同事" !in state.evolution.traitStates)
-        assertEquals(habit, persona.facts.first())
-    }
-
-    @Test
-    fun mutableTraitsChangeSlowlyAndRemainBoundedAcrossLongRuns() {
-        val persona = PersonaProfile(
-            name = "陈拾",
-            mutableTraits = listOf("愿意求助"),
-        )
-        var state = ChatCharacterState(initiative = 70, shareDesire = 65)
-
-        repeat(250) {
-            val current = state.copy(
-                initiative = 70,
-                shareDesire = 65,
-                currentUserImpression = "现在更愿意在需要时开口求助",
-            )
-            val evolution = evolveCharacterEvolution(
-                persona = persona,
-                previous = state,
-                current = current,
-                significance = "MINOR",
-                userMessage = "需要的时候可以求助，不用总自己扛。",
-                assistantMessage = "这次我愿意求助。",
-            )
-            state = current.copy(evolution = evolution)
-        }
-
-        val repeated = state.evolution.traitStates.getValue("愿意求助")
-        assertEquals(1, repeated.evidenceCount)
-        assertEquals(50, repeated.currentWeight)
-
-        listOf(
-            "今天我愿意求助，请你帮我看看。",
-            "这次遇到麻烦，我会主动求助。",
-            "我发现愿意求助其实没有那么难。",
-        ).forEach { assistant ->
-            val current = state.copy(initiative = 70, shareDesire = 65)
-            val evolution = evolveCharacterEvolution(
-                persona = persona,
-                previous = state,
-                current = current,
-                significance = "MINOR",
-                userMessage = "需要帮忙就说。",
-                assistantMessage = assistant,
-            )
-            state = current.copy(evolution = evolution)
-        }
-
-        val trait = state.evolution.traitStates.getValue("愿意求助")
-        assertEquals(4, trait.evidenceCount)
-        assertTrue(trait.currentWeight > trait.baseline)
-        assertTrue(trait.currentWeight in 20..80)
-        assertTrue(state.evolution.initiativeBaseline in 0..100)
-        assertTrue(state.evolution.opennessBaseline in 0..100)
-        assertTrue(state.evolution.securityBaseline in 0..100)
-    }
-
-    @Test
-    fun unrelatedLongMessageDoesNotManufactureBlindSpot() {
-        val persona = PersonaProfile(
-            name = "叶澜",
-            perceptionBlindSpots = listOf("容易忽略别人拐弯表达的情绪"),
-        )
-        val input = "今天主要在整理项目代码和测试结果，顺便把几个文件名统一了一遍。".repeat(4)
-
-        val attention = resolveCharacterAttention(persona, ChatCharacterState(), input)
-
-        assertTrue(attention.possibleBlindSpot.isBlank())
-    }
-
-    @Test
-    fun busyStateCompressesSmallTalkButCriticalQuestionRestoresCoverage() {
-        val persona = PersonaProfile(name = "陈拾")
-        val state = ChatCharacterState(physicalState = "刚下班，很累")
-        val casualInput = "今天路上人好多"
-        val questionInput = "你为什么没回我刚才的问题？"
-        val casual = resolveCharacterMode(
-            persona, state, casualInput, resolveCharacterAttention(persona, state, casualInput),
-        )
-        val question = resolveCharacterMode(
-            persona, state, questionInput, resolveCharacterAttention(persona, state, questionInput),
-        )
-
-        assertTrue(casual.vector.compression > question.vector.compression)
-        assertTrue(question.vector.coverage > casual.vector.coverage)
-        assertTrue(question.vector.analysis > casual.vector.analysis)
-        assertTrue(question.criticalInput)
-    }
-
-    @Test
-    fun sameCharacterCanMoveBetweenLooseAndFocusedModesByContext() {
-        val persona = PersonaProfile(
-            name = "阿青",
-            portrait = "灵动爱开玩笑，但遇到正事会认真。",
-            voiceSamples = listOf("等下，我突然想到个东西。", "你先说重点。"),
-        )
+    fun repeatedWordsDoNotRewriteTheAuthorsHabits() {
+        val habit = CharacterFact("habit", CharacterFactCategories.PREFERENCES_AND_HABITS,
+            "愿意求助", provenance = CharacterFactProvenance.USER_CREATED)
+        val persona = PersonaProfile(name = "阿青", facts = listOf(habit))
         val state = ChatCharacterState()
-        val casualText = "我刚看到一只猫追着塑料袋跑，笑死"
-        val factualText = "你必须告诉我，明天几点出发？"
-        val casual = resolveCharacterMode(
-            persona, state, casualText, resolveCharacterAttention(persona, state, casualText),
-        )
-        val factual = resolveCharacterMode(
-            persona, state, factualText, resolveCharacterAttention(persona, state, factualText),
-        )
+        val evolved = evolveCharacterEvolution(persona, state, state, "MINOR", "愿意求助", "我愿意求助")
+        assertEquals(state.evolution, evolved)
+        assertEquals(listOf(habit), persona.facts)
+    }
 
-        assertTrue(casual.vector.association > factual.vector.association)
-        assertTrue(casual.vector.playfulness > factual.vector.playfulness)
-        assertTrue(casual.vector.freedom > factual.vector.freedom)
-        assertTrue(factual.vector.coverage > casual.vector.coverage)
+    @Test
+    fun repeatedMinorTurnsDoNotCreateASecondPersonality() {
+        val persona = PersonaProfile(name = "陈拾", mutableTraits = listOf("愿意求助"))
+        var state = ChatCharacterState(initiative = 70, shareDesire = 65)
+        val baseline = state.evolution
+        repeat(250) {
+            state = state.copy(evolution = evolveCharacterEvolution(persona, state, state,
+                "MINOR", "需要帮助就说", "这次我愿意求助"))
+        }
+        assertEquals(baseline, state.evolution)
+        assertEquals(listOf("愿意求助"), persona.mutableTraits)
+    }
+
+    @Test
+    fun aLongMessageDoesNotManufactureAnAttentionPrescription() {
+        val persona = PersonaProfile(name = "叶澜", portrait = "插画师")
+        val view = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+            .project(persona, ChatCharacterState(), ChatContextState(), "整理代码和测试结果。".repeat(40), null)
+        assertTrue(!view.dynamicPrompt.contains("注意力落点"))
+        assertTrue(!view.dynamicPrompt.contains("推演"))
+    }
+
+    @Test
+    fun seriousQuestionsDoNotOverrideThePersonsResponseStyle() {
+        val persona = PersonaProfile(name = "陈拾", portrait = "寡言，习惯直接说结论")
+        val state = ChatCharacterState(physicalState = "刚下班，很累")
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val casual = projector.project(persona, state, ChatContextState(), "嗯", null)
+        val serious = projector.project(persona, state, ChatContextState(), "我该不该辞职？", null)
+        assertEquals(casual.stablePrompt, serious.stablePrompt)
+        assertTrue(serious.stablePrompt.contains("寡言，习惯直接说结论"))
+        assertTrue(!serious.dynamicPrompt.contains("本轮模式"))
+        assertTrue(!serious.dynamicPrompt.contains("覆盖完整"))
+    }
+
+    @Test
+    fun explicitQuestionsAndSmallTalkHaveTheSameCharacterAuthority() {
+        val persona = PersonaProfile(name = "阿青", portrait = "灵动爱开玩笑，遇到正事认真",
+            voiceSamples = listOf("等下，我突然想到个东西。", "你先说重点。"))
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val casual = projector.project(persona, ChatCharacterState(), ChatContextState(), "看到猫追塑料袋", null)
+        val factual = projector.project(persona, ChatCharacterState(), ChatContextState(), "明天几点出发", null)
+        assertEquals(casual.stablePrompt, factual.stablePrompt)
+        assertTrue(factual.stablePrompt.contains("遇到正事认真"))
+        assertTrue(!factual.dynamicPrompt.contains("直觉先行"))
     }
 
     @Test
@@ -317,10 +178,10 @@ class CharacterLifeRuntimeV3Test {
             userInput = "早上好",
             storyContext = null,
         )
-        assertTrue(projection.stablePrompt.contains("原作来源：原神"))
-        assertTrue(projection.stablePrompt.contains("当前剧情阶段：稻妻已与旅行者相识"))
-        assertTrue(projection.stablePrompt.contains("原作世界：提瓦特大陆的稻妻"))
-        assertTrue(estimateModelTokens(projection.stablePrompt) <= 520)
+        assertTrue(projection.stablePrompt.contains("【原作来源】\n原神"))
+        assertTrue(projection.stablePrompt.contains("【当前剧情阶段】\n稻妻已与旅行者相识"))
+        assertTrue(projection.stablePrompt.contains("【世界背景】\n提瓦特大陆的稻妻"))
+        assertTrue(estimateModelTokens(projection.stablePrompt) <= 1_040)
     }
 
     @Test
@@ -333,7 +194,7 @@ class CharacterLifeRuntimeV3Test {
         val normal = projector.project(persona, ChatCharacterState(), ChatContextState(), "今天一起散步吧", null)
         val relevant = projector.project(persona, ChatCharacterState(), ChatContextState(), "神里绫人和托马在神里家的职责是什么？", null)
         assertTrue(normal.stablePrompt.contains("神里绫华"))
-        assertTrue(estimateModelTokens(relevant.stablePrompt) <= 520)
+        assertTrue(estimateModelTokens(relevant.stablePrompt) <= 1_040)
         assertTrue(relevant.dynamicPrompt.contains("【本轮相关背景】"))
         assertTrue(relevant.dynamicPrompt.contains("人物身份与经历："))
         assertTrue(relevant.dynamicPrompt.contains("神里绫人"))
@@ -362,12 +223,11 @@ class CharacterLifeRuntimeV3Test {
             storyContext = null,
         )
 
-        assertTrue(estimateModelTokens(projection.stablePrompt) <= 600)
+        assertTrue(estimateModelTokens(projection.stablePrompt) <= 1_040)
         assertTrue(projection.stablePrompt.contains("绝不替用户做重大决定"))
         assertTrue(projection.stablePrompt.contains("不知道未经历的后续剧情"))
-        assertTrue(projection.stablePrompt.contains("只在人物世界内回应"))
-        assertTrue(projection.stablePrompt.contains("禁止用“无现实身体/不能触碰"))
-        assertTrue(projection.stablePrompt.contains("人物意愿和关系"))
+        assertTrue(projection.stablePrompt.contains("当前聊天的人设与故事背景"))
+        assertTrue(projection.stablePrompt.contains("声音") || projection.stablePrompt.contains("语言风格资料"))
     }
 
     @Test
@@ -408,37 +268,25 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun anomalyGuardOnlyMakesMinimalStructuralRepairs() {
-        val result = CharacterReplyAnomalyGuard.repair(
-            "建议：\n1. 先吃饭\n2. 再洗澡\n3. 然后休息\n4. 最后睡觉",
-        )
-        assertTrue("解释式标题" in result.anomalies)
-        assertTrue("过度罗列" in result.anomalies)
-        assertTrue(!result.text.contains("建议："))
-        assertTrue(result.text.contains("先吃饭"))
-
-        val legitimateList = CharacterReplyAnomalyGuard.repair(
-            "1. 苹果\n2. 香蕉\n3. 梨\n4. 葡萄",
-        )
-        assertEquals("1. 苹果\n2. 香蕉\n3. 梨\n4. 葡萄", legitimateList.text)
+    fun aCharactersListAndQuestionsAreNotReformattedByApplicationTaste() {
+        val text = "建议：\n1. 先吃饭\n2. 再洗澡\n3. 然后休息\n4. 最后睡觉"
+        assertTrue(ChatStyleGuard.violations(text, ChatStyleGuard.activePhrases()).isEmpty())
     }
     @Test
-    fun unchangedLifeSourceDoesNotRenewExpiryAfterOtherStateUpdates() {
-        val first = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
-            currentAgenda = "写完封面", updatedAt = 1000L), now = 1000L)
-        val event = first.activeEvents.single { it.source == "agenda" }
-        val later = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
-            currentAgenda = "写完封面", updatedAt = 2000L, lifeState = first), now = 2000L)
-        assertEquals(event.expiresAt, later.activeEvents.single { it.source == "agenda" }.expiresAt)
-        val expired = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
-            currentAgenda = "写完封面", updatedAt = event.expiresAt, lifeState = later), now = event.expiresAt)
-        assertTrue(expired.activeEvents.none { it.source == "agenda" })
+    fun anUnfinishedEventSurvivesTimeButLeavesWhenTheStateActuallyClearsIt() {
+        val first = advanceCharacterLife(PersonaProfile(), ChatCharacterState(currentAgenda = "写完封面"), now = 1L)
+        val later = advanceCharacterLife(PersonaProfile(), ChatCharacterState(currentAgenda = "写完封面",
+            lifeState = first), now = 1_000_000_000L)
+        assertEquals(listOf("写完封面"), later.activeEvents.map { it.summary })
+        val completed = advanceCharacterLife(PersonaProfile(), ChatCharacterState(lifeState = later), now = 1_000_000_001L)
+        assertTrue(completed.activeEvents.isEmpty())
     }
     @Test
-    fun explicitStoryEveningWinsOverPhoneTimeAndWeekendHabit() {
-        val life = advanceCharacterLife(PersonaProfile(lifeContext = "早上去出版社；晚上整理插画；周末看外婆"),
-            ChatCharacterState(), now = 1000L, storyTime = "周末晚上")
-        assertTrue(life.currentBeat.contains("晚上"))
-        assertTrue(renderCharacterLifePrompt(life).contains("不代表此刻已经发生"))
+    fun aHabitDoesNotBecomeALivedEventOrProactivePretext() {
+        val persona = PersonaProfile(lifeContext = "晚上整理插画；周末看外婆")
+        val life = advanceCharacterLife(persona, ChatCharacterState(), now = 1000L, storyTime = "周末晚上")
+        assertTrue(life.activeEvents.isEmpty())
+        assertEquals("", renderCharacterLifePrompt(life))
+        assertEquals(null, characterLifeProactiveReason(persona, ChatCharacterState(), now = 1000L))
     }
 }

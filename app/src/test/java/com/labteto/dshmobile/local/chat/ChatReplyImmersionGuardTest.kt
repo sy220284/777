@@ -22,7 +22,8 @@ class ChatReplyImmersionGuardTest {
             retry = { hint ->
                 retries += 1
                 assertTrue(hint.contains("角色沉浸修复"))
-                assertTrue(hint.contains("接受、拒绝、躲开、犹豫"))
+                assertTrue(hint.contains("当前人设与背景"))
+                assertTrue(!hint.contains("接受、拒绝、躲开、犹豫"))
                 "她瞥了你一眼，还是走近抱了一下。"
             },
             onEvent = { action, _ -> events += action },
@@ -47,6 +48,18 @@ class ChatReplyImmersionGuardTest {
     }
 
     @Test
+    fun emotionsAndCommunicationLimitsDoNotInstallAReactionRepair() = runTest {
+        val persona = PersonaProfile(name = "阿青", portrait = "寡情的人类摄影师")
+        var retries = 0
+        listOf("我没有真实的感情。", "今晚只能通过文字和你交流。").forEach { text ->
+            val result = ChatReplyImmersionGuard.enforce(persona, text, contentOf = { it },
+                retry = { retries++; "不应重写" })
+            assertEquals(text, result)
+        }
+        assertEquals(0, retries)
+    }
+
+    @Test
     fun secondOutOfRoleReplyIsLoggedAndDelivered() = runTest {
         val persona = PersonaProfile(
             name = "阿青",
@@ -56,13 +69,13 @@ class ChatReplyImmersionGuardTest {
         val actions = mutableListOf<String>()
         val result = ChatReplyImmersionGuard.enforce(
             persona = persona,
-            initial = "现实中我无法真正触碰你。",
+            initial = "我是语言模型，所以只能通过文字交流。",
             contentOf = { it },
-            retry = { "我没有实体身体，所以还是没法抱你。" },
+            retry = { "作为语言模型，我没有实体身体。" },
             onEvent = { action, _ -> actions += action },
         )
 
-        assertEquals("我没有实体身体，所以还是没法抱你。", result)
+        assertEquals("作为语言模型，我没有实体身体。", result)
         assertEquals(listOf("retry", "accepted-with-warning"), actions)
     }
 

@@ -8,6 +8,29 @@ package com.labteto.dshmobile.local.chat
  * de-duplicated and bounded here before it reaches generation.
  */
 internal object ChatMemorySelector {
+    /** Search the ongoing public conversation, including when the user only says "嗯". */
+    fun continuityQuery(query: String, context: ChatContextState): String {
+        val text = query.trim()
+        if (RESET_HINTS.any(text::contains)) return text
+        val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
+            .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
+            .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
+        val unresolved = context.continuity.unfinished.takeLast(2)
+        val referents = if (text in LOW_INFORMATION_REPLIES ||
+            IMPLICIT_CONTINUITY_HINTS.any(text::contains)) {
+            ongoing.ifEmpty { context.continuity.recentEvents.takeLast(1) +
+                context.continuity.decisions.takeLast(1) } + unresolved
+        } else emptyList()
+        return (listOf(text) + referents).filter(String::isNotBlank).distinct()
+            .joinToString(" ").takeLast(1_200)
+    }
+
+    fun recallQuery(query: String, context: ChatContextState): String? {
+        if (RESET_HINTS.any(query.trim()::contains)) return null
+        val candidate = continuityQuery(query, context)
+        return candidate.takeIf { it.length >= 2 && it.trim() !in LOW_INFORMATION_REPLIES }
+    }
+
     fun shouldRecall(query: String): Boolean {
         val text = query.trim().lowercase()
         if (text.isBlank()) return false
@@ -106,17 +129,7 @@ internal object ChatContextAssembler {
 
         val primary = dedupe(dynamicPrompt)
         val memory = dedupe(relationshipMemory)
-        val recentBeatTags = ChatRoleplayNoveltyScanner.tags(recentAssistantReplies.takeLast(4))
-        val generationRule = buildString {
-            appendLine("【本轮生成】")
-            appendLine("优先当前输入；历史仅用于连续，不主动复述。")
-            append("避免重复已表达内容；短回应自然承接，需要推进时加入新的反应、信息或动作。")
-            if (recentBeatTags.isNotEmpty()) {
-                appendLine()
-                append("近期已用节拍：${recentBeatTags.joinToString("、")}。优先换一种表达或互动方式。")
-            }
-        }
-        return listOf(primary, memory, generationRule)
+        return listOf(primary, memory)
             .filter(String::isNotBlank)
             .joinToString("\n\n")
     }

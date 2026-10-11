@@ -100,7 +100,7 @@ class CharacterLoreEngine @Inject constructor() {
         if (active.isEmpty()) return ""
         return buildString {
             appendLine("【相关世界信息】以下是当前已解锁的故事背景，不等于人物亲历或已知。")
-            appendLine("只在符合人物当前认知、经历与记忆时使用；未获知的秘密不得以本人见闻自述，不补写未提供的设定。")
+            appendLine("人物的亲历与所知以当前人物资料和实际聊天经历为准。")
             active.forEach { entry ->
                 if (entry.title.isNotBlank()) appendLine("【${entry.title}】")
                 appendLine(entry.content)

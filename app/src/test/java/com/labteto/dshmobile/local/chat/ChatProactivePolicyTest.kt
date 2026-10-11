@@ -225,9 +225,11 @@ class ChatProactivePolicyTest {
             }
             add(message("p-new", "assistant", "刚刚翻开一本旧书，想起我们在雨天的约定。", 900L, proactive = true))
         }
-        val avoidance = recentProactiveAvoidanceContext(messages)
-        assertTrue(avoidance.contains("刚刚翻开一本旧书"))
-        assertFalse(avoidance.contains("草莓奶昔"))
+        val background = recentProactiveContext(messages)
+        assertTrue(background.contains("刚刚翻开一本旧书"))
+        assertFalse(background.contains("草莓奶昔"))
+        assertFalse(background.contains("换一个自然切入点"))
+        assertFalse(background.contains("不复用"))
         assertTrue(isNearDuplicateProactive(
             "刚刚翻开一本旧书，想起我们在雨天的约定。", messages,
         ))
@@ -246,8 +248,8 @@ class ChatProactivePolicyTest {
         val prompt = characterProactiveDirective("用户设置的晚上提醒", persona, state)
         assertTrue(prompt.contains("还没把旧花盆归还给朋友"))
         assertTrue(prompt.contains("整理温室里的新苗"))
-        assertTrue(prompt.contains("不要编造用户刚刚说过"))
-        assertTrue(prompt.contains("不编造重大事件"))
+        assertTrue(prompt.contains("幕后触发条件，不是用户刚发来的消息"))
+        assertTrue(prompt.contains("延续当前人物、关系和故事"))
     }
 
     private fun message(

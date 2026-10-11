@@ -48,8 +48,9 @@ class PersonaImmersionPolicyTest {
         )
 
         assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，没有真实身体，所以没法抱你。"))
-        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "现实中我无法真正触碰你，只能陪你聊聊天。"))
-        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有真实的感情，不能真正理解你的难过。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "作为AI语言模型，我无法抱你。"))
+        assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "现实中我无法真正触碰你，只能陪你聊聊天。"))
+        assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有真实的感情，不能真正理解你的难过。"))
     }
 
     @Test
@@ -59,7 +60,7 @@ class PersonaImmersionPolicyTest {
             portrait = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
         )
 
-        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有实体身体，所以没法走过去抱你。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，所以没法走过去抱你。"))
     }
 
     @Test
@@ -82,7 +83,7 @@ class PersonaImmersionPolicyTest {
 
         assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能抱你。"))
         assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "别靠这么近，我现在不想让你碰。"))
-        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能真正拥抱你，因为我没有实体身体。"))
+        assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能真正拥抱你，因为我没有实体身体。"))
     }
 
     @Test

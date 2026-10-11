@@ -173,11 +173,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             storyContext = handoffSummary,
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
-        val silenceRule = if (mayStaySilent) {
-            "未被点名且无自然回应理由时，只输出 $silentToken。"
-        } else {
-            "本轮必须自然回应，不得输出沉默标记。"
-        }
+        val silenceRule = "若本轮没有发言，使用 $silentToken 表示。"
         val groupDynamic = listOf(
             prepared.dynamicPrompt,
             memoryContext,
@@ -187,9 +183,8 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             """
             【群聊身份】
             你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言只是公开事件，不改变你的固定人物生命资料、知识边界或你自己的关系经历。
-            你可以记得自己在单聊和群聊中真实经历过的事，并按自己的性格、关系、当前情境和表达意愿自然提及；某段旧记忆只有在本轮真正说出口后，才成为其他群成员此刻听到的新信息。
-            不得猜测同轮尚未出现的发言，也不得代写他人的语言、动作、心理或决定。
-            只输出本人发言，不加角色名前缀。$silenceRule
+            你在单聊与群聊中亲历的记忆属于自己；其他成员只知道已经公开的发言与事件。
+            当前输出对应本人的群聊发言。$silenceRule
             """.trimIndent(),
         ).filter(String::isNotBlank).joinToString("\n\n")
         return prepared.copy(dynamicPrompt = groupDynamic)

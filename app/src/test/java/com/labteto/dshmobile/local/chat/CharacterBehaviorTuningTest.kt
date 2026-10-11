@@ -6,11 +6,11 @@ import org.junit.Test
 
 class CharacterBehaviorTuningTest {
     @Test
-    fun naturalTuningPreservesExistingTiming() {
-        val tuning = CharacterBehaviorTuning()
-        assertEquals(3, tuning.transientTtl(3))
-        assertEquals(3, tuning.cooldownTurns(3))
-        assertEquals(10, tuning.relationshipDelta(10))
+    fun legacyBehaviorAxesNoLongerRepresentAnActiveSetting() {
+        val legacy = CharacterBehaviorTuning(intimacy = 100, novelty = 0,
+            persistence = 100, evolution = 100, lockRelationshipStage = true)
+        assertTrue(legacy.isNatural())
+        assertEquals(CharacterBehaviorTuning().signature(), legacy.signature())
     }
 
     @Test
@@ -103,10 +103,15 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
-    fun persistenceAndNoveltyOnlyChangeBehaviorTiming() {
-        val tuned = CharacterBehaviorTuning(persistence = 100, novelty = 100)
-        assertTrue(tuned.transientTtl(5) > CharacterBehaviorTuning().transientTtl(5))
-        assertTrue(tuned.cooldownTurns(3) > CharacterBehaviorTuning().cooldownTurns(3))
+    fun legacyBehaviorFieldsRemainDecodableWithoutAffectingSampling() {
+        val legacy = kotlinx.serialization.json.Json.decodeFromString(
+            CharacterBehaviorTuning.serializer(),
+            """{"persistence":100,"novelty":0,"relationshipPace":100,"expressionVariation":25}""",
+        )
+        assertEquals(25, legacy.expressionVariation)
+        assertEquals(CharacterBehaviorTuning(expressionVariation = 25).roleplayTemperature(
+            "deepseek-flash", "https://api.deepseek.com"),
+            legacy.roleplayTemperature("deepseek-flash", "https://api.deepseek.com"))
     }
 
     @Test
@@ -157,40 +162,21 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
-    fun extremeBaseValuesNeverOverflowOrThrow() {
-        val tuning = CharacterBehaviorTuning(
-            persistence = 100,
-            novelty = 100,
-            relationshipPace = 100,
-        )
-
-        assertTrue(tuning.transientTtl(Int.MAX_VALUE) > 0)
-        assertTrue(tuning.cooldownTurns(Int.MAX_VALUE) in 1..8)
-        assertTrue(tuning.relationshipDelta(Int.MAX_VALUE) > 0)
-        assertEquals(1, tuning.transientTtl(Int.MIN_VALUE))
-        assertEquals(1, tuning.relationshipDelta(Int.MIN_VALUE))
+    fun retiredParametersDoNotChangeTheActiveSamplingSignature() {
+        val base = CharacterBehaviorTuning(samplingTemperaturePosition = 25)
+        assertEquals(base.signature(), base.copy(intimacy = 100, initiative = 0,
+            openness = 0, novelty = 100, relationshipPace = 0).signature())
     }
 
     @Test
-    fun v3ModeConsumesLoreAndRelationshipPaceWithoutRewritingRelationshipFacts() {
-        val attention = CharacterAttentionProjection()
-        val naturalState = ChatCharacterState(
-            interactionIntent = ChatInteractionIntent.FLIRTING.name,
-            behaviorTuning = CharacterBehaviorTuning(),
-        )
-        val tunedState = naturalState.copy(
-            behaviorTuning = CharacterBehaviorTuning(
-                loreAdherence = 0,
-                relationshipPace = 100,
-            ),
-        )
-
-        val natural = resolveCharacterMode(PersonaProfile(), naturalState, "靠近一点", attention).vector
-        val tuned = resolveCharacterMode(PersonaProfile(), tunedState, "靠近一点", attention).vector
-
-        assertTrue(tuned.freedom > natural.freedom)
-        assertTrue(tuned.initiative > natural.initiative)
-        assertEquals(naturalState.dynamics, tunedState.dynamics)
+    fun oldTuningCannotOverwriteCharacterContext() {
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val persona = PersonaProfile(name = "阿青", portrait = "内向寡言，重视自由")
+        val base = ChatCharacterState()
+        val tuned = base.copy(behaviorTuning = CharacterBehaviorTuning(
+            intimacy = 100, initiative = 100, loreAdherence = 0, relationshipPace = 100))
+        assertEquals(projector.project(persona, base, ChatContextState(), "陪我一会", null),
+            projector.project(persona, tuned, ChatContextState(), "陪我一会", null))
     }
 
     @Test

@@ -124,7 +124,6 @@ CURRENT_OWNER_SYMBOLS = {
     "LocalWorkCueKind": "app/src/main/java/com/labteto/dshmobile/local/work/",
     "extractLocalWorkCueSnippet": "app/src/main/java/com/labteto/dshmobile/local/work/",
     "LocalChatContextRefreshCoordinator": "app/src/main/java/com/labteto/dshmobile/local/chat/",
-    "LocalStreamPhraseFilter": "app/src/main/java/com/labteto/dshmobile/local/model/",
     "LocalSubagentRunner": "app/src/main/java/com/labteto/dshmobile/local/work/",
     "LocalSubagentRunnerFactory": "app/src/main/java/com/labteto/dshmobile/local/work/",
     "LocalPersistentJobRecoveryCoordinator": "app/src/main/java/com/labteto/dshmobile/local/work/",

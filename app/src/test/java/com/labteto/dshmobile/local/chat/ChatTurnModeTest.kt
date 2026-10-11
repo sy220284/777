@@ -4,40 +4,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Conversation words remain user input; they do not select a response recipe. */
 class ChatTurnModeTest {
     @Test
-    fun shortContinuationKeepsCurrentBeat() {
-        assertEquals(ChatTurnMode.CONTINUE_BEAT, inferChatTurnMode("继续"))
-        assertEquals(ChatTurnMode.CONTINUE_BEAT, inferChatTurnMode("然后呢"))
-        val prompt = renderChatTurnModeForModel("继续")
-        assertTrue(prompt.contains("【继续】"))
-        assertTrue(prompt.contains("不无过渡跳时、换场或加人"))
+    fun conversationPhrasesDoNotInstallAReactionMode() {
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val persona = PersonaProfile(name = "阿青", portrait = "剑客，重情，寡言")
+        val scene = ChatContextState(scene = ChatSceneState(location = "院子"))
+        val base = projector.project(persona, ChatCharacterState(), scene, "你好", null)
+        listOf("继续", "为什么呢", "换个话题", "别出去", "你还记得上次吗").forEach { input ->
+            val view = projector.project(persona, ChatCharacterState(), scene, input, null)
+            assertEquals(base.stablePrompt, view.stablePrompt)
+            assertTrue(view.dynamicPrompt.contains("地点=院子"))
+            assertTrue(!view.dynamicPrompt.contains("只推进下一拍"))
+            assertTrue(!view.dynamicPrompt.contains("【结束当前节拍】"))
+        }
     }
-
-    @Test
-    fun callbackTransitionAndResetAreSeparated() {
-        assertEquals(ChatTurnMode.CALLBACK, inferChatTurnMode("你还记得我们第一次见面吗"))
-        assertEquals(ChatTurnMode.SCENE_TRANSITION, inferChatTurnMode("我们去外面说吧"))
-        assertEquals(ChatTurnMode.RESET, inferChatTurnMode("换个话题，说正事"))
-    }
-
-    @Test
-    fun followUpDoesNotOpenNewPlot() {
-        assertEquals(ChatTurnMode.FOLLOW_UP, inferChatTurnMode("为什么呢"))
-        assertTrue(renderChatTurnModeForModel("为什么呢").contains("无明确过渡时保持当前场景"))
-    }
-
-    @Test
-    fun negatedMovementDoesNotForceSceneTransition() {
-        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("我不想去外面"))
-        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("别出去，外面太冷了"))
-        assertEquals(ChatTurnMode.SCENE_TRANSITION, inferChatTurnMode("我们去外面说吧"))
-    }
-
-    @Test
-    fun resetWordDoesNotMatchInsideUnrelatedWord() {
-        assertEquals(ChatTurnMode.NORMAL, inferChatTurnMode("预算了三万，接下来怎么安排"))
-        assertEquals(ChatTurnMode.RESET, inferChatTurnMode("算了，换个话题"))
-    }
-
 }

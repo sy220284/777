@@ -13,7 +13,6 @@ import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
 import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
-import com.labteto.dshmobile.local.model.LocalStreamPhraseFilter
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
@@ -117,7 +116,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val maxAttemptsOverride = options.maxAttemptsOverride
         val allowContextOverflowRecovery = options.allowContextOverflowRecovery
         val persistOverflowHistory = options.persistOverflowHistory
-        val streamFilterPhrases = options.streamFilterPhrases
         val requestLog = options.requestLog
         val temperature = options.temperature
         val profile = options.profile
@@ -769,9 +767,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 ?.let { streamingPreviewStore.publishAssistant(it, preview) }
                         },
                     )
-                    val streamFilter = streamFilterPhrases
-                        .takeIf { it.isNotEmpty() }
-                        ?.let(::LocalStreamPhraseFilter)
                     val activePressure = LocalPromptPressureMeter.measure(
                         messages = activeMessages,
                         tools = tools,
@@ -801,7 +796,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 providerStartedNanos = System.nanoTime()
                             },
                             onDelta = { delta ->
-                                    val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                    val visible = delta.content
                                     appendAttemptStream(visible)
                                     streamPreview.append(visible)
                                 },
@@ -851,7 +846,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             })
                             throw error
                         }
-                            streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                             streamPreview.flush()
                             activePrefixAssessment?.let { cache ->
                                 promptCacheContinuity.recordSuccess(

@@ -59,6 +59,18 @@ data class ChatContinuityState(
 
 
 @Serializable
+data class ChatStateObservation(
+    val field: String = "",
+    val value: String = "",
+    val basis: String = "",
+    /** A quoted expression or a contextual interpretation, never an objective user fact. */
+    val interpretation: Boolean = true,
+    val sourceSequence: Long = 0L,
+    val sourceUserMessageId: String = "",
+    val sourceAssistantMessageId: String = "",
+)
+
+@Serializable
 data class ChatCharacterState(
     /** Short-lived bodily condition that can naturally affect attention and reply length. */
     val physicalState: String = "",
@@ -69,6 +81,8 @@ data class ChatCharacterState(
     val recentImpression: String = "",
     /** Durable subjective impression; unlike transient mood/focus it does not expire by turn count. */
     val currentUserImpression: String = "",
+    /** System-owned sources of the latest observed state changes; old stories decode empty. */
+    val stateObservations: List<ChatStateObservation> = emptyList(),
     val lifeState: CharacterLifeState = CharacterLifeState(),
     val activeGoal: String = "",
     val currentAgenda: String = "",
@@ -91,23 +105,22 @@ data class ChatCharacterState(
     val recentVerbalTags: List<String> = emptyList(),
     val recentAddressTerms: List<String> = emptyList(),
     val interactionCooldowns: Map<String, Int> = emptyMap(),
-    /** Per-field age in completed turns. Used to expire short-lived roleplay state. */
+    /** Decode-only ages from the retired turn-count expiry controller. */
     val transientAges: Map<String, Int> = emptyMap(),
-    /** Open-thread age keyed by normalized thread text. */
+    /** Decode-only open-thread ages; elapsed turns no longer resolve unfinished events. */
     val unresolvedThreadAges: Map<String, Int> = emptyMap(),
     val updatedAt: Long = 0L,
 )
 
 internal fun ChatCharacterState.canonicalizeLegacyCharacterState(): ChatCharacterState {
     val migratedImpression = currentUserImpression.ifBlank { recentImpression }
-    return if (recentImpression.isBlank() && migratedImpression == currentUserImpression) {
-        this
-    } else {
-        copy(
-            currentUserImpression = migratedImpression,
-            recentImpression = "",
-        )
-    }
+    return copy(
+        currentUserImpression = migratedImpression,
+        recentImpression = "",
+        interactionCooldowns = emptyMap(),
+        transientAges = emptyMap(),
+        unresolvedThreadAges = emptyMap(),
+    )
 }
 
 @Serializable
@@ -125,6 +138,8 @@ data class ChatPostTurnPlan(
     val suggestions: List<ChatReplySuggestion> = emptyList(),
     val turnSignificance: String = "MINOR",
     val diaryDelta: ChatDiaryDelta? = null,
+    /** Optional literal transcript quotations supporting changed fields, including resolutions. */
+    val stateEvidence: Map<String, String> = emptyMap(),
 )
 @Serializable
 data class ChatReplySuggestionPlan(

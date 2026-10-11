@@ -89,7 +89,7 @@
       ]
     },
     {
-      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告生成与保存",
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告编辑与保存",
       "state": "automated_partial",
       "evidence": [
         "app/src/test/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinatorTest.kt#authorityFailureLeavesAnnouncementUnchangedAndReleasesLease"

@@ -34,7 +34,9 @@ internal class LocalChatTurnCoordinator @Inject constructor(
     /** ProjectFeature owns instruction text; Chat only decides when the current session may use it. */
     internal fun projectStablePrompt(snapshot: LocalHarnessState, base: String): String =
         withChatProjectInstructions(
-            base = base,
+            base = listOf(base, renderChatExpressionPreferences(
+                snapshot.chat.chatStyleGuardCustomPhrases, snapshot.chat.chatStyleGuardEnabled,
+            )).filter(String::isNotBlank).joinToString("\n\n"),
             mode = snapshot.conversationMode,
             projectId = snapshot.projectId,
             resolve = projects::instructionsFor,

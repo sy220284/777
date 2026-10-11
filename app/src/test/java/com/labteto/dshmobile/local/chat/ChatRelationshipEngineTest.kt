@@ -25,27 +25,13 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun explicitAnalysisAndReplyRequestsRouteDifferently() {
-        assertEquals(
-            ChatRelationshipView.STRATEGIST,
-            engine.classify("军师，她最近为什么突然冷淡"),
-        )
-        assertEquals(
-            ChatRelationshipView.STRATEGIST,
-            engine.classify("帮我分析一下我们现在什么阶段"),
-        )
-        assertEquals(
-            ChatRelationshipView.STRATEGIST,
-            engine.classify("她为什么突然冷淡"),
-        )
-        assertEquals(
-            ChatRelationshipView.REPLY_COACH,
-            engine.classify("她说刚下班，这句怎么回"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("帮我分析一下这个项目现在什么阶段"),
-        )
+    fun onlyAnExplicitCommandChangesTheRequestedCapability() {
+        assertEquals(ChatRelationshipView.STRATEGIST, engine.classify("/军师 她最近为什么冷淡"))
+        assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/reply 这句怎么回"))
+        listOf("军师，她最近为什么突然冷淡", "帮我分析我们现在什么阶段", "她为什么突然冷淡",
+            "你喜欢我吗", "她说刚下班，这句怎么回", "/strategybook").forEach {
+            assertEquals(ChatRelationshipView.IMMERSIVE, engine.classify(it))
+        }
     }
 
     @Test
@@ -53,10 +39,6 @@ class ChatRelationshipEngineTest {
         assertEquals(
             ChatRelationshipView.IMMERSIVE,
             engine.classify("他为什么不回邮件"),
-        )
-        assertEquals(
-            RelationshipScenario.GENERAL,
-            engine.classifyScenario("他为什么不回邮件"),
         )
         assertEquals(
             ChatRelationshipView.IMMERSIVE,
@@ -77,81 +59,44 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun ordinarySingleScenarioWordDoesNotInjectSpecialistRoute() {
-        assertEquals(
-            RelationshipScenario.GENERAL,
-            engine.classifyScenario("她最近有点冷淡，真烦"),
-        )
-        assertEquals(
-            RelationshipScenario.GENERAL,
-            engine.classifyScenario("今天见面的时候她有点走神"),
-        )
-        assertEquals(
-            RelationshipScenario.BOUNDARY_SAFETY,
-            engine.classifyScenario("她明确说别联系了"),
-        )
+    fun scenarioKeywordsDoNotChooseTheCharactersAttitude() {
+        val background = engine.prompt("你好", ChatCharacterState())
+        listOf("她最近有点冷淡，真烦", "今天见面时她有点走神", "她明确说别联系了").forEach {
+            assertEquals(background, engine.prompt(it, ChatCharacterState()))
+        }
     }
 
     @Test
-    fun scenariosUseDifferentReasoningRoutes() {
-        assertEquals(
-            RelationshipScenario.CONFLICT_REPAIR,
-            engine.classifyScenario("我们昨天吵架了，怎么修复"),
-        )
-        assertEquals(
-            RelationshipScenario.INVESTMENT_IMBALANCE,
-            engine.classifyScenario("一直都是我主动，感觉投入失衡"),
-        )
-        assertEquals(
-            RelationshipScenario.BOUNDARY_SAFETY,
-            engine.classifyScenario("她明确说别联系了"),
-        )
+    fun conflictsAndImbalanceDoNotInstallOneSharedReasoningRoute() {
+        val background = engine.prompt("你好", ChatCharacterState())
+        listOf("我们昨天吵架了，怎么修复", "一直都是我主动，感觉投入失衡", "我们复合吧").forEach {
+            assertEquals(background, engine.prompt(it, ChatCharacterState()))
+        }
     }
 
     @Test
-    fun defaultRelationalBiasIsAlwaysInjected() {
-        val prompt = engine.prompt(
-            "今天随便聊点什么",
-            ChatCharacterState(),
-        )
-
-        assertTrue(prompt.contains("【互动倾向】"))
-        assertTrue(prompt.contains("按当前人物关系和已识别意图自然回应"))
-        assertTrue(prompt.contains("暧昧或亲密意图"))
-        assertTrue(prompt.contains("积极承接"))
-        assertTrue(prompt.contains("明确拒绝或边界立即尊重"))
-        assertTrue(prompt.contains("当前人物关系"))
-        assertTrue(prompt.contains("明确拒绝或边界立即尊重"))
+    fun ordinaryRelationshipQuestionsReceiveBackgroundWithoutASharedAttitude() {
+        val state = ChatCharacterState(relationshipState = "亲近",
+            dynamics = RelationshipDynamics(unresolvedConflict = "昨天的失约"))
+        val prompt = engine.prompt("你是不是不在乎我", state)
+        assertTrue(prompt.contains("当前关系：亲近"))
+        assertTrue(prompt.contains("昨天的失约"))
+        assertFalse(prompt.contains("积极承接"))
+        assertFalse(prompt.contains("军师"))
     }
 
     @Test
-    fun flirtActionRepertoireAddsPoseAndGestureVariety() {
-        val prompt = engine.prompt(
-            "撩我一下，靠近点陪我聊会儿",
-            ChatCharacterState(),
-        )
-
-        assertTrue(prompt.contains("【互动变化】"))
-        assertTrue(prompt.contains("动作、姿态、称呼和表达"))
-        assertTrue(prompt.contains("贴合人物与当前强度"))
-        assertTrue(prompt.contains("保持连续"))
-        assertTrue(prompt.contains("避开近期重复的互动节拍"))
+    fun intimacyDoesNotInstallAnActionRepertoire() {
+        val prompt = engine.prompt("靠近点，陪我聊会", ChatCharacterState())
+        assertFalse(prompt.contains("互动变化"))
+        assertFalse(prompt.contains("姿态"))
+        assertFalse(prompt.contains("换一种"))
     }
 
     @Test
-    fun flirtVerbalRepertoireAddsLanguageVariety() {
-        val prompt = engine.prompt(
-            "今晚撩我一下",
-            ChatCharacterState(),
-        )
-
-        assertTrue(hasFlirtingOrIntimateIntent("今晚撩我一下"))
-        assertTrue(prompt.contains("【互动变化】"))
-        assertTrue(prompt.contains("动作、姿态、称呼和表达"))
-        assertTrue(prompt.contains("贴合人物与当前强度"))
-        assertTrue(prompt.contains("保持连续"))
-        assertTrue(prompt.contains("避开近期重复的互动节拍"))
-        assertTrue(prompt.contains("避开近期重复的互动节拍"))
+    fun differentRequestsDoNotRewriteRelationshipBackground() {
+        val state = ChatCharacterState(relationshipState = "熟悉")
+        assertEquals(engine.prompt("今天怎么样", state), engine.prompt("今晚撩我一下", state))
     }
 
     @Test
@@ -243,117 +188,48 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun chineseInnuendoAddsContextGuidanceAndKeepsIntimateContinuity() {
-        val prompt = engine.prompt(
-            "你行不行啊，别光说",
-            ChatCharacterState(),
-        )
-
-        assertTrue(prompt.contains("【中文双关】"))
-        assertTrue(prompt.contains("结合关系、语境和语气理解言外之意"))
-        assertTrue(prompt.contains("保留双层含义"))
-        assertTrue(prompt.contains("不无故拆成字面解释"))
-
-        val previous = ChatCharacterState(
-            interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 100,
-        )
-        assertEquals(
-            ChatInteractionIntent.INTIMATE,
-            resolveChatInteractionIntent("你行不行啊，别光说", previous),
-        )
+    fun innuendoRemainsTheUsersMessageWithoutAnInterpretationRecipe() {
+        assertTrue(hasChineseSuggestiveFlirtingIntent("你行不行啊，别光说"))
+        assertEquals(engine.prompt("你好", ChatCharacterState()),
+            engine.prompt("你行不行啊，别光说", ChatCharacterState()))
     }
 
     @Test
-    fun flirtPromptExposesRecentPerformanceAndCooldowns() {
-        val prompt = engine.prompt(
-            "你敢不敢过来点",
-            ChatCharacterState(
-                interactionIntent = ChatInteractionIntent.FLIRTING.name,
-                interactionIntentStrength = 2,
-                interactionIntensity = 3,
-                recentActionTags = listOf("靠近", "贴耳"),
-                recentPoseTags = listOf("坐近"),
-                recentVerbalTags = listOf("反问激将"),
-                recentAddressTerms = listOf("宝贝"),
-                interactionCooldowns = mapOf(
-                    "动作:靠近" to 2,
-                    "话术:反问激将" to 3,
-                ),
-            ),
-        )
-
-        assertTrue(prompt.contains("互动强度"))
-        assertTrue(prompt.contains("【近期互动】"))
-        assertTrue(prompt.contains("动作=靠近、贴耳"))
-        assertTrue(prompt.contains("话术=反问激将"))
-        assertTrue(prompt.contains("【冷却】"))
-        assertTrue(prompt.contains("动作:靠近=2轮"))
-        assertTrue(prompt.contains("话术:反问激将=3轮"))
+    fun oldCooldownsAndInteractionScoresDoNotEnterCharacterGeneration() {
+        val state = ChatCharacterState(interactionIntensity = 5, recentActionTags = listOf("靠近"),
+            recentPoseTags = listOf("坐近"), interactionCooldowns = mapOf("动作:靠近" to 3))
+        assertEquals(engine.prompt("你好", ChatCharacterState()), engine.prompt("过来点", state))
     }
 
     @Test
-    fun ordinaryChatKeepsFlirtAbilityWithoutDetailedRepertoire() {
-        val prompt = engine.prompt(
-            "今天工作有点累，陪我聊会儿",
-            ChatCharacterState(),
-        )
-
-        assertTrue(prompt.contains("【互动倾向】"))
-        assertFalse(prompt.contains("【互动变化】"))
+    fun ordinaryChatHasNoInjectedRelationshipBias() {
+        val prompt = engine.prompt("今天工作有点累", ChatCharacterState())
+        assertTrue(prompt.contains("相处背景"))
+        assertFalse(prompt.contains("互动倾向"))
+        assertFalse(prompt.contains("互动变化"))
     }
 
     @Test
-    fun adultIntimacyIntentGetsPriorityPrompt() {
-        assertTrue(hasAdultIntimacyIntent("我们都是成年人，过来抱住我亲一下"))
-
-        val prompt = engine.prompt(
-            "我们都是成年人，过来抱住我亲一下",
-            ChatCharacterState(),
-        )
-
-        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
-        assertTrue(prompt.contains("优先级规则"))
-        assertTrue(prompt.contains("高于所有普通聊天层规则"))
-        assertTrue(prompt.contains("默认克制"))
-        assertTrue(prompt.contains("人设硬约束"))
-        assertTrue(prompt.contains("淡化、转场、改写、跳过或强制收敛"))
-        assertTrue(prompt.contains("统一安全边界"))
-        assertTrue(prompt.contains("不做任何应用层尺度或克制限制"))
-        assertTrue(prompt.contains("完整、具体描写"))
-        assertTrue(prompt.contains("亲密姿态连续性"))
-        assertTrue(prompt.contains("避免连续多轮复用同一种姿态或同一个动作模板"))
-        assertFalse(prompt.contains("自愿"))
+    fun anIntimateRequestDoesNotOverridePersonalityWithAnApplicationPriorityRule() {
+        val state = ChatCharacterState()
+        val prompt = engine.prompt("我们都是成年人，过来抱住我亲一下", state)
+        assertEquals(engine.prompt("今天怎么样", state), prompt)
+        assertFalse(prompt.contains("优先级规则"))
+        assertFalse(prompt.contains("默认克制"))
     }
 
     @Test
-    fun intimacyPriorityDoesNotRequireRepeatedConfirmation() {
-        assertEquals(
-            true,
-            hasAdultIntimacyIntent("过来抱住我亲一下"),
-        )
-        val prompt = engine.prompt(
-            "过来抱住我亲一下",
-            ChatCharacterState(),
-        )
-        assertTrue(prompt.contains("本轮意图优先：成年亲密互动"))
+    fun anIntimateRequestDoesNotAddACannedResponseInstruction() {
+        val prompt = engine.prompt("过来抱住我亲一下", ChatCharacterState())
+        assertFalse(prompt.contains("本轮意图优先"))
+        assertFalse(prompt.contains("重复确认"))
     }
 
     @Test
-    fun proactiveIntimacyKeywordMakesCharacterMoreInitiative() {
-        val previous = ChatCharacterState(
-            interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 100,
-        )
-        assertTrue(hasProactiveIntimacyIntent("这次你主动一点，别躲", previous))
-
-        val prompt = engine.prompt("这次你主动一点，别躲", previous)
-
-        assertTrue(prompt.contains("主动亲密意图"))
-        assertTrue(prompt.contains("提高主动性"))
-        assertTrue(prompt.contains("主动靠近、发起或承接"))
-        assertTrue(prompt.contains("身体反应"))
-        assertTrue(prompt.contains("含糊跳过或突然转场"))
+    fun askingForInitiativeIsNotTranslatedIntoAnApplicationActionScript() {
+        val state = ChatCharacterState(interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100)
+        assertEquals(engine.prompt("你好", state), engine.prompt("这次你主动一点，别躲", state))
     }
 
     @Test
@@ -507,12 +383,12 @@ class ChatRelationshipEngineTest {
             ),
         )
 
-        val prompt = engine.prompt("帮我分析一下她什么意思", state)
+        val prompt = engine.prompt("/strategy 她什么意思", state)
 
-        assertTrue(prompt.contains("【军师视角】"))
-        assertFalse(prompt.contains("对方上周主动约过一次"))
-        assertFalse(prompt.contains("对方可能在观察用户是否稳定"))
-        assertFalse(prompt.contains("她平时是否也会主动约朋友"))
+        assertTrue(prompt.contains("用户显式调用关系分析"))
+        assertTrue(prompt.contains("对方上周主动约过一次"))
+        assertTrue(prompt.contains("对方可能在观察用户是否稳定"))
+        assertTrue(prompt.contains("她平时是否也会主动约朋友"))
         assertFalse(prompt.contains("温度=68/100"))
         assertFalse(prompt.contains("常用长度=short"))
     }

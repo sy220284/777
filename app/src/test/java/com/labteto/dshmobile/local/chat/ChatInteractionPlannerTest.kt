@@ -83,7 +83,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun firstPersonTopicSwitchClearsOldTopicButQuotationAndNegationDoNot() {
+    fun topicSwitchWordsDoNotInventResolutionOfExistingEvents() {
         val previous = ChatCharacterState(
             currentFocus = "未解决的旧话题",
             currentAgenda = "继续旧讨论",
@@ -92,9 +92,9 @@ class ChatInteractionPlannerTest {
         val patch = """{"state":{},"turnSignificance":"NONE"}"""
         listOf("我想换个话题", "我们先换个话题", "我想先不聊这个", "我希望换个话题").forEach { user ->
             val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
-            assertEquals("", state.currentFocus)
-            assertEquals("", state.currentAgenda)
-            assertTrue(state.unresolvedThreads.isEmpty())
+            assertEquals(previous.currentFocus, state.currentFocus)
+            assertEquals(previous.currentAgenda, state.currentAgenda)
+            assertEquals(previous.unresolvedThreads, state.unresolvedThreads)
         }
         listOf("我不想换个话题", "昨天他说我想换个话题").forEach { user ->
             val state = planner.parse(patch, previous, userMessage = user, assistantMessage = "好")!!.state
@@ -105,7 +105,7 @@ class ChatInteractionPlannerTest {
 
 
     @Test
-    fun shortLivedStateExpiresWhenPlannerKeepsReturningNone() {
+    fun unresolvedStatesSurviveOrdinaryTurnsUntilActuallyUpdated() {
         var state = ChatCharacterState(
             currentFocus = "刚才的争执",
             immediateConcern = "担心用户生气",
@@ -120,8 +120,8 @@ class ChatInteractionPlannerTest {
             )!!.state
         }
 
-        assertTrue(state.currentFocus.isBlank())
-        assertTrue(state.immediateConcern.isBlank())
+        assertEquals("刚才的争执", state.currentFocus)
+        assertEquals("担心用户生气", state.immediateConcern)
         assertTrue(state.unresolvedThreads.isNotEmpty())
     }
 
@@ -265,40 +265,24 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun explicitNaturalTopicChangeStillClearsOldTopic() {
-        val previous = ChatCharacterState(
-            currentFocus = "旧话题",
-            unresolvedThreads = listOf("旧线索"),
-        )
-        val state = planner.parse(
-            """{"state":{},"turnSignificance":"NONE"}""",
-            previous = previous,
-            userMessage = "我们换个话题吧，聊点新的",
-            assistantMessage = "好",
-        )!!.state
-        assertEquals("", state.currentFocus)
-        assertTrue(state.unresolvedThreads.isEmpty())
+    fun changingTheTopicDoesNotAutomaticallyResolveUnfinishedEvents() {
+        val previous = ChatCharacterState(currentFocus = "旧话题", unresolvedThreads = listOf("旧线索"))
+        val state = planner.parse("""{"state":{},"turnSignificance":"NONE"}""",
+            previous, userMessage = "我们换个话题吧，聊点新的", assistantMessage = "好")!!.state
+        assertEquals(previous.currentFocus, state.currentFocus)
+        assertEquals(previous.unresolvedThreads, state.unresolvedThreads)
     }
 
     @Test
-    fun topicResetImmediatelyDropsCurrentTopicAndOpenThreads() {
-        val previous = ChatCharacterState(
-            currentFocus = "旧话题",
-            currentAgenda = "继续解释旧事",
-            immediateConcern = "还在纠结",
-            unresolvedThreads = listOf("旧线索"),
-        )
-        val state = planner.parse(
-            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
-            previous = previous,
-            userMessage = "换个话题，说正事",
-            assistantMessage = "好",
-        )!!.state
-
-        assertTrue(state.currentFocus.isBlank())
-        assertTrue(state.currentAgenda.isBlank())
-        assertTrue(state.immediateConcern.isBlank())
-        assertTrue(state.unresolvedThreads.isEmpty())
+    fun onlyTheExplicitStatePatchResolvesAnEvent() {
+        val previous = ChatCharacterState(mood = "难过", currentFocus = "旧事",
+            currentAgenda = "等待解释", unresolvedThreads = listOf("未完成的约定"))
+        val state = planner.parse("""{"state":{"currentFocus":"","mood":"自然"},"turnSignificance":"MINOR"}""",
+            previous, userMessage = "我们把这件事说清了", assistantMessage = "嗯，这次说开了")!!.state
+        assertEquals("自然", state.mood)
+        assertEquals("", state.currentFocus)
+        assertEquals(previous.currentAgenda, state.currentAgenda)
+        assertEquals(previous.unresolvedThreads, state.unresolvedThreads)
     }
 
     @Test
@@ -365,7 +349,7 @@ class ChatInteractionPlannerTest {
         assertTrue(plannerPrompt.contains("用户纠正（最高优先）"))
         assertTrue(plannerPrompt.contains("不善于拒绝，会服软"))
         assertTrue(!plannerPrompt.contains("表达解释：角色存在嘴硬"))
-        assertTrue(plannerPrompt.contains("角色台词的模糊或习惯性推辞不得单独触发关系降温"))
+        assertTrue(plannerPrompt.contains("人物实际表达"))
         assertTrue(suggestionsPrompt.contains("用户纠正（最高优先）"))
         assertTrue(suggestionsPrompt.contains("不把单个模糊推辞自动解释为关系拒绝"))
         assertTrue(suggestionsPrompt.contains("清晰明确停止、退出或拒绝继续一次即生效"))
@@ -388,7 +372,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun explicitCurrentBoundaryIsOneShotAndDoesNotRequireRepetition() {
+    fun trackerRecordsActualExpressionsAndUserDraftRespectsExplicitBoundaries() {
         val persona = PersonaProfile(
             name = "阿青",
             portrait = "嘴硬心软",
@@ -406,7 +390,8 @@ class ChatInteractionPlannerTest {
             assistantMessage = "好。",
         )
 
-        assertTrue(plannerPrompt.contains("一次表达即生效，不要求重复"))
+        assertTrue(plannerPrompt.contains("人物实际表达"))
+        assertFalse(plannerPrompt.contains("一次表达即生效，不要求重复"))
         assertTrue(suggestionsPrompt.contains("一次即生效"))
     }
 
@@ -453,8 +438,8 @@ class ChatInteractionPlannerTest {
         assertEquals("有点不爽", plan.state.mood)
         assertEquals(65, plan.state.initiative)
         assertEquals(35, plan.state.shareDesire)
-        assertEquals(60, plan.state.dynamics.warmth)
-        assertEquals(58, plan.state.dynamics.trust)
+        assertEquals(95, plan.state.dynamics.warmth)
+        assertEquals(95, plan.state.dynamics.trust)
         assertEquals(2, plan.state.unresolvedThreads.size)
         assertEquals(4, plan.suggestions.size)
         assertEquals(plan.suggestions.map { it.text }.distinct().size, plan.suggestions.size)
@@ -721,7 +706,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun noOpTurnIgnoresSpuriousStateChangesButStillAgesTransientState() {
+    fun noOpTurnPreservesStateWithoutAnExpiryCountdown() {
         val previous = ChatCharacterState(
             mood = "开心",
             relationshipState = "熟悉中",
@@ -763,7 +748,7 @@ class ChatInteractionPlannerTest {
         assertEquals(previous.immediateConcern, plan.state.immediateConcern)
         assertEquals(previous.initiative, plan.state.initiative)
         assertEquals(previous.dynamics, plan.state.dynamics)
-        assertTrue(plan.state.transientAges.values.all { it >= 1 })
+        assertTrue(plan.state.transientAges.isEmpty())
         assertEquals(1, plan.suggestions.size)
         assertEquals("你刚才笑什么？说来听听。", plan.suggestions.single().text)
     }
@@ -803,7 +788,7 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun plannerPersistsActualInteractionPerformanceAndCooldowns() {
+    fun plannerRecordsActualInteractionWithoutCreatingCooldownRules() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.FLIRTING.name,
             interactionIntentStrength = 2,
@@ -829,10 +814,7 @@ class ChatInteractionPlannerTest {
         assertTrue("反问激将" in plan.state.recentVerbalTags)
         assertTrue("反撩接梗" in plan.state.recentVerbalTags)
         assertTrue("宝贝" in plan.state.recentAddressTerms)
-        assertEquals(1, plan.state.interactionCooldowns["动作:牵手"])
-        assertEquals(3, plan.state.interactionCooldowns["动作:靠近"])
-        assertEquals(3, plan.state.interactionCooldowns["话术:反问激将"])
-        assertEquals(2, plan.state.interactionCooldowns["称呼:宝贝"])
+        assertTrue(plan.state.interactionCooldowns.isEmpty())
     }
 
     @Test

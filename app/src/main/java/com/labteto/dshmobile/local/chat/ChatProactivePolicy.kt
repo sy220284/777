@@ -120,7 +120,7 @@ internal fun proactiveConversationFocus(
         ?: fallback
 }
 
-internal fun recentProactiveAvoidanceContext(
+internal fun recentProactiveContext(
     messages: List<LocalHarnessMessage>,
 ): String {
     val recent = messages
@@ -135,13 +135,12 @@ internal fun recentProactiveAvoidanceContext(
 
     if (recent.isEmpty()) return ""
     return buildString {
-        appendLine("【最近主动互动，避免复读】")
+        appendLine("【最近已发生的主动互动】")
         recent.forEachIndexed { index, text ->
             append(index + 1)
             append(". ")
             appendLine(text.take(180))
         }
-        append("本次换一个自然切入点，不复用相同开场、主题或句式。")
     }
 }
 

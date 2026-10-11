@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,7 +78,7 @@ class ChatContextAssemblerTest {
         assertTrue(context.contains("昨天的争执"))
         assertTrue(context.contains("她平时喜欢喝茶"))
         assertTrue(context.indexOf("昨天的争执") == context.lastIndexOf("昨天的争执"))
-        assertTrue(context.contains("不主动复述"))
+        assertFalse(context.contains("不主动复述"))
     }
 
     @Test
@@ -125,23 +126,10 @@ class ChatContextAssemblerTest {
     }
 
     @Test
-    fun recentRoleplayBeatsAreInjectedAsSemanticNoveltyGuard() {
-        val rendered = ChatContextAssembler.assemble(
-            dynamicPrompt = "【当前状态】\n情绪=自然",
-            relationshipMemory = "",
-            userInput = "继续",
-            recentAssistantReplies = listOf(
-                "她轻轻叹了口气，转头看向窗外。",
-                "她沉默片刻，又端起茶喝了一口。",
-            ),
-        )
-
-        assertTrue(rendered.contains("近期已用节拍"))
-        assertTrue(rendered.contains("叹气"))
-        assertTrue(rendered.contains("看向别处"))
-        assertTrue(rendered.contains("沉默停顿"))
-        assertTrue(rendered.contains("端起饮品"))
-        assertTrue(rendered.contains("优先换一种表达或互动方式"))
+    fun familiarGesturesDoNotAddARequestToChangeTheCharactersReaction() {
+        val background = "【当前状态】\n情绪=自然"
+        assertEquals(background, ChatContextAssembler.assemble(background, "", "继续",
+            listOf("她轻轻叹了口气，转头看向窗外。", "她沉默片刻，又端起茶喝了一口。")))
     }
 
     @Test
