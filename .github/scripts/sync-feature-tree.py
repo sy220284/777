@@ -555,6 +555,13 @@ def generate(root):
                                 "status": "旧节点身份待核实",
                                 "reason": "previous_path 缺少相同源码文件的历史证据，不能接管任意旧功能"})
                 continue
+        # 前置检查所有破坏性迁移约束，之后才删除旧路径。
+        parent = find(model, target[:-1])
+        if parent is not None and not parent["children"] and len(target) > 1:
+            pending.append({"id": ident, "path": item["path"],
+                            "status": "原末级功能不能直接变为分类",
+                            "reason": "需审核新父子层级与原功能测试的归属"})
+            continue
         if was and was["path"] != item["path"]:
             if find(model, parts(was["path"])):
                 delete(model, parts(was["path"]))
@@ -565,13 +572,6 @@ def generate(root):
                 delete(model, parts(item["previous_path"]))
                 deleted.append(parts(item["previous_path"]))
                 old_paths[item["previous_path"]] = item["path"]
-        # 新功能不能把既有末级功能变成分类节点而不经人工审核。
-        parent = find(model, target[:-1])
-        if parent is not None and not parent["children"] and len(target) > 1:
-            pending.append({"id": ident, "path": item["path"],
-                            "status": "原末级功能不能直接变为分类",
-                            "reason": "需审核新父子层级与原功能测试的归属"})
-            continue
         add(model, parts(item["path"]))
     for old in deleted:
         prune_empty(model, old)
