@@ -106,17 +106,7 @@ internal object ChatContextAssembler {
 
         val primary = dedupe(dynamicPrompt)
         val memory = dedupe(relationshipMemory)
-        val recentBeatTags = ChatRoleplayNoveltyScanner.tags(recentAssistantReplies.takeLast(4))
-        val generationRule = buildString {
-            appendLine("【本轮生成】")
-            appendLine("优先当前输入；历史仅用于连续，不主动复述。")
-            append("避免重复已表达内容；短回应自然承接，需要推进时加入新的反应、信息或动作。")
-            if (recentBeatTags.isNotEmpty()) {
-                appendLine()
-                append("近期已用节拍：${recentBeatTags.joinToString("、")}。优先换一种表达或互动方式。")
-            }
-        }
-        return listOf(primary, memory, generationRule)
+        return listOf(primary, memory)
             .filter(String::isNotBlank)
             .joinToString("\n\n")
     }
