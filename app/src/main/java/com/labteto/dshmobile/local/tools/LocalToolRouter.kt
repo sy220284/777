@@ -38,13 +38,13 @@ internal object LocalToolRouter {
         return tools.asSequence()
             .filter(::isOptional)
             .mapNotNull { tool ->
-                val exactName = normalized.contains(tool.name.lowercase())
+                val exactName = hasExplicitIntentTerm(normalized, tool.name)
                 val keywordHits = tool.metadata.discoveryKeywords.count { keyword ->
-                    normalized.contains(keyword.lowercase())
+                    hasExplicitIntentTerm(normalized, keyword)
                 }
-                val familyHit = normalized.contains(tool.metadata.family.lowercase())
-                val score = (if (exactName) 100 else 0) + keywordHits * 10 +
-                    (if (familyHit) 3 else 0)
+                // A broad family label ("网络", "智能体", "会话") must not implicitly activate
+                // every optional tool in that category. Explicit discovery still searches family.
+                val score = (if (exactName) 100 else 0) + keywordHits * 10
                 if (score > 0) tool to score else null
             }
             .sortedWith(compareByDescending<Pair<HarnessTool, Int>> { it.second }
@@ -53,6 +53,32 @@ internal object LocalToolRouter {
             .distinct()
             .toList()
     }
+
+    /**
+     * Native/Latin tool tokens must match at identifier boundaries. Plain substring checks make
+     * "api" match "capital", "pr" match "preview", and "web" match "website", silently
+     * adding unrelated schemas. Han text may be attached to Latin names (使用GitHub工具), so
+     * only ASCII identifier characters count as token neighbors.
+     */
+    private fun hasExplicitIntentTerm(text: String, rawTerm: String): Boolean {
+        val term = rawTerm.trim().lowercase()
+        if (term.isEmpty()) return false
+        var from = 0
+        while (true) {
+            val index = text.indexOf(term, startIndex = from)
+            if (index < 0) return false
+            val after = index + term.length
+            val leftOk = !term.first().isAsciiIdentifierChar() ||
+                index == 0 || !text[index - 1].isAsciiIdentifierChar()
+            val rightOk = !term.last().isAsciiIdentifierChar() ||
+                after == text.length || !text[after].isAsciiIdentifierChar()
+            if (leftOk && rightOk) return true
+            from = index + 1
+        }
+    }
+
+    private fun Char.isAsciiIdentifierChar(): Boolean =
+        this in 'a'..'z' || this in '0'..'9' || this == '_'
 
     fun visibleSchemas(
         tools: List<HarnessTool>,

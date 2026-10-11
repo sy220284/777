@@ -101,6 +101,29 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun genericCategoryDoesNotPreactivateUnrelatedToolsInRealCoordinator() {
+        val registry = ToolRegistry().apply {
+            register(tool(name = "team_spawn", access = ToolAccess.AGENT_CONTROL,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "智能体", keywords = setOf("创建团队")) { ToolResult("ok") })
+            register(tool(name = "team_stop", access = ToolAccess.AGENT_CONTROL,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "智能体", keywords = setOf("停止团队")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableTaskRelevantOptionalTools("了解智能体架构")
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+
+        coordinator.enableTaskRelevantOptionalTools("创建团队")
+        assertEquals(setOf("team_spawn"), coordinator.enabledOptionalSnapshot())
+        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+            .contains("team_spawn"))
+        assertTrue(coordinator.searchCapabilities("停止团队").contains("team_stop"))
+        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+            .contains("team_stop"))
+    }
+
+    @Test
     fun disabledNetworkToolsRemainDiscoverableButNotCallable() {
         val registry = ToolRegistry().apply {
             register(tool(name = "web_search", access = ToolAccess.NETWORK,
