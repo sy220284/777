@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,14 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
     private val json: Json,
     @ApplicationContext private val context: Context,
 ) {
+    // Media providers may spend minutes generating an image or transcoding audio.
+    // An idle-read timeout remains, but never use the app-wide 30s short-request policy.
+    private val mediaHttp = http.newBuilder()
+        .readTimeout(10, TimeUnit.MINUTES)
+        .writeTimeout(2, TimeUnit.MINUTES)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .build()
+
     suspend fun generateImage(profile: LocalModelProfile, prompt: String, ratio: String): String {
         require(prompt.isNotBlank()) { "请填写图片内容" }
         require(ratio in setOf("1:1", "16:9", "9:16", "4:3", "3:4")) { "不支持的图片比例" }
@@ -215,7 +224,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             .header("Authorization", "Bearer $credential")
             .header("Accept", "application/json")
         val request = (if (body == null) builder.get() else builder.post(body)).build()
-        withCancellableHttpResponse(http.newCall(request)) { response ->
+        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
             if (!response.isSuccessful) error("MiniMax 多模态请求失败（HTTP ${response.code}）")
             val raw = response.body?.string() ?: error("MiniMax 未返回数据")
             check(raw.length <= MAX_JSON_RESPONSE_CHARS) { "MiniMax 响应体超过安全读取上限" }
