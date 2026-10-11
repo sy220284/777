@@ -112,7 +112,6 @@ internal data class LocalWorkFeatureUiActions(
     val linkRequirementEvidenceForUi: (String, Int, LocalArtifactUiItem) -> Boolean = { _, _, _ -> false },
     val stopBackgroundJob: (String) -> String,
     val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
-    val startResearchAgent: suspend (String) -> LocalWorkUiActionResult,
     val sendBackgroundAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     val usageRevision: StateFlow<Long>? = null,
     val sessionUsage: ((String) -> com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot)? = null,

@@ -59,7 +59,6 @@ internal fun localWorkFeatureUiContribution(
                 onLinkRequirementEvidence = actions.linkRequirementEvidenceForUi,
                 onStopJob = actions.stopBackgroundJob,
                 onStartBackgroundAgent = actions.startBackgroundAgent,
-                onStartResearchAgent = actions.startResearchAgent,
                 onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onContinueArtifact = onContinueArtifact,
                 onOpenSourceSession = shell.parentSessionId
