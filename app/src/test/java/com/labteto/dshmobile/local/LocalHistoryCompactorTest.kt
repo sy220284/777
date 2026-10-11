@@ -129,17 +129,20 @@ class LocalHistoryCompactorTest {
 
     @Test
     fun preservesRecentTurnAndSummarizesOlderIntent() {
-        val pad = "甲".repeat(120)
+        // The structured authority checkpoint has a fixed overhead; use genuinely older
+        // substantial history to assert that compaction *saves* context rather than forcing
+        // a checkpoint on a tiny dialogue that would become larger after compaction.
+        val pad = "甲".repeat(1_500)
         val history = listOf(
             message("system", "系统"),
             message("user", "旧目标：修复会话恢复。" + pad),
             message("assistant", "阶段结论：先补事件日志。" + pad),
             toolCallingAssistant("read"),
             message("tool", "工具输出" + pad),
-            message("user", "最新请求：继续完成剩余问题。" + pad),
-            message("assistant", "正在继续处理。" + pad),
+            message("user", "最新请求：继续完成剩余问题。" + "新".repeat(110)),
+            message("assistant", "正在继续处理。" + "新".repeat(110)),
         )
-        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, maxHistoryChars = 300, tailChars = 260)
+        val compaction = LocalHistoryCompactor(summaries = com.labteto.dshmobile.local.LocalFeatureHistorySummaries, maxHistoryChars = 300, tailChars = 400)
             .compact(history) ?: error("expected compaction")
 
         assertTrue(compaction.omittedMessages > 0)
