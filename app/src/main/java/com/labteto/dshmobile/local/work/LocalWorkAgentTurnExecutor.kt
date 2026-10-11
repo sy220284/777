@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelBudgetPolicies
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalToolCall
@@ -140,7 +141,12 @@ internal class LocalWorkAgentTurnExecutor(
             }
             // A new user turn or checkpoint continuation starts a new request slice.
             // When child requests remain in flight the shared budget stays intact.
-            binding.executionControl.budget.beginExecutionSlice()
+            binding.executionControl.budget.beginExecutionSlice(
+                LocalModelBudgetPolicies.forRoute(
+                    runState.value.modelState.model,
+                    runState.value.modelState.baseUrl,
+                ),
+            )
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
             workTurnToolRuntime.clear(binding)
             workTurnToolRuntime.prepare(binding, input)
