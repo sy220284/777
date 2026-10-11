@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -57,12 +58,15 @@ import com.labteto.dshmobile.ui.theme.ThemePreference
 class ReadmeScreenshotActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        val dark = intent.getBooleanExtra("readme_dark", false)
+        val bars = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
         val screen = intent.getStringExtra(EXTRA_SCREEN).orEmpty()
         require(screen in SUPPORTED_SCREENS) { "未知 README 截图页面：$screen" }
 
         setContent {
-            DshTheme(preference = if (intent.getBooleanExtra("readme_dark", false)) ThemePreference.DARK else ThemePreference.LIGHT) {
+            DshTheme(preference = if (dark) ThemePreference.DARK else ThemePreference.LIGHT) {
                 Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                     ReadmeScreenshotSurface(screen)
                     ScreenshotReadySignal(screen)
@@ -140,7 +144,7 @@ private fun NavigationScreenshot() {
             currentGalleryStoryId = null,
             currentPersonaName = "神里绫华",
             currentPersonaIdentity = "白鹭公主",
-            workModelLabel = "GPT-5.6 Sol",
+            workModelLabel = "MiniMax-M3",
             groupChatEnabled = false,
             running = false,
             onUsageModeChange = {},
@@ -159,6 +163,7 @@ private fun NavigationScreenshot() {
             onTasks = {},
             onTools = {},
             onSettings = {},
+            onMiniMaxQuota = {},
         )
     }
 }
