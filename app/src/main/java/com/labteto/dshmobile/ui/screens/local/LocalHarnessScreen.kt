@@ -128,10 +128,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Only a committed session can move the selected tab. */
+@Suppress("UNUSED_PARAMETER")
 internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
-): LocalUsageMode = pending ?: current
+): LocalUsageMode = current
 @Composable
 internal fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
     LocalSendRejectReason.EMPTY -> stringResource(R.string.local_send_rejected_empty)
@@ -612,7 +614,11 @@ fun LocalHarnessScreen(
             target == LocalUsageMode.CHAT &&
                 shell.usageMode == LocalUsageMode.CHAT &&
                 shell.groupChat.enabled
-        if (target == shell.usageMode && pendingUsageMode == null && !returningFromGroupToSingle) return
+        if (target == shell.usageMode && !returningFromGroupToSingle && !shell.loading) {
+            // This tap must cancel a previously queued switch back to the other mode.
+            viewModel.switchUsageMode(target)
+            return
+        }
         if (target != shell.usageMode) {
             val key = "shown_" + target.name.lowercase()
             if (!modeIntroPreferences.getBoolean(key, false)) {
@@ -620,7 +626,8 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
-        pendingUsageMode = target
+        // Work capability handoff owns pendingUsageMode; ordinary taps use the
+        // runtime navigation inbox, keeping the drawer tied to the real session.
         viewModel.switchUsageMode(target)
     }
 
@@ -691,7 +698,7 @@ fun LocalHarnessScreen(
                 sessions = shell.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
-                modeSwitchEnabled = !shell.loading &&
+                modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 drawerOpen = drawerState.isOpen,
                 pinnedSessionIds = pinnedSessionIds,
