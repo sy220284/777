@@ -50,7 +50,7 @@
 | 交接摘要携带来源会话、消息编号与节选 | workHandoffSummaryWithSelectedMessages | 1 | 1 | 是 |
 | 选中附件使用受限路径和 SHA-256 引用 | workHandoffSummaryWithSelectedMessages | 1 | 1 | 是 |
 | 模型、MCP、插件和设备当前能力提示 | project | 27 | 31 | 是 |
-| 团队未结消息和失败成员的完成声明复核 | inspect | 9 | 2 | 是 |
+| 团队未结消息和失败成员的完成声明复核 | inspect | 9 | 3 | 是 |
 | 交付要求与真实成果事件来源绑定 | projectRequirementEvidenceLinks | 1 | 2 | 尚未发现 |
 | 交付成果当前版本及证据变化提示 | localWorkFileSha256 | 2 | 3 | 是 |
 | 工作目录与文件浏览 | resolve | 42 | 34 | 是 |
@@ -83,7 +83,7 @@
 | 自动、手动和默认审批 | metadata | 54 | 13 | 是 |
 | ChatGPT 账户授权登录 | summary | 52 | 18 | 尚未发现 |
 | ChatGPT 套餐模型目录与账号状态 | parseChatGptPlanModels | 1 | 1 | 尚未发现 |
-| 推理档位及温度上限对多入口的约束 | current | 204 | 40 | 是 |
+| 推理档位及温度上限对多入口的约束 | current | 204 | 41 | 是 |
 | 长期事实来源关联与显式纠正停用 | LocalMemorySettingsCard | 1 | 0 | 尚未发现 |
 | 长期事实修改后的来源失效待办 | remember | 67 | 8 | 是 |
 | 自定义聊天背景 | WallpaperSurfaceLevel | 37 | 1 | 尚未发现 |

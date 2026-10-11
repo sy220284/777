@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "9e150cecd43f",
+  "source_snapshot": "4e97c66a4edd",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -922,10 +922,11 @@
         "app/src/main/java/com/labteto/dshmobile/local/quality/LocalOutputQualityPipeline.kt",
         "app/src/main/java/com/labteto/dshmobile/local/tools/LocalFileInspector.kt"
       ],
-      "test_file_symbol_reference_count": 2,
+      "test_file_symbol_reference_count": 3,
       "test_reference_samples": [
         "app/src/test/java/com/labteto/dshmobile/local/LocalAgentRuntimeFoundationV3Test.kt",
-        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuardTest.kt"
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuardTest.kt",
+        "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidenceTest.kt"
       ],
       "separate_product_entry": null,
       "static_integration_hint": "candidate_external_source_reference",
@@ -2569,7 +2570,7 @@
         "app/src/main/java/com/labteto/dshmobile/automation/WebhookListener.kt",
         "app/src/main/java/com/labteto/dshmobile/connection/HostsStore.kt"
       ],
-      "test_file_symbol_reference_count": 40,
+      "test_file_symbol_reference_count": 41,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/connection/RetiredRemoteUpgradeAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalModelProfileStoreAndroidTest.kt",
