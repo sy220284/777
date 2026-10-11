@@ -232,6 +232,28 @@ def inspect():
             for literal in record.get("literals", []):
                 if literal not in code:
                     raise ValueError("工具映射分支已经消失: " + literal)
+        registered_tests = []
+        for test in item.get("tests", []):
+            path, method, reference = test["path"], test["method"], test["references"]
+            if (not path.endswith(".kt")
+                or ".." in Path(path).parts or
+                not ("/src/test/" in "/" + path or "/src/androidTest/" in "/" + path)
+                or not (ROOT / path).is_file()):
+                raise ValueError("人工测试证据必须是实际存在的Kotlin测试文件")
+            body = (ROOT / path).read_text(encoding="utf-8")
+            if (not re.search(r"@Test\s+fun\s+" + re.escape(method) + r"\s*\(", body)
+                or not re.search(r"\b" + re.escape(reference) + r"\b", body)):
+                raise ValueError("人工测试证据中缺少声称的测试方法或实现引用")
+            if not any(reference in source["symbols"] for source in item["sources"]):
+                raise ValueError("测试引用与核实的生产源码无法关联")
+            registered_tests.append({
+                "path": path, "method": method, "references": reference,
+                "status": "仅发现测试源码，未验证CI是否执行通过"
+            })
+        if review_item.get("explicit_test_candidates", []) != registered_tests:
+            raise ValueError("人工仪表测试真实来源和复核报告不一致")
+        if registered_tests and review_item.get("verification") != "具名源码及仪表测试声明存在（静态，未执行）":
+            raise ValueError("具名仪表测试未单独区分已执行和未执行")
     if {r["path"] for r in reported if r.get("explicit_source_anchor")} != explicit_keys:
         raise ValueError("存在没有真实人工源文件依据的强化证据等级")
     # 工程工作流证据独立从真实YAML job段重算，不能仅凭全文件出现相同词语提升级别。
