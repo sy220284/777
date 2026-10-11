@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1379,
-  "production_source_count": 795,
-  "test_code_file_count": 425,
+  "repository_code_file_count": 1375,
+  "production_source_count": 800,
+  "test_code_file_count": 430,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -1076,6 +1076,26 @@
       "sha256": "90d2b41963fcfab6"
     },
     {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
+      "sha256": "b6b0bd84309db6fd"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
+      "sha256": "6042fdefaedfeb81"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaDocument.kt",
+      "sha256": "565b53bce01f7b9c"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaResultStore.kt",
+      "sha256": "77a765f1f4576d91"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaVideoTaskStore.kt",
+      "sha256": "a245e83ce6d3fd32"
+    },
+    {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMiniMaxPolicy.kt",
       "sha256": "6458f11277fee86a"
     },
@@ -1277,7 +1297,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
-      "sha256": "f70e3e86eb584d05"
+      "sha256": "8cdaeca0bee9624d"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
@@ -1420,8 +1440,8 @@
       "sha256": "dc1cdb48dc2cebb8"
     },
     {
-      "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMiniMaxMediaRuntime.kt",
-      "sha256": "c1ebf61d8a4e9aeb"
+      "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
+      "sha256": "c09436076df53d62"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalModelPerformanceControls.kt",
@@ -1789,7 +1809,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
-      "sha256": "e232bd9d0a7b61eb"
+      "sha256": "906072e13555953f"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalModelToolStepSurface.kt",
@@ -1813,7 +1833,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
-      "sha256": "3341bea8041f852c"
+      "sha256": "ba115219ddb9a629"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillPackage.kt",
@@ -2557,7 +2577,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
-      "sha256": "82711df77b82de45"
+      "sha256": "11375efbf404b135"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationUiStateStore.kt",
@@ -2622,6 +2642,14 @@
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModelDefaults.kt",
       "sha256": "824dc431321bcb21"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "sha256": "43afc1e7d07a2026"
+    },
+    {
+      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt",
+      "sha256": "a6938e934c3e21f2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalModeIntroBanner.kt",
@@ -2732,14 +2760,6 @@
       "sha256": "6f41557f38e74ff5"
     },
     {
-      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaSheet.kt",
-      "sha256": "3f4f1bebe88f0236"
-    },
-    {
-      "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaViewModel.kt",
-      "sha256": "869fdcead378f77c"
-    },
-    {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryComponents.kt",
       "sha256": "bc6f653f4394c8aa"
     },
@@ -2817,7 +2837,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt",
-      "sha256": "73ece5abb7f2466e"
+      "sha256": "fbad60965f7461db"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalSessionStorageCard.kt",
@@ -3253,13 +3273,30 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "4c9cfc98af44",
+  "source_snapshot": "22d5b79ba369",
   "observed_delta": {
-    "baseline": "ae97c2501f05",
-    "added_production_files": [],
-    "removed_production_files": [],
+    "baseline": "4c9cfc98af44",
+    "added_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaDocument.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaResultStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaVideoTaskStore.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMediaCreationRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalMediaStudioViewModel.kt"
+    ],
+    "removed_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalMiniMaxMediaRuntime.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaSheet.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/MiniMaxMediaViewModel.kt"
+    ],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillCatalog.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -3273,9 +3310,10 @@
   "workflow_evidence_features": 14,
   "declared_unexecuted_test_methods": 3,
   "verified_registrations": [
-    "settings.minimax.quota"
+    "settings.minimax.quota",
+    "skills.minimax-official-bundles"
   ],
-  "unverified_changes_count": 1,
+  "unverified_changes_count": 0,
   "obsolete_historical_evidence_count": 11,
   "current_tree_outdated_source_count": 0
 }
