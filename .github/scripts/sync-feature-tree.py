@@ -86,15 +86,17 @@ def delete(root, path):
     if node is None or node["children"]:
         raise ValueError("禁止删除不存在或含子功能的节点: " + " / ".join(path))
     parent["children"].remove(node)
-    # 删除/迁走最后一个叶节点时，顺带清理已空的旧分类，防止死节点残留。
-    ancestors = path[:-1]
-    while ancestors:
-        empty = find(root, ancestors)
-        owner = find(root, ancestors[:-1])
-        if empty is None or empty["children"]:
+
+
+def prune_empty(root, path):
+    # 在新节点写入后清理旧空分类，避免同级改名导致原分类位置跳动。
+    for depth in range(len(path) - 1, 0, -1):
+        current = path[:depth]
+        node = find(root, current)
+        if node is None or node["children"]:
             break
-        owner["children"].remove(empty)
-        ancestors = ancestors[:-1]
+        parent = find(root, current[:-1])
+        parent["children"].remove(node)
 
 
 def add(root, path):
@@ -232,18 +234,23 @@ def generate(root):
         raise ValueError("不支持的功能注册表版本")
     older = {item["id"]: item for item in prev["nodes"]}
     changed_paths = {}
+    removed_paths = []
     for ident, item in older.items():
         updated = registered.get(ident)
         if updated is None or updated["path"] != item["path"]:
             if find(model, parts(item["path"])):
                 delete(model, parts(item["path"]))
+                removed_paths.append(parts(item["path"]))
                 changed_paths[item["path"]] = updated["path"] if updated else None
     for ident, item in sorted(registered.items()):
         if ident not in older and item.get("previous_path") and item["previous_path"] != item["path"]:
             if find(model, parts(item["previous_path"])):
                 delete(model, parts(item["previous_path"]))
+                removed_paths.append(parts(item["previous_path"]))
                 changed_paths[item["previous_path"]] = item["path"]
         add(model, parts(item["path"]))
+    for previous_path in removed_paths:
+        prune_empty(model, previous_path)
     leafpaths = leaves(model)
     if len(leafpaths) != len(set(leafpaths)):
         raise ValueError("功能树叶节点重复")
