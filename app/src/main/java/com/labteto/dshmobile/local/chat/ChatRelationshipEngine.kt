@@ -3,11 +3,6 @@ package com.labteto.dshmobile.local.chat
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal enum class ChatRelationshipView {
-    IMMERSIVE,
-    REPLY_COACH,
-}
-
 internal enum class ChatInteractionIntent {
     NORMAL,
     FLIRTING,
@@ -340,45 +335,31 @@ private val NEGATED_INTIMACY_HINTS = listOf(
 )
 
 /**
- * Relationship cognition core for Chat mode.
- *
- * HeartFlow contributes persona continuity and gradual relationship change.
- * Relationship facts and uncertain impressions remain visible without choosing a response strategy.
- * Explicit reply coaching remains independent from the ordinary character conversation.
+ * Projects verified relationship context only. It neither routes slash commands nor
+ * chooses how the character should respond. Missing relationship facts produce no prompt.
  */
 @Singleton
 class ChatRelationshipEngine @Inject constructor() {
-
-    internal fun classify(input: String): ChatRelationshipView {
-        val text = input.trim().lowercase()
-        if (REPLY_COACH_COMMANDS.any { text == it || text.startsWith("$it ") }) {
-            return ChatRelationshipView.REPLY_COACH
+    @Suppress("UNUSED_PARAMETER")
+    fun prompt(input: String, state: ChatCharacterState): String {
+        val lines = mutableListOf<String>()
+        val status = state.relationshipState.trim()
+        if (status.isNotBlank() && status != "熟悉中") {
+            lines += "当前关系：${status.take(120)}"
         }
-        return ChatRelationshipView.IMMERSIVE
-    }
-
-    fun prompt(input: String, state: ChatCharacterState): String = buildString {
-        appendLine("【双方已有的相处背景】")
-        appendLine("当前关系：${state.relationshipState}")
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)
-            ?.let { appendLine("尚未解决的事：$it") }
+            ?.let { lines += "尚未解决的事：${it.take(240)}" }
         state.dynamics.facts.takeLast(8).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { appendLine("已有事实：${it.joinToString("；") { fact -> fact.text }}") }
+            ?.let { lines += "已有事实：${it.joinToString("；") { fact -> fact.text }}" }
         state.dynamics.hypotheses.takeLast(5).takeIf(List<RelationshipEvidence>::isNotEmpty)
-            ?.let { appendLine("尚未确认的印象：${it.joinToString("；") { fact -> fact.text }}") }
+            ?.let { lines += "尚未确认的印象：${it.joinToString("；") { fact -> fact.text }}" }
         state.dynamics.unknowns.takeLast(5).takeIf(List<String>::isNotEmpty)
-            ?.let { appendLine("仍未知：${it.joinToString("；")}") }
+            ?.let { lines += "仍未知：${it.joinToString("；")}" }
         state.dynamics.sharedMoments.takeLast(6).takeIf(List<String>::isNotEmpty)
-            ?.let { appendLine("共同经历：${it.joinToString("；")}") }
-        when (classify(input)) {
-            ChatRelationshipView.IMMERSIVE -> Unit
-            ChatRelationshipView.REPLY_COACH -> appendLine(
-                "【用户显式调用回复建议】提供用户可直接发送的回复草稿。",
-            )
-        }
-    }.trim()
-
-    private companion object {
-        val REPLY_COACH_COMMANDS = listOf("/reply", "/回复建议")
+            ?.let { lines += "共同经历：${it.joinToString("；")}" }
+        state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)
+            ?.let { lines += "共同物与约定：${it.joinToString("；")}" }
+        if (lines.isEmpty()) return ""
+        return (listOf("【人物关系与共同经历】") + lines).joinToString("\n")
     }
 }
