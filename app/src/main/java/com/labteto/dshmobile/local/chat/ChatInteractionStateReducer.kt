@@ -396,7 +396,10 @@ internal class ChatInteractionStateReducer {
         val quote = evidence.trim()
         if (value.isBlank() || quote.length < 4 ||
             !(userMessage.contains(quote) || assistantMessage.contains(quote))) return false
-        val milestone = Regex("结婚|订婚|离婚|分手|复合|同居|情侣|恋人|恋爱|交往|确定关系|在一起|暧昧期|约会中|矛盾期|分开")
+        // A random genuine quotation ("we had dinner") is not itself evidence
+        // for the model to invent a new relationship conclusion.
+        if (!Regex("关系|相处|彼此|互相|信任|熟悉|亲近|友谊|和解|合作|疏远|默契|隔阂|羁绊|我们之间|我们俩").containsMatchIn(quote)) return false
+        val milestone = Regex("结婚|已婚|婚姻|配偶|订婚|离婚|分手|复合|同居|情侣|恋人|恋爱|交往|确定关系|在一起|暧昧期|约会中|矛盾期|冷战|分开|男朋友|女朋友")
         if (milestone.containsMatchIn(value)) return false
         val rejected = Regex("如果|假如|要是|梦见|听说|希望|打算|计划|没有|还没|尚未|并未|不是|不会|吗\\?|吗？")
         if (rejected.containsMatchIn(quote) || quote.contains('?') || quote.contains('？')) return false
