@@ -20,6 +20,20 @@ internal class AutomaticLanguageServerResolver(
     private var workspaceFamilyCache: WorkspaceFamilyCache? = null
     fun resolve(relativePath: String? = null): List<String> {
         val family = familyFor(relativePath) ?: detectWorkspaceFamily()
+        // Honor project-scoped dependency versions before shared App components.
+        val projectCommand = when (family) {
+            Family.TYPESCRIPT -> workspaceNodeServer(
+                relativePath,
+                listOf("node_modules/typescript-language-server/lib/cli.mjs",
+                    "node_modules/typescript-language-server/lib/cli.js",
+                    "node_modules/typescript-language-server/out/cli.js"),
+            )
+            Family.PYTHON -> workspaceNodeServer(
+                relativePath, listOf("node_modules/pyright/langserver.index.js"),
+            )
+            else -> emptyList()
+        }
+        projectCommand.takeIf { it.isNotEmpty() }?.let { return it }
         installedCommand(managedHint(relativePath)).takeIf { it.isNotEmpty() }?.let { return it }
         family?.let(::commandFor)?.takeIf { it.isNotEmpty() }?.let { return it }
 
@@ -85,9 +99,7 @@ internal class AutomaticLanguageServerResolver(
             executable("basedpyright-langserver", "--stdio")
                 .ifEmpty { executable("pyright-langserver", "--stdio") }
                 .ifEmpty { executable("pylsp") }
-        Family.TYPESCRIPT ->
-            executable("typescript-language-server", "--stdio")
-                .ifEmpty { workspaceTypeScriptServer() }
+        Family.TYPESCRIPT -> executable("typescript-language-server", "--stdio")
         Family.RUST -> executable("rust-analyzer")
         Family.GO -> executable("gopls")
         Family.C_CPP -> executable("clangd")
@@ -96,19 +108,26 @@ internal class AutomaticLanguageServerResolver(
     private fun executable(name: String, vararg args: String): List<String> =
         if (commandAvailable(name)) listOf(name, *args) else emptyList()
 
-    private fun workspaceTypeScriptServer(): List<String> {
+    private fun workspaceNodeServer(
+        relativePath: String?,
+        entryCandidates: List<String>,
+    ): List<String> {
         if (!commandAvailable("node")) return emptyList()
-        val candidates = listOf(
-            "node_modules/typescript-language-server/lib/cli.mjs",
-            "node_modules/typescript-language-server/lib/cli.js",
-            "node_modules/typescript-language-server/out/cli.js",
-        )
-        val script = candidates
-            .asSequence()
-            .map(root::resolve)
-            .firstOrNull(File::isFile)
-            ?: return emptyList()
-        return listOf("node", script.absolutePath, "--stdio")
+        val safeRoot = root.canonicalFile
+        var directory = if (relativePath.isNullOrBlank()) safeRoot
+            else File(safeRoot, relativePath).canonicalFile.parentFile ?: safeRoot
+        if (!directory.toPath().startsWith(safeRoot.toPath())) return emptyList()
+        while (directory.toPath().startsWith(safeRoot.toPath())) {
+            val entry = entryCandidates.asSequence()
+                .map(directory::resolve)
+                .firstOrNull { file ->
+                    file.isFile && file.canonicalFile.toPath().startsWith(safeRoot.toPath())
+                }
+            if (entry != null) return listOf("node", entry.absolutePath, "--stdio")
+            if (directory == safeRoot) break
+            directory = directory.parentFile ?: break
+        }
+        return emptyList()
     }
 
     @Synchronized
