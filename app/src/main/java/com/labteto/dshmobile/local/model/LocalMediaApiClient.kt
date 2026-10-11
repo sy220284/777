@@ -28,6 +28,8 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
+internal data class LocalMediaVideoWireStatus(val state: String, val downloadUrl: String? = null)
+
 internal data class LocalMediaImageResult(val url: String? = null, val file: File? = null) {
     init { require((url != null) != (file != null)) }
 }
@@ -202,17 +204,62 @@ internal class LocalMediaApiClient @Inject constructor(
         }
     }
 
+    /** DashScope Wan async tasks have their own state and timeout, never use MiniMax polling URLs. */
+    suspend fun startVideo(offer: LocalMediaOffer, prompt: String): String {
+        require(offer.provider == LocalMediaProvider.QWEN && offer.kind == LocalMediaKind.VIDEO)
+        require(prompt.isNotBlank()) { "请填写视频描述" }
+        val uri = java.net.URI(normalizeModelBaseUrl(offer.profile.baseUrl))
+        val url = "https://${uri.host}/api/v1/services/aigc/video-generation/video-synthesis"
+        val body = buildJsonObject {
+            put("model", offer.model)
+            put("input", buildJsonObject { put("prompt", prompt) })
+            put("parameters", buildJsonObject {
+                put("size", "1280*720")
+                put("duration", 5)
+            })
+        }
+        val request = authorizedRequest(offer, url)
+            .header("X-DashScope-Async", "enable")
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        val root = readJson(request)
+        return root["output"]?.jsonObject?.get("task_id")?.jsonPrimitive?.contentOrNull
+            ?.takeIf(String::isNotBlank)
+            ?: error("Wan 未返回视频任务编号")
+    }
+
+    suspend fun videoStatus(offer: LocalMediaOffer, taskId: String): LocalMediaVideoWireStatus {
+        require(offer.provider == LocalMediaProvider.QWEN && offer.kind == LocalMediaKind.VIDEO)
+        require(taskId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "视频任务编号无效" }
+        val uri = java.net.URI(normalizeModelBaseUrl(offer.profile.baseUrl))
+        val request = authorizedRequest(offer, "https://${uri.host}/api/v1/tasks/$taskId").get().build()
+        val root = readJson(request)
+        val output = root["output"]?.jsonObject ?: error("Wan 查询响应缺少任务信息")
+        return when (output["task_status"]?.jsonPrimitive?.contentOrNull) {
+            "PENDING" -> LocalMediaVideoWireStatus("Queueing")
+            "RUNNING" -> LocalMediaVideoWireStatus("Processing")
+            "FAILED", "CANCELED" -> LocalMediaVideoWireStatus("Failed")
+            "SUCCEEDED" -> {
+                val link = output["video_url"]?.jsonPrimitive?.contentOrNull
+                    ?.takeIf { it.startsWith("https://") }
+                    ?: error("Wan 视频已完成但没有可用的下载链接")
+                LocalMediaVideoWireStatus("Success", link)
+            }
+            else -> error("Wan 视频任务状态未知或任务已过查询有效期")
+        }
+    }
+
     private suspend fun sendJson(offer: LocalMediaOffer, url: String, body: JsonObject): JsonObject =
         sendJson(offer, url, body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
 
-    private suspend fun sendJson(offer: LocalMediaOffer, url: String, body: RequestBody): JsonObject {
-        val request = authorizedRequest(offer, url).post(body).build()
-        return withContext(Dispatchers.IO) {
-            withCancellableHttpResponse(http.newCall(request)) { response ->
-                if (!response.isSuccessful) error("创作服务请求失败（HTTP ${response.code}）")
-                val payload = response.body?.string() ?: error("创作服务未返回数据")
-                json.parseToJsonElement(payload).jsonObject
-            }
+    private suspend fun sendJson(offer: LocalMediaOffer, url: String, body: RequestBody): JsonObject =
+        readJson(authorizedRequest(offer, url).post(body).build())
+
+    private suspend fun readJson(request: Request): JsonObject = withContext(Dispatchers.IO) {
+        withCancellableHttpResponse(http.newCall(request)) { response ->
+            if (!response.isSuccessful) error("创作服务请求失败（HTTP ${response.code}）")
+            val payload = response.body?.string() ?: error("创作服务未返回数据")
+            json.parseToJsonElement(payload).jsonObject
         }
     }
 
