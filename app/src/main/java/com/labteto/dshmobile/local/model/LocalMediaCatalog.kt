@@ -41,11 +41,16 @@ object LocalMediaCatalog {
                     offer(LocalMediaKind.TRANSCRIBE, "gpt-transcribe", "GPT Transcribe"),
                     offer(LocalMediaKind.TRANSCRIBE, "gpt-4o-transcribe", "GPT-4o Transcribe"),
                 )
-                LocalMediaProvider.QWEN -> listOf(
-                    offer(LocalMediaKind.IMAGE, "qwen-image-3.0", "Qwen Image 3.0"),
-                    offer(LocalMediaKind.IMAGE, "qwen-image-3.0-pro", "Qwen Image 3.0 Pro"),
-                    offer(LocalMediaKind.VIDEO, "wan2.6-t2v", "Wan 2.6 Text-to-Video"),
-                )
+                LocalMediaProvider.QWEN -> buildList {
+                    // Qwen Image 3.0's currently documented compatible endpoint is scoped to
+                    // a Model Studio workspace host; the legacy DashScope host is not equivalent.
+                    val host = URI(normalizeModelBaseUrl(profile.baseUrl)).host.lowercase()
+                    if (host.endsWith(".maas.aliyuncs.com")) {
+                        add(offer(LocalMediaKind.IMAGE, "qwen-image-3.0", "Qwen Image 3.0"))
+                        add(offer(LocalMediaKind.IMAGE, "qwen-image-3.0-pro", "Qwen Image 3.0 Pro"))
+                    }
+                    add(offer(LocalMediaKind.VIDEO, "wan2.6-t2v", "Wan 2.6 Text-to-Video"))
+                }
                 LocalMediaProvider.GEMINI -> listOf(
                     offer(LocalMediaKind.IMAGE, "gemini-3.1-flash-image", "Gemini 3.1 Flash Image"),
                     offer(LocalMediaKind.IMAGE, "gemini-2.5-flash-image", "Gemini 2.5 Flash Image"),
