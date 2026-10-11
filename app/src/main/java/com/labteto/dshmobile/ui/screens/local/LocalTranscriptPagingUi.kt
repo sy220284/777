@@ -3,6 +3,10 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -117,6 +121,83 @@ internal fun LocalWorkStreamingTailFollower(
             if (following && gap > 0) listState.scrollBy(gap.toFloat())
         }
     }
+}
+
+/**
+ * The newest Work event glides into place only when the user was following the tail.
+ * A manual drag pauses following; returning to the bottom opts back in automatically.
+ * The existing streaming-size follower runs while this item transition is idle.
+ */
+@Composable
+internal fun LocalWorkTimelineAutoScroller(
+    listState: LazyListState,
+    sessionId: String,
+    tailIndex: Int,
+    tailKey: String,
+    isReady: Boolean,
+    isCatchingUp: MutableState<Boolean>,
+) {
+    val readerDragging by listState.interactionSource.collectIsDraggedAsState()
+    var readerPaused by remember(sessionId, listState) { mutableStateOf(false) }
+    var previousTailIndex by remember(sessionId, listState) { mutableStateOf(-1) }
+    var previousTailKey by remember(sessionId, listState) { mutableStateOf("") }
+
+    LaunchedEffect(readerDragging, sessionId, listState) {
+        if (readerDragging) {
+            readerPaused = true
+        } else if (listState.isAtWorkTimelineBottom()) {
+            readerPaused = false
+        }
+    }
+    LaunchedEffect(sessionId, listState) {
+        snapshotFlow { listState.isAtWorkTimelineBottom() }
+            .distinctUntilChanged()
+            .collect { atBottom ->
+                if (atBottom && !readerDragging) readerPaused = false
+            }
+    }
+    LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady) {
+        val oldTail = previousTailIndex
+        val oldKey = previousTailKey
+        previousTailIndex = tailIndex
+        previousTailKey = tailKey
+        if (!isReady || oldTail < 0 || tailIndex < 0 ||
+            (tailIndex <= oldTail && tailKey == oldKey)
+        ) return@LaunchedEffect
+        val viewport = listState.layoutInfo
+        val lastVisible = viewport.visibleItemsInfo.lastOrNull()
+        val previousTailGap = lastVisible?.takeIf { it.index == oldTail }
+            ?.let { it.offset + it.size - viewport.viewportEndOffset }
+        if (!shouldFollowNewWorkStep(
+                oldTail, lastVisible?.index ?: -1, previousTailGap,
+                readerPaused, readerDragging,
+            )
+        ) return@LaunchedEffect
+        isCatchingUp.value = true
+        try {
+            listState.animateScrollToItem(tailIndex)
+        } finally {
+            isCatchingUp.value = false
+        }
+    }
+}
+
+internal fun shouldFollowNewWorkStep(
+    previousTailIndex: Int,
+    lastVisibleIndex: Int,
+    previousTailGapPx: Int?,
+    readerPaused: Boolean,
+    readerDragging: Boolean,
+): Boolean =
+    previousTailIndex >= 0 && !readerPaused && !readerDragging &&
+        lastVisibleIndex >= previousTailIndex - 1 &&
+        (previousTailGapPx == null || previousTailGapPx <= 72)
+
+private fun LazyListState.isAtWorkTimelineBottom(): Boolean {
+    val info = layoutInfo
+    val tail = info.visibleItemsInfo.lastOrNull() ?: return false
+    if (tail.index != info.totalItemsCount - 1) return false
+    return tail.offset + tail.size - info.viewportEndOffset <= 72
 }
 
 internal fun LazyListState.conversationViewportExtent(): Int {
