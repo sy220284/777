@@ -217,9 +217,9 @@ internal class ChatInteractionStateReducer {
                 significance = significance,
             )
         }
-        // Only measured message length remains active. Legacy model-scored profiles stay
-        // readable in old stories but are never updated from speculative model output.
-        val pattern = measureUserMessageLength(previous.userPattern, userMessage)
+        // Retired user-profile data is only retained for loading saved stories.
+        // The optional reply drafts rely on actual recent dialogue, not numeric personas.
+        val pattern = previous.userPattern
         val requestedStage = if (rawDynamics?.containsKey("stage") == true) {
             normalizeStage(value.dynamics.stage)
         } else previous.dynamics.stage
@@ -453,28 +453,6 @@ internal class ChatInteractionStateReducer {
         )
     }
 
-    private fun measureUserMessageLength(
-        previous: UserChatPattern,
-        userMessage: String,
-    ): UserChatPattern {
-        val measuredLength = userMessage.trim().length
-        if (measuredLength == 0) return previous
-        val weight = previous.observedTurns.coerceIn(0, 19)
-        val averageChars = if (weight == 0) measuredLength
-            else ((previous.averageMessageChars * weight) + measuredLength) / (weight + 1)
-        // Keep actual observations for the optional reply drafts, never personality scores.
-        return previous.copy(
-            replyLength = when {
-                averageChars < 20 -> "short"
-                averageChars < 80 -> "medium"
-                else -> "long"
-            },
-            observedTurns = (previous.observedTurns + 1).coerceAtMost(1000),
-            averageMessageChars = averageChars.coerceIn(0, 2_000),
-            updatedAt = System.currentTimeMillis(),
-        )
-    }
-
     private fun mergeEvidence(
         previous: List<RelationshipEvidence>,
         incoming: List<RelationshipEvidence>,
@@ -514,9 +492,6 @@ internal class ChatInteractionStateReducer {
         }
         return merged.values.toList().takeLast(limit)
     }
-
-    private fun bounded(value: Int, previous: Int, maxDelta: Int): Int =
-        value.coerceIn(previous - maxDelta, previous + maxDelta).coerceIn(0, 100)
 
     private fun normalizeSignificance(raw: String): String =
         raw.trim().uppercase().takeIf { it in ALLOWED_SIGNIFICANCE } ?: "MINOR"
