@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "snapshot": "532e248f7c6f",
+  "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
+  "code_files_scanned": 1307,
+  "production_sources_scanned": 781,
+  "feature_nodes": 541,
+  "functional_leaves": 444,
+  "existing_executable_test_mappings": 128,
+  "source_verified_registrations": 0,
+  "explicit_retirements": 0,
+  "changes_applied": [],
+  "pending_changes": [],
+  "verification_limits": "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；无法据此证明测试在真实设备或服务上的行为完整。没有声明和证据的历史节点继续保留原状。"
+}

@@ -1,0 +1,97 @@
+name: 自动维护功能树
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: feature-tree-auto-maintenance
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 获取完整主线
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: 扫描全量源码与同步两种功能树
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --self-test
+          python3 .github/scripts/sync-feature-tree.py --preview
+          python3 .github/scripts/sync-feature-tree.py
+          python3 .github/scripts/sync-feature-tree.py --check
+          python3 .github/scripts/check-feature-tree-sync.py
+          python3 .github/scripts/check-acceptance-matrix.py
+          git diff --check
+      - name: 上传本次扫描及复核后的文件
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: feature-tree-reviewed
+          retention-days: 7
+          path: |
+            docs/FEATURE-TREE.zh-CN.md
+            docs/FEATURE-TREE.zh-CN.html
+            docs/FEATURE-TREE-SOURCE-REGISTRY.json
+            docs/FEATURE-SOURCE-INDEX.auto.json
+            docs/FEATURE-REVIEW.auto.json
+            docs/ACCEPTANCE-MATRIX.json
+      - name: 在当前测试 PR 内保留全量刷新结果
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 616 && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
+            docs/FEATURE-REVIEW.auto.json docs/ACCEPTANCE-MATRIX.json
+          if git diff --cached --quiet; then
+            echo "当前功能树和源码一致，无需回写"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "全量扫描并复核后刷新功能树及源码证据"
+          git push origin HEAD:refs/heads/"$TARGET_BRANCH"
+      - name: 自动创建或更新维护 PR
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
+            docs/ACCEPTANCE-MATRIX.json docs/FEATURE-TREE-SOURCE-REGISTRY.json \
+            docs/FEATURE-SOURCE-INDEX.auto.json docs/FEATURE-REVIEW.auto.json
+          if git diff --cached --quiet; then
+            echo "功能树和当前代码一致，无需提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "自动同步功能树与生产源码登记"
+          # 只维护机器人分支，不直接向 main 追加未触发 CI 的文档提交。
+          # 主线发布要求最终 SHA 有真实 CI 证据。
+          git fetch origin refs/heads/automation/feature-tree-maintenance:refs/remotes/origin/automation/feature-tree-maintenance || true
+          git push --force-with-lease origin HEAD:refs/heads/automation/feature-tree-maintenance
+          PR_NUMBER="$(gh pr list --base main --head automation/feature-tree-maintenance --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$PR_NUMBER" ]; then
+            gh pr create --base main --head automation/feature-tree-maintenance \
+              --title "自动更新功能树与源码索引" \
+              --body "全仓库生产代码扫描生成。包含功能声明新增、删除、改名、迁移或源码候选变化；Markdown、交互树和验收索引同步。请以实际代码与检查结果复核，源码候选不视作功能完成。"
+          else
+            echo "已复用自动维护 PR #$PR_NUMBER"
+          fi
