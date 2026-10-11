@@ -28,7 +28,6 @@ class LocalProjectRenameRegressionTest {
             recoveryNotice = MutableStateFlow(null),
             backupAndReset = {},
             createProjectWorkSession = { false },
-            onProjectSessionAccepted = {},
             create = { error("No create expected") },
             select = {},
             rename = { id, next ->
