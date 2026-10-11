@@ -15,6 +15,8 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
@@ -165,6 +167,9 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }
+
+    internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage =
+        withContext(Dispatchers.IO) { localHarness.queryMiniMaxQuota(profile) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 

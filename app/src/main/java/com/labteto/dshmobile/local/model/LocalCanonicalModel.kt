@@ -237,7 +237,7 @@ internal object LocalCanonicalModelCodec {
                 routeFingerprint = routeFingerprint,
             )
         } ?: if (adapterId == LocalModelAdapterIds.OPENAI_CHAT) {
-            chatPrivateReplay(parsed, routeFingerprint, reply.message["reasoning_details"])
+            chatPrivateReplay(parsed, routeFingerprint, reply.message["reasoning_details"], reply.providerContentForReplay)
         } else {
             null
         }
@@ -252,6 +252,7 @@ internal object LocalCanonicalModelCodec {
         message: LocalCanonicalMessage,
         routeFingerprint: String,
         reasoningDetails: JsonElement? = null,
+        providerContent: JsonElement? = null,
     ): LocalModelReplayEnvelope? {
         val reasoning = message.content.filterIsInstance<LocalCanonicalContent.Reasoning>()
             .joinToString("") { it.text }
@@ -261,11 +262,12 @@ internal object LocalCanonicalModelCodec {
                 if (call.providerMetadata.isNotEmpty()) put(call.id, call.providerMetadata)
             }
         }
-        if (reasoning == null && metadata.isEmpty() && reasoningDetails == null) return null
+        if (reasoning == null && metadata.isEmpty() && reasoningDetails == null && providerContent == null) return null
         return LocalModelReplayEnvelope(
             adapterId = LocalModelAdapterIds.OPENAI_CHAT,
             routeFingerprint = routeFingerprint,
             payload = buildJsonObject {
+                providerContent?.let { put("content", it) }
                 reasoning?.let { put("reasoning_content", it) }
                 reasoningDetails?.let { put("reasoning_details", it) }
                 if (metadata.isNotEmpty()) put("tool_metadata", metadata)
@@ -335,6 +337,8 @@ internal object LocalCanonicalModelCodec {
         ) {
             put("reasoning_content", reasoning)
         }
+        compatibleReplay?.takeIf { it.adapterId == LocalModelAdapterIds.OPENAI_CHAT }
+            ?.payload?.get("content")?.let { put("content", it) }
         compatibleReplay?.takeIf { it.adapterId == LocalModelAdapterIds.OPENAI_CHAT }
             ?.payload?.get("reasoning_details")?.let { put("reasoning_details", it) }
         val calls = message.content.filterIsInstance<LocalCanonicalContent.ToolCall>()

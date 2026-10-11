@@ -112,9 +112,9 @@ class LocalMiniMaxCompatibilityTest {
         val continuation = LocalCanonicalModelCodec.toLegacyMessages(
             listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "same",
         ).single()
-        assertEquals("正在核查仓库最新提交", continuation["content"]!!.jsonPrimitive.content)
-        assertEquals("用户要看仓库更新，先检查工具",
-            continuation["reasoning_content"]!!.jsonPrimitive.content)
+        assertEquals("<think>用户要看仓库更新，先检查工具</think>正在核查仓库最新提交",
+            continuation["content"]!!.jsonPrimitive.content)
+        assertFalse(continuation.containsKey("reasoning_content"))
         assertEquals("read", continuation["tool_calls"]!!.jsonArray.single()
             .jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content)
     }
@@ -123,6 +123,7 @@ class LocalMiniMaxCompatibilityTest {
         val raw = """{"choices":[{"message":{
             "role":"assistant",
             "content":"<think>检查设置</think>检查完成",
+            "reasoning_content":"独立原生思考",
             "reasoning_details":[{"index":0,"id":"sig1","type":"reasoning.text","text":"官方推理"}],
             "tool_calls":[{"id":"c1","type":"function","function":{"name":"read","arguments":"{}"}}]
         },"finish_reason":"tool_calls"}]}"""
@@ -131,9 +132,12 @@ class LocalMiniMaxCompatibilityTest {
         assertTrue(reply.reasoning!!.contains("检查设置"))
         val canonical = LocalCanonicalModelCodec.canonicalizeReply(reply, LocalModelAdapterIds.OPENAI_CHAT, "same")
             .canonicalMessage!!
+        val restored = LocalCanonicalModelCodec.message(LocalCanonicalModelCodec.toHistoryMessage(canonical))
         val sameRoute = LocalCanonicalModelCodec.toLegacyMessages(
-            listOf(canonical), LocalModelAdapterIds.OPENAI_CHAT, "same",
+            listOf(restored), LocalModelAdapterIds.OPENAI_CHAT, "same",
         ).single()
+        assertEquals("<think>检查设置</think>检查完成", sameRoute["content"]!!.jsonPrimitive.content)
+        assertEquals("独立原生思考", sameRoute["reasoning_content"]!!.jsonPrimitive.content)
         assertEquals("sig1", sameRoute["reasoning_details"]!!.jsonArray[0]
             .jsonObject["id"]!!.jsonPrimitive.content)
         val differentRoute = LocalCanonicalModelCodec.toLegacyMessages(

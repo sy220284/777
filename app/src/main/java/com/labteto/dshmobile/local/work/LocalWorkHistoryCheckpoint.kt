@@ -9,6 +9,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal data class LocalStructuredWorkState(
@@ -16,6 +18,7 @@ internal data class LocalStructuredWorkState(
     val plan: List<String> = emptyList(),
     val constraints: List<String> = emptyList(),
     val decisions: List<String> = emptyList(),
+    val decisionEpoch: Long = 0L,
     val failures: List<String> = emptyList(),
     val unfinished: List<String> = emptyList(),
     val progress: List<String> = emptyList(),
@@ -29,6 +32,7 @@ internal data class LocalWorkCheckpoint(
     val plan: List<String> = emptyList(),
     val constraints: List<String>,
     val decisions: List<String>,
+    val decisionEpoch: Long = 0L,
     val failures: List<String>,
     val unfinished: List<String>,
     val progress: List<String>,
@@ -37,11 +41,12 @@ internal data class LocalWorkCheckpoint(
     val tools: List<String>,
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
-        put("version", 2)
+        put("version", 3)
         put("goals", JsonArray(goals.map(::JsonPrimitive)))
         put("plan", JsonArray(plan.map(::JsonPrimitive)))
         put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
         put("decisions", JsonArray(decisions.map(::JsonPrimitive)))
+        put("decision_epoch", decisionEpoch)
         put("failures", JsonArray(failures.map(::JsonPrimitive)))
         put("unfinished", JsonArray(unfinished.map(::JsonPrimitive)))
         put("progress", JsonArray(progress.map(::JsonPrimitive)))
@@ -92,6 +97,7 @@ internal data class LocalWorkCheckpoint(
                 plan = list("plan"),
                 constraints = list("constraints"),
                 decisions = list("decisions"),
+                decisionEpoch = value["decision_epoch"]?.jsonPrimitive?.longOrNull ?: 0L,
                 failures = list("failures"),
                 unfinished = list("unfinished"),
                 progress = list("progress"),

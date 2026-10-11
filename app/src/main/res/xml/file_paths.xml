@@ -5,4 +5,5 @@
         path="updates/" />
     <cache-path name="camera" path="camera/" />
     <files-path name="workspace-share" path="local-harness/workspace/" />
+    <cache-path name="minimax-media" path="minimax-media/" />
 </paths>

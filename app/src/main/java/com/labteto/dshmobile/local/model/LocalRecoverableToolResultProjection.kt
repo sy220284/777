@@ -46,7 +46,7 @@ internal fun projectRecoverableToolResult(
     }
     val recovery = when {
         callId == null -> "请缩小查询范围后继续读取。"
-        stored -> "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
+        stored -> "当前已保留原文；可用 tool_output_read(call_id=$callId) 分页或指定 query 检索。原文会按私有存储配额淘汰。"
         else -> "完整结果超过本机私有保留上限；请缩小原查询后重试。"
     }
     return LocalRecoverableToolResultProjection(

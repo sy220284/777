@@ -252,6 +252,8 @@ class DeepSeekClient @Inject constructor(
                 )
                 val content = StringBuilder()
                 val reasoning = StringBuilder()
+                val providerContent = StringBuilder()
+                val providerReasoning = StringBuilder()
                 val miniMaxSplitter = if (LocalMiniMaxPolicy.isOfficial(baseUrl))
                     LocalMiniMaxThinkingTextSplitter() else null
                 val reasoningDetails = linkedMapOf<Int, JsonObject>()
@@ -324,6 +326,7 @@ class DeepSeekClient @Inject constructor(
                         if (delta == null) continue
                         val rawTextDelta = assistantText(delta["content"]).orEmpty() +
                             (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                        providerContent.append(rawTextDelta)
                         val splitText = miniMaxSplitter?.accept(rawTextDelta)
                             ?: LocalModelDelta(content = rawTextDelta)
                         val textDelta = splitText.content
@@ -342,8 +345,10 @@ class DeepSeekClient @Inject constructor(
                         }
                         val detailDelta = (delta["reasoning_details"] as? JsonArray).orEmpty()
                             .mapNotNull { (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull }.joinToString("")
-                        val reasoningDelta = ((delta["reasoning_content"] as? JsonPrimitive)
-                            ?.contentOrNull ?: detailDelta) + splitText.reasoning
+                        val nativeReasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
+                            ?.contentOrNull ?: detailDelta
+                        providerReasoning.append(nativeReasoningDelta)
+                        val reasoningDelta = nativeReasoningDelta + splitText.reasoning
                         if (textDelta.isNotEmpty()) content.append(textDelta)
                         if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
                         if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
@@ -424,7 +429,7 @@ class DeepSeekClient @Inject constructor(
                 val message = buildJsonObject {
                     put("role", "assistant")
                     put("content", content.toString())
-                    if (reasoning.isNotEmpty()) put("reasoning_content", reasoning.toString())
+                    if (providerReasoning.isNotEmpty()) put("reasoning_content", providerReasoning.toString())
                     if (reasoningDetails.isNotEmpty()) put("reasoning_details", JsonArray(reasoningDetails.toSortedMap().values.toList()))
                     if (calls.isNotEmpty()) {
                         put("tool_calls", buildJsonArray {
@@ -447,6 +452,8 @@ class DeepSeekClient @Inject constructor(
                 } ?: DeepSeekTokenUsage(reported = false)
                 LocalModelReply(
                     message = message,
+                    providerContentForReplay = if (miniMaxSplitter != null && providerContent.toString() != content.toString())
+                        JsonPrimitive(providerContent.toString()) else null,
                     content = content.toString(),
                     reasoning = reasoning.toString().takeIf(String::isNotBlank),
                     toolCalls = calls,
@@ -514,17 +521,11 @@ class DeepSeekClient @Inject constructor(
         val splitText = if (miniMax && rawContent != null)
             LocalMiniMaxThinkingTextSplitter.splitComplete(rawContent)
         else LocalModelDelta(content = rawContent.orEmpty())
-        val normalizedMessage = if (miniMax && rawContent != null) {
-            // Native reasoning_details remain available for same-route tool replay.
-            // Only the provider-visible content/thinking boundary is corrected here.
-            JsonObject(message + ("content" to JsonPrimitive(splitText.content)) +
-                (if (splitText.reasoning.isNotBlank()) mapOf(
-                    "reasoning_content" to JsonPrimitive(
-                        listOfNotNull(message["reasoning_content"]?.jsonPrimitive?.contentOrNull
-                            ?.takeIf(String::isNotBlank), splitText.reasoning)
-                            .joinToString("\n"),
-                    ),
-                ) else emptyMap()))
+        // The visible projection may omit thinking; the original field is retained privately
+        // for exact same-route continuation rather than moving it to reasoning_content.
+        val replayContent = message["content"].takeIf { miniMax && rawContent != splitText.content }
+        val normalizedMessage = if (replayContent != null) {
+            JsonObject(message + ("content" to JsonPrimitive(splitText.content)))
         } else if (rawToolCalls.isNotEmpty() && (message["content"] == null || message["content"] is JsonNull)) {
             JsonObject(message + ("content" to JsonPrimitive("")))
         } else {
@@ -543,10 +544,14 @@ class DeepSeekClient @Inject constructor(
             message = normalizedMessage,
             content = assistantText(normalizedMessage["content"])
                 ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull,
-            reasoning = normalizedMessage["reasoning_content"]?.jsonPrimitive?.contentOrNull
-                ?: (message["reasoning_details"] as? JsonArray)?.mapNotNull {
-                    (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull
-                }?.joinToString(""),
+            providerContentForReplay = replayContent,
+            reasoning = listOfNotNull(
+                message["reasoning_content"]?.jsonPrimitive?.contentOrNull
+                    ?: (message["reasoning_details"] as? JsonArray)?.mapNotNull {
+                        (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull
+                    }?.joinToString(""),
+                splitText.reasoning.takeIf(String::isNotBlank),
+            ).joinToString("\n").takeIf(String::isNotBlank),
             toolCalls = calls,
             usage = usage,
         )

@@ -26,9 +26,14 @@ class OnDemandLanguageServerAndroidTest {
         }
         assertTrue(LocalWorkspaceToolGuide.ensure(context, workspace))
         val readme = File(workspace, ".dsh/tools/README.md")
-        assertTrue(readme.readText().contains("capability_search"))
+        val managedGuide = File(workspace, ".dsh/tools/777-runtime-guide.md")
+        assertTrue(managedGuide.readText().contains("capability_search"))
         readme.writeText("# 自定义工具说明\\n")
         assertTrue(!LocalWorkspaceToolGuide.ensure(context, workspace))
+        assertEquals("# 自定义工具说明\\n", readme.readText())
+        managedGuide.writeText("旧版运行指南")
+        assertTrue(!LocalWorkspaceToolGuide.ensure(context, workspace))
+        assertTrue(managedGuide.readText().contains("capability_search"))
         assertEquals("# 自定义工具说明\\n", readme.readText())
     }
 

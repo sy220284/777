@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 
 enum class LocalImageInputMode {
     AUTO,
@@ -55,6 +56,8 @@ data class LocalModelReply(
     val canonicalMessage: LocalCanonicalMessage? = null,
     val routeIdentity: LocalModelRouteIdentity? = null,
     val promptCacheDiagnostic: LocalPromptCacheDiagnostic? = null,
+    /** Native content before display splitting; replay only under the producing route identity. */
+    val providerContentForReplay: JsonElement? = null,
 )
 
 /** High-frequency model preview kept outside the aggregate runtime state. */
