@@ -46,6 +46,31 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun resetInCausalTailCannotResurrectOmittedOldAssistantDecision() {
+        val old = LocalWorkCheckpoint(
+            goals = listOf("完成任务"), constraints = emptyList(),
+            decisions = listOf("决定采用过时方案 A"), failures = emptyList(),
+            unfinished = emptyList(), progress = emptyList(),
+            artifacts = emptyList(), tools = emptyList(),
+        )
+        val stale = message("assistant", "此前决定采用过时方案 A")
+        // User rescinds the old plan in the protected recent tail, which is not part of
+        // the omitted messages supplied to the history summarizer.
+        val correction = message("user", "此前所有方案作废，改为方案 B")
+        val rendered = com.labteto.dshmobile.local.work.LocalWorkHistorySummaryStrategy.summarize(
+            listOf(stale),
+            listOf(buildTrustedWorkCheckpointModelMessage(old.toModelBlock()), stale, correction),
+            8_000,
+            LocalStructuredWorkState(decisions = listOf("改为方案 B"), decisionEpoch = 42L),
+        )
+        val now = requireNotNull(LocalWorkCheckpoint.latestFrom(listOf(
+            buildTrustedWorkCheckpointModelMessage(rendered.modelBlock),
+        )))
+        assertTrue(now.decisions.any { it.contains("方案 B") })
+        assertFalse(now.decisions.any { it.contains("方案 A") })
+    }
+
+    @Test
     fun ordinaryOldPlanMentionNeverRevokesExistingDecisions() {
         val old = LocalWorkCheckpoint(
             goals = emptyList(), constraints = emptyList(),

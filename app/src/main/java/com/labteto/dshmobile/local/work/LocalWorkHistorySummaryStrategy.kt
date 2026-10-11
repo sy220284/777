@@ -135,7 +135,11 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
         val decisions = mergeStructured(
             structuredWorkState?.decisions.orEmpty() +
                 if (explicitReset) emptyList() else previousCheckpoint?.decisions.orEmpty(),
-            select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
+            // The reset can still be in the live causal tail while all pre-reset decisions
+            // sit in the compacted region. In that case none of those fallback messages may
+            // reinstate the revoked plan, even if the reset text is absent from this slice.
+            if (explicitReset && lastDecisionReset < 0) emptyList() else
+                select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
             maxItems = 6,
         )
         // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
