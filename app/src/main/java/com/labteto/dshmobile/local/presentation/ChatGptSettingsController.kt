@@ -12,6 +12,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal suspend fun <T> finishChatGptAccountMutation(block: suspend () -> T): T =
     withContext(NonCancellable) { block() }
@@ -24,8 +26,12 @@ class ChatGptSettingsController @Inject constructor(
     private val planTester: ChatGptPlanConnectionTester,
 ) {
     val state: StateFlow<ChatGptUiState> = auth.state
+    private val accountMutationMutex = Mutex()
+    @Volatile private var latestSelectedAccountId: String? = null
 
     suspend fun refresh() {
+        // Background resume/refresh must not commit over an in-progress account switch.
+        if (!accountMutationMutex.tryLock()) return
         try {
             auth.refresh()
             reconcilePlanProfiles()
@@ -33,20 +39,24 @@ class ChatGptSettingsController @Inject constructor(
             throw cancelled
         } catch (error: Exception) {
             AppLog.warn("ChatGptSettingsController", "ChatGPT background refresh failed", error)
+        } finally {
+            accountMutationMutex.unlock()
         }
     }
 
-    suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) {
-        modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.connect(existingAccountId, requestPlanConsent)
-        reconcilePlanProfiles(selectFirstAccountId = account.id)
-    }
+    suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) =
+        accountMutationMutex.withLock {
+            modelRuntime.requireChatGptAccountSelectionAllowed()
+            val account = auth.connect(existingAccountId, requestPlanConsent)
+            reconcilePlanProfiles(selectFirstAccountId = account.id)
+        }
 
-    suspend fun restart(existingAccountId: String? = null) {
-        modelRuntime.requireChatGptAccountSelectionAllowed()
-        val account = auth.restartAuthorization(existingAccountId)
-        reconcilePlanProfiles(selectFirstAccountId = account.id)
-    }
+    suspend fun restart(existingAccountId: String? = null) =
+        accountMutationMutex.withLock {
+            modelRuntime.requireChatGptAccountSelectionAllowed()
+            val account = auth.restartAuthorization(existingAccountId)
+            reconcilePlanProfiles(selectFirstAccountId = account.id)
+        }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
 
@@ -61,30 +71,36 @@ class ChatGptSettingsController @Inject constructor(
     }
 
     suspend fun select(id: String) {
-        modelRuntime.requireChatGptAccountSelectionAllowed()
-        auth.selectAccount(id)
-        val snapshot = auth.state.value
-        if (shouldRetireChatGptPlanProfiles(snapshot.selectedAccount)) {
-            modelRuntime.retireChatGptAccountProfiles(id)
+        latestSelectedAccountId = id
+        accountMutationMutex.withLock {
+            if (latestSelectedAccountId != id) return@withLock
+            modelRuntime.requireChatGptAccountSelectionAllowed()
+            auth.selectAccount(id)
+            // A newer tap may arrive during the network catalog probe.
+            if (latestSelectedAccountId != id) return@withLock
+            val snapshot = auth.state.value
+            if (shouldRetireChatGptPlanProfiles(snapshot.selectedAccount)) {
+                modelRuntime.retireChatGptAccountProfiles(id)
+            }
+            require(snapshot.connected) {
+                snapshot.error ?: "ChatGPT 账户已登录，但套餐用量尚未启用"
+            }
+            modelRuntime.syncChatGptModels(id, snapshot.models, true)
         }
-        require(snapshot.connected) {
-            snapshot.error ?: "ChatGPT 账户已登录，但套餐用量尚未启用"
-        }
-        modelRuntime.syncChatGptModels(id, snapshot.models, true)
     }
 
-    suspend fun disconnect(id: String): String? {
+    suspend fun disconnect(id: String): String? = accountMutationMutex.withLock {
         modelRuntime.removeChatGptAccountProfiles(id)
-        return finishChatGptAccountMutation {
+        finishChatGptAccountMutation {
             val warning = auth.disconnect(id)
             reconcilePlanProfiles()
             warning
         }
     }
 
-    suspend fun remove(id: String): String? {
+    suspend fun remove(id: String): String? = accountMutationMutex.withLock {
         modelRuntime.removeChatGptAccountProfiles(id)
-        return finishChatGptAccountMutation {
+        finishChatGptAccountMutation {
             val warning = auth.remove(id)
             reconcilePlanProfiles()
             warning
