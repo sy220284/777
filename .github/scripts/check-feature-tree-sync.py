@@ -327,15 +327,27 @@ def inspect():
             or index.get("tracked_legacy_identities") != len(bound)):
         raise ValueError("稳定身份登记数量与全量扫描报告不一致")
     ambiguous_keys = {}
+    cached_code = {}
     for record in reported:
         for src in record.get("existing_production_sources", []):
+            if src not in cached_code:
+                cached_code[src] = (ROOT / src).read_text(encoding="utf-8", errors="replace")
             for declaration in record.get("named_symbols", []):
-                if declaration.get("declaration_found"):
-                    ambiguous_keys.setdefault((src, declaration["symbol"]), []).append(record["path"])
-    ambiguous_paths = sorted({path for paths in ambiguous_keys.values()
-                              if len(paths) > 1 for path in paths})
-    if review.get("ambiguous_named_entry_paths") != ambiguous_paths:
-        raise ValueError("一对多入口歧义名单有遗漏")
+                if not declaration.get("declaration_found"):
+                    continue
+                symbol = declaration["symbol"]
+                if re.search(r"(?:fun|class|object|interface|val|var|enum\\s+class)\\s+" +
+                             re.escape(symbol) + r"\\b", cached_code[src]):
+                    ambiguous_keys.setdefault((src, symbol), set()).add(record["path"])
+    groups = [
+        {"source": source, "symbol": symbol, "features": sorted(members)}
+        for (source, symbol), members in sorted(ambiguous_keys.items())
+        if len(members) > 1
+    ]
+    ambiguous_paths = sorted({path for group in groups for path in group["features"]})
+    if (review.get("ambiguous_named_entry_paths") != ambiguous_paths
+            or review.get("ambiguous_named_entry_groups") != groups):
+        raise ValueError("共享入口歧义的真实源码文件、声明符号或关联功能不一致")
     missing = [r["path"] for r in reported
                if r.get("verification") == "没有可确认的现行入口证据"]
     pending = review.get("unproven_feature_triage", [])
