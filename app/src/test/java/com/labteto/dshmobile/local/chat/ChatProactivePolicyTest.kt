@@ -246,8 +246,8 @@ class ChatProactivePolicyTest {
         val prompt = characterProactiveDirective("用户设置的晚上提醒", persona, state)
         assertTrue(prompt.contains("还没把旧花盆归还给朋友"))
         assertTrue(prompt.contains("整理温室里的新苗"))
-        assertTrue(prompt.contains("不要编造用户刚刚说过"))
-        assertTrue(prompt.contains("不编造重大事件"))
+        assertTrue(prompt.contains("幕后触发条件，不是用户刚发来的消息"))
+        assertTrue(prompt.contains("延续当前人物、关系和故事"))
     }
 
     private fun message(
