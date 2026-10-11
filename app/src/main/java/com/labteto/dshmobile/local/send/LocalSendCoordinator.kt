@@ -92,8 +92,9 @@ internal fun prepareLocalSend(
     allowSteeringDirective: Boolean = false,
 ): LocalPreparedSend? {
     val raw = text.trim()
-    val steer = allowSteeringDirective && raw.startsWith("/steer ") && raw.length > 7
-    val prompt = if (steer) raw.removePrefix("/steer ").trim() else raw
+    val steer = allowSteeringDirective &&
+        (raw.startsWith("/steer ") || (raw == "/steer" && attachments.isNotEmpty()))
+    val prompt = if (steer) raw.removePrefix("/steer").trim() else raw
     if (prompt.isEmpty() && attachments.isEmpty()) return null
     val attachmentBlock = attachments.joinToString("\n") { attachment ->
         val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
