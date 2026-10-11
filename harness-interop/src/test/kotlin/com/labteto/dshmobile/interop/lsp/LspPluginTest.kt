@@ -393,7 +393,7 @@ class LspPluginTest {
         val uri = file.toURI().toString()
         fun frame(message: String) = "Content-Length: ${message.toByteArray().size}\r\n\r\n$message"
         val init = """{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}"""
-        val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$uri","version":1,"diagnostics":[{"message":"Type 'number' is not assignable to type 'string'","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
+        val notification = """{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"$uri","version":1,"diagnostics":[{"message":"Type number is not assignable to string","severity":1,"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]}}"""
         val script = temporary.newFile("delayed-diagnostics.sh").apply {
             writeText(
                 "printf '%s' '" + frame(init) + "'\n" +
