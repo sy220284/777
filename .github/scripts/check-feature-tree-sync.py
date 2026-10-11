@@ -198,6 +198,13 @@ def inspect():
         raise ValueError("全量分级统计与逐功能证据不一致")
     if review.get("observed_code_delta") != index.get("observed_delta"):
         raise ValueError("功能变化报告与扫描索引不一致")
+    expected_ci = sum(bool(v.get("workflow_evidence", [])) for v in reported)
+    expected_unrun = sum(len(v.get("explicit_test_candidates", [])) for v in reported)
+    if (review.get("workflow_evidence_features") != expected_ci
+            or index.get("workflow_evidence_features") != expected_ci
+            or review.get("declared_unexecuted_test_methods") != expected_unrun
+            or index.get("declared_unexecuted_test_methods") != expected_unrun):
+        raise ValueError("工程作业和未执行仪表测试的证据总数与实际报告不一致")
     # 单独复核手工补录的跨模块证据：来源、符号和LSP工具分支必须真实存在。
     explicit_file = DOCS / "FEATURE-TREE-EXPLICIT-EVIDENCE.json"
     explicit = (json.loads(explicit_file.read_text(encoding="utf-8"))
@@ -396,8 +403,10 @@ def inspect():
                     raise ValueError("HTML 逐项测试证据标注不一致")
                 if (child.get("evidenceLevel") != info["verification"] or
                     child.get("sourceCount") != len(info["existing_production_sources"]) or
-                    child.get("missingSourceCount") != len(info["missing_production_sources"])):
-                    raise ValueError("HTML 展示的源码证据状态与复核台账不一致")
+                    child.get("missingSourceCount") != len(info["missing_production_sources"]) or
+                    child.get("workflowJobCount") != len(info.get("workflow_evidence", [])) or
+                    child.get("unrunTestCount") != len(info.get("explicit_test_candidates", []))):
+                    raise ValueError("HTML 展示的源码/CI作业/未执行测试证据与复核台账不一致")
             check_display(child, path)
     check_display(data, [])
     paths = [item["path"] for item in matrix["items"]]
