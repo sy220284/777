@@ -88,7 +88,6 @@ jobs:
             docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
             docs/ACCEPTANCE-MATRIX.json
       - name: 对照已提交产物，不允许PR只更新扫描器却留下过期功能树
-        if: github.event.pull_request.number != 616 # 单次新报告回写后立即恢复门禁
         run: |
           set -euo pipefail
           paths=(
@@ -100,6 +99,8 @@ jobs:
             docs/FEATURE-REALITY-AUDIT.auto.json
             docs/FEATURE-REALITY-AUDIT.zh-CN.md
             docs/FEATURE-EXISTENCE-TRIAGE.json
+            docs/FEATURE-EXISTENCE-AUDIT.auto.json
+            docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
             docs/ACCEPTANCE-MATRIX.json
           )
           for path in "${paths[@]}"; do
@@ -112,48 +113,6 @@ jobs:
             echo "::error::PR中提交的功能树或审计文档与本次真实源码扫描不一致，请同步生成文件"
             exit 1
           fi
-
-  temporary-resolve-existence-report:
-    name: 单次刷新90项存在性溯源到本PR
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 616 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/auto-feature-tree-20261011'
-    needs: audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - name: 精确检出本PR已审计提交
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-          persist-credentials: true
-      - name: 同步存在性审计结果并再次核验
-        env:
-          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          python3 .github/scripts/sync-feature-tree.py
-          python3 .github/scripts/sync-feature-tree.py --check
-          python3 .github/scripts/check-feature-tree-sync.py
-          python3 .github/scripts/audit-feature-reality.py
-          python3 .github/scripts/audit-feature-reality.py --check
-          python3 .github/scripts/investigate-feature-existence.py
-          python3 .github/scripts/investigate-feature-existence.py --check
-          git diff --check
-          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
-            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
-            docs/FEATURE-REVIEW.auto.json docs/FEATURE-REALITY-AUDIT.auto.json \
-            docs/FEATURE-REALITY-AUDIT.zh-CN.md docs/ACCEPTANCE-MATRIX.json \
-            docs/FEATURE-EXISTENCE-AUDIT.auto.json docs/FEATURE-EXISTENCE-AUDIT.zh-CN.md
-          if git diff --cached --quiet; then
-            echo "存在性审计材料已同步"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "归档14项独立性结论和76项弱证据功能代码溯源"
-          git push origin HEAD:refs/heads/"$TARGET_BRANCH"
 
   maintain:
     name: 主线单一维护 PR
