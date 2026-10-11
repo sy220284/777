@@ -577,6 +577,51 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun unverifiedRelationDescriptionCannotBypassStageValidation() {
+        val previous = ChatCharacterState(relationshipState = "熟悉中",
+            dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val unverified = """{"state":{"relationshipState":"已经结婚",
+            "dynamics":{"stage":"COMMITTED"}},"turnSignificance":"MAJOR"}"""
+        val rejected = planner.parse(unverified, previous,
+            userMessage = "我们今天吃了饭", assistantMessage = "挺开心的")!!
+        assertEquals("FAMILIAR", rejected.state.dynamics.stage)
+        assertEquals("熟悉中", rejected.state.relationshipState)
+        val bypass = planner.parse("""{"state":{"relationshipState":"已经结婚"},
+            "stateEvidence":{"relationshipState":"我们今天吃了饭"},
+            "turnSignificance":"MAJOR"}""", previous,
+            userMessage = "我们今天吃了饭", assistantMessage = "挺开心的")!!
+        assertEquals("FAMILIAR", bypass.state.dynamics.stage)
+        assertEquals("熟悉中", bypass.state.relationshipState)
+        val ungrounded = planner.parse("""{"state":{"relationshipState":"相处变得更自在"},
+            "turnSignificance":"MINOR"}""", previous,
+            userMessage = "今天好热", assistantMessage = "嗯")!!
+        assertEquals("熟悉中", ungrounded.state.relationshipState)
+        val grounded = planner.parse("""{"state":{"relationshipState":"相处变得更自在"},
+            "stateEvidence":{"relationshipState":"我们相处变得更自在了"},
+            "turnSignificance":"MINOR"}""", previous,
+            userMessage = "我们相处变得更自在了", assistantMessage = "是啊")!!
+        assertEquals("相处变得更自在", grounded.state.relationshipState)
+        assertEquals("FAMILIAR", grounded.state.dynamics.stage)
+    }
+
+    @Test
+    fun acceptedRelationshipStageAndDescriptionShareTheSameSourcedTransition() {
+        val previous = ChatCharacterState(relationshipState = "熟悉中",
+            dynamics = RelationshipDynamics(stage = "FAMILIAR"))
+        val next = planner.parse("""{"state":{"dynamics":{"stage":"COMMITTED"},
+            "relationshipState":"随意描述"},
+            "stateEvidence":{"dynamics.stage":"我们确认关系，在一起了"},
+            "turnSignificance":"MAJOR"}""", previous,
+            userMessage = "我们确认关系，在一起了", assistantMessage = "好")!!.state
+        assertEquals("COMMITTED", next.dynamics.stage)
+        assertEquals("稳定关系", next.relationshipState)
+        val obs = next.stateObservations.associateBy { it.field }
+        assertEquals("FAMILIAR", obs["dynamics.stage"]?.previousValue)
+        assertEquals("COMMITTED", obs["dynamics.stage"]?.value)
+        assertEquals("熟悉中", obs["relationshipState"]?.previousValue)
+    }
+
+    @Test
     fun stageCannotJumpWithoutExplicitRelationshipEvidence() {
         val previous = ChatCharacterState(
             relationshipState = "熟悉中",
