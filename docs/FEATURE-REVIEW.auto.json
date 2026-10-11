@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "snapshot": "c01861f2ccb3",
+  "snapshot": "bf8f52dc4c82",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1351,
-  "production_sources_scanned": 789,
+  "code_files_scanned": 1363,
+  "production_sources_scanned": 788,
   "feature_nodes": 541,
   "functional_leaves": 444,
   "existing_executable_test_mappings": 128,
@@ -8989,22 +8989,27 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "a2b3463e41ed",
+    "baseline": "71bdded768ba",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeInstallation.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 1,
+  "source_verified_registrations": 0,
   "explicit_retirements": 0,
   "changes_applied": [],
-  "pending_changes": [],
+  "pending_changes": [
+    {
+      "id": "skills.minimax-official-bundles",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
+      "status": "待复核，未写入功能树",
+      "reason": "测试源码没有直接引用所登记的生产入口符号"
+    }
+  ],
   "obsolete_historical_evidence_count": 11,
   "obsolete_historical_evidence": [
     {
