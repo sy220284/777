@@ -145,6 +145,19 @@ internal fun LocalConversationComposer(
 
     fun submit() {
         if (temperatureWritePending) return
+        // Bare slash commands are aliases for the same explicit reply-suggestion action
+        // as the composer button; never inject a coaching instruction into character chat.
+        if (state.usageMode == LocalUsageMode.CHAT && !teamDispatchSelected &&
+            attachments.isEmpty() && input.trim() in setOf("/reply", "/回复建议") &&
+            replySuggestionsAvailable && !replySuggestionsLoading && !state.running
+        ) {
+            openReplySuggestions()
+            capabilityPanel = null
+            onInputChange("")
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            return
+        }
         // Sending is a conversation action, even when the model is not configured.
         // Let the send coordinator reject it with visible feedback and keep the draft.
         val result = if (teamDispatchSelected) {
