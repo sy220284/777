@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | MiniMax | M3 图像理解；M2.7 文本（以现有模型输入协议为准） | `image-01` 文生图；`MiniMax-Hailuo-2.3` 文生视频；`speech-2.8-hd` TTS；`asr-1.0` ASR | **图片、视频、配音、转写已接通**，保留官方模型专用适配 |
 | OpenAI | 官方支持的 GPT 聊天模型支持图像输入；原 `Responses image_generation` 工具独立保留 | `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 图片；`gpt-4o-mini-tts` 配音；`gpt-transcribe`、`gpt-4o-transcribe` 语音转文字 | **图片、配音、转写已接通**（官方 API Key；不包含 ChatGPT Plan OAuth） |
-| 阿里云 Qwen | `qwen3.8-*` 等输入图片的聊天能力按具体预置与兼容协议判断 | `qwen-image-3.0`、`qwen-image-plus` 文生图；万相 `wan2.7-t2v` 等视频模型 | **图片和 Wan 2.6 文生视频已接通**（图片走 OpenAI Images 兼容路径；视频走 DashScope 异步任务）；Wan 2.7 等其他版本尚未接通 |
+| 阿里云 Qwen | `qwen3.8-*` 等输入图片的聊天能力按具体预置与兼容协议判断 | `qwen-image-3.0`、`qwen-image-3.0-pro` 文生图；万相 `wan2.7-t2v` 等视频模型 | **图片和 Wan 2.6 文生视频已接通**（图片走 OpenAI Images 兼容路径；视频走 DashScope 异步任务）；Wan 2.7 等其他版本尚未接通 |
 | Google Gemini | 可支持图片／视频理解；777 当前聊天请求仍按其已编码协议判断 | `gemini-3.1-flash-image`、`gemini-2.5-flash-image` 文生图；`veo-3.1-generate-preview` 视频；`lyria-3.5` 音乐 | **图片已接通**（原生 `generateContent`）；Veo/Lyria 文档已支持但尚未接通 |
 | DeepSeek | 官方 `deepseek-flash` 支持图片输入理解；其他模型不可据此泛化 | 本轮未查证可直接调用的官方图片／视频／语音生成产品 API | **未接通创作**；保留图像理解，不伪装图片生成为已支持 |
 | Anthropic Claude | 官方 Vision 允许图片理解 | Claude Messages 的图像输入不是图像合成端点；不能由 Vision 自动派生创作能力 | **未接通创作**，保留已有 Vision |
@@ -55,3 +55,10 @@
 代码层含 `LocalMediaCatalogTest`：只有官方 HTTPS 账户与 API Key 才进入创作候选；验证套餐 OAuth 排除、不同凭据来源独立、模型 ID 精确校验、纯文本聊天模型仍可借同一账户调用独立创作产品、代理不可冒用官方创造力。
 
 尚无用户真实付费 API 账户、Android 16/17 的真实网络/媒体回归证据；本次代码级 CI 不等于四家创作接口端到端成功。真实验证前不将“已接通”写作“已成功生成”。
+
+
+## 2026-10-11 复查订正
+
+- 根据阿里云 2026-10-10 更新的 **Qwen-Image 3.0 OpenAI 兼容图片接口**，客户端目录只声明该接口明确支持的 `qwen-image-3.0`、`qwen-image-3.0-pro`。旧 `qwen-image-plus` 的生成能力需要独立核对旧版 DashScope API 与异步生命周期，不能使用 3.0 兼容端点和尺寸参数冒充已接通。
+- 各家 API 请求必须先确认业务错误字段，不能因 HTTP 200 判定成功。Gemini inlineData 图片须依据返回的 mimeType 保存和分享，不能强制用 PNG 扩展名。
+- 图像、语音生成/转写的同步等待不适用应用通用 30 秒网络超时，媒体传输拥有可取消的长耗时网络客户端。等待不会自动重试已经产生副作用的生成操作。
