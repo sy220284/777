@@ -897,6 +897,13 @@ def test():
             for filename, value in outputs.items():
                 (root / filename).write_text(value, encoding="utf-8")
 
+        (root / EVIDENCE).write_text(
+            "| 层级 | 功能完整路径 | 等级 | 来源 |\n"
+            "| 2 | A / 旧功能 | 具名源码入口已核（静态） | "
+            "[原入口 · Entry](https://github.com/example/repo/blob/abc/"
+            "app/src/main/java/sample/Feature.kt#L3) |\n",
+            encoding="utf-8"
+        )
         mark("A / 旧功能")
         write_outputs(generate(root))
         assert json.loads((root / REG).read_text(encoding="utf-8"))["nodes"][0]["source"].endswith("Feature.kt")
