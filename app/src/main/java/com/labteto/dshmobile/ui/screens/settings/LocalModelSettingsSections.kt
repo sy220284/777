@@ -46,6 +46,8 @@ import com.labteto.dshmobile.local.model.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalMediaCatalog
+import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
@@ -184,6 +186,23 @@ internal fun LocalModelSettingsCard(
                         ModelCapabilityTags(
                             LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
                         )
+                        val creatorKinds = LocalMediaCatalog.offers(listOf(profile)).map { it.kind }.distinct()
+                        if (creatorKinds.isNotEmpty()) {
+                            val creativeLabels = mapOf(
+                                LocalMediaKind.IMAGE to stringResource(R.string.media_studio_capability_image),
+                                LocalMediaKind.VIDEO to stringResource(R.string.media_studio_capability_video),
+                                LocalMediaKind.SPEECH to stringResource(R.string.media_studio_capability_speech),
+                                LocalMediaKind.TRANSCRIBE to stringResource(R.string.media_studio_capability_transcribe),
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.media_studio_model_capabilities,
+                                    creatorKinds.joinToString(" · ") { kind -> creativeLabels.getValue(kind) },
+                                ),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                        }
                     }
                     DsMenu(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,

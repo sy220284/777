@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,14 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
     private val json: Json,
     @ApplicationContext private val context: Context,
 ) {
+    // Media providers may spend minutes generating an image or transcoding audio.
+    // An idle-read timeout remains, but never use the app-wide 30s short-request policy.
+    private val mediaHttp = http.newBuilder()
+        .readTimeout(10, TimeUnit.MINUTES)
+        .writeTimeout(2, TimeUnit.MINUTES)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .build()
+
     suspend fun generateImage(profile: LocalModelProfile, prompt: String, ratio: String): String {
         require(prompt.isNotBlank()) { "请填写图片内容" }
         require(ratio in setOf("1:1", "16:9", "9:16", "4:3", "3:4")) { "不支持的图片比例" }
@@ -98,7 +107,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             audio[i] = ((high shl 4) or low).toByte()
         }
         return withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "minimax-media").apply { mkdirs() }
+            val dir = File(context.filesDir, "media-studio").apply { mkdirs() }
             val file = File(dir, "voice-${UUID.randomUUID()}.mp3")
             file.writeBytes(audio)
             file
@@ -175,7 +184,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             "视频任务编号无效"
         }
         val root = requestJson(profile, "/v1/query/video_generation?task_id=$taskId")
-        val state = root["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val state = normalizeMiniMaxVideoState(root["status"]?.jsonPrimitive?.contentOrNull.orEmpty())
         when (state) {
             "Queueing", "Processing" -> return MiniMaxVideoStatus(state)
             "Failed" -> return MiniMaxVideoStatus("Failed")
@@ -215,7 +224,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             .header("Authorization", "Bearer $credential")
             .header("Accept", "application/json")
         val request = (if (body == null) builder.get() else builder.post(body)).build()
-        withCancellableHttpResponse(http.newCall(request)) { response ->
+        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
             if (!response.isSuccessful) error("MiniMax 多模态请求失败（HTTP ${response.code}）")
             val raw = response.body?.string() ?: error("MiniMax 未返回数据")
             check(raw.length <= MAX_JSON_RESPONSE_CHARS) { "MiniMax 响应体超过安全读取上限" }
@@ -230,4 +239,12 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
         const val MAX_AUDIO_HEX_CHARS = 40 * 1024 * 1024
         const val MAX_JSON_RESPONSE_CHARS = 45 * 1024 * 1024
     }
+}
+
+/** MiniMax raw wire enum is Preparing/Queueing/Processing/Success/Fail, not Failed. */
+internal fun normalizeMiniMaxVideoState(state: String): String = when (state) {
+    "Preparing", "Queueing" -> "Queueing"
+    "Processing", "Success" -> state
+    "Fail" -> "Failed"
+    else -> error("MiniMax 返回未知视频任务状态：$state")
 }

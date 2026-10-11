@@ -2,6 +2,14 @@
   "version": 1,
   "nodes": [
     {
+      "id": "skills.minimax-official-bundles",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalSkillManager.kt",
+      "entry": "LocalSkillStore",
+      "owner": "TOOLS",
+      "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"
+    },
+    {
       "id": "settings.minimax.quota",
       "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",

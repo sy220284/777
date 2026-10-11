@@ -2068,5 +2068,35 @@
     <string name="minimax_media_select_voice">选择官方音色</string>
     <string name="minimax_media_filter_voice">搜索音色名称或编号</string>
     <string name="minimax_media_no_voices">当前账户未返回可选音色，可继续输入音色编号。</string>
+    <string name="media_studio_title">多模态创作</string>
+    <string name="media_studio_entry">多模态创作</string>
+    <string name="media_studio_notice">创作模型与聊天模型独立选择；不同服务商按各自 API 配额或账单计费。</string>
+    <string name="media_studio_no_model">当前没有为此功能接入可用的创作模型。请在设置中配置受支持的官方账户。</string>
+    <string name="media_studio_selected_model">%1$s · %2$s</string>
+    <string name="media_studio_share">分享／保存生成文件</string>
+    <string name="media_studio_share_image">分享／保存生成图片</string>
+    <string name="media_studio_model_capabilities">已接入创作接口：%1$s（账户权限以实际调用为准）</string>
+    <string name="media_studio_view_image">查看生成图片</string>
+    <string name="media_studio_previous_video_tasks">当前模型已提交的视频任务</string>
+    <string name="media_studio_video_submitting">正在向服务商提交生成任务，请勿重复操作</string>
+    <string name="media_studio_video_unknown">提交结果未确认：可能已经产生费用，请先核实服务商后台，不要盲目重试</string>
+    <string name="media_studio_history">最近创作成果（%1$d）</string>
+    <string name="media_studio_temporary_links_notice">本机文件可长期查看和分享；服务商生成链接可能过期，请及时自行保存。</string>
+    <string name="media_studio_history_item">%1$s · %2$s · %3$s</string>
+    <string name="media_studio_view_result">查看</string>
+    <string name="media_studio_open_temporary_link">打开临时链接</string>
+    <string name="media_studio_result_missing">本机文件已不存在</string>
+    <string name="media_studio_delete_record">删除</string>
+    <string name="media_studio_confirm_delete">确定删除这项成果？本机文件会一并删除。</string>
+    <string name="media_studio_delete_confirm">确认删除</string>
+    <string name="media_studio_delete_cancel">取消</string>
+    <string name="media_studio_video_archive">视频生成任务档案（%1$d）</string>
+    <string name="media_studio_video_account_unavailable">原创作账户未配置或身份已变化；任务保留在本机，但不能用其他账户查询。</string>
+    <string name="media_studio_capability_image">图片生成</string>
+    <string name="media_studio_capability_video">视频生成</string>
+    <string name="media_studio_capability_speech">语音合成</string>
+    <string name="media_studio_capability_transcribe">录音转写</string>
+    <string name="media_studio_kind_speech">语音</string>
+    <string name="media_studio_kind_image">图片</string>
 </resources>
 
