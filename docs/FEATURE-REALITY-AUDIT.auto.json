@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "4904f0bd9e5c",
+  "source_snapshot": "7a6e6bc94dd0",
   "tree": {
     "nodes_excluding_root": 541,
     "leaf_descriptions": 444,
@@ -95,6 +95,26 @@
     "compose_named_screens": 10,
     "compose_support_components": 1,
     "registered_builtin_tools": [
+      {
+        "provider": "automation",
+        "name": "cancel_scheduled_task",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt"
+      },
+      {
+        "provider": "automation",
+        "name": "schedule_recurring_task",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt"
+      },
+      {
+        "provider": "automation",
+        "name": "schedule_task",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt"
+      },
+      {
+        "provider": "automation",
+        "name": "scheduled_task_list",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt"
+      },
       {
         "provider": "device",
         "name": "android_app_info",
@@ -266,6 +286,326 @@
         "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/github/GitHubConnectorPlugin.kt"
       },
       {
+        "provider": "local_builtin_catalog",
+        "name": "apply_patch",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "ask_user_question",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "bash",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "capability_search",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "create_goal",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "download_file",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "edit",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "environment_info",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "exit_plan_mode",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "file_inspect",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "get_goal",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "glob",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "grep",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "http_request",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "interrupt_agent",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "job_kill",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "job_list",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "job_output",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "json_query",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "list_agents",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "list_files",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "list_subagent_models",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "memory_forget",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "memory_list",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "memory_remember",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "memory_search",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "memory_update",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "network_diagnose",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "present",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "read",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "send_message",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "session_event_read",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "session_event_search",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "session_event_trace",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "session_search",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "session_trace",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "skill",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "subagent",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "subagent_fork",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_create_member",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_disable_member",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_dismiss_member",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_interrupt",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_member_status",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_members",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_messages",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_send_message",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_spawn",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_start_member",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_stop_all",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_task_create",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_task_get",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_task_list",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_task_update",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_wait",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "team_wait_for_message",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "todo_write",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "tool_output_read",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "update_goal",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "update_plan",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "web_fetch",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "web_search",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "workflow",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
+        "provider": "local_builtin_catalog",
+        "name": "write",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"
+      },
+      {
         "provider": "lsp",
         "name": "lsp_definition",
         "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
@@ -311,6 +651,31 @@
         "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt"
       },
       {
+        "provider": "mcp_management",
+        "name": "mcp_disconnect",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
+        "provider": "mcp_management",
+        "name": "mcp_http_connect",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
+        "provider": "mcp_management",
+        "name": "mcp_reconnect",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
+        "provider": "mcp_management",
+        "name": "mcp_server_list",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
+        "provider": "mcp_management",
+        "name": "mcp_stdio_connect",
+        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
+      },
+      {
         "provider": "runtime",
         "name": "process_exec",
         "source": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
@@ -344,14 +709,64 @@
         "provider": "runtime",
         "name": "terminal_write",
         "source": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt"
+      },
+      {
+        "provider": "vision",
+        "name": "vision_analyze_file",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      },
+      {
+        "provider": "vision",
+        "name": "vision_analyze_screen",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      },
+      {
+        "provider": "vision",
+        "name": "vision_analyze_vscreen",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      },
+      {
+        "provider": "vision",
+        "name": "vision_status",
+        "source": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
+      },
+      {
+        "provider": "webhook",
+        "name": "webhook_copy_token",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
+      },
+      {
+        "provider": "webhook",
+        "name": "webhook_rotate_token",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
+      },
+      {
+        "provider": "webhook",
+        "name": "webhook_start",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
+      },
+      {
+        "provider": "webhook",
+        "name": "webhook_status",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
+      },
+      {
+        "provider": "webhook",
+        "name": "webhook_stop",
+        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
       }
     ],
-    "builtin_tool_count": 50,
+    "builtin_tool_count": 132,
     "plugin_counts": {
+      "automation": 4,
       "device": 31,
       "github": 3,
+      "local_builtin_catalog": 64,
       "lsp": 9,
-      "runtime": 7
+      "mcp_management": 5,
+      "runtime": 7,
+      "vision": 4,
+      "webhook": 5
     },
     "production_harness_plugin_implementations": [
       {
@@ -392,29 +807,8 @@
       }
     ],
     "plugin_implementation_count": 9,
-    "other_plugin_implementations_not_tool_enumerated": [
-      {
-        "class": "AutomationPlugin",
-        "source": "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt"
-      },
-      {
-        "class": "WebhookPlugin",
-        "source": "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt"
-      },
-      {
-        "class": "LocalBuiltinPlugin",
-        "source": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt"
-      },
-      {
-        "class": "LocalVisionPlugin",
-        "source": "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt"
-      },
-      {
-        "class": "McpToolBridgePlugin",
-        "source": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt"
-      }
-    ],
-    "enumeration_scope": "Four explicit tool registration providers only; other internal/static or dynamic tool providers are not counted",
+    "other_plugin_implementations_not_tool_enumerated": [],
+    "enumeration_scope": "Nine actual HarnessPlugin implementations: eight direct/static registration sites and the LocalBuiltinPlugin->LocalToolCatalog spec catalog; dynamically obtained MCP remote tools excluded",
     "third_party_dynamic_mcp_tools_not_included": true
   },
   "tests": {
