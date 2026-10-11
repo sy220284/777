@@ -164,7 +164,6 @@ internal fun LocalConversationSurface(
     onSelectGalleryPersona: (String) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
     onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
-    onGenerateGroupAnnouncement: suspend (String) -> Result<String>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
     onApprove: (String) -> Unit,
@@ -1016,7 +1015,6 @@ internal fun LocalConversationSurface(
             announcement = state.groupChat.announcement,
             enabled = !state.running,
             onSave = onSaveGroupAnnouncement,
-            onGenerate = onGenerateGroupAnnouncement,
             onDismiss = { showGroupAnnouncement = false },
         )
     }

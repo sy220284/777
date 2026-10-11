@@ -97,7 +97,6 @@ internal fun localShellFeatureUiContribution(
             onSelectGalleryPersona = actions.selectGalleryPersona,
             onAutoFillChatPersona = actions.autoFillChatPersona,
             onSaveGroupAnnouncement = actions.saveGroupAnnouncement,
-            onGenerateGroupAnnouncement = actions.generateGroupAnnouncement,
             onUndoPersonaCorrection = actions.undoPersonaCorrection,
             onPlanModeChange = actions.setPlanMode,
             onApprove = actions.approve,
