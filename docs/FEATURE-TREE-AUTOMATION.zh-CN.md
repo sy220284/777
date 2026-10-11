@@ -1,36 +1,44 @@
-# 功能树自动维护
+# 功能树自动维护与复核
 
-## 实际效果
+## 工作方式
 
-GitHub Actions 的「自动维护功能树」在 main 每次更新、每日定时与手动触发时扫描仓库中所有已识别的代码、构建与工作流文件，并单独分析全部生产 Kotlin/Java 源文件，不依赖 PR 标题或说明。无差异时不产生提交；有差异时先完成验证，再自动创建或更新固定的单一维护 PR。工作流不会绕过现有分支保护，也不会向 main 追加可能影响同 SHA 发布门禁的未经验证提交。合并仍遵循仓库原有 CI 规则。
+GitHub Actions「自动维护功能树」在 `main` 更新、定时任务、手动触发和 PR 时扫描全仓库代码/配置文件，分别清点生产 Kotlin/Java、测试、路由、可见界面与工作流。不依赖 PR 描述推断产品能力。
 
-维护产物：
-- FEATURE-TREE.zh-CN.md：中文产品功能树（沿用现有树的人工核对层级）；
-- FEATURE-TREE.zh-CN.html：交互式功能树（节点、层级、证据入口与 Markdown 同步）；
-- ACCEPTANCE-MATRIX.json：已存在的真实测试映射，随登记的功能改名、迁移、删除正确移动或清除，不虚构测试；
-- FEATURE-TREE-SOURCE-REGISTRY.json：有稳定 ID 的源码功能登记快照，支持识别消失和重组；
-- FEATURE-SOURCE-INDEX.auto.json：全仓库代码及测试代码数量、工作流文件清单、生产源码数量、已注册的本机路由、界面候选及登记数量。
+执行顺序：**全量扫描 → 不写文件的预览与候选分类 → 符号/归属/测试证据复核 → 刷新中文功能树与交互视图 → 独立复核 → 创建或更新单一维护 PR**。复核失败不得提交。PR 上的扫描生成可下载的 Actions 检查产物；已有分支内的实际代码与当前主线需独立核实。自动维护操作不得直接绕开主线合并和发布门禁。
 
-## 自动识别能力及边界
+持续维护文件：
+- `FEATURE-TREE.zh-CN.md`：中文功能树。
+- `FEATURE-TREE.zh-CN.html`：同层级交互树，对有直接测试引用的节点标记“局部测试证据”，不作全部验收承诺。
+- `FEATURE-SOURCE-INDEX.auto.json`：扫描范围、路由、界面候选与源码内容指纹。
+- `FEATURE-REVIEW.auto.json`：**每个末级功能的证据级别**、批准的变更、待确认变更及验证边界。
+- `FEATURE-TREE-SOURCE-REGISTRY.json`：已复核的稳定功能身份和源码证据。
+- `ACCEPTANCE-MATRIX.json`：仅记录已存在的实际测试证据；移动功能时对齐路径，不新增虚构测试。
 
-**明确登记的产品功能**可以自动新增、删除、改名、移动父级及跨模块重组。在对应 Kotlin/Java 生产源码中添加独立一行注释：
+## 什么条件才可自动确认功能
 
-    // FEATURE_TREE: {"id":"chat.diary.revise","path":"第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 日记纠正"}
+扫描器不会根据文件名、类名、文案相似度或模型猜测来删除/新增业务功能。只有源码明确登记、**同时通过独立证据核查**的功能变化才会写入树。例如对应生产入口附近使用：
 
-- id 作为稳定身份，改名和迁移时不变；只修改 path 即可自动迁移旧节点，同时迁移该节点原有的真实验收映射。
-- 首次接管现有无登记的节点，并同时改名时，可额外提供 previous_path 字段，值为旧完整功能路径。自动移动旧节点，避免重复。
-- 源码中首次出现新的 id 时自动增加对应层级；删除该声明后，下一次扫描自动删除对应叶节点。含子功能的父节点不能直接删除，以免连带丢失能力。
-- 源码文件更名或迁移且仍携带同一标识时，自动刷新交互树中的源码位置。
-- 删除实际 Kotlin 函数但保留注释，会导致功能登记未更新；此工作流**不能据此宣称功能有效**。实现开发时应使登记与实际运行入口同生命周期。
+```kotlin
+// FEATURE_TREE: {"id":"chat.diary.revise","path":"第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 日记纠正","entry":"reviseDiary","owner":"CHAT","test":"app/src/test/java/example/DiaryTest.kt#reviseDiaryWorks"}
+```
 
-**未显式登记的旧节点**继续完整保留；扫描器只收集其他源码的路由、界面候选变化，不能根据类名、字符串或单个文件删除就断言用户功能已经不存在或已交付。需要产品语义判断的新增、拆分、合并、行为优化，仍须由修改代码的 Agent 在真实实现入口维护登记。工作流负责实际生成与同步两份树、来源登记和证据索引，无须再逐份手改功能树。
+上面仅是字段格式示意，路径及方法必须在对应仓库中实际存在才会获准。检查要求：稳定唯一 `id`；`path` 末级必须是中文名称；`entry` 必须为当前生产源码的真实声明；`owner` 必须归属七个架构业务模块；`test` 必须指向实际存在的 Kotlin `@Test` 方法且引用对应入口。
 
-## 检验与恢复
+身份未变而 `path` 改变时，自动移动/改名并迁移已有验收索引。首次接管旧节点并同时重命名时，可注明 `previous_path`。已确认的功能退役需在仍存留的生产源码中声明 `action: "retire"`、原 `id` 和 `path`，以及中文 `reason`；仅删除文件或登记会保留旧节点并报告“待复核”，避免误删。
 
-可执行命令：
-- python3 .github/scripts/sync-feature-tree.py --self-test ：验证基础解析与安全删除规则。
-- python3 .github/scripts/sync-feature-tree.py ：扫描与同步。
-- python3 .github/scripts/sync-feature-tree.py --check ：只检查产物是否需要同步，存在差异时失败。
-- python3 .github/scripts/check-acceptance-matrix.py ：确保自动迁移后的测试引用仍真实存在。
+**重要区别：通过这些检查，只能证明源码声明、功能归属与测试引用有一致证据，仍无法证明功能实际效果、启动链路、设备交互和所有异常恢复均已完成验收。** 未登记的历史功能保持原有层级；源代码尚无法自动确定的变化只列候选。
 
-扫描器不会因推测删除既有旧节点，也不会把文件名匹配当成用户已可用的功能。CI 与真实设备验收仍依据 VALIDATION.md。
+## 本地/CI 校验
+
+```bash
+python3 .github/scripts/sync-feature-tree.py --self-test
+python3 .github/scripts/sync-feature-tree.py --preview
+python3 .github/scripts/sync-feature-tree.py
+python3 .github/scripts/sync-feature-tree.py --check
+python3 .github/scripts/check-feature-tree-sync.py
+python3 .github/scripts/check-acceptance-matrix.py
+```
+
+预览不会修改文件；后续同步必须执行双视图、全量文件数量、稳定内容指纹、逐叶证据和已有测试方法验证。检查过程有任何缺口就拒绝提交。生成文档的提交本身不会改变实际产品代码；仓库 CI 与真机验收仍按 `VALIDATION.md` 执行。
+
+源码内容指纹是确定性的，不受仅修改生成文档所造成的 Git SHA 变化影响。功能变化必须在修改它的同一个 PR 中同步核对，不能依赖下一次定时任务补漏。
