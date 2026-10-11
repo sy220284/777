@@ -38,11 +38,6 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         val value = state[name] ?: return
         if (value !is JsonPrimitive || !value.isString) state.remove(name)
     }
-    fun integer(name: String) {
-        val value = state[name] ?: return
-        val parsed = (value as? JsonPrimitive)?.intOrNull
-        if (parsed == null) state.remove(name) else state[name] = JsonPrimitive(parsed)
-    }
     fun strings(name: String) {
         val value = state[name] ?: return
         val list = value as? JsonArray
