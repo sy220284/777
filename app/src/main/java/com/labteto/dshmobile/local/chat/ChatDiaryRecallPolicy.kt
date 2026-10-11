@@ -63,6 +63,11 @@ internal fun isHistoricalDiaryRecall(query: String): Boolean {
 @Suppress("UNUSED_PARAMETER")
 internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boolean): String =
     buildString {
+        appendLine("- 记忆背景：${when (entry.disclosure) {
+            ChatDiaryDisclosure.PRIVATE -> "用户明确要求保密的经历"
+            ChatDiaryDisclosure.SHAREABLE -> "当前人物的私人经历，尚未在群聊公开"
+            ChatDiaryDisclosure.PUBLIC -> "已公开或用户已允许公开的经历"
+        }}")
         appendLine("- 事件：${entry.event}")
         entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
         entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
@@ -72,7 +77,7 @@ internal fun renderRecalledChatDiary(entry: ChatDiaryEntry, groupAudience: Boole
 
 internal fun diaryRecallUsageInstruction(groupAudience: Boolean): String =
     if (groupAudience) {
-        "这些是当前人物自己的经历和感受，已按当前问题关联性选取。只在自然相关且符合人物意愿时提及；想起并不等于一定说出来。其他成员不会自动获得此人物的完整记忆，也不能当作自己的亲历；他们只能听到实际说出口的话。已取消、改期、结束或修正的旧版本不得作为当前有效事实回潮."
+        "这些是当前人物自己的经历和感受，其中的猜测属于人物主观认识。其他成员的所知以实际公开发言和事件为准。已取消、改期、结束或修正的旧版本属于历史。"
     } else {
         "这些日记属于当前角色自己的经历与内在记忆。当前有效版本优先；被后续取消、改期、结束或修正的旧版本不得当成当前状态回潮，除非用户明确追问以前/原来/最开始。"
     }
