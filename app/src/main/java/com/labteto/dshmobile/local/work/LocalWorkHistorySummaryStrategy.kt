@@ -78,19 +78,29 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             message["role"].asText() == "user" &&
                 (messageText(message)?.let(::isExplicitWorkDecisionReset) == true)
         }
+        val lastConstraintReset = extractionMessages.indexOfLast { message ->
+            message["role"].asText() == "user" &&
+                (messageText(message)?.let(::isExplicitWorkConstraintReset) == true)
+        }
 
         fun select(
             role: String? = null,
             cues: Set<String>? = null,
             maxItems: Int,
             decisionsAfterResetOnly: Boolean = false,
-        ): List<String> = (if (decisionsAfterResetOnly && lastDecisionReset >= 0)
-            extractionMessages.drop(lastDecisionReset) else extractionMessages).asReversed()
+            constraintsAfterResetOnly: Boolean = false,
+            explicitDecisionOnly: Boolean = false,
+        ): List<String> = (when {
+            decisionsAfterResetOnly && lastDecisionReset >= 0 -> extractionMessages.drop(lastDecisionReset)
+            constraintsAfterResetOnly && lastConstraintReset >= 0 -> extractionMessages.drop(lastConstraintReset)
+            else -> extractionMessages
+        }).asReversed()
             .asSequence()
             .filter { role == null || it["role"].asText() == role }
             .mapNotNull(::messageText)
             .map(::normalize)
             .filter(String::isNotBlank)
+            .filter { text -> !explicitDecisionOnly || isExplicitUserWorkDecision(text) }
             .filter { text -> cues == null || text.containsAnyCue(cues) }
             .filter { used.add(it) }
             .take(maxItems)
@@ -113,9 +123,24 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
         // carried forward so repeated compaction cannot silently forget still-valid constraints,
         // decisions or known failed approaches. Keyword extraction remains a bounded fallback for
         // history that predates the structured state.
+        val previousConstraintEpoch = previousCheckpoint?.constraintEpoch ?: 0L
+        val observedConstraintEpoch = structuredWorkState?.constraintEpoch ?: 0L
+        val constraintReset = observedConstraintEpoch > previousConstraintEpoch ||
+            (observedConstraintEpoch == 0L && lastConstraintReset >= 0)
+        val constraintEpoch = when {
+            observedConstraintEpoch > previousConstraintEpoch -> observedConstraintEpoch
+            constraintReset -> previousConstraintEpoch + 1L
+            else -> previousConstraintEpoch
+        }
+        // Explicit revocation invalidates the *old* checkpoint. It must not become valid
+        // again merely because a second compaction no longer sees the revocation text.
         val constraints = mergeStructured(
-            structuredWorkState?.constraints.orEmpty() + previousCheckpoint?.constraints.orEmpty(),
-            select(cues = WORK_CONSTRAINT_CUES, maxItems = 6),
+            structuredWorkState?.constraints.orEmpty() +
+                if (constraintReset) emptyList() else previousCheckpoint?.constraints.orEmpty(),
+            if (constraintReset && lastConstraintReset < 0) emptyList() else
+                select(role = "user", cues = WORK_CONSTRAINT_CUES, maxItems = 6,
+                    constraintsAfterResetOnly = true)
+                    .filterNot { isExplicitWorkConstraintReset(it) && !hasNewWorkConstraintAfterReset(it) },
             maxItems = 8,
         )
         val failures = mergeStructured(
@@ -132,14 +157,16 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             explicitReset -> previousDecisionEpoch + 1L
             else -> previousDecisionEpoch
         }
+        val previousVerifiedDecisions = previousCheckpoint?.takeIf { it.userDecisionsVerified }?.decisions.orEmpty()
         val decisions = mergeStructured(
             structuredWorkState?.decisions.orEmpty() +
-                if (explicitReset) emptyList() else previousCheckpoint?.decisions.orEmpty(),
+                if (explicitReset) emptyList() else previousVerifiedDecisions,
             // The reset can still be in the live causal tail while all pre-reset decisions
             // sit in the compacted region. In that case none of those fallback messages may
             // reinstate the revoked plan, even if the reset text is absent from this slice.
             if (explicitReset && lastDecisionReset < 0) emptyList() else
-                select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
+                select(role = "user", cues = WORK_DECISION_CUES, maxItems = 4,
+                    decisionsAfterResetOnly = true, explicitDecisionOnly = true),
             maxItems = 6,
         )
         // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
@@ -160,8 +187,12 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             unfinishedFallback,
             maxItems = 8,
         )
+        val unverifiedPriorDecisions = if (!explicitReset && previousCheckpoint?.userDecisionsVerified == false) {
+            previousCheckpoint.decisions.take(3).map { "历史未核验方案（仅供参考，不得当作用户确认）：$it" }
+        } else emptyList()
         val progress = mergeStructured(
-            structuredWorkState?.progress.orEmpty() + previousCheckpoint?.progress.orEmpty(),
+            structuredWorkState?.progress.orEmpty() + previousCheckpoint?.progress.orEmpty() +
+                unverifiedPriorDecisions,
             select(role = "assistant", maxItems = 3),
             maxItems = 8,
         )
@@ -201,6 +232,8 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             constraints = constraints,
             decisions = decisions,
             decisionEpoch = decisionEpoch,
+            constraintEpoch = constraintEpoch,
+            userDecisionsVerified = true,
             failures = failures,
             unfinished = unfinished,
             progress = progress,
