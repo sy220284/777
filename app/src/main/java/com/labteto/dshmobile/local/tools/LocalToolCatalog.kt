@@ -181,7 +181,10 @@ object LocalToolCatalog {
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
-        add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
+        add(tool("list_subagent_models", "查看本机所有模型配置、凭据就绪状态、协议、模型能力及可用的子代理 profileId；可选向官方服务商查询该账户的模型目录，密钥始终由应用代管且不会输出", properties(
+            "include_provider_models" to boolean("是否使用已保存凭据查询指定服务商官方 /models 接口；默认 false，不会在普通清单请求时联网"),
+            "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),
+        )))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
         add(tool("send_message", "向后台代理追加消息；可继续的持久子代理即使已完成或因进程中断，也会先持久排队并安全恢复同一身份", properties(
             "agent_id" to string("后台代理编号"),
