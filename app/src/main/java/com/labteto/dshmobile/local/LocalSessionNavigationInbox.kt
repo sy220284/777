@@ -1,0 +1,19 @@
+package com.labteto.dshmobile.local
+
+import java.util.concurrent.atomic.AtomicReference
+
+/** Latest tap wins across the mode tabs and conversation history. */
+internal sealed interface LocalSessionNavigationRequest {
+    data class Mode(val value: LocalUsageMode) : LocalSessionNavigationRequest
+    data class Session(val id: String) : LocalSessionNavigationRequest
+}
+
+internal class LocalSessionNavigationInbox {
+    private val latest = AtomicReference<LocalSessionNavigationRequest?>(null)
+    fun offer(request: LocalSessionNavigationRequest) { latest.set(request) }
+    fun take(): LocalSessionNavigationRequest? = latest.getAndSet(null)
+    fun clear() { latest.set(null) }
+    fun offerIfEmpty(request: LocalSessionNavigationRequest) {
+        latest.compareAndSet(null, request)
+    }
+}
