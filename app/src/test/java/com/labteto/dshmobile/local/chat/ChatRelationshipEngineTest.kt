@@ -334,6 +334,23 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun analysisOfQuotedIntimacyDoesNotBecomeAnIntimateActionRequest() {
+        listOf(
+            "她说亲我一下是什么意思？",
+            "帮我分析一下她说亲我一下",
+            "分析一下这句过来抱住我",
+            "她让我亲她一下，这该怎么判断？",
+        ).forEach { input ->
+            assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent(input))
+            assertEquals(0, nextInteractionIntensity(input))
+        }
+        assertEquals(
+            ChatInteractionIntent.INTIMATE,
+            classifyExplicitInteractionIntent("别分析了，过来亲我一下"),
+        )
+    }
+
+    @Test
     fun interactionIntentAvoidsKeywordFalsePositives() {
         assertEquals(
             ChatInteractionIntent.NORMAL,
