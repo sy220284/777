@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.work
 
 import kotlinx.coroutines.CompletableDeferred
+import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.local.model.LocalToolCall
+import kotlinx.serialization.json.JsonObject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +32,16 @@ class LocalWorkModelSteeringTest {
         revision.value = 1L
         assertEquals(LocalWorkSamplingOutcome.Steered, sampling.await())
         assertTrue(cancelled.isCompleted)
+    }
+
+    @Test
+    fun staleUnstartedToolIsSkippedWithoutAnyClaimedSideEffect() {
+        val call = LocalToolCall("call-old", "write", JsonObject(emptyMap()), "{}")
+        val result = workSteeredToolResult(call)
+        assertTrue(result.isError)
+        assertEquals("WORK_TOOL_SUPERSEDED", result.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertEquals(false, result.retryable)
     }
 
     @Test
