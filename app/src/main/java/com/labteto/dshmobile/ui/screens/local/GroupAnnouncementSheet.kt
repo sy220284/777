@@ -92,12 +92,9 @@ internal fun GroupAnnouncementSheet(
     announcement: String,
     enabled: Boolean,
     onSave: suspend (String) -> Result<Unit>,
-    onGenerate: suspend (String) -> Result<String>,
     onDismiss: () -> Unit,
 ) {
     var draft by rememberSaveable(sessionId) { mutableStateOf(announcement) }
-    var direction by rememberSaveable(sessionId) { mutableStateOf("") }
-    var generating by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -115,44 +112,7 @@ internal fun GroupAnnouncementSheet(
             label = { Text(stringResource(R.string.local_group_announcement_content)) },
             minLines = 4,
             maxLines = 9,
-            enabled = enabled && !generating && !saving,
-        )
-        DsTextField(
-            value = direction,
-            onValueChange = { direction = it.take(500) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.local_group_announcement_direction)) },
-            placeholder = { Text(stringResource(R.string.local_group_announcement_direction_hint)) },
-            enabled = enabled && !generating && !saving,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(
-                text = stringResource(R.string.local_group_announcement_drama),
-                onClick = { direction = "修罗场：几人因为同一件事产生互相矛盾的期待，秘密即将被揭开" },
-                enabled = enabled && !generating && !saving,
-                variant = DsButtonVariant.Outline,
-            )
-            DsButton(
-                text = stringResource(R.string.local_group_announcement_mystery),
-                onClick = { direction = "悬疑对峙：有人隐瞒关键线索，众人必须当场作出选择" },
-                enabled = enabled && !generating && !saving,
-                variant = DsButtonVariant.Outline,
-            )
-        }
-        DsButton(
-            text = stringResource(R.string.local_group_announcement_generate),
-            onClick = {
-                generating = true
-                error = null
-                scope.launch {
-                    onGenerate(direction).onSuccess { draft = it }
-                        .onFailure { error = it.message }
-                    generating = false
-                }
-            },
-            enabled = enabled && !generating && !saving,
-            modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
+            enabled = enabled && !saving,
         )
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
         DsButton(
@@ -173,7 +133,7 @@ internal fun GroupAnnouncementSheet(
                     saving = false
                 }
             },
-            enabled = enabled && !generating && !saving && draft != announcement,
+            enabled = enabled && !saving && draft != announcement,
             modifier = Modifier.fillMaxWidth(),
         )
     }

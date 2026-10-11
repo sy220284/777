@@ -243,8 +243,6 @@ class LocalHarnessViewModel @Inject constructor(
     }
     suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
 
-    suspend fun generateGroupChatAnnouncement(direction: String): Result<String> =
-        chatModelAssistController.generateGroupAnnouncement(direction)
     suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
         val result = withContext(Dispatchers.IO) {
             when (state.value.usageMode) {
@@ -301,11 +299,6 @@ class LocalHarnessViewModel @Inject constructor(
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
     internal suspend fun startBackgroundAgent(task: String): LocalWorkUiActionResult {
         val result = runtime.work.startBackgroundAgentForUi(task)
-        return LocalWorkUiActionResult(result.accepted, result.message)
-    }
-
-    internal suspend fun startResearchAgent(task: String): LocalWorkUiActionResult {
-        val result = runtime.work.startResearchAgentForUi(task)
         return LocalWorkUiActionResult(result.accepted, result.message)
     }
 

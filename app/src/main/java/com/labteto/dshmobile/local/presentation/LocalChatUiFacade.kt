@@ -5,8 +5,6 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.visibleStoryStages
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.GroupAnnouncementService
-import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -27,7 +25,6 @@ class LocalChatUiFacade @Inject constructor(
     private val gallery: ChatPersonaGalleryStore,
     private val autoFill: PersonaAutoFillService,
     private val inspection: PersonaInspectionService,
-    private val announcement: GroupAnnouncementService,
 ) {
     internal fun galleryEntries(): List<PersonaGalleryEntry> = gallery.list()
 
@@ -85,12 +82,4 @@ class LocalChatUiFacade @Inject constructor(
         chatContext?.storyStage.orEmpty(), chatContext?.visibleStoryStages().orEmpty(),
     )
 
-    internal suspend fun generateGroupAnnouncement(
-        model: String,
-        baseUrl: String,
-        profileId: String?,
-        members: List<LocalGroupChatMember>,
-        direction: String,
-        current: String,
-    ): String = announcement.generate(model, baseUrl, profileId, members, direction, current)
 }

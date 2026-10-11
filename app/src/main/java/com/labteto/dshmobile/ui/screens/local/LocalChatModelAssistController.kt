@@ -15,30 +15,6 @@ internal class LocalChatModelAssistController(
 ) {
     private val state = runtime.state
 
-    suspend fun generateGroupAnnouncement(direction: String): Result<String> =
-        try {
-            val snapshot = state.value
-            check(!snapshot.loading && !snapshot.kernel.running && snapshot.chat.groupChat.enabled) {
-                "请在群聊空闲时生成公告"
-            }
-            check(snapshot.modelState.configured) { "请先配置聊天模型" }
-            check(snapshot.chat.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
-            Result.success(
-                chatUi.generateGroupAnnouncement(
-                    model = snapshot.modelState.model,
-                    baseUrl = snapshot.modelState.baseUrl,
-                    profileId = snapshot.modelState.modelSelection.activeProfileId,
-                    members = snapshot.chat.groupChat.members,
-                    direction = direction,
-                    current = snapshot.chat.groupChat.announcement,
-                ),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            Result.failure(error)
-        }
-
     suspend fun autoFillCurrentPersona(description: String): Result<PersonaProfile> {
         val snapshot = state.value
         if (

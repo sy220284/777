@@ -18,9 +18,6 @@ internal class LocalWorkAgentController(
     override suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult =
         launchBackgroundAgent(task, instructions = "")
 
-    override suspend fun startResearchAgent(task: String): LocalWorkAgentUiResult =
-        launchBackgroundAgent(task, instructions = LocalResearchAgentPreset.instructions)
-
     private suspend fun launchBackgroundAgent(task: String, instructions: String): LocalWorkAgentUiResult =
         withContext(Dispatchers.IO) {
             val clean = task.trim()

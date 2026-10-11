@@ -210,7 +210,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
-    val sessionSort by viewModel.sessionSort.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
@@ -482,13 +481,6 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.SESSION -> {
-                        SettingsCard(stringResource(R.string.chatlist_title)) {
-                            ToggleRow(
-                                stringResource(R.string.chatlist_sort_updated),
-                                sessionSort == "updated",
-                                stringResource(R.string.chatlist_sort_manual),
-                            ) { viewModel.setSessionSortByRecency(sessionSort != "updated") }
-                        }
                         AppSettingsSection {
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
