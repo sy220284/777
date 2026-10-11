@@ -114,15 +114,15 @@ data class ChatCharacterState(
 
 internal fun ChatCharacterState.canonicalizeLegacyCharacterState(): ChatCharacterState {
     val migratedImpression = currentUserImpression.ifBlank { recentImpression }
-    // A retired intent may still exist in persisted stories, branches or group members.
-    // Do not let an unknown old mode re-enter auxiliary model prompts on recovery.
-    val validIntent = ChatInteractionIntent.entries.any { it.name == interactionIntent }
+    // Only the retired strategist state belongs to this migration.
+    // Preserve unrelated stored values rather than discarding unknown future states.
+    val retiredStrategist = interactionIntent == "STRATEGIST"
     return copy(
         currentUserImpression = migratedImpression,
         recentImpression = "",
-        interactionIntent = if (validIntent) interactionIntent else ChatInteractionIntent.NORMAL.name,
-        interactionIntentStrength = if (validIntent) interactionIntentStrength else 0,
-        interactionIntensity = if (validIntent) interactionIntensity else 0,
+        interactionIntent = if (retiredStrategist) ChatInteractionIntent.NORMAL.name else interactionIntent,
+        interactionIntentStrength = if (retiredStrategist) 0 else interactionIntentStrength,
+        interactionIntensity = if (retiredStrategist) 0 else interactionIntensity,
         interactionCooldowns = emptyMap(),
         transientAges = emptyMap(),
         unresolvedThreadAges = emptyMap(),
