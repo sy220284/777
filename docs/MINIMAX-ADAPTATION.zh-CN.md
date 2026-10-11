@@ -1,6 +1,6 @@
 # MiniMax 模型与官方技能接入
 
-状态：本分支实现，随 PR 合并生效。代码和协议回归可在 CI 验证；尚无真实 MiniMax 账户调用、手机长聊或媒体生成验收。
+状态：模型接入已随 PR #622 合并；本分支进行手机技能适配，合并后生效。代码和协议回归可在 CI 验证；尚无真实 MiniMax 账户调用、手机长聊或媒体生成验收。
 
 ## 用户可见变化
 
@@ -30,11 +30,15 @@
 
 固定来源：MiniMax-AI/skills，提交 `60aaae52bb2af8162732751a4332f62a5fef518b`。
 
-15 项：前端、全栈、Android、iOS、React Native、Flutter、着色器、PPT、Excel、PDF、Word、多媒体 CLI、音乐生成、GIF 贴纸、歌单创作。中文入口由 777 编写，原文及文本参考、脚本、模板位于各包 upstream，来源及原许可一起保留。
+9 项：前端、全栈、着色器、PPT、Excel、Word、多媒体 CLI、音乐生成、歌单创作。各包 MOBILE.md 为手机执行入口，原许可与适用参考资料继续保留。
 
-未预置 Claude Code 宠物专用 buddy-sings，也未将 Community vision-analysis 冒充官方技能。字体、二进制素材和大型歌手数据表未打包；需要时使用已有素材或核实来源后获取。桌面 .NET、Xcode、Android Studio、LibreOffice 和桌面浏览器不属于 APK 已有运行环境；技能必须先核实依赖，清楚区分源码交付、文件生成和真正构建或渲染完成。媒体技能不自动获得用户密钥或套餐权限。
+退出 Android、iOS、React Native、Flutter、PDF 桌面制作、GIF 贴纸六项预置。对应工具链不在 APK 中；不再把它们呈现为手机可执行技能。
 
-现有安装升级新增一次性 MiniMax 种子标记，保持原有技能删除、用户编辑和资源文件。SKILL.md 最后发布，资料缺失不显示安装成功；重装保留用户已有附属文件。首次安装复制资源，以后启动无需重复加载。
+Word 使用内置 Python 标准库创建、读取、替换及结构校验 DOCX。PPT 使用项目内 PptxGenJS 4.0.1 生成文件，并以 Python 检查真实包结构。两者提供 HTML 内容预览，预览不代表 Office 最终排版。Excel 新增标准库创建与读取脚本，修正模板注释兼容问题，退出 pandas 读取与 LibreOffice 重算。前端和着色器使用手机 HTML 预览；全栈使用 Node/Python，退出桌面容器依赖。媒体和音乐通过服务端 API 完成，歌单使用用户提供的资料，退出桌面播放器和应用扫描。
+
+升级时将六项旧技能完整移至 `.dsh/retired-skills/minimax-mobile-v2`，退出活动目录，保留用户修改及附件。保留技能仅更新未修改的旧预置入口；尊重用户编辑和删除，新手机资源按需补齐。迁移标记最后写入，失败可以重试。安装仍由 LocalSkillStore 唯一负责，SKILL.md 最后发布。
+
+媒体技能需要有效账户和相应权限，不自动继承模型配置凭据。尚未进行付费 API 或手机设备验收。
 
 ## 验证范围
 

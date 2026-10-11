@@ -264,6 +264,39 @@ internal class LocalSkillStore(
             }
             workspace.write(".dsh/skills/.minimax-seed-v1", "seeded\n")
         }
+        migrateMiniMaxMobileSkills()
+    }
+
+    /** Retire unavailable hosts and upgrade only untouched bundled instructions. */
+    private fun migrateMiniMaxMobileSkills() {
+        if (bundleFiles == null || File(skillsDir, ".minimax-mobile-v2").exists()) return
+        val archivePath = ".dsh/retired-skills/minimax-mobile-v2"
+        workspace.write("$archivePath/README.md", "已退出的桌面技能保留在此处，不再进入技能目录。用户修改和附属文件均保留。\n")
+        for (id in LocalMiniMaxSkillCatalog.retiredIds) {
+            if (!workspace.skills().contains(id)) continue
+            requireInstalled(id)
+            val destination = File(workspace.path, "$archivePath/$id")
+            require(!destination.exists() && !Files.isSymbolicLink(destination.toPath())) { "旧技能归档位置已存在：$id" }
+            Files.move(File(skillsDir, id).toPath(), destination.toPath())
+        }
+        for (preset in LocalMiniMaxSkillCatalog.entries) {
+            if (!workspace.skills().contains(preset.id)) continue // Keep the user's deletions.
+            requireInstalled(preset.id)
+            val old = buildLocalSkillDocument(preset.id, preset.description,
+                LocalMiniMaxSkillCatalog.legacyInstructions(preset.id), preset.whenToUse, preset.title)
+            val original = workspace.readSkill(preset.id)
+            val files = bundleFiles(preset.id)
+            require("MOBILE.md" in files && "LICENSE" in files && "SOURCE.md" in files) { "手机技能资源不完整" }
+            files.forEach { (relative, text) ->
+                require(relative.split('/').none { it.isBlank() || it == "." || it == ".." } &&
+                    '\\' !in relative && relative != "SKILL.md") { "技能资源路径无效" }
+                val target = File(workspace.path, ".dsh/skills/${preset.id}/$relative")
+                if (!target.exists()) workspace.write(".dsh/skills/${preset.id}/$relative", text)
+            }
+            if (original == old) workspace.write(".dsh/skills/${preset.id}/SKILL.md",
+                buildLocalSkillDocument(preset.id, preset.description, preset.instructions, preset.whenToUse, preset.title))
+        }
+        workspace.write(".dsh/skills/.minimax-mobile-v2", "seeded\n")
     }
 
     private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()
@@ -274,7 +307,7 @@ internal class LocalSkillStore(
         require(!workspace.skills().contains(id)) { "同名技能已经存在" }
         if (id in bundledIds) {
             val files = requireNotNull(bundleFiles) { "当前环境未提供 MiniMax 技能资源" }(id)
-            require("upstream/SKILL.md" in files && "LICENSE" in files && "SOURCE.md" in files) {
+            require("MOBILE.md" in files && "LICENSE" in files && "SOURCE.md" in files) {
                 "MiniMax 技能资源不完整"
             }
             // Publish SKILL.md last. Preserve supporting files edited by the user after removal.
@@ -371,7 +404,7 @@ internal class LocalSkillStore(
     }
 }
 
-// FEATURE_TREE: {"id":"skills.minimax-official-bundles","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录","owner":"TOOLS","entry":"LocalSkillManager","test":"app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"}
+// FEATURE_TREE: {"id":"skills.minimax-official-bundles","path":"第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录","owner":"TOOLS","entry":"LocalSkillStore","test":"app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"}
 @Singleton
 internal class LocalSkillManager @Inject constructor(
     storage: LocalSessionStorageRuntime,
