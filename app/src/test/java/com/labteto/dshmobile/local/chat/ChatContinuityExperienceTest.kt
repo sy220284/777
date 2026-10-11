@@ -140,7 +140,9 @@ class ChatContinuityExperienceTest {
             revisions = ChatDiaryEntryPolicy.revisionsOf(source) + revised)
         val state = ChatCharacterState(
             mood = "平静", relationshipState = "稳定关系",
-            dynamics = RelationshipDynamics(stage = "COMMITTED", sharedMoments = listOf("昨天一起散步")),
+            dynamics = RelationshipDynamics(stage = "COMMITTED", sharedMoments = listOf("昨天一起散步"),
+                facts = listOf(RelationshipEvidence("误认双方已经确认关系", confidence = 95, source = "dialogue"),
+                    RelationshipEvidence("昨天一起散步", confidence = 95, source = "dialogue"))),
             stateObservations = listOf(
                 ChatStateObservation(field = "dynamics.stage", value = "COMMITTED",
                     previousValue = "FAMILIAR", interpretation = true,
@@ -154,6 +156,7 @@ class ChatContinuityExperienceTest {
         assertEquals("FAMILIAR", resolved.dynamics.stage)
         assertEquals("熟悉中", resolved.relationshipState)
         assertEquals(listOf("昨天一起散步"), resolved.dynamics.sharedMoments)
+        assertEquals(listOf("昨天一起散步"), resolved.dynamics.facts.map { it.text })
         assertEquals("平静", resolved.mood)
         assertEquals(resolved, reconcileDiaryState(resolved, listOf(correction)))
     }
