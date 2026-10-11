@@ -206,6 +206,9 @@ internal fun LocalMediaStudioSheetContent(
                             onClick = { openMediaUrl(context, url) { error = it } })
                     }
                     image?.file?.let { file ->
+                        DsButton(text = stringResource(R.string.media_studio_view_image),
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { viewMediaFile(context, file, "image/png") { error = it } })
                         DsButton(text = stringResource(R.string.media_studio_share_image),
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { shareMediaFile(context, file, "image/png") { error = it } })
@@ -323,6 +326,16 @@ private fun openMediaUrl(context: Context, url: String, onError: (String) -> Uni
     }
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
         .onFailure { onError(it.message.orEmpty()) }
+}
+
+private fun viewMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
+    runCatching {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
+    }.onFailure { onError(it.message.orEmpty()) }
 }
 
 private fun shareMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
