@@ -3,9 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -136,24 +133,24 @@ internal fun LocalWorkTimelineAutoScroller(
     tailKey: String,
     isReady: Boolean,
     isCatchingUp: MutableState<Boolean>,
+    isReaderPaused: MutableState<Boolean>,
 ) {
     val readerDragging by listState.interactionSource.collectIsDraggedAsState()
-    var readerPaused by remember(sessionId, listState) { mutableStateOf(false) }
     var previousTailIndex by remember(sessionId, listState) { mutableStateOf(-1) }
     var previousTailKey by remember(sessionId, listState) { mutableStateOf("") }
 
     LaunchedEffect(readerDragging, sessionId, listState) {
         if (readerDragging) {
-            readerPaused = true
+            isReaderPaused.value = true
         } else if (listState.isAtWorkTimelineBottom()) {
-            readerPaused = false
+            isReaderPaused.value = false
         }
     }
     LaunchedEffect(sessionId, listState) {
         snapshotFlow { listState.isAtWorkTimelineBottom() }
             .distinctUntilChanged()
             .collect { atBottom ->
-                if (atBottom && !readerDragging) readerPaused = false
+                if (atBottom && !readerDragging) isReaderPaused.value = false
             }
     }
     LaunchedEffect(sessionId, listState, tailIndex, tailKey, isReady) {
@@ -170,7 +167,7 @@ internal fun LocalWorkTimelineAutoScroller(
             ?.let { it.offset + it.size - viewport.viewportEndOffset }
         if (!shouldFollowNewWorkStep(
                 oldTail, lastVisible?.index ?: -1, previousTailGap,
-                readerPaused, readerDragging,
+                isReaderPaused.value, readerDragging,
             )
         ) return@LaunchedEffect
         isCatchingUp.value = true
