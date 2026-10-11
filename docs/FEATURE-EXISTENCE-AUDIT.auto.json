@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "f1de56cd9ae5",
+  "source_snapshot": "4bc6d5a7eeb5",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -2094,7 +2094,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 133,
+      "other_production_symbol_reference_count": 132,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2148,7 +2148,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 133,
+      "other_production_symbol_reference_count": 132,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2202,7 +2202,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 4,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 133,
+      "other_production_symbol_reference_count": 132,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -2856,7 +2856,7 @@
       "best_static_cross_file_symbol": "snapshot",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 142,
+      "other_production_symbol_reference_count": 143,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",
@@ -2977,7 +2977,7 @@
       "best_static_cross_file_symbol": "snapshot",
       "source_file_shared_by_tree_descriptions": 3,
       "source_is_shared_in_feature_tree": true,
-      "other_production_symbol_reference_count": 142,
+      "other_production_symbol_reference_count": 143,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",
@@ -3070,7 +3070,7 @@
       "best_static_cross_file_symbol": "request",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 133,
+      "other_production_symbol_reference_count": 132,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkSchedule.kt",
         "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt",
@@ -3478,7 +3478,7 @@
       "best_static_cross_file_symbol": "snapshot",
       "source_file_shared_by_tree_descriptions": 1,
       "source_is_shared_in_feature_tree": false,
-      "other_production_symbol_reference_count": 142,
+      "other_production_symbol_reference_count": 143,
       "other_production_reference_samples": [
         "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt",

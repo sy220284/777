@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import kotlinx.serialization.json.contentOrNull
 
 /** Unknown admission is conservative. Only a known unstarted or read-only invocation can retry. */
 internal fun localToolFailure(
@@ -28,3 +29,22 @@ internal fun localToolFailure(
 internal fun String.isRetryableToolTransportFailure(): Boolean =
     this in setOf("TIMEOUT", "NETWORK_ERROR", "DNS_FAILED", "TOOL_TIMEOUT", "TOOL_LIFECYCLE_UNAVAILABLE", "PARALLEL_TASK_ERROR", "TOOL_IO_ERROR") ||
         startsWith("MODEL_HTTP_5") || contains("TIMEOUT") || contains("NETWORK")
+
+/** Short, schema-derived recovery instructions for invalid model tool arguments. */
+internal fun toolArgumentContractSummary(schema: kotlinx.serialization.json.JsonObject): String {
+    val function = schema["function"] as? kotlinx.serialization.json.JsonObject
+        ?: return "请依据本轮真实工具参数定义重构调用"
+    val parameters = function["parameters"] as? kotlinx.serialization.json.JsonObject
+        ?: return "请依据本轮真实工具参数定义重构调用"
+    val required = (parameters["required"] as? kotlinx.serialization.json.JsonArray)
+        ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }.orEmpty()
+    val properties = parameters["properties"] as? kotlinx.serialization.json.JsonObject
+    val fields = properties?.entries.orEmpty().take(12).joinToString("，") { (name, element) ->
+        val detail = element as? kotlinx.serialization.json.JsonObject
+        val type = (detail?.get("type") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+            ?: "schema"
+        name + ":" + type
+    }
+    return "按当前工具 schema 重构参数；必填=" + required.joinToString(",").ifBlank { "无" } +
+        "；字段类型=" + fields + "。数组必须传数组，JSON Schema 的 required 必须是字符串数组；不要凭猜测补字段。"
+}

@@ -16,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -177,8 +178,16 @@ internal class LocalWorkBackgroundToolExecutor(
         enabledOptionalTools: MutableSet<String>): AgentToolResult? = when (call.name) {
         "capability_search" -> AgentToolResult(tools.execution.searchCapabilities(call.arguments.string("query"), enabledOptionalTools))
         "memory_search", "memory_list" -> AgentToolResult(memoryTools.execute(call.name, call.arguments, allowMutation = false))
-        "tool_output_read" -> AgentToolResult(tools.toolOutputStore.read(sessionId, call.arguments.string("call_id"),
-            call.arguments.int("start_byte", 0), call.arguments.int("max_bytes", com.labteto.dshmobile.local.LocalToolOutputStore.DEFAULT_READ_BYTES)))
+        "tool_output_read" -> AgentToolResult(
+            (call.arguments["query"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)?.let { query ->
+                tools.toolOutputStore.search(
+                    sessionId, call.arguments.string("call_id"), query,
+                    call.arguments.int("start_byte", 0),
+                )
+            } ?: tools.toolOutputStore.read(sessionId, call.arguments.string("call_id"),
+                call.arguments.int("start_byte", 0),
+                call.arguments.int("max_bytes", com.labteto.dshmobile.local.LocalToolOutputStore.DEFAULT_READ_BYTES))
+        )
         else -> null
     }
 

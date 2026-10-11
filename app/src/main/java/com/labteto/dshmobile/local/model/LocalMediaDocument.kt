@@ -40,7 +40,13 @@ internal class LocalMediaDocument<T>(
 
     fun write(value: T) {
         requireAvailable()
-        durable.write(json.encodeToString(serializer, value), ::valid)
+        try {
+            durable.write(json.encodeToString(serializer, value), ::valid)
+        } catch (failure: Exception) {
+            readFailure = failure
+            AppLog.failure("MediaStorage", "commit_media_document", failure)
+            throw failure
+        }
     }
 
     private fun decode(raw: String): T = json.decodeFromString(serializer, raw)
