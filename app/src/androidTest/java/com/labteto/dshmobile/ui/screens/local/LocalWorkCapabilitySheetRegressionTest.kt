@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -235,7 +236,10 @@ class LocalWorkCapabilitySheetRegressionTest {
             }
         }
         compose.onNodeWithTag("handoff_search").performTextReplacement("第1条旧记录")
-        compose.onNodeWithTag("handoff_message_msg-1").performClick()
+        // The search IME can cover the bottom-sheet checkbox: scroll to the visible
+        // touch target before tapping, then verify both semantics and callback state.
+        compose.onNodeWithTag("handoff_message_msg-1").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("handoff_message_msg-1").assertIsOn()
         compose.runOnIdle { assertEquals(listOf("msg-1"), selected.value) }
         compose.onNodeWithTag("handoff_search").performTextReplacement("")
         compose.onNodeWithTag("handoff_message_msg-1").assertIsDisplayed()
