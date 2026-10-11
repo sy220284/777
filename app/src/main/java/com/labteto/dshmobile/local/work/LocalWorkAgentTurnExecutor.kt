@@ -370,16 +370,18 @@ internal class LocalWorkAgentTurnExecutor(
                             throw error
                         }
                     }
-                    if (sampling === LocalWorkSamplingOutcome.Steered) {
-                        runEventLog.append("work/model-sampling-steered", buildJsonObject {
-                            put("step", modelStep + 1)
-                            put("run_id", runContext.runId)
-                            put("revision", binding.steeringRevision.value)
-                            put("effect", "model_only")
-                        })
-                        continue
+                    val rawReply = when (sampling) {
+                        LocalWorkSamplingOutcome.Steered -> {
+                            runEventLog.append("work/model-sampling-steered", buildJsonObject {
+                                put("step", modelStep + 1)
+                                put("run_id", runContext.runId)
+                                put("revision", binding.steeringRevision.value)
+                                put("effect", "model_only")
+                            })
+                            continue
+                        }
+                        is LocalWorkSamplingOutcome.Completed -> sampling.value
                     }
-                    val rawReply = (sampling as LocalWorkSamplingOutcome.Completed).value
                     val reply = rawReply.also { completed ->
                         usageTracker.recordForeground(
                             snapshot = snapshot,
