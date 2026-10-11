@@ -50,23 +50,6 @@ jobs:
             docs/FEATURE-SOURCE-INDEX.auto.json
             docs/FEATURE-REVIEW.auto.json
             docs/ACCEPTANCE-MATRIX.json
-      - name: 在当前测试 PR 内保留全量刷新结果
-        if: github.event_name == 'pull_request' && github.event.pull_request.number == 616 && github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          git add docs/FEATURE-TREE.zh-CN.md docs/FEATURE-TREE.zh-CN.html \
-            docs/FEATURE-TREE-SOURCE-REGISTRY.json docs/FEATURE-SOURCE-INDEX.auto.json \
-            docs/FEATURE-REVIEW.auto.json docs/ACCEPTANCE-MATRIX.json
-          if git diff --cached --quiet; then
-            echo "当前功能树和源码一致，无需回写"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "全量扫描并复核后刷新功能树及源码证据"
-          git push origin HEAD:refs/heads/"$TARGET_BRANCH"
       - name: 自动创建或更新维护 PR
         if: github.event_name != 'pull_request'
         env:
