@@ -316,4 +316,38 @@ class LspPluginTest {
         }
     }
 
+
+    @Test fun readOnlySubagentAndPlanModeCannotDownloadComponents() = runTest {
+        temporary.newFile("check.py").writeText("value = 1")
+        var installs = 0
+        var approvals = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            canInstallOnDemand = { true },
+            installOnDemand = { installs++; listOf("node", "server.js") },
+        )
+        plugin.install(context)
+        try {
+            for (scope in listOf(
+                ToolContext(allowMutation = false, approval = { approvals++; true }),
+                ToolContext(attributes = mapOf("plan_mode" to true),
+                    approval = { approvals++; true }),
+            )) {
+                val result = context.tools.execute(
+                    "lsp_hover",
+                    buildJsonObject { put("path", "check.py") },
+                    context = scope,
+                )
+                assertTrue(result.isError)
+            }
+            assertEquals(0, installs)
+            assertEquals(0, approvals)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
 }
