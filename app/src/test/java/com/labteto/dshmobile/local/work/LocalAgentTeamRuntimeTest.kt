@@ -669,7 +669,7 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
-    fun terminalCheckpointBecomesFirstClassAgentMessageAndCompletedProgress() {
+    fun terminalCheckpointBecomesAgentMessageWithoutFabricatingGoalProgress() {
         val fixture = fixture("team-messages")
         appendActiveMember(fixture.log, "team-messages")
         fixture.jobs.startPersistent(
@@ -698,7 +698,8 @@ class LocalAgentTeamRuntimeTest {
 
         assertEquals(1, messages.size)
         assertEquals("完成审查", messages.single().content)
-        assertEquals(100, ui.members.single().progressPercent)
+        assertEquals(4, ui.members.single().executionSteps)
+        assertEquals(4, ui.members.single().executionStepLimit)
         assertEquals(1, ui.members.single().resultMessageCount)
     }
 
@@ -751,7 +752,8 @@ class LocalAgentTeamRuntimeTest {
         assertEquals("member-1", task.ownerId)
         val displayed = fixture.runtime.uiState("team-auto-complete")
         assertTrue(displayed.members.single().awaitingReview)
-        assertEquals(95, displayed.members.single().progressPercent)
+        assertEquals(3, displayed.members.single().executionSteps)
+        assertEquals(3, displayed.members.single().executionStepLimit)
         assertEquals(1, displayed.returnedMemberCount)
         assertEquals(0, displayed.completedTaskCount)
     }
