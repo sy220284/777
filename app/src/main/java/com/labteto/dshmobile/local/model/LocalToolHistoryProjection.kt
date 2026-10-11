@@ -55,7 +55,7 @@ internal fun projectStaleToolResults(
                     append(retained.text)
                     append("\n[旧工具结果已从实时模型上下文衰减")
                     if (!callId.isNullOrBlank()) {
-                        append("；完整原文可用 tool_output_read(call_id=")
+                        append("；若仍在本机保留期内，可用 tool_output_read(call_id=")
                         append(callId)
                         append(") 分段读取")
                     }
@@ -73,7 +73,7 @@ internal fun projectStaleToolResults(
     return LocalHistoryCompaction(
         messages = projected,
         omittedMessages = 0,
-        summary = "旧工具结果已降级为有界模型投影，完整事实仍保留在工具结果存储。",
+        summary = "旧工具结果已降级为有界模型投影；原文恢复以私有工具结果存储实际保留状态为准。",
         estimatedTokensBefore = before,
         estimatedTokensAfter = after,
     )

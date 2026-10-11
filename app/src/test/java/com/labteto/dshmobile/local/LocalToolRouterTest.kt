@@ -212,6 +212,25 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun explicitToolNameAlwaysOutranksMultipleBroadDescriptionMatches() {
+        val tools = listOf(
+            tool("github_pr", "处理项目 PR", ToolExposure.OPTIONAL, "GitHub", setOf("github", "pr")),
+            tool("http_request", "PR 分支 Github 项目 API PR Github 分支", ToolExposure.OPTIONAL, "GitHub", setOf("接口请求")),
+            tool("github_pr_review", "查看 PR 的 reviewer", ToolExposure.OPTIONAL, "GitHub", setOf("review")),
+        )
+        assertEquals("github_pr", LocalToolRouter.search(tools, "github_pr Github PR 项目").first().name)
+    }
+
+    @Test
+    fun descriptionMatchingCannotSuppressExplicitKeyword() {
+        val tools = listOf(
+            tool("task_action", "查找文档", ToolExposure.OPTIONAL, "执行", setOf("查找定义")),
+            tool("generic_reference", "查找文档和定义，还能查找相关说明", ToolExposure.OPTIONAL, "文档"),
+        )
+        assertEquals("task_action", LocalToolRouter.search(tools, "查找定义").first().name)
+    }
+
+    @Test
     fun capabilitySearchDoesNotHardCapLargeOptionalCatalog() {
         val tools = (0 until 1_000).map { index ->
             tool(

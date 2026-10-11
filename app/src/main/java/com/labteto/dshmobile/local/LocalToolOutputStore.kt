@@ -97,7 +97,7 @@ internal class LocalToolOutputStore(
         val pageBytes = maxBytes.coerceAtMost(visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
 
         val source = File(sessionDir(sessionId), key(callId) + ".txt")
-        if (!source.isFile) return "未找到该工具调用的完整保留结果：$callId"
+        if (!source.isFile) return missingResult(callId)
 
         val totalBytes = source.length().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         if (startByte >= totalBytes) return "工具结果没有第 $startByte 个 UTF-8 字节"
@@ -139,6 +139,76 @@ internal class LocalToolOutputStore(
             }
         }
     }
+
+    /**
+     * Bounded literal search of the retained UTF-8 result. Reads in chunks instead of materializing
+     * a potentially multi-megabyte output just to locate a short diagnostic string.
+     * Returned offsets can be passed directly to read(startByte=...).
+     */
+    @Synchronized
+    fun search(sessionId: String, callId: String, query: String, startByte: Int = 0): String {
+        require(startByte >= 0) { "start_byte 必须大于等于 0" }
+        val needle = query.toByteArray(Charsets.UTF_8)
+        require(needle.isNotEmpty() && needle.size <= MAX_SEARCH_QUERY_BYTES) {
+            "query 必须为 1–$MAX_SEARCH_QUERY_BYTES 个 UTF-8 字节"
+        }
+        val source = File(sessionDir(sessionId), key(callId) + ".txt")
+        if (!source.isFile) return missingResult(callId)
+        val total = source.length()
+        if (startByte >= total) return "工具结果没有第 $startByte 个 UTF-8 字节"
+        val prefix = IntArray(needle.size)
+        var p = 0
+        for (i in 1 until needle.size) {
+            while (p > 0 && needle[i] != needle[p]) p = prefix[p - 1]
+            if (needle[i] == needle[p]) p++
+            prefix[i] = p
+        }
+        val matches = mutableListOf<Long>()
+        var more = false
+        RandomAccessFile(source, "r").use { file ->
+            file.seek(startByte.toLong())
+            var position = startByte.toLong()
+            var matched = 0
+            val buffer = ByteArray(8 * 1024)
+            scan@ while (true) {
+                val count = file.read(buffer)
+                if (count < 0) break
+                for (i in 0 until count) {
+                    val value = buffer[i]
+                    while (matched > 0 && value != needle[matched]) matched = prefix[matched - 1]
+                    if (value == needle[matched]) matched++
+                    if (matched == needle.size) {
+                        val offset = position - needle.size + 1L
+                        if (matches.size >= MAX_SEARCH_MATCHES) {
+                            more = true
+                            break@scan
+                        }
+                        matches += offset
+                        matched = prefix[matched - 1]
+                    }
+                    position++
+                }
+            }
+        }
+        return buildString {
+            append("工具调用 ").append(callId).append(" · 字面量查询 ")
+                .append(query).append(" · 原文 ").append(total).append(" 字节")
+            if (matches.isEmpty()) {
+                append("\n没有匹配内容。")
+            } else {
+                append("\n匹配位置（UTF-8 字节偏移）：")
+                matches.forEach { offset ->
+                    append("\n- ").append(offset).append("；使用 start_byte=")
+                        .append(offset.coerceAtMost(Int.MAX_VALUE.toLong()))
+                        .append(" 读取附近原文")
+                }
+                if (more) append("\n还有更多匹配；使用更靠后的 start_byte 继续搜索。")
+            }
+        }
+    }
+
+    private fun missingResult(callId: String): String =
+        "未找到该工具调用的完整保留结果：$callId（可能已经容量淘汰、会话清理或未成功落盘；请重新定位可靠证据）"
 
     private fun safeUtf8PrefixLength(bytes: ByteArray): Int {
         if (bytes.isEmpty()) return 0
@@ -235,6 +305,8 @@ internal class LocalToolOutputStore(
     companion object {
         const val DEFAULT_READ_BYTES = 4 * 1024
         const val MAX_READ_BYTES = 48 * 1024
+        private const val MAX_SEARCH_QUERY_BYTES = 512
+        private const val MAX_SEARCH_MATCHES = 10
         private const val MIN_READ_BYTES = 1_024
         private const val DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
         private const val DEFAULT_MAX_FILES_PER_SESSION = 64

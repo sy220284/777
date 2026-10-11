@@ -116,6 +116,11 @@ internal object LocalToolRouter {
         return JsonArray((core + optional).map(HarnessTool::schema))
     }
 
+    /**
+     * Ranks capabilities by the strongest matching evidence. A flood of weak description/family
+     * terms can no longer outrank a concrete tool identifier or an explicit discovery keyword.
+     * Search does not change the conservative implicit preactivation contract.
+     */
     fun search(
         tools: List<HarnessTool>,
         query: String,
@@ -123,17 +128,13 @@ internal object LocalToolRouter {
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
-        // Bound parsing work while preserving intent at both ends of a long request.
-        // A tool name appended after detailed instructions must remain discoverable.
         val termPattern = Regex("[\\p{L}\\p{N}_-]{2,}")
         val front = termPattern.findAll(normalized.take(MAX_CAPABILITY_QUERY_EDGE_CHARS))
             .map { it.value }.take(12).toList()
         val tail = termPattern.findAll(normalized.takeLast(MAX_CAPABILITY_QUERY_EDGE_CHARS))
             .map { it.value }.toList().takeLast(12)
-        // Java regex treats a continuous Chinese phrase as one word. Add bigrams so
-        // natural requests can match Chinese capability keywords without a hardcoded tool list.
         val chunks = front + tail
-        val hanWords = Regex("[\\u4e00-\\u9fff]{2,}")
+        val hanWords = Regex("[\u4e00-\u9fff]{2,}")
         val chineseTerms = chunks.flatMap { chunk ->
             hanWords.findAll(chunk).flatMap { it.value.windowed(2).asSequence() }.toList()
         }
@@ -141,33 +142,39 @@ internal object LocalToolRouter {
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
         for (tool in tools) {
             if (!isOptional(tool)) continue
-            val haystack = buildString {
-                append(tool.name.lowercase())
-                append(' ').append(description(tool).lowercase())
-                append(' ').append(tool.metadata.family.lowercase())
-                append(' ').append(tool.metadata.discoveryKeywords.joinToString(" ").lowercase())
-                append(' ').append(tool.metadata.requirements.joinToString(" ").lowercase())
-                append(' ').append(tool.metadata.usageNotes.joinToString(" ").lowercase())
-            }
-            var score = 0
+            val name = tool.name.lowercase()
+            val family = tool.metadata.family.lowercase()
+            val keywords = tool.metadata.discoveryKeywords.map(String::lowercase)
+            val descriptionText = description(tool).lowercase()
+            val explanatoryText = (tool.metadata.requirements + tool.metadata.usageNotes)
+                .joinToString(" ").lowercase()
+            var strongest = 0
+            var supportingHits = 0
             for (term in terms) {
-                score += when {
-                    tool.name.equals(term, ignoreCase = true) -> 100
-                    tool.name.contains(term, ignoreCase = true) -> 25
-                    tool.metadata.family.equals(term, ignoreCase = true) -> 20
-                    haystack.contains(term) -> 10
+                val match = when {
+                    name == term -> 10_000
+                    name.split('_', '-').any { it == term } -> 2_000
+                    keywords.any { it == term } -> 1_200
+                    family == term -> 800
+                    hasExplicitIntentTerm(name, term) -> 600
+                    keywords.any { hasExplicitIntentTerm(it, term) } -> 400
+                    hasExplicitIntentTerm(descriptionText, term) -> 160
+                    hasExplicitIntentTerm(explanatoryText, term) -> 80
                     else -> 0
                 }
+                strongest = maxOf(strongest, match)
+                if (match > 0) supportingHits++
             }
-            if (score > 0) scored += tool to score
+            if (strongest > 0) {
+                // At most 16 tie-break points: relevance tier, not query verbosity, drives ranking.
+                scored += tool to strongest * 32 + supportingHits.coerceAtMost(16)
+            }
         }
         scored.sortWith(
-            compareByDescending<Pair<HarnessTool, Int>> { pair -> pair.second }
-                .thenBy { pair -> pair.first.name },
+            compareByDescending<Pair<HarnessTool, Int>> { it.second }
+                .thenBy { it.first.name },
         )
-        return scored
-            .take(limit.coerceAtLeast(1))
-            .map { pair -> pair.first }
+        return scored.take(limit.coerceAtLeast(1)).map { it.first }
     }
 
     fun capabilitySummary(
