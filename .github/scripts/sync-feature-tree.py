@@ -224,7 +224,7 @@ def generate(root):
         old, match = original_html(html)
         dataset = json.dumps(
             to_html(model, old, {v["path"]: v for v in registered.values()}),
-            ensure_ascii=False, separators=(",", ":"
+            ensure_ascii=False, separators=(",", ":")
         )
         html = html[:match.start(2)] + dataset + html[match.end(2):]
     matrix_text = (root / MATRIX).read_text(encoding="utf-8")
