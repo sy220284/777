@@ -132,6 +132,26 @@ def inspect():
         if name in leaf_paths:
             raise ValueError("已批准退役的功能仍留在现行树")
         approved_paths.add(name)
+        approval = next(x for x in config["approvals"] if x["path"] == name)
+        symbol = approval["symbol"]
+        live_entry = re.compile(
+            r"(?:fun|class|object|interface|val|var|enum\\s+class)\\s+" +
+            re.escape(symbol) + r"\\b"
+        )
+        for file in (ROOT / "app").rglob("*"):
+            if not file.is_file() or file.suffix not in {".kt", ".java"}:
+                continue
+            relative = file.relative_to(ROOT).as_posix()
+            if ("/src/main/" in "/" + relative and live_entry.search(
+                file.read_text(encoding="utf-8", errors="replace")
+            )):
+                raise ValueError("二次复核发现退役符号仍有现存生产声明: " + name)
+            if ("/src/test/" in "/" + relative or "/src/androidTest/" in "/" + relative):
+                if re.search(r"\\b" + re.escape(symbol) + r"\\b",
+                             file.read_text(encoding="utf-8", errors="replace")):
+                    raise ValueError("二次复核发现退役符号仍在测试中使用: " + name)
+        if any(x["path"] == name for x in matrix["items"]):
+            raise ValueError("二次复核发现退役功能仍有验收索引: " + name)
     for candidate in review.get("legacy_retirements_requiring_review", []):
         if candidate["path"] not in [v["path"] for v in config["approvals"]]:
             raise ValueError("退役未批准项没有真实审核请求")
