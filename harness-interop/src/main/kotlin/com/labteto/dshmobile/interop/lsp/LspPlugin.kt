@@ -77,6 +77,8 @@ class LspPlugin(
     private val resourceScheduler: HarnessResourceScheduler? = null,
     private val canInstallOnDemand: (String?) -> Boolean = { false },
     private val installOnDemand: suspend (String?) -> List<String> = { emptyList() },
+    private val managedStatus: () -> String = { "" },
+    private val uninstallOnDemand: (String) -> Boolean = { false },
 ) : HarnessPlugin {
     override val id = "local-language-server"
 
@@ -97,8 +99,10 @@ class LspPlugin(
                 HarnessTool(
                     name = name,
                     schema = schemaFor(name),
-                    access = ToolAccess.READ_ONLY,
-                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    access = if (name == "lsp_uninstall_component") ToolAccess.PROCESS else ToolAccess.READ_ONLY,
+                    approvalPolicy = if (name == "lsp_uninstall_component") {
+                        ToolApprovalPolicy.ALWAYS
+                    } else ToolApprovalPolicy.NEVER,
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "LSP",
@@ -135,9 +139,17 @@ class LspPlugin(
         input: JsonObject,
         context: ToolContext,
     ): ToolResult {
+        if (name == "lsp_uninstall_component") {
+            val component = input["component"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            require(component in setOf("typescript", "pyright")) { "未知组件：仅支持 typescript、pyright" }
+            // Release the process before deleting any of its JS files.
+            closeClientsGracefully()
+            check(uninstallOnDemand(component)) { "组件卸载失败：" + component }
+            return ToolResult("代码智能组件已卸载：" + component + "；需要时可重新下载")
+        }
         if (name == "lsp_status") {
             if (clients.isNotEmpty()) {
-                return ToolResult("代码智能已启动 ${clients.size} 个语言服务")
+                return ToolResult("代码智能已启动 ${clients.size} 个语言服务；" + managedStatus())
             }
             val detected = runCatching { command(null) }.getOrDefault(emptyList())
             return ToolResult(
@@ -149,7 +161,7 @@ class LspPlugin(
                     }
                 } else {
                     "已检测到可用语言服务器，将在首次语义查询时按需启动"
-                },
+                } + "; " + managedStatus(),
             )
         }
 
@@ -360,7 +372,8 @@ class LspPlugin(
 
     private fun schemaFor(name: String): JsonObject {
         val description = when (name) {
-            "lsp_status" -> "查看当前项目代码智能状态；语言服务器由 777 自动检测并按需启动"
+            "lsp_status" -> "查看当前项目代码智能状态、已安装的语言服务器组件；不触发下载"
+            "lsp_uninstall_component" -> "卸载本机已安装的代码智能组件；需用户审批，再次使用时重新下载"
             "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
             "lsp_references" -> "查询代码引用；需要时自动启动匹配的语言服务器"
             "lsp_hover" -> "查询代码类型与说明；需要时自动启动匹配的语言服务器"
@@ -371,7 +384,9 @@ class LspPlugin(
             else -> "列出文件中的代码符号；需要时自动启动匹配的语言服务器"
         }
         val properties = buildJsonObject {
-            if (name == "lsp_workspace_symbols") {
+            if (name == "lsp_uninstall_component") {
+                put("component", buildJsonObject { put("type", "string") })
+            } else if (name == "lsp_workspace_symbols") {
                 put("query", buildJsonObject { put("type", "string") })
             } else if (name != "lsp_status") {
                 put("path", buildJsonObject { put("type", "string") })
@@ -384,6 +399,7 @@ class LspPlugin(
             }
         }
         val required = when (name) {
+            "lsp_uninstall_component" -> setOf("component")
             "lsp_workspace_symbols" -> setOf("query")
             "lsp_rename_preview" -> setOf("path", "new_name")
             "lsp_status" -> emptySet()
@@ -394,10 +410,11 @@ class LspPlugin(
 
     companion object {
         private val LSP_DISCOVERY_KEYWORDS = setOf(
-            "lsp", "语言服务器", "代码", "定义", "引用", "符号", "重命名", "诊断", "hover", "implementation",
+            "lsp", "语言服务器", "代码", "定义", "引用", "符号", "重命名", "诊断", "卸载", "hover", "implementation",
         )
         private val names = listOf(
             "lsp_status",
+            "lsp_uninstall_component",
             "lsp_definition",
             "lsp_references",
             "lsp_hover",
