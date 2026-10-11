@@ -2088,5 +2088,11 @@
     <string name="media_studio_delete_cancel">取消</string>
     <string name="media_studio_video_archive">视频生成任务档案（%1$d）</string>
     <string name="media_studio_video_account_unavailable">原创作账户未配置或身份已变化；任务保留在本机，但不能用其他账户查询。</string>
+    <string name="media_studio_capability_image">图片生成</string>
+    <string name="media_studio_capability_video">视频生成</string>
+    <string name="media_studio_capability_speech">语音合成</string>
+    <string name="media_studio_capability_transcribe">录音转写</string>
+    <string name="media_studio_kind_speech">语音</string>
+    <string name="media_studio_kind_image">图片</string>
 </resources>
 
