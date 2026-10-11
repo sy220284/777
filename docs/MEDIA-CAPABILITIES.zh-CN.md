@@ -16,11 +16,11 @@
 | --- | --- | --- | --- |
 | MiniMax | M3 图像理解；M2.7 文本（以现有模型输入协议为准） | `image-01` 文生图；`MiniMax-Hailuo-2.3` 文生视频；`speech-2.8-hd` TTS；`asr-1.0` ASR | **图片、视频、配音、转写已接通**，保留官方模型专用适配 |
 | OpenAI | 官方支持的 GPT 聊天模型支持图像输入；原 `Responses image_generation` 工具独立保留 | `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 图片；`gpt-4o-mini-tts` 配音；`gpt-transcribe`、`gpt-4o-transcribe` 语音转文字 | **图片、配音、转写已接通**（官方 API Key；不包含 ChatGPT Plan OAuth） |
-| 阿里云 Qwen | `qwen3.8-*` 等输入图片的聊天能力按具体预置与兼容协议判断 | `qwen-image-3.0`、`qwen-image-plus` 文生图；万相 `wan2.7-t2v` 等视频模型 | **图片已接通**（Qwen Image 官方 OpenAI Images 兼容路径），视频已有官方能力但尚未接通 |
+| 阿里云 Qwen | `qwen3.8-*` 等输入图片的聊天能力按具体预置与兼容协议判断 | `qwen-image-3.0`、`qwen-image-plus` 文生图；万相 `wan2.7-t2v` 等视频模型 | **图片和 Wan 2.6 文生视频已接通**（图片走 OpenAI Images 兼容路径；视频走 DashScope 异步任务）；Wan 2.7 等其他版本尚未接通 |
 | Google Gemini | 可支持图片／视频理解；777 当前聊天请求仍按其已编码协议判断 | `gemini-3.1-flash-image`、`gemini-2.5-flash-image` 文生图；`veo-3.1-generate-preview` 视频；`lyria-3.5` 音乐 | **图片已接通**（原生 `generateContent`）；Veo/Lyria 文档已支持但尚未接通 |
 | DeepSeek | 官方 `deepseek-flash` 支持图片输入理解；其他模型不可据此泛化 | 本轮未查证可直接调用的官方图片／视频／语音生成产品 API | **未接通创作**；保留图像理解，不伪装图片生成为已支持 |
 | Anthropic Claude | 官方 Vision 允许图片理解 | Claude Messages 的图像输入不是图像合成端点；不能由 Vision 自动派生创作能力 | **未接通创作**，保留已有 Vision |
-| Kimi Code | 项目预置部分 K3 型号有图片／视频输入标签；视频输入不等于视频生成 | 尚未确认同一 `api.kimi.com/coding/v1` 凭据提供可调用的专业生成 API | **未接通创作**；避免按视频输入标签错误暴露生成按钮 |
+| Kimi Code | 项目预置部分 K3 型号有图片／视频输入标签；视频输入不等于视频生成 | 官方公开 API 文档说明 Vision 是输入理解、TTS/ASR 暂不可用；Kimi Code 的编码套餐与开放平台 API Key 不互通，不能把输入模态当成生成服务 | **未接通创作**；避免按视频输入标签错误暴露生成按钮 |
 | 智谱 GLM | 按具体 GLM 模型区分文本、图片理解 | 官方存在 CogView / CogVideo 家族专业生成产品，但本轮未核实与用户的聊天模型账户相同的模型、版本与专用端点细节 | **未接通创作**；有官方可用接口时新增适配器与模型条目 |
 | 自定义 OpenAI 兼容代理 | 仅能通过具体协议探测确认已实现的聊天／图像输入 | **不能**因为自称 OpenAI 兼容就默认兼容 `/images/generations`、语音、视频或账户费用 | **默认不接通付费创作**，必须明确配置可验证的专属适配 |
 
@@ -31,7 +31,7 @@
 1. 业务操作只有 `IMAGE` / `VIDEO` / `SPEECH` / `TRANSCRIBE` 四种；每种能力只显示已接入可执行模型，不复制服务商专用面板；列表按照用户已配置凭据来源生成。对应底层选择精确到 profile ID + 服务商 + 操作 + 创作模型 ID。
 2. 执行时冻结选项并复用 `LocalModelCredentialResolver.resolve(..., profile)`，不再次读取聊天的 mutable active model。服务商 SDK 只能处理自己的协议与生成结果，不能控制 UI 的模型选择。
 3. 图片统一归一化为 HTTPS 结果链接或本机缓存图片（通过 Android FileProvider 分享）；配音统一本机 MP3 缓存文件；ASR 统一文字结果供复制/插入当前输入；视频统一任务 ID → 显式查询 → 下载链接。
-4. 当前视频只接入 MiniMax Hailuo 2.3，并保留会话内任务编号；不冒充 Gemini Veo、Qwen Wan 等平台异步任务已支持。已开始生成的外部收费任务不会因页面离开自动退款，也不静默创建新任务重试。
+4. 当前视频接入 MiniMax Hailuo 2.3 和 Qwen Wan 2.6；它们采用不同的提交／查询端点，并保留会话内任务编号；不冒充 Gemini Veo、Qwen Wan 等平台异步任务已支持。已开始生成的外部收费任务不会因页面离开自动退款，也不静默创建新任务重试。
 5. 费用与用量采用服务商各自的账号事实源，不把 MiniMax 套餐余额跨服务商共享。UI 明确提示各创作产品可能单独计费。
 6. 用户已在设置配置聊天账户并不代表有该商家的图片/视频权限；本轮以官方文档静态能力+用户配置识别为入口判断，真正调用是否获授权由服务商返回，失败应当显示，不静默换账户重试。
 7. 旧 `MiniMaxMediaSheet`／`MiniMaxMediaViewModel`／`LocalMiniMaxMediaRuntime` 退出，原 `MiniMaxNativeMediaClient` 仅保留作为 MiniMax provider transport，避免复制业务状态。
@@ -43,11 +43,12 @@
 - OpenAI TTS：https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create （`gpt-4o-mini-tts`、`/v1/audio/speech`）
 - OpenAI STT：https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create （`gpt-transcribe`、`gpt-4o-transcribe`、`/v1/audio/transcriptions`）
 - Qwen Image 官方 OpenAI 兼容 API：https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference （`/compatible-mode/v1/images/generations`，返回 URL，非通用 GPT Image Base64）
-- 阿里云万相专业视频模型：https://help.aliyun.com/zh/model-studio/use-video-generation/ （文档存在≠本客户端已接通）
+- 阿里云万相专业视频模型：https://help.aliyun.com/zh/model-studio/use-video-generation/ ；Wan 异步生成与 24 小时任务／URL 有效期：https://help.aliyun.com/zh/model-studio/text-to-video-guide （已接通 Wan 2.6，其他型号不能据此冒充已适配）
 - Gemini 图片生成/REST：https://ai.google.dev/gemini-api/docs/generate-content/image-generation ，模型：https://ai.google.dev/gemini-api/docs/models
 - Gemini Veo：https://ai.google.dev/gemini-api/docs/veo （异步视频，不应复用 MiniMax 任务轮询路径）
 - DeepSeek Flash Vision：https://api-docs.deepseek.com/guides/vision/
 - Claude Vision：https://docs.anthropic.com/zh-CN/docs/build-with-claude/vision
+- Kimi 官方 API：https://www.kimi.com/help/kimi-api/api-overview 、https://www.kimi.com/help/kimi-api/api-model-capabilities 、https://www.kimi.com/help/kimi-api/api-troubleshooting （尤其关注 Kimi Code 与开放平台账户隔离）
 
 ## 验证说明
 
