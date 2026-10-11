@@ -58,11 +58,11 @@ internal fun referencedWorkToolCallIds(snapshot: List<kotlinx.serialization.json
         message["tool_call_id"]?.jsonPrimitive?.contentOrNull
     }
     val checkpoint = LocalWorkCheckpoint.latestFrom(snapshot)
-    val checkpointIds = if (checkpoint?.toolCallIds?.isNotEmpty() == true) {
+    val checkpointIds = if (checkpoint?.hasTypedToolReferences == true) {
         checkpoint.toolCallIds
     } else {
         checkpoint?.facts.orEmpty().mapNotNull { fact ->
-            Regex("""(?:^|\\s)call=([^\\s]+)""").find(fact)?.groupValues?.getOrNull(1)
+            Regex("""(?:^|\s)call=([^\s]+)""").find(fact)?.groupValues?.getOrNull(1)
         }
     }
     return (recent + checkpointIds).filter(String::isNotBlank).distinct()
