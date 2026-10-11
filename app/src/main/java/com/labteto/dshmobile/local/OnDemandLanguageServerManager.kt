@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -56,7 +57,7 @@ internal class OnDemandLanguageServerManager(
     internal fun status(path: String?): String {
         val component = componentFor(path) ?: return "该语言尚无 Android 本地按需安装方案"
         return if (installedCommand(path).isNotEmpty()) {
-            component.id + " " + component.version + " 已安装，可离线使用"
+            component.id + " " + component.version + " 已安装（待首次真实语义查询验证）"
         } else {
             component.id + " " + component.version + " 尚未安装；首次语义查询需确认后下载"
         }
@@ -142,10 +143,24 @@ internal class OnDemandLanguageServerManager(
         val extracted = File(parent, ".npm-stage")
         if (extracted.exists()) extracted.deleteRecursively()
         try {
-            fetchArchive("https://registry.npmjs.org/npm/-/npm-11.6.2.tgz", archive)
-            check(fileDigest(archive, "SHA-512") == NPM_SHA512) {
-                "npm 启动组件 SHA-512 校验失败"
+            var valid = false
+            var lastError: Exception? = null
+            repeat(3) { attempt ->
+                if (valid) return@repeat
+                try {
+                    fetchArchive("https://registry.npmjs.org/npm/-/npm-11.6.2.tgz", archive)
+                    check(fileDigest(archive, "SHA-512") == NPM_SHA512) {
+                        "npm 引导包完整性校验失败（SHA-512）"
+                    }
+                    valid = true
+                } catch (error: Exception) {
+                    if (error is InterruptedException) throw error
+                    lastError = error
+                    archive.delete()
+                    if (attempt < 2) Thread.sleep(250L * (1L shl attempt))
+                }
             }
+            check(valid) { "npm 引导包下载或校验失败：" + lastError?.message }
             check(extracted.mkdirs()) { "无法创建解压目录" }
             extractVerifiedTar(archive, extracted)
             val entry = File(extracted, "package/bin/npm-cli.js")
@@ -216,20 +231,29 @@ internal class OnDemandLanguageServerManager(
             connection.connectTimeout = 15_000
             connection.readTimeout = 30_000
             try {
-                check(connection.responseCode == 200) { "npm 引导包下载失败：" + connection.responseCode }
+                val response = connection.responseCode
+                check(response == 200) { "npm 引导包下载 HTTP $response" }
+                val expected = connection.contentLengthLong.takeIf { it >= 0 }
+                if (expected != null) check(expected <= MAX_TARBALL_BYTES) {
+                    "npm 引导包超过限制"
+                }
+                var received = 0L
                 FileOutputStream(dest).use { output ->
                     connection.inputStream.use { input ->
                         val buffer = ByteArray(16 * 1024)
-                        var count = 0L
                         while (true) {
                             val n = input.read(buffer)
                             if (n < 0) break
-                            count += n
-                            check(count <= MAX_TARBALL_BYTES) { "下载包超过大小限制" }
+                            received += n
+                            check(received <= MAX_TARBALL_BYTES) { "npm 引导包体积异常" }
                             output.write(buffer, 0, n)
                         }
                     }
                 }
+                if (expected != null && expected != received) {
+                    throw IOException("npm 引导包短读：$received/$expected")
+                }
+                check(received > 0) { "npm 引导包为空" }
             } finally {
                 connection.disconnect()
             }
