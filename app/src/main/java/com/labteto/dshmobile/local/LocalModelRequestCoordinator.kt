@@ -45,6 +45,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.observability.sanitizeDiagnosticText
 import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
@@ -557,7 +558,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.providerParam?.let { put("provider_param", it) }
                                 error.cause?.let { cause ->
                                     put("cause_type", cause.javaClass.simpleName)
-                                    cause.message?.let { put("cause_detail", it.take(800)) }
+                                    cause.message?.let { put("cause_detail", sanitizeDiagnosticText(it).take(800)) }
                                 }
                             }
                             put("retryable", event.retryable)

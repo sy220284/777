@@ -241,7 +241,15 @@ internal fun TaskCard(
 
         if (task.failureStreak > 0 && task.recurringMinutes != null) {
             Text(
-                stringResource(R.string.tasks_failure_streak_active, task.failureStreak),
+                stringResource(
+                    when {
+                        task.status == AutomationStatus.PAUSED -> R.string.tasks_failure_streak_paused
+                        task.status == AutomationStatus.SCHEDULED || task.status == AutomationStatus.RUNNING ||
+                            task.status == AutomationStatus.QUEUED -> R.string.tasks_failure_streak_active
+                        else -> R.string.tasks_failure_streak_inactive
+                    },
+                    task.failureStreak,
+                ),
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.error,
             )
