@@ -57,6 +57,14 @@
 尚无用户真实付费 API 账户、Android 16/17 的真实网络/媒体回归证据；本次代码级 CI 不等于四家创作接口端到端成功。真实验证前不将“已接通”写作“已成功生成”。
 
 
+## 源码复审补充（同日）
+
+1. Qwen Image 3.0 兼容端点在当前官方文档中明确要求百炼 Workspace 域名（`{WorkspaceId}.{region}.maas.aliyuncs.com/compatible-mode/v1`）。不再对旧 `dashscope.aliyuncs.com` 聊天路由直接宣称 3.0 文生图已接通；该旧官方入口仍可通过独立 DashScope 异步协议提供已适配的 Wan 2.6 文生视频。API 权限和模型实际开通范围仍以账户响应为准。
+2. Qwen Image 3.0 OpenAI 兼容接口仅对 `qwen-image-3.0`/`qwen-image-3.0-pro` 开放；旧 `qwen-image-plus` 未沿用该协议。参见 2026-10-10 官方说明：https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference 。
+3. 新媒体请求复用 Android 可取消的 OkHttp 调用，但不再继承共享短请求 30 秒读取超时。媒体服务 HTTP 200 但返回 `error`/`code` 时标记失败；Gemini Base64 图像依据实际 `inlineData.mimeType` 保存和分享。
+4. OpenAI 音频上传优先根据 Android SAF 提供的原始文件名识别合法扩展名，在原始 MIME 缺失时仍允许已明确支持的格式，拒绝将其他音频伪装为 MP3。文档：https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create 。
+5. 同一视频创作模型可以连续提交多个任务，当前会话以路由分组保留任务编号并允许选择旧任务回查。**这仍不是持久运行中心**：异步响应尚未在外部 API 接受后立即进入数据库，弹层被关闭、进程退出时任务 ID 可能丢失。需要作为后续最高优先级的业务 Owner 生命周期升级，不应在这次 PR 中假称完全解决。
+
 ## 2026-10-11 复查订正
 
 - 根据阿里云 2026-10-10 更新的 **Qwen-Image 3.0 OpenAI 兼容图片接口**，客户端目录只声明该接口明确支持的 `qwen-image-3.0`、`qwen-image-3.0-pro`。旧 `qwen-image-plus` 的生成能力需要独立核对旧版 DashScope API 与异步生命周期，不能使用 3.0 兼容端点和尺寸参数冒充已接通。
