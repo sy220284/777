@@ -57,7 +57,7 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
         "currentUserImpression").forEach(::string)
     strings("unresolvedThreads")
 
-    fun nested(name: String, numeric: Set<String>, textual: Set<String>,
+    fun nested(name: String, textual: Set<String>,
                stringArrays: Set<String>, evidenceArrays: Set<String> = emptySet()) {
         val source = state[name] ?: return
         val objectValue = source as? JsonObject ?: run {
@@ -65,11 +65,6 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
             return
         }
         val fields = objectValue.toMutableMap()
-        numeric.forEach { key ->
-            val value = fields[key] ?: return@forEach
-            val number = (value as? JsonPrimitive)?.intOrNull
-            if (number == null) fields.remove(key) else fields[key] = JsonPrimitive(number)
-        }
         textual.forEach { key ->
             val value = fields[key] ?: return@forEach
             if (value !is JsonPrimitive || !value.isString) fields.remove(key)
@@ -115,11 +110,10 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     }
 
     nested("dynamics",
-        emptySet(),
         setOf("stage", "unresolvedConflict"),
         setOf("unknowns", "sharedMoments", "sharedObjects"),
         setOf("facts", "hypotheses"))
-    nested("continuity", emptySet(), emptySet(),
+    nested("continuity", emptySet(),
         setOf("recentEvents", "recurringEvents", "decisions", "unfinished"))
 
     // Retired numerical scores and speculative user profiles are decode-only legacy data.
