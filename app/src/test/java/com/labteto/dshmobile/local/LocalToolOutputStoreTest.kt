@@ -117,6 +117,34 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun activeCheckpointReferenceSurvivesOrdinaryEvictionButNotStorageBudget() {
+        val store = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 128,
+            maxFilesPerSession = 2,
+            maxSessionBytes = 256,
+            maxGlobalBytes = 512,
+        )
+        store.store("work", "important", "evidence")
+        store.retainActiveReferences("work", listOf("important"))
+        store.store("work", "ordinary", "temporary")
+        store.store("work", "latest", "fresh")
+        assertTrue(store.read("work", "important").contains("evidence"))
+        assertTrue(store.read("work", "ordinary").startsWith("未找到"))
+        assertTrue(store.read("work", "latest").contains("fresh"))
+        // Reference priorities survive process recreation because the manifest is private and durable.
+        val restored = LocalToolOutputStore(
+            root = File(temporary.root, "tool-output"),
+            maxOutputBytes = 128,
+            maxFilesPerSession = 2,
+            maxSessionBytes = 256,
+            maxGlobalBytes = 512,
+        )
+        restored.store("work", "next", "more")
+        assertTrue(restored.read("work", "important").contains("evidence"))
+    }
+
+    @Test
     fun deletingSessionRemovesItsPrivateOutputs() {
         val root = File(temporary.root, "tool-output")
         val store = LocalToolOutputStore(root)

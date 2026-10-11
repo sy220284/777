@@ -80,6 +80,47 @@ internal class LocalToolOutputStore(
         return if (target.isFile) Stored(bytes.size) else null
     }
 
+    /**
+     * The Work projection supplies the currently referenced call IDs. Persist only hashed IDs in
+     * this private session directory so process restarts do not silently discard active references.
+     * Pins influence eviction order but never defeat per-session/global byte limits.
+     */
+    @Synchronized
+    fun retainActiveReferences(sessionId: String, callIds: Collection<String>) {
+        val dir = sessionDir(sessionId).apply { mkdirs() }
+        val target = File(dir, ACTIVE_REFERENCES_FILE)
+        val names = callIds.filter(String::isNotBlank).distinct().takeLast(MAX_ACTIVE_REFERENCES)
+            .map { key(it) + ".txt" }.toSet()
+        val serialized = names.sorted().joinToString("\n")
+        if (target.isFile && target.readText() == serialized) return
+        if (names.isEmpty()) {
+            target.delete()
+            return
+        }
+        val temp = File(dir, ".active-refs.tmp")
+        try {
+            FileOutputStream(temp).use { output ->
+                output.write(serialized.toByteArray(Charsets.UTF_8))
+                output.flush()
+                output.fd.sync()
+            }
+            try {
+                Files.move(temp.toPath(), target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            temp.delete()
+        }
+    }
+
+    private fun activeReferenceFileNames(dir: File): Set<String> {
+        val manifest = File(dir, ACTIVE_REFERENCES_FILE)
+        if (!manifest.isFile) return emptySet()
+        return manifest.readLines().take(MAX_ACTIVE_REFERENCES).toSet()
+    }
+
     @Synchronized
     fun read(
         sessionId: String,
@@ -98,6 +139,7 @@ internal class LocalToolOutputStore(
 
         val source = File(sessionDir(sessionId), key(callId) + ".txt")
         if (!source.isFile) return missingResult(callId)
+        source.setLastModified(System.currentTimeMillis())
 
         val totalBytes = source.length().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         if (startByte >= totalBytes) return "工具结果没有第 $startByte 个 UTF-8 字节"
@@ -242,12 +284,18 @@ internal class LocalToolOutputStore(
     private fun pruneSession(dir: File, protectedFile: File): Long {
         var keptBytes = 0L
         var removedBytes = 0L
+        val active = activeReferenceFileNames(dir)
         dir.listFiles()
             .orEmpty()
             .filter { it.isFile && !it.name.startsWith(".") }
             .sortedWith(
-                compareByDescending<File> { if (it == protectedFile) 1 else 0 }
-                    .thenByDescending(File::lastModified),
+                compareByDescending<File> { file ->
+                    when {
+                        file == protectedFile -> 2
+                        file.name in active -> 1
+                        else -> 0
+                    }
+                }.thenByDescending(File::lastModified),
             )
             .forEachIndexed { index, file ->
                 val length = file.length()
@@ -262,12 +310,20 @@ internal class LocalToolOutputStore(
     }
 
     private fun pruneGlobal(protectedFile: File): Long {
+        val activeByDirectory = mutableMapOf<File, Set<String>>()
         var keptBytes = 0L
         root.walkTopDown()
             .filter { it.isFile && !it.name.startsWith(".") }
             .sortedWith(
-                compareByDescending<File> { if (it == protectedFile) 1 else 0 }
-                    .thenByDescending(File::lastModified),
+                compareByDescending<File> { file ->
+                    when {
+                        file == protectedFile -> 2
+                        file.name in activeByDirectory.getOrPut(file.parentFile) {
+                            activeReferenceFileNames(file.parentFile)
+                        } -> 1
+                        else -> 0
+                    }
+                }.thenByDescending(File::lastModified),
             )
             .forEach { file ->
                 val length = file.length()
@@ -307,6 +363,8 @@ internal class LocalToolOutputStore(
         const val MAX_READ_BYTES = 48 * 1024
         private const val MAX_SEARCH_QUERY_BYTES = 512
         private const val MAX_SEARCH_MATCHES = 10
+        private const val ACTIVE_REFERENCES_FILE = ".active-tool-refs"
+        private const val MAX_ACTIVE_REFERENCES = 16
         private const val MIN_READ_BYTES = 1_024
         private const val DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
         private const val DEFAULT_MAX_FILES_PER_SESSION = 64
