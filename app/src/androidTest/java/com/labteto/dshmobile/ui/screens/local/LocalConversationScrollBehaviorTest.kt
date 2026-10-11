@@ -254,11 +254,101 @@ class LocalConversationScrollBehaviorTest {
     @Test
     fun workTimelineAutoFollowDoesNotTreatLargeParagraphTopAsBottom() {
         assertTrue(shouldFollowNewWorkStep(10, 10, 10, false, false))
-        assertTrue(shouldFollowNewWorkStep(10, 10, null, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, null, false, false))
+        assertTrue(shouldFollowNewWorkStep(10, 9, 0, false, false))
+        // Seeing only the row before a zero-height placeholder is NOT proof of proximity.
+        assertFalse(shouldFollowNewWorkStep(10, 9, null, false, false))
         assertFalse(shouldFollowNewWorkStep(10, 10, 600, false, false))
         assertFalse(shouldFollowNewWorkStep(10, 7, null, false, false))
         assertFalse(shouldFollowNewWorkStep(10, 10, 0, true, false))
         assertFalse(shouldFollowNewWorkStep(10, 10, 0, false, true))
+    }
+
+    @Test
+    fun longFinalWorkReplyAlignsItsBottomWithoutAnimatingThroughEntireParagraph() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val following = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "long-tail-$it" }) { index ->
+                            Text(
+                                "step-$index",
+                                Modifier.fillMaxWidth().height(
+                                    if (index == 12) 740.dp else 64.dp,
+                                ),
+                            )
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "long-final",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "long-tail-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = following,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(9) } }
+        compose.waitForIdle()
+
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.last()
+            assertEquals(12, last.index)
+            assertTrue(last.offset + last.size - info.viewportEndOffset <= 72)
+            assertFalse(following.value)
+        }
+    }
+
+    @Test
+    fun readingBeginningOfTallFinalReplyDoesNotTriggerNextStepAutoFollow() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val following = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "long-reply-$it" }) { index ->
+                            Text(
+                                "long-reply-$index",
+                                Modifier.fillMaxWidth().height(
+                                    if (index == 11) 740.dp else 64.dp,
+                                ),
+                            )
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "reading-long-reply",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "long-reply-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = following,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(11) } }
+        compose.waitForIdle()
+
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(11, listState.firstVisibleItemIndex)
+            assertFalse(listState.layoutInfo.visibleItemsInfo.any { it.index == 12 })
+        }
     }
 
 }
