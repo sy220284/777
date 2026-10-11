@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class LocalMediaImage(val url: String? = null, val file: File? = null)
 data class LocalMediaVoice(val id: String, val name: String)
@@ -83,10 +84,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     }
 
     /** Persist before submitting the request. Never retry if provider acceptance is uncertain. */
-    fun createVideo(offer: LocalMediaOffer, prompt: String): LocalMediaVideoTask {
+    suspend fun createVideo(offer: LocalMediaOffer, prompt: String): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO)
         require(prompt.isNotBlank()) { "请填写视频描述" }
-        val task = videoStore.begin(offer)
+        val task = withContext(Dispatchers.IO) { videoStore.begin(offer) }
         scope.launch {
             try {
                 val externalId = when (offer.provider) {
