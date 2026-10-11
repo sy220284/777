@@ -4,6 +4,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.File
+import java.net.URI
 import java.util.ArrayDeque
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -197,7 +198,7 @@ class LspProcessClient(
         synchronized(messagesLock) { readerFailure == null }
 
     fun diagnosticRevision(uri: String): Long = synchronized(messagesLock) {
-        latestDiagnostics[uri]?.first ?: 0L
+        latestDiagnostics[diagnosticUriKey(uri)]?.first ?: 0L
     }
 
     /**
@@ -213,7 +214,7 @@ class LspProcessClient(
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
         synchronized(messagesLock) {
             while (true) {
-                val pair = latestDiagnostics[uri]
+                val pair = latestDiagnostics[diagnosticUriKey(uri)]
                 if (pair != null && pair.first > sinceRevision) {
                     val publishedVersion = pair.second["version"]?.jsonPrimitive?.intOrNull
                     if (publishedVersion == null || publishedVersion >= version) return@boundedIo pair.second
@@ -358,7 +359,7 @@ class LspProcessClient(
                                 val uri = params?.get("uri")?.jsonPrimitive?.content
                                 if (uri != null && params != null) {
                                     diagnosticSerial++
-                                    latestDiagnostics[uri] = diagnosticSerial to params
+                                    latestDiagnostics[diagnosticUriKey(uri)] = diagnosticSerial to params
                                     messagesLock.notifyAll()
                                 }
                             }
@@ -375,6 +376,21 @@ class LspProcessClient(
             }
         }, "lsp-json-rpc-reader").apply { isDaemon = true; start() }
     }
+
+    /**
+     * Some language servers normalize Java file:/path URIs into file:///path when publishing
+     * diagnostics. The document identity must survive that equivalent serialization.
+     */
+    private fun diagnosticUriKey(value: String): String = runCatching {
+        val parsed = URI(value).normalize()
+        if (parsed.scheme.equals("file", ignoreCase = true) &&
+            parsed.host.isNullOrEmpty() && parsed.path.startsWith("/")
+        ) {
+            URI("file", "", parsed.path, null).toASCIIString()
+        } else {
+            parsed.toASCIIString()
+        }
+    }.getOrDefault(value)
 
     private fun positionParams(uri: String, line: Int, character: Int): JsonObject =
         buildJsonObject {
