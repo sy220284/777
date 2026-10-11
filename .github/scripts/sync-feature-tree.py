@@ -1066,6 +1066,8 @@ def generate(root):
                     child["evidenceLevel"] = item["verification"]
                     child["sourceCount"] = len(item["existing_production_sources"])
                     child["missingSourceCount"] = len(item["missing_production_sources"])
+                    child["workflowJobCount"] = len(item.get("workflow_evidence", []))
+                    child["unrunTestCount"] = len(item.get("explicit_test_candidates", []))
                     if "identity_id" in item:
                         child["identityId"] = item["identity_id"]
                         child["identityStatus"] = item["identity_status"]
@@ -1144,6 +1146,8 @@ def generate(root):
         "existing_executable_test_mappings": len(matrix["items"]),
         "leaf_evidence": evidence,
         "evidence_grade_summary": categories,
+        "workflow_evidence_features": sum(bool(v.get("workflow_evidence")) for v in evidence),
+        "declared_unexecuted_test_methods": sum(len(v.get("explicit_test_candidates", [])) for v in evidence),
         "tracked_legacy_identities": len(identities),
         "stale_legacy_identities": stale_identities,
         "ambiguous_named_entry_paths": ambiguous_identities,
@@ -1171,6 +1175,8 @@ def generate(root):
     index["observed_delta"] = delta
     index["tracked_legacy_identities"] = len(identities)
     index["unproven_feature_count"] = len(unresolved_features)
+    index["workflow_evidence_features"] = sum(bool(v.get("workflow_evidence")) for v in evidence)
+    index["declared_unexecuted_test_methods"] = sum(len(v.get("explicit_test_candidates", [])) for v in evidence)
     index["verified_registrations"] = sorted(registry_nodes)
     index["unverified_changes_count"] = len(pending)
     index["obsolete_historical_evidence_count"] = len(historical_gaps)
