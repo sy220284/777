@@ -97,7 +97,14 @@ internal fun UsageCalculationPage(
     onOpenPricing: () -> Unit,
     analytics: TokenUsageAnalyticsSnapshot = TokenUsageAnalyticsSnapshot(),
     onOpenGroup: (TokenUsageGroupKind, String, String) -> Unit = { _, _, _ -> },
+    configuredModels: List<String> = emptyList(),
+    selectedModel: String? = null,
+    onSelectModel: (String?) -> Unit = {},
 ) {
+    val availableModels = (configuredModels + analytics.byModel.keys).distinct().sorted()
+    val visibleAnalytics = selectedModel?.let { analytics.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: analytics
+    val visibleUsage = selectedModel?.let { visibleAnalytics.tracked.asUsageSnapshot() } ?: usage
+    var modelMenuExpanded by remember { androidx.compose.runtime.mutableStateOf(false) }
     var modeIndex by rememberSaveable { mutableIntStateOf(0) }
     var rangeIndex by rememberSaveable { mutableIntStateOf(0) }
     var showAllGroups by rememberSaveable(modeIndex) {
@@ -105,15 +112,54 @@ internal fun UsageCalculationPage(
     }
     var selectedEpochDay by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
     val mode = if (modeIndex == 0) LocalUsageMode.CHAT else LocalUsageMode.WORK
-    val modeAnalytics = if (mode == LocalUsageMode.CHAT) analytics.chat else analytics.work
+    val modeAnalytics = if (mode == LocalUsageMode.CHAT) visibleAnalytics.chat else visibleAnalytics.work
     val range = UsageRange.entries[rangeIndex.coerceIn(0, UsageRange.entries.lastIndex)]
-    val days = remember(analytics.days, mode, range) {
-        dailyWindow(analytics.days, mode, range.days)
+    val days = remember(visibleAnalytics.days, mode, range) {
+        dailyWindow(visibleAnalytics.days, mode, range.days)
     }
     val selectedDay = days.firstOrNull { it.first == selectedEpochDay } ?: days.lastOrNull()
     val colors = DsTheme.colors
 
-    DeviceUsageHero(usage)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.usage_model_filter_label),
+            style = DsType.std14Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        Box {
+            DsButton(
+                text = (selectedModel ?: stringResource(R.string.usage_model_all)) + " ▾",
+                onClick = { modelMenuExpanded = true },
+                variant = DsButtonVariant.Ghost,
+            )
+            androidx.compose.material3.DropdownMenu(
+                expanded = modelMenuExpanded,
+                onDismissRequest = { modelMenuExpanded = false },
+            ) {
+                (listOf<String?>(null) + availableModels).forEach { model ->
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(model ?: stringResource(R.string.usage_model_all)) },
+                        onClick = {
+                            modelMenuExpanded = false
+                            onSelectModel(model)
+                        },
+                    )
+                }
+            }
+        }
+    }
+    DeviceUsageHero(visibleUsage, showEstimatedCost = selectedModel == null || visibleUsage.estimatedCostCny > 0.0)
+    if (selectedModel != null && analytics.modelHistoryPartial) {
+        Text(
+            stringResource(R.string.usage_model_history_partial),
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+        )
+    }
 
     DsSegmentedTabs(
         labels = listOf(
@@ -188,7 +234,7 @@ internal fun UsageCalculationPage(
 
     UsageEfficiency(mode, modeAnalytics)
 
-    val groups = if (mode == LocalUsageMode.CHAT) analytics.sessions else analytics.tasks
+    val groups = if (mode == LocalUsageMode.CHAT) visibleAnalytics.sessions else visibleAnalytics.tasks
     SectionHeading(
         if (mode == LocalUsageMode.CHAT) {
             stringResource(R.string.usage_conversations)
@@ -239,7 +285,7 @@ internal fun UsageCalculationPage(
         }
     }
 
-    if (usage.totalTokens > analytics.tracked.totalTokens) {
+    if (selectedModel == null && usage.totalTokens > analytics.tracked.totalTokens) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.row,
@@ -269,7 +315,7 @@ internal fun UsageCalculationPage(
         }
     }
 
-    if (usage.unreportedRequestCount > 0L || usage.unpricedTokens > 0L) {
+    if (visibleUsage.unreportedRequestCount > 0L || (selectedModel == null && usage.unpricedTokens > 0L)) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.row,
@@ -284,14 +330,14 @@ internal fun UsageCalculationPage(
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.warnLabel,
                 )
-                if (usage.unreportedRequestCount > 0L) {
+                if (visibleUsage.unreportedRequestCount > 0L) {
                     Text(
-                        stringResource(R.string.local_usage_unreported, usage.unreportedRequestCount),
+                        stringResource(R.string.local_usage_unreported, visibleUsage.unreportedRequestCount),
                         style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
-                if (usage.unpricedTokens > 0L) {
+                if (selectedModel == null && usage.unpricedTokens > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unpriced, formatNumber(usage.unpricedTokens)),
                         style = DsType.caption11.withReadingWeight(),
@@ -319,9 +365,11 @@ internal fun UsageCalculationPage(
 internal fun UsageLogPage(
     analytics: TokenUsageAnalyticsSnapshot,
     onOpenRequest: (String) -> Unit,
+    selectedModel: String? = null,
 ) {
     val colors = DsTheme.colors
-    if (analytics.recentRecords.isEmpty()) {
+    val visibleAnalytics = selectedModel?.let { analytics.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: analytics
+    if (visibleAnalytics.recentRecords.isEmpty()) {
         EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
         return
     }
@@ -331,7 +379,7 @@ internal fun UsageLogPage(
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column {
-            val records = analytics.recentRecords.take(120)
+            val records = visibleAnalytics.recentRecords.take(120)
             records.forEachIndexed { index, record ->
                 UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
                 if (index != records.lastIndex) UsageDivider()
@@ -476,3 +524,16 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
         color = colors.labelTertiary,
     )
 }
+
+/** A UI-only projection; server-reported request accounting remains in TokenUsageAnalyticsStore. */
+private fun TokenUsageAggregate.asUsageSnapshot() = DeepSeekUsageSnapshot(
+    inputTokens = inputTokens,
+    cacheHitTokens = cacheHitTokens,
+    cacheMissTokens = cacheMissTokens,
+    cacheWriteTokens = cacheWriteTokens,
+    outputTokens = outputTokens,
+    reasoningTokens = reasoningTokens,
+    requestCount = requestCount,
+    unreportedRequestCount = unreportedRequestCount,
+    estimatedCostCny = estimatedCostCny,
+)
