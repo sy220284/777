@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -133,6 +134,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                                     ids.joinToString("\n")
                             },
                             onFailure = { error ->
+                                if (error is CancellationException) throw error
                                 "官方模型目录查询未成功（${when (error) {
                                     is IllegalArgumentException -> "配置或接口不受支持"
                                     else -> "服务商拒绝、响应异常或网络故障"
