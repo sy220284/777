@@ -47,6 +47,8 @@ internal class LocalWorkRunBinding(
     val state = MutableStateFlow(initialState)
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
     val enabledOptionalTools = linkedSetOf<String>()
+    /** Not an extra queue: monotonic signal for committed, explicitly steered Work inputs. */
+    val steeringRevision = MutableStateFlow(0L)
     /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
     val executionControl = LocalWorkExecutionControl()
 
