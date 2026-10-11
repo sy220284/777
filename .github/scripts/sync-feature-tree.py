@@ -1296,6 +1296,56 @@ def test():
         assert len(stale) == 1
         assert stale[0]["id"] == "existing.0001"
 
+        # 工程 job 的证据必须在该 job 自己的命令中，而非同文件其他作业。
+        automation_file = root / ".github/workflows/sample.yml"
+        automation_file.parent.mkdir(parents=True, exist_ok=True)
+        automation_file.write_text(
+            "name: 核查\n"
+            "jobs:\n"
+            "  alpha:\n"
+            "    steps:\n"
+            "      - run: echo ONLY_ALPHA\n"
+            "  beta:\n"
+            "    steps:\n"
+            "      - run: echo ONLY_BETA\n",
+            encoding="utf-8"
+        )
+        job_evidence = {"version": 1, "items": [{
+            "path": "B / 试验功能",
+            "grade": "CI工作流入口存在（静态）",
+            "sources": [{"path": ".github/workflows/sample.yml",
+                         "job": "alpha", "literals": ["ONLY_ALPHA"]}],
+        }]}
+        (root / WORKFLOW_EVIDENCE).write_text(
+            json.dumps(job_evidence, ensure_ascii=False), encoding="utf-8"
+        )
+        assert len(verified_workflow_evidence(root, ["B / 试验功能"])) == 1
+        job_evidence["items"][0]["sources"][0]["literals"] = ["ONLY_BETA"]
+        (root / WORKFLOW_EVIDENCE).write_text(
+            json.dumps(job_evidence, ensure_ascii=False), encoding="utf-8"
+        )
+        try:
+            verified_workflow_evidence(root, ["B / 试验功能"])
+            raise AssertionError("不能因为另一个 job 中有命令就承认当前 job 功能")
+        except ValueError:
+            pass
+        # 单个符号仅存在于一个具体文件，禁止在另一文件假造共享入口歧义。
+        alternate = root / "app/src/main/java/sample/Other.kt"
+        alternate.write_text("class Other {}\n", encoding="utf-8")
+        entries = [
+            {"path": "B / 一", "existing_production_sources": [
+                "app/src/main/java/sample/Feature.kt"
+            ], "named_symbols": [{"symbol": "Entry", "declaration_found": True}]},
+            {"path": "B / 二", "existing_production_sources": [
+                "app/src/main/java/sample/Other.kt"
+            ], "named_symbols": [{"symbol": "Entry", "declaration_found": True}]},
+        ]
+        assert not ambiguous_source_anchors(root, entries)
+        entries[1]["existing_production_sources"] = [
+            "app/src/main/java/sample/Feature.kt"
+        ]
+        assert len(ambiguous_source_anchors(root, entries)) == 1
+
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
