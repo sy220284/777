@@ -268,10 +268,10 @@ internal fun LocalConversationSurface(
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
     val transcriptItems = remember(transcriptMessages, state.usageMode) {
-        buildLocalTranscript(
+        buildLocalDisplayTranscript(buildLocalTranscript(
             transcriptMessages,
             includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-        )
+        ))
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -743,7 +743,13 @@ internal fun LocalConversationSurface(
                             }
                         }
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
+                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkStep -> WorkTimelineStepRow(
+                            message = transcriptItem.message,
+                            repeatCount = transcriptItem.repeatCount,
+                            active = state.running && transcriptItem.message.role != "tool" &&
+                                transcriptItem.key == transcriptItems.lastOrNull()?.key,
+                        )
                     }
                 }
                 if (showStreamingTail) {
@@ -759,11 +765,21 @@ internal fun LocalConversationSurface(
                             LocalStreamingWorkPreview(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
-                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
-                                lastDurableNarrative = (transcriptItems.lastOrNull() as?
-                                    LocalTranscriptItem.WorkProcess)?.messages?.lastOrNull {
-                                    it.role == "progress" || it.role == "assistant"
-                                }?.content,
+                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                                lastDurableNarrative = transcriptItems.asReversed().firstNotNullOfOrNull { item ->
+                                    when (item) {
+                                        is LocalTranscriptItem.WorkStep ->
+                                            item.message.takeIf {
+                                                it.role == "progress" || it.role == "assistant"
+                                            }?.content
+                                        is LocalTranscriptItem.WorkProcess ->
+                                            item.messages.lastOrNull {
+                                                it.role == "progress" || it.role == "assistant"
+                                            }?.content
+                                        else -> null
+                                    }
+                                },
                             )
                         }
                     }
