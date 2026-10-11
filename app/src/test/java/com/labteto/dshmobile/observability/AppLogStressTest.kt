@@ -189,4 +189,62 @@ class AppLogStressTest {
         assertEquals(200, snapshot.size)
         assertEquals("entry-4999", snapshot.last().message)
     }
+    @Test
+    fun failedInFlightBatchKeepsGlobalCapacityDuringNewOffers() {
+        val scheduled = ArrayDeque<Runnable>()
+        val retries = ArrayDeque<Runnable>()
+        val stored = mutableListOf<Int>()
+        var broken = true
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { batch: List<Int> ->
+                if (broken) throw java.io.IOException("disk full")
+                stored.addAll(batch)
+            },
+            important = { it < 0 },
+            capacity = 3,
+            batchSize = 2,
+            scheduleRetry = { retries.addLast(it) },
+        )
+        queue.offer(-1)
+        queue.offer(1)
+        queue.offer(2)
+        scheduled.removeFirst().run()
+        assertEquals(listOf(-1, 1, 2), queue.snapshot().outstanding)
+        queue.offer(3)
+        queue.offer(4)
+        val stalled = queue.snapshot()
+        assertEquals(3, stalled.outstanding.size)
+        assertTrue(stalled.outstanding.contains(-1))
+        assertEquals(2L, stalled.overflow)
+        broken = false
+        retries.removeFirst().run()
+        assertEquals(queue.snapshot().outstanding.size, 0)
+        assertEquals(3, stored.size)
+    }
+
+    @Test
+    fun allInFlightEntriesAreReservedEvenForMoreFailures() {
+        val scheduled = ArrayDeque<Runnable>()
+        val retry = ArrayDeque<Runnable>()
+        var fail = true
+        val queue = DiagnosticWriteQueue(
+            executor = Executor { scheduled.addLast(it) },
+            writer = { _: List<Int> -> if (fail) throw java.io.IOException("full") },
+            important = { it < 0 },
+            capacity = 2,
+            batchSize = 2,
+            scheduleRetry = { retry.addLast(it) },
+        )
+        queue.offer(-1)
+        queue.offer(-2)
+        scheduled.removeFirst().run()
+        queue.offer(-3)
+        assertEquals(listOf(-1, -2), queue.snapshot().outstanding)
+        assertEquals(1L, queue.snapshot().overflow)
+        fail = false
+        retry.removeFirst().run()
+        assertTrue(queue.snapshot().outstanding.isEmpty())
+    }
+
 }

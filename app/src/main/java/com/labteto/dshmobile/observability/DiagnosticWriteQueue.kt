@@ -4,8 +4,9 @@ import java.util.ArrayDeque
 import java.util.concurrent.Executor
 
 /**
- * Single scheduled drain, batched writes, no producer-thread disk I/O.
- * An in-flight copy stays visible to export until the writer has completed.
+ * A single background consumer. A batch remains outstanding until its write succeeds.
+ * The capacity includes pending AND in-flight entries, including entries waiting for retry.
+ * Producers never perform disk I/O or wait for a failed writer.
  */
 internal class DiagnosticWriteQueue<T>(
     private val executor: Executor,
@@ -36,89 +37,92 @@ internal class DiagnosticWriteQueue<T>(
     fun offer(entry: T) {
         val priority = important(entry)
         val start = synchronized(gate) {
-            if (pending.size >= capacity) {
+            // Entries being written remain reserved: neither new offers nor retries can
+            // expand the outstanding set or evict an in-flight record.
+            if (pending.size + inFlight.size >= capacity) {
                 if (ordinaryCount > 0) {
-                    val expendable = pending.iterator()
-                    while (expendable.hasNext()) {
-                        if (!important(expendable.next())) {
-                            expendable.remove()
+                    val it = pending.iterator()
+                    while (it.hasNext()) {
+                        if (!important(it.next())) {
+                            it.remove()
                             ordinaryCount--
                             break
                         }
                     }
                     pending.addLast(entry)
                     if (!priority) ordinaryCount++
-                } else if (priority) {
-                    // Keep the first failure (root cause) as well as the newest failure.
-                    val iterator = pending.iterator()
-                    iterator.next()
-                    if (iterator.hasNext()) {
-                        iterator.next()
-                        iterator.remove()
-                    } else {
-                        pending.removeFirst()
-                    }
+                } else if (priority && pending.isNotEmpty()) {
+                    // Keep the oldest failure (often the root cause) and newest failures.
+                    val it = pending.iterator()
+                    if (inFlight.isEmpty() && pending.size > 1) it.next()
+                    it.next()
+                    it.remove()
                     pending.addLast(entry)
                 }
-                // When full of failures, an incoming ordinary message is discarded.
+                // The evicted entry OR the rejected new entry is counted as lost.
                 overflow++
             } else {
                 pending.addLast(entry)
                 if (!priority) ordinaryCount++
             }
-            if (draining) false else {
+            if (draining || (pending.isEmpty() && inFlight.isEmpty())) false else {
                 draining = true
                 true
             }
         }
-        if (start) {
-            try {
-                executor.execute { drain() }
-            } catch (error: Exception) {
-                synchronized(gate) {
-                    draining = false
-                    writeError = error.javaClass.simpleName
-                }
-            }
-        }
+        if (start) dispatch()
     }
 
     fun snapshot(): Snapshot<T> = synchronized(gate) {
         Snapshot(inFlight + pending.toList(), overflow, writeError)
     }
 
-    /** Only used by the test/maintenance clear path. The disk lock must be held by the caller. */
+    /** The caller must hold the persistent storage lock before clearing durable state. */
     fun clearPending() = synchronized(gate) {
         pending.clear()
         ordinaryCount = 0
         overflow = 0L
         writeError = null
+        // An active write is protected until it completes; the caller uses generation
+        // invalidation to prevent the old batch from reaching storage after a clear.
+    }
+
+    private fun dispatch() {
+        try {
+            executor.execute { drain() }
+        } catch (error: Exception) {
+            synchronized(gate) {
+                draining = false
+                writeError = error.javaClass.simpleName
+            }
+        }
     }
 
     private fun drain() {
         while (true) {
             val batch = synchronized(gate) {
-                if (pending.isEmpty()) {
-                    draining = false
-                    return
-                }
-                buildList {
-                    repeat(minOf(batchSize, pending.size)) {
-                        val item = pending.removeFirst()
-                        if (!important(item)) ordinaryCount--
-                        add(item)
+                if (inFlight.isNotEmpty()) {
+                    inFlight
+                } else {
+                    if (pending.isEmpty()) {
+                        draining = false
+                        return
                     }
-                }.also { inFlight = it }
+                    buildList {
+                        repeat(minOf(batchSize, pending.size)) {
+                            val item = pending.removeFirst()
+                            if (!important(item)) ordinaryCount--
+                            add(item)
+                        }
+                    }.also { inFlight = it }
+                }
             }
             try {
                 writer(batch)
             } catch (error: Exception) {
                 synchronized(gate) {
-                    batch.asReversed().forEach { item ->
-                        pending.addFirst(item)
-                        if (!important(item)) ordinaryCount++
-                    }
-                    inFlight = emptyList()
+                    // Do not reinsert: the batch retained its capacity reservation
+                    // throughout the write, so concurrent offers cannot overfill it.
                     writeError = error.javaClass.simpleName
                     draining = scheduleRetry != null
                 }
