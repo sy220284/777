@@ -34,6 +34,23 @@ internal fun userFacingWorkToolProvider(toolName: String?): String? {
     }
 }
 
+/** User-facing tool purposes use a small reviewed allowlist, never raw tool identifiers. */
+internal fun userFacingWorkToolActionRes(toolName: String?): Int? {
+    val name = toolName?.lowercase().orEmpty()
+    return when {
+        name.contains("github") && (name.contains("workflow") || name.contains("check_run")) ->
+            R.string.local_work_action_github_ci
+        name.contains("github") && (name.contains("pull_request") || name.contains("_pr_") ||
+            name.endsWith("_pr")) -> R.string.local_work_action_github_pr
+        name.contains("github") && (name.contains("update_file") || name.contains("create_") ||
+            name.contains("merge_") || name.contains("update_ref")) ->
+            R.string.local_work_action_github_write
+        name.contains("github") -> R.string.local_work_action_github_read
+        name.contains("figma") -> R.string.local_work_action_figma
+        else -> null
+    }
+}
+
 /** A readable chronological step, with optional explanation instead of a hidden disclosure. */
 @Composable
 internal fun WorkContentBlock(node: LocalWorkProcessNode, running: Boolean) {
@@ -151,7 +168,7 @@ internal fun WorkTimelineStepRow(
     val failed = message.toolIsError ?: localWorkToolFailed(message.content)
     val provider = userFacingWorkToolProvider(message.toolName)
     val kind = com.labteto.dshmobile.ui.agentOperationKind(message.toolName)
-    val action = stringResource(agentOperationLabelRes(kind))
+    val action = stringResource(userFacingWorkToolActionRes(message.toolName) ?: agentOperationLabelRes(kind))
     val label = if (provider != null) "$provider · $action" else action
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.tiny),
