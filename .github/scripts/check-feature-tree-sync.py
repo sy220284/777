@@ -382,6 +382,35 @@ def inspect():
     pending = review.get("unproven_feature_triage", [])
     if [r["path"] for r in pending] != missing or index.get("unproven_feature_count") != len(missing):
         raise ValueError("逐项无源码证据功能的待核实登记不完整")
+    followup_file = DOCS / "FEATURE-EXISTENCE-TRIAGE.json"
+    if followup_file.is_file():
+        followup_data = json.loads(followup_file.read_text(encoding="utf-8"))
+        if followup_data.get("version") != 1 or not isinstance(followup_data.get("items"), list):
+            raise ValueError("存在性核查文件不是指定结构")
+        lookup = {item["path"]: item for item in followup_data["items"]}
+        if len(lookup) != len(followup_data["items"]) or set(lookup) != set(missing):
+            raise ValueError("存在性核查未逐条覆盖历史待确认入口")
+        byname = {x["path"]: x for x in reported}
+        for path, record in lookup.items():
+            expected = {
+                "kind": record["kind"],
+                "availability": record["availability"],
+                "separate_product_entry": record["independent"],
+                "production_sources_confirmed": len(record["source"]),
+                "test_methods_confirmed": len(record["test"]),
+                "explanation": record["conclusion"],
+            }
+            if byname[path].get("followup") != expected:
+                raise ValueError("逐项功能的核实结论与手工代码证据不一致")
+            if next(x for x in pending if x["path"] == path).get("followup") != expected:
+                raise ValueError("待核报告遗漏已完成的独立性核实")
+        if (review.get("followup_investigated_descriptions") != len(lookup)
+            or index.get("followup_investigated_descriptions") != len(lookup)
+            or review.get("followup_production_or_compatibility")
+                != sum(bool(x["source"]) for x in lookup.values())
+            or review.get("followup_test_only_descriptions")
+                != sum(not x["source"] for x in lookup.values())):
+            raise ValueError("补充核实和实际运行状态分类统计失配")
     for item in pending:
         if item.get("candidate_role") != "仅供排查的真实文件路径，尚未确认业务功能":
             raise ValueError("弱证据功能的源码候选必须明确不能代表功能通过")
@@ -405,7 +434,9 @@ def inspect():
                     child.get("sourceCount") != len(info["existing_production_sources"]) or
                     child.get("missingSourceCount") != len(info["missing_production_sources"]) or
                     child.get("workflowJobCount") != len(info.get("workflow_evidence", [])) or
-                    child.get("unrunTestCount") != len(info.get("explicit_test_candidates", []))):
+                    child.get("unrunTestCount") != len(info.get("explicit_test_candidates", [])) or
+                    child.get("followupKind") != info.get("followup", {}).get("kind") or
+                    child.get("followupAvailability") != info.get("followup", {}).get("availability")):
                     raise ValueError("HTML 展示的源码/CI作业/未执行测试证据与复核台账不一致")
             check_display(child, path)
     check_display(data, [])
