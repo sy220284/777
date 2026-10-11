@@ -568,6 +568,7 @@
     <string name="tasks_run_skipped">已暂缓</string>
     <string name="tasks_last_result">最近结果：%1$s</string>
     <string name="tasks_last_status">最近状态：%1$s</string>
+    <string name="tasks_failure_streak_active">已连续失败 %1$d 次，任务仍按原计划执行；可暂停后检查原因</string>
     <string name="tasks_open_result">查看结果</string>
     <string name="tasks_notification_complete">自动化任务已完成</string>
     <string name="tasks_notification_blocked">自动化任务需要处理</string>
