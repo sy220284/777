@@ -338,61 +338,138 @@ def generate(root):
     html = (root / HTML).read_text(encoding="utf-8")
     model, block = parse(md)
     registered, index = scan(root)
-    prev = json.loads((root / REG).read_text(encoding="utf-8")) if (root / REG).exists() else {"version": 1, "nodes": []}
+    prev = (json.loads((root / REG).read_text(encoding="utf-8"))
+            if (root / REG).exists() else {"version": 1, "nodes": []})
     if prev.get("version") != 1:
         raise ValueError("不支持的功能注册表版本")
     older = {item["id"]: item for item in prev["nodes"]}
-    changed_paths = {}
-    removed_paths = []
-    for ident, item in older.items():
-        updated = registered.get(ident)
-        if updated is None or updated["path"] != item["path"]:
-            if find(model, parts(item["path"])):
-                delete(model, parts(item["path"]))
-                removed_paths.append(parts(item["path"]))
-                changed_paths[item["path"]] = updated["path"] if updated else None
-    for ident, item in sorted(registered.items()):
-        if ident not in older and item.get("previous_path") and item["previous_path"] != item["path"]:
+    valid, retired, pending = checked_registration(root, registered, older)
+    old_paths = {}
+    deleted = []
+    # 退役必须有明确的退役声明；登记消失只产生候选，不做破坏性变更。
+    for ident, item in retired.items():
+        if find(model, parts(item["path"])):
+            delete(model, parts(item["path"]))
+            deleted.append(parts(item["path"]))
+            old_paths[item["path"]] = None
+    for ident, item in sorted(valid.items()):
+        was = older.get(ident)
+        if was and was["path"] != item["path"]:
+            if find(model, parts(was["path"])):
+                delete(model, parts(was["path"]))
+                deleted.append(parts(was["path"]))
+                old_paths[was["path"]] = item["path"]
+        if not was and item.get("previous_path") and item["previous_path"] != item["path"]:
             if find(model, parts(item["previous_path"])):
                 delete(model, parts(item["previous_path"]))
-                removed_paths.append(parts(item["previous_path"]))
-                changed_paths[item["previous_path"]] = item["path"]
+                deleted.append(parts(item["previous_path"]))
+                old_paths[item["previous_path"]] = item["path"]
         add(model, parts(item["path"]))
-    for previous_path in removed_paths:
-        prune_empty(model, previous_path)
-    leafpaths = leaves(model)
-    if len(leafpaths) != len(set(leafpaths)):
-        raise ValueError("功能树叶节点重复")
-    # 无语义节点变化时保持两份旧图原样，避免格式化引起无意义的大规模差异。
-    semantic_diff = bool(registered or older)
-    if semantic_diff:
-        md = md[:block.start(2)] + render(model) + md[block.end(2):]
-        old, match = original_html(html)
-        dataset = json.dumps(
-            to_html(model, old, {v["path"]: v for v in registered.values()}),
-            ensure_ascii=False, separators=(",", ":")
-        )
-        html = html[:match.start(2)] + dataset + html[match.end(2):]
+    for old in deleted:
+        prune_empty(model, old)
+    all_leaves = leaves(model)
+    if len(all_leaves) != len(set(all_leaves)):
+        raise ValueError("功能树叶节点存在重复路径")
     matrix_text = (root / MATRIX).read_text(encoding="utf-8")
-    if changed_paths:
-        matrix = json.loads(matrix_text)
-        ranks = {name: i for i, name in enumerate(leafpaths)}
-        items = []
+    matrix = json.loads(matrix_text)
+    ranks = {name: i for i, name in enumerate(all_leaves)}
+    if old_paths:
+        updated = []
         for item in matrix["items"]:
-            location = changed_paths.get(item["path"], item["path"])
-            if location is None:
+            target = old_paths.get(item["path"], item["path"])
+            if target is None:
                 continue
-            if location not in ranks:
-                raise ValueError("测试证据无法映射新功能位置: " + location)
-            items.append({**item, "path": location})
-        matrix["items"] = sorted(items, key=lambda x: ranks[x["path"]])
+            if target not in ranks:
+                raise ValueError("旧测试证据不能映射新功能路径: " + target)
+            updated.append({**item, "path": target})
+        matrix["items"] = sorted(updated, key=lambda x: ranks[x["path"]])
         matrix_text = json.dumps(matrix, ensure_ascii=False, indent=2) + "\n"
-    normalized = [{k: v for k, v in item.items() if k != "previous_path"}
-                  for item in sorted(registered.values(), key=lambda v: v["id"])]
+    for item in matrix["items"]:
+        if item["path"] not in ranks:
+            raise ValueError("存在已失效的测试证据映射: " + item["path"])
+
+    # 所有节点仍以中文产品名称呈现；旧有混合术语不因扫描被擅自更名。
+    snap = snapshot(root)
+    model["name"] = "777 神言神语（当前生产代码功能树）"
+    md = md[:block.start(2)] + render(model) + md[block.end(2):]
+    header = (
+        f"代码核对基准：当前检出的 Git 提交 \x60{snap}\x60。扫描后确认的功能变更写入功能树；"
+        "证据不足的候选变化保留待核实，不能视为已交付。\n\n"
+        "说明：本图展示已登记的产品功能及归属。历史功能仍需按真实调用链逐项验收；"
+        "源码符号、路由和测试存在仅构成局部证据，不证明全部功能可用。"
+        "参考 [功能审计](FUNCTION-AUDIT.zh-CN.md)、"
+        "[代码证据台账](FEATURE-CODE-EVIDENCE.zh-CN.md)、"
+        "[自动复核结果](FEATURE-REVIEW.auto.json) 与"
+        "[交互式树状图](FEATURE-TREE.zh-CN.html)。"
+    )
+    md = re.sub(
+        r"(?<=# 777《神言神语》全功能架构树\n\n)[\s\S]*?(?=\n\n\x60{3}text\n)",
+        header, md, count=1,
+    )
+    old, html_match = original_html(html)
+    dataset = json.dumps(
+        to_html(model, old, {v["path"]: v for v in valid.values()
+                             if (root / v["source"]).is_file()}),
+        ensure_ascii=False, separators=(",", ":"),
+    )
+    html = html[:html_match.start(2)] + dataset + html[html_match.end(2):]
+    # 替换过期的主线/PR 快照说明，避免历史提交号伪装为最新。
+    html = re.sub(r'(<p class="sub">按架构 3\.0 的真实所有权展开.*?)</p>',
+                  f'<p class="sub">按架构 3.0 的实际功能归属展示 · 当前源码快照 {snap}</p>',
+                  html, count=1)
+    html = re.sub(
+        r'<div class="meta">.*?</div>',
+        f'<div class="meta"><span class="chip">已扫描代码 <b>{index["repository_code_file_count"]}</b></span>'
+        f'<span class="chip">生产源码 <b>{index["production_source_count"]}</b></span>'
+        f'<span class="chip">源码基准 <b>{snap}</b></span><span class="chip" id="total"></span></div>',
+        html, count=1, flags=re.S,
+    )
+    html = re.sub(
+        r'<p class="foot">.*?</p>',
+        '<p class="foot">依据：<a href="ARCHITECTURE.md">架构 3.0</a> · '
+        '<a href="FEATURE-TREE.zh-CN.md">中文功能树</a> · '
+        '<a href="FEATURE-REVIEW.auto.json">源码复核结果</a> · '
+        '节点为功能索引，不代表运行验收全部通过。</p>',
+        html, count=1, flags=re.S,
+    )
+    html = re.sub(
+        r'(<p class="sub">2026-10-10 核对：).*?(</p>)',
+        f'<p class="sub">本图按照代码快照 {snap} 与现存登记刷新。'
+        '未经证明的新增与退役变化不会直接写入节点；验收仍以真实测试和设备执行为准。</p>',
+        html, count=1, flags=re.S,
+    )
+    node_count = validate_view(model, html)
+    review = {
+        "version": 1,
+        "snapshot": snap,
+        "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
+        "code_files_scanned": index["repository_code_file_count"],
+        "production_sources_scanned": index["production_source_count"],
+        "feature_nodes": node_count,
+        "functional_leaves": len(all_leaves),
+        "existing_executable_test_mappings": len(matrix["items"]),
+        "source_verified_registrations": len(valid),
+        "explicit_retirements": len(retired),
+        "changes_applied": [{"previous": previous, "current": current}
+                            for previous, current in sorted(old_paths.items())],
+        "pending_changes": pending,
+        "verification_limits": (
+            "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；"
+            "无法据此证明测试在真实设备或服务上的行为完整。"
+            "没有声明和证据的历史节点继续保留原状。"
+        ),
+    }
+    index["source_snapshot"] = snap
+    index["verified_registrations"] = sorted(valid)
+    index["unverified_changes_count"] = len(pending)
+    normalized = [{k: v for k, v in item.items() if k not in {"previous_path", "action", "reason"}}
+                  for item in sorted(valid.values(), key=lambda v: v["id"])
+                  if (root / item["source"]).is_file()]
     return {
         MD: md, HTML: html, MATRIX: matrix_text,
         REG: json.dumps({"version": 1, "nodes": normalized}, ensure_ascii=False, indent=2) + "\n",
         INDEX: json.dumps(index, ensure_ascii=False, indent=2) + "\n",
+        REVIEW: json.dumps(review, ensure_ascii=False, indent=2) + "\n",
     }
 
 
