@@ -146,8 +146,10 @@ class LspPlugin(
         if (name == "lsp_uninstall_component") {
             val component = input["component"]?.jsonPrimitive?.contentOrNull.orEmpty()
             require(component in setOf("typescript", "pyright")) { "未知组件：仅支持 typescript、pyright" }
-            // Release the process before deleting any of its JS files.
-            closeClientsGracefully()
+            // Only release processes belonging to this component; keep other languages live.
+            closeClientsGracefully { handle ->
+                handle.command.any { it.contains("/components/" + component + "-") }
+            }
             check(uninstallOnDemand(component)) { "组件卸载失败：" + component }
             return ToolResult("代码智能组件已卸载：" + component + "；需要时可重新下载")
         }
@@ -347,10 +349,14 @@ class LspPlugin(
         throw error
     }
 
-    private suspend fun closeClientsGracefully() {
-        val current = clients.values.toList()
-        clients.clear()
-        versions.clear()
+    private suspend fun closeClientsGracefully(
+        shouldClose: (ClientHandle) -> Boolean = { true },
+    ) {
+        val current = clients.values.filter(shouldClose)
+        current.forEach { handle ->
+            clients.remove(handle.key)
+            versions.remove(handle.key)
+        }
         var cancellation: CancellationException? = null
         for (handle in current) {
             try {
