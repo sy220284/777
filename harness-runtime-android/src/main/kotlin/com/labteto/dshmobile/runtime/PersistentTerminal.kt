@@ -26,6 +26,14 @@ class PersistentPipeTerminalProvider(
     )
 
     private val sessions = ConcurrentHashMap<String, Session>()
+    // A terminal session lives in this process/provider instance. Reconstructed agents must
+    // never mistake a prior runtime's session ID for an accessible live process.
+    private val runtimeEpoch = UUID.randomUUID().toString().replace("-", "").take(10)
+
+    fun runtimeGeneration(): String = runtimeEpoch
+
+    fun isFromPreviousRuntime(sessionId: String): Boolean =
+        isPriorTerminalRuntimeSession(sessionId, runtimeEpoch)
 
     override suspend fun open(command: List<String>, workingDirectory: String?): String =
         withContext(Dispatchers.IO) {
@@ -43,7 +51,8 @@ class PersistentPipeTerminalProvider(
                     },
             )
             val process = managed.process
-            val id = "term-" + UUID.randomUUID().toString().replace("-", "").take(16)
+            val id = "term-" + runtimeEpoch + "-" +
+                UUID.randomUUID().toString().replace("-", "").take(12)
             sessions[id] = Session(managed, process.outputStream, process.inputStream)
             id
         }
@@ -121,7 +130,11 @@ class PersistentPipeTerminalProvider(
     }
 
     private fun requireKnownSession(id: String): Session =
-        sessions[id] ?: error("终端会话不存在：$id")
+        sessions[id] ?: if (isFromPreviousRuntime(id)) {
+            error("TERMINAL_RUNTIME_RESET：终端执行环境已重建，旧会话失效。请检查之前命令的持久产物，重新打开终端；不要直接重复可能有副作用的写操作。")
+        } else {
+            error("TERMINAL_SESSION_NOT_FOUND：终端会话已结束、被关闭或不存在：$id")
+        }
 
     private fun requireLiveSession(id: String): Session {
         val session = requireKnownSession(id)
@@ -143,4 +156,14 @@ class PersistentPipeTerminalProvider(
     private companion object {
         const val MAX_READ_BYTES = 64 * 1024
     }
+}
+
+/**
+ * Only epoch-bearing IDs identify a *proven* prior runtime. Legacy or malformed identifiers
+ * remain ordinary unknown sessions; do not pretend they definitely came from a reset.
+ */
+internal fun isPriorTerminalRuntimeSession(sessionId: String, currentEpoch: String): Boolean {
+    val match = Regex("""^term-([a-f0-9]{10})-[a-f0-9]{12}$""").matchEntire(sessionId)
+        ?: return false
+    return match.groupValues[1] != currentEpoch
 }
