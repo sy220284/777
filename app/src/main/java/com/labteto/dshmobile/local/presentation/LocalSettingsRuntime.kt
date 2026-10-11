@@ -6,6 +6,9 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.MiniMaxProviderQuotaClient
+import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
@@ -33,6 +36,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val diagnostics: LocalDiagnosticsPort,
     private val chatGpt: ChatGptSettingsController,
     private val modelRuntime: LocalModelRuntime,
+    private val miniMaxQuota: MiniMaxProviderQuotaClient,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
@@ -64,6 +68,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
     fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
+    internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
     fun selectModel(id: String) = modelRuntime.selectModel(id)
     fun removeModel(id: String) = modelRuntime.removeModel(id)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId)
