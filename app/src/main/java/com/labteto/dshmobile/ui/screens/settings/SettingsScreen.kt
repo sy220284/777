@@ -66,8 +66,6 @@ import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
-import com.labteto.dshmobile.local.model.LocalMiniMaxPolicy
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -215,11 +213,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
     val localHarness by viewModel.localHarnessState.collectAsStateWithLifecycle()
-    val selectedMiniMaxProfile = localHarness.modelSelection.activeProfile?.takeIf { profile ->
-        profile.authKind == LocalModelAuthKind.API_KEY &&
-            profile.model.startsWith("MiniMax-", ignoreCase = true) &&
-            LocalMiniMaxPolicy.isOfficial(profile.baseUrl)
-    }
+    val selectedMiniMaxProfile = localHarness.miniMaxQuotaProfile
     val approvalMode by viewModel.approvalMode.collectAsStateWithLifecycle()
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
@@ -347,7 +341,7 @@ fun SettingsScreen(
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_PERFORMANCE -> stringResource(R.string.settings_model_performance_title)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
-        SettingsDestination.MINIMAX_QUOTA -> "MiniMax 套餐额度"
+        SettingsDestination.MINIMAX_QUOTA -> stringResource(R.string.minimax_quota_title)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
         SettingsDestination.USAGE_LOG -> stringResource(R.string.usage_log_title)
@@ -453,8 +447,8 @@ fun SettingsScreen(
                                 AppSettingsDivider()
                                 AppSettingsRow(
                                     icon = FeatherIcons.CreditCard,
-                                    title = "MiniMax 套餐额度",
-                                    subtitle = "查看当前账户的官方剩余配额或余额",
+                                    title = stringResource(R.string.minimax_quota_title),
+                                    subtitle = stringResource(R.string.minimax_quota_entry_hint),
                                     onClick = { page = SettingsDestination.MINIMAX_QUOTA },
                                     compact = true,
                                 )
