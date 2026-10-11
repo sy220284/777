@@ -46,8 +46,6 @@ class CharacterBehaviorTuningDialogTest {
                     )
                 }
             }
-            compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
-                .performScrollTo().performClick()
             compose.onNodeWithText(context.getString(
                 R.string.local_character_tuning_temperature_value, 1.0, 77,
             )).assertExists()
@@ -81,8 +79,6 @@ class CharacterBehaviorTuningDialogTest {
                     )
                 }
             }
-            compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
-                .performScrollTo().performClick()
             compose.onNodeWithContentDescription(context.getString(R.string.local_character_tuning_expression_variation))
                 .performScrollTo()
                 .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(100f) }
@@ -183,11 +179,9 @@ class CharacterBehaviorTuningDialogTest {
             }
         }
 
-        val advanced = context.getString(R.string.local_character_tuning_advanced)
         val expressionVariation =
             context.getString(R.string.local_character_tuning_expression_variation)
 
-        compose.onNodeWithText(advanced).performScrollTo().performClick()
         compose.onNodeWithText(expressionVariation).assertDoesNotExist()
     }
 
@@ -209,8 +203,6 @@ class CharacterBehaviorTuningDialogTest {
                 )
             }
         }
-        compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
-            .performScrollTo().performClick()
         compose.onNodeWithText("温度 1.30 · 100").assertExists()
     }
 
@@ -234,42 +226,24 @@ class CharacterBehaviorTuningDialogTest {
                 )
             }
         }
-        compose.onNodeWithText(context.getString(R.string.local_character_tuning_advanced))
-            .performScrollTo().performClick()
         compose.onNodeWithText(context.getString(
             R.string.local_character_tuning_temperature_provider_default, 1.0, 50,
         )).assertExists()
     }
 
     @Test
-    fun advancedParametersStayHiddenUntilRequestedAndRemainReachable() {
+    fun retiredBehaviorParametersAreAbsentEvenForAnOldCustomizedCharacter() {
         compose.setContent {
             DshTheme {
-                CharacterBehaviorTuningDialog(
-                    personaName = "角色",
-                    portraitPath = "",
-                    relationshipState = "熟悉",
-                    mood = "平静",
-                    evolution = CharacterEvolutionState(),
-                    initial = CharacterBehaviorTuning(),
-                    onSave = { Result.success(Unit) },
-                    onDismiss = {},
-                )
+                CharacterBehaviorTuningDialog(personaName = "角色", portraitPath = "",
+                    relationshipState = "熟悉", mood = "平静", evolution = CharacterEvolutionState(),
+                    initial = CharacterBehaviorTuning(intimacy = 100, evolution = 100),
+                    onSave = { Result.success(Unit) }, onDismiss = {})
             }
         }
-
-        val evolution = context.getString(R.string.local_character_tuning_evolution)
-        val afterglow = context.getString(R.string.local_character_tuning_afterglow)
-        val advanced = context.getString(R.string.local_character_tuning_advanced)
-
-        compose.onNodeWithText(evolution).assertDoesNotExist()
-        compose.onNodeWithText(afterglow).assertDoesNotExist()
-
-        compose.onNodeWithText(advanced)
-            .performScrollTo()
-            .performClick()
-
-        compose.onNodeWithText(evolution).assertExists()
-        compose.onNodeWithText(afterglow).assertExists()
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_evolution)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_afterglow)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_lock_stage)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_character_tuning_expression_variation)).assertExists()
     }
 }
