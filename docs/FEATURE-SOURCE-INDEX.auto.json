@@ -1501,7 +1501,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeInstallation.kt",
-      "sha256": "ade46060b384ba22"
+      "sha256": "d798458b776380ed"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeLibraryStore.kt",
@@ -3229,12 +3229,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "a2b3463e41ed",
+  "source_snapshot": "c01861f2ccb3",
   "observed_delta": {
-    "baseline": "c96a8ed97096",
+    "baseline": "a2b3463e41ed",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeInstallation.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

@@ -62,12 +62,12 @@
 | 工具和插件清单 | refresh | 23 | 6 | 是 |
 | 分类浏览、配置和状态展示 | refresh | 23 | 6 | 是 |
 | 工具安装和管理入口 | refresh | 23 | 6 | 是 |
-| 已安装技能读取和调用 | install | 18 | 13 | 是 |
-| 自定义技能创建与编辑 | install | 18 | 13 | 是 |
-| 上传 SKILL.md 与 ZIP 技能包 | install | 18 | 13 | 是 |
-| Work 对话创建并写入技能目录 | install | 18 | 13 | 是 |
-| 技能中文显示名称 | install | 18 | 13 | 是 |
-| 新技能创建时填写中文名 | install | 18 | 13 | 是 |
+| 已安装技能读取和调用 | install | 19 | 13 | 是 |
+| 自定义技能创建与编辑 | install | 19 | 13 | 是 |
+| 上传 SKILL.md 与 ZIP 技能包 | install | 19 | 13 | 是 |
+| Work 对话创建并写入技能目录 | install | 19 | 13 | 是 |
+| 技能中文显示名称 | install | 19 | 13 | 是 |
+| 新技能创建时填写中文名 | install | 19 | 13 | 是 |
 | 输入框与历史消息显示中文名 | LocalMessageRow | 2 | 1 | 尚未发现 |
 | JSON 结构查询 | resolve | 39 | 34 | 是 |
 | 长输出分页读取 | resolve | 39 | 34 | 是 |
@@ -76,8 +76,8 @@
 | 网页搜索 | request | 128 | 48 | 是 |
 | 网页抓取与页面正文获取 | request | 128 | 48 | 是 |
 | HTTP 请求 | request | 128 | 48 | 是 |
-| 图片理解和视觉模型调用 | install | 18 | 13 | 是 |
-| 截图和媒体附件处理 | install | 18 | 13 | 是 |
+| 图片理解和视觉模型调用 | install | 19 | 13 | 是 |
+| 截图和媒体附件处理 | install | 19 | 13 | 是 |
 | 图像分析缓存 | LocalVisionAnalysisCache | 1 | 1 | 尚未发现 |
 | 副作用识别 | metadata | 51 | 13 | 是 |
 | 自动、手动和默认审批 | metadata | 51 | 13 | 是 |

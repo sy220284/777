@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "a2b3463e41ed",
+  "snapshot": "c01861f2ccb3",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1351,
   "production_sources_scanned": 789,
@@ -8989,10 +8989,12 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "c96a8ed97096",
+    "baseline": "a2b3463e41ed",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledRuntimeInstallation.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],
