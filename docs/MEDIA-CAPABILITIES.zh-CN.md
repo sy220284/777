@@ -30,8 +30,8 @@
 
 1. 业务操作只有 `IMAGE` / `VIDEO` / `SPEECH` / `TRANSCRIBE` 四种；每种能力只显示已接入可执行模型，不复制服务商专用面板；列表按照用户已配置凭据来源生成。对应底层选择精确到 profile ID + 服务商 + 操作 + 创作模型 ID。
 2. 执行时冻结选项并复用 `LocalModelCredentialResolver.resolve(..., profile)`，不再次读取聊天的 mutable active model。服务商 SDK 只能处理自己的协议与生成结果，不能控制 UI 的模型选择。
-3. 图片统一归一化为 HTTPS 结果链接或本机缓存图片（通过 Android FileProvider 分享）；配音统一本机 MP3 缓存文件；ASR 统一文字结果供复制/插入当前输入；视频统一任务 ID → 显式查询 → 下载链接。
-4. 当前视频接入 MiniMax Hailuo 2.3 和 Qwen Wan 2.6；它们采用不同的提交／查询端点，并保留会话内任务编号；不冒充 Gemini Veo、Qwen Wan 等平台异步任务已支持。已开始生成的外部收费任务不会因页面离开自动退款，也不静默创建新任务重试。
+3. 图片统一归一化为 HTTPS 结果链接或本机持久文件（通过 Android FileProvider 分享）；配音统一本机 MP3 持久文件；ASR 统一文字结果供复制/插入当前输入；视频统一任务 ID → 显式查询 → 下载链接。
+4. 当前视频接入 MiniMax Hailuo 2.3 和 Qwen Wan 2.6；它们采用不同的提交／查询端点，并保留持久视频任务档案；不冒充 Gemini Veo、其他 Wan 型号等未适配的异步任务已支持。已开始生成的外部收费任务不会因页面离开自动退款，也不静默创建新任务重试。
 5. 费用与用量采用服务商各自的账号事实源，不把 MiniMax 套餐余额跨服务商共享。UI 明确提示各创作产品可能单独计费。
 6. 用户已在设置配置聊天账户并不代表有该商家的图片/视频权限；本轮以官方文档静态能力+用户配置识别为入口判断，真正调用是否获授权由服务商返回，失败应当显示，不静默换账户重试。
 7. 旧 `MiniMaxMediaSheet`／`MiniMaxMediaViewModel`／`LocalMiniMaxMediaRuntime` 退出，原 `MiniMaxNativeMediaClient` 仅保留作为 MiniMax provider transport，避免复制业务状态。
@@ -63,10 +63,22 @@
 2. Qwen Image 3.0 OpenAI 兼容接口仅对 `qwen-image-3.0`/`qwen-image-3.0-pro` 开放；旧 `qwen-image-plus` 未沿用该协议。参见 2026-10-10 官方说明：https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference 。
 3. 新媒体请求复用 Android 可取消的 OkHttp 调用，但不再继承共享短请求 30 秒读取超时。媒体服务 HTTP 200 但返回 `error`/`code` 时标记失败；Gemini Base64 图像依据实际 `inlineData.mimeType` 保存和分享。
 4. OpenAI 音频上传优先根据 Android SAF 提供的原始文件名识别合法扩展名，在原始 MIME 缺失时仍允许已明确支持的格式，拒绝将其他音频伪装为 MP3。文档：https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create 。
-5. 同一视频创作模型可以连续提交多个任务，当前会话以路由分组保留任务编号并允许选择旧任务回查。**这仍不是持久运行中心**：异步响应尚未在外部 API 接受后立即进入数据库，弹层被关闭、进程退出时任务 ID 可能丢失。需要作为后续最高优先级的业务 Owner 生命周期升级，不应在这次 PR 中假称完全解决。
+5. 同一视频创作模型可以连续提交多个任务，`LocalMediaVideoTaskStore` 统一持久保存任务身份、原账户路由指纹、服务商任务 ID、终态与错误。面板退出后进程内媒体运行时仍继续提交。进程崩溃恰在远端接受付费请求但尚未拿到任务编号的极端窗口，记录会恢复为 `OUTCOME_UNKNOWN`，不自动重试；只有用户向服务商核对才可确定远端是否接收。这一风险无法仅靠本机存储完全消除。
 
 ## 2026-10-11 复查订正
 
 - 根据阿里云 2026-10-10 更新的 **Qwen-Image 3.0 OpenAI 兼容图片接口**，客户端目录只声明该接口明确支持的 `qwen-image-3.0`、`qwen-image-3.0-pro`。旧 `qwen-image-plus` 的生成能力需要独立核对旧版 DashScope API 与异步生命周期，不能使用 3.0 兼容端点和尺寸参数冒充已接通。
 - 各家 API 请求必须先确认业务错误字段，不能因 HTTP 200 判定成功。Gemini inlineData 图片须依据返回的 mimeType 保存和分享，不能强制用 PNG 扩展名。
 - 图像、语音生成/转写的同步等待不适用应用通用 30 秒网络超时，媒体传输拥有可取消的长耗时网络客户端。等待不会自动重试已经产生副作用的生成操作。
+
+
+## 统一多模态运行时：任务与成果持久化（2026-10-11）
+
+- **业务所有者唯一**：`LocalMediaCreationRuntime` 是主动多模态创作唯一执行入口；`LocalMediaVideoTaskStore` 只负责视频任务事实，`LocalMediaResultStore` 只负责图片/配音成果索引。聊天界面不再维护重复的视频任务 Map。Work/Agent 运行中心暂不接管外部媒体任务，避免双写和跨 Feature 所有权冲突。
+- **视频提交顺序**：冻结创作路由 → `SharedPreferences.commit` 先持久化 SUBMITTING 与原账户路线指纹 → 进程级 SupervisorJob 发出外部生成请求 → 成功获取远端 task ID 后持久化为 QUEUED → 手动只读查询 → 持久化终态和视频 URL。失败、取消或断电处于不确定提交时不盲目自动重试。
+- **无法消除的崩溃窗口**：服务商已接受收费请求但客户端未收到其 task ID 时，本机无法判断远端是否完成。冷恢复会标记 `OUTCOME_UNKNOWN` 并要求去服务商平台核对；要彻底消除这段风险，需要服务商支持幂等提交键或可查询的请求身份。
+- **账户身份匹配**：恢复查询绑定创作账户 ID、路由指纹、服务商、专业模型，不能自动改用当前聊天模型或其他账户。账户已移除时任务档案仍可查看，但查询会要求恢复原配置。
+- **成果文件**：本轮新生成的 GPT/Gemini 图片和 MiniMax/OpenAI MP3 配音保存于 `filesDir/media-studio/`，而非会被系统清理的 `cacheDir`；按 provider/model/kind 记入 `LocalMediaResultStore`，支持跨会话查看、分享和确认删除。应用卸载或清数据仍会删除本地文件，重要成果可使用系统分享另行导出。
+- **服务商在线图片**：MiniMax/Qwen 等返回的 HTTPS URL 只作为*临时成果链接*记录，不宣称图片已经离线保存。过期后仍需服务商续签 URL 或用户先前手动下载。
+- **诊断与隐私**：状态与失败原因回到持久视频任务记录，不保存提示词或明文 API Key。图片/视频/语音消费和费用不可从文字 Token 账本推算，仍需服务商权威响应对接。
+- **验证**：`LocalMediaPersistenceRulesTest` 覆盖崩溃保守恢复、远端 ID 身份附着、终态防迟到覆盖、账户匹配以及文件/链接序列化，仍需真实付费账户与 Android 设备测试。
