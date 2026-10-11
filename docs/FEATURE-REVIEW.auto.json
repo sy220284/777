@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "snapshot": "5bdb390dff5f",
+  "snapshot": "a11548a874bd",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
   "code_files_scanned": 1307,
   "production_sources_scanned": 781,
@@ -2233,5 +2233,153 @@
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [],
+  "obsolete_historical_evidence_count": 11,
+  "obsolete_historical_evidence": [
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告生成与保存",
+      "historical_grade": "测试方法已核",
+      "historical_production_sources": [],
+      "missing_production_sources": [],
+      "remaining_production_sources": [],
+      "historical_test_files": [
+        "app/src/test/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinatorTest.kt"
+      ],
+      "assessment": "不在现行树内，历史证据不足以判定退役"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 亲密距离与状态延续",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 主动性与表达开放度",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 人物变化与情绪余韵",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 互动新鲜度与原设遵循",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 关系节奏与阶段锁定",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物行为调节 / 独立人物约定与运行时行为调节分离",
+      "historical_grade": "专属源码路径已核",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorResolver.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorResolver.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "不在现行树内且历史生产来源全部消失；高度疑似已退役"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 历史事实与调节参数分离",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterEvolution.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 回复风格及重复短语过滤",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStyleGuard.kt"
+      ],
+      "missing_production_sources": [],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStyleGuard.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "不在现行树内但原有实现仍存在；可能改名、合并或重新归类"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物发言异常检查",
+      "historical_grade": "具名业务入口已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterReplyAnomalyGuard.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterReplyAnomalyGuard.kt"
+      ],
+      "remaining_production_sources": [],
+      "historical_test_files": [],
+      "assessment": "不在现行树内且历史生产来源全部消失；高度疑似已退役"
+    }
+  ],
+  "current_tree_outdated_source_count": 0,
+  "current_tree_outdated_sources": [],
+  "approved_legacy_retirements": [],
+  "legacy_retirements_requiring_review": [],
   "verification_limits": "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；无法据此证明测试在真实设备或服务上的行为完整。没有声明和证据的历史节点继续保留原状。"
 }
