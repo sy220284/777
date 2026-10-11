@@ -375,7 +375,14 @@ internal fun LocalMediaStudioSheetContent(
                         Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             Text(
                                 stringResource(R.string.media_studio_history_item,
-                                    task.provider, task.model, task.phase.name),
+                                    task.provider, task.model, stringResource(when (task.phase) {
+                                        LocalMediaVideoPhase.SUBMITTING -> R.string.media_studio_video_submitting
+                                        LocalMediaVideoPhase.OUTCOME_UNKNOWN -> R.string.media_studio_video_unknown
+                                        LocalMediaVideoPhase.QUEUED -> R.string.minimax_media_video_queued
+                                        LocalMediaVideoPhase.PROCESSING -> R.string.minimax_media_video_processing
+                                        LocalMediaVideoPhase.SUCCEEDED -> R.string.minimax_media_video_success
+                                        LocalMediaVideoPhase.FAILED -> R.string.minimax_media_video_failed
+                                    })),
                                 color = colors.labelPrimary,
                                 style = DsType.caption11.withReadingWeight(),
                             )
@@ -517,9 +524,9 @@ internal fun LocalMediaStudioSheetContent(
                     }
                 }
             }
-            historyError?.let { Text(it, color = colors.labelPrimary,
-                style = DsType.caption11.withReadingWeight()) }
         }
+        historyError?.let { Text(it, color = colors.labelPrimary,
+            style = DsType.caption11.withReadingWeight()) }
     }
 }
 
