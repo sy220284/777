@@ -22,7 +22,8 @@ class ChatReplyImmersionGuardTest {
             retry = { hint ->
                 retries += 1
                 assertTrue(hint.contains("角色沉浸修复"))
-                assertTrue(hint.contains("接受、拒绝、躲开、犹豫"))
+                assertTrue(hint.contains("当前人设与背景"))
+                assertTrue(!hint.contains("接受、拒绝、躲开、犹豫"))
                 "她瞥了你一眼，还是走近抱了一下。"
             },
             onEvent = { action, _ -> events += action },
