@@ -501,9 +501,18 @@ def test():
         (root / MATRIX).write_text(json.dumps(test_matrix, ensure_ascii=False), encoding="utf-8")
         source = root / "app/src/main/java/sample/Feature.kt"
         source.parent.mkdir(parents=True)
-        def mark(path):
-            payload = json.dumps({"id": "feature.first", "path": path}, ensure_ascii=False)
-            source.write_text("// FEATURE_TREE: " + payload + "\nclass Entry {}\n", encoding="utf-8")
+        test_file = root / "app/src/test/java/sample/FeatureTest.kt"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text("class FeatureTest { @Test fun entryWorks() { Entry() } }\n", encoding="utf-8")
+        def mark(path, action=None, evidence=True):
+            payload = {"id": "feature.first", "path": path}
+            if action == "retire":
+                payload.update({"action": "retire", "reason": "功能确认退役"})
+            elif evidence:
+                payload.update({"entry": "Entry", "owner": "CHAT",
+                                "test": "app/src/test/java/sample/FeatureTest.kt#entryWorks"})
+            source.write_text("// FEATURE_TREE: " + json.dumps(payload, ensure_ascii=False) +
+                              "\nclass Entry {}\n", encoding="utf-8")
         def write_outputs(outputs):
             for filename, value in outputs.items():
                 (root / filename).write_text(value, encoding="utf-8")
@@ -521,12 +530,21 @@ def test():
         assert json.loads(renamed[MATRIX])["items"][0]["path"] == "B / 新功能"
         assert "新功能" in renamed[HTML] and "旧功能" not in renamed[HTML]
         write_outputs(renamed)
+        # 未核实的声明丢失只能产生候选，不得移除原功能。
         source.write_text("class Entry {}\n", encoding="utf-8")
+        tentative = generate(root)
+        assert find(parse(tentative[MD])[0], ["B", "新功能"]) is not None
+        assert json.loads(tentative[REVIEW])["pending_changes"]
+        mark("B / 新功能", action="retire")
         removed = generate(root)
         removed_tree, _ = parse(removed[MD])
         assert find(removed_tree, ["B", "新功能"]) is None
         assert json.loads(removed[MATRIX])["items"] == []
         assert json.loads(removed[REG])["nodes"] == []
+        mark("B / 新功能", evidence=False)
+        rejected = generate(root)
+        assert json.loads(rejected[REVIEW])["pending_changes"]
+        assert find(parse(rejected[MD])[0], ["B", "新功能"]) is None
 
 
 if __name__ == "__main__":
