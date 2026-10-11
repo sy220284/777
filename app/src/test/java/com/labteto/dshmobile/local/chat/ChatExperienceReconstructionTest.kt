@@ -38,6 +38,10 @@ class ChatExperienceReconstructionTest {
         assertTrue(query.contains("约定"))
         assertNull(ChatMemorySelector.recallQuery("嗯", ChatContextState()))
         assertNull(ChatMemorySelector.recallQuery("别再提那件事", context))
+        val processed = ChatContextState(continuity = ChatContinuityState(
+            recentEvents = listOf("解释了上次失约的医院电话"), decisions = listOf("周六继续看照片")))
+        assertTrue(ChatMemorySelector.recallQuery("继续", processed).orEmpty().contains("医院"))
+        assertTrue(ChatMemorySelector.recallQuery("继续", processed).orEmpty().contains("周六"))
     }
 
     @Test fun resolvedEmotionsAndConflictsUpdateTogetherAndRetainTheirSource() {
