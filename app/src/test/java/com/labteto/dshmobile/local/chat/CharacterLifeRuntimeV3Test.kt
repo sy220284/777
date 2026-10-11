@@ -270,7 +270,7 @@ class CharacterLifeRuntimeV3Test {
     @Test
     fun aCharactersListAndQuestionsAreNotReformattedByApplicationTaste() {
         val text = "建议：\n1. 先吃饭\n2. 再洗澡\n3. 然后休息\n4. 最后睡觉"
-        assertEquals(text, ChatStyleGuard.filterLiteral(text, ChatStyleGuard.activePhrases()))
+        assertTrue(ChatStyleGuard.violations(text, ChatStyleGuard.activePhrases()).isEmpty())
     }
     @Test
     fun anUnfinishedEventSurvivesTimeButLeavesWhenTheStateActuallyClearsIt() {
