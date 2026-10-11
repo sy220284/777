@@ -237,11 +237,15 @@ internal class AutomationWorkerSettlementCoordinator(
         }
         if (updated == null) return
 
-        maybeNotify(
-            task = updated,
-            titleRes = R.string.tasks_notification_failed,
-            sessionId = sessionId,
-        )
+        // Notify on the first failure and periodically thereafter, without pausing the schedule.
+        // Every failure remains visible in receipts and the task's consecutive failure count.
+        if (updated.failureStreak == 1 || updated.failureStreak % 5 == 0) {
+            maybeNotify(
+                task = updated,
+                titleRes = R.string.tasks_notification_failed,
+                sessionId = sessionId,
+            )
+        }
         if (usesChainedAutomationScheduling(updated) &&
             committedNext != null && updated.status == AutomationStatus.SCHEDULED
         ) {
