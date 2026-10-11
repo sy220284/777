@@ -334,6 +334,92 @@ def historical_code_evidence(root, leafpaths):
     return missing_entries, current_orphans
 
 
+def legacy_leaf_evidence(root, leafpaths, matrix):
+    """旧台账只提供证据线索：文件、具名声明、测试映射分开复核。"""
+    historical = {}
+    if (root / EVIDENCE).is_file():
+        for line in (root / EVIDENCE).read_text(encoding="utf-8").splitlines():
+            if not line.startswith("| "):
+                continue
+            cells = [x.strip() for x in line.strip("|").split("|")]
+            if len(cells) < 4 or not cells[0].isdigit() or " / " not in cells[1]:
+                continue
+            path, grade, raw = cells[1:4]
+            paths = sorted(set(HISTORICAL_LINK.findall(raw)))
+            sources = [x for x in paths if "/src/main/" in "/" + x]
+            historical[path] = (grade, sources, raw)
+    mapped = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
+    result = []
+    for name in leafpaths:
+        grade, sources, raw = historical.get(name, (None, [], ""))
+        existing = [x for x in sources if (root / x).is_file()]
+        missing = [x for x in sources if x not in existing]
+        symbols = []
+        for label in re.findall(r"\[([^\]]+)\]\(https://github\.com/[^)]+\)", raw):
+            if " · " not in label:
+                continue
+            symbol = label.rsplit(" · ", 1)[-1].strip()
+            if not re.fullmatch(r"[A-Za-z_]\w*", symbol):
+                continue
+            declared = any(
+                re.search(SYMBOL % re.escape(symbol),
+                          (root / src).read_text(encoding="utf-8", errors="replace"))
+                for src in existing
+            )
+            symbols.append({"symbol": symbol, "declaration_found": declared})
+        test_count = mapped.get(name, 0)
+        if missing and not existing and not test_count:
+            grade_now = "旧源码已失效，需核实迁移或退役"
+        elif test_count and any(x["declaration_found"] for x in symbols):
+            grade_now = "真实测试映射及具名源码声明（静态）"
+        elif test_count:
+            grade_now = "真实测试映射（仅局部）"
+        elif any(x["declaration_found"] for x in symbols):
+            grade_now = "具名源码声明存在（静态，待调用链复核）"
+        elif existing and grade and "候选" not in grade:
+            grade_now = "历史生产文件仍存在（待入口复核）"
+        elif existing:
+            grade_now = "候选生产文件仍存在（不足以证明功能）"
+        else:
+            grade_now = "没有可确认的现行入口证据"
+        result.append({
+            "path": name, "verification": grade_now,
+            "test_reference_count": test_count,
+            "historical_grade": grade,
+            "existing_production_sources": existing,
+            "missing_production_sources": missing,
+            "named_symbols": symbols,
+        })
+    return result
+
+
+def observed_code_delta(root, current, source_snapshot):
+    """输出本次可确定的路由/界面变化；下次相同快照必须幂等。"""
+    file = root / INDEX
+    if not file.is_file():
+        return {"baseline": "initial", "added_routes": [], "removed_routes": [],
+                "added_ui": [], "removed_ui": []}
+    before = json.loads(file.read_text(encoding="utf-8"))
+    if before.get("source_snapshot") == source_snapshot:
+        return before.get("observed_delta", {
+            "baseline": source_snapshot, "added_routes": [], "removed_routes": [],
+            "added_ui": [], "removed_ui": [],
+        })
+    old_routes = set(before.get("registered_routes", []))
+    new_routes = set(current.get("registered_routes", []))
+    old_ui = {(x["symbol"], x["source"]) for x in before.get("candidate_ui_screens", [])}
+    new_ui = {(x["symbol"], x["source"]) for x in current.get("candidate_ui_screens", [])}
+    def format_ui(entries):
+        return [{"symbol": symbol, "source": source} for symbol, source in sorted(entries)]
+    return {
+        "baseline": before.get("source_snapshot", "unknown"),
+        "added_routes": sorted(new_routes - old_routes),
+        "removed_routes": sorted(old_routes - new_routes),
+        "added_ui": format_ui(new_ui - old_ui),
+        "removed_ui": format_ui(old_ui - new_ui),
+    }
+
+
 def approved_legacy_retirements(root, model, registered, previous, matrix):
     """旧功能下线必须有独立的明确审核记录及负向源码证据。"""
     file = root / RETIREMENTS
@@ -690,6 +776,11 @@ def generate(root):
         html, count=1, flags=re.S,
     )
     node_count = validate_view(model, html)
+    evidence = legacy_leaf_evidence(root, all_leaves, matrix)
+    categories = {}
+    for e in evidence:
+        categories[e["verification"]] = categories.get(e["verification"], 0) + 1
+    delta = observed_code_delta(root, index, snap)
     review = {
         "version": 1,
         "snapshot": snap,
@@ -699,13 +790,9 @@ def generate(root):
         "feature_nodes": node_count,
         "functional_leaves": len(all_leaves),
         "existing_executable_test_mappings": len(matrix["items"]),
-        "leaf_evidence": [
-            {"path": path, "verification": (
-                "存在直接测试方法引用（仅部分证据）" if path in evidence_counts else
-                "尚无直接测试映射，待逐功能验证"
-            ), "test_reference_count": evidence_counts.get(path, 0)}
-            for path in all_leaves
-        ],
+        "leaf_evidence": evidence,
+        "evidence_grade_summary": categories,
+        "observed_code_delta": delta,
         "source_verified_registrations": len(registry_nodes),
         "explicit_retirements": len(retired),
         "changes_applied": [{"previous": previous, "current": current}
@@ -724,6 +811,7 @@ def generate(root):
         ),
     }
     index["source_snapshot"] = snap
+    index["observed_delta"] = delta
     index["verified_registrations"] = sorted(registry_nodes)
     index["unverified_changes_count"] = len(pending)
     index["obsolete_historical_evidence_count"] = len(historical_gaps)
