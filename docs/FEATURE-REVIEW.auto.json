@@ -1,0 +1,2237 @@
+{
+  "version": 1,
+  "snapshot": "5bdb390dff5f",
+  "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
+  "code_files_scanned": 1307,
+  "production_sources_scanned": 781,
+  "feature_nodes": 541,
+  "functional_leaves": 444,
+  "existing_executable_test_mappings": 128,
+  "leaf_evidence": [
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 本机聊天／工作模式切换",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 9
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 侧边栏与会话列表",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 功能路由和页面恢复",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 页面返回、抽屉和浮层管理",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 加号统一能力入口",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 首页和导航 / 导航转场和加载状态",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 新建、切换与搜索会话",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 历史消息加载与分页",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 输入草稿和附件预览",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息操作和反馈",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 运行中、排队中、拒绝发送的反馈",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 会话列表和历史读取按单会话故障隔离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 主题颜色、圆角、字体与间距",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 浅色、深色及系统主题适配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 触控、无障碍与输入法适配",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 应用启动及初始化界面",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 前台服务与后台状态通知",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 完成、审批和提问通知",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 个人侧栏头像管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 应用级服务 / 更新提示、下载与安装",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物内核与16类可扩展人物事实",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4自由与深度编辑、事实核验和AI补全",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4人物导入、导出（旧版本不兼容）",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物主档案 / V4事实字段规范与旧消费者一致性校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集创建、编辑、删除和归档",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物与会话绑定",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物头像、立绘和预置素材",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 图集历史、合并与转移",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 预置人物及预置目录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线和人物世界观",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 不同故事线与会话的关联",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 多故事线 / 故事线持续演化",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 人物选择与对话启动",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息生成与流式展示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 回复重生成与版本切换",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 消息修改后重发",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 对话分支及历史回滚",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 连续消息与排队发送",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 单人对话 / 用户回复建议",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员选择和管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员身份与参与规则",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊发言编排与点名",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 成员回复顺序和失败反馈",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群成员关系和记忆隔离",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群公告编辑与保存",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 群聊状态恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 群聊 / 明确点名与一般提及分离，允许成员自然沉默",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与未完成话题",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 用户互动习惯",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 关系推进、阶段与变化",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物生活状态与主动性",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 16类人物资料持续可见",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 模型温度独立采样",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 人物人设与采样 / 历史调参兼容读取，退出反应控制",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 共同经历与采样设置分离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物／图集身份隔离",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 5
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 关系记忆提取和召回",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 3
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 人物日记生成和管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记条目合并与取代",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记相关性召回",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记导入、导出与回滚恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 删除和重新编辑后的记忆维护",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记人工纠正、停用与并发版本核验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 日记来源会话及消息标识与跳转",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 同源长期事实变动触发派生日记失效",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物记忆与日记 / 未完成日记清理的重启补偿与召回隔离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 上下文和人物事实组装",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色沉浸感与原设约束",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 用户与作者表达偏好及重复诊断",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 聊天后状态及关系更新",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 网页背景信息引入",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 回复质量补救与修订预算",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 角色独立记忆与群聊发言上下文约束",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 人物主动发起互动",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 与自动化任务联动",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 用户活跃情况判断",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 主动聊天 / 主动消息归属与恢复",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 创建和切换工作会话",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作请求发送与排队",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 目标、约束和当前进展提取",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 工作上下文组装",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 任务执行模式与续轮",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 回复重新生成和质量检查",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 自主选择公开历史对话和消息来源",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 加载更早分页、筛选并保留已选消息",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 交接摘要携带来源会话、消息编号与节选",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 选中附件使用受限路径和 SHA-256 引用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作会话 / 聊天转工作交接与用户选定材料 / 模型、MCP、插件和设备当前能力提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 方案生成与阶段拆解",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 计划展示和人工审阅",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 计划模式 / 只读规划与修改权限边界",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 当前目标与目标状态更新",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 待办建立与更新",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 待办事项 / 完成状态和执行关联",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 任务进度与阶段状态投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 阶段推进 / 关键决定、失败尝试和未完事项",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 多轮思考和工具调用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 工具结果回填与继续推理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 用户提问与答案继续",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 高风险操作审批",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 步骤、资源和上下文预算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 任务取消、停止、受控结束",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 输出真实性与完成声明检查",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 主智能体执行 / 团队未结消息和失败成员的完成声明复核",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 普通子代理与分叉子代理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 持久子代理与冷启动恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 独立身份指令与本轮任务",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理权限、工具名单和深度限制",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理任务邮箱和消息接收",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理结果结构化校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 并行执行和流水线工作流",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 子代理模型选路与调用消耗",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 子智能体 / 资料研究代理预设",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 创建团队和启动助手",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队负责人编排与任务分配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员招募、职责和生命周期",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员启动、停用、解散与停止全部",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务创建、领取、修改与分配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务依赖与阻塞关系",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 任务重开、删除和完成确认",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队共享任务板 / 并发文件修改范围冲突提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 发消息、收消息、等待消息",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 2
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 持久邮箱和重启后补投",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 助手执行结果回收",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 成员消息和协作 / 主智能体核验结果后结算",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 工作输入区内的集群入口",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 集群运行状态条与任务进度",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员列表及当前任务",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 成员执行输出展开",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 给运行中助手追加消息",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 停止单个和全部助手",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 恢复与停止状态反馈",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 输出选择、复制和历史范围说明",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 任务负责人、依赖、冲突、完整说明",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 继续处理与异常接管草稿",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 集群界面 / 不能收消息时禁用发送并保留草稿",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队事件记录及任务板重建",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 成员状态与子任务运行事实关联",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 失败、停用和失联任务重新释放",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 团队冷恢复与批量投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 恢复时任务邮箱续投",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 智能体团队／集群 / 团队数据与恢复 / 未完成任务阻止错误完成声明",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 任务列表与运行状态",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 主任务／子任务关联",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 执行阶段和步骤轨迹",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工具调用活动时间线",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 中断、失败和恢复提示",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 后台任务与运行结果",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 工作成果清单、逐项操作及历史范围",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 6
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付要求与真实成果事件来源绑定",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 运行中心 / 交付成果当前版本及证据变化提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作目录与文件浏览",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件预览和分享",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 文件修改与补丁应用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 从真实成功工具调用识别成果",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果当前可用性和安全路径核对",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 工作状态压缩与恢复检查点",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果来源调用与事件序号可追溯",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 工作空间和成果 / 成果首次创建和当前内容哈希对照",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 自动工作任务执行入口",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 后台任务触发和恢复",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 自动化与工作联动 / 工作任务与计划、审批的联系",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目新建、列表与切换",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目名称与项目身份管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目档案 / 项目删除及关联引用保护（存在引用时阻止删除）",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 5
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目长期规则和上下文",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 项目规则应用到工作／子代理／聊天",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目指令 / 规则文件不可读时拒绝执行",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 会话与项目绑定",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目范围的记忆与资料关联",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 项目功能 / 项目关联 / 项目身份与工作目录分离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 新建、查看、编辑和删除",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 任务启用、停用与暂停",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 手动执行和执行记录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 自动任务目录 / 单次、重复与每月日程",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 本地时间与时区处理",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 日程生成和下一次运行计算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 触发去重与并发限制",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 后台任务调度",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 定时调度 / 任务代次与旧运行隔离",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 自然语言生成任务计划",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 从原任务内容优化指令",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 时间、触发条件的编辑和确认",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 智能任务规划 / 任务更新与原调度器复用",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 角色主动互动任务",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 用户活跃情况限制",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 定时发起聊天和会话归属",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 聊天自动化 / 中断及恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 定时发起工作任务",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 模型路由及工作执行契约",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 工作自动化 / 后台任务状态与结果结算",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / Webhook 接收和校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 请求大小及执行边界",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 外部触发 / 触发结果保存和查询",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 任务持久化和冷恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / Worker 状态与真实执行对账",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 删除／重建后阻止旧任务结算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 自动化功能 / 恢复与结算 / 暂停／恢复与手动执行代次保护",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具和插件清单",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 分类浏览、配置和状态展示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具可见性与授权状态",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具中心 / 工具安装和管理入口",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 预置技能目录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 已安装技能读取和调用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能创建与编辑",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 上传 SKILL.md 与 ZIP 技能包",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能包附属文件安装与安全校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / Work 对话创建并写入技能目录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能文档和元数据解析",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能调用标记识别",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能使用范围和提示词预算",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 大技能完整读取与损坏隔离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 技能中文显示名称",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 新技能创建时填写中文名",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 自定义技能名称修改",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 输入框与历史消息显示中文名",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 技能 / 保留技能原始调用标识",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件读取和内容检索",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件编辑与差异修改",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 文件名匹配与全文搜索",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / JSON 结构查询",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / Shell 命令与脚本执行",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 模型上下文工具 / 长输出分页读取",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 连接凭据管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / GitHub 工具调用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 跳转定义与查找引用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 悬停信息和查找实现",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 文件／工作区符号",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 诊断与重命名预览",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / MCP 服务器接入和管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / HTTP 与标准输入输出连接",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部工具发现及动态注册",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 高权限调用审批",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页搜索",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 网页抓取与页面正文获取",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / HTTP 请求",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 公网地址及重定向安全检查",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 网页能力 / 请求大小、超时和安全重试",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图片理解和视觉模型调用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 截图和媒体附件处理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 文件预览与 PDF 渲染",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 图像分析缓存",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具可用范围",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 副作用识别",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 自动、手动和默认审批",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 修改型工具隔离",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 工具权限 / 工具执行轨迹和失败状态",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型服务商和协议选择",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型配置新增、编辑、切换和移除",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / API 密钥与连接测试",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 账户授权登录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / ChatGPT 套餐模型目录与账号状态",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 模型表现全局上限、模型参数、推理模式和上下文长度",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 主智能体与子智能体模型配置",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 模型与账号 / 推理档位及温度上限对多入口的约束",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 本机累计 Token",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 聊天与工作用量切换",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 7／30／90 天消耗趋势",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 按会话、任务和请求追溯",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 主代理／子代理消耗区分",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 缓存命中及费用分解",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / 模型价格和未知价格提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆空间和分类浏览",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 全局／项目／对话链记忆归属",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 记忆记录查看和维护",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 人物私有记忆隔离展示",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实来源关联与显式纠正停用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 记忆管理 / 长期事实修改后的来源失效待办",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 浅色／深色／跟随系统",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 主题配色",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 字体、文字尺寸和排版",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 自定义聊天背景",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 外观与阅读 / 背景图片选择、移除和实时预览",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 运行步数和执行预算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 子代理模型与能力设置",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 工具审批策略",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / Android 设备权限",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 任务相关配置状态与执行授权分开提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 无障碍与通知监听实时服务状态提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 智能体与权限 / 屏幕共享和录制逐次系统授权提示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 本地会话存储设置",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 日志和故障诊断",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 运行环境信息",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 设置与个人配置 / 存储与诊断 / 诊断报告导出",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话创建、读写、删除和归档",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话归属、运行租约与唯一写入者",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 消息块和正文记录",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 会话事件流水账",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 持久会话身份登记册取代目录后缀发现",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 写入前登记、删除后注销及跨实例同步",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 旧会话按文档身份及备份核验补录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 聊天历史分页与索引",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 消息／工具／上下文表面记录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 请求证据重建与摘要校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 状态投影注册、版本和事件水位",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 模型历史检查点和尾部重放",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 工具活动只读投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 事件投影检查点与真实会话身份分离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 持久会话登记与摘要投影索引分工",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 前台会话恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 中断运行的事实核对",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 已知与未知副作用区分",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话清理与归档维护",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 批次投影和中断后重建",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 登记册损坏后验证原文件重建",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 单个会话备份损坏不阻断其他会话",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话直接读取补登记与快照身份防串话",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / OpenAI 响应协议",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / Anthropic 消息协议",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / DeepSeek 兼容协议",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 供应商与协议 / ChatGPT 套餐专用协议分流",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 密钥加密保存",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / ChatGPT OAuth 授权回调",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 身份令牌校验及刷新",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 账户与凭据 / 账号权限和套餐凭据隔离",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型目录与能力识别",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 一次运行固定真实模型路由",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 运行中配置变化隔离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 连接健康诊断和重试约束",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 模型路由 / 模型路由的推理及温度上限统一生效",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求封装和入场校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 流式文本、思考和工具调用",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 网络中断、取消和重试",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 请求证据和响应终态",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 请求与响应 / 图片等多模态输入",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 系统／开发者／动态提示词分层",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 模型历史窗口和压缩",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Token 压力与上下文预算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / Prompt 缓存指纹与连续性",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享模型与路由 / 上下文与缓存 / 工作语义检查点",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 推理－工具－结果多步循环",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 主代理与子代理公共契约",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 运行标识和父子层级",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 智能体循环 / 全局步数和动态预算",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 创建和启动规格",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 稳定身份与本轮任务分离",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 前台／持久消息邮箱",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 满载拒绝和消息去重",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 休眠、继续和重激活",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 子代理管理 / 输出结构校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 步骤和历史检查点",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 最终结果先验证再提交",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 中断恢复和未知副作用保护",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 运行恢复 / 过期结果不能提交",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 并行与流水线工作流",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 阶段任务分配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享智能体核心 / 执行编排 / 取消及继续执行契约",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具目录与能力声明",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 模型可见工具定义与过滤",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具调用入场和权限判断",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具执行身份与真实启动记录",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具输出格式和结构化验证",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 错误、超时、取消与结果恢复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享工具执行 / 工具运行活动和审计投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 记忆存储与检索",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 作用域和可见性",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 记忆冲突与来源合并",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 记忆维护、过期和删除",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 记忆库只读分类投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 来源失效待办持久化及清理确认",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享记忆 / 按来源精准失效派生日记并幂等恢复",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享资源与任务 / 资源调度和运行租约",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享资源与任务 / 后台任务注册与运行状态",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享资源与任务 / 子任务持久化与队列",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享资源与任务 / 请求并发控制和取消传播",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享资源与任务 / 进程恢复后的运行归属裁决",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享交互 / 审批请求和结果回填",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享交互 / 用户提问和回答继续",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享交互 / 发送状态和队列控制",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享交互 / 后台结果到前台状态同步",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / Token 请求级账本",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 7
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 输入、输出、推理和缓存细分",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 成本与汇总统计",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 运行事件和错误日志",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享用量和诊断 / 结构化诊断与故障报告",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 本地数据持久化与备份",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 原子写入、损坏恢复和版本迁移",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 3
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 密钥安全存储",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 文件访问路径边界",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 网络安全边界",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享存储与安全 / 权限及副作用约束",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动只执行一次",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 进程生命周期协程范围",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 启动初始化及恢复触发",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 初始化失败状态投影",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第二层｜共享运行能力 / 轻量进程内核 / 功能及服务的组合根装配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / Node／Python／Git 工具运行环境",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 运行时文件安装、校验与修复",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 前台服务和 Android 后台执行",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / JSON 请求与响应",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 流式响应和断流处理",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 底层协议与兼容 / 请求状态和错误分类",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / GitHub 接口工具",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / LSP 语言服务器适配",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / Android 设备权限提供方",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Kotlin／Gradle 多模块构建",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 代码格式与静态检查",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 架构 3.0 所有权门禁",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 性能、资源和安全门禁",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / ARM64／x86_64 运行时与安装包构建",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / Android 16／17 设备回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 运行时缓存的构建前校验保存",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 缓存命中与构建耗时汇总",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 安装包大小、签名和运行时完整性",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 构建与持续集成 / 合并前多阶段门禁",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / Android 应用单元测试",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 核心智能体循环测试",
+      "verification": "存在直接测试方法引用（仅部分证据）",
+      "test_reference_count": 1
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话、工具、模型与恢复测试",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 团队任务与 UI 回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 技能中文名称和编辑回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 官方语义样本差分验证",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 测试数据来源与固定版本校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 会话登记升级、备份损坏和并发写入回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 单聊群聊工作共存及历史读取隔离回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 人物日记纠正与能力状态界面回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 测试与语义验证 / 交付要求、成果版本和记忆来源证据回归",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 发行版本和变更记录",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 构建安装包与签名校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 在线更新检测",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 增量补丁下载与校验",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 发布与升级 / 安全安装和失败反馈",
+      "verification": "尚无直接测试映射，待逐功能验证",
+      "test_reference_count": 0
+    }
+  ],
+  "source_verified_registrations": 0,
+  "explicit_retirements": 0,
+  "changes_applied": [],
+  "pending_changes": [],
+  "verification_limits": "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；无法据此证明测试在真实设备或服务上的行为完整。没有声明和证据的历史节点继续保留原状。"
+}
