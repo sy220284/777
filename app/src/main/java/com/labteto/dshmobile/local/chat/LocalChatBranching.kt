@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.observability.AppLog
+
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import kotlinx.serialization.Serializable
@@ -470,6 +472,9 @@ internal fun decodeChatBranchStateEvent(data: JsonObject): LocalChatBranchState?
         val encoded = data["state"]?.jsonObject ?: return@runCatching null
         chatBranchJson.decodeFromJsonElement(LocalChatBranchState.serializer(), encoded)
             .canonicalizeLegacyChatBranchState()
+    }.onFailure { error ->
+        AppLog.warn("ChatBranch",
+            "failure=true operation=decode_branch_state cause_type=${error.javaClass.simpleName}")
     }.getOrNull()
 
 private fun branchParentKey(parentId: String?): String = parentId ?: CHAT_BRANCH_ROOT

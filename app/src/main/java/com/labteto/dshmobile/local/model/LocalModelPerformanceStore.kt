@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.Context
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -62,7 +63,8 @@ internal object LocalModelPerformanceStore {
                 ModelReasoningCeiling.valueOf(
                     saved.getString(KEY_REASONING, ModelReasoningCeiling.CUSTOM.name).orEmpty(),
                 )
-            }.getOrDefault(ModelReasoningCeiling.CUSTOM)
+            }.onFailure { AppLog.failure("ModelPerformance", "read_reasoning_ceiling", it) }
+                .getOrDefault(ModelReasoningCeiling.CUSTOM)
             val temperature = saved.getFloat(KEY_TEMPERATURE, 1.3f).toDouble().coerceIn(1.0, 2.0)
             preferences = saved
             mutable.value = ModelPerformanceLimits(ceiling, temperature)

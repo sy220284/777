@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.local.tools.optionalString
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -86,7 +87,13 @@ private fun decodeTranscriptBlocks(value: JsonArray?): List<LocalMessageBlock>? 
             (item[key] as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.contentOrNull
         fun long(key: String): Long? = (item[key] as? JsonPrimitive)?.longOrNull
         val source = string("source")
-            ?.let { runCatching { LocalMessageMediaSource.valueOf(it.uppercase()) }.getOrNull() }
+            ?.let { name ->
+                runCatching { LocalMessageMediaSource.valueOf(name.uppercase()) }
+                    .onFailure { error ->
+                        AppLog.warn("TranscriptRestore",
+                            "failure=true operation=decode_media_source cause_type=${error.javaClass.simpleName}")
+                    }.getOrNull()
+            }
             ?: LocalMessageMediaSource.USER
         when (kind) {
             "text" -> blocks += LocalMessageBlock.Text(string("text") ?: return null)
@@ -141,6 +148,11 @@ internal fun projectSessionTranscriptTail(
         .forEach { event ->
             if (event.type == "chat/active-transcript" || event.type == "work/active-transcript") {
                 val decoded = decodeTranscriptMessages(event.data)
+                if (decoded == null) {
+                    AppLog.warn("TranscriptRestore",
+                        "failure=true operation=replay_active_transcript event_type=${event.type} " +
+                            "event_seq=${event.sequence} cause_type=InvalidTranscript")
+                }
                 if (decoded != null) {
                     messages.clear()
                     messages += maxMessages?.let(decoded::takeLast) ?: decoded
@@ -158,6 +170,11 @@ internal fun projectSessionTranscriptTail(
                 }
             }
             val decoded = decodeTranscriptMessages(event.data)
+            if (decoded == null && event.data.containsKey("transcript")) {
+                AppLog.warn("TranscriptRestore",
+                    "failure=true operation=replay_transcript_event event_type=${event.type.take(64)} " +
+                        "event_seq=${event.sequence} cause_type=InvalidTranscript")
+            }
             if (decoded != null) {
                 decoded.forEach { message ->
                     if (knownIds.add(message.id)) messages += message

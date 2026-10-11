@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.LocalForegroundTurnWakeCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
@@ -202,6 +203,8 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 detail = output.takeIf { status != LocalWorkAutomationStatus.DELIVERED },
             )
         } catch (timeout: TimeoutCancellationException) {
+            AppLog.warn("WorkAutomation", "failure=true operation=run_scheduled_work " +
+                "session_id=${sessionId.take(80)} cause_type=TimeoutCancellationException")
             val detail = "后台任务执行超时，已停止本轮任务"
             persistTranscript(
                 session = session,
@@ -219,6 +222,8 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            AppLog.warn("WorkAutomation", "failure=true operation=run_scheduled_work " +
+                "session_id=${sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
             val detail = "后台任务失败：" + (error.message ?: error::class.java.simpleName)
             persistTranscript(
                 session = session,

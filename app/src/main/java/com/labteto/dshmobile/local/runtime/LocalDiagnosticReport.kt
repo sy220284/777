@@ -20,6 +20,7 @@ internal fun appendLocalDiagnosticDetails(
     eventLog: LocalSessionEventLog,
     usageTracker: DeepSeekUsageTracker,
     appLogs: List<AppLogEntry>,
+    onSessionIntegrity: (Boolean) -> Unit = {},
 ): String = buildString {
     append(baseReport.trimEnd())
     appendLine()
@@ -45,6 +46,8 @@ internal fun appendLocalDiagnosticDetails(
         append(" process=").append(entry.processInstanceId ?: "legacy")
         append(" process_started_at=").append(entry.processStartedAtMillis ?: -1L)
         entry.throwableType?.takeIf(String::isNotBlank)?.let { append(" throwable=").append(it.take(64)) }
+        entry.message.substringAfter("operation=", "").substringBefore(' ').takeIf(String::isNotBlank)
+            ?.let { append(" operation=").append(sanitizeDiagnosticText(it).take(100)) }
         appendLine()
     }
     appendLine()
@@ -67,21 +70,26 @@ internal fun appendLocalDiagnosticDetails(
         cursor = nextCursor
     }
     val logDiagnostics = eventLog.diagnostics()
+    val sessionComplete = logDiagnostics.malformedRows == 0L &&
+        logDiagnostics.segmentReadFailures == 0L && logDiagnostics.archiveFailures == 0L
+    onSessionIntegrity(sessionComplete)
+    appendLine(if (sessionComplete) "会话事件完整性：正常" else "会话事件完整性：存在损坏或读取失败，请检查下列计数")
     appendLine(
         "持久事件：导出最近 ${events.size} 条；latest_sequence=$latestSequence；" +
             "malformed_rows=${logDiagnostics.malformedRows} " +
             "segment_read_failures=${logDiagnostics.segmentReadFailures} " +
             "archive_failures=${logDiagnostics.archiveFailures}",
     )
+    val exportKeysByType = HashMap<String, List<String>>()
     events.forEach { event ->
         append("event seq=").append(event.sequence)
         append(" at=").append(event.createdAt)
         append(" feature=").append(event.type.substringBefore('/'))
         append(" type=").append(event.type)
         append(" payload_chars=").append(event.data.toString().length)
-        (DIAGNOSTIC_EVENT_KEYS + DIAGNOSTIC_EVENT_TYPE_KEYS[event.type].orEmpty())
-            .distinct()
-            .forEach { key ->
+        exportKeysByType.getOrPut(event.type) {
+            (DIAGNOSTIC_EVENT_KEYS + DIAGNOSTIC_EVENT_TYPE_KEYS[event.type].orEmpty()).distinct()
+        }.forEach { key ->
             event.data[key]?.toString()?.let { value ->
                 append(" ").append(key).append("=")
                 append(
@@ -210,6 +218,9 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "total_tokens",
     "provider_code",
     "provider_param",
+    "status",
+    "retry_after_ms",
+    "cause_detail",
     "model",
     "provider",
     "profile_id",
@@ -299,7 +310,7 @@ private val DIAGNOSTIC_EVENT_TYPE_KEYS = mapOf(
 )
 
 private const val EVENT_PAGE_SIZE = 200
-private const val MAX_DIAGNOSTIC_APP_LOGS = 800
+private const val MAX_DIAGNOSTIC_APP_LOGS = 2_000
 private const val MAX_DIAGNOSTIC_EVENTS = 3_000
 private const val MAX_DIAGNOSTIC_TOKEN_RECORDS = 2_000
 private const val MAX_DIAGNOSTIC_FIELD_CHARS = 320

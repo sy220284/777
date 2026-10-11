@@ -3,9 +3,11 @@ package com.labteto.dshmobile.ui.screens.settings
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.labteto.dshmobile.R
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
@@ -121,10 +123,17 @@ class SettingsViewModel @Inject constructor(
      * revoked, and does not outlive the process, so a remembered URI would produce a background that
      * silently disappears later — indistinguishable, from the outside, from the feature being broken.
      */
-    fun setBackgroundImage(uri: Uri) {
+    fun setBackgroundImage(uri: Uri, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val stored = runCatching { importBackgroundImage(uri) }.getOrNull() ?: return@launch
-            hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
+            try {
+                val stored = importBackgroundImage(uri)
+                hostsStore.setSetting { it.copy(backgroundImagePath = stored) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "import_background_image", error)
+                onError(appContext.getString(R.string.settings_background_import_failed))
+            }
         }
     }
 
@@ -138,9 +147,15 @@ class SettingsViewModel @Inject constructor(
     private suspend fun importBackgroundImage(uri: Uri): String = withContext(Dispatchers.IO) {
         val directory = File(appContext.filesDir, APP_BACKGROUND_DIR).apply { mkdirs() }
         val target = File(directory, APP_BACKGROUND_FILE)
-        val source = appContext.contentResolver.openInputStream(uri)
-            ?: error("Cannot open the picked image")
-        source.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+        val staging = File.createTempFile("background-", ".part", directory)
+        try {
+            val source = appContext.contentResolver.openInputStream(uri)
+                ?: error("Cannot open the picked image")
+            source.use { input -> staging.outputStream().use { output -> input.copyTo(output) } }
+            check(staging.renameTo(target)) { "Cannot replace the background image" }
+        } finally {
+            staging.delete()
+        }
         target.absolutePath
     }
 
@@ -173,6 +188,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "connect_chatgpt", error)
                 onDone(error.message ?: "ChatGPT 登录失败")
             }
         }
@@ -186,6 +202,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "restart_chatgpt_authorization", error)
                 onDone(error.message ?: "重新开始 ChatGPT 授权失败")
             }
         }
@@ -207,6 +224,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "select_chatgpt_account", error)
                 onDone(error.message ?: "切换 ChatGPT 账户失败")
             }
         }
@@ -219,6 +237,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "disconnect_chatgpt_account", error)
                 onDone(error.message ?: "断开 ChatGPT 账户失败")
             }
         }
@@ -231,6 +250,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "remove_chatgpt_account", error)
                 onDone(error.message ?: "移除 ChatGPT 授权记录失败")
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.observability.isDiagnosticFailure
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -27,6 +28,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -66,8 +68,16 @@ internal fun NetworkDiagnosticDialog(
             onClick = {
                 running = true
                 scope.launch {
-                    result = runCatching { diagnose(target) }.getOrElse { it.message ?: failedText }
-                    running = false
+                    try {
+                        result = diagnose(target)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        AppLog.failure("Diagnostics", "network_probe", error)
+                        result = error.message ?: failedText
+                    } finally {
+                        running = false
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -122,7 +132,7 @@ internal fun EnvironmentInfoDialog(
             modifier = Modifier.fillMaxWidth(),
         )
         SelectionContainer {
-            val visible = events.filter { !errorsOnly || it.level == "E" }.takeLast(40)
+            val visible = events.filter { !errorsOnly || it.isDiagnosticFailure() }.takeLast(40)
             Text(
                 if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
                     "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"

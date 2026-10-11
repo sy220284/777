@@ -275,7 +275,11 @@ internal class AutomationWorkerSettlementCoordinator(
             hostsStore.settingsOnce().notifyLocalJobs
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            com.labteto.dshmobile.observability.AppLog.failure(
+                "AutomationWorkerSettlement", "read_notification_preference", error,
+                sessionId = sessionId,
+            )
             true
         }
         currentCoroutineContext().ensureActive()

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.automation
 
 import android.content.Context
+import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -60,7 +61,11 @@ class WebhookResultStore @Inject constructor(
     @Synchronized
     fun get(id: String): WebhookRunResult? =
         preferences.getString(id, null)?.let { raw ->
-            runCatching { json.decodeFromString(WebhookRunResult.serializer(), raw) }.getOrNull()
+            runCatching { json.decodeFromString(WebhookRunResult.serializer(), raw) }
+                .onFailure { error ->
+                    AppLog.warn("WebhookResults", "failure=true operation=read_webhook_result " +
+                        "request_id=${id.take(80)} cause_type=${error.javaClass.simpleName}")
+                }.getOrNull()
         }
 
     @Synchronized
@@ -97,6 +102,9 @@ class WebhookResultStore @Inject constructor(
             val raw = value as? String ?: return@mapNotNull null
             val parsed = runCatching {
                 json.decodeFromString(WebhookRunResult.serializer(), raw)
+            }.onFailure { error ->
+                AppLog.warn("WebhookResults", "failure=true operation=scan_webhook_result " +
+                    "request_id=${key.take(80)} cause_type=${error.javaClass.simpleName}")
             }.getOrNull() ?: return@mapNotNull null
             Triple(key, parsed.updatedAt, parsed.status)
         }

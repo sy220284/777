@@ -58,14 +58,46 @@ internal class LocalDiagnosticsRuntime @Inject constructor(
 
     override suspend fun diagnosticReport(): String = withContext(Dispatchers.IO) {
         val sessionId = runtimeStateStore.currentSessionId
-        val appLogs = AppLog.exportSnapshot()
-        val baseReport = DiagnosticReport.build(appLogs, environment.build(null))
-        appendLocalDiagnosticDetails(
-            baseReport = baseReport,
-            sessionId = sessionId,
-            eventLog = sessionStorage.eventLogs.get(sessionId),
-            usageTracker = usageTracker,
-            appLogs = appLogs,
-        )
+        val captureIssues = mutableListOf<String>()
+        val environmentText = try {
+            environment.build(null)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            AppLog.failure("Diagnostics", "export_environment", error, sessionId = sessionId)
+            captureIssues += "环境信息采集失败：${error.javaClass.simpleName}"
+            "环境信息读取失败，其余诊断继续导出"
+        }
+
+        // Capture session evidence before taking the final process-log snapshot: failures
+        // in this stage must appear in the same report, not only in the next export.
+        var sessionComplete = true
+        val sessionDetails = try {
+            appendLocalDiagnosticDetails(
+                baseReport = "",
+                sessionId = sessionId,
+                eventLog = sessionStorage.eventLogs.get(sessionId),
+                usageTracker = usageTracker,
+                appLogs = AppLog.exportForDiagnostics().entries,
+                onSessionIntegrity = { sessionComplete = it },
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            AppLog.failure("Diagnostics", "export_session_trace", error, sessionId = sessionId)
+            captureIssues += "会话结构化追踪采集失败：${error.javaClass.simpleName}"
+            "会话结构化追踪缺失：operation=export_session_trace；原因=${error.javaClass.simpleName}。基础进程日志仍可用。"
+        }
+        if (!sessionComplete) captureIssues += "会话事件存在损坏或读取失败"
+
+        val processLogs = AppLog.exportForDiagnostics()
+        val integrity = listOf(processLogs.integrity) + captureIssues
+        val status = if (integrity.size == 1 && integrity[0] == "正常") "正常" else
+            integrity.filter { it != "正常" }.joinToString("；")
+        DiagnosticReport.build(
+            processLogs.entries,
+            environmentText,
+            logIntegrity = status,
+        ) + "\n\n" + sessionDetails.trimStart()
     }
 }

@@ -314,6 +314,11 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
 - ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
 - ChatGPT 套餐 Responses 长流不得按固定六分钟整次超时切断正在正常传输的请求；保留连接/读空闲超时与协程取消。收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
+- DeepSeek、Anthropic、Responses 和视觉推理不得使用固定整次调用时长切断仍正常工作的请求；连接超时、空闲读超时、显式取消、HTTP 错误和业务安全边界分别判定。
+- 前台 Work 回合不得因为固定 15 分钟墙钟或动态 512 步阈值截断仍有进展的任务；工具超时、用户取消、执行进展检测、逐步检查点及上下文真实容量保护分别生效。超时和快照保存失败必须记录所属 run/session 与原因。
+- 运行诊断必须记录未处理崩溃、后台运行异常及模型/工具/设置等已捕获的真实失败；每条记录应包含操作名称及可用的会话、运行和请求关联标识，并包含脱敏的异常原因链。正常取消或预期的能力缺失要区分为事件，不能伪报异常。
+- 持久异常日志采用单后台消费者批量写入，产生日志的线程不得因队列拥塞被迫同步写盘；队列应有内存上限，溢出与写入失败必须明确统计并在导出中可见。诊断导出需将已落盘、待写和正在写入的数据组成一致快照，损坏行或读取失败必须提示报告不完整；保留有界近期记录与真实构建/进程来源，维持现有凭据保护边界。
+- 导出当前会话事件账本失败时，必须如实告知诊断不完整，并仍提供基础进程日志与失败信息；不能伪报导出成功。
 - 运行诊断必须记录脱敏的 profile/account/client_id 绑定、OpenAI request ID、provider code 与 HTTP status，禁止记录 access/refresh token。
 - ChatGPT 模型档案必须绑定保存的 issued client_id 对应账户；切换模型档案时同步账户选择，禁止用可变“当前账户”替代档案 credentialRef。
 - ChatGPT 套餐共享的 function/custom tools 必须按 SIWC 预览契约放入 namespace；标准 API Key Responses 继续使用普通顶层 function tools，不相互污染协议。

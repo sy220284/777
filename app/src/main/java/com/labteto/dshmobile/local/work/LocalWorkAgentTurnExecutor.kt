@@ -39,7 +39,7 @@ import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
-import com.labteto.dshmobile.local.runtime.FOREGROUND_TURN_TIMEOUT_MILLIS
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalAgentProgressTracker
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.LocalAgentRunResourceBudget
@@ -68,7 +68,6 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -624,25 +623,17 @@ internal class LocalWorkAgentTurnExecutor(
             )
 
             try {
-                withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
-                    modelGateway.withFrozenRoute(
-                        profileId = runSnapshot.modelState.modelSelection.activeProfileId,
-                        model = runSnapshot.modelState.model,
-                        baseUrl = runSnapshot.modelState.baseUrl,
-                    ) { loop.run(input) }
-                }
-            } catch (_: TimeoutCancellationException) {
+                modelGateway.withFrozenRoute(
+                    profileId = runSnapshot.modelState.modelSelection.activeProfileId,
+                    model = runSnapshot.modelState.model,
+                    baseUrl = runSnapshot.modelState.baseUrl,
+                ) { loop.run(input) }
+            } catch (timeout: TimeoutCancellationException) {
+                // Only an actual nested operation may now time out; foreground work has no wall-clock stop.
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-                val timeoutError = LocalModelException(
-                    code = "WORK_SLICE_TIMEOUT",
-                    message = "本轮执行达到 15 分钟切片上限",
-                    retryable = false,
-                    continuationEligible = true,
-                )
-                val queued = queueAutomaticWorkContinuation(binding, runContext.runId, timeoutError)
-                if (!queued) {
-                    binding.state.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
-                }
+                AppLog.failure("WorkAgentTurn", "foreground_operation_timeout", timeout,
+                    sessionId = foregroundSessionId, runId = runContext.runId)
+                binding.state.update { it.copy(error = "后台操作超时，已保留当前进度；请查看诊断原因后继续") }
             } catch (_: CancellationException) {
                 binding.runHandle.cancellationRequested = true
                 foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
@@ -676,6 +667,8 @@ internal class LocalWorkAgentTurnExecutor(
                     workModelHistoryRuntime.persist(binding)
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
+                    AppLog.failure("WorkAgentTurn", "persist_work_checkpoint", error,
+                        sessionId = foregroundSessionId, runId = runContext.runId)
                     binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
                     try {

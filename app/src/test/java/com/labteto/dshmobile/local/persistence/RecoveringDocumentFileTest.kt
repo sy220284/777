@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.persistence
 
 import java.io.File
+import com.labteto.dshmobile.observability.AppLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -29,6 +30,18 @@ class RecoveringDocumentFileTest {
             store.restoreFromRecoverySource("valid:restored") { it.startsWith("valid:") }
             assertEquals("valid:restored", RecoveringDocumentFile(file).read({ "empty" }, ::decode))
         }
+    }
+
+    @Test fun corruptDocumentBackupRecoveryLeavesDiagnosticTrace() {
+        val root = temporary.newFolder()
+        val file = File(root, "data.json").apply { writeText("broken-primary") }
+        File(root, "data.json.bak").writeText("valid:backup")
+        AppLog.clear()
+        assertEquals("valid:backup", RecoveringDocumentFile(file).read({ "empty" }, ::decode))
+        val errors = AppLog.snapshot().filter { it.tag == "RecoveringDocument" }
+        assertTrue(errors.any { it.message.contains("decode_durable_document") })
+        assertTrue(errors.any { it.message.contains("recover_document_from_backup") })
+        assertFalse(errors.any { it.message.contains("broken-primary") })
     }
 
     @Test fun missingPrimaryRecoversBackupAndBrandNewStateCanBeCreated() {

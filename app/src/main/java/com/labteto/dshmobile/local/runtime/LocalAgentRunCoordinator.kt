@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
@@ -435,7 +436,8 @@ internal class LocalAgentRunCoordinator(
                     basePrompt = RECOVERY_CONTINUATION_PROMPT,
                 ),
             )
-        }.getOrDefault(RECOVERY_CONTINUATION_PROMPT)
+        }.onFailure { AppLog.failure("AgentRecovery", "decorate_recovery_prompt", it) }
+            .getOrDefault(RECOVERY_CONTINUATION_PROMPT)
     }
     fun markRecoveryQueued(
         sessionId: String,

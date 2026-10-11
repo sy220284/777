@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.LocalMessageMediaSource
@@ -82,6 +83,7 @@ class LocalSessionTranscriptProjectionTest {
             event(9L, encodeTranscriptMessages(listOf(answer))),
         )
 
+        AppLog.clear()
         val projected = projectSessionTranscriptTail(
             snapshotMessages = listOf(existing),
             events = events,
@@ -91,6 +93,10 @@ class LocalSessionTranscriptProjectionTest {
         assertEquals(listOf("m-old", "m-reason", "m-answer"), projected.messages.map { it.id })
         assertEquals("旧消息", projected.messages.first().content)
         assertEquals(9L, projected.projectedThroughSequence)
+        org.junit.Assert.assertTrue(AppLog.snapshot().any {
+            it.tag == "TranscriptRestore" && it.message.contains("event_seq=8") &&
+                it.message.contains("operation=replay_transcript_event")
+        })
     }
 
     @Test

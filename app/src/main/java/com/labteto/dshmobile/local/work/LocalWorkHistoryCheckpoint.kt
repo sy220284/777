@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
 import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -75,6 +76,9 @@ internal data class LocalWorkCheckpoint(
                     .trim()
                 runCatching {
                     fromJsonObject(json.parseToJsonElement(payload) as JsonObject)
+                }.onFailure { error ->
+                    AppLog.warn("WorkCheckpoint",
+                        "failure=true operation=decode_work_checkpoint cause_type=${error.javaClass.simpleName}")
                 }.getOrNull()
             }
 

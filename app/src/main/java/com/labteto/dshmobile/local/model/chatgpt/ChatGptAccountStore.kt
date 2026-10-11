@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.local.security.KeystorePreferenceSecretStore
+import com.labteto.dshmobile.observability.AppLog
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,14 +35,28 @@ class ChatGptAccountStore @Inject constructor(
         val ids = accountIds()
         return ids.mapNotNull { id ->
             secret(id).get()?.let { raw ->
-                runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }.getOrNull()
+                runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
+                    .onFailure { error ->
+                        // Never log raw deserialization text from encrypted account records.
+                        AppLog.error("ChatGptAccountStore",
+                            "operation=decode_account_record account_tail=${id.takeLast(8)} " +
+                                "cause_type=${error.javaClass.simpleName} status=invalid_private_record")
+                    }
+                    .getOrNull()
             }
         }
     }
 
     suspend fun get(id: String): ChatGptAccountRecord? =
         secret(id).get()?.let { raw ->
-            runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }.getOrNull()
+            runCatching { json.decodeFromString<ChatGptAccountRecord>(raw) }
+                    .onFailure { error ->
+                        // Never log raw deserialization text from encrypted account records.
+                        AppLog.error("ChatGptAccountStore",
+                            "operation=decode_account_record account_tail=${id.takeLast(8)} " +
+                                "cause_type=${error.javaClass.simpleName} status=invalid_private_record")
+                    }
+                    .getOrNull()
         }
 
     suspend fun selectedId(): String? = dataStore.data.first()[selectedKey]

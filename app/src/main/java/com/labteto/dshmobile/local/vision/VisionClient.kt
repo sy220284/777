@@ -66,7 +66,8 @@ class VisionClient @Inject constructor(
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Total duration is not a safe proxy for a stalled vision inference.
+        .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
     override suspend fun analyze(
@@ -308,7 +309,6 @@ class VisionClient @Inject constructor(
         const val CONNECT_TIMEOUT_SECONDS = 15L
         const val READ_TIMEOUT_SECONDS = 180L
         const val WRITE_TIMEOUT_SECONDS = 90L
-        const val CALL_TIMEOUT_SECONDS = 210L
         const val MAX_RESPONSE_BYTES = 4 * 1024 * 1024
         const val MAX_IMAGE_DATA_URL_CHARS = 24 * 1024 * 1024
     }

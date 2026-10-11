@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.labteto.dshmobile.observability.AppLog
 import java.util.concurrent.ConcurrentHashMap
 
 internal enum class LocalReasoningMode { DEFAULT, FAST, LOW, DEEP, MAX }
@@ -11,6 +12,10 @@ internal class LocalReasoningPreferences(private val preferences: SharedPreferen
     fun modeOrNull(sessionId: String): LocalReasoningMode? {
         val stored = preferences.getString("mode:$sessionId", null)
         if (stored != null) return runCatching { LocalReasoningMode.valueOf(stored) }
+            .onFailure { error ->
+                AppLog.warn("ReasoningPreferences", "operation=read_reasoning_mode status=invalid_value " +
+                    "session_id=${sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
+            }
             .getOrDefault(LocalReasoningMode.DEFAULT)
         // Only explicit legacy choices migrate. An absent boolean is not a user selection.
         return if (preferences.contains("reasoning:$sessionId")) {

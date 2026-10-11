@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.observability.AppLog
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -36,8 +37,10 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: IllegalArgumentException) {
+            AppLog.warn("ModelProbe", "failure=true operation=resolve_stored_model_route cause_type=IllegalArgumentException")
             return error.message ?: "模型配置无效"
         } catch (error: Exception) {
+            AppLog.warn("ModelProbe", "failure=true operation=resolve_stored_model_route cause_type=${error.javaClass.simpleName}")
             val message = error.message.orEmpty().let { raw ->
                 apiKey.trim().takeIf(String::isNotBlank)?.let { raw.replace(it, "••••") } ?: raw
             }
@@ -57,8 +60,12 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         withTimeout(20_000L) { block() }
         "连接成功，模型已完成实际响应"
     } catch (error: CancellationException) {
-        if (error is TimeoutCancellationException) "检测超时，请检查网络或接口地址" else throw error
+        if (error is TimeoutCancellationException) {
+            AppLog.warn("ModelProbe", "failure=true operation=test_model_connection cause_type=TimeoutCancellationException")
+            "检测超时，请检查网络或接口地址"
+        } else throw error
     } catch (error: Exception) {
+        AppLog.warn("ModelProbe", "failure=true operation=test_model_connection cause_type=${error.javaClass.simpleName}")
         val message = error.message.orEmpty().let { raw ->
             secret?.takeIf(String::isNotBlank)?.let { raw.replace(it, "••••") } ?: raw
         }

@@ -3,11 +3,13 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.io.readBoundedLine
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.observability.AppLog
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.util.LinkedHashMap
+import java.util.concurrent.atomic.AtomicLong
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -30,6 +32,8 @@ internal class PersonaGalleryHistoryStore(
     private val json: Json,
 ) {
     init { root.mkdirs() }
+
+    private val malformedArchiveRows = AtomicLong(0)
 
     private data class CountStamp(val modified: Long, val length: Long, val rows: Int)
     private val rowCounts = object : LinkedHashMap<String, CountStamp>(64, 0.75f, true) {
@@ -328,7 +332,16 @@ internal class PersonaGalleryHistoryStore(
     }
 
     private fun decode(line: String): LocalHarnessMessage? =
-        runCatching { json.decodeFromString(LocalHarnessMessage.serializer(), line) }.getOrNull()
+        runCatching { json.decodeFromString(LocalHarnessMessage.serializer(), line) }
+            .onFailure { error ->
+                // Keep the failed row private; report every failure via an aggregate count.
+                val failures = malformedArchiveRows.incrementAndGet()
+                if (failures <= 3 || failures % 100L == 0L) {
+                    AppLog.warn("PersonaHistory",
+                        "failure=true operation=decode_persona_archive_row malformed_rows=$failures " +
+                            "cause_type=${error.javaClass.simpleName}")
+                }
+            }.getOrNull()
 
     private fun archiveFile(entryId: String, storyId: String): File =
         File(entryDirectory(entryId), safe(storyId) + ".jsonl")

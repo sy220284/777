@@ -239,6 +239,21 @@ internal fun TaskCard(
             }
         }
 
+        if (task.failureStreak > 0 && task.recurringMinutes != null) {
+            Text(
+                stringResource(
+                    when {
+                        task.status == AutomationStatus.PAUSED -> R.string.tasks_failure_streak_paused
+                        task.status == AutomationStatus.SCHEDULED || task.status == AutomationStatus.RUNNING ||
+                            task.status == AutomationStatus.QUEUED -> R.string.tasks_failure_streak_active
+                        else -> R.string.tasks_failure_streak_inactive
+                    },
+                    task.failureStreak,
+                ),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.error,
+            )
+        }
         task.lastError?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_status, it.take(160)),
@@ -300,7 +315,7 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                if (task.mode == AutomationMode.CHAT && task.recurringMinutes != null) {
+                if (task.recurringMinutes != null) {
                     DsButton(
                         text = stringResource(
                             if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume

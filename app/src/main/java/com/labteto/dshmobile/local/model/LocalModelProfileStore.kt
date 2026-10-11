@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.persistence.RecoveringJsonValue
 import com.labteto.dshmobile.persistence.recoverJsonValue
 import kotlinx.serialization.json.Json
@@ -43,7 +44,12 @@ internal class LocalModelProfileStore(
             val baseUrl = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val model = com.labteto.dshmobile.local.model.migrateOfficialClaudeModel(storedModel, baseUrl)
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
-                ?.let { runCatching { LocalModelAuthKind.valueOf(it) }.getOrNull() }
+                ?.let { rawKind ->
+                    runCatching { LocalModelAuthKind.valueOf(rawKind) }
+                        .onFailure { AppLog.warn("ModelProfile",
+                            "operation=decode_auth_kind status=invalid cause_type=${it.javaClass.simpleName}") }
+                        .getOrNull()
+                }
                 ?: LocalModelAuthKind.API_KEY
             val credentialRef = obj["credentialRef"]?.jsonPrimitive?.contentOrNull
             val preset = LocalModelPresets.find(model, baseUrl)
@@ -59,7 +65,12 @@ internal class LocalModelProfileStore(
                     LocalModelAuthKind.API_KEY ->
                         preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
                             ?: obj["protocol"]?.jsonPrimitive?.contentOrNull
-                                ?.let { runCatching { LocalModelProtocol.valueOf(it) }.getOrNull() }
+                                ?.let { rawProtocol ->
+                                    runCatching { LocalModelProtocol.valueOf(rawProtocol) }
+                                        .onFailure { AppLog.warn("ModelProfile",
+                                            "operation=decode_model_protocol status=invalid cause_type=${it.javaClass.simpleName}") }
+                                        .getOrNull()
+                                }
                             ?: preset?.protocol
                             ?: LocalModelProtocol.CHAT_COMPLETIONS
                 },

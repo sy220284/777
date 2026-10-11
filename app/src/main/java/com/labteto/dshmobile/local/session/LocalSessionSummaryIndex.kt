@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -82,16 +83,31 @@ internal class LocalSessionSummaryIndex(
         if (!file.isFile) return null
         return runCatching {
             json.decodeFromString(LocalSessionSummaryRecord.serializer(), file.readText())
-        }.getOrElse {
+        }.getOrElse { error ->
+            AppLog.warn("SessionSummaryIndex",
+                "failure=true operation=decode_session_summary session_id=${id.take(80)} " +
+                    "cause_type=${error.javaClass.simpleName}")
             val corrupt = File(root, file.name + ".corrupt-" + System.currentTimeMillis())
-            runCatching { file.renameTo(corrupt) }
+            val isolated = runCatching { file.renameTo(corrupt) }
+                .onFailure { renameError ->
+                    AppLog.warn("SessionSummaryIndex",
+                        "failure=true operation=isolate_corrupt_summary session_id=${id.take(80)} " +
+                            "cause_type=${renameError.javaClass.simpleName}")
+                }.getOrDefault(false)
+            if (!isolated) AppLog.warn("SessionSummaryIndex",
+                "failure=true operation=isolate_corrupt_summary session_id=${id.take(80)} status=failed")
             null
         }
     }
 
     private fun LocalSessionSummaryRecord.toSummary(): LocalSessionSummary? {
         if (version != CURRENT_VERSION || id.isBlank()) return null
-        val usage = runCatching { LocalUsageMode.valueOf(usageMode) }.getOrNull() ?: return null
+        val usage = runCatching { LocalUsageMode.valueOf(usageMode) }
+            .onFailure { error ->
+                AppLog.warn("SessionSummaryIndex",
+                    "failure=true operation=decode_summary_mode session_id=${id.take(80)} " +
+                        "cause_type=${error.javaClass.simpleName}")
+            }.getOrNull() ?: return null
         return LocalSessionSummary(
             id = id,
             title = title,

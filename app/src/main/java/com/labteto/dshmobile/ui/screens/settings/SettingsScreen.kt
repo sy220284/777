@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
@@ -221,6 +222,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
+    val exportSuccess = stringResource(R.string.settings_export_diagnostics_success)
+    val exportPartial = stringResource(R.string.settings_export_diagnostics_partial)
     val storageExported = stringResource(R.string.settings_local_session_storage_exported)
     val storageExportFailed = stringResource(R.string.settings_local_session_storage_export_failed)
     val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
@@ -232,11 +235,17 @@ fun SettingsScreen(
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         stream.write(report.toByteArray(Charsets.UTF_8))
-                    } ?: error("无法打开导出文件")
+                        stream.flush()
+                    } ?: error("Cannot open diagnostic export destination")
                 }
+                val integrity = report.lineSequence()
+                    .firstOrNull { it.startsWith("日志完整性：") }
+                    ?.removePrefix("日志完整性：")
+                toast.second(if (integrity == "正常") exportSuccess else exportPartial)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                AppLog.failure("Settings", "export_diagnostic_report", error)
                 toast.second(exportFailed)
             }
         }
@@ -272,7 +281,8 @@ fun SettingsScreen(
                 toast.second(storageExported)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "export_session_archive", error)
                 toast.second(storageExportFailed)
             } finally {
                 localSessionStorageBusy = false
@@ -535,7 +545,7 @@ fun SettingsScreen(
                                 onAdaptiveContrastChange = { enabled ->
                                     viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
                                 },
-                                onPick = viewModel::setBackgroundImage,
+                                onPick = { uri -> viewModel.setBackgroundImage(uri) { message -> toast.second(message) } },
                                 onClear = viewModel::clearBackgroundImage,
                             )
                         }
@@ -862,7 +872,8 @@ fun SettingsScreen(
                                     try {
                                         localSessionStorageStatus = viewModel.compactLocalSessionStorage()
                                         toast.second(storageCompacted)
-                                    } catch (_: Exception) {
+                                    } catch (error: Exception) {
+                                        AppLog.failure("Settings", "compact_session_archive", error)
                                         toast.second(storageCompactFailed)
                                     } finally {
                                         localSessionStorageBusy = false
