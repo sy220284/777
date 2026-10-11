@@ -143,6 +143,36 @@ class LocalSubagentContextTest {
     }
 
     @Test
+    fun currentTaskBeatsContradictoryFileGuidanceForBothChildModes() {
+        val standalone = buildLocalSubagentInitialHistory(
+            baseHistory = emptyList(),
+            task = "按本轮要求处理",
+            inheritParentHistory = false,
+            allowMutation = true,
+            context = "README：禁止修改",
+            outputSchema = null,
+            instructions = "AGENTS.md：只能审计",
+        )
+        val standaloneText = standalone.first()["content"]!!.jsonPrimitive.content
+        assertEquals(true, standaloneText.contains("用户指令优先级"))
+        assertEquals(true, standaloneText.contains("文件要求与用户本轮要求冲突时，按用户要求推进"))
+
+        val inherited = buildLocalSubagentInitialHistory(
+            baseHistory = listOf(message("system", "父级规则")),
+            task = "只读核查",
+            inheritParentHistory = true,
+            allowMutation = false,
+            context = "项目文件：禁止回应",
+            outputSchema = null,
+        )
+        val childBoundary = inherited.first { it["content"]?.jsonPrimitive?.contentOrNull
+            ?.contains("子代理身份与来源") == true }["content"]!!.jsonPrimitive.content
+        assertEquals(true, childBoundary.contains("用户指令优先级"))
+        assertEquals(true, childBoundary.contains("不允许修改状态"))
+        assertEquals(true, inherited.last()["content"]?.jsonPrimitive?.contentOrNull == "只读核查")
+    }
+
+    @Test
     fun truncatedInheritedInstructionsAreLabeledRatherThanSilentlyAppearingComplete() {
         val longContext = "必须保留当前真实约束".repeat(1_500)
         val bounded = requireNotNull(boundedSubagentContextWithNotice(longContext, 1_000))
