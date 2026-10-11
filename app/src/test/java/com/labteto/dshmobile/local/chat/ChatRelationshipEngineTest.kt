@@ -39,6 +39,26 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun retiredStrategistStateInStoredConversationFallsBackToNormal() {
+        val oldState = ChatCharacterState(
+            interactionIntent = "STRATEGIST",
+            interactionIntentStrength = 1,
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL,
+            resolveChatInteractionIntent("她什么意思", oldState),
+        )
+        assertEquals(
+            ChatInteractionIntent.NORMAL.name to 0,
+            nextInteractionIntentState("她什么意思", oldState),
+        )
+        assertEquals(
+            engine.prompt("她什么意思", oldState),
+            engine.prompt("/军师 她什么意思", oldState),
+        )
+    }
+
+    @Test
     fun workAndFictionLanguageDoNotTriggerRelationshipRouting() {
         assertEquals(
             ChatRelationshipView.IMMERSIVE,
