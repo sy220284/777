@@ -538,7 +538,7 @@ fun SettingsScreen(
                                 onAdaptiveContrastChange = { enabled ->
                                     viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
                                 },
-                                onPick = viewModel::setBackgroundImage,
+                                onPick = { uri -> viewModel.setBackgroundImage(uri) { message -> toast.second(message) } },
                                 onClear = viewModel::clearBackgroundImage,
                             )
                         }
