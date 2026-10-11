@@ -132,6 +132,8 @@ internal data class LocalModeIntro(val usageMode: LocalUsageMode)
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    workActions: LocalWorkFeatureUiActions? = null,
+    onOpenWorkArtifact: (String) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -194,6 +196,7 @@ internal fun LocalConversationSurface(
         loadTurn = loadTurnUsage,
         loadRequest = loadUsageRequest,
     )
+    var workDesignSection by rememberSaveable(state.sessionId) { mutableStateOf(3) }
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
@@ -652,6 +655,7 @@ internal fun LocalConversationSurface(
             GroupReplyFailureNotice(state.groupChat, state.running) { request -> onSend(request, emptyList()) }
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
+            val transcriptBody: @Composable () -> Unit = {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -815,6 +819,16 @@ internal fun LocalConversationSurface(
                     }
                 }
             }
+            }
+            if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
+                LocalWorkDesignSurface(
+                    actions = workActions, sessionId = state.sessionId, title = sessionTitle,
+                    section = workDesignSection, onSelectSection = { workDesignSection = it },
+                    onAnswer = onAnswerQuestion, onCancelQuestion = onCancelQuestion,
+                    onOpenEvidence = onOpenRunCenter, onOpenArtifact = onOpenWorkArtifact,
+                    execution = transcriptBody,
+                )
+            } else transcriptBody()
 
             ConversationScrollShortcut(
                 target = scrollHint.target,
@@ -1047,7 +1061,7 @@ internal fun LocalConversationSurface(
     }
     state.pendingQuestion
         ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-        ?.takeUnless { localPlanReviewOf(it) != null }
+        ?.takeUnless { localPlanReviewOf(it) != null || workActions != null }
         ?.let { question ->
         QuestionDialog(
             question = question.question,

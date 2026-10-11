@@ -463,6 +463,12 @@ fun LocalHarnessScreen(
             pinnedSessionIds = pinnedSessionIds,
             sessionTitleOverrides = sessionTitleOverrides,
             actions = shellActions,
+            workActions = workActions,
+            onOpenWorkArtifact = { path ->
+                requestedFilePath = path
+                filesMode = LocalFilesMode.CONVERSATION
+                pushFeature(LocalFeaturePage.WORKSPACE)
+            },
             onSettingsDestinationChange = { settingsDestination = it },
             onPushFeature = ::pushFeature,
             onNewSession = { showNewSessionMode = true },

@@ -2103,5 +2103,34 @@
     <string name="media_studio_capability_transcribe">录音转写</string>
     <string name="media_studio_kind_speech">语音</string>
     <string name="media_studio_kind_image">图片</string>
+    <string name="fluid_work_goal">目标</string>
+    <string name="fluid_work_plan">计划</string>
+    <string name="fluid_work_decision">决策点</string>
+    <string name="fluid_work_execution">执行中</string>
+    <string name="fluid_work_outputs">产出</string>
+    <string name="fluid_item_count">%1$d 项</string>
+    <string name="fluid_tool_output">工具输出</string>
+    <string name="fluid_goal_empty">目标尚未建立。提交任务后会显示真实目标。</string>
+    <string name="fluid_plan_empty">暂无计划</string>
+    <string name="fluid_decision_empty">当前没有等待你的决策</string>
+    <string name="fluid_outputs_empty">暂无已记录产出</string>
+    <string name="fluid_outputs_failed">产出加载失败，请重试</string>
+    <string name="fluid_output_missing">文件当前不可用</string>
+    <string name="fluid_approval_modal_hint">请在审批对话框中确认操作范围</string>
+    <string name="fluid_back_execution">返回执行</string>
+    <string name="fluid_decision_checkpoint">决策检查点</string>
+    <string name="fluid_decision_continue">确认选择并继续</string>
+    <string name="fluid_decision_failed">提交未成功，选择已保留，请重试</string>
+    <string name="fluid_persona_relationship">关系</string>
+    <string name="fluid_persona_events">事件</string>
+    <string name="fluid_persona_memories">记忆</string>
+    <string name="fluid_persona_settings">设定</string>
+    <string name="fluid_persona_now">此刻</string>
+    <string name="fluid_persona_unfinished">未完话题</string>
+    <string name="fluid_persona_stage">关系阶段</string>
+    <string name="fluid_persona_no_events">暂无已记录事件</string>
+    <string name="fluid_persona_no_memories">暂无已记录记忆</string>
+    <string name="fluid_persona_stories">故事线</string>
+    <string name="fluid_persona_archive">查看完整故事档案</string>
 </resources>
 

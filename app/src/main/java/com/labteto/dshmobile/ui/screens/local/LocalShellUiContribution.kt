@@ -29,6 +29,8 @@ internal fun localShellFeatureUiContribution(
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
     actions: LocalShellFeatureUiActions,
+    workActions: LocalWorkFeatureUiActions,
+    onOpenWorkArtifact: (String) -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
@@ -48,6 +50,8 @@ internal fun localShellFeatureUiContribution(
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            workActions = workActions,
+            onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,
             loadTurnSummaries = actions.turnUsageSummaries,
             loadTurnUsage = actions.turnUsage,

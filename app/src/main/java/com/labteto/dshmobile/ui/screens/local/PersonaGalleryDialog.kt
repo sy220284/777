@@ -236,6 +236,7 @@ internal fun PersonaGalleryScreen(
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showMoreActions by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showPortraitActions by remember(selectedId) { mutableStateOf(false) }
+    var personaDesignSection by rememberSaveable(selectedId) { mutableStateOf(0) }
     var showPersonaDetails by rememberSaveable(selectedId) { mutableStateOf(false) }
     var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
@@ -840,16 +841,39 @@ internal fun PersonaGalleryScreen(
                         selected.stories.size,
                         totalDialogue,
                     )
-                    PersonaGalleryDetailHeaderV3(
-                        entry = selected,
-                        relationSummary = relationSummary,
-                        busy = busy || inspecting,
-                        onChoosePortrait = {
-                            portraitTargetId = selected.id
-                            portraitPicker.launch(arrayOf("image/*"))
+                    FluidPersonaIdentity(
+                        entry = selected, subtitle = relationSummary, enabled = !busy && !inspecting,
+                        onPortrait = {
+                            if (selected.portraitPath.isBlank()) {
+                                portraitTargetId = selected.id
+                                portraitPicker.launch(arrayOf("image/*"))
+                            } else showPortraitActions = true
                         },
-                        onManagePortrait = { showPortraitActions = true },
                     )
+                    FluidSectionNavigation(
+                        labels = listOf(R.string.fluid_persona_relationship, R.string.fluid_persona_events,
+                            R.string.fluid_persona_memories, R.string.fluid_persona_settings).map { stringResource(it) },
+                        selected = personaDesignSection, onSelect = { personaDesignSection = it },
+                        tag = "personaDesignSection",
+                    )
+                    if (selected.stories.size > 1) {
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            selected.stories.sortedByDescending(PersonaGalleryStory::updatedAt).forEach { story ->
+                                DsButton(story.title, {
+                                    if (!hasLocalStoryEdits || story.id == selectedStoryId) selectedStoryId = story.id
+                                    else error = saveEditsBeforeSwitchText
+                                }, enabled = !busy && !inspecting,
+                                    variant = if (story.id == selectedStoryId) DsButtonVariant.Primary else DsButtonVariant.Ghost)
+                            }
+                        }
+                    }
+                    if (personaDesignSection != 3) {
+                        FluidSectionSwap(personaDesignSection) { section ->
+                            FluidPersonaStorySection(selectedStory, section)
+                        }
+                    }
+
 
                     notice?.let {
                         Surface(
@@ -866,6 +890,10 @@ internal fun PersonaGalleryScreen(
                         }
                     }
 
+                    if (personaDesignSection == 3) {
+                        DsButton(stringResource(R.string.persona_gallery_view_profile),
+                            { showPersonaDetails = true }, modifier = Modifier.fillMaxWidth(),
+                            variant = DsButtonVariant.Outline)
                     Text(
                         stringResource(R.string.persona_gallery_storylines_title),
                         style = DsType.std14Strong.withReadingWeight(),
@@ -1055,6 +1083,7 @@ internal fun PersonaGalleryScreen(
                             }
                         }
 
+                    }
                     }
 
                 }
