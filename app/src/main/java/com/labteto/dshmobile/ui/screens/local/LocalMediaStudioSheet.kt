@@ -166,6 +166,7 @@ internal fun LocalMediaStudioSheetContent(
                                 option.profile.displayName ?: option.profile.model,
                             ),
                             onClick = { chosenId = option.id; showModelChoices = false },
+                            enabled = !busy,
                             size = DsButtonSize.Small,
                             variant = if (selected.id == option.id) DsButtonVariant.Primary else DsButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth(),
@@ -256,6 +257,7 @@ internal fun LocalMediaStudioSheetContent(
                                         videoState = null
                                         videoLink = null
                                     },
+                                    enabled = !busy,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
