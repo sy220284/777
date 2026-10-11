@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "scope": "repository_code_and_all_production_sources",
+  "repository_code_file_count": 1307,
+  "production_source_count": 781,
+  "test_code_file_count": 409,
+  "workflow_files": [
+    ".github/workflows/capture-readme-ui.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/cleanup-old-releases.yml",
+    ".github/workflows/dev-toolchain.yml",
+    ".github/workflows/feature-tree-auto.yml",
+    ".github/workflows/release.yml"
+  ],
+  "registered_routes": [
+    "HOME",
+    "PERSONA_GALLERY",
+    "DIARY",
+    "WORKSPACE",
+    "RUN_CENTER",
+    "PROJECT",
+    "TASKS",
+    "TOOLS",
+    "SETTINGS"
+  ],
+  "candidate_ui_screens": [
+    {
+      "symbol": "CharacterDiaryScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/CharacterDiaryScreen.kt"
+    },
+    {
+      "symbol": "ChatAutomationScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/ChatAutomationScreen.kt"
+    },
+    {
+      "symbol": "DsFullScreenDialog",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/components/Overlays.kt"
+    },
+    {
+      "symbol": "LocalHarnessScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+    },
+    {
+      "symbol": "LocalProjectScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt"
+    },
+    {
+      "symbol": "LocalRunCenterScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalRunCenterScreen.kt"
+    },
+    {
+      "symbol": "PersonaGalleryScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
+    },
+    {
+      "symbol": "SettingsScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt"
+    },
+    {
+      "symbol": "TasksScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
+    },
+    {
+      "symbol": "ToolsScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt"
+    },
+    {
+      "symbol": "WorkTasksScreen",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt"
+    }
+  ],
+  "semantic_registration_count": 0,
+  "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
+  "source_snapshot": "b4f1ecc2a3f8",
+  "verified_registrations": [],
+  "unverified_changes_count": 0
+}
