@@ -5,7 +5,6 @@ import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.local.automation.parseAutomationPlan
-import com.labteto.dshmobile.local.automation.parseAutomationSuggestions
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,19 +47,6 @@ class ChatAutomationPlanningPolicyTest {
 
         assertEquals(60L, interval.recurringMinutes)
         assertEquals(60L, silence.silenceMinutes)
-    }
-
-    @Test
-    fun suggestionsAreDeduplicatedAndLimitedToThree() {
-        val suggestions = parseAutomationSuggestions(
-            """{"suggestions":["明晚来聊今天的事","周末问问计划","周末问问计划","三天没聊时来找我"]}""",
-            json,
-        )
-
-        assertEquals(
-            listOf("明晚来聊今天的事", "周末问问计划", "三天没聊时来找我"),
-            suggestions,
-        )
     }
 
     @Test

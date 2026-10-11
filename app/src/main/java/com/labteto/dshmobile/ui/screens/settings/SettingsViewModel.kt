@@ -75,12 +75,6 @@ class SettingsViewModel @Inject constructor(
     val deviceCapabilities: StateFlow<DeviceCapabilitiesState> =
         deviceCapabilitiesController.state
 
-    val sessionSort: StateFlow<String> = hostsStore.sessionSort.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        "manual",
-    )
-
     init {
         viewModelScope.launch {
             hostsStore.settings.collect { _state.value = it }
@@ -142,12 +136,6 @@ class SettingsViewModel @Inject constructor(
             ?: error("Cannot open the picked image")
         source.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
         target.absolutePath
-    }
-
-    fun setSessionSortByRecency(enabled: Boolean) {
-        viewModelScope.launch {
-            hostsStore.setSessionSort(if (enabled) "updated" else "manual")
-        }
     }
 
     /** Reload every capability-backed Settings section without requiring an app restart. */

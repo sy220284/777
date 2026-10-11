@@ -34,7 +34,6 @@ class HostsStore @Inject constructor(
         val THEME = stringPreferencesKey("theme")
         val ACCENT_THEME = stringPreferencesKey("accent_theme")
         val RETIRED_LOCALE = stringPreferencesKey("locale")
-        val SESSION_SORT = stringPreferencesKey("session_sort")
     }
 
     private val retiredStringKeys = listOf(
@@ -42,6 +41,7 @@ class HostsStore @Inject constructor(
         "last_sessions_json", "last_sessions_json_backup",
         "harness_sessions_json", "harness_sessions_json_backup",
         "relay_tokens_json", "relay_tokens_json_backup",
+        "session_sort",
     ).map(::stringPreferencesKey)
 
     private val retiredBooleanKeys = listOf(
@@ -86,13 +86,6 @@ class HostsStore @Inject constructor(
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
         )
-
-    /** Drawer session ordering: `"manual"` follows the workspace order, `"updated"` sorts by recency. */
-    val sessionSort: Flow<String> = dataStore.data.map { it[Keys.SESSION_SORT] ?: "manual" }
-
-    suspend fun setSessionSort(value: String) {
-        dataStore.edit { it[Keys.SESSION_SORT] = value }
-    }
 
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
         var committed: AppSettings? = null

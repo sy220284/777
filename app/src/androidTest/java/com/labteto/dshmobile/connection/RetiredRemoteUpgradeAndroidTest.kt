@@ -74,7 +74,7 @@ class RetiredRemoteUpgradeAndroidTest {
         oldBooleans.forEach { assertNull("Remote switch still present: $it", current[booleanPreferencesKey(it)]) }
         assertEquals("local-token-unchanged", current[stringPreferencesKey("local_harness_webhook_token")])
         assertEquals("model-preserved", current[stringPreferencesKey("unrelated_model_state")])
-        assertEquals("updated", store.sessionSort.first())
+        assertNull(current[stringPreferencesKey("session_sort")])
 
         val upgraded = HostsStore(dataStore, context).settingsOnce()
         assertEquals("dark", upgraded.themePreference)

@@ -22,14 +22,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
-enum class PlannerUiError { SUGGESTIONS_FAILED, SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
+enum class PlannerUiError { SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, MONTHLY, CUSTOM }
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
     val notice: TasksNotice? = null,
-    val plannerSuggestions: List<String> = emptyList(),
-    val suggestionsLoading: Boolean = false,
-    val suggestionSessionId: String? = null,
     val planning: Boolean = false,
     val plannerError: PlannerUiError? = null,
     val saveRevision: Long = 0L,
@@ -78,7 +75,6 @@ class TasksViewModel @Inject constructor(
     init {
         viewModelScope.launch { scheduler.tasks.collect { tasks -> _state.update { it.copy(tasks = tasks) } } }
     }
-    fun loadChatSuggestions(force: Boolean = false) = planner.loadChatSuggestions(force)
     fun submitChatPlan(input: String, editingTaskId: String? = null) = planner.submitChatPlan(input, editingTaskId)
     private fun saveChatDraft(
         draft: AutomationPlanDraft,

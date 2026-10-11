@@ -123,9 +123,6 @@ internal fun ChatAutomationScreen(
     val planMention = stringResource(R.string.tasks_chat_plan_mention)
 
     BackHandler(enabled = handleRootSystemBack, onBack = onClose)
-    LaunchedEffect(harnessState.sessionId, canPlan) {
-        if (canPlan) viewModel.loadChatSuggestions()
-    }
     LaunchedEffect(state.saveRevision) {
         if (state.saveRevision > observedSaveRevision) {
             draft = ""
@@ -214,44 +211,6 @@ internal fun ChatAutomationScreen(
                     }
                 }
 
-                item("suggestions-heading") {
-                    SectionTitle(
-                        title = stringResource(R.string.tasks_chat_suggestions_title),
-                        subtitle = stringResource(R.string.tasks_chat_suggestions_subtitle),
-                    )
-                }
-                when {
-                    state.suggestionsLoading -> item("suggestions-loading") {
-                        Text(
-                            stringResource(R.string.tasks_chat_suggestions_loading),
-                            modifier = Modifier.padding(horizontal = DsSpacing.large),
-                            style = DsType.small13.withReadingWeight(),
-                            color = colors.labelSecondary,
-                        )
-                    }
-                    state.plannerSuggestions.isEmpty() &&
-                        state.plannerError != PlannerUiError.SUGGESTIONS_FAILED -> item("suggestions-empty") {
-                        Text(
-                            stringResource(R.string.tasks_chat_suggestions_empty),
-                            modifier = Modifier.padding(horizontal = DsSpacing.large),
-                            style = DsType.small13.withReadingWeight(),
-                            color = colors.labelTertiary,
-                        )
-                    }
-                    else -> items(
-                        state.plannerSuggestions.take(3),
-                        key = { "suggestion|$it" },
-                    ) { suggestion ->
-                        AutomationSuggestionRow(
-                            text = suggestion,
-                            onClick = {
-                                editingTaskId = null
-                                draft = "$planMention $suggestion"
-                            },
-                            modifier = Modifier.padding(horizontal = DsSpacing.large),
-                        )
-                    }
-                }
             }
 
             state.plannerError?.let {
@@ -259,7 +218,7 @@ internal fun ChatAutomationScreen(
                     stringResource(it.messageRes()),
                     modifier = Modifier.padding(horizontal = DsSpacing.large),
                     style = DsType.small13.withReadingWeight(),
-                    color = if (it == PlannerUiError.SUGGESTIONS_FAILED) colors.labelSecondary else colors.error,
+                    color = colors.error,
                 )
             }
             DsConversationComposer {
@@ -357,66 +316,6 @@ private fun AutomationCardSurface(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             content = content,
         )
-    }
-}
-
-@Composable
-private fun AutomationSuggestionRow(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.bgLayer1,
-        tonalElevation = 0.dp,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-        ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = DsShapes.row,
-                color = colors.bgModulePlatform,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.Icon(
-                        FeatherIcons.Clock,
-                        contentDescription = null,
-                        tint = colors.labelSecondary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                Text(
-                    text,
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                )
-                Text(
-                    stringResource(R.string.tasks_chat_suggestion_hint),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                )
-            }
-            androidx.compose.material3.Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = colors.labelCaption,
-                modifier = Modifier.size(16.dp),
-            )
-        }
     }
 }
 
@@ -869,7 +768,6 @@ private fun chatScheduleDescription(task: AutomationTask): String = when (task.s
 }
 
 private fun PlannerUiError.messageRes(): Int = when (this) {
-    PlannerUiError.SUGGESTIONS_FAILED -> R.string.tasks_chat_suggestions_failed
     PlannerUiError.SESSION_CHANGED -> R.string.tasks_chat_session_changed
     PlannerUiError.SAVE_FAILED -> R.string.tasks_chat_save_failed
     PlannerUiError.PLAN_FAILED -> R.string.tasks_chat_plan_failed

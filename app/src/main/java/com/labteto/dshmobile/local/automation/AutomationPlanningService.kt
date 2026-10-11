@@ -57,12 +57,6 @@ internal data class AutomationPlanDraft(
     val windowEndMinuteOfDay: Int? = null,
 )
 
-internal data class AutomationSuggestionSet(
-    val sourceSessionId: String,
-    val sourceRevision: AutomationPlanningRevision,
-    val suggestions: List<String>,
-)
-
 @Singleton
 class AutomationPlanningService @Inject constructor(
     private val runtime: LocalAutomationRuntime,
@@ -103,42 +97,11 @@ class AutomationPlanningService @Inject constructor(
         )
     }
 
-    internal suspend fun suggestions(): AutomationSuggestionSet {
-        val context = runtime.planningContext()
-        validateContext(context)
-        if (context.recentMessages.isEmpty()) {
-            return AutomationSuggestionSet(context.sessionId, context.revision, emptyList())
-        }
-        val reply = complete(
-            context = context,
-            system = """
-                你负责根据最近聊天提出 2～3 个“以后由当前角色主动发生”的定时互动建议。
-                建议必须延续聊天中真实存在的话题、关系、计划或情绪，不得编造双方已经做过的事或不存在的约定。
-                建议要具体到“什么时候/什么条件 + 角色做什么”，一句话能让用户直接修改。
-                避免重复相同切入点，避免营销口吻。
-                只返回 JSON：{"suggestions":["建议1","建议2","建议3"]}。
-            """.trimIndent(),
-            user = buildString {
-                appendLine("当前角色：${context.personaName.ifBlank { "当前角色" }}")
-                appendLine("最近聊天：")
-                append(recentConversation(context))
-            },
-        )
-        return AutomationSuggestionSet(
-            sourceSessionId = context.sessionId,
-            sourceRevision = context.revision,
-            suggestions = parseAutomationSuggestions(reply, json),
-        )
-    }
-
     internal val revisions get() = runtime.planningRevisions
     internal fun currentRevision() = runtime.planningRevision()
 
     internal fun isCurrent(draft: AutomationPlanDraft): Boolean =
         resolveAutomationPlanningRevision(runtime.planningRevision(), draft.sourceRevision).accepted
-
-    internal fun isCurrent(suggestions: AutomationSuggestionSet): Boolean =
-        resolveAutomationPlanningRevision(runtime.planningRevision(), suggestions.sourceRevision).accepted
 
     private suspend fun complete(
         context: AutomationPlanningContext,
@@ -219,16 +182,6 @@ class AutomationPlanningService @Inject constructor(
                 "$speaker：${message.content.replace("\n", " ").take(500)}"
             }
             .ifBlank { "暂无可用聊天记录" }
-}
-
-internal fun parseAutomationSuggestions(raw: String, json: Json): List<String> {
-    val root = json.parseToJsonElement(extractPlannerJson(raw)).jsonObject
-    return root["suggestions"]
-        ?.jsonArray
-        ?.mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotBlank) }
-        ?.distinct()
-        ?.take(3)
-        .orEmpty()
 }
 
 internal fun parseAutomationPlan(
