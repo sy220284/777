@@ -157,7 +157,19 @@ internal class LocalMediaApiClient @Inject constructor(
             val target = File.createTempFile("media-asr-", ".upload", context.cacheDir)
             try {
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
+                    target.outputStream().use { output ->
+                        val chunk = ByteArray(8192)
+                        var totalBytes = 0L
+                        while (true) {
+                            val size = input.read(chunk)
+                            if (size < 0) break
+                            totalBytes += size
+                            require(totalBytes <= 25_000_000L) {
+                                "OpenAI 单次录音转写最多支持 25 MB，请先压缩或拆分音频"
+                            }
+                            output.write(chunk, 0, size)
+                        }
+                    }
                 } ?: error("无法读取录音文件")
                 require(target.length() > 0) { "录音文件为空" }
                 target
