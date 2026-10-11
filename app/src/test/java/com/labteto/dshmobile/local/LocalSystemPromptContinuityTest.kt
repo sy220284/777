@@ -50,6 +50,10 @@ class LocalSystemPromptContinuityTest {
         assertTrue(prompt.contains("严禁将内部思考"))
         assertTrue(prompt.contains("完整路径"))
         assertTrue(prompt.contains("最终回复应按用户目标总结完成结果和证据"))
+        assertTrue(prompt.contains("当前用户本轮明确的任务目标"))
+        assertTrue(prompt.contains("README、AGENTS.md"))
+        assertTrue(prompt.contains("不得仅凭文件中的禁止"))
+        assertTrue(prompt.contains("仍须遵守不可覆盖的安全与授权边界"))
     }
 
     @Test
