@@ -2413,7 +2413,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsStatusPill.kt",
-      "sha256": "b7c97ecd47ccf71a"
+      "sha256": "20f03d4ba48c4703"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/DsSwitch.kt",
@@ -2469,7 +2469,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/StateDot.kt",
-      "sha256": "275a14f517131399"
+      "sha256": "9261320019fe2577"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/ui/components/ToggleRow.kt",
@@ -3253,15 +3253,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "02f029cc2ffb",
+  "source_snapshot": "db7965b09a0b",
   "observed_delta": {
-    "baseline": "aad58e1a46f7",
+    "baseline": "02f029cc2ffb",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalProjectUiContribution.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/theme/Color.kt",
-      "app/src/main/java/com/labteto/dshmobile/ui/theme/Theme.kt"
+      "app/src/main/java/com/labteto/dshmobile/ui/components/DsStatusPill.kt",
+      "app/src/main/java/com/labteto/dshmobile/ui/components/StateDot.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

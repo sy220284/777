@@ -41,7 +41,7 @@ fun DsStatusPill(
 ) {
     val colors = DsTheme.colors
     val dot = when (state) {
-        DsStatus.Running -> colors.accent
+        DsStatus.Running -> colors.success
         DsStatus.Done -> colors.success
         DsStatus.Warning -> colors.warnLabel
         DsStatus.Failed -> colors.error
@@ -49,7 +49,11 @@ fun DsStatusPill(
     }
     Row(
         modifier = modifier
-            .background(colors.bgModulePlatform, DsShapes.pillFull)
+            .background(
+                if (state == DsStatus.Running || state == DsStatus.Done) colors.successTertiary
+                else colors.bgModulePlatform,
+                DsShapes.pillFull,
+            )
             .padding(horizontal = 9.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
