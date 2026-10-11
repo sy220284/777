@@ -349,6 +349,13 @@ class ChatInteractionPlannerTest {
             interactionIntensity = 3,
         )
         assertEquals(active, active.canonicalizeLegacyCharacterState())
+
+        val unrelatedStoredState = ChatCharacterState(
+            interactionIntent = "FUTURE_MODE",
+            interactionIntentStrength = 4,
+            interactionIntensity = 3,
+        )
+        assertEquals(unrelatedStoredState, unrelatedStoredState.canonicalizeLegacyCharacterState())
     }
 
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
