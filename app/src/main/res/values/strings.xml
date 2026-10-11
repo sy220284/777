@@ -2073,5 +2073,6 @@
     <string name="media_studio_share_image">分享／保存生成图片</string>
     <string name="media_studio_model_capabilities">可用创作：%1$s</string>
     <string name="media_studio_view_image">查看生成图片</string>
+    <string name="media_studio_previous_video_tasks">当前模型已提交的视频任务</string>
 </resources>
 
