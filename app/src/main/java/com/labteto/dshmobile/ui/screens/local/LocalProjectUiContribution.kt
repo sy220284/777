@@ -37,7 +37,6 @@ internal data class LocalProjectUiActions(
     val recoveryNotice: StateFlow<String?>,
     val backupAndReset: () -> Unit,
     val createProjectWorkSession: () -> Boolean,
-    val onProjectSessionAccepted: () -> Unit,
     val create: (String) -> String,
     val select: (String) -> Unit,
     val rename: (String, String) -> Unit,
@@ -119,7 +118,7 @@ internal fun LocalProjectScreen(
             text = stringResource(R.string.local_project_start_work_session),
             onClick = {
                 runCatching { actions.createProjectWorkSession() }
-                    .onSuccess { if (it) actions.onProjectSessionAccepted() else error = localProjectCannotSwitchMessage }
+                    .onSuccess { if (!it) error = localProjectCannotSwitchMessage }
                     .onFailure { error = it.message }
             },
             modifier = Modifier.fillMaxWidth(),

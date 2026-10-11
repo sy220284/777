@@ -8,9 +8,9 @@ import org.junit.Test
 
 class LocalHarnessModeTransitionTest {
     @Test
-    fun pendingModeWinsImmediatelyInDrawer() {
+    fun drawerSelectionTracksCommittedSessionOnly() {
         assertEquals(
-            LocalUsageMode.CHAT,
+            LocalUsageMode.WORK,
             localHarnessDrawerUsageMode(
                 current = LocalUsageMode.WORK,
                 pending = LocalUsageMode.CHAT,

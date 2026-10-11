@@ -98,7 +98,7 @@ internal fun LocalModeDrawer(
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
-    var deleteCandidateId by remember { mutableStateOf<String?>(null) }
+    var deleteCandidateIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -129,6 +129,13 @@ internal fun LocalModeDrawer(
     LaunchedEffect(usageMode) {
         selectionOpen = false
         selectedIds.clear()
+    }
+    LaunchedEffect(sessions) {
+        val availableIds = sessions.mapTo(hashSetOf()) { it.id }
+        selectedIds.removeAll { it !in availableIds }
+        if (renameTargetId != null && renameTargetId !in availableIds) renameTargetId = null
+        if (deleteCandidateIds.any { it !in availableIds }) deleteCandidateIds = emptySet()
+        if (selectedIds.isEmpty()) selectionOpen = false
     }
 
     BackHandler(enabled = drawerOpen && (selectionOpen || searchOpen)) {
@@ -320,7 +327,7 @@ internal fun LocalModeDrawer(
                             },
                             onRename = { renameTargetId = session.id },
                             onTogglePinned = { onTogglePinSession(session.id) },
-                            onDelete = { deleteCandidateId = session.id },
+                            onDelete = { deleteCandidateIds = setOf(session.id) },
                         )
                     }
                 }
@@ -356,7 +363,7 @@ internal fun LocalModeDrawer(
                             },
                             onRename = { renameTargetId = session.id },
                             onTogglePinned = { onTogglePinSession(session.id) },
-                            onDelete = { deleteCandidateId = session.id },
+                            onDelete = { deleteCandidateIds = setOf(session.id) },
                         )
                     }
                 }
@@ -404,7 +411,7 @@ internal fun LocalModeDrawer(
                             )
                             DsButton(
                                 text = stringResource(R.string.local_delete_session),
-                                onClick = { requestDelete(selectedIds.toSet()) },
+                                onClick = { deleteCandidateIds = selectedIds.toSet() },
                                 enabled = selectedIds.isNotEmpty() && !deleteInFlight,
                                 variant = DsButtonVariant.Danger,
                                 size = DsButtonSize.Small,
@@ -443,15 +450,18 @@ internal fun LocalModeDrawer(
                 },
             )
         }
-        deleteCandidateId?.let { id ->
+        if (deleteCandidateIds.isNotEmpty()) {
+            val ids = deleteCandidateIds
             ConfirmDialog(
                 title = stringResource(R.string.local_delete_session),
-                body = stringResource(R.string.local_delete_session_confirm_message),
+                body = if (ids.size > 1) {
+                    stringResource(R.string.local_delete_sessions_confirm_multiple, ids.size)
+                } else stringResource(R.string.local_delete_session_confirm_message),
                 confirmLabel = stringResource(R.string.local_delete_session),
-                onDismiss = { deleteCandidateId = null },
+                onDismiss = { deleteCandidateIds = emptySet() },
                 onConfirm = {
-                    deleteCandidateId = null
-                    requestDelete(setOf(id))
+                    deleteCandidateIds = emptySet()
+                    requestDelete(ids)
                 },
             )
         }

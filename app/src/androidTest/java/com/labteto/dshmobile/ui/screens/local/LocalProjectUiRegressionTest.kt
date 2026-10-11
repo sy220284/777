@@ -24,7 +24,6 @@ class LocalProjectUiRegressionTest {
 
     @Test fun selectedProjectStartsExactlyOneWorkSession() {
         var started = 0
-        var navigated = 0
         compose.setContent {
             DshTheme {
                 LocalProjectScreen(
@@ -33,7 +32,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow<String?>(null),
                         backupAndReset = {},
                         createProjectWorkSession = { started++; true },
-                        onProjectSessionAccepted = { navigated++ },
                         create = { "" }, select = {}, rename = { _, _ -> },
                         updateInstructions = { _, _ -> },
                     ),
@@ -44,7 +42,7 @@ class LocalProjectUiRegressionTest {
         compose.onNodeWithText(context.getString(R.string.local_project_start_work_session)).performClick()
         compose.runOnIdle {
             assertEquals(1, started)
-            assertEquals(1, navigated)
+            // Navigation is now owned by the shell after the session is actually active.
         }
     }
 
@@ -67,7 +65,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
                         createProjectWorkSession = { false },
-                        onProjectSessionAccepted = {},
                         create = { "" },
                         select = {},
                         rename = { _, _ -> },
@@ -104,7 +101,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow<String?>("目录损坏"),
                         backupAndReset = { reset++ },
                         createProjectWorkSession = { error("invalid") },
-                        onProjectSessionAccepted = {},
                         create = { error("invalid") }, select = {}, rename = { _, _ -> },
                         updateInstructions = { _, _ -> },
                     ),
@@ -134,7 +130,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
                         createProjectWorkSession = { false },
-                        onProjectSessionAccepted = {},
                         create = { "" }, select = {}, rename = { _, _ -> },
                         delete = { id ->
                             attempts++
@@ -182,7 +177,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
                         createProjectWorkSession = { false },
-                        onProjectSessionAccepted = {},
                         create = { "" }, select = {}, rename = { _, _ -> },
                         delete = { called++ },
                         updateInstructions = { _, _ -> },
@@ -218,7 +212,6 @@ class LocalProjectUiRegressionTest {
                         recoveryNotice = MutableStateFlow(null),
                         backupAndReset = {},
                         createProjectWorkSession = { false },
-                        onProjectSessionAccepted = {},
                         create = { "" }, select = {}, rename = { _, _ -> },
                         delete = { id ->
                             calls++

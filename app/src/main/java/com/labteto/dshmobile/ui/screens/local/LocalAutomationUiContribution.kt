@@ -9,7 +9,6 @@ internal fun localAutomationFeatureUiContribution(
     onCreateViaChat: (String) -> Unit,
     actions: LocalAutomationFeatureUiActions,
     onTaskModeChange: (AutomationMode?) -> Unit,
-    onResetNavigation: () -> Unit,
     onPopFeature: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
@@ -32,10 +31,8 @@ internal fun localAutomationFeatureUiContribution(
             onPopFeature()
         },
         onOpenSession = { sessionId ->
-            if (actions.switchSession(sessionId)) {
-                onTaskModeChange(null)
-                onResetNavigation()
-            }
+            // Keep the task page until the new conversation is actually visible.
+            actions.switchSession(sessionId)
         },
         initialMode = taskMode,
         onCreateViaChat = onCreateViaChat,

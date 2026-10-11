@@ -277,7 +277,8 @@ internal fun ChatGptAccountPanel(
                                         ) { error -> error?.let(report) }
                                     }
                                 },
-                                enabled = !busy,
+                                // A later account tap replaces the previous catalog-loading request.
+                                enabled = !busy || state.phase == ChatGptAuthPhase.LOADING_MODELS,
                                 size = DsButtonSize.Small,
                                 variant = DsButtonVariant.Ghost,
                             )
