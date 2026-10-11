@@ -184,7 +184,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             "视频任务编号无效"
         }
         val root = requestJson(profile, "/v1/query/video_generation?task_id=$taskId")
-        val state = root["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val state = normalizeMiniMaxVideoState(root["status"]?.jsonPrimitive?.contentOrNull.orEmpty())
         when (state) {
             "Queueing", "Processing" -> return MiniMaxVideoStatus(state)
             "Failed" -> return MiniMaxVideoStatus("Failed")
@@ -239,4 +239,12 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
         const val MAX_AUDIO_HEX_CHARS = 40 * 1024 * 1024
         const val MAX_JSON_RESPONSE_CHARS = 45 * 1024 * 1024
     }
+}
+
+/** MiniMax raw wire enum is Preparing/Queueing/Processing/Success/Fail, not Failed. */
+internal fun normalizeMiniMaxVideoState(state: String): String = when (state) {
+    "Preparing", "Queueing" -> "Queueing"
+    "Processing", "Success" -> state
+    "Fail" -> "Failed"
+    else -> error("MiniMax 返回未知视频任务状态：$state")
 }

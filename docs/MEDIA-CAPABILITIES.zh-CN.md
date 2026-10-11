@@ -82,3 +82,9 @@
 - **服务商在线图片**：MiniMax/Qwen 等返回的 HTTPS URL 只作为*临时成果链接*记录，不宣称图片已经离线保存。过期后仍需服务商续签 URL 或用户先前手动下载。
 - **诊断与隐私**：状态与失败原因回到持久视频任务记录，不保存提示词或明文 API Key。图片/视频/语音消费和费用不可从文字 Token 账本推算，仍需服务商权威响应对接。
 - **验证**：`LocalMediaPersistenceRulesTest` 覆盖崩溃保守恢复、远端 ID 身份附着、终态防迟到覆盖、账户匹配以及文件/链接序列化，仍需真实付费账户与 Android 设备测试。
+
+## 媒体记录恢复与视频状态
+
+视频任务与成果索引复用 Shared 的 RecoveringDocumentFile，正常提交使用原子替换、备份及损坏隔离。旧 SharedPreferences JSON 首次读取先完整解码，成功提交到应用私有媒体目录后由新文档接管；损坏旧记录保留原文，不迁移为空表。主文件与备份都不可恢复时，媒体页面显示恢复错误，并在对应计费生成之前阻止覆盖原记录。临时图片链接仍不冒充永久下载。
+
+MiniMax 原始视频状态 Preparing、Queueing、Processing、Success、Fail 在供应商边界归一化；Preparing 映射到排队中，Fail 映射到失败。依据：[MiniMax 官方视频状态查询](https://platform.minimax.io/docs/api-reference/video-generation-query)。

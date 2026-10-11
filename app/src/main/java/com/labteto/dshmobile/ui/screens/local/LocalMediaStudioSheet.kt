@@ -358,6 +358,9 @@ internal fun LocalMediaStudioSheetContent(
             error?.let { Text(stringResource(R.string.minimax_media_error, it),
                 color = colors.labelPrimary, style = DsType.caption11.withReadingWeight()) }
         }
+        viewModel.storageError?.let {
+            Text(stringResource(R.string.minimax_media_error, it), color = colors.labelPrimary, style = DsType.caption11.withReadingWeight())
+        }
         if (videoTasks.isNotEmpty()) {
             DsButton(
                 text = stringResource(R.string.media_studio_video_archive, videoTasks.size),

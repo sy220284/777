@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.Context
-import com.labteto.dshmobile.observability.AppLog
+import java.io.File
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject
@@ -100,11 +100,17 @@ class LocalMediaVideoTaskStore @Inject constructor(
     private val json: Json,
 ) {
     private val prefs = context.getSharedPreferences("local_media_video_tasks", Context.MODE_PRIVATE)
+    private val document = LocalMediaDocument(
+        File(context.filesDir, "media-studio/video-tasks.json"), LocalMediaVideoTaskList.serializer(), json,
+        legacySource = { prefs.getString(KEY, null) },
+    )
+    val recoveryError: String? get() = document.recoveryError
     private val mutableTasks = MutableStateFlow(readAndRecover())
     val tasks: StateFlow<List<LocalMediaVideoTask>> = mutableTasks
 
     @Synchronized
     fun begin(offer: LocalMediaOffer, now: Long = System.currentTimeMillis()): LocalMediaVideoTask {
+        document.requireAvailable()
         LocalMediaCatalog.requireValid(offer)
         require(offer.kind == LocalMediaKind.VIDEO)
         val task = LocalMediaVideoTask(
@@ -170,25 +176,15 @@ class LocalMediaVideoTaskStore @Inject constructor(
     }
 
     private fun readAndRecover(): List<LocalMediaVideoTask> {
-        val source = prefs.getString(KEY, null) ?: return emptyList()
-        val restored = runCatching {
-            json.decodeFromString(LocalMediaVideoTaskList.serializer(), source).tasks
-        }.onFailure {
-            AppLog.warn("MediaTasks", "failure=true operation=read_media_tasks cause_type=${it.javaClass.simpleName}")
-        }.getOrElse { return emptyList() }
+        val restored = document.readOrNull(::LocalMediaVideoTaskList)?.tasks ?: return emptyList()
         val recovered = LocalMediaVideoTransitions.recover(restored)
-        if (restored != recovered) {
-            check(prefs.edit().putString(KEY,
-                json.encodeToString(LocalMediaVideoTaskList.serializer(), LocalMediaVideoTaskList(recovered))
-            ).commit()) { "视频任务恢复结果无法持久保存" }
-        }
+        if (restored != recovered) document.write(LocalMediaVideoTaskList(recovered))
         return recovered
     }
 
     /** Do not evict unresolved or completed charged tasks automatically. */
     private fun persist(items: List<LocalMediaVideoTask>) {
-        val encoded = json.encodeToString(LocalMediaVideoTaskList.serializer(), LocalMediaVideoTaskList(items))
-        check(prefs.edit().putString(KEY, encoded).commit()) { "视频任务无法持久保存；已阻止可能付费的请求" }
+        document.write(LocalMediaVideoTaskList(items))
         mutableTasks.value = items
     }
 

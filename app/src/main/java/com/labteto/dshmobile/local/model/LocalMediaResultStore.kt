@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.Context
-import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.net.URI
@@ -42,6 +41,12 @@ class LocalMediaResultStore @Inject constructor(
 ) {
     private val prefs = context.getSharedPreferences("local_media_results", Context.MODE_PRIVATE)
     private val directory = File(context.filesDir, "media-studio")
+    private val document = LocalMediaDocument(
+        File(directory, "results.json"), LocalMediaResultList.serializer(), json,
+        legacySource = { prefs.getString(KEY, null) },
+    )
+    val recoveryError: String? get() = document.recoveryError
+    fun requireAvailable() = document.requireAvailable()
     private val mutableResults = MutableStateFlow(load())
     val results: StateFlow<List<LocalMediaResult>> = mutableResults
 
@@ -68,6 +73,7 @@ class LocalMediaResultStore @Inject constructor(
 
     @Synchronized
     fun remove(id: String) {
+        document.requireAvailable()
         val current = mutableResults.value
         val existing = current.firstOrNull { it.id == id } ?: return
         val file = fileFor(existing)
@@ -108,19 +114,12 @@ class LocalMediaResultStore @Inject constructor(
 
     @Synchronized
     private fun persist(items: List<LocalMediaResult>) {
-        val raw = json.encodeToString(LocalMediaResultList.serializer(), LocalMediaResultList(items))
-        check(prefs.edit().putString(KEY, raw).commit()) { "生成成果记录无法持久保存" }
+        document.write(LocalMediaResultList(items))
         mutableResults.value = items
     }
 
-    private fun load(): List<LocalMediaResult> {
-        val raw = prefs.getString(KEY, null) ?: return emptyList()
-        return runCatching {
-            json.decodeFromString(LocalMediaResultList.serializer(), raw).results
-        }.onFailure {
-            AppLog.warn("MediaResults", "failure=true operation=load_media_results cause_type=${it.javaClass.simpleName}")
-        }.getOrElse { emptyList() }
-    }
+    private fun load(): List<LocalMediaResult> =
+        document.readOrNull(::LocalMediaResultList)?.results.orEmpty()
 
     private companion object { const val KEY = "completed_media_results_v1" }
 }

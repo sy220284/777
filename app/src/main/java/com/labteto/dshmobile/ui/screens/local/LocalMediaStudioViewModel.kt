@@ -18,6 +18,7 @@ import javax.inject.Inject
 class LocalMediaStudioViewModel @Inject constructor(
     private val creation: LocalMediaCreationRuntime,
 ) : ViewModel() {
+    val storageError: String? get() = creation.storageError
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = creation.videoTasks
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = creation.generatedResults
     fun resultFile(item: LocalMediaResult): File? = creation.resultFile(item)

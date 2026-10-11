@@ -42,6 +42,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 ) {
     // The provider request belongs to the media capability, not a disposable Compose sheet.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val storageError: String? get() = videoStore.recoveryError ?: resultStore.recoveryError
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
     fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
@@ -52,6 +53,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImage {
         validate(offer, LocalMediaKind.IMAGE)
+        resultStore.requireAvailable()
         val result = when (offer.provider) {
             LocalMediaProvider.MINIMAX -> LocalMediaImage(url = miniMax.generateImage(offer.profile, prompt, ratio))
             else -> api.image(offer, prompt, ratio).let(::imageResult)
@@ -80,6 +82,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     suspend fun speech(offer: LocalMediaOffer, text: String, voice: String): File {
         validate(offer, LocalMediaKind.SPEECH)
+        resultStore.requireAvailable()
         val file = when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.synthesizeSpeech(offer.profile, text, voice)
             LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
