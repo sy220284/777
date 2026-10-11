@@ -7,6 +7,7 @@ import com.labteto.dshmobile.core.net.withCancellableHttpResponse
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +85,14 @@ internal class LocalMediaApiClient @Inject constructor(
     private val json: Json,
     @ApplicationContext private val context: Context,
 ) {
+    // Media providers may spend minutes generating an image or transcoding audio.
+    // An idle-read timeout remains, but never use the app-wide 30s short-request policy.
+    private val mediaHttp = http.newBuilder()
+        .readTimeout(10, TimeUnit.MINUTES)
+        .writeTimeout(2, TimeUnit.MINUTES)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .build()
+
     suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImageResult {
         require(offer.kind == LocalMediaKind.IMAGE && prompt.isNotBlank())
         require(ratio in setOf("1:1", "16:9", "9:16", "4:3", "3:4"))
@@ -183,7 +192,7 @@ internal class LocalMediaApiClient @Inject constructor(
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         return withContext(Dispatchers.IO) {
-            withCancellableHttpResponse(http.newCall(request)) { response ->
+            withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
                 if (!response.isSuccessful) error("OpenAI 配音请求失败（HTTP ${response.code}）")
                 val file = outputFile("mp3")
                 try {
@@ -291,7 +300,7 @@ internal class LocalMediaApiClient @Inject constructor(
         readJson(authorizedRequest(offer, url).post(body).build())
 
     private suspend fun readJson(request: Request): JsonObject = withContext(Dispatchers.IO) {
-        withCancellableHttpResponse(http.newCall(request)) { response ->
+        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
             if (!response.isSuccessful) error("创作服务请求失败（HTTP ${response.code}）")
             val payload = response.body?.string() ?: error("创作服务未返回数据")
             LocalMediaApiResponse.checked(json.parseToJsonElement(payload).jsonObject)
