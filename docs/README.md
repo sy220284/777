@@ -12,6 +12,9 @@
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 所有权、Shared Capability、应用组合根、极薄 Runtime Kernel 与架构门禁 |
 | [FEATURE-TREE.zh-CN.md](FEATURE-TREE.zh-CN.md)／[交互版](FEATURE-TREE.zh-CN.html) | 全功能中文树：模块、功能、子功能、细分能力、代码定位及未合并 PR 标记；随代码同步维护 |
+| [FEATURE-TREE-AUTOMATION.zh-CN.md](FEATURE-TREE-AUTOMATION.zh-CN.md) | 主线与定时全源码扫描、源码功能登记、自动更新功能树和代码候选索引的使用及验证边界 |
+| [FEATURE-REALITY-AUDIT.zh-CN.md](FEATURE-REALITY-AUDIT.zh-CN.md)／[逐项JSON](FEATURE-REALITY-AUDIT.auto.json) | 独立读取真实生产代码、路由、工具注册、页面与测试，逐项对照功能树；区分描述数、静态证据和真实执行状态 |
+| [FEATURE-EXISTENCE-AUDIT.zh-CN.md](FEATURE-EXISTENCE-AUDIT.zh-CN.md)／[逐项JSON](FEATURE-EXISTENCE-AUDIT.auto.json) | 专项排查原14项缺入口及76项弱证据功能：独立存在、共享实现、历史兼容、真实测试声明与待验收状态 |
 | [FUNCTION-AUDIT.zh-CN.md](FUNCTION-AUDIT.zh-CN.md) | 当前完整功能树逐节点审计台账、确定问题及验证缺口；依据最新主线持续更新 |
 | [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |
 | [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |

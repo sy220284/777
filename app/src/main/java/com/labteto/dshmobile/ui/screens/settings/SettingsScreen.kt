@@ -267,6 +267,7 @@ fun SettingsScreen(
     var showEnvironment by rememberSaveable { mutableStateOf(false) }
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
+    var showChatPreferenceDiagnostics by rememberSaveable { mutableStateOf(false) }
     var localSessionStorageStatus by remember { mutableStateOf<LocalSessionStorageStatus?>(null) }
     var localSessionStorageBusy by rememberSaveable { mutableStateOf(false) }
     val sessionStorageExporter = rememberLauncherForActivityResult(
@@ -636,27 +637,41 @@ fun SettingsScreen(
                                 personaFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
                             }
 
-                            Text(
-                                stringResource(R.string.settings_chat_guard_hits_title),
-                                style = DsType.small13Strong.withReadingWeight(),
-                                color = colors.labelPrimary,
-                            )
-                            if (localHarness.styleGuardHits.isEmpty()) {
-                                Text(
-                                    stringResource(R.string.settings_chat_guard_hits_empty),
-                                    style = DsType.caption11.withReadingWeight(),
-                                    color = colors.labelTertiary,
-                                )
-                            } else {
-                                localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
-                                    ChatFilterPhraseRow(phrase = hit)
-                                }
+                            if (localHarness.styleGuardHits.isNotEmpty()) {
                                 DsButton(
-                                    text = stringResource(R.string.settings_chat_guard_hits_clear),
-                                    onClick = viewModel::clearChatStyleGuardHits,
+                                    text = stringResource(
+                                        if (showChatPreferenceDiagnostics) {
+                                            R.string.settings_chat_guard_hits_hide
+                                        } else {
+                                            R.string.settings_chat_guard_hits_show
+                                        },
+                                        localHarness.styleGuardHits.size,
+                                    ),
+                                    onClick = {
+                                        showChatPreferenceDiagnostics = !showChatPreferenceDiagnostics
+                                    },
                                     variant = DsButtonVariant.Ghost,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
+                                if (showChatPreferenceDiagnostics) {
+                                    Text(
+                                        stringResource(R.string.settings_chat_guard_hits_title),
+                                        style = DsType.small13Strong.withReadingWeight(),
+                                        color = colors.labelPrimary,
+                                    )
+                                    localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
+                                        ChatFilterPhraseRow(phrase = hit)
+                                    }
+                                    DsButton(
+                                        text = stringResource(R.string.settings_chat_guard_hits_clear),
+                                        onClick = {
+                                            viewModel.clearChatStyleGuardHits()
+                                            showChatPreferenceDiagnostics = false
+                                        },
+                                        variant = DsButtonVariant.Ghost,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
                             }
                         }
                     }

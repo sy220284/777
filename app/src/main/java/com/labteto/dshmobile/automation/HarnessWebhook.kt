@@ -179,7 +179,7 @@ class WebhookController @Inject constructor(
         context.getSharedPreferences("local_harness_webhook", Context.MODE_PRIVATE)
 
     suspend fun start(port: Int = DEFAULT_PORT, allowLan: Boolean = false): String {
-        require(!allowLan) { "Webhook 仅允许本机回环监听；远程访问请使用加密中继" }
+        require(!allowLan) { "Webhook 仅支持本机回环监听（127.0.0.1）；当前没有内置远程中继，也不支持局域网直连" }
         require(port in 1024..65535) { "Webhook 端口必须在 1024..65535" }
         val token = tokenStore.getOrCreate()
         preferences.edit()

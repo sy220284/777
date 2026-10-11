@@ -1,0 +1,527 @@
+{
+  "version": 1,
+  "policy": "手工逐项核对的源码声明线索，仅用于静态证据等级，不代表行为验收或授权自动改树",
+  "items": [
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 跳转定义与查找引用",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "definition",
+            "references"
+          ]
+        }
+      ],
+      "scope": "LSP 查询方法源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 悬停信息和查找实现",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "hover",
+            "implementation"
+          ]
+        }
+      ],
+      "scope": "LSP 查询方法源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 文件／工作区符号",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "documentSymbols",
+            "workspaceSymbols"
+          ]
+        }
+      ],
+      "scope": "LSP 符号查询源码声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / 语言服务器能力 / 诊断与重命名预览",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+          "symbols": [
+            "rename"
+          ]
+        },
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+          "symbols": [
+            "execute"
+          ],
+          "literals": [
+            "lsp_diagnostics",
+            "lsp_rename_preview"
+          ]
+        }
+      ],
+      "scope": "重命名方法与诊断工具分发代码存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 持久会话身份登记册取代目录后缀发现",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "DurableSessionCatalog",
+            "ids",
+            "register"
+          ]
+        }
+      ],
+      "scope": "持久身份目录声明及登记入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 写入前登记、删除后注销及跨实例同步",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "register",
+            "unregister"
+          ]
+        }
+      ],
+      "scope": "注册与注销入口源码声明存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 会话事实源 / 旧会话按文档身份及备份核验补录",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "adopt",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "历史身份补录与快照校验入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 历史与投影 / 事件投影检查点与真实会话身份分离",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "discoverExistingDocuments",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "按文档身份发现已有会话的入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 登记册损坏后验证原文件重建",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "ensureLoaded",
+            "discoverExistingDocuments"
+          ]
+        }
+      ],
+      "scope": "损坏恢复及扫描入口存在"
+    },
+    {
+      "path": "第二层｜共享运行能力 / 共享会话与事件 / 恢复与维护 / 会话直接读取补登记与快照身份防串话",
+      "sources": [
+        {
+          "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+          "symbols": [
+            "adopt",
+            "documentHasIdentity"
+          ]
+        }
+      ],
+      "scope": "读取时补录及快照身份校验方法存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider",
+            "open",
+            "write",
+            "read"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"terminal_open\"",
+            "\"terminal_read\"",
+            "\"terminal_close\""
+          ]
+        }
+      ],
+      "scope": "持久终端会话与读写关闭工具在生产源码有真实入口，无法据此证明外部命令已安装"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\"",
+            "\"terminal_status\""
+          ]
+        }
+      ],
+      "scope": "进程执行及持久终端状态查询已定义，后台进程完整运行能力仍待测试"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "AndroidDeviceProvider",
+            "accessibilityTree",
+            "accessibilityFind"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_screen\"",
+            "\"android_click_node\""
+          ]
+        }
+      ],
+      "scope": "无障碍控件树、查找与节点动作工具的真实源码分支存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "notificationList",
+            "notificationStatus"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_notification_list\""
+          ]
+        }
+      ],
+      "scope": "通知读取与授权状态查询的真实工具入口存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_screenshot\"",
+            "\"android_tap\"",
+            "\"android_swipe\""
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "AndroidDeviceProvider"
+          ],
+          "literals": [
+            "\"android_screenshot\""
+          ]
+        }
+      ],
+      "scope": "屏幕截图和点击滑动动作的工具注册与分发代码存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController",
+            "create",
+            "screenshotPng"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_vscreen_create\"",
+            "\"android_vscreen_screenshot\""
+          ]
+        }
+      ],
+      "scope": "虚拟显示创建截图及工具分发声明存在，真实设备运行另验"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "acquireAgentVirtualDisplay",
+            "releaseAgentVirtualDisplay"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController"
+          ]
+        }
+      ],
+      "scope": "智能体虚拟屏资源申请与释放声明存在，所有权约束仍需设备测试"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"terminal_open\"",
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "安卓进程及终端基础服务实现入口存在，外部命令可用性另验"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController"
+          ]
+        }
+      ],
+      "scope": "设备工具插件及虚拟显示控制器真实声明存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 代码与版本控制 / Git 仓库操作",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbols": [
+            "BundledGitRuntime",
+            "prepare",
+            "searchPaths"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "打包Git运行时准备及通用执行入口已存在，具体Git仓库操作需真实命令验证"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 外部工具协议 / 外部调用中断和卸载",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "McpToolBridgePlugin",
+            "uninstall",
+            "disconnectFromUi"
+          ]
+        }
+      ],
+      "scope": "MCP断连、卸载和协程取消相关声明存在，外部超时表现另验"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / 外部互通适配 / MCP HTTP／标准输入输出适配",
+      "sources": [
+        {
+          "path": "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+          "symbols": [
+            "McpToolBridgePlugin",
+            "connectHttpFromUi",
+            "connectStdioFromUi"
+          ]
+        }
+      ],
+      "scope": "MCP HTTP与stdio的连接入口已声明，协议真实互通仍需测试"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 人物状态与关系 / 当前场景、情绪与关系状态及来源",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatStateObservations.kt",
+          "symbols": [
+            "observeCharacterStateChanges"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+          "symbols": [
+            "ChatSceneRuntime",
+            "extractTurnEvents"
+          ]
+        }
+      ],
+      "scope": "人物状态变化观察、来源绑定及场景事件提取声明存在，情绪关系完整性待验"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 聊天功能 / 聊天质量 / 人物身份与背景连续性检查",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+          "symbols": [
+            "ChatSceneRuntime",
+            "inspectReply"
+          ]
+        },
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/chat/ChatContinuitySanitizer.kt",
+          "symbols": [
+            "sanitizeChatContinuity"
+          ]
+        }
+      ],
+      "scope": "场景回复连续性检查与文本清理入口存在，身份及背景全量校验待测"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Git 命令行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+          "symbols": [
+            "BundledGitRuntime",
+            "prepare",
+            "status"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "Git打包运行时与工具执行入口存在，真实Git二进制启动需设备验证"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
+          "symbols": [
+            "BundledNodeRuntime",
+            "prepare",
+            "status"
+          ],
+          "literals": [
+            "\"runtime/node\""
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledNodeRuntimeTest.kt",
+          "method": "bundledNodeRunsJavaScriptAndChildProcessOnAndroid16",
+          "references": "BundledNodeRuntime"
+        }
+      ],
+      "scope": "Node运行时打包准备和命令执行入口以及Android仪表测试源码存在，真机通过状态需另核"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
+          "symbols": [
+            "BundledPythonRuntime",
+            "prepare",
+            "status"
+          ],
+          "literals": [
+            "\"runtime/python\""
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledPythonRuntimeTest.kt",
+          "method": "bundledPythonRunsStdlibAndAndroidShellOnAndroid16",
+          "references": "BundledPythonRuntime"
+        }
+      ],
+      "scope": "Python运行时准备和执行入口以及Android仪表测试源码存在，真实设备测试结果需另核"
+    }
+  ]
+}
