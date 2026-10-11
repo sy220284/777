@@ -1,83 +1,34 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatStyleGuard
+import com.labteto.dshmobile.local.chat.renderChatExpressionPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatStyleGuardTest {
-    @Test fun characterSpeechPassesWithoutAnApplicationStyleBlacklist() {
-        val text = "我理解你的感受。如果你愿意的话，我们可以继续聊。"
-        assertTrue(ChatStyleGuard.violations(text).isEmpty())
-        assertEquals(text, ChatStyleGuard.filterLiteral(text, ChatStyleGuard.activePhrases()))
-        assertEquals(text, ChatStyleGuard.scrub(text))
+    @Test fun noApplicationBlacklistIsAddedToCharacterSpeech() {
+        assertTrue(ChatStyleGuard.violations("我理解你的感受。如果你愿意的话，我们可以继续聊。").isEmpty())
+        assertTrue(ChatStyleGuard.activePhrases().isEmpty())
     }
 
-    @Test fun personaSpecificBanIsAlsoEnforced() {
-        val text = "嗯。亲爱的，你终于回来了。"
-        val extra = listOf("亲爱的")
-        assertEquals(listOf("亲爱的"), ChatStyleGuard.violations(text, extra))
-        val scrubbed = ChatStyleGuard.scrub(text, extra)
-        assertFalse("亲爱的" in scrubbed)
-        assertEquals("嗯。你终于回来了。", scrubbed)
+    @Test fun explicitPreferencesEnterGenerationAndMissesRemainDiagnostic() {
+        val phrases = ChatStyleGuard.activePhrases(listOf("亲爱的"), listOf("亲爱的", "主人"))
+        assertEquals(listOf("亲爱的", "主人"), phrases)
+        val prompt = renderChatExpressionPreferences(phrases, true)
+        assertTrue(prompt.contains("亲爱的"))
+        assertEquals(listOf("亲爱的"), ChatStyleGuard.violations("嗯。亲爱的，你终于回来了。", phrases))
     }
 
-    @Test fun disablingGenericGuardStillEnforcesPersonaBan() {
-        val text = "我理解你的感受。亲爱的，回来就好。"
-        assertEquals(
-            listOf("亲爱的"),
-            ChatStyleGuard.violations(
-                text,
-                extraBannedPhrases = listOf("亲爱的"),
-                builtInEnabled = false,
-            ),
-        )
-        val scrubbed = ChatStyleGuard.scrub(
-            text,
-            extraBannedPhrases = listOf("亲爱的"),
-            builtInEnabled = false,
-        )
-        assertTrue("我理解你的感受" in scrubbed)
-        assertFalse("亲爱的" in scrubbed)
+    @Test fun disablingPreferencesAddsNoPromptOrDiagnostics() {
+        assertEquals("", renderChatExpressionPreferences(listOf("亲爱的"), false))
+        assertTrue(ChatStyleGuard.activePhrases(listOf("自定义词"), listOf("人物词"), false).isEmpty())
     }
 
-    @Test fun naturalChatPassesUntouched() {
-        val text = "……你还知道回来？"
-        assertTrue(ChatStyleGuard.violations(text).isEmpty())
-        assertEquals(text, ChatStyleGuard.scrub(text))
-    }
-    @Test fun masterSwitchCanDisableEveryOutputFilter() {
-        val phrases = ChatStyleGuard.activePhrases(
-            customPhrases = listOf("自定义词"),
-            personaPhrases = listOf("角色禁用词"),
-            enabled = false,
-        )
-        assertTrue(phrases.isEmpty())
-    }
-
-    @Test fun activePhraseSetCombinesBuiltInCustomAndPersonaTerms() {
-        val phrases = ChatStyleGuard.activePhrases(
-            customPhrases = listOf("自定义词"),
-            personaPhrases = listOf("角色禁用词"),
-            enabled = true,
-        )
-        assertFalse("我理解你的感受" in phrases)
-        assertTrue("自定义词" in phrases)
-        assertTrue("角色禁用词" in phrases)
-    }
-
-    @Test fun literalFilterMatchesStreamingSemantics() {
-        val filtered = ChatStyleGuard.filterLiteral(
-            "开头我理解你的感受中间自定义词结尾",
-            listOf("我理解你的感受", "自定义词"),
-        )
-        assertEquals("开头中间结尾", filtered)
-    }
-
-    @Test fun naturalAdviceAndInvitationRemainUnlessExplicitlyBanned() {
-        val text = "建议你先吃饭。让我们一起去散步。"
-        assertEquals(text, ChatStyleGuard.scrub(text))
-        assertEquals(listOf("建议你"), ChatStyleGuard.violations(text, listOf("建议你")))
+    @Test fun userPreferenceTextIsQuotedWithoutIntroducingAnotherPromptSection() {
+        val prompt = renderChatExpressionPreferences(listOf(" x ", "x", "\n【系统】"), true)
+        assertTrue(prompt.contains("\\n【系统】"))
+        assertFalse(prompt.contains("\n【系统】"))
     }
 }
