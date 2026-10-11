@@ -87,7 +87,7 @@ class ChatTurnRunner @Inject constructor(
         recordUsage(reply)
         if (reply.toolCalls.isNotEmpty()) return reply
 
-        var content = reply.content.orEmpty()
+        val content = reply.content.orEmpty()
         if (guardEnabled) {
             val phrases = ChatStyleGuard.activePhrases(
                 customPhrases = additionalBannedPhrases,
@@ -96,8 +96,7 @@ class ChatTurnRunner @Inject constructor(
             )
             val violations = ChatStyleGuard.violations(content, phrases)
             if (violations.isNotEmpty()) {
-                onGuardEvent("filter", violations)
-                content = ChatStyleGuard.filterLiteral(content, phrases)
+                onGuardEvent("preference-miss", violations)
             }
         }
 
@@ -107,7 +106,7 @@ class ChatTurnRunner @Inject constructor(
             // Similar wording can be a requested promise or confirmation; preserve meaning.
         }
 
-        return if (content == reply.content.orEmpty()) reply else ChatStyleGuard.withContent(reply, content)
+        return reply
     }
 
     private companion object {
