@@ -730,6 +730,20 @@ object LocalModelPresets {
         val host = runCatching {
             URI(normalizeModelBaseUrl(baseUrl)).host?.lowercase()
         }.getOrNull()
+        val routeBudget = LocalModelBudgetPolicies.forRoute(model, baseUrl)
+        if (routeBudget.workProjectionTriggerPermille != null &&
+            protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.ANTHROPIC_MESSAGES) &&
+            authKind == LocalModelAuthKind.API_KEY
+        ) {
+            return LocalPromptCachePolicy(
+                mode = LocalPromptCacheMode.PREFIX_AUTO,
+                preserveToolSurface = true,
+                allowAdaptiveEarlyCompaction = false,
+                workProjectionTargetRatioPermille = routeBudget.workProjectionTargetPermille,
+                workProjectionTriggerRatioPermille = routeBudget.workProjectionTriggerPermille,
+                reportsHitMissTokens = true,
+            )
+        }
         return when (host) {
             "api.deepseek.com" -> LocalPromptCachePolicy(
                 mode = LocalPromptCacheMode.PREFIX_AUTO,
