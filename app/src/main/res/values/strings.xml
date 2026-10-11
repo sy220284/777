@@ -2072,5 +2072,6 @@
     <string name="media_studio_share">分享／保存生成文件</string>
     <string name="media_studio_share_image">分享／保存生成图片</string>
     <string name="media_studio_model_capabilities">可用创作：%1$s</string>
+    <string name="media_studio_view_image">查看生成图片</string>
 </resources>
 
