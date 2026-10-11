@@ -62,6 +62,8 @@ data class ChatContinuityState(
 data class ChatStateObservation(
     val field: String = "",
     val value: String = "",
+    /** Historical value used when a sourced relationship transition is later invalidated. */
+    val previousValue: String = "",
     val basis: String = "",
     /** A quoted expression or a contextual interpretation, never an objective user fact. */
     val interpretation: Boolean = true,
