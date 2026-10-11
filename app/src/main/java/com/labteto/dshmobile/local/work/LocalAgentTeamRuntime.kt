@@ -339,6 +339,7 @@ internal class LocalAgentTeamRuntime(
             .sortedBy(::taskNumber)
         val taskById = visibleTasks.associateBy { it.id }
         val memberById = state.members.associateBy { it.id }
+        val memberExecutions = memberExecutionEvidenceByJobId(sessionId, state.members)
 
         val resultMessages = agentMessages(
             sessionId = sessionId,
@@ -360,7 +361,7 @@ internal class LocalAgentTeamRuntime(
             val currentTask = visibleTasks.firstOrNull {
                 it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
             }
-            val execution = memberExecutionEvidence(sessionId, member)
+            val execution = memberExecutions[member.jobId] ?: MemberExecutionEvidence(null, null)
             LocalAgentTeamMemberUiState(
                 id = member.id,
                 jobId = member.jobId,
@@ -1504,19 +1505,49 @@ internal class LocalAgentTeamRuntime(
     private fun memberExecutionEvidence(
         sessionId: String,
         member: LocalTeamMemberSnapshot,
-    ): MemberExecutionEvidence {
-        if (member.phase == LocalTeamMemberPhase.CREATED) return MemberExecutionEvidence(null, null)
-        val log = eventLogFor(sessionId)
-        val checkpoint = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
-            data["background_job_id"]?.jsonPrimitive?.contentOrNull == member.jobId
+    ): MemberExecutionEvidence =
+        memberExecutionEvidenceByJobId(sessionId, listOf(member))
+            .getValue(member.jobId)
+
+    /**
+     * UI projection asks for every member at once: reading each event segment separately for
+     * each member causes O(members × history) repeated decompression during long-running teams.
+     */
+    private fun memberExecutionEvidenceByJobId(
+        sessionId: String,
+        members: List<LocalTeamMemberSnapshot>,
+    ): Map<String, MemberExecutionEvidence> {
+        if (members.isEmpty()) return emptyMap()
+        val ids = members.filter { it.phase != LocalTeamMemberPhase.CREATED }
+            .map(LocalTeamMemberSnapshot::jobId).toSet()
+        val keys = ids.flatMap { id -> listOf("checkpoint:$id", "start:$id") }.toSet()
+        val events = eventLogFor(sessionId).latestMatchingByKey(
+            types = setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT, "subagent/start"),
+            requiredKeys = keys,
+        ) { event ->
+            val id = event.data["background_job_id"]?.jsonPrimitive?.contentOrNull
+                ?: return@latestMatchingByKey null
+            when (event.type) {
+                LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT -> "checkpoint:$id"
+                "subagent/start" -> "start:$id"
+                else -> null
+            }
         }
-        val steps = checkpoint?.data?.get("step")?.jsonPrimitive?.intOrNull?.coerceAtLeast(0)
-        val softLimit = checkpoint?.data?.get("soft_step_limit")
-            ?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
-        val initialLimit = log.latestMatching(setOf("subagent/start")) { data ->
-            data["background_job_id"]?.jsonPrimitive?.contentOrNull == member.jobId
-        }?.data?.get("max_steps")?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
-        return MemberExecutionEvidence(steps, softLimit ?: initialLimit)
+        return members.associate { member ->
+            val checkpoint = events["checkpoint:${member.jobId}"]?.data
+            val start = events["start:${member.jobId}"]?.data
+            val usedSteps = checkpoint?.get("step")
+                ?.jsonPrimitive?.intOrNull?.coerceAtLeast(0)
+            val softLimit = checkpoint?.get("soft_step_limit")
+                ?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
+            val initialLimit = start?.get("max_steps")
+                ?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
+            member.jobId to if (member.phase == LocalTeamMemberPhase.CREATED) {
+                MemberExecutionEvidence(null, null)
+            } else {
+                MemberExecutionEvidence(usedSteps, softLimit ?: initialLimit)
+            }
+        }
     }
 
     private suspend fun waitForChange(sessionId: String, timeoutMs: Int): String {
