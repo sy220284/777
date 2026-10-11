@@ -261,6 +261,15 @@ def inspect():
     pending = review.get("unproven_feature_triage", [])
     if [r["path"] for r in pending] != missing or index.get("unproven_feature_count") != len(missing):
         raise ValueError("逐项无源码证据功能的待核实登记不完整")
+    for item in pending:
+        if item.get("candidate_role") != "仅供排查的真实文件路径，尚未确认业务功能":
+            raise ValueError("弱证据功能的源码候选必须明确不能代表功能通过")
+        links = item.get("candidate_files")
+        if not isinstance(links, list) or len(links) != len(set(links)):
+            raise ValueError("弱证据源码候选格式或唯一性不正确")
+        for link in links:
+            if not isinstance(link, str) or ".." in link.split("/") or not (ROOT / link).is_file():
+                raise ValueError("源码候选指向不存在的文件，不能误导审核")
     by_path = {x["path"]: x for x in reported}
     def check_display(node, stack):
         for child in node["children"]:
