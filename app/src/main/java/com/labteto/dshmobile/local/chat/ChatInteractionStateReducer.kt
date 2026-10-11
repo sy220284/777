@@ -15,7 +15,7 @@ internal class ChatInteractionStateReducer {
         val rawState = parsed.rawState
         val significance = normalizeSignificance(decoded.turnSignificance)
 
-        val agedPrevious = ageTransientState(previous, userMessage)
+        val agedPrevious = previous.canonicalizeLegacyCharacterState()
         val baseState = if (significance == "NONE") {
             applyExplicitTransientClears(
                 value = decoded.state,
@@ -64,12 +64,13 @@ internal class ChatInteractionStateReducer {
     ): ChatCharacterState {
         if (rawState == null) return previous
 
-        val ages = previous.transientAges.toMutableMap()
+        val ages = mutableMapOf<String, Int>()
         var changed = false
 
         fun shouldClear(key: String, value: String): Boolean =
             rawState.containsKey(key) && value.isBlank()
 
+        val clearMood = rawState.containsKey("mood") && (value.mood.isBlank() || value.mood == "自然")
         val clearPhysicalState = shouldClear("physicalState", value.physicalState)
         val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
         val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
@@ -91,10 +92,11 @@ internal class ChatInteractionStateReducer {
                 changed = true
             }
         }
-        if (clearThreads) changed = true
+        if (clearThreads || clearMood) changed = true
         if (!changed) return previous
 
         return previous.copy(
+            mood = if (clearMood) "自然" else previous.mood,
             physicalState = if (clearPhysicalState) "" else previous.physicalState,
             currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
             activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
@@ -148,20 +150,6 @@ internal class ChatInteractionStateReducer {
         assistantMessage: String,
     ): ChatCharacterState {
         val signals = extractInteractionPerformanceSignals(assistantMessage)
-        val cooldowns = previous.interactionCooldowns
-            .mapValues { (_, turns) -> turns - 1 }
-            .filterValues { it > 0 }
-            .toMutableMap()
-
-        fun cool(prefix: String, tags: List<String>, turns: Int) {
-            tags.forEach { tag -> cooldowns["$prefix:$tag"] = turns }
-        }
-
-        cool("动作", signals.actionTags, previous.behaviorTuning.cooldownTurns(ACTION_COOLDOWN_TURNS))
-        cool("姿态", signals.poseTags, previous.behaviorTuning.cooldownTurns(POSE_COOLDOWN_TURNS))
-        cool("话术", signals.verbalTags, previous.behaviorTuning.cooldownTurns(VERBAL_COOLDOWN_TURNS))
-        cool("称呼", signals.addressTerms, previous.behaviorTuning.cooldownTurns(ADDRESS_COOLDOWN_TURNS))
-
         val resetRequested = isInteractionResetIntent(userMessage)
         val assistantIntensity = if (resetRequested) 0 else assistantInitiatedInteractionIntensity(assistantMessage)
         val finalIntensity = if (resetRequested) 0 else maxOf(state.interactionIntensity, assistantIntensity)
@@ -187,7 +175,7 @@ internal class ChatInteractionStateReducer {
             recentPoseTags = mergeRecentTags(previous.recentPoseTags, signals.poseTags, RECENT_POSE_LIMIT),
             recentVerbalTags = mergeRecentTags(previous.recentVerbalTags, signals.verbalTags, RECENT_VERBAL_LIMIT),
             recentAddressTerms = mergeRecentTags(previous.recentAddressTerms, signals.addressTerms, RECENT_ADDRESS_LIMIT),
-            interactionCooldowns = if (finalIntensity == 0) emptyMap() else cooldowns.toMap(),
+            interactionCooldowns = emptyMap(),
         )
     }
     private fun mergeRecentTags(
@@ -221,7 +209,6 @@ internal class ChatInteractionStateReducer {
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
                 raw = rawDynamics,
-                tuning = previous.behaviorTuning,
             )
         }
         val pattern = if (rawPattern == null && userMessage.isBlank()) {
@@ -238,7 +225,6 @@ internal class ChatInteractionStateReducer {
             normalizeStage(value.dynamics.stage)
         } else previous.dynamics.stage
         val relationshipDescription = when {
-            previous.behaviorTuning.lockRelationshipStage -> previous.relationshipState
             dynamics.stage != previous.dynamics.stage -> stageLabel(dynamics.stage)
             requestedStage != previous.dynamics.stage -> previous.relationshipState
             rawState?.containsKey("relationshipState") == true ->
@@ -301,7 +287,7 @@ internal class ChatInteractionStateReducer {
             unresolvedThreadAges = previous.unresolvedThreadAges,
             updatedAt = System.currentTimeMillis(),
         )
-        return resetUpdatedAges(merged, rawState)
+        return merged.copy(transientAges = emptyMap(), unresolvedThreadAges = emptyMap())
     }
     private fun mergeSceneAndContinuity(
         value: ChatCharacterState,
@@ -320,104 +306,6 @@ internal class ChatInteractionStateReducer {
             scene = previous.scene,
             continuity = continuity,
             updatedAt = System.currentTimeMillis(),
-        )
-    }
-
-    private fun ageTransientState(
-        previous: ChatCharacterState,
-        userMessage: String,
-    ): ChatCharacterState {
-        // Treat only an explicit topic-ending instruction as a reset. Common conversational
-        // phrases such as "算了" or "说正事" can be quoted or refer to something else.
-        val topicReset = TOPIC_RESET_REQUEST.containsMatchIn(userMessage.trim())
-        val nextAges = previous.transientAges.toMutableMap()
-
-        fun age(key: String, value: String, ttl: Int, clearOnTopicReset: Boolean = false): String {
-            if (value.isBlank()) {
-                nextAges.remove(key)
-                return ""
-            }
-            if (topicReset && clearOnTopicReset) {
-                nextAges.remove(key)
-                return ""
-            }
-            val next = (nextAges[key] ?: 0) + 1
-            return if (next > ttl) {
-                nextAges.remove(key)
-                ""
-            } else {
-                nextAges[key] = next
-                value
-            }
-        }
-
-        val nextThreadAges = previous.unresolvedThreadAges.toMutableMap()
-        val threads = if (topicReset) {
-            nextThreadAges.clear()
-            emptyList()
-        } else {
-            previous.unresolvedThreads.filter { thread ->
-                val key = normalizeChatInteractionText(thread)
-                val next = (nextThreadAges[key] ?: 0) + 1
-                if (next > previous.behaviorTuning.transientTtl(THREAD_TTL)) {
-                    nextThreadAges.remove(key)
-                    false
-                } else {
-                    nextThreadAges[key] = next
-                    true
-                }
-            }
-        }
-
-        return previous.copy(
-            physicalState = age(
-                "physicalState",
-                previous.physicalState,
-                previous.behaviorTuning.transientTtl(3),
-                clearOnTopicReset = false,
-            ),
-            mood = age("mood", previous.mood.takeUnless { it == "自然" }.orEmpty(), previous.behaviorTuning.moodTtl()).ifBlank { "自然" },
-            currentFocus = age("currentFocus", previous.currentFocus, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
-            currentUserImpression = previous.currentUserImpression,
-            recentImpression = "",
-            activeGoal = age("activeGoal", previous.activeGoal, previous.behaviorTuning.transientTtl(12)),
-            currentAgenda = age("currentAgenda", previous.currentAgenda, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
-            internalConflict = age("internalConflict", previous.internalConflict, previous.behaviorTuning.transientTtl(6)),
-            immediateConcern = age("immediateConcern", previous.immediateConcern, previous.behaviorTuning.transientTtl(2), clearOnTopicReset = true),
-            unresolvedThreads = threads,
-            transientAges = nextAges,
-            unresolvedThreadAges = nextThreadAges,
-        )
-    }
-
-    private fun resetUpdatedAges(
-        state: ChatCharacterState,
-        rawState: JsonObject?,
-    ): ChatCharacterState {
-        if (rawState == null) return state
-        val ages = state.transientAges.toMutableMap()
-
-        fun reset(key: String, value: String) {
-            if (!rawState.containsKey(key)) return
-            if (value.isBlank()) ages.remove(key) else ages[key] = 0
-        }
-
-        reset("physicalState", state.physicalState)
-        reset("mood", state.mood.takeUnless { it == "自然" }.orEmpty())
-        reset("currentFocus", state.currentFocus)
-        reset("activeGoal", state.activeGoal)
-        reset("currentAgenda", state.currentAgenda)
-        reset("internalConflict", state.internalConflict)
-        reset("immediateConcern", state.immediateConcern)
-
-        val threadAges = if (rawState.containsKey("unresolvedThreads")) {
-            state.unresolvedThreads.associate { normalizeChatInteractionText(it) to 0 }
-        } else {
-            state.unresolvedThreadAges
-        }
-        return state.copy(
-            transientAges = ages,
-            unresolvedThreadAges = threadAges,
         )
     }
 
@@ -467,7 +355,6 @@ internal class ChatInteractionStateReducer {
         userMessage: String,
         assistantMessage: String,
         raw: JsonObject,
-        tuning: CharacterBehaviorTuning,
     ): RelationshipDynamics {
         val candidateStage = if (raw.containsKey("stage")) normalizeStage(value.stage) else previous.stage
         // Check that an explicit relationship event supports the requested target stage.
@@ -476,7 +363,6 @@ internal class ChatInteractionStateReducer {
             candidateStage, userMessage, assistantMessage,
         )
         val stage = when {
-            tuning.lockRelationshipStage -> previous.stage
             candidateStage == previous.stage -> previous.stage
             explicitStageEvidence -> candidateStage
             else -> previous.stage
@@ -484,11 +370,11 @@ internal class ChatInteractionStateReducer {
 
         return RelationshipDynamics(
             stage = stage,
-            warmth = if (raw.containsKey("warmth")) bounded(value.warmth, previous.warmth, tuning.relationshipDelta(10)) else previous.warmth,
-            trust = if (raw.containsKey("trust")) bounded(value.trust, previous.trust, tuning.relationshipDelta(8)) else previous.trust,
-            reciprocity = if (raw.containsKey("reciprocity")) bounded(value.reciprocity, previous.reciprocity, tuning.relationshipDelta(8)) else previous.reciprocity,
-            tension = if (raw.containsKey("tension")) bounded(value.tension, previous.tension, tuning.relationshipDelta(12)) else previous.tension,
-            stability = if (raw.containsKey("stability")) bounded(value.stability, previous.stability, tuning.relationshipDelta(8)) else previous.stability,
+            warmth = if (raw.containsKey("warmth")) value.warmth.coerceIn(0, 100) else previous.warmth,
+            trust = if (raw.containsKey("trust")) value.trust.coerceIn(0, 100) else previous.trust,
+            reciprocity = if (raw.containsKey("reciprocity")) value.reciprocity.coerceIn(0, 100) else previous.reciprocity,
+            tension = if (raw.containsKey("tension")) value.tension.coerceIn(0, 100) else previous.tension,
+            stability = if (raw.containsKey("stability")) value.stability.coerceIn(0, 100) else previous.stability,
             unresolvedConflict = if (raw.containsKey("unresolvedConflict")) {
                 value.unresolvedConflict.trim().take(240)
             } else previous.unresolvedConflict,
