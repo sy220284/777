@@ -10,23 +10,8 @@ internal class ChatInteractionPromptBuilder {
     ): String = buildString {
         appendLine("更新人物隐藏状态，只输出 JSON。")
         appendPostTurnPersonaContext(persona)
-        appendCharacterEvolutionContext(state.evolution)
-        appendCharacterBehaviorTuningContext(state.behaviorTuning)
 
-        appendLine(
-            "上一状态：身体=${state.physicalState.ifBlank { "无" }}｜情绪=${state.mood}｜" +
-                "关系=${state.relationshipState}｜阶段=${state.dynamics.stage}｜" +
-                "温度=${state.dynamics.warmth} 信任=${state.dynamics.trust} " +
-                "互惠=${state.dynamics.reciprocity} 张力=${state.dynamics.tension} " +
-                "稳定=${state.dynamics.stability}｜主动=${state.initiative} 分享=${state.shareDesire}",
-        )
-        if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
-            appendLine(
-                "互动：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
-                    "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}",
-            )
-        }
+        appendLine("上一状态：身体=${state.physicalState.ifBlank { "无" }}｜情绪=${state.mood}｜关系=${state.relationshipState}")
         state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("当前注意：$it") }
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户的主观印象：$it") }
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
@@ -68,32 +53,26 @@ internal class ChatInteractionPromptBuilder {
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        if (hasFlirtingOrIntimateIntent(userMessage, state)) {
-            appendLine("当前为亲密互动：按上下文保留互动连续性；双关不当作新事实。")
-        }
-        if (hasAdultIntimacyIntent(userMessage, state)) {
-            appendLine("当前意图明确，状态更新按实际互动推进，不重复确认或自行转移。")
-        }
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
         appendLine(
             "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
-                "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression, initiative, shareDesire；" +
-                "dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments,sharedObjects)；" +
+                "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression；" +
+                "dynamics(stage,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments,sharedObjects)；" +
                 "userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。",
         )
-        appendLine("输出补丁必须遵守 JSON 类型：state.initiative/shareDesire 与 dynamics.warmth/trust/reciprocity/tension/stability 为0到100整数；dynamics.unresolvedConflict 为字符串，无冲突写空字符串。")
+        appendLine("dynamics.unresolvedConflict 为字符串，无冲突写空字符串。")
         appendLine("dynamics.facts/hypotheses 必须是对象数组，每项含 text(字符串)、confidence(整数)、source(字符串)；没有可核实的新证据就省略这些字段，禁止用字符串数组替代。")
         appendLine("规则：")
         appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构人物生活、心理或用户动机。")
-        appendLine("- 角色台词的模糊或习惯性推辞不得单独触发关系降温、冲突或边界状态；结合人物表达、关系阶段和持续参与证据判断。针对当前行为的清晰明确停止、退出或拒绝继续，一次表达即生效，不要求重复。")
+        appendLine("- 状态记录描述已经发生的互动与人物实际表达，不给下一轮预设反应或行为要求。")
         appendLine("- physicalState 只在对话确有证据时更新，例如困、饿、刚醒、头疼、手上正忙；没有证据不要编。")
         appendLine("- currentUserImpression 是人物长期主观印象，只在有新证据时修正；允许不完整和犯错，但不能把猜测升级为用户事实，也不按轮数自动消失。")
         appendLine("- sharedObjects 只保存双方真实建立、未来可能自然回调的小物件、共同梗、未完成小约定；普通名词不写入。")
-        appendLine("- 人物生活流只从V4生活事实、既有生活事件、已发生经历和当前明确对话推进；允许低风险日常进展，禁止凭空生成重大人生事件、关系事实或不可逆事件。")
-        appendLine("- 状态与用户画像渐进变化；stage 仅在明确事件或持续强证据下变化，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
+        appendLine("- 生活状态记录已经发生的事情；人物的习惯资料不等于此刻已经做过的事。")
+        appendLine("- stage 描述实际关系事件，取 NEW/FAMILIAR/AMBIGUOUS/DATING/COMMITTED/CONFLICT/COOLING/SEPARATED/REPAIRING。")
         appendLine("- warmth/trust/reciprocity/tension/stability 只是派生诊断；共同经历、共同物、明确事件和真实行为证据优先，禁止仅凭数值推动人物选择或关系跨级。")
-        appendLine("- evolution 与 lifeState 为系统维护层；可变特质只由多轮真实经历渐进更新，模型不得输出、覆盖或重置。")
-        appendLine("- 已失效短期状态显式清空；scene 和 interaction* 由系统维护，不输出。")
+        appendLine("- evolution 与 lifeState 为兼容与事件投影字段，模型不输出。")
+        appendLine("- 情绪、身体状态、当前安排与未完事项由本轮实际事件更新；省略字段保留原值，已结束的状态显式清空。scene 和 interaction* 由系统维护，不输出。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
