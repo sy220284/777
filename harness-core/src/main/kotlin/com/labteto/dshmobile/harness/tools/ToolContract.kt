@@ -18,6 +18,8 @@ data class ToolMetadata(
     val discoveryKeywords: Set<String> = emptySet(),
     val requirements: List<String> = emptyList(),
     val usageNotes: List<String> = emptyList(),
+    /** Explicit opt-in for concurrent pure reads. Never inferred from access alone. */
+    val parallelReadSafe: Boolean = false,
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }
