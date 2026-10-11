@@ -12,6 +12,8 @@ import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -277,7 +279,7 @@ class LocalToolRouterTest {
     }
 
     @Test
-    fun optionalPromptBudgetNeverDropsCoreAndRejectsOversizedOptionalSchema() {
+    fun optionalPromptBudgetNeverDropsCoreAndLoadsExplicitLargeSchemaWhenBudgetAllows() {
         val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
         val small = tool("small_remote", "小型远端工具", ToolExposure.OPTIONAL, "MCP")
         val huge = tool(
@@ -298,7 +300,7 @@ class LocalToolRouterTest {
             ),
         )
         assertEquals(
-            listOf("read", "small_remote"),
+            listOf("read", "small_remote", "huge_remote"),
             names(
                 LocalToolRouter.visibleSchemas(
                     tools = listOf(core, small, huge),
@@ -307,6 +309,45 @@ class LocalToolRouterTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun oversizedDescriptionIsCompactedWithoutChangingArgumentContract() {
+        val properties = buildJsonObject {
+            // A property literally named "description" must never disappear.
+            put("description", buildJsonObject {
+                put("type", "string")
+                put("description", "输入说明" + "冗长".repeat(60_000))
+            })
+            put("payload", buildJsonObject { put("type", "array") })
+        }
+        val tool = tool("verbose_tool", "工具文档" + "文字".repeat(60_000),
+            ToolExposure.OPTIONAL, "MCP").copy(
+            schema = functionToolSchema(
+                "verbose_tool", "工具文档" + "文字".repeat(60_000),
+                properties = properties,
+                required = setOf("description"),
+            ),
+        )
+
+        val result = LocalToolRouter.selectSchemas(
+            tools = listOf(tool), enabledOptional = linkedSetOf("verbose_tool"),
+        )
+        assertEquals(listOf("verbose_tool"), names(result.schemas))
+        assertTrue("verbose_tool" in result.compactedNames)
+        assertTrue(result.omittedReasons.isEmpty())
+        val args = result.schemas.first().jsonObject["function"]!!.jsonObject["parameters"]!!.jsonObject
+        assertTrue("description" in args["properties"]!!.jsonObject)
+        assertEquals("string", args["properties"]!!.jsonObject["description"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("description", args["required"]!!.toString().trim('[', ']', '"'))
+    }
+
+    @Test
+    fun exhaustedBudgetReturnsConcreteOmissionReason() {
+        val big = tool("big", "文档" + "文字".repeat(60_000), ToolExposure.OPTIONAL, "MCP")
+        val result = LocalToolRouter.selectSchemas(listOf(big), setOf("big"), 0)
+        assertTrue(result.schemas.isEmpty())
+        assertTrue(result.omittedReasons["big"].orEmpty().contains("预算"))
     }
 
     @Test
