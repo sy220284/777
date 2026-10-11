@@ -99,6 +99,7 @@ internal class LocalSessionLifecycleCoordinator(
             val started = when (request) {
                 is LocalSessionNavigationRequest.Mode -> startUsageModeSwitch(request.value)
                 is LocalSessionNavigationRequest.Session -> startSessionSwitch(request.id)
+                is LocalSessionNavigationRequest.ChatDomain -> startChatDomainModeSwitch(request.command)
             }
             if (!started) {
                 if (state.value.loading || navigationBusy()) {
@@ -222,16 +223,29 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     fun switchDomainMode(command: LocalSessionDomainModeCommand) {
+        // Group/single switches also supersede any older mode or session tap.
+        if (state.value.kernel.running && !state.value.loading) return
+        navigationInbox.offer(LocalSessionNavigationRequest.ChatDomain(command))
+        continueQueuedNavigation()
+    }
+
+    private fun startChatDomainModeSwitch(command: LocalSessionDomainModeCommand): Boolean {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.kernel.running) return
-        applyChatModeRoute(
-            chatSessionLifecycle.resolveModeCommand(
-                command = command,
-                usageMode = snapshot.usageMode,
-                chat = snapshot.chat,
-                sessions = snapshot.sessions,
-            ),
-        )
+        if (snapshot.loading || snapshot.kernel.running) return false
+        return when (val route = chatSessionLifecycle.resolveModeCommand(
+            command = command,
+            usageMode = snapshot.usageMode,
+            chat = snapshot.chat,
+            sessions = snapshot.sessions,
+        )) {
+            null, LocalChatSessionModeRoute.Noop -> true
+            is LocalChatSessionModeRoute.Switch -> startSessionSwitch(route.sessionId)
+            is LocalChatSessionModeRoute.Create -> createSession(
+                mode = LocalConversationMode.INDEPENDENT,
+                usageMode = LocalUsageMode.CHAT,
+                domainSpec = route.spec,
+            )
+        }
     }
 
     private fun applyChatModeRoute(route: LocalChatSessionModeRoute?) {
