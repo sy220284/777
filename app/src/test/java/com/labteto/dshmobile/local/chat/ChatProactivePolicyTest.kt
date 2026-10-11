@@ -225,9 +225,11 @@ class ChatProactivePolicyTest {
             }
             add(message("p-new", "assistant", "刚刚翻开一本旧书，想起我们在雨天的约定。", 900L, proactive = true))
         }
-        val avoidance = recentProactiveAvoidanceContext(messages)
-        assertTrue(avoidance.contains("刚刚翻开一本旧书"))
-        assertFalse(avoidance.contains("草莓奶昔"))
+        val background = recentProactiveContext(messages)
+        assertTrue(background.contains("刚刚翻开一本旧书"))
+        assertFalse(background.contains("草莓奶昔"))
+        assertFalse(background.contains("换一个自然切入点"))
+        assertFalse(background.contains("不复用"))
         assertTrue(isNearDuplicateProactive(
             "刚刚翻开一本旧书，想起我们在雨天的约定。", messages,
         ))
