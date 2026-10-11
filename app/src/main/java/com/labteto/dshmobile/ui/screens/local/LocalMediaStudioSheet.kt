@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,7 @@ import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
+import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalMediaImage
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
@@ -55,8 +57,6 @@ import kotlinx.coroutines.launch
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
     preferredProfileId: String?,
-    videoTasks: Map<String, List<String>>,
-    onVideoTaskChange: (String, String) -> Unit,
     onInsertTranscript: (String) -> Unit,
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
 ) {
@@ -64,6 +64,7 @@ internal fun LocalMediaStudioSheetContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
+    val videoTasks by viewModel.videoTasks.collectAsState()
     var mode by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
@@ -81,8 +82,6 @@ internal fun LocalMediaStudioSheetContent(
     var busy by remember(selected?.id) { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
     var image by remember(selected?.id) { mutableStateOf<LocalMediaImage?>(null) }
-    var videoLink by remember(selected?.id) { mutableStateOf<String?>(null) }
-    var videoState by remember(selected?.id) { mutableStateOf<String?>(null) }
     var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
     var transcript by remember(selected?.id) { mutableStateOf<String?>(null) }
     var audioFile by remember(selected?.id) { mutableStateOf<File?>(null) }
@@ -226,66 +225,66 @@ internal fun LocalMediaStudioSheetContent(
                     DsButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.startVideo(selected, prompt)
-                            // The external creation may already be billable; retain its returned ID even
-                            // if the user selected a different creative model while submission was pending.
-                            onVideoTaskChange(selected.id, task)
-                            if (selected.id == activeOfferId) {
-                                viewedVideoTaskId = task
-                                videoState = "Queueing"
-                                videoLink = null
-                            }
+                            val task = viewModel.createVideo(selected, prompt)
+                            viewedVideoTaskId = task.id
                         } })
-                    val taskIds = videoTasks[selected.id].orEmpty()
-                    val videoTaskId = viewedVideoTaskId.takeIf { it in taskIds }
-                        ?: taskIds.lastOrNull().orEmpty()
-                    if (taskIds.size > 1) {
+                    val taskRecords = videoTasks.filter { it.belongsTo(selected) }.asReversed()
+                    val currentTask = taskRecords.firstOrNull { it.id == viewedVideoTaskId }
+                        ?: taskRecords.firstOrNull()
+                    if (taskRecords.size > 1) {
                         Text(stringResource(R.string.media_studio_previous_video_tasks),
                             style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth().height(128.dp),
                             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
-                            items(taskIds.asReversed(), key = { it }) { taskId ->
+                            items(taskRecords, key = { it.id }) { task ->
                                 DsButton(
-                                    text = taskId,
+                                    text = "${task.model} · ${task.providerTaskId ?: task.id.take(8)}",
                                     size = DsButtonSize.Small,
-                                    variant = if (videoTaskId == taskId) DsButtonVariant.Primary
+                                    variant = if (currentTask?.id == task.id) DsButtonVariant.Primary
                                         else DsButtonVariant.Ghost,
-                                    onClick = {
-                                        viewedVideoTaskId = taskId
-                                        videoState = null
-                                        videoLink = null
-                                    },
+                                    onClick = { viewedVideoTaskId = task.id },
                                     enabled = !busy,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
                     }
-                    if (videoTaskId.isNotBlank()) {
-                        Text(stringResource(R.string.minimax_media_task_id, videoTaskId),
-                            color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
-                        DsButton(text = stringResource(R.string.minimax_media_check_video),
-                            enabled = !busy, modifier = Modifier.fillMaxWidth(),
-                            onClick = { submit(selected) {
-                                val result = viewModel.videoStatus(selected, videoTaskId)
-                                if (selected.id == activeOfferId) {
-                                    videoState = result.state
-                                    videoLink = result.downloadUrl
-                                }
-                            } })
-                        Text(stringResource(when (videoState) {
-                            "Success" -> R.string.minimax_media_video_success
-                            "Failed" -> R.string.minimax_media_video_failed
-                            "Processing" -> R.string.minimax_media_video_processing
-                            else -> R.string.minimax_media_video_queued
-                        }), color = colors.labelSecondary)
-                    }
-                    videoLink?.let { link ->
-                        DsButton(text = stringResource(R.string.minimax_media_open_video),
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { openMediaUrl(context, link) { error = it } })
+                    currentTask?.let { task ->
+                        task.providerTaskId?.let { taskId ->
+                            Text(stringResource(R.string.minimax_media_task_id, taskId),
+                                color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
+                        }
+                        Text(
+                            stringResource(when (task.phase) {
+                                LocalMediaVideoPhase.SUBMITTING -> R.string.media_studio_video_submitting
+                                LocalMediaVideoPhase.OUTCOME_UNKNOWN -> R.string.media_studio_video_unknown
+                                LocalMediaVideoPhase.QUEUED -> R.string.minimax_media_video_queued
+                                LocalMediaVideoPhase.PROCESSING -> R.string.minimax_media_video_processing
+                                LocalMediaVideoPhase.SUCCEEDED -> R.string.minimax_media_video_success
+                                LocalMediaVideoPhase.FAILED -> R.string.minimax_media_video_failed
+                            }),
+                            color = colors.labelSecondary,
+                        )
+                        task.lastError?.let { reason ->
+                            Text(reason, color = colors.labelSecondary,
+                                style = DsType.caption11.withReadingWeight())
+                        }
+                        if (task.phase == LocalMediaVideoPhase.QUEUED ||
+                            task.phase == LocalMediaVideoPhase.PROCESSING
+                        ) {
+                            DsButton(text = stringResource(R.string.minimax_media_check_video),
+                                enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                                onClick = { submit(selected) {
+                                    viewModel.refreshVideo(selected, task.id)
+                                } })
+                        }
+                        task.downloadUrl?.let { url ->
+                            DsButton(text = stringResource(R.string.minimax_media_open_video),
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { openMediaUrl(context, url) { error = it } })
+                        }
                     }
                 }
                 LocalMediaKind.SPEECH -> {
