@@ -27,13 +27,52 @@ internal class LocalWorkspaceReadWriteGate {
     private val exclusive = Mutex()
     private var readers = 0
 
-    suspend fun <T> execute(tool: HarnessTool, block: suspend () -> T): T = when {
-        requiresSharedWorkspaceMutationLease(tool) -> withWrite(block)
-        isParallelSafeReadTool(tool) -> withRead(block)
-        else -> block()
+    internal class Lease(private val release: suspend () -> Unit) {
+        private val closed = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        suspend fun close() {
+            if (closed.compareAndSet(false, true)) withContext(NonCancellable) { release() }
+        }
+    }
+
+    /**
+     * Acquire only at the registry's onExecutionStarted admission stage; approval waits must not
+     * block unrelated reads or writers. The registry has already validated input and authority.
+     */
+    suspend fun acquire(tool: HarnessTool): Lease? = when {
+        requiresSharedWorkspaceMutationLease(tool) -> acquireWrite()
+        isParallelSafeReadTool(tool) -> acquireRead()
+        else -> null
+    }
+
+    suspend fun <T> execute(tool: HarnessTool, block: suspend () -> T): T {
+        val lease = acquire(tool)
+        return try {
+            block()
+        } finally {
+            lease?.close()
+        }
     }
 
     internal suspend fun <T> withRead(block: suspend () -> T): T {
+        val lease = acquireRead()
+        return try {
+            block()
+        } finally {
+            lease.close()
+        }
+    }
+
+    internal suspend fun <T> withWrite(block: suspend () -> T): T {
+        val lease = acquireWrite()
+        return try {
+            block()
+        } finally {
+            lease.close()
+        }
+    }
+
+    private suspend fun acquireRead(): Lease {
         turnstile.lock()
         try {
             readerCountLock.lock()
@@ -46,32 +85,24 @@ internal class LocalWorkspaceReadWriteGate {
         } finally {
             turnstile.unlock()
         }
-        return try {
-            block()
-        } finally {
-            withContext(NonCancellable) {
-                readerCountLock.lock()
-                try {
-                    readers -= 1
-                    if (readers == 0) exclusive.unlock()
-                } finally {
-                    readerCountLock.unlock()
-                }
+        return Lease {
+            readerCountLock.lock()
+            try {
+                readers -= 1
+                if (readers == 0) exclusive.unlock()
+            } finally {
+                readerCountLock.unlock()
             }
         }
     }
 
-    internal suspend fun <T> withWrite(block: suspend () -> T): T {
+    private suspend fun acquireWrite(): Lease {
         turnstile.lock()
         try {
             exclusive.lock()
         } finally {
             turnstile.unlock()
         }
-        return try {
-            block()
-        } finally {
-            exclusive.unlock()
-        }
+        return Lease { exclusive.unlock() }
     }
 }
