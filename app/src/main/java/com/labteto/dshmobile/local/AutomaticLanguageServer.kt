@@ -14,16 +14,26 @@ internal class AutomaticLanguageServerResolver(
     private val root: File,
     private val commandAvailable: (String) -> Boolean,
     private val legacyCommand: () -> List<String> = { emptyList() },
+    private val installedCommand: (String?) -> List<String> = { emptyList() },
     private val clockNanos: () -> Long = System::nanoTime,
 ) {
     private var workspaceFamilyCache: WorkspaceFamilyCache? = null
     fun resolve(relativePath: String? = null): List<String> {
         val family = familyFor(relativePath) ?: detectWorkspaceFamily()
+        installedCommand(managedHint(relativePath)).takeIf { it.isNotEmpty() }?.let { return it }
         family?.let(::commandFor)?.takeIf { it.isNotEmpty() }?.let { return it }
 
         val legacy = runCatching(legacyCommand).getOrDefault(emptyList())
         return legacy.takeIf { isUsableLegacy(it, family) }.orEmpty()
     }
+
+    /** Maps workspace-only queries to the same language family as file queries. */
+    internal fun managedHint(relativePath: String?): String? =
+        when (familyFor(relativePath) ?: detectWorkspaceFamily()) {
+            Family.TYPESCRIPT -> relativePath ?: "index.ts"
+            Family.PYTHON -> relativePath ?: "index.py"
+            else -> null
+        }
 
     private fun isUsableLegacy(command: List<String>, family: Family?): Boolean {
         val executable = command.firstOrNull()?.takeIf(String::isNotBlank) ?: return false
