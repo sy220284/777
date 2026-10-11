@@ -40,6 +40,7 @@ internal fun LocalStreamingChatTurn(
     // Avoid accessing StateFlow.value during composition (Compose lint violation).
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
+    val visibleReply = visibleAssistantText(stream.assistant)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         if (stream.reasoning.isNotBlank()) {
             ChatThinkingRow(
@@ -54,12 +55,12 @@ internal fun LocalStreamingChatTurn(
                 streaming = true,
             )
         }
-        if (stream.assistant.isNotBlank()) {
+        if (visibleReply.isNotBlank()) {
             LocalMessageRow(
                 message = LocalHarnessMessage(
                     id = "streaming:$sessionId",
                     role = "assistant",
-                    content = stream.assistant,
+                    content = visibleReply,
                     createdAt = 0L,
                 ),
                 chatMode = true,
@@ -74,7 +75,7 @@ internal fun LocalStreamingChatTurn(
                 onRegenerate = { false },
             )
         }
-        if (stream.reasoning.isBlank() && stream.assistant.isBlank()) {
+        if (stream.reasoning.isBlank() && visibleReply.isBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(DsSpacing.small))
