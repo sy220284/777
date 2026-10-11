@@ -135,7 +135,7 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
         val decisions = mergeStructured(
             structuredWorkState?.decisions.orEmpty() +
                 if (explicitReset) emptyList() else previousCheckpoint?.decisions.orEmpty(),
-            select(cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
+            select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4, decisionsAfterResetOnly = true),
             maxItems = 6,
         )
         // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
