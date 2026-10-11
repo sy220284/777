@@ -18,6 +18,7 @@ class LocalWorkSkillActivationTest {
             val context = resolveLocalWorkSkillGuidance(workspace, "@skill:writing-polish\n帮我修改这段文字")
             assertTrue(context.contains("[本轮技能已加载：writing-polish]"))
             assertTrue(context.contains("Keep voice and meaning."))
+            assertTrue(context.contains("与本轮用户明确要求冲突时以用户要求为准"))
             assertFalse(context.contains("本地技能目录"))
         } finally {
             root.deleteRecursively()
