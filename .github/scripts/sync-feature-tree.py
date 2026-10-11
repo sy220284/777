@@ -18,6 +18,7 @@ EVIDENCE = Path("docs/FEATURE-CODE-EVIDENCE.zh-CN.md")
 RETIREMENTS = Path("docs/FEATURE-TREE-RETIREMENTS.json")
 LEGACY_IDENTITIES = Path("docs/FEATURE-TREE-LEGACY-IDENTITIES.json")
 EXPLICIT_EVIDENCE = Path("docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json")
+WORKFLOW_EVIDENCE = Path("docs/FEATURE-TREE-WORKFLOW-EVIDENCE.json")
 import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
@@ -341,6 +342,53 @@ def historical_code_evidence(root, leafpaths):
     return missing_entries, current_orphans
 
 
+def verified_workflow_evidence(root, leafpaths):
+    """只验证具体CI/发布作业和命令确实存在，不推断实际执行成功。"""
+    source = root / WORKFLOW_EVIDENCE
+    if not source.is_file():
+        return {}
+    manifest = json.loads(source.read_text(encoding="utf-8"))
+    if manifest.get("version") != 1 or not isinstance(manifest.get("items"), list):
+        raise ValueError("工作流证据索引格式无效")
+    result = {}
+    for item in manifest["items"]:
+        name = item.get("path")
+        if not isinstance(name, str) or name in result or name not in leafpaths:
+            raise ValueError("工作流证据引用重复或不存在的功能")
+        if not isinstance(item.get("grade"), str) or "静态" not in item["grade"]:
+            raise ValueError("工作流证据必须明确为静态证据")
+        sources = item.get("sources")
+        if not isinstance(sources, list) or not sources:
+            raise ValueError("工作流证据缺少明确CI任务来源")
+        checked = []
+        for entry in sources:
+            path, job, literals = entry.get("path"), entry.get("job"), entry.get("literals")
+            if (not isinstance(path, str) or not path.startswith(".github/workflows/")
+                    or not path.endswith((".yml", ".yaml"))
+                    or ".." in Path(path).parts or not (root / path).is_file()):
+                raise ValueError("工作流证据引用了不存在或非法的YAML文件")
+            if not isinstance(job, str) or not re.fullmatch(r"[a-z][\w-]*", job):
+                raise ValueError("工作流证据的job身份无效")
+            if not isinstance(literals, list) or not literals or any(
+                not isinstance(x, str) or not x.strip() for x in literals
+            ):
+                raise ValueError("工作流证据缺少具体命令、工具或步骤")
+            body = (root / path).read_text(encoding="utf-8")
+            candidates = list(re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*(?:#.*)?$", body, re.M))
+            matches = [m for m in candidates if m.group(1) == job]
+            if len(matches) != 1:
+                raise ValueError("未找到唯一的工作流作业: " + path + "#" + job)
+            start = matches[0].end()
+            next_job = next((m for m in candidates if m.start() > matches[0].start()), None)
+            task = body[start:next_job.start()] if next_job else body[start:]
+            for literal in literals:
+                if literal not in task:
+                    raise ValueError("工作流作业缺少预期命令：" + path + "#" + job + " / " + literal)
+            checked.append({"path": path, "job": job, "literals": literals})
+        result[name] = {"grade": item["grade"], "sources": checked}
+    return result
+
+
 def legacy_leaf_evidence(root, leafpaths, matrix):
     """旧台账只提供证据线索：文件、具名声明、测试映射分开复核。"""
     historical = {}
@@ -393,6 +441,7 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             if len(CHINESE.findall(scope)) < 4:
                 raise ValueError("手工证据必须用中文解释静态验证的范围")
             explicit[item["path"]] = {"sources": verified, "scope": scope}
+    workflow = verified_workflow_evidence(root, leafpaths)
     mapped = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
     result = []
     for name in leafpaths:
@@ -413,6 +462,7 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             )
             symbols.append({"symbol": symbol, "declaration_found": declared})
         manual = explicit.get(name)
+        workflow_anchor = workflow.get(name)
         if manual:
             for source in manual["sources"]:
                 if source["path"] not in existing:
@@ -432,6 +482,8 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             grade_now = "真实测试映射（仅局部）"
         elif any(x["declaration_found"] for x in symbols):
             grade_now = "具名源码声明存在（静态，待调用链复核）"
+        elif workflow_anchor:
+            grade_now = workflow_anchor["grade"]
         elif existing and grade and "候选" not in grade:
             grade_now = "历史生产文件仍存在（待入口复核）"
         elif existing:
@@ -447,6 +499,7 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             "named_symbols": symbols,
             "explicit_source_anchor": bool(manual),
             "explicit_static_scope": manual["scope"] if manual else None,
+            "workflow_evidence": workflow_anchor["sources"] if workflow_anchor else [],
         })
     return result
 
