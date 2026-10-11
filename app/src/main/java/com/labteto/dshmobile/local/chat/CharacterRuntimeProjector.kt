@@ -88,6 +88,8 @@ internal class CharacterRuntimeProjector(
             "人物自身限制" to persona.hardConstraints.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物所知范围" to persona.knowledgeBoundary.filterNot(::isCommonCharacterBoundary).joinToString("；"),
             "人物修订资料" to persona.corrections.joinToString("；"),
+            "作者填写的表达偏好" to persona.bannedPhrases.takeIf(List<String>::isNotEmpty)
+                ?.let { "避用表达：${it.joinToString("；")}" }.orEmpty(),
             "语言风格资料" to persona.trustedFactText(CharacterFactCategories.VOICE_STYLE)
                 .ifBlank { if (legacy) persona.voiceSamples.joinToString("\n") else "" },
             "自身认知与矛盾" to persona.trustedFactText(CharacterFactCategories.IDENTITY_GAP)
@@ -100,7 +102,14 @@ internal class CharacterRuntimeProjector(
                 .ifBlank { if (legacy) persona.quirks.joinToString("；") else "" },
             "人物经历" to persona.trustedFactText(CharacterFactCategories.BIOGRAPHY)
                 .ifBlank { if (legacy) persona.lifeContext else "" },
+            "自我叙述" to persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE),
+            "关键选择" to persona.trustedFactText(CharacterFactCategories.DEFINING_CHOICES),
+            "情感经历" to persona.trustedFactText(CharacterFactCategories.EMOTIONAL_IMPRINTS),
             "生活与责任" to persona.trustedFactText(CharacterFactCategories.LIFE_GRAVITY),
+            "未竟事项" to persona.trustedFactText(CharacterFactCategories.UNFINISHED_BUSINESS),
+            "既有关系" to persona.trustedFactText(CharacterFactCategories.RELATIONSHIPS),
+            "局限与代价" to persona.trustedFactText(CharacterFactCategories.LIMITS_AND_COSTS),
+            "补充人物资料" to persona.trustedFactText(CharacterFactCategories.CUSTOM_FACTS),
             "原作来源" to persona.franchise,
             "当前剧情阶段" to persona.timelinePosition,
             "世界背景" to persona.worldSetting,
@@ -117,9 +126,9 @@ internal class CharacterRuntimeProjector(
             estimateModelTokens("\n\n【$title】\n") + 1
         }
         val bodyBudget = (STABLE_PERSONA_TOKEN_BUDGET - framingTokens).coerceAtLeast(0)
-        val sectionBudget = bodyBudget / sections.size.coerceAtLeast(1)
-        return (listOf(heading) + sections.map { (title, text) ->
-            "【$title】\n${takeWithinModelTokenBudget(text.trim(), sectionBudget)}"
+        val budgets = allocateCharacterContextBudget(sections.map { it.second }, bodyBudget)
+        return (listOf(heading) + sections.mapIndexed { index, (title, text) ->
+            "【$title】\n${takeWithinModelTokenBudget(text.trim(), budgets[index])}"
         }).joinToString("\n\n")
     }
 
@@ -130,7 +139,7 @@ internal class CharacterRuntimeProjector(
         state.currentAgenda.takeIf(String::isNotBlank)?.let { lines += "正在做：${it.take(180)}" }
         state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
         state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
-        state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+        state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法）" }
             ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
                 ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
@@ -180,7 +189,8 @@ internal class CharacterRuntimeProjector(
         userInput: String,
         storyContext: String?,
     ): String {
-        val query = listOf(userInput, storyContext.orEmpty().takeLast(450)).joinToString(" ")
+        val query = listOf(ChatMemorySelector.continuityQuery(userInput, context),
+            storyContext.orEmpty().takeLast(450)).joinToString(" ")
         if (query.isBlank()) return ""
         val core = setOf(
             CharacterFactCategories.PERSONALITY,
@@ -192,7 +202,7 @@ internal class CharacterRuntimeProjector(
                     it.provenance == CharacterFactProvenance.UNVERIFIED) }
         val direct = visible.filter { fact ->
             relevantTo(fact.content, query) || relevantTo(fact.category, query)
-        }.take(3)
+        }
         val directIds = direct.mapTo(hashSetOf(), CharacterFact::id)
         val linkedIds = direct.flatMap(CharacterFact::relatedFactIds).toSet()
         // Expand only from genuinely relevant facts and only within the current story stage.
@@ -203,12 +213,10 @@ internal class CharacterRuntimeProjector(
                     fact.relatedFactIds.any(directIds::contains) ||
                     sharesRelevantTopicWithKnownFact(fact, direct, query)
             )
-        }.take(4 - direct.size)
-        val relevant = direct + linked
+        }
+        val relevant = (direct.take(1) + linked + direct.drop(1)).distinctBy(CharacterFact::id)
         if (relevant.isEmpty()) return ""
-        return takeWithinModelTokenBudget(buildString {
-            appendLine("【本轮相关人物事实】")
-            relevant.forEach { fact ->
+        val facts = relevant.map { fact ->
                 val status = when (fact.provenance) {
                     CharacterFactProvenance.CANON -> "原作资料"
                     CharacterFactProvenance.USER_CREATED -> "作者明确设定"
@@ -219,9 +227,21 @@ internal class CharacterRuntimeProjector(
                     ?.let { "；视角：${it.take(60)}" }.orEmpty()
                 val evidence = fact.sourceReference.takeIf(String::isNotBlank)
                     ?.let { "；来源：${it.take(80)}" }.orEmpty()
-                appendLine("${fact.category}（${status}${viewpoint}${evidence}）：${fact.content.take(650)}")
+                "${fact.category}（${status}${viewpoint}${evidence}）：${fact.content}"
+        }
+        val selected = mutableListOf<String>()
+        var remaining = 500 - estimateModelTokens("【本轮相关人物事实】\n")
+        for (fact in facts) {
+            if (remaining <= 0) break
+            // Keep space for a related experience when the first match is a long biography.
+            val allowance = if (selected.isEmpty() && facts.size > 1) remaining / 2 else remaining
+            val excerpt = takeWithinModelTokenBudget(fact, allowance)
+            if (excerpt.isNotBlank()) {
+                selected += excerpt
+                remaining -= estimateModelTokens(excerpt + "\n")
             }
-        }.trim(), 500)
+        }
+        return "【本轮相关人物事实】\n" + selected.joinToString("\n")
     }
 
     /**
