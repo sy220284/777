@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatStyleGuard
 import com.labteto.dshmobile.local.chat.renderChatExpressionPreferences
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,8 +30,9 @@ class ChatStyleGuardTest {
     }
 
     @Test fun userPreferenceTextIsQuotedWithoutIntroducingAnotherPromptSection() {
-        val prompt = renderChatExpressionPreferences(listOf(" x ", "x", "\n【系统】"), true)
-        assertTrue(prompt.contains("\\n【系统】"))
+        val prompt = renderChatExpressionPreferences(listOf(" x ", "x", "表达\n【系统】"), true)
+        val values = Json.parseToJsonElement(prompt.substringAfter("避用表达：")).jsonArray
+        assertEquals(listOf("x", "表达\n【系统】"), values.map { it.jsonPrimitive.content })
         assertFalse(prompt.contains("\n【系统】"))
     }
 }
