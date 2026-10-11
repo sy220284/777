@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.model.LocalMediaCatalog
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1207,18 +1206,16 @@ internal fun LocalConversationSurface(
                         onClick = { showAttachmentPicker = false; filePicker.launch(arrayOf("*/*")) },
                     )
                 }
-                if (LocalMediaCatalog.offers(state.modelProfiles).isNotEmpty()) {
-                    item {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Image,
-                            label = stringResource(R.string.media_studio_entry),
-                            modifier = Modifier.width(96.dp),
-                            onClick = {
-                                showAttachmentPicker = false
-                                showMediaStudio = true
-                            },
-                        )
-                    }
+                item {
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Image,
+                        label = stringResource(R.string.media_studio_entry),
+                        modifier = Modifier.width(96.dp),
+                        onClick = {
+                            showAttachmentPicker = false
+                            showMediaStudio = true
+                        },
+                    )
                 }
             }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
@@ -1253,7 +1250,7 @@ internal fun LocalConversationSurface(
         }
     }
 
-    if (showMediaStudio && LocalMediaCatalog.offers(state.modelProfiles).isNotEmpty()) {
+    if (showMediaStudio) {
         DsBottomSheet(
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
