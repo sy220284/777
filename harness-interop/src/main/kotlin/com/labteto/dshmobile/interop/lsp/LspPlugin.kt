@@ -35,13 +35,13 @@ internal fun lspExtensionFailure(toolName: String, error: Exception): ToolResult
     val message = error.message.orEmpty()
     val code = when {
         message.contains("未检测到可运行的语言服务器") -> "LSP_SERVER_UNAVAILABLE"
-        message.contains("拒绝启动") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
+        message.contains("拒绝启动") || message.contains("拒绝下载") || message.contains("需要人工审批") -> "LSP_START_APPROVAL_REQUIRED"
         message.contains("启动失败") || error is IOException -> "LSP_START_FAILED"
         error is IllegalArgumentException -> "LSP_INPUT_INVALID"
         else -> "LSP_REQUEST_FAILED"
     }
     val hint = when (code) {
-        "LSP_SERVER_UNAVAILABLE" -> "安装匹配的语言服务器；当前仍可使用 read、grep、glob 和编译测试。"
+        "LSP_SERVER_UNAVAILABLE" -> "当前可继续使用 read、grep、glob 和编译测试；如支持按需安装，可批准首次下载。"
         "LSP_START_APPROVAL_REQUIRED" -> "返回当前会话批准语言服务器首次启动，再重新执行查询。"
         "LSP_START_FAILED" -> "核对可执行文件、运行环境和启动命令；修复后重新查询可再次启动。"
         "LSP_INPUT_INVALID" -> "检查路径、大小、语言类型和工具查询参数。"
@@ -71,6 +71,8 @@ class LspPlugin(
     private val commandResolver: (List<String>) -> List<String> = { it },
     private val environment: () -> Map<String, String> = { emptyMap() },
     private val resourceScheduler: HarnessResourceScheduler? = null,
+    private val canInstallOnDemand: (String?) -> Boolean = { false },
+    private val installOnDemand: suspend (String?) -> List<String> = { emptyList() },
 ) : HarnessPlugin {
     override val id = "local-language-server"
 
@@ -136,7 +138,11 @@ class LspPlugin(
             val detected = runCatching { command(null) }.getOrDefault(emptyList())
             return ToolResult(
                 if (detected.isEmpty()) {
-                    "当前项目未检测到可运行的语言服务器；代码任务会继续使用文件读取、搜索与编译/测试能力"
+                    if (canInstallOnDemand(null)) {
+                        "语言服务器尚未安装；首次语义查询会询问是否按需下载"
+                    } else {
+                        "当前项目未检测到可运行的语言服务器；代码任务会继续使用文件读取、搜索与编译/测试能力"
+                    }
                 } else {
                     "已检测到可用语言服务器，将在首次语义查询时按需启动"
                 },
@@ -217,9 +223,16 @@ class LspPlugin(
         relativePath: String?,
         context: ToolContext,
     ): ClientHandle {
-        val configured = runCatching { command(relativePath) }.getOrElse { error ->
+        val detected = runCatching { command(relativePath) }.getOrElse { error ->
             throw IllegalStateException("语言服务器自动检测失败：${error.message ?: error::class.java.simpleName}", error)
         }
+        val configured = if (detected.isEmpty() && canInstallOnDemand(relativePath)) {
+            val approval = context.approval ?: error("首次下载语言服务器需要人工审批")
+            if (!approval(installApprovalTool(relativePath))) {
+                error("用户拒绝下载语言服务器")
+            }
+            installOnDemand(relativePath)
+        } else detected
         require(configured.isNotEmpty()) {
             "当前文件/项目未检测到可运行的语言服务器；请继续使用 read、grep、glob、编译或测试完成分析"
         }
@@ -262,6 +275,19 @@ class LspPlugin(
         }
         return ClientHandle(key, resolved, next, lease).also { clients[key] = it }
     }
+
+    private fun installApprovalTool(relativePath: String?): HarnessTool = HarnessTool(
+        name = "lsp_install",
+        schema = functionToolSchema(
+            name = "lsp_install",
+            description = "从 npm 官方源按需下载安装语言服务器及依赖：" + (relativePath ?: "当前项目"),
+        ),
+        access = ToolAccess.NETWORK,
+        approvalPolicy = ToolApprovalPolicy.ALWAYS,
+        exposure = ToolExposure.INTERNAL,
+        metadata = ToolMetadata(family = "LSP"),
+        executor = HarnessToolExecutor { _, _, _ -> ToolResult("代码智能组件安装已批准") },
+    )
 
     private fun startApprovalTool(resolved: List<String>): HarnessTool = HarnessTool(
         name = "lsp_start",
