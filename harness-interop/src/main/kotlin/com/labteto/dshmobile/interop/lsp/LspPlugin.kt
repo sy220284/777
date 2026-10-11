@@ -106,8 +106,12 @@ class LspPlugin(
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "LSP",
-                        discoveryKeywords = LSP_DISCOVERY_KEYWORDS,
-                        requirements = listOf(
+                        discoveryKeywords = if (name == "lsp_uninstall_component") {
+                            setOf("卸载语言服务器", "移除语言组件", "lsp_uninstall")
+                        } else LSP_DISCOVERY_KEYWORDS,
+                        requirements = if (name == "lsp_uninstall_component") {
+                            listOf("需用户审批；卸载前会停止当前运行的语言服务")
+                        } else listOf(
                             "项目需能自动检测到可运行的语言服务器；首次启动外部语言服务进程需要人工审批",
                         ),
                     ),
