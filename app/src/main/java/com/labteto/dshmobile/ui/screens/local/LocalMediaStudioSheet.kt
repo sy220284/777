@@ -67,6 +67,8 @@ internal fun LocalMediaStudioSheetContent(
     val videoTasks by viewModel.videoTasks.collectAsState()
     val generatedResults by viewModel.generatedResults.collectAsState()
     var showHistory by remember { mutableStateOf(false) }
+    var showVideoArchive by remember { mutableStateOf(false) }
+    var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
     var mode by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
@@ -355,6 +357,74 @@ internal fun LocalMediaStudioSheetContent(
                 color = colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             error?.let { Text(stringResource(R.string.minimax_media_error, it),
                 color = colors.labelPrimary, style = DsType.caption11.withReadingWeight()) }
+        }
+        if (videoTasks.isNotEmpty()) {
+            DsButton(
+                text = stringResource(R.string.media_studio_video_archive, videoTasks.size),
+                onClick = { showVideoArchive = !showVideoArchive },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showVideoArchive) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(232.dp),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                ) {
+                    items(videoTasks.asReversed(), key = { it.id }) { task ->
+                        val matchingOffer = models.firstOrNull { task.belongsTo(it) }
+                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Text(
+                                stringResource(R.string.media_studio_history_item,
+                                    task.provider, task.model, task.phase.name),
+                                color = colors.labelPrimary,
+                                style = DsType.caption11.withReadingWeight(),
+                            )
+                            Text(
+                                task.providerTaskId ?: task.id,
+                                color = colors.labelSecondary,
+                                style = DsType.caption11.withReadingWeight(),
+                            )
+                            task.lastError?.let { reason ->
+                                Text(reason, color = colors.labelSecondary,
+                                    style = DsType.caption11.withReadingWeight())
+                            }
+                            if (matchingOffer == null) {
+                                Text(stringResource(R.string.media_studio_video_account_unavailable),
+                                    color = colors.labelSecondary,
+                                    style = DsType.caption11.withReadingWeight())
+                            } else if (task.phase in setOf(
+                                    LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING
+                                )
+                            ) {
+                                DsButton(
+                                    text = stringResource(R.string.minimax_media_check_video),
+                                    size = DsButtonSize.Small,
+                                    enabled = videoRefreshBusy == null,
+                                    onClick = {
+                                        videoRefreshBusy = task.id
+                                        scope.launch {
+                                            try {
+                                                viewModel.refreshVideo(matchingOffer, task.id)
+                                            } catch (failure: Exception) {
+                                                historyError = failure.message.orEmpty()
+                                            } finally {
+                                                videoRefreshBusy = null
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                            task.downloadUrl?.let { url ->
+                                DsButton(
+                                    text = stringResource(R.string.minimax_media_open_video),
+                                    size = DsButtonSize.Small,
+                                    onClick = { openMediaUrl(context, url) { historyError = it } },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
         if (generatedResults.isNotEmpty()) {
             DsButton(
