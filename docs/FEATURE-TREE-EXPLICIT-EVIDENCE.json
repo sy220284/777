@@ -456,6 +456,72 @@
         }
       ],
       "scope": "Git打包运行时与工具执行入口存在，真实Git二进制启动需设备验证"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Node.js 执行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledNodeRuntime.kt",
+          "symbols": [
+            "BundledNodeRuntime",
+            "prepare",
+            "status"
+          ],
+          "literals": [
+            "\"runtime/node\""
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledNodeRuntimeTest.kt",
+          "method": "bundledNodeRunsJavaScriptAndChildProcessOnAndroid16",
+          "references": "BundledNodeRuntime"
+        }
+      ],
+      "scope": "Node运行时打包准备和命令执行入口以及Android仪表测试源码存在，真机通过状态需另核"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
+      "sources": [
+        {
+          "path": "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledPythonRuntime.kt",
+          "symbols": [
+            "BundledPythonRuntime",
+            "prepare",
+            "status"
+          ],
+          "literals": [
+            "\"runtime/python\""
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/BundledPythonRuntimeTest.kt",
+          "method": "bundledPythonRunsStdlibAndAndroidShellOnAndroid16",
+          "references": "BundledPythonRuntime"
+        }
+      ],
+      "scope": "Python运行时准备和执行入口以及Android仪表测试源码存在，真实设备测试结果需另核"
     }
   ]
 }
