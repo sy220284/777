@@ -242,4 +242,78 @@ class LspPluginTest {
         }
     }
 
+
+    @Test fun onDemandInstallationOccursOnlyOnFirstSemanticQueryAndRequiresApproval() = runBlocking {
+        Assume.assumeTrue(File("/bin/sh").isFile)
+        fun frame(json: String) =
+            "Content-Length: " + json.toByteArray().size + "\r\n\r\n" + json
+        val server = temporary.newFile("on-demand-server.sh")
+        server.writeText(
+            "printf '%s' '" +
+                frame("""{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}""") +
+                frame("""{"jsonrpc":"2.0","id":2,"result":{"contents":"first"}}""") +
+                frame("""{"jsonrpc":"2.0","id":3,"result":{"contents":"second"}}""") +
+                "'\nexec cat >/dev/null\n",
+        )
+        temporary.newFile("sample.ts").writeText("const answer = 42")
+        var installs = 0
+        var approvals = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            canInstallOnDemand = { it?.endsWith(".ts") == true },
+            installOnDemand = {
+                installs++
+                listOf("/bin/sh", server.absolutePath)
+            },
+        )
+        plugin.install(context)
+        try {
+            val status = context.tools.execute("lsp_status", JsonObject(emptyMap()))
+            assertFalse(status.isError)
+            assertEquals(0, installs)
+            assertEquals(0, approvals)
+            withTimeout(5_000) {
+                val scope = ToolContext(approval = { approvals++; true })
+                val first = context.tools.execute("lsp_hover",
+                    buildJsonObject { put("path", "sample.ts") }, context = scope)
+                val second = context.tools.execute("lsp_hover",
+                    buildJsonObject { put("path", "sample.ts") }, context = scope)
+                assertTrue(first.content.contains("first"))
+                assertTrue(second.content.contains("second"))
+            }
+            assertEquals(1, installs)
+            assertEquals(2, approvals) // download + first process launch
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
+    @Test fun rejectingDownloadNeverExecutesInstaller() = runTest {
+        temporary.newFile("sample.py").writeText("a = 1")
+        var installs = 0
+        val context = HarnessContext()
+        val plugin = LspPlugin(
+            root = temporary.root,
+            json = Json,
+            command = { emptyList() },
+            canInstallOnDemand = { true },
+            installOnDemand = { installs++; listOf("node", "server.js") },
+        )
+        plugin.install(context)
+        try {
+            val result = context.tools.execute(
+                "lsp_hover",
+                buildJsonObject { put("path", "sample.py") },
+                context = ToolContext(approval = { false }),
+            )
+            assertTrue(result.isError)
+            assertEquals(0, installs)
+        } finally {
+            plugin.uninstall(context)
+        }
+    }
+
 }
