@@ -73,6 +73,8 @@ internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List
                 val previous = lastOrNull() as? LocalTranscriptItem.WorkStep
                 val samePoll = message.role == "tool" && previous?.message?.role == "tool" &&
                     message.toolName == previous.message.toolName &&
+                    // Same action name alone is insufficient: parallel jobs may use one API.
+                    message.content == previous.message.content &&
                     isRepeatedWorkPollingTool(message.toolName) &&
                     (message.toolIsError ?: localWorkToolFailed(message.content)) ==
                     (previous.message.toolIsError ?: localWorkToolFailed(previous.message.content))
