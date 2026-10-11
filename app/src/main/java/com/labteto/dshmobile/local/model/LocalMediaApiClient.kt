@@ -119,11 +119,11 @@ internal class LocalMediaApiClient @Inject constructor(
             }
             LocalMediaProvider.QWEN -> {
                 val size = when (ratio) {
-                    "1:1" -> if (offer.model == "qwen-image-plus") "1328x1328" else "1024x1024"
-                    "16:9" -> if (offer.model == "qwen-image-plus") "1664x928" else "1536x864"
-                    "9:16" -> if (offer.model == "qwen-image-plus") "928x1664" else "864x1536"
-                    "4:3" -> if (offer.model == "qwen-image-plus") "1472x1104" else "1536x1152"
-                    else -> if (offer.model == "qwen-image-plus") "1104x1472" else "1152x1536"
+                    "1:1" -> "1024x1024"
+                    "16:9" -> "1536x864"
+                    "9:16" -> "864x1536"
+                    "4:3" -> "1536x1152"
+                    else -> "1152x1536"
                 }
                 val base = java.net.URI(normalizeModelBaseUrl(offer.profile.baseUrl))
                 val url = "https://${base.host}/compatible-mode/v1/images/generations"
