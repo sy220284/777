@@ -87,7 +87,14 @@ object AppLog {
                     synchronous = true,
                 )
             }
-            previous?.uncaughtException(thread, throwable)
+            if (previous != null) {
+                previous.uncaughtException(thread, throwable)
+            } else {
+                // Never consume a fatal crash when Android has no previous default handler.
+                // Clear our handler before invoking ThreadGroup to avoid recursive delegation.
+                Thread.setDefaultUncaughtExceptionHandler(null)
+                thread.threadGroup?.uncaughtException(thread, throwable)
+            }
         }
         crashHandlerInstalled = true
     }
