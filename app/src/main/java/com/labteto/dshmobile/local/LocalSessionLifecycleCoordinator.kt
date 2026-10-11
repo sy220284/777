@@ -228,7 +228,10 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchDomainMode(command: LocalSessionDomainModeCommand) {
         // Group/single switches also supersede any older mode or session tap.
-        if (state.value.kernel.running && !state.value.loading) return
+        if (state.value.kernel.running && !state.value.loading) {
+            state.update { it.copy(error = "请先结束当前回复，再切换单聊或群聊") }
+            return
+        }
         navigationInbox.offer(LocalSessionNavigationRequest.ChatDomain(command))
         continueQueuedNavigation()
     }
@@ -307,10 +310,14 @@ internal class LocalSessionLifecycleCoordinator(
         }
     }
 
+    private fun isKnownSession(sessionId: String): Boolean =
+        state.value.sessions.any { it.id == sessionId } ||
+            sessionCoordinator.summaries().any { it.id == sessionId }
+
     fun switchSession(sessionId: String): Boolean {
-        if (sessionId != currentSessionId() &&
-            state.value.sessions.none { it.id == sessionId }
-        ) return false
+        // Visible history stays in memory; deep links may target a persisted session
+        // before the UI summary index has refreshed.
+        if (sessionId != currentSessionId() && !isKnownSession(sessionId)) return false
         navigationInbox.offer(LocalSessionNavigationRequest.Session(sessionId))
         continueQueuedNavigation()
         return true
@@ -319,7 +326,7 @@ internal class LocalSessionLifecycleCoordinator(
     private fun startSessionSwitch(sessionId: String): Boolean {
         if (state.value.loading) return false
         if (sessionId == currentSessionId()) return true
-        if (state.value.sessions.none { it.id == sessionId }) return false
+        if (!isKnownSession(sessionId)) return false
         // The visible Chat run is cancelled; detached Work runs keep their ownership.
         val cancelVisibleChatRun = navigationBusy()
         if (!beginTransition()) return false
