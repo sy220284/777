@@ -29,10 +29,13 @@ class WorkConversationFlowTest {
                 toolName = "mcp__Figma__use_figma", createdAt = 4L),
         )
         compose.setContent { DshTheme { WorkProcessRow(events, running.value) } }
-        compose.onNodeWithText("我先检查当前消息流。").assertExists()
-        compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
         compose.onNodeWithText("工作进行中").assertExists()
+        // Running timeline starts collapsed: show only the latest meaningful stage.
+        compose.onNodeWithText("我先检查当前消息流。").assertDoesNotExist()
+        compose.onNodeWithText("GitHub", substring = true).assertDoesNotExist()
         compose.onAllNodesWithText("已经定位问题，正在更新实现。").assertCountEquals(1)
+        compose.onNodeWithText("工作进行中").performClick()
+        compose.onNodeWithText("我先检查当前消息流。").assertExists()
         compose.onNodeWithText("Figma", substring = true).assertDoesNotExist()
         compose.onNodeWithText("/internal/test/arguments", substring = true).assertDoesNotExist()
         compose.onNodeWithText("internal tool output", substring = true).assertDoesNotExist()
