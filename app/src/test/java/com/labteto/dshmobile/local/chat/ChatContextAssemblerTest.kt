@@ -78,7 +78,7 @@ class ChatContextAssemblerTest {
         assertTrue(context.contains("昨天的争执"))
         assertTrue(context.contains("她平时喜欢喝茶"))
         assertTrue(context.indexOf("昨天的争执") == context.lastIndexOf("昨天的争执"))
-        assertTrue(context.contains("不主动复述"))
+        assertFalse(context.contains("不主动复述"))
     }
 
     @Test
