@@ -27,10 +27,14 @@ internal object PersonaImmersionPolicy {
             "（引用原文）",
         )
 
+        val authoredAI = personaHasAuthoredAIIdentity(persona)
         val always = RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS
             .mapNotNull { pattern -> pattern.find(checkedText)?.value?.trim() }
+            .filterNot { claim -> authoredAI && (!claim.contains("ChatGPT", ignoreCase = true) ||
+                persona.coreIdentity.contains("ChatGPT", ignoreCase = true) ||
+                persona.name.equals("ChatGPT", ignoreCase = true)) }
 
-        val contextual = if (personaMayHaveNonEmbodiedForm(persona)) {
+        val contextual = if (authoredAI) {
             emptyList()
         } else {
             RUNTIME_EMBODIED_CHARACTER_PATTERNS
@@ -43,21 +47,22 @@ internal object PersonaImmersionPolicy {
     fun breaksReplyImmersion(persona: PersonaProfile, text: String): Boolean =
         findReplyViolations(persona, text).isNotEmpty()
 
-    private fun personaMayHaveNonEmbodiedForm(persona: PersonaProfile): Boolean {
-        val canonical = persona.canonicalV4()
+    private fun personaHasAuthoredAIIdentity(persona: PersonaProfile): Boolean {
         val source = buildString {
-            appendLine(canonical.coreIdentity)
-            canonical.facts.forEach { appendLine(it.content) }
-            appendLine(canonical.franchise)
-            canonical.hardConstraints.forEach(::appendLine)
-            canonical.loreEntries.forEach { entry ->
-                appendLine(entry.title)
-                appendLine(entry.content)
-                entry.keywords.forEach(::appendLine)
-            }
+            appendLine(persona.name)
+            appendLine(persona.coreIdentity.ifBlank { persona.portrait })
+            appendLine(persona.trustedFactText(CharacterFactCategories.SELF_NARRATIVE))
+            appendLine(persona.trustedFactText(CharacterFactCategories.LIMITS_AND_COSTS))
         }
-        return NON_EMBODIED_CHARACTER_PATTERNS.any { pattern ->
-            pattern.containsMatchIn(source)
+        return source.lineSequence().any { line ->
+            AUTHORED_AI_IDENTITY.findAll(line).any { match ->
+                val before = line.take(match.range.first).takeLast(12)
+                val after = line.drop(match.range.last + 1).take(12)
+                !Regex("并非|不是|并不属于|不自称|不可自称|不要自称|不得自称|禁止自称|研究|开发|维护")
+                    .containsMatchIn(before) &&
+                    !Regex("^\\s*(?:研究员|研究者|开发者|工程师|researcher|engineer)", RegexOption.IGNORE_CASE)
+                        .containsMatchIn(after)
+            }
         }
     }
 
@@ -76,11 +81,7 @@ internal object PersonaImmersionPolicy {
         Regex("""(?i)\b(?:as an? ai|i (?:am|'m) (?:an? )?ai)\b"""),
     )
 
-    private val NON_EMBODIED_CHARACTER_PATTERNS = listOf(
-        Regex("""幽灵|灵体|意识体|机器人|仿生人|机械生命|程序生命|数字生命|虚拟生命|全息投影|投影形态|无实体|没有固定肉身|寄宿.{0,16}(?:镜|物|载体)|机械机体"""),
-        Regex("""(?i)(?:本体|身份|自身|角色|她|他|它|ta).{0,12}(?:是|属于|为).{0,8}(?:(?:AI|人工智能)(?:意识|生命|程序|人格|个体)|(?:AI|人工智能)(?=[，。；;\s]|$))"""),
-        Regex("""(?i)(?:AI|人工智能)(?:意识|生命|程序|人格|个体|角色)"""),
-    )
+    private val AUTHORED_AI_IDENTITY = Regex("""(?i)\bAI\b|人工智能|语言模型|聊天机器人|虚拟助手|智能助手|程序生命|数字生命|机器人|仿生人""")
 
     private val OUT_OF_ROLE_PATTERNS = listOf(
         Regex("""(?i)(?:作为|身为)\s*(?:一个|一名)?\s*(?:AI|人工智能|语言模型|大语言模型|聊天机器人|虚拟助手|智能助手)"""),
