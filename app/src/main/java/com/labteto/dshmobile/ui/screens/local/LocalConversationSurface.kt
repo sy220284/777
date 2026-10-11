@@ -234,8 +234,7 @@ internal fun LocalConversationSurface(
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var mediaVideoTaskId by rememberSaveable(state.sessionId) { mutableStateOf("") }
-    var mediaVideoRouteId by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaVideoTasks by rememberSaveable(state.sessionId) { mutableStateOf(mapOf<String, String>()) }
     var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -1264,11 +1263,9 @@ internal fun LocalConversationSurface(
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
                 preferredProfileId = activeModelProfile?.id,
-                videoTaskId = mediaVideoTaskId,
-                videoRouteId = mediaVideoRouteId,
+                videoTasks = mediaVideoTasks,
                 onVideoTaskChange = { routeId, taskId ->
-                    mediaVideoRouteId = routeId
-                    mediaVideoTaskId = taskId
+                    mediaVideoTasks = mediaVideoTasks + (routeId to taskId)
                 },
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
