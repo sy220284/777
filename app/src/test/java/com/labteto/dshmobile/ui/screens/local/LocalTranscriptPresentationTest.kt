@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
-import com.labteto.dshmobile.ui.components.DsStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -198,15 +197,14 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun hiddenFailedMilestoneRemainsVisibleInRecentSteps() {
-        val nodes = listOf(
-            LocalWorkProcessNode(summary = "初始化", failed = true),
-            *List(8) { LocalWorkProcessNode(summary = "阶段$it") }.toTypedArray(),
-        )
-        val visible = visibleWorkProcessNodes(nodes, showAll = false, collapsedLimit = 5)
-        assertEquals(5, visible.size)
-        assertTrue(visible.first().failed)
-        assertEquals("阶段7", visible.last().summary)
+    fun legacyMiniMaxThinkingDoesNotShowAsWorkProgressOrInlinePreview() {
+        assertEquals(null, localWorkProcessSummary("<think>用户要看仓库更新，先按系统提示检查目录"))
+        assertEquals("已确认新提交", localWorkProcessSummary("<think>内部分析</think>已确认新提交"))
+        assertEquals(null, localWorkProcessSummary("用户要我先看系统提示"))
+        assertEquals("已核对仓库更新", localWorkProcessSummary("已核对仓库更新"))
+        assertEquals("", inlineWorkPreviewText("<think>用户需要我先分析", null))
+        assertEquals("现在开始检查", inlineWorkPreviewText("<think>分析完成</think>现在开始检查", null))
+        assertEquals("已经完成", inlineWorkPreviewText("<think>分析完成</think>已经完成", "<think>旧思考</think>"))
     }
 
     @Test
@@ -215,14 +213,6 @@ class LocalTranscriptPresentationTest {
         assertEquals("", inlineWorkPreviewText("已有内容", "已有内容"))
         assertEquals("", inlineWorkPreviewText("已有", "已有内容"))
         assertEquals("不同阶段", inlineWorkPreviewText("不同阶段", "已有内容"))
-    }
-
-    @Test
-    fun collapsedFocusKeepsLatestFailureEvenWhenLaterStageSucceeds() {
-        val failed = LocalWorkProcessNode(summary = "校验文件", failed = true)
-        val later = LocalWorkProcessNode(summary = "已读取其他文件")
-        assertEquals(failed, workProcessFocus(listOf(failed, later)))
-        assertEquals(later, workProcessFocus(listOf(later)))
     }
 
     @Test
@@ -340,39 +330,6 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun workProcessAggregateStatusKeepsFailureVisibleAfterRunStops() {
-        val failed = LocalWorkProcessNode(
-            operationKinds = listOf(AgentOperationKind.Execute),
-            failed = true,
-            count = 1,
-        )
-        val completed = LocalWorkProcessNode(
-            operationKinds = listOf(AgentOperationKind.Search),
-            count = 1,
-        )
-
-        assertEquals(DsStatus.Running, workProcessStatus(listOf(failed, completed), running = true))
-        assertEquals(DsStatus.Warning, workProcessStatus(listOf(failed, completed), running = false))
-        assertEquals(DsStatus.Done, workProcessStatus(listOf(completed), running = false))
-    }
-
-    @Test
-    fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
-        val nodes = (1..12).map { index ->
-            LocalWorkProcessNode(
-                operationKinds = listOf(AgentOperationKind.Generic),
-                count = index,
-            )
-        }
-        val recent = visibleWorkProcessNodes(nodes, showAll = false)
-        val all = visibleWorkProcessNodes(nodes, showAll = true)
-        assertEquals(LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT, recent.size)
-        assertEquals(8, recent.first().count)
-        assertEquals(12, recent.last().count)
-        assertEquals(12, all.size)
-    }
-
-    @Test
     fun visibleDialogueQuotaIgnoresBackgroundWorkMessages() {
         val messages = buildList {
             repeat(10) { turn ->
@@ -466,6 +423,168 @@ class LocalTranscriptPresentationTest {
     fun structuredSuccessDoesNotTreatErrorDocumentationAsFailedTool() {
         val nodes = buildWorkProcessNodes(listOf(LocalHarnessMessage(id = "tool", role = "tool",
             content = "说明：[NETWORK_ERROR] 是错误代码", createdAt = 1L, toolName = "read_file", toolIsError = false)))
-        assertEquals(DsStatus.Done, workProcessStatus(nodes, running = false))
+        assertFalse(nodes.single().failed)
     }
+    @Test
+    fun workTimelineNarrationKeepsStageSummaryAndOptionalExplanatoryText() {
+        val note = localWorkProcessNarration(
+            "已经找到造成页面卡住的核心问题。需要修正执行流展示顺序，避免阶段成果再次被隐藏。"
+        )
+        assertEquals("已经找到造成页面卡住的核心问题。", note?.first)
+        assertEquals("需要修正执行流展示顺序，避免阶段成果再次被隐藏。", note?.second)
+        assertEquals(null, localWorkProcessNarration("git status --short"))
+        assertEquals(null, localWorkProcessNarration("我需要先检查内部提示"))
+        assertEquals(null, localWorkProcessNarration("/private/secret/config.json"))
+    }
+
+    @Test
+    fun narrativeDetailsOmitCommandLinesAndPrivatePaths() {
+        val note = localWorkProcessNarration(
+            "已经完成第一轮核查，发现了一个重要问题。\ngit status --short\n详见 /private/secret/file.txt 的异常记录。"
+        )
+        assertEquals("已经完成第一轮核查，发现了一个重要问题。", note?.first)
+        assertEquals("详见 … 的异常记录。", note?.second)
+        assertTrue(note?.second?.contains("git status") == false)
+        assertTrue(note?.second?.contains("/private/secret") == false)
+    }
+
+    @Test
+    fun workTimelinePreservesAllStagesAndProviderForMergedToolResult() {
+        val messages = (1..9).flatMap { index ->
+            listOf(
+                message("p$index", "progress", "阶段$index 已核查"),
+                message("t$index", "tool", "result", toolName = "mcp__GitHub__fetch"),
+            )
+        }
+        val timeline = conversationWorkProcessNodes(buildWorkProcessNodes(messages))
+        assertEquals(9, timeline.size)
+        assertEquals("阶段1 已核查", timeline.first().summary)
+        assertEquals("阶段9 已核查", timeline.last().summary)
+        assertEquals("GitHub", userFacingWorkToolProvider(timeline.first().toolName))
+        assertTrue(timeline.all { it.toolContent == null })
+    }
+
+    @Test
+    fun workDisplayProjectsIndividualLazyItemsWithoutChangingDurableTranscript() {
+        val source = listOf(
+            message("u1", "user", "检查"),
+            message("p1", "progress", "检查相关分支"),
+            message("t1", "tool", "result", toolName = "read"),
+            message("t2", "tool", "result", toolName = "edit_file"),
+            message("p2", "progress", "发现了一个需要修复的问题"),
+            message("a1", "assistant", "检查完毕"),
+        )
+        val durable = buildLocalTranscript(source)
+        assertEquals(3, durable.size)
+        assertEquals(4, (durable[1] as LocalTranscriptItem.WorkProcess).messages.size)
+        val display = buildLocalDisplayTranscript(durable)
+        assertEquals(6, display.size)
+        assertEquals(
+            listOf("work-step:p1", "work-step:t1", "work-step:t2", "work-step:p2"),
+            display.filterIsInstance<LocalTranscriptItem.WorkStep>().map { it.key },
+        )
+        assertEquals("检查完毕", (display.last() as LocalTranscriptItem.Message).message.content)
+    }
+
+    @Test
+    fun repeatedPollingCompactsOnlyAdjacentEquivalentChecks() {
+        val work = LocalTranscriptItem.WorkProcess(listOf(
+            message("t1", "tool", "running", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+            message("t2", "tool", "running", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+            message("t3", "tool", "output", toolName = "mcp__GitHub__fetch_file"),
+            message("t4", "tool", "output", toolName = "mcp__GitHub__fetch_file"),
+            message("p1", "progress", "发现关键问题"),
+            message("t5", "tool", "output", toolName = "mcp__GitHub__fetch_workflow_run_jobs"),
+        ))
+        val projected = buildLocalDisplayTranscript(listOf(work))
+            .filterIsInstance<LocalTranscriptItem.WorkStep>()
+        assertEquals(5, projected.size)
+        assertEquals(2, projected.first().repeatCount)
+        assertEquals(1, projected[1].repeatCount)
+        assertEquals(1, projected[2].repeatCount)
+        assertEquals("work-step:t5", projected.last().key)
+    }
+
+    @Test
+    fun narrativeProjectionKeepsParagraphsButRedactsCommandsAndReasoning() {
+        val content = "发现阻塞。需要先修正日志。\ngit status --short\n已核查 /private/test/config.json 的异常"
+        val visible = localWorkTimelineText(content)!!
+        assertTrue(visible.contains("发现阻塞。需要先修正日志。"))
+        assertTrue(visible.contains("已核查 … 的异常"))
+        assertFalse(visible.contains("git status"))
+        assertFalse(visible.contains("/private/test/config.json"))
+        assertEquals(null, localWorkTimelineText("我需要先检查内部提示"))
+        assertEquals(null, localWorkTimelineText("/private/test/config.json"))
+        assertTrue(isWorkTimelineMilestone("发现一个异常"))
+        assertFalse(isWorkTimelineMilestone("正在读取代码"))
+    }
+
+    @Test
+    fun longWorkDisplayKeepsAllOperationsWithStableKeys() {
+        val durable = LocalTranscriptItem.WorkProcess(
+            (1..250).map { message("tool-$it", "tool", "result-$it", toolName = "read_file") },
+        )
+        val visible = buildLocalDisplayTranscript(listOf(durable))
+        assertEquals(250, visible.size)
+        assertEquals(250, visible.map { it.key }.distinct().size)
+        assertEquals("work-step:tool-1", visible.first().key)
+        assertEquals("work-step:tool-250", visible.last().key)
+    }
+
+    @Test
+    fun timelineTailIndexIncludesPendingPlanReviewAndHistoryLoadingRows() {
+        assertEquals(
+            12,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 11, showPagingRow = true,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = true, showStreamingTail = false,
+            ),
+        )
+        assertEquals(
+            13,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 11, showPagingRow = true,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = true, showStreamingTail = true,
+            ),
+        )
+    }
+
+    @Test
+    fun timelineTailIndexIncludesEmptyStateAndDoesNotInventItems() {
+        assertEquals(
+            1,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = true, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = true,
+            ),
+        )
+        assertEquals(
+            2,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = true,
+                showEmptyWorkbench = true, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = true,
+            ),
+        )
+        assertEquals(
+            0,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = false, showEmptyGroupSetup = true,
+                showPlanReview = false, showStreamingTail = false,
+            ),
+        )
+        assertEquals(
+            -1,
+            localTranscriptLastListIndex(
+                transcriptItemCount = 0, showPagingRow = false,
+                showEmptyWorkbench = false, showEmptyGroupSetup = false,
+                showPlanReview = false, showStreamingTail = false,
+            ),
+        )
+    }
+
 }

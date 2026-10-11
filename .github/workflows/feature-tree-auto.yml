@@ -90,6 +90,7 @@ jobs:
       - name: 校验生成证据与人工修改的扫描器或快照
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           paths=(
@@ -123,7 +124,12 @@ jobs:
             .github/scripts/investigate-feature-existence.py
             .github/scripts/check-acceptance-matrix.py
           )
-          if ! git diff --quiet "$PR_BASE_SHA" HEAD -- "${generator_paths[@]}" "${paths[@]}"; then
+          # The checkout may be a synthetic merge commit. Compare only changes
+          # authored on the PR branch since its merge-base with main; otherwise
+          # unrelated main snapshot updates can trigger a false positive.
+          git rev-parse --verify "${PR_HEAD_SHA}^{commit}" >/dev/null
+          pr_merge_base="$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          if ! git diff --quiet "$pr_merge_base" "$PR_HEAD_SHA" -- "${generator_paths[@]}" "${paths[@]}"; then
             if ! git diff --exit-code -- "${paths[@]}"; then
               echo "::error::本PR修改了生成器或扫描快照，提交的快照必须与本次源码扫描一致"
               exit 1

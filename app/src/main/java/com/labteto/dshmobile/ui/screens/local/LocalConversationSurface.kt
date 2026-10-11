@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -73,6 +74,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfo
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.presentation.LocalWorkTemperatureControls
@@ -264,10 +266,10 @@ internal fun LocalConversationSurface(
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
     val transcriptItems = remember(transcriptMessages, state.usageMode) {
-        buildLocalTranscript(
+        buildLocalDisplayTranscript(buildLocalTranscript(
             transcriptMessages,
             includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-        )
+        ))
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -277,14 +279,28 @@ internal fun LocalConversationSurface(
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
     val showTranscriptPagingRow = transcriptHistoryError != null ||
         (hasOlderTranscript && loadingOlderTranscript)
-    val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
+    val showEmptyWorkbench = transcriptItems.isEmpty() &&
+        (state.usageMode == LocalUsageMode.WORK ||
+            (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))
+    val showEmptyGroupSetup = transcriptItems.isEmpty() &&
+        state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
+        state.groupChat.members.size < 2
+    val planReview = state.pendingQuestion
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.let(::localPlanReviewOf)
     val showStreamingTail = shouldShowWorkStreamingTail(
         running = state.running,
         usageMode = state.usageMode,
         lastItem = transcriptItems.lastOrNull(),
     )
-    val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex +
-        (if (showStreamingTail) 1 else 0)
+    val transcriptLastListIndex = localTranscriptLastListIndex(
+        transcriptItemCount = transcriptItems.size,
+        showPagingRow = showTranscriptPagingRow,
+        showEmptyWorkbench = showEmptyWorkbench,
+        showEmptyGroupSetup = showEmptyGroupSetup,
+        showPlanReview = planReview != null,
+        showStreamingTail = showStreamingTail,
+    )
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -434,16 +450,34 @@ internal fun LocalConversationSurface(
         listState = listState,
         anchoredViewportExtent = composerTailViewportAnchor,
     )
+    val workTailFollowing = remember(state.sessionId) { mutableStateOf(false) }
+    val workReaderPaused = remember(state.sessionId) { mutableStateOf(false) }
     LocalWorkStreamingTailFollower(
         listState = listState,
-        enabled = showStreamingTail,
+        enabled = showStreamingTail && !workTailFollowing.value &&
+            (state.usageMode != LocalUsageMode.WORK || !workReaderPaused.value),
     )
-
-    LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
-        if (transcriptItems.isNotEmpty()) {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            if (lastVisible >= transcriptLastListIndex - 2) {
-                listState.animateScrollToItem(transcriptLastListIndex)
+    if (state.usageMode == LocalUsageMode.WORK) {
+        LocalWorkTimelineAutoScroller(
+            listState = listState,
+            sessionId = state.sessionId,
+            tailIndex = transcriptLastListIndex,
+            tailKey = if (showStreamingTail) "work-streaming:${state.sessionId}"
+                else transcriptItems.lastOrNull()?.key.orEmpty(),
+            isReady = transcriptInitialPositionReady,
+            isCatchingUp = workTailFollowing,
+            isReaderPaused = workReaderPaused,
+        )
+    } else {
+        // Chat mode retains its established scrolling behavior.
+        var previousChatTailIndex by remember(state.sessionId) { mutableStateOf(-1) }
+        LaunchedEffect(state.messages.size, transcriptItems.size, state.running) {
+            if (transcriptItems.isNotEmpty()) {
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val wasNearTail = previousChatTailIndex < 0 ||
+                    lastVisible >= previousChatTailIndex - 2
+                previousChatTailIndex = transcriptLastListIndex
+                if (wasNearTail) listState.animateScrollToItem(transcriptLastListIndex)
             }
         }
     }
@@ -640,7 +674,7 @@ internal fun LocalConversationSurface(
                         )
                     }
                 }
-                if (transcriptItems.isEmpty() && (state.usageMode == LocalUsageMode.WORK || (!state.groupChat.enabled && state.chatPersona.isUnboundChatPersona()))) {
+                if (showEmptyWorkbench) {
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
@@ -649,12 +683,7 @@ internal fun LocalConversationSurface(
                         }
                     }
                 }
-                if (
-                    transcriptItems.isEmpty() &&
-                    state.usageMode == LocalUsageMode.CHAT &&
-                    state.groupChat.enabled &&
-                    state.groupChat.members.size < 2
-                ) {
+                if (showEmptyGroupSetup) {
                     item {
                         DsCard {
                             Text(
@@ -670,9 +699,6 @@ internal fun LocalConversationSurface(
                         }
                     }
                 }
-                val planReview = state.pendingQuestion
-                    ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-                    ?.let(::localPlanReviewOf)
                 planReview?.let { review ->
                     item(key = "pending-plan-review") {
                         LocalPlanReviewCard(
@@ -705,7 +731,9 @@ internal fun LocalConversationSurface(
                     when (transcriptItem) {
                         is LocalTranscriptItem.Message -> Column {
                             LocalMessageRow(
-                                message = transcriptItem.message,
+                                message = if (transcriptItem.message.role == "assistant")
+                                    transcriptItem.message.copy(content = visibleAssistantText(transcriptItem.message.content))
+                                else transcriptItem.message,
                                 chatMode = state.usageMode == LocalUsageMode.CHAT,
                                 workspacePath = state.workspacePath,
                                 skillDisplayNames = skillDisplayNames,
@@ -737,7 +765,21 @@ internal fun LocalConversationSurface(
                             }
                         }
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
+                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkStep -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(
+                                fadeInSpec = tween(durationMillis = 180),
+                                placementSpec = tween(durationMillis = 220),
+                                fadeOutSpec = null,
+                            ),
+                        ) {
+                            WorkTimelineStepRow(
+                                message = transcriptItem.message,
+                                repeatCount = transcriptItem.repeatCount,
+                                active = state.running && transcriptItem.message.role != "tool" &&
+                                    transcriptItem.key == transcriptItems.lastOrNull()?.key,
+                            )
+                        }
                     }
                 }
                 if (showStreamingTail) {
@@ -753,11 +795,21 @@ internal fun LocalConversationSurface(
                             LocalStreamingWorkPreview(
                                 sessionId = state.sessionId,
                                 streamingState = streamingState,
-                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
-                                lastDurableNarrative = (transcriptItems.lastOrNull() as?
-                                    LocalTranscriptItem.WorkProcess)?.messages?.lastOrNull {
-                                    it.role == "progress" || it.role == "assistant"
-                                }?.content,
+                                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkStep ||
+                                    transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
+                                lastDurableNarrative = transcriptItems.asReversed().firstNotNullOfOrNull { item ->
+                                    when (item) {
+                                        is LocalTranscriptItem.WorkStep ->
+                                            item.message.takeIf {
+                                                it.role == "progress" || it.role == "assistant"
+                                            }?.content
+                                        is LocalTranscriptItem.WorkProcess ->
+                                            item.messages.lastOrNull {
+                                                it.role == "progress" || it.role == "assistant"
+                                            }?.content
+                                        else -> null
+                                    }
+                                },
                             )
                         }
                     }
@@ -771,10 +823,16 @@ internal fun LocalConversationSurface(
                 onClick = { target ->
                     scrollHint.hide()
                     scope.launch {
-                        listState.animateScrollToItem(
-                            if (target == ConversationScrollTarget.START) 0
-                            else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0),
-                        )
+                        val targetIndex = if (target == ConversationScrollTarget.START) 0
+                            else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)
+                        listState.animateScrollToItem(targetIndex)
+                        // A long final reply can fill more than one viewport: the
+                        // "latest" shortcut must reach its bottom, not its first line.
+                        if (target == ConversationScrollTarget.LATEST &&
+                            state.usageMode == LocalUsageMode.WORK
+                        ) {
+                            listState.alignWorkTimelineTailAfterScroll(targetIndex)
+                        }
                     }
                 },
             )

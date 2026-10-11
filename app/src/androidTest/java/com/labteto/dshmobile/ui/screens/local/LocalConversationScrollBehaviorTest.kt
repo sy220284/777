@@ -9,11 +9,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.runBlocking
@@ -197,4 +202,210 @@ class LocalConversationScrollBehaviorTest {
             assertEquals(10, listState.firstVisibleItemIndex)
         }
     }
+    @Test
+    fun newWorkStepsFollowAtBottomPauseInHistoryAndResumeAfterReturning() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val catchingUp = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "work-$it" }) { index ->
+                            Text("work-$index", Modifier.fillMaxWidth().height(64.dp))
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "work-test",
+                        tailIndex = rows.intValue - 1, tailKey = "work-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = catchingUp,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(9) } }
+        compose.waitForIdle()
+
+        // A single incoming operation glides into the bottom viewport.
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 12 })
+            assertFalse(catchingUp.value)
+        }
+
+        // Reading prior history stops the movement even when several events land at once.
+        compose.runOnIdle { runBlocking { listState.scrollToItem(2) } }
+        compose.waitForIdle()
+        compose.runOnIdle { rows.intValue = 16 }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(2, listState.firstVisibleItemIndex) }
+
+        // User scrolls back to the newest item. Following resumes on the next update.
+        compose.runOnIdle { runBlocking { listState.scrollToItem(13) } }
+        compose.waitForIdle()
+        compose.runOnIdle { rows.intValue = 17 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 16 })
+        }
+    }
+
+    @Test
+    fun workTimelineAutoFollowDoesNotTreatLargeParagraphTopAsBottom() {
+        assertTrue(shouldFollowNewWorkStep(10, 10, 10, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, null, false, false))
+        assertTrue(shouldFollowNewWorkStep(10, 9, 0, false, false))
+        // Seeing only the row before a zero-height placeholder is NOT proof of proximity.
+        assertFalse(shouldFollowNewWorkStep(10, 9, null, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 600, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 7, null, false, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 0, true, false))
+        assertFalse(shouldFollowNewWorkStep(10, 10, 0, false, true))
+    }
+
+    @Test
+    fun longFinalWorkReplyAlignsItsBottomWithoutAnimatingThroughEntireParagraph() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val following = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "long-tail-$it" }) { index ->
+                            Text(
+                                "step-$index",
+                                Modifier.fillMaxWidth().height(
+                                    if (index == 12) 740.dp else 64.dp,
+                                ),
+                            )
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "long-final",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "long-tail-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = following,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(9) } }
+        compose.waitForIdle()
+
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.last()
+            assertEquals(12, last.index)
+            assertTrue(last.offset + last.size - info.viewportEndOffset <= 72)
+            assertFalse(following.value)
+        }
+    }
+
+    @Test
+    fun readingBeginningOfTallFinalReplyDoesNotTriggerNextStepAutoFollow() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(12)
+        val following = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(rows.intValue, key = { "long-reply-$it" }) { index ->
+                            Text(
+                                "long-reply-$index",
+                                Modifier.fillMaxWidth().height(
+                                    if (index == 11) 740.dp else 64.dp,
+                                ),
+                            )
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "reading-long-reply",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "long-reply-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = following,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(11) } }
+        compose.waitForIdle()
+
+        compose.runOnIdle { rows.intValue = 13 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(11, listState.firstVisibleItemIndex)
+            assertFalse(listState.layoutInfo.visibleItemsInfo.any { it.index == 12 })
+        }
+    }
+
+    @Test
+    fun fingerScrollPausesFollowingUntilReaderReturnsToBottom() {
+        lateinit var listState: LazyListState
+        val rows = mutableIntStateOf(24)
+        val catchingUp = mutableStateOf(false)
+        val readerPaused = mutableStateOf(false)
+        compose.setContent {
+            DshTheme {
+                listState = rememberLazyListState()
+                Box(Modifier.fillMaxWidth().height(240.dp)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().testTag("work-timeline-scroll"),
+                    ) {
+                        items(rows.intValue, key = { "finger-step-$it" }) { index ->
+                            Text("finger-step-$index", Modifier.fillMaxWidth().height(64.dp))
+                        }
+                    }
+                    LocalWorkTimelineAutoScroller(
+                        listState = listState, sessionId = "gesture-priority",
+                        tailIndex = rows.intValue - 1,
+                        tailKey = "finger-step-" + (rows.intValue - 1),
+                        isReady = true, isCatchingUp = catchingUp,
+                        isReaderPaused = readerPaused,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { runBlocking { listState.scrollToItem(20) } }
+        compose.waitForIdle()
+        compose.onNodeWithTag("work-timeline-scroll").performTouchInput { swipeDown() }
+        compose.waitForIdle()
+        var historyIndex = -1
+        compose.runOnIdle {
+            assertTrue(readerPaused.value)
+            historyIndex = listState.firstVisibleItemIndex
+            assertTrue(historyIndex < 20)
+        }
+        compose.runOnIdle { rows.intValue = 28 }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(historyIndex, listState.firstVisibleItemIndex) }
+
+        compose.runOnIdle { runBlocking { listState.scrollToItem(24) } }
+        compose.waitForIdle()
+        compose.runOnIdle { assertFalse(readerPaused.value) }
+        compose.runOnIdle { rows.intValue = 29 }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.index == 28 })
+        }
+    }
+
 }
