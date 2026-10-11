@@ -2061,5 +2061,8 @@
     <string name="minimax_media_running">MiniMax 正在处理请求…</string>
     <string name="minimax_media_error">操作失败：%1$s</string>
     <string name="minimax_media_invalid_url">服务商返回的链接不是安全的 HTTPS 地址</string>
+    <string name="minimax_media_select_voice">选择官方音色</string>
+    <string name="minimax_media_filter_voice">搜索音色名称或编号</string>
+    <string name="minimax_media_no_voices">当前账户未返回可选音色，可继续输入音色编号。</string>
 </resources>
 
