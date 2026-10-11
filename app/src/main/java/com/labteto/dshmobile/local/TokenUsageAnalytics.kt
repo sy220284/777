@@ -515,13 +515,14 @@ class TokenUsageAnalyticsStore @Inject constructor(
         key: String,
         recordLimit: Int = DETAIL_RECORDS,
         sessionId: String? = null,
+        modelFilter: String? = null,
     ): TokenUsageGroupDetail? {
         require(kind != TokenUsageGroupKind.TURN || !sessionId.isNullOrBlank()) {
             "Turn usage requires a source session"
         }
         val detailLimit = recordLimit.coerceIn(1, MAX_DETAIL_RECORDS)
         val records = allRecords().distinctForAccounting().filter { record ->
-            when (kind) {
+            (modelFilter == null || record.model == modelFilter) && when (kind) {
                 TokenUsageGroupKind.TURN -> record.context.mode == LocalUsageMode.CHAT &&
                     record.context.sessionId == sessionId && record.context.turnId == key
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
