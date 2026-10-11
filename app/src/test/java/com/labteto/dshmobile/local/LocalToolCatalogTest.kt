@@ -47,6 +47,9 @@ class LocalToolCatalogTest {
             .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
 
         assertEquals(setOf("parallel", "pipeline"), modes.toSet())
+        val contextModes = subagentProperties.getValue("context_mode").jsonObject["enum"]!!.jsonArray
+            .map { it.jsonPrimitive.content }.toSet()
+        assertEquals(setOf("isolated", "inherit"), contextModes)
         assertTrue("model" in subagentProperties)
         assertTrue("max_steps" in subagentProperties)
         assertTrue("output_schema" in subagentProperties)
