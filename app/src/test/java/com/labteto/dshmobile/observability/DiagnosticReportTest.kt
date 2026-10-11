@@ -18,7 +18,7 @@ class DiagnosticReportTest {
                     "api_key=abc123",
                 ),
             ),
-            environment = "环境\n工作区：/data/private/secret\n执行预算：模型 1/2\n最近诊断：\n- E/Harness：private event\n替代路径：private info",
+            environment = "环境\nAuthorization: Bearer leaked-environment-token\n工作区：/data/private/secret\n执行预算：模型 1/2\n最近诊断：\n- E/Harness：private event\n替代路径：private info",
             androidApi = 36,
         )
 
@@ -27,6 +27,7 @@ class DiagnosticReportTest {
         assertTrue(report.contains("详细日志（最近 1 条，已脱敏）"))
         assertTrue(report.contains("<redacted>"))
         assertFalse(report.contains("super-secret-token"))
+        assertFalse(report.contains("leaked-environment-token"))
         assertFalse(report.contains("abc123"))
         assertFalse(report.contains("/data/private/secret"))
         assertFalse(report.contains("private event"))
