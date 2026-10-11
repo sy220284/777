@@ -173,6 +173,8 @@ fun LocalHarnessScreen(
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
+    var settledSessionId by rememberSaveable { mutableStateOf("") }
+    var settledUsageMode by rememberSaveable { mutableStateOf("") }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
@@ -257,6 +259,64 @@ fun LocalHarnessScreen(
         featureStack = localFeatureHome()
     }
 
+    // Only a settled session/mode transition commits navigation. This covers every entry point,
+    // including tasks, gallery, notifications, projects and drawer history.
+    LaunchedEffect(shell.sessionId, shell.usageMode, shell.loading) {
+        if (!shell.loading && shell.sessionId.isNotBlank()) {
+            if (settledSessionId.isNotBlank() &&
+                (settledSessionId != shell.sessionId || settledUsageMode != shell.usageMode.name)
+            ) {
+                resetFeatureNavigation()
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                settingsDestination = SettingsDestination.ROOT
+                taskMode = null
+                requestedFilePath = null
+                filesMode = LocalFilesMode.WORKSPACE
+                composerHandoff = emptyList()
+                if (drawerState.isOpen) drawerState.close()
+            }
+            settledSessionId = shell.sessionId
+            settledUsageMode = shell.usageMode.name
+        }
+    }
+
+    suspend fun deleteSessionsAndNavigate(ids: Set<String>): Int {
+        val deletingCurrent = shell.sessionId in ids
+        return try {
+            val deleted = viewModel.deleteSessions(ids)
+            if (deleted > 0 && deletingCurrent) {
+                resetFeatureNavigation()
+                memorySourceSessionId = null
+                memorySourceMessageId = null
+                settingsDestination = SettingsDestination.ROOT
+                taskMode = null
+                filesMode = LocalFilesMode.WORKSPACE
+                requestedFilePath = null
+                composerHandoff = emptyList()
+                pendingWorkCapability = null
+                workCapabilityConfirmed = false
+                workCapabilityConfiguring = false
+                pendingUsageMode = null
+                showGroupSetup = false
+                showNewSessionMode = false
+                drawerState.close()
+            } else if (deleted == 0) {
+                android.widget.Toast.makeText(
+                    context, R.string.local_delete_session_failed, android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+            deleted
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            android.widget.Toast.makeText(
+                context, R.string.local_delete_session_failed, android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            0
+        }
+    }
+
     fun handoffWorkCapability(prompt: String) {
         composerHandoff = listOf(shell.sessionId, prompt)
         taskMode = null
@@ -301,7 +361,7 @@ fun LocalHarnessScreen(
         exitGroupChat = viewModel::leaveGroupChatMode,
         toggleSessionPinned = viewModel::toggleSessionPinned,
         renameSession = viewModel::renameSession,
-        deleteSessions = viewModel::deleteSessions,
+        deleteSessions = ::deleteSessionsAndNavigate,
         configureChatPersona = viewModel::configureChatPersona,
         configureGroupMembers = viewModel::configureGroupChatMembers,
         selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
@@ -436,9 +496,7 @@ fun LocalHarnessScreen(
                 handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
             onOpenSourceSession = { sourceSessionId ->
-                if (viewModel.switchSession(sourceSessionId)) {
-                    resetFeatureNavigation()
-                }
+                viewModel.switchSession(sourceSessionId)
             },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
@@ -571,15 +629,21 @@ fun LocalHarnessScreen(
 
     LaunchedEffect(requestedSessionId, shell.sessions, shell.loading, shell.sessionId) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
-        val accepted = acceptLocalSessionNavigation(
-            currentSessionId = shell.sessionId,
-            targetSessionId = target,
-            sessions = shell.sessions,
-            switchSession = viewModel::switchSession,
-        )
-        if (accepted) {
-            resetFeatureNavigation()
+        if (shell.loading || shell.sessionId.isBlank()) return@LaunchedEffect
+        if (target == shell.sessionId) {
             onSessionRequestConsumed()
+        } else if (shell.sessions.none { it.id == target }) {
+            onSessionRequestConsumed()
+            android.widget.Toast.makeText(
+                context, R.string.local_session_target_missing, android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        } else {
+            acceptLocalSessionNavigation(
+                currentSessionId = shell.sessionId,
+                targetSessionId = target,
+                sessions = shell.sessions,
+                switchSession = viewModel::switchSession,
+            )
         }
     }
 
@@ -653,11 +717,10 @@ fun LocalHarnessScreen(
                 },
                 onSwitchSession = { sessionId ->
                     if (viewModel.switchSession(sessionId)) {
-                        resetFeatureNavigation()
                         scope.launch { drawerState.close() }
                     }
                 },
-                onDeleteSessions = viewModel::deleteSessions,
+                onDeleteSessions = ::deleteSessionsAndNavigate,
                 onRenameSession = viewModel::renameSession,
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },

@@ -34,7 +34,6 @@ internal fun localAutomationFeatureUiContribution(
         onOpenSession = { sessionId ->
             if (actions.switchSession(sessionId)) {
                 onTaskModeChange(null)
-                onResetNavigation()
             }
         },
         initialMode = taskMode,

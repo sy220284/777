@@ -65,6 +65,9 @@
     <string name="local_delete_session">删除会话</string>
     <string name="local_drawer_multi_select">多选</string>
     <string name="local_delete_session_confirm_message">删除后该会话与历史记录将被移除，确定继续吗？</string>
+    <string name="local_delete_sessions_confirm_multiple">将删除选中的 %1$d 个会话及其历史记录，确定继续吗？</string>
+    <string name="local_delete_session_failed">会话删除未完成，请重试或查看诊断记录</string>
+    <string name="local_session_target_missing">该会话已删除或不可用，已保留当前页面</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
     <string name="local_drawer_pinned">置顶</string>
     <string name="local_drawer_recent">最近</string>

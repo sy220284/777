@@ -43,6 +43,13 @@ internal fun localSessionNavigationBusy(
     visibleRunActive: Boolean,
 ): Boolean = sessionTransitioning || visibleRunActive
 
+/** A background deletion leaves the visible session untouched. */
+internal fun localDeletedCurrentSessionMode(
+    currentSessionId: String,
+    deletedIds: Set<String>,
+    usageMode: LocalUsageMode,
+): LocalUsageMode? = usageMode.takeIf { currentSessionId in deletedIds }
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort,
@@ -271,6 +278,8 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchSession(sessionId: String): Boolean {
         if (sessionId == currentSessionId()) return true
+        // Missing or deleted IDs must never be reconstructed as phantom blank sessions.
+        if (sessionCoordinator.summaries().none { it.id == sessionId }) return false
         // Work turns are session-owned: changing the visible conversation only changes the UI
         // projection. Never stop the Work turn, its subagents, terminals or non-persistent jobs here.
         // Chat still uses the legacy visible turn slot; if one is active, close it safely before the
@@ -281,6 +290,11 @@ internal class LocalSessionLifecycleCoordinator(
         scope.launch {
             transitionMutex.withLock {
                 try {
+                    // Recheck after acquiring the transition lock: deletion may have won the race.
+                    if (sessionCoordinator.summaries().none { it.id == sessionId }) {
+                        state.update { it.copy(error = "目标会话已不存在，请从历史记录重新选择") }
+                        return@withLock
+                    }
                     if (cancelVisibleChatRun) cancelActiveRunAndJoin()
                     persist()
                     activateSession(sessionId, null)
@@ -319,24 +333,52 @@ internal class LocalSessionLifecycleCoordinator(
                     LocalSessionRuntimeKind.SESSION_DELETE,
                 )
                 try {
-                    if (currentSessionId() in ids) {
-                        val previous = state.value
-                        val replacement = available.firstOrNull {
-                            it.id !in ids && it.usageMode == previous.usageMode
-                        } ?: available.firstOrNull { it.id !in ids }
-                        val nextSessionId = replacement?.id ?: UUID.randomUUID().toString()
-                        activateSession(nextSessionId, null)
-                        loadSession(nextSessionId)
-                        if (replacement == null) {
-                            state.update {
-                                it.copy(
-                                    usageMode = previous.usageMode,
-                                    chat = it.chat.copy(
-                                        personaId = previous.chat.personaId,
-                                        chatPersona = previous.chat.chatPersona,
-                                    ),
-                                )
-                            }
+                    val previous = state.value
+                    val freshUsageMode = localDeletedCurrentSessionMode(
+                        currentSessionId(), ids, previous.usageMode,
+                    )
+                    if (freshUsageMode != null) {
+                        // Deletion must not auto-select previous history or switch Chat/Work.
+                        val sourceId = currentSessionId()
+                        val nextSessionId = UUID.randomUUID().toString()
+                        val chatPlan = chatSessionLifecycle.prepareCreate(
+                            mode = LocalConversationMode.INDEPENDENT,
+                            usageMode = freshUsageMode,
+                            domainSpec = if (freshUsageMode == LocalUsageMode.CHAT) {
+                                chatSessionLifecycle.singleCreateSpec()
+                            } else null,
+                            sourceSessionId = sourceId,
+                            nextSessionId = nextSessionId,
+                            sourceUsageMode = previous.usageMode,
+                            sourceChat = previous.chat,
+                            sessionsRoot = sessionsRoot,
+                        )
+                        activateSession(nextSessionId, -1L)
+                        resetModelHistory()
+                        state.update {
+                            it.copy(
+                                sessionId = nextSessionId,
+                                usageMode = freshUsageMode,
+                                chat = chatPlan.chat,
+                                conversationMode = LocalConversationMode.INDEPENDENT,
+                                parentSessionId = null,
+                                lineageId = UUID.randomUUID().toString(),
+                                projectId = null,
+                                handoffSummary = null,
+                                messages = emptyList(),
+                                transcriptIndex = LocalTranscriptRuntimeIndex(),
+                                work = LocalWorkSessionLifecyclePlanner.initialState(
+                                    usageMode = freshUsageMode,
+                                    sessionId = nextSessionId,
+                                    jobs = jobs.snapshotInfos(),
+                                ),
+                                safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
+                                kernel = LocalKernelState(
+                                    resources = resourceScheduler.snapshot()
+                                        .toLocalHarnessResourceState(freshUsageMode),
+                                ),
+                                error = null,
+                            )
                         }
                     }
                     beforeEventLogsDeleted(ids)

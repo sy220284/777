@@ -32,11 +32,11 @@ internal fun localChatFeatureUiContribution(
             LocalFeatureDrawerEntry.GROUP_CHAT to {
                 val establishedSessionId = findEstablishedGroupChatSession(sessions)?.id
                 if (establishedSessionId != null) {
-                    if (onSwitchSession(establishedSessionId)) onResetNavigation()
+                    if (onSwitchSession(establishedSessionId)) onCloseDrawer()
                 } else {
                     onOpenGroupSetup()
+                    onCloseDrawer()
                 }
-                onCloseDrawer()
             },
             LocalFeatureDrawerEntry.PERSONA_GALLERY to {
                 onCloseDrawer()
@@ -45,6 +45,7 @@ internal fun localChatFeatureUiContribution(
             },
             LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE to {
                 onOpenFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
+                onCloseDrawer()
             },
             LocalFeatureDrawerEntry.DIARY to {
                 onOpenFromDrawer(LocalFeaturePage.DIARY)
@@ -63,10 +64,7 @@ internal fun localChatFeatureUiContribution(
                 onCorrectEntry = actions.correctDiaryEntry,
                 onDeactivateEntry = actions.deactivateDiaryEntry,
                 onOpenSourceSession = { sessionId ->
-                    if (onSwitchSession(sessionId)) {
-                        onResetNavigation()
-                        true
-                    } else false
+                    onSwitchSession(sessionId)
                 },
                 onDismiss = onPopFeature,
             )

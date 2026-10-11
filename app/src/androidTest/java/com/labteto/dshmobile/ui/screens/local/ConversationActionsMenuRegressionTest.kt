@@ -2,6 +2,8 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -40,5 +42,16 @@ class ConversationActionsMenuRegressionTest {
         compose.onNodeWithContentDescription("对话操作").performClick()
         compose.onNodeWithText("置顶").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, pinned) }
+
+        compose.onNodeWithContentDescription("对话操作").performClick()
+        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.runOnIdle { assertEquals(0, deleted) }
+        compose.onNodeWithText("取消").performClick()
+        compose.runOnIdle { assertEquals(0, deleted) }
+
+        compose.onNodeWithContentDescription("对话操作").performClick()
+        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.onNode(hasText("删除会话") and hasClickAction()).performClick()
+        compose.runOnIdle { assertEquals(1, deleted) }
     }
 }

@@ -24,6 +24,7 @@ internal fun ConversationActionsMenu(
 ) {
     val colors = DsTheme.colors
     var expanded by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     Box {
         DsIconButton(
             icon = FeatherIcons.MoreVertical,
@@ -49,9 +50,24 @@ internal fun ConversationActionsMenu(
                     text = stringResource(R.string.local_delete_session),
                     icon = FeatherIcons.Trash2,
                     danger = true,
-                    onClick = onDelete,
+                    onClick = {
+                        expanded = false
+                        confirmDelete = true
+                    },
                 ),
             ),
         )
+        if (confirmDelete) {
+            ConfirmDialog(
+                title = stringResource(R.string.local_delete_session),
+                body = stringResource(R.string.local_delete_session_confirm_message),
+                confirmLabel = stringResource(R.string.local_delete_session),
+                onDismiss = { confirmDelete = false },
+                onConfirm = {
+                    confirmDelete = false
+                    onDelete()
+                },
+            )
+        }
     }
 }
