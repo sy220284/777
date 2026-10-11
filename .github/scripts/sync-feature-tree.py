@@ -467,7 +467,46 @@ def historical_identity_review(root, leafpaths, entries):
     return identities, stale, ambiguous
 
 
-def classify_unproven_features(entries):
+def classify_unproven_features(entries, root):
+    # 文件仅为人工定位线索；文件存在不能证明整个产品能力存在。
+    clues = {
+        "聊天人物与连续性": [
+            "app/src/main/java/com/labteto/dshmobile/local/chat/ChatSceneRuntime.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt",
+        ],
+        "语言服务器": [
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspClient.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/AutomaticLanguageServer.kt",
+        ],
+        "设备权限与虚拟显示": [
+            "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+            "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+            "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+        ],
+        "本机终端与执行环境": [
+            "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+            "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+        ],
+        "共享会话身份与恢复": [
+            "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/DurableSessionCatalog.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt",
+        ],
+        "持续集成与测试": [
+            ".github/workflows/ci.yml",
+            ".github/scripts/check-local-architecture-boundaries.py",
+            ".github/scripts/check-test-quality.py",
+        ],
+        "构建发布": [
+            ".github/workflows/release.yml",
+            ".github/scripts/check-apk-runtime-layout.py",
+        ],
+        "共享工具或其他能力": [
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+            "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+        ],
+    }
     """55项空证据仅分类和提出需验证的实际领域，不凭词语相似度确认能力。"""
     results = []
     for record in entries:
@@ -493,6 +532,8 @@ def classify_unproven_features(entries):
         results.append({"path": path, "issue": "缺少可确认的现行源码入口",
                         "domain": area, "inspect": route,
                         "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
+                        "candidate_files": [p for p in clues[area] if (root / p).is_file()],
+                        "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
                         "existing_candidate_symbols": [x["symbol"] for x in record.get("named_symbols", [])]})
     return results
 
@@ -857,7 +898,7 @@ def generate(root):
     identities, stale_identities, ambiguous_identities = historical_identity_review(
         root, all_leaves, evidence
     )
-    unresolved_features = classify_unproven_features(evidence)
+    unresolved_features = classify_unproven_features(evidence, root)
     for record in evidence:
         binding = identities.get(record["path"])
         if binding is not None:
