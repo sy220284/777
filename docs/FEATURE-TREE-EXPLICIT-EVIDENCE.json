@@ -141,6 +141,209 @@
         }
       ],
       "scope": "读取时补录及快照身份校验方法存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider",
+            "open",
+            "write",
+            "read"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"terminal_open\"",
+            "\"terminal_read\"",
+            "\"terminal_close\""
+          ]
+        }
+      ],
+      "scope": "持久终端会话与读写关闭工具在生产源码有真实入口，无法据此证明外部命令已安装"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"process_exec\"",
+            "\"terminal_status\""
+          ]
+        }
+      ],
+      "scope": "进程执行及持久终端状态查询已定义，后台进程完整运行能力仍待测试"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 无障碍界面读取与操作",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "AndroidDeviceProvider",
+            "accessibilityTree",
+            "accessibilityFind"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_screen\"",
+            "\"android_click_node\""
+          ]
+        }
+      ],
+      "scope": "无障碍控件树、查找与节点动作工具的真实源码分支存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 通知内容读取",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "notificationList",
+            "notificationStatus"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_notification_list\""
+          ]
+        }
+      ],
+      "scope": "通知读取与授权状态查询的真实工具入口存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 屏幕截图和动作执行",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_screenshot\"",
+            "\"android_tap\"",
+            "\"android_swipe\""
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "AndroidDeviceProvider"
+          ],
+          "literals": [
+            "\"android_screenshot\""
+          ]
+        }
+      ],
+      "scope": "屏幕截图和点击滑动动作的工具注册与分发代码存在"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 隔离虚拟屏",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController",
+            "create",
+            "screenshotPng"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ],
+          "literals": [
+            "\"android_vscreen_create\"",
+            "\"android_vscreen_screenshot\""
+          ]
+        }
+      ],
+      "scope": "虚拟显示创建截图及工具分发声明存在，真实设备运行另验"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / Android 设备工具 / 虚拟屏资源归属和权限",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDeviceProvider.kt",
+          "symbols": [
+            "acquireAgentVirtualDisplay",
+            "releaseAgentVirtualDisplay"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController"
+          ]
+        }
+      ],
+      "scope": "智能体虚拟屏资源申请与释放声明存在，所有权约束仍需设备测试"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 持久终端与进程管理",
+      "sources": [
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/PersistentTerminal.kt",
+          "symbols": [
+            "PersistentPipeTerminalProvider"
+          ]
+        },
+        {
+          "path": "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+          "symbols": [
+            "AndroidRuntimePlugin"
+          ],
+          "literals": [
+            "\"terminal_open\"",
+            "\"process_exec\""
+          ]
+        }
+      ],
+      "scope": "安卓进程及终端基础服务实现入口存在，外部命令可用性另验"
+    },
+    {
+      "path": "第三层｜平台与工程保障 / Android 本机运行时 / 原生设备能力及虚拟显示",
+      "sources": [
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+          "symbols": [
+            "AndroidDevicePlugin"
+          ]
+        },
+        {
+          "path": "harness-device-android/src/main/java/com/labteto/dshmobile/device/vscreen/VirtualDisplayController.kt",
+          "symbols": [
+            "VirtualDisplayController"
+          ]
+        }
+      ],
+      "scope": "设备工具插件及虚拟显示控制器真实声明存在"
     }
   ]
 }
