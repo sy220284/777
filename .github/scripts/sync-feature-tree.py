@@ -128,6 +128,7 @@ def leaves(root):
 def scan(root):
     markers, screens, routes = {}, [], []
     production, tested, scanned = 0, 0, 0
+    source_fingerprints = []
     workflow_files = []
     code_suffixes = {".kt", ".java", ".kts", ".py", ".sh", ".ts", ".tsx",
                      ".js", ".jsx", ".xml", ".yml", ".yaml", ".gradle", ".toml"}
@@ -150,6 +151,9 @@ def scan(root):
         if not is_production:
             continue
         production += 1
+        source_fingerprints.append({
+            "path": path, "sha256": hashlib.sha256(file.read_bytes()).hexdigest()[:16]
+        })
         if file.name == "LocalFeatureCatalog.kt":
             match = re.search(r"enum class LocalFeatureRoute\s*\{([^}]*)\}", text, re.S)
             if match:
@@ -189,6 +193,7 @@ def scan(root):
         "registered_routes": routes,
         "candidate_ui_screens": sorted(screens, key=lambda x: (x["symbol"], x["source"])),
         "semantic_registration_count": len(markers),
+        "production_file_fingerprints": source_fingerprints,
         "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
     }
 
@@ -398,12 +403,16 @@ def observed_code_delta(root, current, source_snapshot):
     file = root / INDEX
     if not file.is_file():
         return {"baseline": "initial", "added_routes": [], "removed_routes": [],
-                "added_ui": [], "removed_ui": []}
+                "added_ui": [], "removed_ui": [], "added_production_files": [],
+                "removed_production_files": [], "modified_production_files": [],
+                "moved_unchanged_files": []}
     before = json.loads(file.read_text(encoding="utf-8"))
     if before.get("source_snapshot") == source_snapshot:
         return before.get("observed_delta", {
             "baseline": source_snapshot, "added_routes": [], "removed_routes": [],
             "added_ui": [], "removed_ui": [],
+            "added_production_files": [], "removed_production_files": [],
+            "modified_production_files": [], "moved_unchanged_files": [],
         })
     old_routes = set(before.get("registered_routes", []))
     new_routes = set(current.get("registered_routes", []))
@@ -411,8 +420,26 @@ def observed_code_delta(root, current, source_snapshot):
     new_ui = {(x["symbol"], x["source"]) for x in current.get("candidate_ui_screens", [])}
     def format_ui(entries):
         return [{"symbol": symbol, "source": source} for symbol, source in sorted(entries)]
+    old_sources = {x["path"]: x["sha256"] for x in before.get("production_file_fingerprints", [])}
+    new_sources = {x["path"]: x["sha256"] for x in current["production_file_fingerprints"]}
+    tracked = "production_file_fingerprints" in before
+    added = sorted(set(new_sources) - set(old_sources)) if tracked else []
+    removed = sorted(set(old_sources) - set(new_sources)) if tracked else []
+    modified = sorted(x for x in set(old_sources) & set(new_sources)
+                      if old_sources[x] != new_sources[x]) if tracked else []
+    renames = []
+    for old in removed[:]:
+        matched = next((p for p in added if new_sources[p] == old_sources[old]), None)
+        if matched:
+            renames.append({"previous": old, "current": matched, "basis": "文件内容指纹完全相同"})
+            removed.remove(old)
+            added.remove(matched)
     return {
         "baseline": before.get("source_snapshot", "unknown"),
+        "added_production_files": added,
+        "removed_production_files": removed,
+        "modified_production_files": modified,
+        "moved_unchanged_files": renames,
         "added_routes": sorted(new_routes - old_routes),
         "removed_routes": sorted(old_routes - new_routes),
         "added_ui": format_ui(new_ui - old_ui),
