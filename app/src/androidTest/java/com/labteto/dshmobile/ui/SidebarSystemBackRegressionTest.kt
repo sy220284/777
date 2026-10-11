@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.platform.app.InstrumentationRegistry
@@ -13,7 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SidebarSystemBackRegressionTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun personaGalleryAddPageConsumesSystemBackBeforeLeavingGallery() {
@@ -34,16 +37,21 @@ class SidebarSystemBackRegressionTest {
             }
         }
 
-        // Wait for real page content, not host-window focus: the focused window can vary
-        // across Android versions. Dispatch the real system Back and verify the callback.
         compose.onNodeWithText(InstrumentationRegistry.getInstrumentation().targetContext.getString(
             R.string.persona_gallery_add_title,
         )).assertIsDisplayed()
+        // Composition readiness is not input readiness. Previous field tests may leave an IME
+        // dismissal in flight; wait for this activity to own the focused input window first.
+        compose.waitUntil(timeoutMillis = 8_000L) { compose.activity.hasWindowFocus() }
+        compose.runOnUiThread {
+            ViewCompat.getWindowInsetsController(compose.activity.window.decorView)
+                ?.hide(WindowInsetsCompat.Type.ime())
+        }
+        compose.waitUntil(timeoutMillis = 8_000L) {
+            ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) != true
+        }
         pressDeviceBack()
-        // On Android emulators, Back may first dismiss a leftover input method.
-        // Check the real page callback after any IME dismissal, without masking a navigation failure.
-        compose.waitForIdle()
-        if (backCount.get() == 0) pressDeviceBack()
         compose.waitUntil(timeoutMillis = 8_000L) { backCount.get() != 0 }
         compose.waitForIdle()
 
