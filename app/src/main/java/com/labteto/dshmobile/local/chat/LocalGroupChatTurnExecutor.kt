@@ -440,7 +440,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 persona = persona,
             ) ?: return null
             recordGroupDiary(member, persona, plan, sharedPending, snapshot)
-            plan.state
+            plan.state.bindStateObservationSources(sharedPending)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -570,7 +570,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     persona = source.persona,
                 ) ?: return@forEach
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
-                result[galleryId] = parsed.state
+                result[galleryId] = parsed.state.bindStateObservationSources(sharedPending)
             }
             val observerDiaries = (root["observerDiaries"] as? JsonArray).orEmpty()
             observerDiaries.forEach { element ->
