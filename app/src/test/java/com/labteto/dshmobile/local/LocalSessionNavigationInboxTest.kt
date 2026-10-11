@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatSessionModeCommand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -11,6 +13,7 @@ class LocalSessionNavigationInboxTest {
         inbox.offer(LocalSessionNavigationRequest.Mode(LocalUsageMode.CHAT))
         inbox.offer(LocalSessionNavigationRequest.Session("work-old"))
         inbox.offer(LocalSessionNavigationRequest.Mode(LocalUsageMode.WORK))
+        inbox.offer(LocalSessionNavigationRequest.ChatDomain(LocalChatSessionModeCommand(LocalChatMode.GROUP)))
         inbox.offer(LocalSessionNavigationRequest.Session("chat-new"))
         assertEquals(LocalSessionNavigationRequest.Session("chat-new"), inbox.take())
         assertNull(inbox.take())
