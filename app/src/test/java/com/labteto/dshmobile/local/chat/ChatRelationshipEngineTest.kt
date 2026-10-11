@@ -8,35 +8,7 @@ import org.junit.Test
 class ChatRelationshipEngineTest {
     private val engine = ChatRelationshipEngine()
 
-    @Test
-    fun ordinaryRelationshipEmotionStaysImmersive() {
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("她今天又没回我，烦死了"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("陪我聊会儿"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("她最近有点冷淡，真烦"),
-        )
-    }
 
-    @Test
-    fun replyCoachingRequiresAnExplicitCommandAndStrategistCommandsAreRemoved() {
-        assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/reply 这句怎么回"))
-        assertEquals(ChatRelationshipView.REPLY_COACH, engine.classify("/回复建议 这句怎么回"))
-        listOf(
-            "/军师 她最近为什么冷淡", "/strategy 她什么意思", "/analyze 关系怎么样",
-            "/debrief 复盘一下", "/分析 这句话", "/strategybook",
-            "军师，她最近为什么突然冷淡", "帮我分析我们现在什么阶段",
-            "她为什么突然冷淡", "你喜欢我吗", "她说刚下班，这句怎么回",
-        ).forEach {
-            assertEquals(ChatRelationshipView.IMMERSIVE, engine.classify(it))
-        }
-    }
 
     @Test
     fun retiredStrategistStateInStoredConversationFallsBackToNormal() {
@@ -58,29 +30,6 @@ class ChatRelationshipEngineTest {
         )
     }
 
-    @Test
-    fun workAndFictionLanguageDoNotTriggerRelationshipRouting() {
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("他为什么不回邮件"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("小说里他为什么不回消息"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("这个角色他为什么突然不回消息"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("帮我回客户邮件，告诉他明天给结果"),
-        )
-        assertEquals(
-            ChatRelationshipView.IMMERSIVE,
-            engine.classify("这个客户关系怎么样，为什么最近不推进"),
-        )
-    }
 
     @Test
     fun scenarioKeywordsDoNotChooseTheCharactersAttitude() {
@@ -226,9 +175,26 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
+    fun relationshipContextAppearsOnlyForActualFactsAndHasNoCommandRouting() {
+        val empty = ChatCharacterState()
+        assertEquals("", engine.prompt("今天怎么样", empty))
+        assertEquals("", engine.prompt("/reply", empty))
+        val recorded = ChatCharacterState(dynamics = RelationshipDynamics(
+            facts = listOf(RelationshipEvidence("师父答应下周带我练剑", confidence = 95, source = "dialogue")),
+            sharedObjects = listOf("一起修好的木剑"),
+        ))
+        val text = engine.prompt("今天做什么", recorded)
+        assertTrue(text.contains("人物关系与共同经历"))
+        assertTrue(text.contains("师父答应下周带我练剑"))
+        assertTrue(text.contains("一起修好的木剑"))
+        assertFalse(text.contains("回复草稿"))
+        assertEquals(text, engine.prompt("/reply", recorded))
+    }
+
+    @Test
     fun ordinaryChatHasNoInjectedRelationshipBias() {
         val prompt = engine.prompt("今天工作有点累", ChatCharacterState())
-        assertTrue(prompt.contains("相处背景"))
+        assertTrue(prompt.isEmpty())
         assertFalse(prompt.contains("互动倾向"))
         assertFalse(prompt.contains("互动变化"))
     }
