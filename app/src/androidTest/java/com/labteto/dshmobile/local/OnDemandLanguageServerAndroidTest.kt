@@ -93,4 +93,46 @@ class OnDemandLanguageServerAndroidTest {
             }
         }
     }
+
+    @Test fun installPyrightAndQueryRealPythonSymbols() = runBlocking {
+        withTimeout(240_000L) {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val nodeRuntime = BundledNodeRuntime(context)
+            nodeRuntime.prepare()
+            val runtime = AndroidProcessRuntime(
+                dynamicSearchPaths = nodeRuntime::searchPaths,
+                baseEnvironment = nodeRuntime::environment,
+            )
+            val home = File(context.noBackupFilesDir, "pyright-android-smoke")
+            if (home.exists()) check(home.deleteRecursively())
+            val manager = OnDemandLanguageServerManager(
+                home = home,
+                commandAvailable = runtime::isCommandAvailable,
+                resolveCommand = runtime::resolveCommand,
+                processEnvironment = { runtime.processEnvironment() },
+            )
+            val command = manager.ensureInstalled("example.py")
+            assertEquals(command, manager.ensureInstalled("example.py"))
+            val workspace = File(context.cacheDir, "pyright-smoke").apply { mkdirs() }
+            val file = File(workspace, "example.py")
+            val code = "def greet(name: str) -> str:\n    return name\n\nvalue = greet('yes')\n"
+            file.writeText(code)
+            val client = LspProcessClient(
+                command = command,
+                json = Json,
+                workingDirectory = workspace,
+                commandResolver = runtime::resolveCommand,
+                environmentProvider = { runtime.processEnvironment() },
+            )
+            try {
+                client.initialize(workspace.toURI().toString())
+                client.didOpen(file.toURI().toString(), "python", 1, code)
+                val symbols = client.documentSymbols(file.toURI().toString())
+                assertTrue("真实 Pyright 符号包含函数 greet", symbols.toString().contains("greet"))
+            } finally {
+                client.close()
+            }
+        }
+    }
+
 }
