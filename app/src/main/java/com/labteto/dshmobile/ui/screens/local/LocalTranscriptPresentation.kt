@@ -6,7 +6,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
  * User-facing transcript projection.
  *
  * Reasoning, tool results and assistant text emitted alongside tool calls are implementation
- * details of one agent turn. They are grouped into a single collapsed work-process row so the
+ * details of one agent turn. They become separate lightweight UI rows so the
  * transcript keeps the completed answer visually dominant.
  */
 internal sealed interface LocalTranscriptItem {
@@ -38,7 +38,58 @@ internal sealed interface LocalTranscriptItem {
 
         override val key: String = "work:${messages.first().id}"
     }
+
+    /** One event per lazy-list row; the persisted transcript remains unchanged. */
+    data class WorkStep(
+        val message: LocalHarnessMessage,
+        val repeatCount: Int = 1,
+    ) : LocalTranscriptItem {
+        override val key: String = "work-step:${message.id}"
+    }
 }
+
+/** Only recurring status polls are compacted; ordinary identical-looking calls stay distinct. */
+internal fun isRepeatedWorkPollingTool(name: String?): Boolean {
+    val normalized = name?.lowercase().orEmpty()
+    return normalized.contains("workflow_run") || normalized.contains("workflow_job") ||
+        normalized.contains("check_status") || normalized.startsWith("job_poll") ||
+        normalized.endsWith("_poll") || normalized.endsWith("_status")
+}
+
+/** The UI has independent stable slots for long-running Work steps, not one giant column. */
+internal fun buildLocalDisplayTranscript(items: List<LocalTranscriptItem>): List<LocalTranscriptItem> =
+    buildList {
+        items.forEach { item ->
+            if (item !is LocalTranscriptItem.WorkProcess) {
+                add(item)
+                return@forEach
+            }
+            var visibleCount = 0
+            item.messages.forEach { message ->
+                if (message.role !in setOf("tool", "progress", "assistant")) return@forEach
+                if (message.role != "tool" && localWorkTimelineText(message.content) == null) {
+                    return@forEach
+                }
+                val previous = lastOrNull() as? LocalTranscriptItem.WorkStep
+                val samePoll = message.role == "tool" && previous?.message?.role == "tool" &&
+                    message.toolName == previous.message.toolName &&
+                    // Same action name alone is insufficient: parallel jobs may use one API.
+                    message.content == previous.message.content &&
+                    isRepeatedWorkPollingTool(message.toolName) &&
+                    (message.toolIsError ?: localWorkToolFailed(message.content)) ==
+                    (previous.message.toolIsError ?: localWorkToolFailed(previous.message.content))
+                if (samePoll && previous != null) {
+                    set(lastIndex, previous.copy(repeatCount = previous.repeatCount + 1))
+                } else {
+                    add(LocalTranscriptItem.WorkStep(message))
+                    visibleCount++
+                }
+            }
+            if (visibleCount == 0 && item.messages.any { it.role == "reasoning" }) {
+                add(item) // Only a generic thinking indicator; never display reasoning body.
+            }
+        }
+    }
 
 internal fun userVisibleDialogueMessageCount(
     messages: List<LocalHarnessMessage>,

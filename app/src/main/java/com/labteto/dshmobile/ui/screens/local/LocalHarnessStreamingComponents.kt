@@ -22,6 +22,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -39,6 +40,7 @@ internal fun LocalStreamingChatTurn(
     // Avoid accessing StateFlow.value during composition (Compose lint violation).
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
+    val visibleReply = visibleAssistantText(stream.assistant)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         if (stream.reasoning.isNotBlank()) {
             ChatThinkingRow(
@@ -53,12 +55,12 @@ internal fun LocalStreamingChatTurn(
                 streaming = true,
             )
         }
-        if (stream.assistant.isNotBlank()) {
+        if (visibleReply.isNotBlank()) {
             LocalMessageRow(
                 message = LocalHarnessMessage(
                     id = "streaming:$sessionId",
                     role = "assistant",
-                    content = stream.assistant,
+                    content = visibleReply,
                     createdAt = 0L,
                 ),
                 chatMode = true,
@@ -73,7 +75,7 @@ internal fun LocalStreamingChatTurn(
                 onRegenerate = { false },
             )
         }
-        if (stream.reasoning.isBlank() && stream.assistant.isBlank()) {
+        if (stream.reasoning.isBlank() && visibleReply.isBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(DsSpacing.small))
@@ -93,8 +95,10 @@ internal fun LocalStreamingChatTurn(
  * empty loading cards when a work timeline exists.
  */
 internal fun inlineWorkPreviewText(draft: String, lastDurableNarrative: String?): String {
-    val committed = lastDurableNarrative?.trim().orEmpty()
-    val candidate = draft.trim()
+    // A previous session or a nonconforming provider may embed tagged thinking in content.
+    // Hide only leading tagged thinking while preserving the raw event and model replay.
+    val committed = visibleAssistantText(lastDurableNarrative.orEmpty()).trim()
+    val candidate = visibleAssistantText(draft).trim()
     if (candidate.isEmpty()) return ""
     if (committed.isEmpty()) return candidate
     if (committed.startsWith(candidate)) return ""

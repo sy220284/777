@@ -1352,6 +1352,11 @@
     <string name="local_work_process_show_more">查看更早的 %1$d 步</string>
     <string name="local_work_process_show_recent">只看最近步骤</string>
     <string name="local_work_process_operation_count">%1$d 个操作</string>
+    <string name="local_work_action_github_ci">检查流水线状态</string>
+    <string name="local_work_action_github_read">读取仓库内容</string>
+    <string name="local_work_action_github_pr">查看拉取请求</string>
+    <string name="local_work_action_github_write">更新仓库文件</string>
+    <string name="local_work_action_figma">查看或编辑设计</string>
     <string name="local_work_process_step_number">第 %1$d 步</string>
     <string name="local_work_process_step_operation_detail">第 %1$d 步 · %2$s · %3$d 个操作</string>
     <string name="common_state_expanded">已展开</string>

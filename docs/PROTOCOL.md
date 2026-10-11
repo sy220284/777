@@ -73,3 +73,9 @@ Web、Vision、Subagent、Automation 的模型请求继承父 run 归属。
 - 协议基线升级必须更新代码、fixture 和一致性测试。
 
 本机兼容范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
+
+### MiniMax 标签式思考的展示与重放
+
+官方 OpenAI 兼容接口返回的 `content` 中 `<think>` 段属于原始协议事实；流式、非流式及 SSE fallback 都只向界面输出清理后的正文。原始 `content` 保存在既有 route-bound replay envelope 中，同一路由续轮还原原字段；不把标签内文本搬成服务商的 `reasoning_content`。服务商独立返回的 `reasoning_content`、`reasoning_details` 与工具元数据保持原字段含义，账号或路由变化后不转发私有重放内容。持久历史还原后遵循相同隔离规则。流式响应即使在 `<think>` 段内提前中断，未闭合的思考片段也不显示在助手正文中；续轮重放仍保留原始提供方字段。
+
+依据：[MiniMax 官方 OpenAI SDK，多轮函数调用原文保留说明](https://platform.minimax.io/docs/api-reference/text-openai-api)。
