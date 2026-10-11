@@ -647,9 +647,17 @@ def classify_unproven_features(entries, root):
             ".github/workflows/release.yml",
             ".github/scripts/check-apk-runtime-layout.py",
         ],
+        "Git与版本控制": [
+            "app/src/main/java/com/labteto/dshmobile/local/runtime/BundledGitRuntime.kt",
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/github/GitHubConnectorPlugin.kt",
+        ],
+        "MCP外部互通": [
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpClient.kt",
+        ],
         "共享工具或其他能力": [
-            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
-            "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
+            "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
         ],
     }
     """55项空证据仅分类和提出需验证的实际领域，不凭词语相似度确认能力。"""
@@ -672,12 +680,37 @@ def classify_unproven_features(entries, root):
             area, route = "聊天人物与连续性", "app/local/chat"
         elif "发布与升级" in path:
             area, route = "构建发布", ".github/workflows/release.yml、app/local/update"
+        elif "Git 仓库操作" in path:
+            area, route = "Git与版本控制", "app/local/runtime/BundledGitRuntime、harness-interop/github"
+        elif "外部工具协议" in path or "MCP" in path:
+            area, route = "MCP外部互通", "harness-interop/mcp"
         else:
-            area, route = "共享工具或其他能力", "检查对应产品模块与共享运行目录"
+            area, route = "共享工具或其他能力", "按用户实际功能入口检查共享工具模块"
+        targeted = {
+            "16类人物资料": [
+                "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaCanonicalV4.kt",
+                "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaStore.kt",
+            ],
+            "模型温度": [
+                "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuning.kt",
+                "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt",
+            ],
+            "历史调参": [
+                "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt",
+            ],
+            "共同经历": [
+                "app/src/main/java/com/labteto/dshmobile/local/chat/ChatMemoryBinding.kt",
+            ],
+            "表达偏好": [
+                "app/src/main/java/com/labteto/dshmobile/local/chat/ChatExpressionPreferences.kt",
+            ],
+        }
+        candidate_files = next((paths for term, paths in targeted.items() if term in path),
+                               clues[area])
         results.append({"path": path, "issue": "缺少可确认的现行源码入口",
                         "domain": area, "inspect": route,
                         "needed": "验证真实实现声明、调用方与行为测试后再升级证据等级",
-                        "candidate_files": [p for p in clues[area] if (root / p).is_file()],
+                        "candidate_files": [p for p in candidate_files if (root / p).is_file()],
                         "candidate_role": "仅供排查的真实文件路径，尚未确认业务功能",
                         "existing_candidate_symbols": [x["symbol"] for x in record.get("named_symbols", [])]})
     return results
