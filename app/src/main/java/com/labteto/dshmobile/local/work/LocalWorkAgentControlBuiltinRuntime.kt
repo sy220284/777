@@ -54,9 +54,13 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
+                val background = args.boolean("run_in_background", false)
+                val historyMode = resolveReadonlySubagentHistoryMode(
+                    args.optionalString("context_mode"), background, virtualScreen,
+                )
                 val outputSchema = args.outputSchema()
                 val toolAllowlist = args.toolAllowlist()
-                if (args.boolean("run_in_background", false)) {
+                if (background) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
                         model = model,
@@ -76,11 +80,12 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                             instructions = instructions,
                             modelOverride = model,
                             maxSteps = maxSteps,
+                            parentCallId = if (historyMode == LocalSubagentHistoryMode.INHERIT_PARENT) call.id else null,
                             capabilities = LocalSubagentCapabilities(
                                 allowMutation = false,
                                 continuable = false,
                                 virtualScreen = virtualScreen,
-                                historyMode = LocalSubagentHistoryMode.ISOLATED,
+                                historyMode = historyMode,
                                 toolAllowlist = toolAllowlist,
                                 outputSchema = outputSchema,
                             ),
@@ -165,4 +170,24 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             "workflow",
         ) + LocalAgentTeamContract.TOOL_NAMES
     }
+}
+
+/** Read-only dispatch can share conversation context without inheriting write permission. */
+internal fun resolveReadonlySubagentHistoryMode(
+    requested: String?,
+    background: Boolean,
+    virtualScreen: Boolean,
+): LocalSubagentHistoryMode {
+    val mode = when (requested?.trim()?.lowercase().orEmpty()) {
+        "", "isolated" -> LocalSubagentHistoryMode.ISOLATED
+        "inherit" -> LocalSubagentHistoryMode.INHERIT_PARENT
+        else -> throw IllegalArgumentException("context_mode 只能为 isolated 或 inherit")
+    }
+    require(mode != LocalSubagentHistoryMode.INHERIT_PARENT || !background) {
+        "继承完整上下文仅支持前台只读子代理；后台恢复无法安全继承父会话历史"
+    }
+    require(mode != LocalSubagentHistoryMode.INHERIT_PARENT || !virtualScreen) {
+        "继承完整上下文暂不支持同时分配独立虚拟屏"
+    }
+    return mode
 }

@@ -108,7 +108,7 @@ object LocalToolCatalog {
         add(tool("capability_search", "从实时注册表查看完整能力目录，或按自然语言、能力族、工具名发现并自动加载扩展。已连接 MCP 或新增插件的工具无需修改目录代码；如需总览可搜索『能力目录』。工具执行仍遵守连接、权限和审批要求", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
-        add(tool("update_plan", "更新当前任务计划", properties(
+        add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
             "items" to buildJsonObject {
                 put("type", "array")
                 put("description", "按执行顺序排列的计划项")
@@ -118,7 +118,7 @@ object LocalToolCatalog {
         add(tool("exit_plan_mode", "提交完整计划供用户审批；仅在规划模式中调用", properties(
             "plan" to string("完整、可直接执行的计划"),
         ), listOf("plan")))
-        add(tool("todo_write", "替换当前实现任务清单", properties(
+        add(tool("todo_write", "记录实际执行项及 pending/in_progress/completed 状态；它是进度权威来源，不要与 update_plan 重复维护步骤。按需使用", properties(
             "items" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject {
@@ -137,7 +137,7 @@ object LocalToolCatalog {
                 })
             },
         ), listOf("items")))
-        add(tool("create_goal", "创建或替换当前会话目标", properties(
+        add(tool("create_goal", "维护跨多轮任务的目标与验收条件。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
             "description" to string("目标和完成标准"),
         ), listOf("description")))
         add(tool("get_goal", "读取当前会话目标", properties()))
@@ -157,9 +157,16 @@ object LocalToolCatalog {
             "query" to string("可选；按当前任务内容优先展示相关技能；分页时保持一致"),
             "offset" to integer("可选；继续上次技能目录的 offset，默认 0"),
         )))
-        add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
+        add(tool("subagent", "统一的只读子代理入口：可隔离执行或继承当前对话上下文，同一工具块中多个调用可并行；始终禁止写入。需带写入权限的子代理仍须使用独立授权的 subagent_fork", properties(
             "task" to string("交给子代理的完整任务"),
             "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
+            "context_mode" to buildJsonObject {
+                put("type", "string")
+                put("description", "isolated 只传任务（默认）；inherit 前台只读继承父会话历史，不能与后台或虚拟屏共用")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("isolated")); add(JsonPrimitive("inherit"))
+                })
+            },
             "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
@@ -167,7 +174,7 @@ object LocalToolCatalog {
             "allowed_tools" to stringArray("可选；限制子代理本次可见且可执行的工具名；包含当前不可用工具时启动直接失败"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
-        add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
+        add(tool("subagent_fork", "需要继承父会话当前操作权限时使用的高级代理入口；可能具有写入权限。纯阅读分析请使用 subagent 的 context_mode=inherit", properties(
             "task" to string("需要结合当前上下文处理的任务"),
             "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
