@@ -15,7 +15,6 @@ internal fun localChatFeatureUiContribution(
     gallery: List<PersonaGalleryEntry>,
     state: StateFlow<LocalConversationSurfaceState>,
     actions: LocalChatFeatureUiActions,
-    onResetNavigation: () -> Unit,
     onNewPersona: () -> Unit,
     onPopFeature: () -> Unit,
     sessions: List<LocalSessionSummary>,
@@ -91,7 +90,8 @@ internal fun localChatFeatureUiContribution(
                 onSetPortrait = actions.setGalleryPortrait,
                 onRemovePortrait = actions.removeGalleryPortrait,
                 onStart = { id, storyId, freshStory ->
-                    if (actions.startFromGallery(id, storyId, freshStory)) onResetNavigation()
+                    // The shell returns home when the new gallery session has actually loaded.
+                    actions.startFromGallery(id, storyId, freshStory)
                 },
                 onCreate = onNewPersona,
                 onDismiss = onPopFeature,
