@@ -137,6 +137,11 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     // Decode only model-owned patch fields. The reducer computes the rest from durable history.
     val normalizedState = JsonObject(state.filterKeys { it in CHAT_MODEL_WRITABLE_STATE_FIELDS })
     val result = root.toMutableMap().apply { put("state", normalizedState) }
+    result["stateEvidence"]?.let { value ->
+        result["stateEvidence"] = JsonObject((value as? JsonObject).orEmpty().filter { (_, quote) ->
+            quote is JsonPrimitive && quote.isString
+        })
+    }
     result["turnSignificance"]?.let { value ->
         if (value !is JsonPrimitive || !value.isString) result.remove("turnSignificance")
     }
