@@ -90,6 +90,7 @@ jobs:
       - name: 校验生成证据与人工修改的扫描器或快照
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           paths=(
@@ -111,6 +112,14 @@ jobs:
               exit 1
             fi
           done
+          # The source registry is a hand-maintained input, not a generated snapshot.
+          # Keep its presence check above, but do not require bulk generated files in a code PR.
+          snapshot_paths=()
+          for path in "${paths[@]}"; do
+            if [[ "$path" != "docs/FEATURE-TREE-SOURCE-REGISTRY.json" ]]; then
+              snapshot_paths+=("$path")
+            fi
+          done
           # Every PR still performs the complete audit and uploads the generated evidence.
           # A regular code PR does not need to commit 1MB of snapshot churn: the main
           # maintenance job owns the authoritative generated-file update.
@@ -123,8 +132,10 @@ jobs:
             .github/scripts/investigate-feature-existence.py
             .github/scripts/check-acceptance-matrix.py
           )
-          if ! git diff --quiet "$PR_BASE_SHA" HEAD -- "${generator_paths[@]}" "${paths[@]}"; then
-            if ! git diff --exit-code -- "${paths[@]}"; then
+          git rev-parse --verify "${PR_HEAD_SHA}^{commit}" >/dev/null
+          pr_merge_base="$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          if ! git diff --quiet "$pr_merge_base" "$PR_HEAD_SHA" -- "${generator_paths[@]}" "${snapshot_paths[@]}"; then
+            if ! git diff --exit-code -- "${snapshot_paths[@]}"; then
               echo "::error::本PR修改了生成器或扫描快照，提交的快照必须与本次源码扫描一致"
               exit 1
             fi
