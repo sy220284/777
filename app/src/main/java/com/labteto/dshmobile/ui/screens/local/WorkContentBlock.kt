@@ -159,7 +159,12 @@ internal fun WorkTimelineStepRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Icon(
-            imageVector = if (failed) FeatherIcons.AlertTriangle else FeatherIcons.CheckCircle,
+            imageVector = when {
+                failed -> FeatherIcons.AlertTriangle
+                provider == "GitHub" -> FeatherIcons.GitBranch
+                provider == "Figma" -> FeatherIcons.Palette
+                else -> FeatherIcons.CheckCircle
+            },
             contentDescription = null,
             tint = if (failed) colors.error else colors.labelSecondary,
             modifier = Modifier.size(18.dp),
