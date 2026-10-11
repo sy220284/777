@@ -59,7 +59,8 @@ object LocalMediaCatalog {
         if (!uri.scheme.equals("https", true) || uri.port != -1) return null
         val host = uri.host?.lowercase() ?: return null
         return when {
-            host in setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io") ->
+            host in setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io") &&
+                profile.model.startsWith("MiniMax-", ignoreCase = true) ->
                 LocalMediaProvider.MINIMAX
             host == "api.openai.com" -> LocalMediaProvider.OPENAI
             host in setOf("dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com") ||
