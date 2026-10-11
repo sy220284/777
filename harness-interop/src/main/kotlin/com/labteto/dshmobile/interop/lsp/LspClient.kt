@@ -186,6 +186,9 @@ class LspProcessClient(
     }
 
     /** Record a revision before didOpen/didChange so an old push cannot masquerade as new. */
+    fun isLive(): Boolean = process?.isAlive == true &&
+        synchronized(messagesLock) { readerFailure == null }
+
     fun diagnosticRevision(uri: String): Long = synchronized(messagesLock) {
         latestDiagnostics[uri]?.first ?: 0L
     }
