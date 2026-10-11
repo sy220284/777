@@ -28,6 +28,25 @@ class TokenUsageDatabaseAndroidTest {
         id, time, "test", TokenUsageContext(mode = LocalUsageMode.CHAT),
         inputTokens = 2L, outputTokens = 3L, reported = true,
     )
+    @Test fun modelLifetimeTotalsStaySeparatedAndSurviveDatabaseReopen() {
+        database.migrate(legacy)
+        database.append(record("m3-chat").copy(model = "MiniMax-M3"))
+        database.append(record("m3-work").copy(
+            model = "MiniMax-M3",
+            context = TokenUsageContext(mode = LocalUsageMode.WORK),
+        ))
+        database.append(record("deepseek").copy(model = "deepseek-chat"))
+        assertEquals(10L, database.lifetimeTotals().models.getValue("MiniMax-M3").tracked.totalTokens)
+        assertEquals(5L, database.lifetimeTotals().models.getValue("MiniMax-M3").chat.totalTokens)
+        assertEquals(5L, database.lifetimeTotals().models.getValue("MiniMax-M3").work.totalTokens)
+        assertEquals(5L, database.lifetimeTotals().models.getValue("deepseek-chat").tracked.totalTokens)
+        database.close()
+        database = TokenUsageDatabase(context, json, name)
+        database.backfillModelTotalsIfNeeded()
+        assertEquals(10L, database.lifetimeTotals().models.getValue("MiniMax-M3").tracked.totalTokens)
+        assertFalse(database.lifetimeTotals().modelHistoryPartial)
+    }
+
     @Test fun cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens() {
         database.migrate(legacy)
         val value = record("cache-write").copy(
