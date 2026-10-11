@@ -225,6 +225,13 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             recentTools(extractionMessages, maxItems = 8),
             maxItems = 12,
         )
+        // Tool retention must not parse human-readable "call=..." observations as authority.
+        // Keep typed IDs through repeat compactions; legacy checkpoints remain readable.
+        val toolCallIds = (previousCheckpoint?.toolCallIds.orEmpty() +
+            structuredWorkState?.toolCallIds.orEmpty())
+            .filter(String::isNotBlank)
+            .distinct()
+            .takeLast(32)
 
         return LocalWorkCheckpoint(
             goals = goals,
@@ -240,6 +247,7 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             facts = facts,
             artifacts = artifacts,
             tools = tools,
+            toolCallIds = toolCallIds,
         )
     }
 
