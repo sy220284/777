@@ -82,13 +82,18 @@ internal data class LocalPreparedSend(
     val memoryInput: String,
     val modelMessage: JsonObject,
     val blocks: List<LocalMessageBlock> = emptyList(),
+    /** Explicit choice to update the current Work sampling, not just queue a future turn. */
+    val steerCurrentRun: Boolean = false,
 )
 
 internal fun prepareLocalSend(
     text: String,
     attachments: List<LocalImportedAttachment>,
+    allowSteeringDirective: Boolean = false,
 ): LocalPreparedSend? {
-    val prompt = text.trim()
+    val raw = text.trim()
+    val steer = allowSteeringDirective && raw.startsWith("/steer ") && raw.length > 7
+    val prompt = if (steer) raw.removePrefix("/steer ").trim() else raw
     if (prompt.isEmpty() && attachments.isEmpty()) return null
     val attachmentBlock = attachments.joinToString("\n") { attachment ->
         val kind = if (attachment.mediaType.startsWith("image/")) "图片" else "文件"
@@ -138,6 +143,7 @@ internal fun prepareLocalSend(
         content = content,
         visibleContent = prompt,
         memoryInput = prompt,
+        steerCurrentRun = steer,
         modelMessage = buildLocalUserModelMessage(content, attachments),
         blocks = blocks,
     )
