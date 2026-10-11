@@ -754,8 +754,9 @@ fun SettingsScreen(
                                     initialValue = null,
                                     selection,
                                     usageAnalytics,
+                                    selectedUsageModel,
                                 ) {
-                                    value = viewModel.usageGroupDetail(selection.kind, selection.key)
+                                    value = viewModel.usageGroupDetail(selection.kind, selection.key, selectedUsageModel)
                                 }
                                 UsageGroupDetailPage(
                                     detail = detail,
