@@ -234,6 +234,50 @@ def inspect():
                     raise ValueError("工具映射分支已经消失: " + literal)
     if {r["path"] for r in reported if r.get("explicit_source_anchor")} != explicit_keys:
         raise ValueError("存在没有真实人工源文件依据的强化证据等级")
+    # 工程工作流证据独立从真实YAML job段重算，不能仅凭全文件出现相同词语提升级别。
+    workflow_manifest = DOCS / "FEATURE-TREE-WORKFLOW-EVIDENCE.json"
+    evidence_file = (json.loads(workflow_manifest.read_text(encoding="utf-8"))
+                     if workflow_manifest.is_file() else {"version": 1, "items": []})
+    if evidence_file.get("version") != 1 or not isinstance(evidence_file.get("items"), list):
+        raise ValueError("工程工作流证据格式不合法")
+    seen_workflow_paths = set()
+    manual_jobs = {}
+    for feature in evidence_file["items"]:
+        key = feature["path"]
+        if key in seen_workflow_paths or key not in {x["path"] for x in reported}:
+            raise ValueError("工程工作流证据重复或引用了现行树外的功能")
+        seen_workflow_paths.add(key)
+        verified = []
+        for record in feature["sources"]:
+            file_name, job, phrases = record["path"], record["job"], record["literals"]
+            if (not isinstance(file_name, str) or
+                    not file_name.startswith(".github/workflows/") or
+                    not file_name.endswith((".yml", ".yaml")) or
+                    ".." in Path(file_name).parts or not (ROOT / file_name).is_file()):
+                raise ValueError("工作流证据路径失效或跨出允许目录")
+            if not isinstance(job, str) or not re.fullmatch(r"[a-z][\w-]*", job):
+                raise ValueError("工作流任务名称缺失或非法")
+            lines = (ROOT / file_name).read_text(encoding="utf-8").splitlines()
+            anchors = [i for i, line in enumerate(lines)
+                       if re.fullmatch(r"  ([A-Za-z][\w-]*):[ \t]*(?:#.*)?", line)]
+            selected = [i for i in anchors if lines[i].split(":", 1)[0].strip() == job]
+            if len(selected) != 1:
+                raise ValueError("找不到唯一的工程工作流 job: " + file_name + "#" + job)
+            start = selected[0]
+            end = next((i for i in anchors if i > start), len(lines))
+            scoped = "\n".join(lines[start:end])
+            if (not isinstance(phrases, list) or not phrases or
+                    any(not isinstance(q, str) or not q.strip() or q not in scoped for q in phrases)):
+                raise ValueError("工程任务内不存在声明的执行命令：" + file_name + "#" + job)
+            verified.append({"path": file_name, "job": job, "literals": phrases})
+        manual_jobs[key] = verified
+        item = next(x for x in reported if x["path"] == key)
+        if (item.get("workflow_evidence") != verified or
+                item.get("verification") != feature["grade"]):
+            raise ValueError("工程工作流证据与逐功能真实核查结果不一致")
+    for record in reported:
+        if record.get("workflow_evidence", []) and record["path"] not in manual_jobs:
+            raise ValueError("存在未登记的工程工作流证据")
     # 不依赖扫描器的身份声明：重新验证静态 ID、路径、原始文件和真实 Kotlin/Java 声明。
     identities_file = DOCS / "FEATURE-TREE-LEGACY-IDENTITIES.json"
     manifest = (json.loads(identities_file.read_text(encoding="utf-8"))
