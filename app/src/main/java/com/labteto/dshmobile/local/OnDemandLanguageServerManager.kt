@@ -199,7 +199,8 @@ internal class OnDemandLanguageServerManager(
         val parent = File(home, "components")
         return parent.listFiles().orEmpty()
             .filter { it.isDirectory && it.name.startsWith(component.id + "-") }
-            .all(File::deleteRecursively)
+            .map { it.deleteRecursively() }
+            .all { it }
     }
 
     companion object {
