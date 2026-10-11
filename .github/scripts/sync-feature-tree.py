@@ -17,6 +17,7 @@ REVIEW = Path("docs/FEATURE-REVIEW.auto.json")
 EVIDENCE = Path("docs/FEATURE-CODE-EVIDENCE.zh-CN.md")
 RETIREMENTS = Path("docs/FEATURE-TREE-RETIREMENTS.json")
 LEGACY_IDENTITIES = Path("docs/FEATURE-TREE-LEGACY-IDENTITIES.json")
+EXPLICIT_EVIDENCE = Path("docs/FEATURE-TREE-EXPLICIT-EVIDENCE.json")
 import hashlib
 BLOCK = re.compile(r"(\x60{3}text\s*\n)(.*?)(\n\x60{3})", re.S)
 ROW = re.compile(r"^([│ ]*)([├└])─ (.+)$")
@@ -354,6 +355,44 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             paths = sorted(set(HISTORICAL_LINK.findall(raw)))
             sources = [x for x in paths if "/src/main/" in "/" + x]
             historical[path] = (grade, sources, raw)
+    explicit = {}
+    file = root / EXPLICIT_EVIDENCE
+    if file.is_file():
+        manifest = json.loads(file.read_text(encoding="utf-8"))
+        if manifest.get("version") != 1 or not isinstance(manifest.get("items"), list):
+            raise ValueError("手工源码证据索引格式无效")
+        for item in manifest["items"]:
+            name = item.get("path")
+            if name in explicit or name not in leafpaths:
+                raise ValueError("具名源码证据引用重复或不存在的功能路径")
+            verified = []
+            for evidence in item.get("sources", []):
+                source = evidence.get("path")
+                if (not isinstance(source, str)
+                        or "/src/main/" not in "/" + source
+                        or ".." in Path(source).parts
+                        or not source.endswith((".kt", ".java"))):
+                    raise ValueError("手工证据来源不是合法的生产源码")
+                file = root / source
+                if not file.is_file():
+                    raise ValueError("手工证据引用的生产源码不存在: " + source)
+                body = file.read_text(encoding="utf-8", errors="replace")
+                names = evidence.get("symbols")
+                if not isinstance(names, list) or not names:
+                    raise ValueError("必须提供真实存在的具名代码声明")
+                for name_symbol in names:
+                    if not isinstance(name_symbol, str) or not re.search(
+                        SYMBOL % re.escape(name_symbol), body
+                    ):
+                        raise ValueError("手工证据未找到真实源码声明: " + str(name_symbol))
+                for literal in evidence.get("literals", []):
+                    if not isinstance(literal, str) or literal not in body:
+                        raise ValueError("手工证据约定的工具调用分支不存在: " + str(literal))
+                verified.append({"path": source, "symbols": names})
+            scope = item.get("scope", "")
+            if len(CHINESE.findall(scope)) < 4:
+                raise ValueError("手工证据必须用中文解释静态验证的范围")
+            explicit[item["path"]] = {"sources": verified, "scope": scope}
     mapped = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
     result = []
     for name in leafpaths:
@@ -373,6 +412,14 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
                 for src in existing
             )
             symbols.append({"symbol": symbol, "declaration_found": declared})
+        manual = explicit.get(name)
+        if manual:
+            for source in manual["sources"]:
+                if source["path"] not in existing:
+                    existing.append(source["path"])
+                for symbol in source["symbols"]:
+                    if not any(x["symbol"] == symbol for x in symbols):
+                        symbols.append({"symbol": symbol, "declaration_found": True})
         test_count = mapped.get(name, 0)
         if missing and not existing and not test_count:
             grade_now = "旧源码已失效，需核实迁移或退役"
@@ -395,6 +442,8 @@ def legacy_leaf_evidence(root, leafpaths, matrix):
             "existing_production_sources": existing,
             "missing_production_sources": missing,
             "named_symbols": symbols,
+            "explicit_source_anchor": bool(manual),
+            "explicit_static_scope": manual["scope"] if manual else None,
         })
     return result
 
