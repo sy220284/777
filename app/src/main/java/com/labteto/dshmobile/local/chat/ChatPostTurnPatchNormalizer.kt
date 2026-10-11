@@ -13,18 +13,15 @@ import kotlinx.serialization.json.booleanOrNull
 internal val CHAT_MODEL_WRITABLE_STATE_FIELDS: Set<String> = setOf(
     "physicalState", "mood", "relationshipState", "currentFocus",
     "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
-    "unresolvedThreads", "currentUserImpression", "initiative", "shareDesire",
-    "dynamics", "userPattern", "continuity",
+    "unresolvedThreads", "currentUserImpression",
+    "dynamics", "continuity",
 )
 
 internal val CHAT_MODEL_WRITABLE_NESTED_FIELDS: Map<String, Set<String>> = mapOf(
     "dynamics" to setOf(
-        "stage", "warmth", "trust", "reciprocity", "tension", "stability",
-        "unresolvedConflict", "facts", "hypotheses", "unknowns",
+        "stage", "unresolvedConflict", "facts", "hypotheses", "unknowns",
         "sharedMoments", "sharedObjects",
     ),
-    "userPattern" to setOf("replyLength", "directness", "playfulness",
-        "initiative", "emojiStyle", "preferredTone"),
     "continuity" to setOf("recentEvents", "recurringEvents", "decisions", "unfinished"),
 )
 
@@ -63,7 +60,6 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     listOf("physicalState", "mood", "relationshipState", "currentFocus",
         "activeGoal", "currentAgenda", "internalConflict", "immediateConcern",
         "currentUserImpression").forEach(::string)
-    listOf("initiative", "shareDesire").forEach(::integer)
     strings("unresolvedThreads")
 
     fun nested(name: String, numeric: Set<String>, textual: Set<String>,
@@ -124,16 +120,16 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
     }
 
     nested("dynamics",
-        setOf("warmth", "trust", "reciprocity", "tension", "stability"),
+        emptySet(),
         setOf("stage", "unresolvedConflict"),
         setOf("unknowns", "sharedMoments", "sharedObjects"),
         setOf("facts", "hypotheses"))
-    nested("userPattern",
-        setOf("directness", "playfulness", "initiative", "observedTurns", "averageMessageChars"),
-        setOf("replyLength", "emojiStyle", "preferredTone"), emptySet())
     nested("continuity", emptySet(), emptySet(),
         setOf("recentEvents", "recurringEvents", "decisions", "unfinished"))
 
+    // Retired numerical scores and speculative user profiles are decode-only legacy data.
+    // Model patch fields are limited to real events, sourced facts and present-tense state.
+    // The reducer calculates measured user-message length separately.
     // Decode only model-owned patch fields. The reducer computes the rest from durable history.
     val normalizedState = JsonObject(state.filterKeys { it in CHAT_MODEL_WRITABLE_STATE_FIELDS })
     val result = root.toMutableMap().apply { put("state", normalizedState) }
