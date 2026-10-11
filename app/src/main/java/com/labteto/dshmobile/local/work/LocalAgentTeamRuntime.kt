@@ -360,6 +360,7 @@ internal class LocalAgentTeamRuntime(
             val currentTask = visibleTasks.firstOrNull {
                 it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
             }
+            val execution = memberExecutionEvidence(sessionId, member)
             LocalAgentTeamMemberUiState(
                 id = member.id,
                 jobId = member.jobId,
@@ -373,12 +374,8 @@ internal class LocalAgentTeamRuntime(
                 currentTask = currentTask?.subject,
                 hasCurrentTaskResult = currentTask != null && activity in setOf("dormant", "completed") &&
                     hasFreshTaskResult(sessionId, currentTask, member.jobId),
-                progressPercent = if (currentTask != null && activity in setOf("dormant", "completed")) {
-                    // 成员已交回结果，但任务仍待 Lead 核验；展示不得提前满格。
-                    95
-                } else {
-                    memberProgressPercent(sessionId, member, activity)
-                },
+                executionSteps = execution.usedSteps,
+                executionStepLimit = execution.stepLimit,
                 resultMessageCount = messageCounts[member.id] ?: 0,
                 pendingMessageCount =
                     state.pendingMessages.count { it.targetId == member.id } +
@@ -1201,7 +1198,7 @@ internal class LocalAgentTeamRuntime(
                 LocalTeamMemberPhase.FAILED -> "failed"
                 else -> "missing"
             }
-        val progress = memberProgressPercent(sessionId, member, jobStatus)
+        val execution = memberExecutionEvidence(sessionId, member)
         val currentTask = state.tasks.firstOrNull {
             it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
         }?.subject
@@ -1212,9 +1209,11 @@ internal class LocalAgentTeamRuntime(
             append(member.phase.name.lowercase())
             append(" | activity=")
             append(jobStatus)
-            append(" | progress=")
-            append(progress)
-            append("% | id=")
+            execution.usedSteps?.let { steps ->
+                append(" | steps=").append(steps)
+                execution.stepLimit?.let { append("/").append(it) }
+            }
+            append(" | id=")
             append(member.id)
             append(" | agent=")
             append(member.jobId)
@@ -1499,51 +1498,25 @@ internal class LocalAgentTeamRuntime(
         return "等待助手消息超时：" + timeoutMs + "ms"
     }
 
-    private fun memberProgressPercent(
+    private data class MemberExecutionEvidence(val usedSteps: Int?, val stepLimit: Int?)
+
+    /** A step budget is a resource limit, not a measure of task completion. */
+    private fun memberExecutionEvidence(
         sessionId: String,
         member: LocalTeamMemberSnapshot,
-        activity: String,
-    ): Int {
-        if (member.phase == LocalTeamMemberPhase.CREATED) return 0
-        if (member.phase == LocalTeamMemberPhase.PROVISIONING) return 5
-        if (member.phase == LocalTeamMemberPhase.DISMISSED) return 100
+    ): MemberExecutionEvidence {
+        if (member.phase == LocalTeamMemberPhase.CREATED) return MemberExecutionEvidence(null, null)
         val log = eventLogFor(sessionId)
-        val checkpoint = log.latestMatching(
-            setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT),
-        ) { data ->
+        val checkpoint = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == member.jobId
         }
-        val step = checkpoint?.data
-            ?.get("step")
-            ?.jsonPrimitive
-            ?.intOrNull
-            ?.coerceAtLeast(0)
-            ?: 0
-        val softLimit = checkpoint?.data
-            ?.get("soft_step_limit")
-            ?.jsonPrimitive
-            ?.intOrNull
-            ?.takeIf { it > 0 }
-        val startLimit = log.latestMatching(setOf("subagent/start")) { data ->
+        val steps = checkpoint?.data?.get("step")?.jsonPrimitive?.intOrNull?.coerceAtLeast(0)
+        val softLimit = checkpoint?.data?.get("soft_step_limit")
+            ?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
+        val initialLimit = log.latestMatching(setOf("subagent/start")) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == member.jobId
-        }?.data
-            ?.get("max_steps")
-            ?.jsonPrimitive
-            ?.intOrNull
-            ?.takeIf { it > 0 }
-        val limit = softLimit ?: startLimit ?: 1
-        val measured = ((step.toDouble() / limit.toDouble()) * 100.0)
-            .toInt()
-            .coerceIn(0, 95)
-        return when {
-            activity == "dormant" || activity == "completed" -> 100
-            member.phase == LocalTeamMemberPhase.FAILED ||
-                activity in setOf("failed", "cancelled", "killed") -> measured
-            member.phase == LocalTeamMemberPhase.DISABLED ||
-                activity == "interrupted" -> measured
-            activity == "running" || activity == "stopping" -> measured.coerceAtLeast(10)
-            else -> measured
-        }
+        }?.data?.get("max_steps")?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }
+        return MemberExecutionEvidence(steps, softLimit ?: initialLimit)
     }
 
     private suspend fun waitForChange(sessionId: String, timeoutMs: Int): String {
@@ -1592,7 +1565,7 @@ internal class LocalAgentTeamRuntime(
                     LocalTeamMemberPhase.FAILED -> "failed"
                     else -> "missing"
                 }
-                val progress = memberProgressPercent(sessionId, member, activity)
+                val execution = memberExecutionEvidence(sessionId, member)
                 val messages = agentMessages(
                     sessionId = sessionId,
                     targetName = member.name,
@@ -1601,7 +1574,10 @@ internal class LocalAgentTeamRuntime(
                 add(
                     member.name + " | " + member.phase.name.lowercase() +
                         " | activity=" + activity +
-                        " | progress=" + progress + "%" +
+                        (execution.usedSteps?.let { used ->
+                            " | steps=" + used +
+                                (execution.stepLimit?.let { "/$it" } ?: "")
+                        } ?: "") +
                         " | messages=" + messages +
                         " | id=" + member.id +
                         " | agent=" + member.jobId,
