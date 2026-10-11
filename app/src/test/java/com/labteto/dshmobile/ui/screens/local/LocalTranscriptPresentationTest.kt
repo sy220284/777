@@ -210,6 +210,17 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun legacyMiniMaxThinkingDoesNotShowAsWorkProgressOrInlinePreview() {
+        assertEquals(null, localWorkProcessSummary("<think>用户要看仓库更新，先按系统提示检查目录"))
+        assertEquals("已确认新提交", localWorkProcessSummary("<think>内部分析</think>已确认新提交"))
+        assertEquals(null, localWorkProcessSummary("用户要我先看系统提示"))
+        assertEquals("已核对仓库更新", localWorkProcessSummary("已核对仓库更新"))
+        assertEquals("", inlineWorkPreviewText("<think>用户需要我先分析", null))
+        assertEquals("现在开始检查", inlineWorkPreviewText("<think>分析完成</think>现在开始检查", null))
+        assertEquals("已经完成", inlineWorkPreviewText("<think>分析完成</think>已经完成", "<think>旧思考</think>"))
+    }
+
+    @Test
     fun inlineWorkStreamDisplaysOnlyUncommittedSuffix() {
         assertEquals("下一段", inlineWorkPreviewText("已有内容下一段", "已有内容"))
         assertEquals("", inlineWorkPreviewText("已有内容", "已有内容"))
