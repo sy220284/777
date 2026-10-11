@@ -73,7 +73,7 @@ def inspect():
         if path.suffix not in CODE and path.name != "gradlew":
             continue
         digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
-        digest.update(b"\\0".replace(b"\\0", bytes([0])))
+        digest.update(bytes([0]))
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     sha = digest.hexdigest()[:12]
     if index["source_snapshot"] != sha or review["snapshot"] != sha:
