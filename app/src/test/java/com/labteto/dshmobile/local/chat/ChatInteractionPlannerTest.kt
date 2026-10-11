@@ -316,6 +316,41 @@ class ChatInteractionPlannerTest {
         assertTrue(state.unresolvedThreads.isEmpty())
     }
 
+    @Test
+    fun retiredModeFromSavedStoryCannotAppearInAuxiliaryPromptOrResumeState() {
+        val legacy = ChatCharacterState(
+            mood = "疲倦",
+            interactionIntent = "STRATEGIST",
+            interactionIntentStrength = 3,
+            interactionIntensity = 2,
+            recentVerbalTags = listOf("直球"),
+        )
+        val migrated = legacy.canonicalizeLegacyCharacterState()
+        assertEquals(ChatInteractionIntent.NORMAL.name, migrated.interactionIntent)
+        assertEquals(0, migrated.interactionIntentStrength)
+        assertEquals(0, migrated.interactionIntensity)
+        assertEquals("疲倦", migrated.mood)
+        assertEquals(listOf("直球"), migrated.recentVerbalTags)
+
+        val suggestion = planner.suggestionsPrompt(
+            PersonaProfile(name = "阿青"), legacy, "你好", "好",
+        )
+        assertFalse(suggestion.contains("STRATEGIST"))
+        assertTrue(suggestion.contains("人物当前情绪=疲倦"))
+
+        val resumed = planner.applyDeterministicInteractionState(legacy, "", "好")
+        assertEquals(ChatInteractionIntent.NORMAL.name, resumed.interactionIntent)
+        assertEquals(0, resumed.interactionIntentStrength)
+        assertEquals(0, resumed.interactionIntensity)
+
+        val active = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            interactionIntentStrength = 2,
+            interactionIntensity = 3,
+        )
+        assertEquals(active, active.canonicalizeLegacyCharacterState())
+    }
+
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
