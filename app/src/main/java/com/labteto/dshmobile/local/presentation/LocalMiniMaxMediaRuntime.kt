@@ -14,6 +14,8 @@ fun LocalModelProfile.canUseMiniMaxNativeMedia(): Boolean =
         model.startsWith("MiniMax-", ignoreCase = true) &&
         LocalMiniMaxPolicy.isOfficial(baseUrl)
 
+data class LocalMiniMaxVoice(val id: String, val name: String)
+
 data class LocalMiniMaxVideoStatus(val state: String, val downloadUrl: String?)
 
 /** Narrow Media feature-facing contract. Credential resolution and HTTP remain Model-owned. */
@@ -21,6 +23,8 @@ data class LocalMiniMaxVideoStatus(val state: String, val downloadUrl: String?)
 class LocalMiniMaxMediaRuntime @Inject internal constructor(
     private val client: MiniMaxNativeMediaClient,
 ) {
+    suspend fun voices(profile: LocalModelProfile): List<LocalMiniMaxVoice> =
+        client.systemVoices(profile).map { LocalMiniMaxVoice(it.id, it.name) }
     suspend fun image(profile: LocalModelProfile, prompt: String, ratio: String): String =
         client.generateImage(profile, prompt, ratio)
     suspend fun speech(profile: LocalModelProfile, text: String, voice: String): File =
