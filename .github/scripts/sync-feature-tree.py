@@ -414,11 +414,18 @@ def generate(root):
         header, md, count=1,
     )
     old, html_match = original_html(html)
-    dataset = json.dumps(
-        to_html(model, old, {v["path"]: v for v in valid.values()
-                             if (root / v["source"]).is_file()}),
-        ensure_ascii=False, separators=(",", ":"),
-    )
+    evidence_counts = {item["path"]: len(item["evidence"]) for item in matrix["items"]}
+    structure = to_html(model, old, {v["path"]: v for v in valid.values()
+                                    if (root / v["source"]).is_file()})
+    def annotate(node, stack):
+        for child in node["children"]:
+            path = stack + [child["name"]]
+            full = " / ".join(path)
+            if not child["children"] and full in evidence_counts:
+                child["testCount"] = evidence_counts[full]
+            annotate(child, path)
+    annotate(structure, [])
+    dataset = json.dumps(structure, ensure_ascii=False, separators=(",", ":"))
     html = html[:html_match.start(2)] + dataset + html[html_match.end(2):]
     # 替换过期的主线/PR 快照说明，避免历史提交号伪装为最新。
     html = re.sub(r'(<p class="sub">按架构 3\.0 的真实所有权展开.*?)</p>',
@@ -445,6 +452,15 @@ def generate(root):
         '未经证明的新增与退役变化不会直接写入节点；验收仍以真实测试和设备执行为准。</p>',
         html, count=1, flags=re.S,
     )
+    # 旧版写死的功能数和核查结论不得被冒充当前扫描事实。
+    html = re.sub(
+        r'<p class="sub">源码核查级别：.*?</p>',
+        f'<p class="sub">当前功能树末级 {len(all_leaves)} 项；其中 '
+        f'{len(evidence_counts)} 项存在直接 Kotlin 测试引用，其余 '
+        f'{len(all_leaves) - len(evidence_counts)} 项仍需逐功能核对调用链。'
+        '源码登记通过不等于真实运行验收；<a href="FEATURE-REVIEW.auto.json">查看完整复核结果</a>。</p>',
+        html, count=1, flags=re.S,
+    )
     node_count = validate_view(model, html)
     review = {
         "version": 1,
@@ -455,6 +471,13 @@ def generate(root):
         "feature_nodes": node_count,
         "functional_leaves": len(all_leaves),
         "existing_executable_test_mappings": len(matrix["items"]),
+        "leaf_evidence": [
+            {"path": path, "verification": (
+                "存在直接测试方法引用（仅部分证据）" if path in evidence_counts else
+                "尚无直接测试映射，待逐功能验证"
+            ), "test_reference_count": evidence_counts.get(path, 0)}
+            for path in all_leaves
+        ],
         "source_verified_registrations": len(valid),
         "explicit_retirements": len(retired),
         "changes_applied": [{"previous": previous, "current": current}
