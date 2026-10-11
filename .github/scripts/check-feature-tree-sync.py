@@ -241,6 +241,19 @@ def inspect():
         or review["production_sources_scanned"] != sources):
         raise ValueError("扫描文件数量不符：扫描器可能遗漏代码或工作流")
 
+    # 全生产源码清单必须完整，内容指纹须由实际磁盘字节重新计算。
+    recorded_sources = index.get("production_file_fingerprints", [])
+    actual_sources = []
+    for file in sorted(ROOT.rglob("*")):
+        if not file.is_file() or any(x in SKIP for x in file.relative_to(ROOT).parts):
+            continue
+        rel = file.relative_to(ROOT).as_posix()
+        if "/src/main/" in "/" + rel and file.suffix in {".kt", ".java"}:
+            actual_sources.append({
+                "path": rel, "sha256": hashlib.sha256(file.read_bytes()).hexdigest()[:16]
+            })
+    if recorded_sources != actual_sources or len(actual_sources) != sources:
+        raise ValueError("生产源码文件清单或内容指纹与真实代码不一致")
     ids = set()
     for item in registry["nodes"]:
         ident = item["id"]
