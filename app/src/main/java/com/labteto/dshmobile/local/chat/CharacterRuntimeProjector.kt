@@ -165,7 +165,7 @@ internal class CharacterRuntimeProjector(
         return buildString {
             appendLine("【此刻】")
             val budgets = allocateCharacterContextBudget(lines,
-                MOMENT_TOKEN_BUDGET - estimateModelTokens("【此刻】\\n") - lines.size)
+                MOMENT_TOKEN_BUDGET - estimateModelTokens("【此刻】\n") - lines.size)
             lines.forEachIndexed { index, line ->
                 appendLine(takeWithinModelTokenBudget(line, budgets[index]))
             }
