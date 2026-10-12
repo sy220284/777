@@ -48,14 +48,14 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCheckbox
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyCheckboxControl
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
-import com.labteto.dshmobile.ui.components.DsSearchField
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SySearchField
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -252,7 +252,7 @@ internal fun LocalWorkspaceFilesDialog(
                         directory.takeIf(String::isNotEmpty)
                     else -> null
                 }
-                DsTopBar(
+                SyTopBar(
                     title = headerTitle,
                     subtitle = headerSubtitle,
                     onBack = ::navigateBack,
@@ -290,7 +290,7 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
-                if (preview == null) DsSearchField(query, { query = it },
+                if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small))
 
@@ -307,11 +307,11 @@ internal fun LocalWorkspaceFilesDialog(
                                 style = DsType.small13Strong.withReadingWeight(),
                                 color = DsTheme.colors.labelPrimary,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.common_cancel),
                                 onClick = { selecting = false; selected.clear(); shareError = null },
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
                             )
                         }
                         Row(
@@ -320,7 +320,7 @@ internal fun LocalWorkspaceFilesDialog(
                             ),
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_select_all),
                                 onClick = {
                                     selected.clear()
@@ -328,15 +328,15 @@ internal fun LocalWorkspaceFilesDialog(
                                     shareError = if (visibleSharePaths.size > MAX_LOCAL_SHARE_FILES) limitText else null
                                 },
                                 modifier = Modifier.weight(1f),
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Outline,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Outline,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_share_selected),
                                 onClick = { share(selected.toList()) },
                                 modifier = Modifier.weight(1f),
                                 enabled = selected.isNotEmpty() && !sharing,
-                                size = DsButtonSize.Small,
+                                size = SyButtonSize.Small,
                             )
                         }
                     } else {
@@ -344,11 +344,11 @@ internal fun LocalWorkspaceFilesDialog(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_select),
                                 onClick = { selecting = true },
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
                             )
                         }
                     }
@@ -358,11 +358,11 @@ internal fun LocalWorkspaceFilesDialog(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_files_share_one),
                             onClick = { share(listOf(preview!!.file.path)) },
                             enabled = !sharing,
-                            size = DsButtonSize.Small,
+                            size = SyButtonSize.Small,
                         )
                     }
                 }
@@ -710,7 +710,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 )
             }
             if (selecting) {
-                DsCheckbox(
+                SyCheckboxControl(
                     checked = selected,
                     onCheckedChange = { controls?.toggle?.invoke(file.path) },
                 )
