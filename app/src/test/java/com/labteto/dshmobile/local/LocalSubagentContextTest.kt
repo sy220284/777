@@ -55,6 +55,60 @@ class LocalSubagentContextTest {
     }
 
     @Test
+    fun unknownExplicitForkCallMustFailRatherThanExposeUnboundedParentHistory() {
+        val parent = listOf(message("system", "system"), message("user", "parent task"))
+        val error = runCatching {
+            inheritedHistoryBeforeToolCall(parent, "call-not-present")
+        }.exceptionOrNull()
+        assertEquals(true, error is IllegalArgumentException)
+        assertEquals(true, error?.message.orEmpty().contains("SUBAGENT_FORK_BOUNDARY_MISSING"))
+    }
+
+    @Test
+    fun childForkDoesNotReceiveParentToolTransactionsOrHiddenReasoning() {
+        val parent = listOf(
+            message("system", "父级系统提示"),
+            message("user", "审计模块 A"),
+            buildJsonObject {
+                put("role", "assistant")
+                put("content", "父代理中间步骤")
+                put("tool_calls", buildJsonArray { add(toolCall("parent-read", "read")) })
+            },
+            buildJsonObject {
+                put("role", "tool")
+                put("tool_call_id", "parent-read")
+                put("content", "private token from parent tool")
+            },
+            buildJsonObject {
+                put("role", "assistant")
+                put("content", "确认了模块 A 的接口")
+                put("reasoning_content", "parent hidden reasoning")
+                put("reasoning_details", "parent private replay")
+                put("_dsh_model_replay", "opaque-provider-payload")
+                put("_dsh_responses_output", "opaque-response-payload")
+            },
+        )
+        val seed = buildLocalSubagentInitialHistory(
+            baseHistory = parent,
+            task = "只读核查接口是否仍存在",
+            inheritParentHistory = true,
+            allowMutation = false,
+            context = "",
+            outputSchema = null,
+        )
+        val serialized = seed.joinToString(" ") { it.toString() }
+        assertEquals(true, serialized.contains("确认了模块 A 的接口"))
+        assertEquals(false, serialized.contains("parent-read"))
+        assertEquals(false, serialized.contains("private token from parent tool"))
+        assertEquals(false, serialized.contains("parent hidden reasoning"))
+        assertEquals(false, serialized.contains("parent private replay"))
+        assertEquals(false, serialized.contains("opaque-provider-payload"))
+        assertEquals(false, serialized.contains("opaque-response-payload"))
+        assertEquals(false, seed.any { it["role"]?.jsonPrimitive?.contentOrNull == "tool" })
+        assertEquals("只读核查接口是否仍存在", seed.last()["content"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
     fun stableAgentInstructionsAreSeparateFromTheTurnTask() {
         val seed = buildLocalSubagentInitialHistory(
             baseHistory = emptyList(),

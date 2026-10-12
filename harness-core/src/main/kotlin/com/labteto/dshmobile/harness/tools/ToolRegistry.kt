@@ -29,6 +29,8 @@ data class ToolContext(
     val attributes: Map<String, Any?> = emptyMap(),
     val approval: (suspend (HarnessTool) -> Boolean)? = null,
     val onExecutionStarted: (suspend (HarnessTool) -> Unit)? = null,
+    /** Optional exact tool identity captured with the model-visible permission/tool surface. */
+    val expectedRegistration: HarnessTool? = null,
 )
 
 enum class ToolResultRetention {
@@ -141,6 +143,9 @@ class ToolRegistry private constructor(
             ),
             executionStarted = false,
         )
+        if (context.expectedRegistration != null && context.expectedRegistration !== tool) {
+            return registrationChanged(name)
+        }
         validateToolInput(tool, input)?.let { problem ->
             return ToolInvocationResult(
                 result = ToolResult(
@@ -190,6 +195,9 @@ class ToolRegistry private constructor(
             )
         }
 
+        // A plugin may be replaced or uninstalled while the user is reading its approval prompt.
+        // Never execute a handler other than the one whose contract was admitted.
+        if (tools.get(name) !== tool) return registrationChanged(name)
         context.onExecutionStarted?.invoke(tool)
         val timeoutMillis = tool.timeoutMillis
         if (timeoutMillis == null) {
@@ -217,6 +225,17 @@ class ToolRegistry private constructor(
             executionStarted = true,
         )
     }
+
+    private fun registrationChanged(name: String): ToolInvocationResult = ToolInvocationResult(
+        result = ToolResult(
+            content = "工具 $name 已在本轮接纳或审批期间更新/卸载，旧操作没有执行。",
+            isError = true,
+            errorCode = "TOOL_REGISTRATION_CHANGED",
+            retryable = false,
+            recoveryHint = "刷新工具列表与权限后，按当前任务重新核实并调用；不要沿用旧的审批结果。",
+        ),
+        executionStarted = false,
+    )
 
     private fun validateToolRegistration(tool: HarnessTool) {
         require(TOOL_NAME.matches(tool.name)) {

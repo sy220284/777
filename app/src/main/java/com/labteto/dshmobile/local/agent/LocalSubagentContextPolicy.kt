@@ -40,8 +40,44 @@ internal fun inheritedHistoryBeforeToolCall(
                 call.id == parentCallId
             }
     }
-    return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
+    require(boundary >= 0) {
+        "SUBAGENT_FORK_BOUNDARY_MISSING：找不到父代理工具调用 $parentCallId；拒绝继承未截取的父级历史"
+    }
+    return history.take(boundary).toMutableList()
 }
+
+/**
+ * A child may inherit the parent's user-facing conversation, never the parent's tool
+ * transactions or hidden reasoning. Tool results are observable only through a new authorized
+ * tool call by this child; carrying them forward would create orphaned tool messages.
+ *
+ * Mirrors Codex fork's typed history filtering, using 777's canonical message representation.
+ */
+internal fun parentConversationForSubagent(history: List<JsonObject>): MutableList<JsonObject> =
+    history.mapNotNull { item ->
+        when (item["role"]?.jsonPrimitive?.contentOrNull) {
+            "system", "developer", "user" -> item
+            "assistant" -> {
+                if (LocalCanonicalModelCodec.canonicalToolCalls(item).isNotEmpty() ||
+                    item["content"] == null
+                ) {
+                    null
+                } else {
+                    val visible = item.filterKeys { key ->
+                        key !in setOf(
+                            "reasoning", "reasoning_content", "reasoning_details",
+                            "analysis", "thoughts", "provider_replay", "model_tool_calls",
+                            "tool_calls", "function_call", "tool_call_id",
+                            "_dsh_model_replay", "_dsh_responses_output",
+                        )
+                    }
+                    JsonObject(visible)
+                }
+            }
+            else -> null
+        }
+    }.toMutableList()
+
 
 
 internal fun buildLocalSubagentInitialHistory(
@@ -53,7 +89,11 @@ internal fun buildLocalSubagentInitialHistory(
     outputSchema: JsonObject?,
     instructions: String = "",
 ): List<JsonObject> {
-    val history = baseHistory.toMutableList()
+    val history = if (inheritParentHistory) {
+        parentConversationForSubagent(baseHistory)
+    } else {
+        baseHistory.toMutableList()
+    }
     if (!inheritParentHistory) {
         history += buildJsonObject {
             put("role", "system")
