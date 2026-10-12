@@ -84,6 +84,23 @@ internal fun ChatContextState.normalized(): ChatContextState {
         .toList()
         .takeLast(MAX_CONTINUITY_EVIDENCE)
 
+    val orderedSceneEvents = sceneEvents.sortedBy(ChatSceneEvent::sequence)
+    val latestLocationEvent = orderedSceneEvents.lastOrNull { it.kind == ChatSceneEventKind.LOCATION }
+    val validSceneEvents = orderedSceneEvents
+        .filter(ChatSceneRuntime::isPlausibleRecordedEvent)
+        .distinctBy { event ->
+            listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
+        }
+        .takeLast(RECENT_SCENE_EVENT_LIMIT)
+    val correctedLocation = if (latestLocationEvent != null &&
+        latestLocationEvent.to == scene.location &&
+        !ChatSceneRuntime.isPlausibleRecordedEvent(latestLocationEvent)
+    ) {
+        // Bad legacy parser output should not remain a hard truth after restoring an archive.
+        // Replay only a known earlier location; otherwise leave the location unknown.
+        validSceneEvents.lastOrNull { it.kind == ChatSceneEventKind.LOCATION }?.to.orEmpty()
+    } else scene.location
+
     return copy(
         storyStage = storyStage.trim().take(160),
         unlockedStoryStages = (unlockedStoryStages + storyStage)
@@ -91,7 +108,7 @@ internal fun ChatContextState.normalized(): ChatContextState {
             .let { stages -> if (storyStage.isBlank()) emptyList() else stages },
         scene = scene.copy(
             sceneTime = scene.sceneTime.trim().take(80),
-            location = scene.location.trim().take(120),
+            location = correctedLocation.trim().take(120),
             participants = scene.participants.cleanContextLines(8, 80),
             positions = scene.positions.cleanContextLines(8, 120),
             activeActions = scene.activeActions.cleanContextLines(6, 120),
@@ -108,12 +125,7 @@ internal fun ChatContextState.normalized(): ChatContextState {
             unfinished = unfinished,
             evidence = groundedEvidence,
         ),
-        sceneEvents = sceneEvents
-            .sortedBy(ChatSceneEvent::sequence)
-            .distinctBy { event ->
-                listOf(event.sequence.toString(), event.kind.name, event.actor, event.to)
-            }
-            .takeLast(RECENT_SCENE_EVENT_LIMIT),
+        sceneEvents = validSceneEvents,
     )
 }
 
