@@ -74,7 +74,7 @@ internal class CharacterRuntimeProjector(
                     unlockedStages = context.visibleStoryStages(),
                 ),
                 relationshipEngine.prompt(userInput, runtimeState),
-                intimacyMode.prompt(userInput, runtimeState),
+                intimacyMode.prompt(userInput, runtimeState, context, activePersona),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }
