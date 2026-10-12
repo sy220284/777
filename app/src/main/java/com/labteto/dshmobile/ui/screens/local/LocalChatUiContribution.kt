@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 @Composable
 internal fun localChatFeatureUiContribution(
     gallery: List<PersonaGalleryEntry>,
+    initialGalleryEntryId: String?,
+    galleryEntryOpenVersion: Int,
     state: StateFlow<LocalConversationSurfaceState>,
     actions: LocalChatFeatureUiActions,
     onNewPersona: () -> Unit,
@@ -72,6 +74,8 @@ internal fun localChatFeatureUiContribution(
             )
             LocalFeaturePage.PERSONA_GALLERY -> PersonaGalleryScreen(
                 entries = gallery,
+                initialEntryId = initialGalleryEntryId,
+                entryOpenVersion = galleryEntryOpenVersion,
                 presets = actions.personaPresets,
                 currentPersona = surface.chatPersona,
                 currentGalleryId = surface.galleryId,
