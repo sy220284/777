@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "independent_code_first_static_audit",
-  "source_snapshot": "4e97c66a4edd",
+  "source_snapshot": "37db8e449335",
   "tree": {
     "nodes_excluding_root": 542,
     "leaf_descriptions": 445,
@@ -12,7 +12,7 @@
     }
   },
   "code": {
-    "production_files": 803,
+    "production_files": 824,
     "module_count": 7,
     "module_names": [
       "SHELL",
@@ -47,11 +47,6 @@
         "is_named_screen": true
       },
       {
-        "symbol": "DsFullScreenDialog",
-        "source": "app/src/main/java/com/labteto/dshmobile/ui/components/Overlays.kt",
-        "is_named_screen": false
-      },
-      {
         "symbol": "LocalHarnessScreen",
         "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
         "is_named_screen": true
@@ -75,6 +70,11 @@
         "symbol": "SettingsScreen",
         "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
         "is_named_screen": true
+      },
+      {
+        "symbol": "SyFullScreenDialog",
+        "source": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyOverlays.kt",
+        "is_named_screen": false
       },
       {
         "symbol": "TasksScreen",
@@ -1050,7 +1050,7 @@
       "evidence_level": "named_code_declaration",
       "static_identity": "existing.0098",
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt"
+        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
@@ -1062,7 +1062,7 @@
       "evidence_level": "named_code_declaration",
       "static_identity": "existing.0100",
       "source_files": [
-        "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt"
+        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
       ],
       "test_references": 0,
       "workflow_job_count": 0,
