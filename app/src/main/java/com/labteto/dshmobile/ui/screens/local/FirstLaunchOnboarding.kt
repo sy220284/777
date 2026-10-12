@@ -36,8 +36,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -167,7 +167,7 @@ internal fun FirstLaunchOnboarding(
                 }
             }
             Spacer(Modifier.height(DsSpacing.xlarge))
-            DsButton(
+            SyButton(
                 text = stringResource(
                     when (step) {
                         0 -> R.string.shenyan_onboarding_try_chat
@@ -178,7 +178,7 @@ internal fun FirstLaunchOnboarding(
                 onClick = { if (step < 2) step++ else onStart(mode) },
                 modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp),
             )
-            DsButton(
+            SyButton(
                 text = stringResource(
                     when (step) {
                         0 -> R.string.shenyan_onboarding_skip
@@ -194,7 +194,7 @@ internal fun FirstLaunchOnboarding(
                     }
                 },
                 modifier = Modifier.fillMaxWidth().widthIn(max = 380.dp),
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
         }
     }
