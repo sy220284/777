@@ -129,25 +129,32 @@ internal class LocalWorkTurnToolRuntime(
         allowMutation: Boolean = true,
         superseded: () -> Boolean = { false },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
-        val parallel = calls.size > 1 && calls.all { isParallel(it.name) }
-        if (!parallel) {
-            return calls.map { call ->
+        val output = mutableListOf<Pair<LocalToolCall, AgentToolResult>>()
+        val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index].name) }
+        for (group in groups) {
+            val part = calls.subList(group.startInclusive, group.endExclusive)
+            if (!group.parallel) {
+                val call = part.single()
+                output += call to if (superseded()) workSteeredToolResult(call)
+                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                continue
+            }
+            // Do not execute any later group before this entire group settles. Resource leases
+            // remain in the shared tool coordinator, so approval and write semantics are intact.
+            output += isolatedParallelMap(part) { call ->
                 call to if (superseded()) workSteeredToolResult(call)
-                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+                    else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+            }.mapIndexed { index, result ->
+                result.getOrElse { error ->
+                    val call = part[index]
+                    call to parallelFailure(
+                        call,
+                        error.message ?: error::class.java.simpleName,
+                    )
+                }
             }
         }
-        return isolatedParallelMap(calls) { call ->
-            call to if (superseded()) workSteeredToolResult(call)
-                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
-        }.mapIndexed { index, result ->
-            result.getOrElse { error ->
-                val call = calls[index]
-                call to parallelFailure(
-                    call,
-                    error.message ?: error::class.java.simpleName,
-                )
-            }
-        }
+        return output
     }
 
     private suspend fun approve(
