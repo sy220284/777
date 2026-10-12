@@ -24,11 +24,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -96,8 +96,8 @@ internal fun LocalWorkDesignSurface(
                 Text(state?.goal?.description?.takeIf(String::isNotBlank) ?: title,
                     modifier = Modifier.weight(1f), style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary)
-                DsButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
-                    variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
             }
             FluidSectionNavigation(labels, section, onSelectSection, counts = counts, numbered = true,
                 attention = if (state?.pendingQuestion != null || state?.pendingApproval != null) 2 else null,
@@ -111,7 +111,7 @@ internal fun LocalWorkDesignSurface(
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                     .padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
                     when (visibleSection) {
-                        0 -> DsCard {
+                        0 -> SyGlassCard {
                             FluidPanelTitle(stringResource(R.string.fluid_work_goal))
                             Text(state?.goal?.description ?: stringResource(R.string.fluid_goal_empty),
                                 style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
@@ -122,7 +122,7 @@ internal fun LocalWorkDesignSurface(
                                 Text(it, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
                             }
                         }
-                        1 -> DsCard {
+                        1 -> SyGlassCard {
                             FluidPanelTitle(stringResource(R.string.fluid_work_plan))
                             if (state?.plan.isNullOrEmpty()) Text(stringResource(R.string.fluid_plan_empty),
                                 style = DsType.small13, color = colors.labelSecondary)
@@ -148,24 +148,24 @@ internal fun LocalWorkDesignSurface(
                                         onAnswer(question.callId, answer).also { if (it) onSelectSection(3) }
                                     }, onCancel = { onCancelQuestion(question.callId) })
                             }
-                            state?.pendingApproval?.let { approval -> DsCard {
+                            state?.pendingApproval?.let { approval -> SyGlassCard {
                                 FluidPanelTitle(stringResource(R.string.local_approval_title))
                                 Text(approval.summary, style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
                                 Text(stringResource(R.string.fluid_approval_modal_hint), style = DsType.small13,
                                     color = colors.warnLabel)
                             } }
-                            if (state?.pendingQuestion == null && state?.pendingApproval == null) DsCard {
+                            if (state?.pendingQuestion == null && state?.pendingApproval == null) SyGlassCard {
                                 Text(stringResource(R.string.fluid_decision_empty), style = DsType.std14,
                                     color = colors.labelSecondary)
-                                DsButton(stringResource(R.string.fluid_back_execution), { onSelectSection(3) },
-                                    variant = DsButtonVariant.Ghost)
+                                SyButton(stringResource(R.string.fluid_back_execution), { onSelectSection(3) },
+                                    variant = SyButtonVariant.Ghost)
                             }
                         }
-                        4 -> DsCard {
+                        4 -> SyGlassCard {
                             FluidPanelTitle(stringResource(R.string.fluid_work_outputs))
                             if (outputError) {
                                 Text(stringResource(R.string.fluid_outputs_failed), color = colors.error)
-                                DsButton(stringResource(R.string.common_retry), { refresh++ })
+                                SyButton(stringResource(R.string.common_retry), { refresh++ })
                             } else if (artifacts.isEmpty()) Text(stringResource(R.string.fluid_outputs_empty),
                                 style = DsType.std14, color = colors.labelSecondary)
                             artifacts.forEach { artifact ->
@@ -183,8 +183,8 @@ internal fun LocalWorkDesignSurface(
                                         }
                                     })
                             }
-                            DsButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
-                                variant = DsButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
+                            SyButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
+                                variant = SyButtonVariant.Outline, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }
@@ -206,27 +206,27 @@ internal fun FluidDecisionPanel(id: String, question: String, options: List<Stri
     var custom by rememberSaveable(id) { mutableStateOf("") }
     var submitted by remember(id) { mutableStateOf(false) }
     var failed by remember(id) { mutableStateOf(false) }
-    DsCard {
+    SyGlassCard {
         FluidPanelTitle(stringResource(R.string.fluid_decision_checkpoint))
         Text(question, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
         options.forEach { option ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = selection == option, enabled = !submitted,
                     onClick = { selection = option; custom = "" })
-                DsButton(option, { selection = option; custom = "" }, enabled = !submitted,
-                    variant = DsButtonVariant.Ghost, modifier = Modifier.weight(1f))
+                SyButton(option, { selection = option; custom = "" }, enabled = !submitted,
+                    variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
             }
         }
-        DsTextField(custom, { custom = it; selection = "" }, enabled = !submitted,
+        SyTextField(custom, { custom = it; selection = "" }, enabled = !submitted,
             modifier = Modifier.fillMaxWidth().testTag("workDecisionCustom"),
             label = { Text(stringResource(R.string.local_question_custom_answer)) })
         if (failed) Text(stringResource(R.string.fluid_decision_failed), color = DsTheme.colors.error)
-        DsButton(stringResource(R.string.fluid_decision_continue), {
+        SyButton(stringResource(R.string.fluid_decision_continue), {
             submitted = onAnswer(custom.trim().ifEmpty { selection })
             failed = !submitted
         }, enabled = !submitted && (custom.isNotBlank() || selection.isNotBlank()),
             modifier = Modifier.fillMaxWidth().testTag("workDecisionContinue"))
-        DsButton(stringResource(R.string.common_cancel), onCancel, enabled = !submitted,
-            variant = DsButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+        SyButton(stringResource(R.string.common_cancel), onCancel, enabled = !submitted,
+            variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
     }
 }
