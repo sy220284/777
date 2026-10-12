@@ -58,10 +58,16 @@ internal fun structuredWorkState(
                             revokedConstraints.clear()
                             constraintEpoch = event.sequence
                         }
+                        val reinstated = parseLocalWorkConstraintReinstatement(userText)
                         if (scopedEdit != null) {
                             revokedConstraints += scopedEdit.previous
                             constraints.removeAll { isRevokedWorkConstraint(it, revokedConstraints) }
                             scopedEdit.replacement?.let(constraints::add)
+                        } else if (reinstated != null) {
+                            revokedConstraints.removeAll {
+                                normalizedWorkConstraint(it) == normalizedWorkConstraint(reinstated)
+                            }
+                            constraints += reinstated
                         } else if (!constraintReset || hasNewWorkConstraintAfterReset(userText)) {
                             extractLocalWorkCueSnippet(userText, LocalWorkCueKind.CONSTRAINT)
                                 ?.takeUnless { isRevokedWorkConstraint(it, revokedConstraints) }
