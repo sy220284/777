@@ -60,6 +60,17 @@ internal fun ChatContextState.withStoryStageSelection(selected: String): ChatCon
 internal fun ChatContextState.visibleStoryStages(): Set<String> =
     (unlockedStoryStages + storyStage).map(String::trim).filter(String::isNotBlank).toSet()
 
+/**
+ * The transcript remains authoritative. These stable IDs bind a projected fact to its
+ * original event rather than relying on a candidate's free-text paraphrase.
+ */
+internal fun chatContinuityEventId(
+    kind: ChatContinuityFactKind,
+    text: String,
+    sourceSequence: Long = 0L,
+): String = "${kind.name.lowercase()}:${sourceSequence}:${normalizeContinuityFact(text).hashCode().toUInt().toString(16)}"
+
+
 internal fun ChatContextState.normalized(): ChatContextState {
     val recentEvents = continuity.recentEvents.cleanRecentContextLines(5, 180)
     val decisions = continuity.decisions.cleanRecentContextLines(4, 180)
@@ -76,6 +87,9 @@ internal fun ChatContextState.normalized(): ChatContextState {
                 sourceUserMessageId = item.sourceUserMessageId.trim().take(160),
                 sourceAssistantMessageId = item.sourceAssistantMessageId.trim().take(160),
                 evidence = item.evidence.trim().take(360),
+                eventId = item.eventId.ifBlank {
+                    chatContinuityEventId(item.kind, item.text, item.sourceSequence)
+                },
             )
         }
         .filter { item ->
@@ -363,6 +377,7 @@ internal fun groundContinuityEvidence(
     previous: ChatContinuityState,
     candidate: ChatContinuityState,
     pendingTurns: List<ChatPendingTurn>,
+    resolvedContinuityIds: List<String> = emptyList(),
 ): ChatContinuityState {
     val orderedTurns = pendingTurns.sortedBy(ChatPendingTurn::sequence)
     val previousEvidence = previous.evidence.associateBy { item ->
@@ -378,23 +393,26 @@ internal fun groundContinuityEvidence(
         preserveUnrelatedPrevious: Boolean = false,
         limit: Int,
     ): List<String> {
-        val pendingQuestions = previousValues.count { old ->
-            Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(old)
-        }
         val retainedPrevious = previousValues.filterNot { previousFact ->
+            val key = kind to normalizeContinuityFact(previousFact)
+            val eventId = previousEvidence[key]?.eventId?.takeIf(String::isNotBlank)
+                ?: chatContinuityEventId(kind, previousFact, previousEvidence[key]?.sourceSequence ?: 0L)
             val plannerOmittedFact = values.none { incoming ->
                 normalizeContinuityFact(incoming) == normalizeContinuityFact(previousFact) ||
                     (kind == ChatContinuityFactKind.OPEN_THREAD &&
                         continuityOpenThreadsShareSubject(previousFact, incoming))
             }
+            // Resolution must refer to this exact event, be omitted by the model's current
+            // projection AND be supported by the real exchange, never a generic "好".
+            val confirmedByEventId = kind == ChatContinuityFactKind.OPEN_THREAD &&
+                plannerOmittedFact && eventId in resolvedContinuityIds &&
+                confirmationClosesPendingQuestion(previousFact, orderedTurns)
             continuityRemovalGrounded(
                 kind = kind,
                 fact = previousFact,
                 turns = orderedTurns,
                 activeFactCount = previousValues.size,
-            ) || (kind == ChatContinuityFactKind.OPEN_THREAD && plannerOmittedFact &&
-                pendingQuestions == 1 &&
-                confirmationClosesPendingQuestion(previousFact, orderedTurns))
+            ) || confirmedByEventId
         }
         if (values.isEmpty()) return retainedPrevious.takeLast(limit)
         val previousKeys = retainedPrevious.associateBy(::normalizeContinuityFact)
@@ -422,6 +440,14 @@ internal fun groundContinuityEvidence(
                     sourceUserMessageId = direct.first.userMessageId,
                     sourceAssistantMessageId = direct.first.assistantMessageId,
                     evidence = direct.first.rawEvidence(),
+                    eventId = previous.evidence.firstOrNull { item ->
+                        item.kind == kind && kind == ChatContinuityFactKind.OPEN_THREAD &&
+                            continuityOpenThreadsShareSubject(item.text, value)
+                    }?.let { item ->
+                        item.eventId.ifBlank {
+                            chatContinuityEventId(item.kind, item.text, item.sourceSequence)
+                        }
+                    } ?: chatContinuityEventId(kind, value, direct.first.sequence),
                 )
                 return@forEach
             }
@@ -508,9 +534,8 @@ internal fun groundContinuityEvidence(
 }
 
 /**
- * A short acceptance is evidence for an unresolved yes/no question only when the character
- * acknowledges that acceptance AND the planner independently retires the question. Never
- * treat a bare "好" or an unrelated topic change as completion.
+ * A short acceptance is evidence for a model-selected, uniquely identified unresolved
+ * yes/no event only when the character acknowledges it. A generic "好" is not completion.
  */
 private fun confirmationClosesPendingQuestion(
     fact: String,
