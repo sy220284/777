@@ -102,8 +102,8 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
