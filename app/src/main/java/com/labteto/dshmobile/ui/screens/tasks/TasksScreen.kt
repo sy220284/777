@@ -43,13 +43,13 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SyIconButton
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -181,7 +181,7 @@ private fun WorkTasksScreen(
     val navigateBack = { if (showCreate) resetEditor() else if (selectedTaskId != null) selectedTaskId = null else onClose() }
     BackHandler(enabled = showCreate || selectedTaskId != null || handleRootSystemBack) { navigateBack() }
 
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
             when (notice) {
@@ -228,17 +228,17 @@ private fun WorkTasksScreen(
                                 onClick = { createMenuOpen = true },
                                 tint = colors.labelPrimary,
                             )
-                            DsPopupMenu(
+                            SyPopupMenu(
                                 expanded = createMenuOpen,
                                 onDismiss = { createMenuOpen = false },
                                 items = listOf(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.tasks_create_manual),
                                         icon = FeatherIcons.Edit3,
                                         onClick = ::startCreate,
                                     ),
                                 ) + if (onCreateViaChat != null) listOf(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.tasks_create_via_chat),
                                         icon = FeatherIcons.MessageCircle,
                                         onClick = createFromChat,
@@ -331,7 +331,7 @@ private fun WorkTasksScreen(
                 }
             }
         }
-        DsToastHost(toast, Modifier.safeDrawingPadding())
+        SyToastHost(toast, Modifier.safeDrawingPadding())
     }
 }
 
