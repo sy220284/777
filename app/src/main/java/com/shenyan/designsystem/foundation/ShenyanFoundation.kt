@@ -12,6 +12,7 @@ enum class ShenyanMode { LIGHT, DARK, MATTE }
 @Immutable
 data class SyColors(
     val canvas: Color,
+    val topBar: Color,
     // Five semantic material tiers. L1-L3 are translucent; L4 prioritises readability; L5 solid.
     val materialL1: Color,
     val materialL2: Color,
@@ -39,7 +40,7 @@ data class SyColors(
 )
 
 private val Light = SyColors(
-    canvas = Color(0xFFEDE6DA),
+    canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
     materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0x75FFFFFF),
     materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xD9FFFFFF),
     materialL5 = Color(0xFFFAF7F2), materialSheen = Color(0xB8FFFFFF),
@@ -49,7 +50,7 @@ private val Light = SyColors(
     selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
 )
 private val Dark = SyColors(
-    canvas = Color(0xFF24211E),
+    canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
     materialL1 = Color(0x0EFFF5E4), materialL2 = Color(0x16FFF5E4),
     materialL3 = Color(0x1FFFF5E4), materialL4 = Color(0xE0312B26),
     materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
@@ -59,7 +60,7 @@ private val Dark = SyColors(
     selected = Color(0xFF60422F), overlay = Color(0x5C000000)
 )
 private val Matte = SyColors(
-    canvas = Color(0xFF0F0F10),
+    canvas = Color(0xFF0F0F10), topBar = Color(0xFF18181A),
     materialL1 = Color(0xFF181819), materialL2 = Color(0xFF1E1E20),
     materialL3 = Color(0xFF232324), materialL4 = Color(0xFF29292B),
     materialL5 = Color(0xFF29292B), materialSheen = Color(0x0EFFFFFF),
@@ -68,6 +69,18 @@ private val Matte = SyColors(
     textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
     selected = Color(0xFF573F30), overlay = Color(0x99000000)
 )
+
+/** Published read-only palettes; one source for Figma, native and migration adapters. */
+object ShenyanPalettes {
+    val light: SyColors get() = Light
+    val dark: SyColors get() = Dark
+    val matte: SyColors get() = Matte
+    fun forMode(mode: ShenyanMode): SyColors = when (mode) {
+        ShenyanMode.LIGHT -> Light
+        ShenyanMode.DARK -> Dark
+        ShenyanMode.MATTE -> Matte
+    }
+}
 
 val LocalSyColors = staticCompositionLocalOf { Light }
 
