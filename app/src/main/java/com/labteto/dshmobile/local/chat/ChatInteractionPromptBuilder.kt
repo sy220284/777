@@ -76,6 +76,8 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- 情绪、身体状态、当前安排与未完事项由本轮实际事件更新；省略字段保留原值，已结束的状态显式清空。scene 和 interaction* 由系统维护，不输出。")
         appendLine("- 重新核对上一状态是否仍然成立；已经说开、完成、撤销或纠正的事项更新为当前版本。状态值为空字符串表示结束，mood为空或自然表示已无特定情绪；dynamics.unresolvedConflict为空表示矛盾已解。不要仅因聊了几轮清除状态，也不要把已解事项永久保留。")
         appendLine("- stateEvidence引用实际对话，嵌套字段用dynamics.unresolvedConflict等完整字段名；不编造引文。人物的主观理解与用户事实分开，未知情绪不补写。")
+        appendLine("- dynamics.unknowns 若输出，必须是本轮处理后仍未解答问题的完整列表；已由对话确认的问题移除，全部解答则输出 []。省略字段代表本轮没有检查此项。")
+        appendLine("- 用户说不再讨论某话题，不等于该事件从历史中删除；应停止把它当成本轮目标，后续明确重新提起时仍可回忆。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
