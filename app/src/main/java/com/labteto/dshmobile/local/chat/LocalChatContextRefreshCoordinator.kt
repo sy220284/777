@@ -232,7 +232,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
         sourceUserMessageId: String? = null,
         assistantEventSequence: Long? = null,
     ) {
-        cancelScheduledRefresh()
+        // The durable turn is the queue entry. Submitting a new job only updates the
+        // coalesced signal and must not cancel a currently running consolidation batch.
         val generation = enqueue(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
@@ -253,9 +254,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 profile = profile,
             )
         }
-        LocalChatPostTurnJobOwner.replace(job)
+        LocalChatPostTurnJobOwner.submit(job)
         job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
-        job.start()
     }
 
     private fun scheduleRetry(
@@ -297,9 +297,8 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 retryAttempt = retryAttempt + 1,
             )
         }
-        LocalChatPostTurnJobOwner.replace(job)
+        LocalChatPostTurnJobOwner.submit(job)
         job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
-        job.start()
     }
 
     fun enqueue(
