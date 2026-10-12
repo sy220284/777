@@ -615,8 +615,10 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
                 pending.sequence > nextContext.processedThroughSequence &&
                     pending.generation == expectedGeneration
             }) {
+            // Finishing a batch is progress, not a failure. Reset the failure budget so
+            // a long burst can drain beyond four batches instead of stranding older turns.
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "remaining-pending",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, 0, "remaining-pending",
             )
         }
     }
