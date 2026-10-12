@@ -37,6 +37,10 @@ internal fun FluidRunBoardColumn(
             state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
                 Text(goal, style = DsType.std14, color = DsTheme.colors.labelPrimary)
             }
+            state.goal?.let { goal ->
+                Text(localGoalStatusLabel(goal.status), style = DsType.caption11,
+                    color = DsTheme.colors.labelSecondary)
+            }
             if (state.running) {
                 state.workflowProgress?.let { WorkflowProgressSection(it) }
                     ?: Text(stringResource(R.string.local_tool_phase_running),
@@ -51,7 +55,7 @@ internal fun FluidRunBoardColumn(
         }
         if (jobs.isNotEmpty()) RunCenterJobsSection(state.sessionId, jobs, section == 1,
             showAll = true, onJobOutput, onStopJob, onSendAgentMessage)
-        else if (!(section == 0 && state.running) &&
+        else if (!(section == 0 && (state.running || state.goal != null)) &&
             !(section == 1 && (state.pendingQuestion != null || state.pendingApproval != null))) {
             DsCard { Text(stringResource(R.string.fluid_board_empty), color = DsTheme.colors.labelSecondary) }
         }
