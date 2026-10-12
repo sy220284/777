@@ -62,10 +62,10 @@ fun SyButton(
     val latestHold by rememberUpdatedState(onHoldRepeat)
     LaunchedEffect(pressed, enabled, loading) {
         if (!pressed || !enabled || loading || latestHold == null) return@LaunchedEffect
-        delay(500L)
+        delay(420L)
         while (true) {
             latestHold?.invoke() ?: break
-            delay(115L)
+            delay(90L)
         }
     }
     val scale by animateFloatAsState(
