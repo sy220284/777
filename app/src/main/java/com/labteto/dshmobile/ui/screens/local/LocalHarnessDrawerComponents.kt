@@ -47,9 +47,9 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCheckboxControl
-import com.labteto.dshmobile.ui.components.DsPill
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -260,7 +260,7 @@ internal fun DrawerQuickAction(
                 )
             }
         }
-        badge?.let { DsPill(text = it) }
+        badge?.let { SyPill(text = it) }
     }
 }
 
@@ -317,7 +317,7 @@ internal fun LocalSessionDrawerRow(
     val thresholdPulse = rememberHapticPulse()
 
     Box(Modifier.fillMaxWidth()) {
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.Trash2,
             contentDescription = stringResource(R.string.local_delete_session),
             onClick = {
