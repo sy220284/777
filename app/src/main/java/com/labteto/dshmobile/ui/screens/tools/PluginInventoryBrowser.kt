@@ -40,7 +40,7 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsFilterChip
+import com.shenyan.designsystem.components.SyFilterChip
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
@@ -250,7 +250,7 @@ internal fun PluginInventoryBrowser(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 items(5) { category ->
-                    DsFilterChip(
+                    SyFilterChip(
                         text = when (category) {
                             1 -> "${connectionStatus} · ${connectedServices.size}"
                             2 -> stringResource(R.string.plugin_category_work)
