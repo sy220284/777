@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 
 /**
  * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
@@ -51,10 +54,18 @@ fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val interactionHover = if (dark) this.hover else accent.copy(alpha = 0.06f)
     val interactionPressed = accent.copy(alpha = if (dark) 0.24f else 0.19f)
     val interactionActive = accent.copy(alpha = if (dark) 0.14f else 0.15f)
+    // Nudge the first gradient stop away from the accent while preserving foreground contrast.
+    val brandGradientStart = lerp(
+        accent,
+        if (on.luminance() < 0.5f) Color.White else Color.Black,
+        0.10f,
+    )
+    val dimmedPrimary = accent.copy(alpha = 0.30f).compositeOver(bgLayer2)
     return copy(
-        brandPrimary = accent,
+        brandPrimary = brandGradientStart,
         onBrandPrimary = on,
         buttonPrimaryHover = primaryHover,
+        buttonPrimaryDimmed = dimmedPrimary,
         accent = accent,
         onAccent = on,
         accentTertiary = tertiary,

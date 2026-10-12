@@ -21,6 +21,8 @@ class AccentThemeTest {
             for (palette in AccentPalettes.ALL.filter { it != AccentPalettes.DEFAULT }) {
                 val themed = base.withAccent(palette, dark)
                 assertEquals(palette.lightAccent.takeIf { !dark } ?: palette.darkAccent, themed.accent)
+                assertNotEquals(themed.accent, themed.brandPrimary)
+                assertNotEquals(base.buttonPrimaryDimmed, themed.buttonPrimaryDimmed)
                 assertNotEquals(base.hoverAccent, themed.hoverAccent)
                 assertNotEquals(base.active, themed.active)
                 assertNotEquals(base.sidebarNavAccent, themed.sidebarNavAccent)
