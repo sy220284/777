@@ -62,9 +62,9 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenu
 import com.labteto.dshmobile.ui.components.DsValueRow
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
