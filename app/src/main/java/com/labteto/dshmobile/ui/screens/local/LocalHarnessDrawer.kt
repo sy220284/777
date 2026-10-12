@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -104,6 +106,8 @@ internal fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     val sy = LocalSyPalette.current
+    val expandLabel = stringResource(R.string.sy_v5_nav_expand)
+    val collapseLabel = stringResource(R.string.sy_v5_nav_collapse)
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
     var syRailCollapsed by rememberSaveable { mutableStateOf(false) }
     if (docked && syRailCollapsed) {
@@ -114,14 +118,14 @@ internal fun LocalModeDrawer(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(onClick = { syRailCollapsed = false }) { Text("»", color = sy.text) }
-            DsIconButton(icon = FeatherIcons.Plus, contentDescription = "新建会话",
+            TextButton(onClick = { syRailCollapsed = false }, modifier = Modifier.semantics { contentDescription = expandLabel }) { Text("»", color = sy.text) }
+            DsIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.User, contentDescription = "人物图集",
+            DsIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
                 onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.Search, contentDescription = "工作与任务",
+            DsIconButton(icon = FeatherIcons.Search, contentDescription = stringResource(R.string.sy_v5_tasks),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = "设置",
+            DsIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
         }
         return
@@ -247,7 +251,7 @@ internal fun LocalModeDrawer(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (docked) {
-                        TextButton(onClick = { syRailCollapsed = true }) {
+                        TextButton(onClick = { syRailCollapsed = true }, modifier = Modifier.semantics { contentDescription = collapseLabel }) {
                             Text("«", color = sy.text)
                         }
                     }
