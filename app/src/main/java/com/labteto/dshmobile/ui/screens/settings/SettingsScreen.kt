@@ -535,7 +535,7 @@ fun SettingsScreen(
                             ReadingPreferencesRow(
                                 settings,
                                 onTextScaleChange = { value ->
-                                    viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) }
+                                    viewModel.set { it.copy(textScale = value.coerceIn(com.labteto.dshmobile.connection.AppDisplayLimits.MIN_READING_SCALE, com.labteto.dshmobile.connection.AppDisplayLimits.MAX_READING_SCALE)) }
                                 },
                                 onTextWeightChange = { value ->
                                     viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
