@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.model.LocalMediaResult
+import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 
 /**
  * User-facing transcript projection.
@@ -40,6 +42,15 @@ internal sealed interface LocalTranscriptItem {
     }
 
     /** One event per lazy-list row; the persisted transcript remains unchanged. */
+    /** Sidecar media timeline rows are visible but never replayed as model/persona dialogue. */
+    data class MediaResult(val result: LocalMediaResult) : LocalTranscriptItem {
+        override val key: String = "media-result:${result.id}"
+    }
+
+    data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
+        override val key: String = "media-video:${task.id}"
+    }
+
     data class WorkStep(
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
@@ -197,3 +208,27 @@ internal fun shouldShowWorkStreamingTail(
     (lastItem as? LocalTranscriptItem.Message)?.message?.role == "assistant")
 
 private val WORK_PROCESS_ROLES = setOf("reasoning", "tool", "progress")
+
+// Insert paid media results into the conversation timeline without polluting model history.
+// Legacy unassigned archive items remain in Media Studio, never leak across sessions.
+internal fun mergeLocalMediaTimeline(
+    transcript: List<LocalTranscriptItem>,
+    sessionId: String,
+    results: List<LocalMediaResult>,
+    videoTasks: List<LocalMediaVideoTask>,
+): List<LocalTranscriptItem> {
+    if (sessionId.isBlank()) return transcript
+    val media = results.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.MediaResult(it) } +
+        videoTasks.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.VideoTask(it) }
+    if (media.isEmpty()) return transcript
+    fun timestamp(item: LocalTranscriptItem): Long = when (item) {
+        is LocalTranscriptItem.Message -> item.message.createdAt
+        is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
+        is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
+        is LocalTranscriptItem.WorkStep -> item.message.createdAt
+        is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis
+        is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+    }
+    // Stable sort preserves original transcript order when event timestamps tie.
+    return (transcript + media).sortedBy(::timestamp)
+}
