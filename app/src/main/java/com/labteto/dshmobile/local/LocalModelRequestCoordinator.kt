@@ -166,7 +166,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
         )
-        val softProjectionScale = pressureStore.softProjectionScale(routeFingerprint)
+        val softProjectionScale = if (baselinePressure.estimatedInputTokens.toDouble() >= operationalLimit * 0.85) {
+            // Never defer context recovery near the real uncalibrated admission boundary.
+            1.0
+        } else {
+            pressureStore.softProjectionScale(routeFingerprint)
+        }
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
             workProjectionEnabled = contextPolicy != null,
@@ -343,6 +348,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("auth_kind", frozenProfile.authKind.name)
             put("protocol", runSurface.protocol.name)
             put("route_fingerprint", routeFingerprint)
+            put("model_contract_version", 1)
+            put("contract_operational_input_limit", runSurface.contract.operationalInputLimitTokens)
+            runSurface.contract.documentedContextWindowTokens?.let { put("contract_documented_context_window", it) }
+            put("contract_work_requests_per_slice", runSurface.contract.executionBudget.workRequestsPerSlice)
+            put("contract_image_input_status", runSurface.contract.imageInput.status.name.lowercase())
+            put("contract_tool_calling_status", runSurface.contract.toolCalling.status.name.lowercase())
+            put("soft_projection_scale_permille", (softProjectionScale * 1_000).toInt())
             put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
             put("prompt_cache_key_enabled", promptCacheKey != null)
             put("prompt_cache_ttl_enabled", promptCacheTtl != null)
