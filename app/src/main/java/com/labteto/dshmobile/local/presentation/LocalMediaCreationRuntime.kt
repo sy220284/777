@@ -59,7 +59,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     fun models(profiles: List<LocalModelProfile>): List<LocalMediaOffer> = LocalMediaCatalog.offers(profiles)
 
-    suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImage {
+    suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null): LocalMediaImage {
         validate(offer, LocalMediaKind.IMAGE)
         resultStore.requireAvailable()
         val result = when (offer.provider) {
@@ -67,8 +67,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             else -> api.image(offer, prompt, ratio).let(::imageResult)
         }
         withContext(Dispatchers.IO) {
-            result.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it) }
-                ?: result.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it) }
+            result.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
+                ?: result.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
                 ?: error("生成服务没有返回可保存的图片成果")
         }
         return result
@@ -88,7 +88,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
 
-    suspend fun speech(offer: LocalMediaOffer, text: String, voice: String): File {
+    suspend fun speech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String? = null): File {
         validate(offer, LocalMediaKind.SPEECH)
         resultStore.requireAvailable()
         val file = when (offer.provider) {
@@ -96,24 +96,27 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
             else -> error("此服务商未接入配音")
         }
-        withContext(Dispatchers.IO) { resultStore.addFile(offer, LocalMediaKind.SPEECH, file) }
+        withContext(Dispatchers.IO) { resultStore.addFile(offer, LocalMediaKind.SPEECH, file, sessionId, text) }
         return file
     }
 
-    suspend fun transcribe(offer: LocalMediaOffer, uri: Uri): String {
+    suspend fun transcribe(offer: LocalMediaOffer, uri: Uri, sessionId: String? = null): String {
         validate(offer, LocalMediaKind.TRANSCRIBE)
-        return when (offer.provider) {
+        resultStore.requireAvailable()
+        val text = when (offer.provider) {
             LocalMediaProvider.MINIMAX -> miniMax.transcribe(offer.profile, uri)
             LocalMediaProvider.OPENAI -> api.transcription(offer, uri)
             else -> error("此服务商未接入语音转写")
         }
+        withContext(Dispatchers.IO) { resultStore.addText(offer, sessionId, text) }
+        return text
     }
 
     /** Persist before submitting the request. Never retry if provider acceptance is uncertain. */
-    suspend fun createVideo(offer: LocalMediaOffer, prompt: String): LocalMediaVideoTask {
+    suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO)
         require(prompt.isNotBlank()) { "请填写视频描述" }
-        val task = withContext(Dispatchers.IO) { videoStore.begin(offer) }
+        val task = withContext(Dispatchers.IO) { videoStore.begin(offer, sessionId = sessionId, description = prompt) }
         scope.launch {
             try {
                 val externalId = when (offer.provider) {
