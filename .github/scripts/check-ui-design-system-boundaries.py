@@ -17,13 +17,13 @@ RULES = (
     (re.compile(r"\bAlertDialog\s*\("), set(), "use DsDialog"),
     (
         re.compile(r"\bDialog\s*\("),
-        {"components/Overlays.kt"},
-        "use DsDialog/DsFullScreenDialog",
+        {"components/Overlays.kt", "shenyan/SyResponsiveSheet.kt"},
+        "use SyResponsiveSheet/SyConfirmDialog",
     ),
     (
         re.compile(r"\bModalBottomSheet\s*\("),
-        {"components/DsBottomSheet.kt"},
-        "use DsBottomSheet",
+        {"components/DsBottomSheet.kt", "shenyan/SyResponsiveSheet.kt"},
+        "use SyResponsiveSheet",
     ),
     (
         re.compile(r"\bDropdownMenu\s*\("),
