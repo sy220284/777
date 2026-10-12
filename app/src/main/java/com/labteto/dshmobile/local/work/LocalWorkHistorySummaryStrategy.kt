@@ -134,19 +134,35 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
         }
         // A scoped edit is authoritative only if the user quoted the precise superseded
         // requirement. Preserve tombstones across compactions; do not revoke unrelated rules.
-        val currentScopedEdits = extractionMessages
+        val currentScopedInstructions = extractionMessages
             .drop(if (lastConstraintReset >= 0) lastConstraintReset else 0)
             .asSequence()
             .filter { it["role"].asText() == "user" }
             .mapNotNull(::messageText)
-            .mapNotNull(::parseLocalWorkScopedConstraintEdit)
             .toList()
-        val revokedConstraints = (
+        val revoked = (
             (if (constraintReset) emptyList() else previousCheckpoint?.revokedConstraints.orEmpty()) +
-                structuredWorkState?.revokedConstraints.orEmpty() +
-                currentScopedEdits.map(LocalWorkScopedConstraintEdit::previous)
-            ).map(String::trim).filter(String::isNotBlank).distinct().takeLast(64)
-        val explicitReplacements = currentScopedEdits.mapNotNull(LocalWorkScopedConstraintEdit::replacement)
+                structuredWorkState?.revokedConstraints.orEmpty()
+            ).distinct().toMutableList()
+        val explicitReplacements = mutableListOf<String>()
+        // Apply only explicit, user-authored scoped changes in chronological order. An old
+        // checkpoint tombstone cannot override a later, deliberately reinstated requirement.
+        currentScopedInstructions.forEach { instruction ->
+            val edit = parseLocalWorkScopedConstraintEdit(instruction)
+            if (edit != null) {
+                revoked += edit.previous
+                edit.replacement?.let(explicitReplacements::add)
+            } else {
+                parseLocalWorkConstraintReinstatement(instruction)?.let { restored ->
+                    revoked.removeAll {
+                        normalizedWorkConstraint(it) == normalizedWorkConstraint(restored)
+                    }
+                    explicitReplacements += restored
+                }
+            }
+        }
+        val revokedConstraints = revoked.map(String::trim)
+            .filter(String::isNotBlank).distinct().takeLast(64)
         val constraints = mergeStructured(
             structuredWorkState?.constraints.orEmpty() +
                 explicitReplacements +
@@ -155,7 +171,8 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
                 select(role = "user", cues = WORK_CONSTRAINT_CUES, maxItems = 6,
                     constraintsAfterResetOnly = true)
                     .filterNot { isExplicitWorkConstraintReset(it) && !hasNewWorkConstraintAfterReset(it) }
-                    .filterNot { parseLocalWorkScopedConstraintEdit(it) != null },
+                    .filterNot { parseLocalWorkScopedConstraintEdit(it) != null ||
+                        parseLocalWorkConstraintReinstatement(it) != null },
             maxItems = 16,
         ).filterNot { isRevokedWorkConstraint(it, revokedConstraints) }.takeLast(8)
         val failures = mergeStructured(
