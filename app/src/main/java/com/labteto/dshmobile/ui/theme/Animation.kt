@@ -69,6 +69,11 @@ object DsAnimations {
     val tabBackground: FiniteAnimationSpec<Color> = tween(200, easing = fluidEase)
     val tabIndicator: FiniteAnimationSpec<Dp> = tween(200, easing = fluidEase)
 
+    /** Reference list entry: 360ms reveal; 80ms between items, capped at ten cards. */
+    val cascade: FiniteAnimationSpec<Float> = tween(360, easing = fluidEase)
+    const val cascadeStaggerMs = 80L
+    const val cascadeMaxItems = 10
+
     /** Sliding indicator used by compact segmented controls. It settles instead of gliding mechanically. */
     val segmentSlide: FiniteAnimationSpec<Dp> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,

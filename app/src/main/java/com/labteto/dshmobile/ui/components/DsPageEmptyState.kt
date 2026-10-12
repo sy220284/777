@@ -81,8 +81,8 @@ fun DsPageEmptyState(
             DsButton(
                 text = actionText,
                 onClick = onAction,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Normal,
+                variant = DsButtonVariant.Primary,
             )
         }
     }
