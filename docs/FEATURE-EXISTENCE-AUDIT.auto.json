@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "671f1bbb8e94",
+  "source_snapshot": "eed5668da1ea",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {

@@ -38,7 +38,7 @@ internal fun resolveWorkGoalUpdate(
 ): LocalGoal {
     val current = snapshot.goal ?: error("当前会话没有目标")
     val candidate = current.copy(status = status, note = note?.take(2_000))
-    val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, candidate, workspaceRoot) else null
+    val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, current, workspaceRoot) else null
     val transition = resolveWorkGoalTransition(current, candidate, snapshot, delivery)
     if (!transition.accepted) {
         eventLog.append("goal/transition-rejected", buildJsonObject {

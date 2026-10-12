@@ -32,6 +32,8 @@ internal fun localWorkDeliveryEvidence(
 ): LocalWorkDeliveryEvidence {
     val needsArtifact = goal.artifactPaths.isNotEmpty()
     val needsTest = goal.verificationCommands.isNotEmpty()
+    if (goal.id.isBlank() && goal.status != "completed") return LocalWorkDeliveryEvidence(needsArtifact, needsTest,
+        unmetRequirements = listOf("旧目标尚未明确验收要求；请依据原任务重新声明成果与验收，不适用时显式为空，已完成进度保留"))
     if (!needsArtifact && !needsTest) return LocalWorkDeliveryEvidence(false, false)
     val start = goal.startedAtSequence.takeIf { it >= 0L } ?: log.latestMatching(setOf("goal/state")) {
         it.value("id") == goal.id && goal.id.isNotBlank()

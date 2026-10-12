@@ -2176,7 +2176,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
-      "sha256": "f3e0ff1d41f64ada"
+      "sha256": "9a5e182a1d76160c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDiagnosticsAdapter.kt",
@@ -2204,7 +2204,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
-      "sha256": "2b4e01222fb1ceff"
+      "sha256": "7cb94b15e7375850"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
@@ -3380,15 +3380,12 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "671f1bbb8e94",
+  "source_snapshot": "eed5668da1ea",
   "observed_delta": {
-    "baseline": "afbe939b5d82",
+    "baseline": "a3b53c8578ef",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt"
-    ],
+    "modified_production_files": [],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

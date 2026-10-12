@@ -187,6 +187,15 @@ class LocalWorkDeliveryEvidenceTest {
         log.append("assistant/message", buildJsonObject { put("content", "All done. BUILD SUCCESSFUL.") })
         assertEquals(2, localWorkDeliveryEvidence(log, goal, root).missing.size)
     }
+    @Test fun unfinishedLegacyGoalRequiresExplicitAcceptanceWithoutInventingFilesOrTests() = scenario(emptyList(), emptyList()) { log, _, root ->
+        val legacy = LocalGoal("Legacy discussion")
+        val evidence = localWorkDeliveryEvidence(log, legacy, root)
+        assertFalse(evidence.needsArtifact)
+        assertFalse(evidence.needsTest)
+        assertTrue(evidence.missing.isNotEmpty())
+        assertTrue(localWorkDeliveryEvidence(log, legacy.copy(status = "completed"), root).missing.isEmpty())
+    }
+
     @Test fun discussionGoalDoesNotAcquireUnrelatedFileOrTestObligations() = scenario(emptyList(), emptyList()) { log, goal, root ->
         assertTrue(localWorkDeliveryEvidence(log, goal.copy(description = "讨论应用代码的构建方案"), root).missing.isEmpty())
     }
