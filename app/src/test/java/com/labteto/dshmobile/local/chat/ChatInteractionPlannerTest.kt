@@ -1700,4 +1700,39 @@ class ChatInteractionPlannerTest {
         assertEquals("", speculative.currentAgenda)
     }
 
+    @Test
+    fun sparsePostTurnPatchNeverReplacesUnownedCharacterStateWithDefaults() {
+        val previous = ChatCharacterState(
+            mood = "心情平和",
+            currentUserImpression = "对方做事有自己的节奏",
+            stateObservations = listOf(ChatStateObservation(
+                field = "currentUserImpression",
+                value = "对方做事有自己的节奏",
+                sourceSequence = 12L,
+            )),
+            lifeState = CharacterLifeState(
+                activeEvents = listOf(CharacterLifeEvent(
+                    summary = "正在照顾窗边的绿植", source = "observation",
+                )),
+            ),
+        )
+        val unchanged = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "嗯", assistantMessage = "好",
+        )!!.state
+        assertEquals(previous.currentUserImpression, unchanged.currentUserImpression)
+        assertTrue(unchanged.stateObservations.isNotEmpty())
+        assertTrue(unchanged.lifeState.activeEvents.isNotEmpty())
+
+        val moodUpdated = planner.parse(
+            """{"state":{"mood":"高兴"},"turnSignificance":"MINOR"}""",
+            previous = previous,
+            userMessage = "我看见你笑了", assistantMessage = "我很高兴",
+        )!!.state
+        assertEquals("高兴", moodUpdated.mood)
+        assertEquals(previous.currentUserImpression, moodUpdated.currentUserImpression)
+        assertTrue(moodUpdated.lifeState.activeEvents.isNotEmpty())
+    }
+
 }

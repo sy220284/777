@@ -182,7 +182,9 @@ internal class ChatInteractionStateReducer {
                 ) -> value.relationshipState.trim().take(120)
             else -> previous.relationshipState
         }
-        val merged = value.copy(
+        // Patch the existing authoritative snapshot. Copying the model's partially decoded
+        // default state loses fields it never owned (lifeState, observations, impressions).
+        val merged = previous.copy(
             behaviorTuning = previous.behaviorTuning.normalized(),
             physicalState = if (rawState?.containsKey("physicalState") == true) {
                 value.physicalState.trim().take(120)
@@ -206,6 +208,9 @@ internal class ChatInteractionStateReducer {
             immediateConcern = if (rawState?.containsKey("immediateConcern") == true) {
                 value.immediateConcern.trim().take(240)
             } else previous.immediateConcern,
+            currentUserImpression = if (rawState?.containsKey("currentUserImpression") == true) {
+                value.currentUserImpression.trim().take(240)
+            } else previous.currentUserImpression,
             unresolvedThreads = if (rawState?.containsKey("unresolvedThreads") == true) {
                 value.unresolvedThreads.asSequence()
                     .map(String::trim)
