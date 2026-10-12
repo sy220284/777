@@ -81,7 +81,7 @@ class HostsStore @Inject constructor(
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
-            textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(0.9f, 1.3f),
+            textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE),
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
@@ -100,7 +100,7 @@ class HostsStore @Inject constructor(
                 prefs[Keys.SIDEBAR_AVATAR] = it
             } ?: prefs.remove(Keys.SIDEBAR_AVATAR)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
-            prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(0.9f, 1.3f)
+            prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
             prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =
                 next.wallpaperSurfaceTransparency.coerceIn(0f, 1f)
