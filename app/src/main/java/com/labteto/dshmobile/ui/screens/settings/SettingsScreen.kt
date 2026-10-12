@@ -77,7 +77,7 @@ import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.components.DsHierarchyPage
+import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.UserBubble
@@ -402,7 +402,7 @@ fun SettingsScreen(
                     },
                 )
 
-                DsHierarchyPage(
+                SyHierarchyPage(
                     page = page,
                     pageKey = { it.name },
                     depth = { it.navigationDepth() },
