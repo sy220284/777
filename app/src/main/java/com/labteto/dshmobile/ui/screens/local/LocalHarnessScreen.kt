@@ -695,6 +695,10 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
+        if (target != shell.usageMode || returningFromGroupToSingle) {
+            // Mode tabs live in the drawer: the next Home back returns to the source drawer.
+            conversationOpenedFromDrawer = true
+        }
         // Work capability handoff owns pendingUsageMode; ordinary taps use the
         // runtime navigation inbox, keeping the drawer tied to the real session.
         viewModel.switchUsageMode(target)
