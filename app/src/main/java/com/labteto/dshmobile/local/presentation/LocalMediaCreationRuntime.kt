@@ -60,7 +60,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
     fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
     fun videoFile(task: LocalMediaVideoTask): File? = videoStore.fileFor(task)
-    suspend fun removeResult(id: String) = withContext(Dispatchers.IO) { resultStore.remove(id) }
+    suspend fun removeResult(id: String) = withContext(Dispatchers.IO) {
+        resultStore.remove(id)
+        creationJobs.dismiss(id)
+    }
 
 
     fun models(profiles: List<LocalModelProfile>): List<LocalMediaOffer> = LocalMediaCatalog.offers(profiles)
