@@ -74,8 +74,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -503,7 +503,7 @@ internal fun PersonaGalleryScreen(
                         )
                     }
                 } else {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_rename_story),
                         icon = FeatherIcons.Edit3,
                         onClick = { editingStoryTitle = true },
@@ -516,7 +516,7 @@ internal fun PersonaGalleryScreen(
                     currentGalleryStoryId == story.id &&
                     currentHasUnsavedChanges
                 ) {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_save_progress),
                         onClick = {
                             busy = true
@@ -543,7 +543,7 @@ internal fun PersonaGalleryScreen(
                 currentHasUnsavedChanges &&
                 canSave
             ) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_save_current_new_story),
                     onClick = {
                         busy = true
@@ -569,14 +569,14 @@ internal fun PersonaGalleryScreen(
                 style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_view_profile),
                 icon = FeatherIcons.User,
                 onClick = { dismissMoreActions(); showPersonaDetails = true },
                 enabled = !busy && !inspecting,
             )
             selectedStory?.let { story ->
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = if (inspecting) {
                         stringResource(R.string.persona_gallery_inspecting)
                     } else {
@@ -600,13 +600,13 @@ internal fun PersonaGalleryScreen(
                     enabled = !busy && !inspecting,
                 )
             }
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_portrait_actions_title),
                 icon = FeatherIcons.Image,
                 onClick = { dismissMoreActions(); showPortraitActions = true },
                 enabled = !busy && !inspecting,
             )
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_export_file),
                 icon = FeatherIcons.Download,
                 onClick = { dismissMoreActions(); showExportFormatDialog = true; error = null },
@@ -655,7 +655,7 @@ internal fun PersonaGalleryScreen(
                         }
                     }
                 } else {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_delete_story),
                         icon = FeatherIcons.Trash2,
                         danger = true,
@@ -681,7 +681,7 @@ internal fun PersonaGalleryScreen(
                     },
                 )
             } else {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_delete),
                     icon = FeatherIcons.Trash2,
                     danger = true,
@@ -707,7 +707,7 @@ internal fun PersonaGalleryScreen(
             onDismiss = { showPortraitActions = false },
             dismissEnabled = !busy,
         ) {
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_portrait_replace),
                 icon = FeatherIcons.Image,
                 onClick = {
@@ -718,7 +718,7 @@ internal fun PersonaGalleryScreen(
                 enabled = !busy,
             )
             if (selected.portraitPath.isNotBlank()) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_portrait_remove),
                     icon = FeatherIcons.Trash2,
                     danger = true,
