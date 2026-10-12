@@ -203,6 +203,7 @@ internal fun settingsInkColors(colors: DsColors): DsColors = colors
 fun SettingsScreen(
     onClose: () -> Unit,
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
+    entryRequest: Int = 0,
     memorySourceSessionId: String? = null,
     memorySourceMessageId: String? = null,
     onCheckUpdate: () -> Unit = {},
@@ -263,7 +264,7 @@ fun SettingsScreen(
             }
         }
     }
-    var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var page by rememberSaveable(initialDestination, entryRequest) { mutableStateOf(initialDestination) }
     var showAllMemories by rememberSaveable(memorySourceSessionId, memorySourceMessageId) {
         mutableStateOf(false)
     }
