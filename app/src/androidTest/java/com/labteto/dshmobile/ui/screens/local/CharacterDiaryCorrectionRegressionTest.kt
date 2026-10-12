@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -12,6 +13,8 @@ import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.ChatDiarySourceRef
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import kotlinx.coroutines.CompletableDeferred
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,6 +34,45 @@ class CharacterDiaryCorrectionRegressionTest {
         createdAt = 1L,
         updatedAt = 1L,
     )
+
+
+    @Test
+    fun switchingCharacterNeverShowsPreviouslyLoadedPrivateDiary() {
+        val secondReady = CompletableDeferred<List<ChatDiaryEntry>>()
+        val first = PersonaGalleryEntry(id = "first", persona = PersonaProfile(id = "a", name = "甲"))
+        val second = PersonaGalleryEntry(id = "second", persona = PersonaProfile(id = "b", name = "乙"))
+        compose.setContent {
+            DshTheme {
+                CharacterDiaryScreen(
+                    gallery = listOf(first, second),
+                    currentPersona = first.persona,
+                    currentGalleryId = first.id,
+                    loadEntries = { key ->
+                        when (key) {
+                            "gallery:first" -> listOf(entry().copy(
+                                subjectKey = key, personaName = "甲", event = "甲的私密日记"))
+                            "gallery:second" -> secondReady.await()
+                            else -> emptyList()
+                        }
+                    },
+                    onCorrectEntry = { _, _, _, _ -> false },
+                    onDeactivateEntry = { _, _, _ -> false },
+                    onOpenSourceSession = { false },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("甲的私密日记").assertIsDisplayed()
+        compose.onNodeWithText("乙").performClick()
+        compose.onNodeWithText("甲的私密日记").assertDoesNotExist()
+        compose.runOnIdle {
+            secondReady.complete(listOf(entry().copy(
+                id = "event-2", subjectKey = "gallery:second",
+                personaName = "乙", event = "乙自己的日记")))
+        }
+        compose.onNodeWithText("乙自己的日记").assertIsDisplayed()
+        compose.onNodeWithText("甲的私密日记").assertDoesNotExist()
+    }
 
     @Test
     fun editingDiaryRequiresExplicitSaveAndRefreshesCurrentCharacter() {
