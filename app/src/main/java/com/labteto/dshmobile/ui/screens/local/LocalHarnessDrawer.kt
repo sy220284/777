@@ -45,13 +45,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsCategoryRow
@@ -294,7 +294,7 @@ internal fun LocalModeDrawer(
                     onSelect = onUsageModeChange,
                 )
                 if (searchOpen) {
-                    DsTextField(
+                    SyTextField(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
@@ -487,12 +487,12 @@ internal fun LocalModeDrawer(
                                 color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f),
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_delete_session),
                                 onClick = { deleteCandidateIds = selectedIds.toSet() },
                                 enabled = selectedIds.isNotEmpty() && !deleteInFlight,
-                                variant = DsButtonVariant.Danger,
-                                size = DsButtonSize.Small,
+                                variant = SyButtonVariant.Danger,
+                                size = SyButtonSize.Small,
                             )
                             DsIconButton(
                                 icon = FeatherIcons.X,
