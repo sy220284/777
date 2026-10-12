@@ -16,28 +16,28 @@ internal class ChatInteractionStateReducer {
         val significance = normalizeSignificance(decoded.turnSignificance)
 
         val agedPrevious = previous.canonicalizeLegacyCharacterState()
-        val baseState = if (significance == "NONE") {
-            applyExplicitTransientClears(
-                value = decoded.state,
-                previous = agedPrevious,
-                rawState = rawState,
-            )
-        } else {
-            sanitizeState(
-                value = decoded.state,
-                previous = agedPrevious,
-                userMessage = userMessage,
-                assistantMessage = assistantMessage,
-                rawState = rawState,
-                stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
-                descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
-                significance = significance,
-            )
-        }
+        val effectivePatch = ChatStatePatchAuthority.effectivePatch(
+            raw = rawState,
+            state = decoded.state,
+            significance = significance,
+            quotations = decoded.stateEvidence,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+        )
+        val baseState = sanitizeState(
+            value = decoded.state,
+            previous = agedPrevious,
+            userMessage = userMessage,
+            assistantMessage = assistantMessage,
+            rawState = effectivePatch,
+            stageQuote = decoded.stateEvidence["dynamics.stage"].orEmpty(),
+            descriptionQuote = decoded.stateEvidence["relationshipState"].orEmpty(),
+            significance = significance,
+        )
         val continuityState = mergeSceneAndContinuity(
             value = decoded.state,
             previous = baseState,
-            rawState = rawState,
+            rawState = effectivePatch,
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
@@ -57,71 +57,6 @@ internal class ChatInteractionStateReducer {
                 assistantMessage = assistantMessage,
             ), quotations = decoded.stateEvidence, userMessage = userMessage, assistantMessage = assistantMessage),
             turnSignificance = significance,
-        )
-    }
-
-    private fun applyExplicitTransientClears(
-        value: ChatCharacterState,
-        previous: ChatCharacterState,
-        rawState: JsonObject?,
-    ): ChatCharacterState {
-        if (rawState == null) return previous
-
-        val ages = mutableMapOf<String, Int>()
-        var changed = false
-
-        fun shouldClear(key: String, value: String): Boolean =
-            rawState.containsKey(key) && value.isBlank()
-
-        val clearMood = rawState.containsKey("mood") && (value.mood.isBlank() || value.mood == "自然")
-        val clearPhysicalState = shouldClear("physicalState", value.physicalState)
-        val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
-        val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
-        val clearCurrentAgenda = shouldClear("currentAgenda", value.currentAgenda)
-        val clearInternalConflict = shouldClear("internalConflict", value.internalConflict)
-        val clearImmediateConcern = shouldClear("immediateConcern", value.immediateConcern)
-        val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
-
-        listOf(
-            "physicalState" to clearPhysicalState,
-            "currentFocus" to clearCurrentFocus,
-            "activeGoal" to clearActiveGoal,
-            "currentAgenda" to clearCurrentAgenda,
-            "internalConflict" to clearInternalConflict,
-            "immediateConcern" to clearImmediateConcern,
-        ).forEach { (key, clear) ->
-            if (clear) {
-                ages.remove(key)
-                changed = true
-            }
-        }
-        if (clearThreads || clearMood) changed = true
-        val rawDynamics = rawState["dynamics"]?.let {
-            runCatching { it.jsonObject }.getOrNull()
-        }
-        val unknownsPatched = rawDynamics?.containsKey("unknowns") == true
-        val resolvedConflict = rawDynamics?.containsKey("unresolvedConflict") == true &&
-            value.dynamics.unresolvedConflict.isBlank()
-        if (!changed && !unknownsPatched && !resolvedConflict) return previous
-
-        return previous.copy(
-            mood = if (clearMood) "自然" else previous.mood,
-            physicalState = if (clearPhysicalState) "" else previous.physicalState,
-            currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
-            activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
-            currentAgenda = if (clearCurrentAgenda) "" else previous.currentAgenda,
-            internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
-            immediateConcern = if (clearImmediateConcern) "" else previous.immediateConcern,
-            unresolvedThreads = if (clearThreads) emptyList() else previous.unresolvedThreads,
-            dynamics = previous.dynamics.copy(
-                unknowns = if (unknownsPatched) {
-                    mergeStrings(emptyList(), value.dynamics.unknowns, 6, 160)
-                } else previous.dynamics.unknowns,
-                unresolvedConflict = if (resolvedConflict) "" else previous.dynamics.unresolvedConflict,
-            ),
-            transientAges = ages,
-            unresolvedThreadAges = if (clearThreads) emptyMap() else previous.unresolvedThreadAges,
-            updatedAt = System.currentTimeMillis(),
         )
     }
 

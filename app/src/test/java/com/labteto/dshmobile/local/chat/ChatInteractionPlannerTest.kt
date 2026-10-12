@@ -1678,4 +1678,26 @@ class ChatInteractionPlannerTest {
         assertEquals("", state.dynamics.unresolvedConflict)
     }
 
+    @Test
+    fun noneSignificanceReconcilesEvidenceBackedNewStateWithoutAllowingSpeculation() {
+        val previous = ChatCharacterState(mood = "自然", currentAgenda = "")
+        val confirmed = planner.parse(
+            """{"state":{"mood":"高兴","currentAgenda":"准备收拾书桌"},"stateEvidence":{"mood":"我现在很高兴","currentAgenda":"我正准备收拾书桌"},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "我正准备收拾书桌",
+            assistantMessage = "我现在很高兴",
+        )!!.state
+        assertEquals("高兴", confirmed.mood)
+        assertEquals("准备收拾书桌", confirmed.currentAgenda)
+
+        val speculative = planner.parse(
+            """{"state":{"mood":"愤怒","currentAgenda":"计划离家出走"},"turnSignificance":"NONE"}""",
+            previous = previous,
+            userMessage = "天气不错",
+            assistantMessage = "是啊",
+        )!!.state
+        assertEquals("自然", speculative.mood)
+        assertEquals("", speculative.currentAgenda)
+    }
+
 }
