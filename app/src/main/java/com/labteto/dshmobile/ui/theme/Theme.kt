@@ -10,6 +10,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import com.labteto.dshmobile.connection.AppDisplayLimits
 import com.labteto.dshmobile.ui.shenyan.SyMode
 import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
 import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
@@ -281,7 +282,9 @@ fun DshTheme(
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
-    val clampedTextScale = textScale.coerceIn(0.9f, 1.3f)
+    val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
+    val effectiveFontScale = (currentDensity.fontScale * clampedTextScale)
+        .coerceAtMost(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)
     val readingPreferences = DsReadingPreferences(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
@@ -291,7 +294,7 @@ fun DshTheme(
         LocalDsReadingPreferences provides readingPreferences,
         LocalDensity provides Density(
             density = currentDensity.density,
-            fontScale = currentDensity.fontScale * clampedTextScale,
+            fontScale = effectiveFontScale,
         ),
     ) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
