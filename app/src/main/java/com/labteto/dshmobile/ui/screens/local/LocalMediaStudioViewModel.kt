@@ -22,6 +22,7 @@ class LocalMediaStudioViewModel @Inject constructor(
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = creation.videoTasks
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = creation.generatedResults
     fun resultFile(item: LocalMediaResult): File? = creation.resultFile(item)
+    fun videoFile(task: LocalMediaVideoTask): File? = creation.videoFile(task)
     suspend fun removeResult(id: String) = creation.removeResult(id)
 
     suspend fun image(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null): LocalMediaImage =
