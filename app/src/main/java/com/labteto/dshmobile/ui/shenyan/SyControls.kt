@@ -15,6 +15,8 @@ import com.labteto.dshmobile.R
 
 /** Android migration facades; there is one real renderer in com.shenyan.designsystem. */
 enum class SyButtonStyle { PRIMARY, GHOST, OUTLINE, DANGER }
+enum class SyButtonVariant { Primary, Info, Ghost, Outline, Danger }
+enum class SyButtonSize { Normal, Small, Large }
 
 @Composable
 fun SyButton(
@@ -27,8 +29,17 @@ fun SyButton(
     icon: ImageVector? = null,
     height: Dp = SyDimensions.minimumTouch,
     onHoldRepeat: (() -> Unit)? = null,
+    variant: SyButtonVariant? = null,
+    size: SyButtonSize = SyButtonSize.Normal,
 ) {
-    val canonicalStyle = when (style) {
+    val resolvedStyle = when (variant) {
+        SyButtonVariant.Primary -> SyButtonStyle.PRIMARY
+        SyButtonVariant.Info, SyButtonVariant.Ghost -> SyButtonStyle.GHOST
+        SyButtonVariant.Outline -> SyButtonStyle.OUTLINE
+        SyButtonVariant.Danger -> SyButtonStyle.DANGER
+        null -> style
+    }
+    val canonicalStyle = when (resolvedStyle) {
         SyButtonStyle.PRIMARY -> com.shenyan.designsystem.components.SyButtonStyle.PRIMARY
         SyButtonStyle.GHOST -> com.shenyan.designsystem.components.SyButtonStyle.GHOST
         SyButtonStyle.OUTLINE -> com.shenyan.designsystem.components.SyButtonStyle.OUTLINE
@@ -37,7 +48,8 @@ fun SyButton(
     com.shenyan.designsystem.components.SyButton(
         text = text, onClick = onClick, modifier = modifier,
         enabled = enabled, loading = loading, style = canonicalStyle,
-        icon = icon, height = height, onHoldRepeat = onHoldRepeat,
+        icon = icon, height = if (size == SyButtonSize.Large) 52.dp else height,
+        onHoldRepeat = onHoldRepeat,
     )
 }
 
@@ -95,11 +107,13 @@ fun SyGlassCard(
     modifier: Modifier = Modifier,
     elevated: Boolean = false,
     onClick: (() -> Unit)? = null,
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(4.dp),
     content: @Composable ColumnScope.() -> Unit,
-) = com.shenyan.designsystem.components.SyGlassCard(
+) = com.shenyan.designsystem.components.SyMaterialFrame(
     modifier = modifier,
     onClick = onClick,
     tier = if (elevated) com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else com.shenyan.designsystem.components.SyMaterialTier.L3_CARD,
+    verticalArrangement = verticalArrangement,
     content = content,
 )
