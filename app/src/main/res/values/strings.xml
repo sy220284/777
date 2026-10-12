@@ -2227,5 +2227,8 @@
     <string name="media_chat_creation_uncertain_hint">请先核对服务商的生成记录。</string>
     <string name="media_chat_creation_safe_retry">为避免重复计费，应用不会自动重新提交此请求。</string>
     <string name="media_chat_preview_unavailable">预览暂时不可用，可打开原图查看</string>
+    <string name="local_model_policy_known_context">上下文 %1$d Token</string>
+    <string name="local_model_policy_unknown_context">上下文容量未确认</string>
+    <string name="local_model_policy_work_budget">%1$s · Work 每片 %2$d 次请求</string>
 </resources>
 
