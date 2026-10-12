@@ -56,6 +56,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.observability.AppLog
@@ -210,6 +212,8 @@ fun SettingsScreen(
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
+    // Re-probe after returning from Android settings; a stale permission badge is misleading.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = settingsInkColors(DsTheme.colors)
     val toast = rememberDsToast()
@@ -303,6 +307,11 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    LaunchedEffect(page) {
+        if (page == SettingsDestination.PERMISSIONS || page == SettingsDestination.NOTIFICATIONS) {
+            viewModel.refreshDeviceCapabilities()
+        }
+    }
     LaunchedEffect(page, selectedMiniMaxProfile?.id) {
         if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) page = SettingsDestination.ROOT
     }
