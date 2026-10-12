@@ -20,22 +20,12 @@ internal data class LocalRunModelSurface(
 }
 
 internal fun LocalModelProfile.toRunModelSurface(): LocalRunModelSurface {
-    val resolvedProtocol = resolveLocalModelProtocol(
-        authKind = authKind,
-        profile = this,
-        model = model,
-        baseUrl = baseUrl,
-    )
+    val contract = LocalEffectiveModelContracts.forProfile(this)
     return LocalRunModelSurface(
         profile = this,
-        protocol = resolvedProtocol,
-        capabilities = LocalModelPresets.runtimeCapabilitiesFor(
-            model = model,
-            baseUrl = baseUrl,
-            protocol = resolvedProtocol,
-            authKind = authKind,
-        ),
-        routeFingerprint = routeFingerprint(),
+        protocol = contract.protocol,
+        capabilities = contract.runtime,
+        routeFingerprint = contract.routeFingerprint ?: routeFingerprint(),
     )
 }
 
@@ -44,10 +34,11 @@ internal fun LocalModelState.currentModelRuntimeCapabilities(): LocalModelRuntim
     val protocol = profile?.let {
         resolveLocalModelProtocol(it.authKind, it, model, baseUrl)
     } ?: LocalModelPresets.protocolFor(model, baseUrl)
-    return LocalModelPresets.runtimeCapabilitiesFor(
+    return LocalEffectiveModelContracts.resolve(
         model = model,
         baseUrl = baseUrl,
         protocol = protocol,
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
-    )
+        profile = profile,
+    ).runtime
 }
