@@ -1,5 +1,13 @@
 package com.labteto.dshmobile.connection
 
+/** UI support contract, shared by settings, rendering and regression tests. */
+object AppDisplayLimits {
+    const val MIN_SUPPORTED_WIDTH_DP = 393
+    const val MIN_READING_SCALE = 0.9f
+    const val MAX_READING_SCALE = 1.5f
+    const val MAX_EFFECTIVE_FONT_SCALE = 1.5f
+}
+
 /** Local application preferences persisted through DataStore. */
 data class AppSettings(
     val notifyLocalJobs: Boolean = true,
