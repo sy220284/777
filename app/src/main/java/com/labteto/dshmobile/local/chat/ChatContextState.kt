@@ -741,7 +741,10 @@ internal fun renderChatContextForModel(
             .filter { it.sequence > normalized.processedThroughSequence }
             .filter { it.generation == normalized.generation }
             .sortedBy(ChatPendingTurn::sequence)
-        if (pending.isNotEmpty() && (focusQuery == null ||
+        val pausedWeakReply = focusQuery != null &&
+            normalized.attention.pausedSubject.isNotBlank() &&
+            ChatTurnContextPolicy.isWeakReply(focusQuery)
+        if (pending.isNotEmpty() && !pausedWeakReply && (focusQuery == null ||
                 !ChatTurnContextPolicy.isTopicRedirect(focusQuery))) {
             appendLine("【尚未归并｜最高连续性优先】")
             appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
