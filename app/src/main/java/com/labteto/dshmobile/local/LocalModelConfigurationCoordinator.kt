@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelConnectionTester
 import com.labteto.dshmobile.local.model.LocalApiModelCatalog
+import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfile
