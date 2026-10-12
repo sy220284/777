@@ -54,8 +54,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.shenyan.designsystem.components.SyIconButton
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.shenyan.designsystem.components.SyCategoryRow
+import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -354,7 +354,7 @@ internal fun LocalModeDrawer(
                         )
                     }
                     items(matchedPersonas, key = { "persona:" + it.id }) { entry ->
-                        DsCategoryRow(
+                        SyCategoryRow(
                             icon = FeatherIcons.User,
                             title = entry.persona.name,
                             subtitle = entry.persona.coreIdentity.ifBlank {
@@ -506,8 +506,8 @@ internal fun LocalModeDrawer(
                         }
                     }
                 } else {
-                    DsGroupCard {
-                        DsCategoryRow(
+                    SyGroupCard {
+                        SyCategoryRow(
                             icon = FeatherIcons.SettingsOutline,
                             title = stringResource(R.string.settings_title),
                             titleTextStyle = DsType.navigationItem,
