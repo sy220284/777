@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -39,7 +42,7 @@ class FluidDesignInteractionTest {
         compose.onNodeWithTag("workDecisionCustom").performTextInput("Use the existing endpoint")
         compose.onNodeWithTag("workDecisionContinue").performClick()
         compose.onNodeWithText(context.getString(R.string.fluid_decision_failed)).assertIsDisplayed()
-        compose.onNodeWithTag("workDecisionCustom").assertTextEquals("Use the existing endpoint")
+        compose.onNodeWithTag("workDecisionCustom").assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("Use the existing endpoint")))
         compose.onNodeWithTag("workDecisionContinue").performClick()
         compose.runOnIdle { assertEquals(listOf("Use the existing endpoint", "Use the existing endpoint"), attempts) }
     }

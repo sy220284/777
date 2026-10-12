@@ -50,5 +50,10 @@ internal fun FluidRunBoardColumn(
             !(section == 1 && (state.pendingQuestion != null || state.pendingApproval != null))) {
             DsCard { Text(stringResource(R.string.fluid_board_empty), color = DsTheme.colors.labelSecondary) }
         }
+        if (section == 1) state.goal?.let { goal -> DsCard {
+            FluidPanelTitle(stringResource(R.string.local_run_current_goal))
+            Text(goal.description, style = DsType.std14, color = DsTheme.colors.labelPrimary)
+        } }
+
     }
 }
