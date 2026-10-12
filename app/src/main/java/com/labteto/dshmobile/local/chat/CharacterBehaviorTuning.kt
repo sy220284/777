@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import kotlinx.serialization.Serializable
 
 /**
@@ -65,7 +65,7 @@ data class CharacterBehaviorTuning(
         copy(samplingTemperaturePosition = level.coerceIn(0, 4) * 25)
 
     internal fun roleplayTemperature(model: String, baseUrl: String): Double? {
-        val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
+        val range = LocalEffectiveModelContracts.resolve(model, baseUrl).temperature ?: return null
         val position = temperaturePosition(range)
         if (range.omitAtChatDefault && position == range.defaultPosition) return null
         return range.at(position)
