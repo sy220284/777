@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -24,6 +25,34 @@ class LocalSubagentInboxRecoveryScanTest {
         )
         assertTrue(result.isEmpty())
         assertEquals(70, pages)
+    }
+
+    @Test
+    fun preservesClaimedInboxMessagesAcrossLongArchiveWithoutDuplicatingPendingIds() {
+        val wanted = QueuedAgentInput(id = "msg-keep", content = "新的用户限制")
+        val pending = QueuedAgentInput(id = "msg-pending", content = "已在队列")
+        val encoded = encodeLocalSubagentInboxClaimEvent(
+            agentId = "agent", backgroundJobId = "job-1",
+            messages = listOf(wanted, pending),
+        )
+        var pages = 0
+        val result = recoverSubagentInboxClaims(
+            backgroundJobId = "job-1",
+            checkpointSequence = 0L, scanThrough = 13_001L,
+            alreadyClaimed = emptySet(), pendingIds = setOf("msg-pending"),
+            pageAfter = { cursor ->
+                pages++
+                ((cursor + 1L)..minOf(cursor + 200L, 13_001L)).map { index ->
+                    if (index == 13_001L) LocalSessionEventLog.Event(
+                        sequence = index, type = LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
+                        createdAt = 0L, data = encoded,
+                    ) else event(index)
+                }
+            },
+        )
+        assertEquals(listOf("msg-keep"), result.map { it.id })
+        assertEquals("新的用户限制", result.single().content)
+        assertTrue(pages > 64)
     }
 
     @Test
