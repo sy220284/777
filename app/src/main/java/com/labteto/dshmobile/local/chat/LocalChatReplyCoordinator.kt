@@ -175,10 +175,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = "若本轮没有发言，使用 $silentToken 表示。"
-        val groupDynamic = ChatUnifiedTurnContext.compose(
-            userMessage = input, context = sharedContext,
-            parts = listOf(
-            ChatContextPart(ChatContextLayer.LIVE, prepared.dynamicPrompt),
+        val parts = prepared.dynamicParts + listOf(
             ChatContextPart(ChatContextLayer.RECALL, memoryContext),
             ChatContextPart(ChatContextLayer.INSTRUCTION, announcement.takeIf(String::isNotBlank)?.let { text ->
                 "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你真实知道的内容和当前状态判断；不要把公告当成你已经做过或说过的事。"
@@ -191,7 +188,10 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             """.trimIndent()),
             ),
         )
-        return prepared.copy(dynamicPrompt = groupDynamic)
+        return prepared.copy(
+            dynamicPrompt = ChatUnifiedTurnContext.compose(input, sharedContext, parts),
+            dynamicParts = parts,
+        )
     }
 
     suspend fun finalizeGroup(

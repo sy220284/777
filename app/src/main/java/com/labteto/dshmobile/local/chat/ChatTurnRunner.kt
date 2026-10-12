@@ -9,6 +9,7 @@ data class ChatTurnContext(
     val persona: PersonaProfile,
     val stablePrompt: String,
     val dynamicPrompt: String,
+    val dynamicParts: List<ChatContextPart> = emptyList(),
 ) {
     val prompt: String
         get() = listOf(stablePrompt, dynamicPrompt)
@@ -53,16 +54,15 @@ class ChatTurnRunner @Inject constructor(
                 ${it.take(MAX_STORY_CONTEXT_CHARS)}
                 """.trimIndent()
             }.orEmpty()
+            val parts = listOf(
+                ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
+                ChatContextPart(ChatContextLayer.HISTORICAL, continuationPrompt),
+            )
             return ChatTurnContext(
                 persona = persona,
                 stablePrompt = UNBOUND_CHAT_PROMPT,
-                dynamicPrompt = ChatUnifiedTurnContext.compose(
-                    userMessage = userInput, context = context,
-                    parts = listOf(
-                        ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
-                        ChatContextPart(ChatContextLayer.HISTORICAL, continuationPrompt),
-                    ),
-                ),
+                dynamicPrompt = ChatUnifiedTurnContext.compose(userInput, context, parts),
+                dynamicParts = parts,
             )
         }
 
@@ -77,6 +77,7 @@ class ChatTurnRunner @Inject constructor(
             persona = persona,
             stablePrompt = runtime.stablePrompt,
             dynamicPrompt = runtime.dynamicPrompt,
+            dynamicParts = runtime.dynamicParts,
         )
     }
 

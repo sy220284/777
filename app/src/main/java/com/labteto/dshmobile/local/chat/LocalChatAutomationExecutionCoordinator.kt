@@ -387,15 +387,13 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                             })
                         }
                 }
+                val dynamicParts = chatContext.dynamicParts + listOf(
+                    ChatContextPart(ChatContextLayer.RECALL, relationshipMemory),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, proactiveBackground),
+                    ChatContextPart(ChatContextLayer.INSTRUCTION, proactiveDirective),
+                )
                 val dynamicContext = ChatUnifiedTurnContext.compose(
-                    userMessage = conversationFocus,
-                    context = sessionContext,
-                    parts = listOf(
-                        ChatContextPart(ChatContextLayer.LIVE, chatContext.dynamicPrompt),
-                        ChatContextPart(ChatContextLayer.RECALL, relationshipMemory),
-                        ChatContextPart(ChatContextLayer.HISTORICAL, proactiveBackground),
-                        ChatContextPart(ChatContextLayer.INSTRUCTION, proactiveDirective),
-                    ),
+                    conversationFocus, sessionContext, dynamicParts,
                 )
                 val requestMessages = withChatTurnContext(
                     history = localHistory,

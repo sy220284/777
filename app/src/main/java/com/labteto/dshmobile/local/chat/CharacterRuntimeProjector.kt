@@ -78,12 +78,7 @@ internal class CharacterRuntimeProjector(
             "【连续性摘要｜已发生】\n${it.take(MAX_STORY_CONTEXT_CHARS)}"
         }.orEmpty()
 
-        return CharacterRuntimeProjection(
-            stablePrompt = stablePrompt(activePersona),
-            dynamicPrompt = ChatUnifiedTurnContext.compose(
-                userMessage = userInput,
-                context = context,
-                parts = listOf(
+        val parts = listOf(
                     ChatContextPart(ChatContextLayer.LIVE, momentPrompt(activePersona, runtimeState, userInput, attention)),
                     ChatContextPart(ChatContextLayer.HISTORICAL, renderCharacterLifePrompt(runtimeState.lifeState)),
                     ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
@@ -97,8 +92,11 @@ internal class CharacterRuntimeProjector(
                         unlockedStages = context.visibleStoryStages(),
                     )),
                     ChatContextPart(ChatContextLayer.HISTORICAL, relationshipEngine.prompt(userInput, relevantRelationshipState)),
-                ),
-            ),
+                )
+        return CharacterRuntimeProjection(
+            stablePrompt = stablePrompt(activePersona),
+            dynamicPrompt = ChatUnifiedTurnContext.compose(userInput, context, parts),
+            dynamicParts = parts,
         )
     }
 
@@ -346,4 +344,5 @@ internal class CharacterRuntimeProjector(
 internal data class CharacterRuntimeProjection(
     val stablePrompt: String,
     val dynamicPrompt: String,
+    val dynamicParts: List<ChatContextPart> = emptyList(),
 )

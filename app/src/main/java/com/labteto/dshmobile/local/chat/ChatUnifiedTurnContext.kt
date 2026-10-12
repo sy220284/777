@@ -6,14 +6,14 @@ package com.labteto.dshmobile.local.chat
  * Source owners decide what is true and what this character knows. This boundary decides whether
  * that already-validated content belongs in the current reply. It never changes durable memory.
  */
-internal enum class ChatContextLayer {
+enum class ChatContextLayer {
     LIVE,               // Current bodily condition, actual scene and current interaction.
     HISTORICAL,         // Old events, shared experiences and story checkpoints.
     RECALL,             // Search results and diarized historical material.
     INSTRUCTION,        // Role, audience, group announcement and authorized timer intent.
 }
 
-internal data class ChatContextPart(
+data class ChatContextPart(
     val layer: ChatContextLayer,
     val text: String,
 )
