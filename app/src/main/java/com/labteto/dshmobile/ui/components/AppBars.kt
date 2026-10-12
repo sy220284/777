@@ -37,13 +37,8 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-/**
- * 统一 mobile page bar.
- *
- * The title occupies a flexible center slot between fixed 48dp hit areas, wrapping when text grows.
- * Root pages may request [largeTitle], but it only raises typographic weight/size instead of creating
- * a second stacked toolbar; this keeps every secondary page on the same vertical rhythm.
- */
+/** Compatibility API. New visuals now live in canonical ShenyanChrome.kt. */
+@Deprecated("V5: replace with com.shenyan.designsystem.components.SyTopBar")
 @Composable
 fun DsTopBar(
     title: String,
@@ -60,61 +55,20 @@ fun DsTopBar(
     backIcon: ImageVector = FeatherIcons.ChevronLeft,
     plainBackButton: Boolean = false,
 ) {
-    val colors = DsTheme.colors
-    val sy = LocalSyPalette.current
-    // V5: the global toolbar is a SOLID chrome layer, never another glass plate.
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = sy.topBar,
-        border = BorderStroke(1.dp, sy.border.copy(alpha = .5f)),
-    ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Reserve an equal 48dp slot at either end. Unlike a centered overlay, this
-        // gives the title a real width constraint and lets large text grow vertically.
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = if (LocalConfiguration.current.screenWidthDp >= 600) SyDimensions.toolbarExpanded else SyDimensions.toolbarPhone),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DsIconButton(
-                icon = backIcon,
-                contentDescription = backContentDescription,
-                onClick = onBack,
-                containerColor = Color.Transparent,
-                iconSize = 24.dp,
-                tint = colors.labelPrimary,
-            )
-            Text(
-                title,
-                modifier = Modifier.weight(1f),
-                style = (if (largeTitle) DsType.title22 else DsType.headline17).withReadingWeight(),
-                color = colors.labelPrimary,
-                textAlign = TextAlign.Center,
-            )
-            if ((actionIcon != null || actionPainter != null) && onAction != null) {
-                DsIconButton(
-                    icon = actionIcon,
-                    iconPainter = actionPainter,
-                    contentDescription = actionContentDescription,
-                    onClick = onAction,
-                    enabled = actionEnabled,
-                    containerColor = Color.Transparent,
-                    iconSize = 24.dp,
-                    tint = colors.labelPrimary,
-                )
-            } else {
-                Box(Modifier.size(DsSpacing.touchTarget))
-            }
-        }
-        subtitle?.takeIf(String::isNotBlank)?.let {
-            Text(
-                it,
-                modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.tiny, bottom = DsSpacing.small),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-            )
-        }
-    }
-    }
+    com.shenyan.designsystem.components.SyTopBar(
+        title = title,
+        onBack = onBack,
+        backContentDescription = backContentDescription,
+        backIcon = backIcon,
+        modifier = modifier,
+        subtitle = subtitle,
+        largeTitle = largeTitle,
+        actionIcon = actionIcon,
+        actionPainter = actionPainter,
+        actionContentDescription = actionContentDescription,
+        actionEnabled = actionEnabled,
+        onAction = onAction,
+    )
 }
 
 /** 统一 compact peer selector: neutral track, white selected segment, no chromatic category fill. */
