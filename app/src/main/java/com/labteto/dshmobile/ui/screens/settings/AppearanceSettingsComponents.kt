@@ -164,39 +164,22 @@ internal fun ReadingPreferencesRow(
 
 @Composable
 internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
-    val colors = DsTheme.colors
-    val options = listOf(
-        "light" to stringResource(R.string.settings_appearance_light),
-        "dark" to stringResource(R.string.settings_appearance_dark),
-        "matte_black" to stringResource(R.string.settings_appearance_matte_black),
-        "system" to stringResource(R.string.settings_appearance_system),
+    // Screen 26: theme modes are a four-position choice track, not four unrelated
+    // preview cards. Real previews remain in AppearanceReadingPreview below.
+    DsSegmented(
+        segments = listOf(
+            DsSegment("light", stringResource(R.string.settings_appearance_light)),
+            DsSegment("dark", stringResource(R.string.settings_appearance_dark)),
+            DsSegment("matte_black", stringResource(R.string.settings_appearance_matte_black)),
+            DsSegment("system", stringResource(R.string.settings_appearance_system)),
+        ),
+        selectedKey = settings.themePreference,
+        onSelect = onSelect,
+        role = Role.RadioButton,
+        hapticOnChange = true,
+        stretch = true,
+        modifier = Modifier.fillMaxWidth(),
     )
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
-        // 预览先行：每块内画出主题本身的底色与卡片条，选中块描 accent 边
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            options.take(2).forEach { (key, label) ->
-                ThemePreviewBlock(
-                    themeKey = key,
-                    label = label,
-                    selected = settings.themePreference == key,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(key) },
-                )
-            }
-        }
-        Spacer(Modifier.height(DsSpacing.small))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            options.takeLast(2).forEach { (key, label) ->
-                ThemePreviewBlock(
-                    themeKey = key,
-                    label = label,
-                    selected = settings.themePreference == key,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(key) },
-                )
-            }
-        }
-    }
 }
 
 @Composable
