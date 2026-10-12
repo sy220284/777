@@ -51,7 +51,7 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
@@ -468,7 +468,7 @@ private fun ChatAutomationEventRow(
         )
     }
     if (confirmDelete) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.tasks_delete_confirm_title),
             onDismiss = { confirmDelete = false },
         ) {
