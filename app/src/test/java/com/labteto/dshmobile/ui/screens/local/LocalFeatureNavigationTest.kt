@@ -338,15 +338,18 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
-    fun navigationHistoryIsBoundedToTwelveEntries() {
+    fun deepNavigationPreservesEveryParentInsteadOfDiscardingHistory() {
         var stack = localFeatureHome()
         repeat(20) { index ->
             val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.RUN_CENTER
             stack = localFeaturePush(stack, page)
         }
 
-        assertEquals(12, stack.size)
+        assertEquals(21, stack.size)
+        assertEquals(LocalFeaturePage.HOME.name, stack.first())
         assertEquals(LocalFeaturePage.RUN_CENTER, localFeatureCurrent(stack))
+        repeat(20) { stack = localFeaturePop(stack) }
+        assertEquals(localFeatureHome(), stack)
     }
 
     @Test
