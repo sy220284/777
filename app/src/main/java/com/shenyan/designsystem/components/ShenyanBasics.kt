@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -25,45 +26,89 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.delay
 import com.shenyan.designsystem.foundation.*
 
 /** 基础 18 组件：所有业务动作由调用者注入，完全不依赖旧版 Ds 控件。 */
-enum class SyButtonStyle { PRIMARY, SECONDARY, GHOST, DANGER }
+enum class SyButtonStyle { PRIMARY, SECONDARY, GHOST, OUTLINE, DANGER }
 
+/**
+ * Single V5 button implementation. Supports legacy business handlers during migration.
+ * Never uses a separate fallback button renderer.
+ */
 @Composable
-fun SyButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
-             style: SyButtonStyle = SyButtonStyle.PRIMARY, enabled: Boolean = true, loading: Boolean = false) {
+fun SyButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    style: SyButtonStyle = SyButtonStyle.PRIMARY,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    icon: ImageVector? = null,
+    height: Dp = SyMetric.touch,
+    onHoldRepeat: (() -> Unit)? = null,
+) {
     val c = LocalSyColors.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val repeatAction by rememberUpdatedState(onHoldRepeat)
+    LaunchedEffect(pressed, enabled, loading) {
+        if (!pressed || !enabled || loading || repeatAction == null) return@LaunchedEffect
+        delay(420L)
+        while (true) {
+            val action = repeatAction ?: break
+            action()
+            delay(90L)
+        }
+    }
     val reduceMotion = LocalSyReduceMotion.current
-    val scale by animateFloatAsState(if (pressed && enabled) .97f else 1f,
-        animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs), label = "syButtonPress")
+    val scale by animateFloatAsState(
+        if (pressed && enabled) .97f else 1f,
+        animationSpec = tween(if (reduceMotion) 0 else SyMotion.pressMs),
+        label = "syButtonPress",
+    )
     val fill = when (style) {
         SyButtonStyle.PRIMARY -> c.primary
         SyButtonStyle.DANGER -> c.danger
-        SyButtonStyle.GHOST -> Color.Transparent
         SyButtonStyle.SECONDARY -> c.surfaceRaised
+        SyButtonStyle.GHOST, SyButtonStyle.OUTLINE -> Color.Transparent
     }
     val foreground = when (style) {
         SyButtonStyle.PRIMARY -> c.onPrimary
         SyButtonStyle.DANGER -> Color(0xFF241613)
         else -> c.text
     }
-    Surface(onClick = onClick, enabled = enabled && !loading, interactionSource = interaction,
-        modifier = modifier.heightIn(min = SyMetric.touch).scale(scale),
-        color = if (style == SyButtonStyle.PRIMARY) Color.Transparent else fill, contentColor = foreground,
+    Surface(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        interactionSource = interaction,
+        modifier = modifier.heightIn(min = height.coerceAtLeast(SyMetric.touch)).scale(scale),
+        color = if (style == SyButtonStyle.PRIMARY) Color.Transparent else fill,
+        contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.GHOST)
-            BorderStroke(1.dp, c.border) else null) {
-        Row(Modifier
-                .background(if (style == SyButtonStyle.PRIMARY)
-                    Brush.horizontalGradient(listOf(c.primary, c.primaryPressed))
-                    else Brush.horizontalGradient(listOf(fill, fill)))
-                .padding(horizontal = 16.dp, vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            if (loading) { CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)) }
-            Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE)
+            BorderStroke(1.dp, c.border) else null,
+    ) {
+        Row(
+            Modifier.background(
+                Brush.horizontalGradient(if (style == SyButtonStyle.PRIMARY)
+                    listOf(c.primary, c.primaryPressed) else listOf(fill, fill))
+            ).padding(horizontal = 16.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(Modifier.size(16.dp),
+                    color = foreground, strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+            } else if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
+            }
+            if (text.isNotEmpty()) {
+                Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
