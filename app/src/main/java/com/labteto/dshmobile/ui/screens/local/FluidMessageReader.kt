@@ -15,7 +15,7 @@ import com.labteto.dshmobile.ui.theme.*
 /** Design 05: immersive reading occupies the display and keeps the conversation mounted beneath it. */
 @Composable
 internal fun FluidMessageReader(title: String, content: String, onDismiss: () -> Unit) {
-    DsFullScreenDialog(onDismiss = onDismiss) {
+    SyFullScreenDialog(onDismiss = onDismiss) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
