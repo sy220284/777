@@ -63,6 +63,25 @@ class LocalFeatureEntryDescriptionsRegressionTest {
     }
 
     @Test
+    fun groupNewSessionHasNoExplanatoryTextAndKeepsActions() {
+        var selected = ""
+        compose.setContent {
+            DshTheme {
+                GroupNewSessionDialog(
+                    onDismiss = {},
+                    onNewGroup = { selected = "group" },
+                    onNewSingle = { selected = "single" },
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.local_group_new_session_intro)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_group_new_group)).performClick()
+        compose.runOnIdle { assertEquals("group", selected) }
+        compose.onNodeWithText(context.getString(R.string.local_group_new_single)).performClick()
+        compose.runOnIdle { assertEquals("single", selected) }
+    }
+
+    @Test
     fun agentTeamLaunchEntryHasNoSubtitleAndStillResponds() {
         var clicks = 0
         compose.setContent {
