@@ -46,4 +46,26 @@ class ChatTurnModeTest {
         assertTrue(recalled.dynamicPrompt.contains("宋制襦裙"))
     }
 
+    @Test
+    fun lastTopicPauseAlsoFiltersRelationshipFactsAndStorySummary() {
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val persona = PersonaProfile(name = "阿青")
+        val state = ChatCharacterState(dynamics = RelationshipDynamics(
+            facts = listOf(RelationshipEvidence(
+                text = "答应一起展示宋制襦裙", source = "dialogue", confidence = 90,
+            )),
+            sharedMoments = listOf("上次一起展示明制披衫"),
+            unknowns = listOf("是否继续展示服饰"),
+        ))
+        val context = ChatContextState(attention = ChatAttentionState(
+            pausedSubject = "衣服", lastUserSubject = "", updatedSequence = 99L,
+        ))
+        val projection = projector.project(
+            persona, state, context, "嗯",
+            "剧情提要：刚才在展示宋制襦裙",
+        )
+        assertTrue(!projection.dynamicPrompt.contains("宋制襦裙"))
+        assertTrue(!projection.dynamicPrompt.contains("明制披衫"))
+    }
+
 }
