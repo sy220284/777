@@ -47,12 +47,22 @@ internal class ChatInteractionPromptBuilder {
             appendLine("已定事项：${state.continuity.decisions.joinToString("；")}")
         }
         if (state.continuity.unfinished.isNotEmpty()) {
-            appendLine("待续事项：${state.continuity.unfinished.joinToString("；")}")
+            appendLine("待续事件（编号只用于准确结清，不向用户展示）：")
+            state.continuity.unfinished.forEach { fact ->
+                val source = state.continuity.evidence.firstOrNull {
+                    it.kind == ChatContinuityFactKind.OPEN_THREAD && it.text == fact
+                }
+                val id = source?.eventId?.takeIf(String::isNotBlank)
+                    ?: chatContinuityEventId(
+                        ChatContinuityFactKind.OPEN_THREAD, fact, source?.sourceSequence ?: 0L,
+                    )
+                appendLine("- $id：$fact")
+            }
         }
 
         appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
         appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
-        appendLine("输出：{\"state\":{仅写变化字段},\"stateEvidence\":{\"变化字段名\":\"支持变化的本轮原文\"},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
+        appendLine("输出：{\"state\":{仅写变化字段},\"stateEvidence\":{\"变化字段名\":\"支持变化的本轮原文\"},\"resolvedContinuityIds\":[],\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
         appendLine(
             "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
                 "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression；" +
@@ -78,6 +88,7 @@ internal class ChatInteractionPromptBuilder {
         appendLine("- stateEvidence引用实际对话，嵌套字段用dynamics.unresolvedConflict等完整字段名；不编造引文。人物的主观理解与用户事实分开，未知情绪不补写。")
         appendLine("- dynamics.unknowns 若输出，必须是本轮处理后仍未解答问题的完整列表；已由对话确认的问题移除，全部解答则输出 []。省略字段代表本轮没有检查此项。")
         appendLine("- 用户说不再讨论某话题，不等于该事件从历史中删除；应停止把它当成本轮目标，后续明确重新提起时仍可回忆。")
+        appendLine("- resolvedContinuityIds 仅填写本批用户真实对话已确认/完成且本轮不再保留的待续事件编号；同一句确认了几件事要逐项关联，不能猜编号或仅凭角色自己说了算。")
         appendLine("- continuity 只保留当前有效的关键事件、决定和待续事项，合并重复，不复制旧台词。")
         appendLine("- NONE=无有效变化；MINOR=短期或连续性变化；MAJOR=重大关系事件、共同经历或稳定事实。")
         appendLine("- suggestions 固定为空；不得替用户作重大决定。现实关系建议禁止跟踪、胁迫、欺骗操控或绕过明确拒绝。")
