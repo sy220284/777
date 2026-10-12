@@ -27,8 +27,15 @@ internal fun recoverSubagentInboxClaims(
         check(page.isNotEmpty()) {
             "SUBAGENT_RECOVERY_HISTORY_GAP：持久事件日志缺少待恢复区间；停止续跑以防遗漏用户消息"
         }
+        // Append-only logs have contiguous event sequences. A page can silently skip
+        // damaged rows or unreadable segments: never mark that recovery as complete.
+        var expected = cursor + 1L
         for (event in page) {
             if (event.sequence > scanThrough) break
+            check(event.sequence == expected) {
+                "SUBAGENT_RECOVERY_SEQUENCE_GAP：期望事件序号 $expected，实际 ${event.sequence}；不能丢弃未确认的用户消息"
+            }
+            expected++
             if (event.type != LOCAL_SUBAGENT_INBOX_CLAIM_EVENT ||
                 event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != backgroundJobId
             ) continue
@@ -38,7 +45,7 @@ internal fun recoverSubagentInboxClaims(
                 recovered += message
             }
         }
-        val nextCursor = page.last().sequence
+        val nextCursor = minOf(page.last().sequence, scanThrough)
         check(nextCursor > cursor) {
             "SUBAGENT_RECOVERY_NO_PROGRESS：持久事件日志未推进读取位置，停止续跑避免无限扫描"
         }
