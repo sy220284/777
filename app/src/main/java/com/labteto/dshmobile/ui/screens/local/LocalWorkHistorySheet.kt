@@ -123,7 +123,7 @@ internal fun LocalWorkHistorySheet(
                                     else -> stringResource(R.string.local_run_history_result)
                                 }), style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
                             record.artifacts.forEach { artifact ->
-                                DsSheetChoiceRow(title = artifact.reference,
+                                SySheetChoiceRow(title = artifact.reference,
                                     subtitle = if (artifact.currentlyAvailable == false) stringResource(R.string.local_artifact_file_unavailable) else null,
                                     onClick = {
                                         artifactFailed = false
