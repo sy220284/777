@@ -32,18 +32,23 @@ internal fun workflowStageLabel(stage: String): String = stringResource(when (st
     else -> R.string.local_workflow_stalled
 })
 
+/** Explicitly derive color/motion from real execution state, not percentage alone. */
+internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): DsProgressStatus {
+    val blocked = progress.blockedReason != null || progress.stage == "受阻"
+    return when {
+        blocked -> DsProgressStatus.Failed
+        progress.stage == "已完成" && progress.total > 0 &&
+            progress.completed >= progress.total -> DsProgressStatus.Done
+        progress.total <= 0 -> DsProgressStatus.Idle
+        else -> DsProgressStatus.Running
+    }
+}
+
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors
     val isBlocked = progress.blockedReason != null || progress.stage == "受阻"
-    val isDone = !isBlocked && progress.stage == "已完成" &&
-        progress.total > 0 && progress.completed >= progress.total
-    val progressStatus = when {
-        isBlocked -> DsProgressStatus.Failed
-        isDone -> DsProgressStatus.Done
-        progress.total <= 0 -> DsProgressStatus.Idle
-        else -> DsProgressStatus.Running
-    }
+    val progressStatus = workflowProgressVisualStatus(progress)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
         // The stage changes in place rather than posting an unconditional completion toast.
         AnimatedContent(

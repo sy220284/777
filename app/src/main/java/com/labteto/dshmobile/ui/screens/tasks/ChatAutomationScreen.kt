@@ -90,6 +90,13 @@ internal fun chatAutomationVisualStatus(task: AutomationTask): ChatAutomationVis
     ) ChatAutomationVisualStatus.ONGOING else ChatAutomationVisualStatus.PENDING
 }
 
+/** UI-only story/session filter; it does not mutate the task's persisted target. */
+internal fun chatAutomationInSession(
+    targetSessionId: String?,
+    currentSessionId: String,
+    currentOnly: Boolean,
+): Boolean = !currentOnly || (currentSessionId.isNotBlank() && targetSessionId == currentSessionId)
+
 internal fun sortChatAutomationTasks(tasks: List<AutomationTask>): List<AutomationTask> =
     tasks.sortedWith(
         compareBy<AutomationTask> {
@@ -123,9 +130,9 @@ internal fun ChatAutomationScreen(
     // This filter is a view concern, not an automation policy; ALL always stays available.
     var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
     val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
-    val visibleTasks = if (currentSessionOnly) {
-        tasks.filter { it.targetSessionId == harnessState.sessionId }
-    } else tasks
+    val visibleTasks = tasks.filter {
+        chatAutomationInSession(it.targetSessionId, harnessState.sessionId, currentSessionOnly)
+    }
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
