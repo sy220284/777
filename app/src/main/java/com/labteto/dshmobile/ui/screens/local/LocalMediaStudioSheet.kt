@@ -40,10 +40,10 @@ import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalMediaImage
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -145,14 +145,14 @@ internal fun LocalMediaStudioSheetContent(
         if (selected == null) {
             Text(stringResource(R.string.media_studio_no_model), color = colors.labelSecondary)
         } else {
-            DsButton(
+            SyButton(
                 text = stringResource(
                     R.string.media_studio_selected_model, selected.label,
                     selected.profile.displayName ?: selected.profile.model,
                 ),
                 onClick = { if (!busy) showModelChoices = !showModelChoices },
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 enabled = !busy,
             )
             if (showModelChoices) {
@@ -161,15 +161,15 @@ internal fun LocalMediaStudioSheetContent(
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     items(available, key = { it.id }) { option ->
-                        DsButton(
+                        SyButton(
                             text = stringResource(
                                 R.string.media_studio_selected_model, option.label,
                                 option.profile.displayName ?: option.profile.model,
                             ),
                             onClick = { chosenId = option.id; showModelChoices = false },
                             enabled = !busy,
-                            size = DsButtonSize.Small,
-                            variant = if (selected.id == option.id) DsButtonVariant.Primary else DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = if (selected.id == option.id) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -177,7 +177,7 @@ internal fun LocalMediaStudioSheetContent(
             }
 
             if (kind != LocalMediaKind.TRANSCRIBE) {
-                DsTextField(
+                SyTextField(
                     value = prompt, onValueChange = { prompt = it },
                     label = { Text(stringResource(
                         if (kind == LocalMediaKind.SPEECH) R.string.minimax_media_speech_input
@@ -192,19 +192,19 @@ internal fun LocalMediaStudioSheetContent(
                 LocalMediaKind.IMAGE -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                         listOf("1:1", "16:9", "9:16").forEach { option ->
-                            DsButton(text = option, enabled = !busy, size = DsButtonSize.Small,
-                                variant = if (ratio == option) DsButtonVariant.Primary else DsButtonVariant.Ghost,
+                            SyButton(text = option, enabled = !busy, size = SyButtonSize.Small,
+                                variant = if (ratio == option) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                                 onClick = { ratio = option })
                         }
                     }
-                    DsButton(text = stringResource(R.string.minimax_media_create_image),
+                    SyButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
                             val result = viewModel.image(selected, prompt, ratio)
                             if (selected.id == activeOfferId) image = result
                         } })
                     image?.url?.let { url ->
-                        DsButton(text = stringResource(R.string.minimax_media_open_image),
+                        SyButton(text = stringResource(R.string.minimax_media_open_image),
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { openMediaUrl(context, url) { error = it } })
                     }
@@ -215,16 +215,16 @@ internal fun LocalMediaStudioSheetContent(
                             "webp" -> "image/webp"
                             else -> "application/octet-stream"
                         }
-                        DsButton(text = stringResource(R.string.media_studio_view_image),
+                        SyButton(text = stringResource(R.string.media_studio_view_image),
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { viewMediaFile(context, file, mime) { error = it } })
-                        DsButton(text = stringResource(R.string.media_studio_share_image),
+                        SyButton(text = stringResource(R.string.media_studio_share_image),
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { shareMediaFile(context, file, mime) { error = it } })
                     }
                 }
                 LocalMediaKind.VIDEO -> {
-                    DsButton(text = stringResource(R.string.minimax_media_start_video),
+                    SyButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
                             val task = viewModel.createVideo(selected, prompt)
@@ -241,11 +241,11 @@ internal fun LocalMediaStudioSheetContent(
                             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
                             items(taskRecords, key = { it.id }) { task ->
-                                DsButton(
+                                SyButton(
                                     text = "${task.model} · ${task.providerTaskId ?: task.id.take(8)}",
-                                    size = DsButtonSize.Small,
-                                    variant = if (currentTask?.id == task.id) DsButtonVariant.Primary
-                                        else DsButtonVariant.Ghost,
+                                    size = SyButtonSize.Small,
+                                    variant = if (currentTask?.id == task.id) SyButtonVariant.Primary
+                                        else SyButtonVariant.Ghost,
                                     onClick = { viewedVideoTaskId = task.id },
                                     enabled = !busy,
                                     modifier = Modifier.fillMaxWidth(),
@@ -276,33 +276,33 @@ internal fun LocalMediaStudioSheetContent(
                         if (task.phase == LocalMediaVideoPhase.QUEUED ||
                             task.phase == LocalMediaVideoPhase.PROCESSING
                         ) {
-                            DsButton(text = stringResource(R.string.minimax_media_check_video),
+                            SyButton(text = stringResource(R.string.minimax_media_check_video),
                                 enabled = !busy, modifier = Modifier.fillMaxWidth(),
                                 onClick = { submit(selected) {
                                     viewModel.refreshVideo(selected, task.id)
                                 } })
                         }
                         task.downloadUrl?.let { url ->
-                            DsButton(text = stringResource(R.string.minimax_media_open_video),
+                            SyButton(text = stringResource(R.string.minimax_media_open_video),
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { openMediaUrl(context, url) { error = it } })
                         }
                     }
                 }
                 LocalMediaKind.SPEECH -> {
-                    DsTextField(
+                    SyTextField(
                         value = voiceId, onValueChange = { voiceId = it },
                         label = { Text(stringResource(R.string.minimax_media_voice_id)) },
                         singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(),
                     )
-                    DsButton(text = stringResource(R.string.minimax_media_select_voice),
+                    SyButton(text = stringResource(R.string.minimax_media_select_voice),
                         onClick = { submit(selected) {
                             val fetched = viewModel.voices(selected)
                             if (selected.id == activeOfferId) { voices = fetched; showVoices = true }
                         } },
-                        enabled = !busy, modifier = Modifier.fillMaxWidth(), variant = DsButtonVariant.Ghost)
+                        enabled = !busy, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
                     if (showVoices) {
-                        DsTextField(value = voiceFilter, onValueChange = { voiceFilter = it },
+                        SyTextField(value = voiceFilter, onValueChange = { voiceFilter = it },
                             label = { Text(stringResource(R.string.minimax_media_filter_voice)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth())
                         LazyColumn(
@@ -312,14 +312,14 @@ internal fun LocalMediaStudioSheetContent(
                             items(voices.filter {
                                 it.name.contains(voiceFilter, true) || it.id.contains(voiceFilter, true)
                             }, key = { it.id }) { voice ->
-                                DsButton(text = voice.name,
+                                SyButton(text = voice.name,
                                     onClick = { voiceId = voice.id; showVoices = false },
-                                    modifier = Modifier.fillMaxWidth(), size = DsButtonSize.Small,
-                                    variant = DsButtonVariant.Ghost)
+                                    modifier = Modifier.fillMaxWidth(), size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost)
                             }
                         }
                     }
-                    DsButton(text = stringResource(R.string.minimax_media_create_speech),
+                    SyButton(text = stringResource(R.string.minimax_media_create_speech),
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
@@ -327,24 +327,24 @@ internal fun LocalMediaStudioSheetContent(
                             if (selected.id == activeOfferId) audioFile = file
                         } })
                     audioFile?.let { file ->
-                        DsButton(text = stringResource(R.string.minimax_media_share_speech),
+                        SyButton(text = stringResource(R.string.minimax_media_share_speech),
                             onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } },
                             modifier = Modifier.fillMaxWidth())
                     }
                 }
                 LocalMediaKind.TRANSCRIBE -> {
-                    DsButton(text = stringResource(R.string.minimax_media_pick_audio),
+                    SyButton(text = stringResource(R.string.minimax_media_pick_audio),
                         enabled = !busy, modifier = Modifier.fillMaxWidth(),
                         onClick = { picker.launch(arrayOf("audio/*")) })
                     transcript?.let { text ->
                         Text(text, color = colors.labelPrimary, style = DsType.std14.withReadingWeight())
                         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                            DsButton(text = stringResource(R.string.minimax_media_insert_text),
-                                onClick = { onInsertTranscript(text) }, size = DsButtonSize.Small)
-                            DsButton(text = stringResource(R.string.minimax_media_copy_text),
+                            SyButton(text = stringResource(R.string.minimax_media_insert_text),
+                                onClick = { onInsertTranscript(text) }, size = SyButtonSize.Small)
+                            SyButton(text = stringResource(R.string.minimax_media_copy_text),
                                 onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                                     .setPrimaryClip(ClipData.newPlainText("transcription", text)) },
-                                size = DsButtonSize.Small, variant = DsButtonVariant.Ghost)
+                                size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
                         }
                     }
                 }
@@ -358,10 +358,10 @@ internal fun LocalMediaStudioSheetContent(
             Text(stringResource(R.string.minimax_media_error, it), color = colors.labelPrimary, style = DsType.caption11.withReadingWeight())
         }
         if (videoTasks.isNotEmpty()) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.media_studio_video_archive, videoTasks.size),
                 onClick = { showVideoArchive = !showVideoArchive },
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (showVideoArchive) {
@@ -402,9 +402,9 @@ internal fun LocalMediaStudioSheetContent(
                                     LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING
                                 )
                             ) {
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.minimax_media_check_video),
-                                    size = DsButtonSize.Small,
+                                    size = SyButtonSize.Small,
                                     enabled = videoRefreshBusy == null,
                                     onClick = {
                                         videoRefreshBusy = task.id
@@ -421,9 +421,9 @@ internal fun LocalMediaStudioSheetContent(
                                 )
                             }
                             task.downloadUrl?.let { url ->
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.minimax_media_open_video),
-                                    size = DsButtonSize.Small,
+                                    size = SyButtonSize.Small,
                                     onClick = { openMediaUrl(context, url) { historyError = it } },
                                 )
                             }
@@ -433,10 +433,10 @@ internal fun LocalMediaStudioSheetContent(
             }
         }
         if (generatedResults.isNotEmpty()) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.media_studio_history, generatedResults.size),
                 onClick = { showHistory = !showHistory },
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (showHistory) {
@@ -469,21 +469,21 @@ internal fun LocalMediaStudioSheetContent(
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                                 if (file != null) {
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.media_studio_view_result),
-                                        size = DsButtonSize.Small,
+                                        size = SyButtonSize.Small,
                                         onClick = { viewMediaFile(context, file, mime) { historyError = it } },
                                     )
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.media_studio_share),
-                                        size = DsButtonSize.Small,
-                                        variant = DsButtonVariant.Ghost,
+                                        size = SyButtonSize.Small,
+                                        variant = SyButtonVariant.Ghost,
                                         onClick = { shareMediaFile(context, file, mime) { historyError = it } },
                                     )
                                 } else if (asset.remoteUrl != null) {
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.media_studio_open_temporary_link),
-                                        size = DsButtonSize.Small,
+                                        size = SyButtonSize.Small,
                                         onClick = { openMediaUrl(context, asset.remoteUrl) { historyError = it } },
                                     )
                                 } else {
@@ -491,10 +491,10 @@ internal fun LocalMediaStudioSheetContent(
                                         style = DsType.caption11.withReadingWeight(),
                                         color = colors.labelSecondary)
                                 }
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.media_studio_delete_record),
-                                    size = DsButtonSize.Small,
-                                    variant = DsButtonVariant.Ghost,
+                                    size = SyButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost,
                                     onClick = { pendingDeleteId = asset.id },
                                 )
                             }
@@ -503,8 +503,8 @@ internal fun LocalMediaStudioSheetContent(
                                     style = DsType.caption11.withReadingWeight(),
                                     color = colors.labelSecondary)
                                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                                    DsButton(text = stringResource(R.string.media_studio_delete_confirm),
-                                        size = DsButtonSize.Small, onClick = {
+                                    SyButton(text = stringResource(R.string.media_studio_delete_confirm),
+                                        size = SyButtonSize.Small, onClick = {
                                             scope.launch {
                                                 try {
                                                     viewModel.removeResult(asset.id)
@@ -514,8 +514,8 @@ internal fun LocalMediaStudioSheetContent(
                                                 }
                                             }
                                         })
-                                    DsButton(text = stringResource(R.string.media_studio_delete_cancel),
-                                        size = DsButtonSize.Small, variant = DsButtonVariant.Ghost,
+                                    SyButton(text = stringResource(R.string.media_studio_delete_cancel),
+                                        size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
                                         onClick = { pendingDeleteId = null })
                                 }
                             }
