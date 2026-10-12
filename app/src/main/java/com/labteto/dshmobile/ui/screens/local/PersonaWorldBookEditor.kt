@@ -75,12 +75,24 @@ internal fun PersonaWorldBookEditor(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
+                    Column(
                         modifier = Modifier.weight(1f),
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.labelPrimary,
-                    )
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        Text(
+                            entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        if (entry.keywords.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.local_persona_lore_entry_keywords) + " · " +
+                                    entry.keywords.take(3).joinToString(" · "),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelTertiary,
+                            )
+                        }
+                    }
                     DsButton(
                         text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
                         onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
