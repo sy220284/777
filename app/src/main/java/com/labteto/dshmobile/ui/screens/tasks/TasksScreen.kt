@@ -38,13 +38,13 @@ import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -209,7 +209,7 @@ private fun WorkTasksScreen(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 Box(Modifier.fillMaxWidth()) {
-                    DsTopBar(
+                    SyTopBar(
                         title = stringResource(
                             if (showCreate) {
                                 if (editingTaskIdState.value != null) R.string.tasks_edit else R.string.tasks_new
@@ -286,9 +286,9 @@ private fun WorkTasksScreen(
                             stringResource(R.string.tasks_filter_running),
                             stringResource(R.string.tasks_filter_paused),
                         )
-                        DsSegmented(
+                        SySegmented(
                             segments = statusFilters.mapIndexed { index, filter ->
-                                DsSegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
+                                SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
                             },
                             selectedKey = listFilter.name,
                             onSelect = { key ->
@@ -311,10 +311,10 @@ private fun WorkTasksScreen(
                                     style = DsType.small13.withReadingWeight(),
                                     color = colors.labelSecondary,
                                 )
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.tasks_filter_all),
                                     onClick = { listFilter = WorkTaskListFilter.ALL },
-                                    variant = DsButtonVariant.Outline,
+                                    variant = SyButtonVariant.Outline,
                                 )
                             }
                         } else {
