@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.project.ProjectContextPort
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelBudgetPolicies
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelReply
@@ -143,12 +144,21 @@ internal class LocalWorkAgentTurnExecutor(
             }
             // A new user turn or checkpoint continuation starts a new request slice.
             // When child requests remain in flight the shared budget stays intact.
-            binding.executionControl.budget.beginExecutionSlice(
-                LocalModelBudgetPolicies.forRoute(
-                    runState.value.modelState.model,
-                    runState.value.modelState.baseUrl,
-                ),
-            )
+            val selectedRoute = runState.value.modelState
+            val selectedProfile = selectedRoute.modelSelection.activeProfile?.takeIf {
+                it.model == selectedRoute.model &&
+                    normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(selectedRoute.baseUrl)
+            }
+            val effectiveModel = if (selectedProfile != null) {
+                LocalEffectiveModelContracts.forProfile(selectedProfile, withTools = true)
+            } else {
+                LocalEffectiveModelContracts.resolve(
+                    model = selectedRoute.model,
+                    baseUrl = selectedRoute.baseUrl,
+                    withTools = true,
+                )
+            }
+            binding.executionControl.budget.beginExecutionSlice(effectiveModel.executionBudget)
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
             workTurnToolRuntime.clear(binding)
             workTurnToolRuntime.prepare(binding, input)
