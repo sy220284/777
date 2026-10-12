@@ -98,6 +98,8 @@ class CharacterDiaryCorrectionRegressionTest {
                 )
             }
         }
+        // The recorded event is presented as a readable diary heading, not generated content.
+        compose.onNodeWithTag("diary_paper_event_event-1").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("diary_edit_event-1").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(0, saved) }
         compose.onNodeWithTag("diary_edit_event").performTextReplacement("周末改去山上")
