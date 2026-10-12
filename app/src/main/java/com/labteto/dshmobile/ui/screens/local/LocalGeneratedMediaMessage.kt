@@ -149,6 +149,7 @@ internal fun LocalGeneratedVideoTaskRow(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val savedVideo = remember(task.id, task.fileName) { viewModel.videoFile(task) }
     val offer = remember(task.offerId, task.routeFingerprint, offers) {
         offers.firstOrNull { task.belongsTo(it) }
     }
@@ -192,7 +193,7 @@ internal fun LocalGeneratedVideoTaskRow(
         }
         if (task.phase == LocalMediaVideoPhase.SUCCEEDED && task.downloadUrl != null) {
             if (showingPlayer) {
-                InlineVideoPlayer(task.downloadUrl, onError = { error = it })
+                InlineVideoPlayer(task.downloadUrl, savedVideo, onError = { error = it })
             } else {
                 Surface(shape = DsShapes.block, color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
@@ -205,9 +206,15 @@ internal fun LocalGeneratedVideoTaskRow(
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 DsButton(text = if (showingPlayer) "收起播放" else "播放视频", size = DsButtonSize.Small,
                     onClick = { showingPlayer = !showingPlayer })
-                DsButton(text = "打开原视频", size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
-                    onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                if (savedVideo != null) {
+                    DsButton(text = "分享／保存视频", size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                        onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
+                } else {
+                    DsButton(text = "打开原视频", size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                        onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
+                }
             }
         } else {
             task.lastError?.let {
@@ -236,6 +243,10 @@ internal fun LocalGeneratedVideoTaskRow(
                 Text("原创作账户已不可用，请恢复该账户后查询。",
                     color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             }
+        }
+        task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
+            Text(it, style = DsType.caption11.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary)
         }
         error?.let { Text(it, color = DsTheme.colors.labelSecondary,
             style = DsType.caption11.withReadingWeight()) }
@@ -355,9 +366,9 @@ private fun InlineSpeechPlayer(file: File) {
 }
 
 @Composable
-private fun InlineVideoPlayer(url: String, onError: (String) -> Unit) {
-    var player by remember(url) { mutableStateOf<VideoView?>(null) }
-    DisposableEffect(url) {
+private fun InlineVideoPlayer(url: String, localFile: File?, onError: (String) -> Unit) {
+    var player by remember(url, localFile?.absolutePath) { mutableStateOf<VideoView?>(null) }
+    DisposableEffect(url, localFile?.absolutePath) {
         onDispose { player?.stopPlayback(); player = null }
     }
     AndroidView(
@@ -369,7 +380,7 @@ private fun InlineVideoPlayer(url: String, onError: (String) -> Unit) {
                 setMediaController(controls)
                 setOnPreparedListener { start() }
                 setOnErrorListener { _, _, _ -> onError("视频加载失败，请检查网络或原始视频是否已过期"); true }
-                setVideoURI(Uri.parse(url))
+                setVideoURI(localFile?.let { Uri.fromFile(it) } ?: Uri.parse(url))
                 player = this
             }
         },
