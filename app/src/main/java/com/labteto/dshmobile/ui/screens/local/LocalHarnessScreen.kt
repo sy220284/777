@@ -104,10 +104,10 @@ import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.local.model.canQueryMiniMaxQuota
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
