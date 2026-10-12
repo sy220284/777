@@ -59,23 +59,14 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun flirtingRestoresActionRepertoire() {
-        val prompt = engine.prompt("靠近点，陪我聊会", ChatCharacterState())
-        assertTrue(prompt.contains("互动变化"))
-        assertTrue(prompt.contains("互动强度"))
-    }
-
-    @Test
-    fun requestGuidanceChangesWithoutRewritingRelationshipFacts() {
+    fun relationshipFactsStayIndependentFromIntimacyIntent() {
         val state = ChatCharacterState(relationshipState = "亲近")
         val normal = engine.prompt("今天怎么样", state)
         val flirting = engine.prompt("今晚撩我一下", state)
+        assertEquals(normal, flirting)
         assertTrue(normal.contains("当前关系：亲近"))
-        assertTrue(flirting.contains("当前关系：亲近"))
-        assertFalse(normal.contains("互动变化"))
-        assertTrue(flirting.contains("互动变化"))
+        assertFalse(flirting.contains("【亲密模式】"))
     }
-
     @Test
     fun chineseInnuendoRecognizesStrongAndContextualDoubleMeanings() {
         assertEquals(
@@ -165,27 +156,9 @@ class ChatRelationshipEngineTest {
     }
 
     @Test
-    fun chineseInnuendoRestoresContextGuidance() {
-        assertTrue(hasChineseSuggestiveFlirtingIntent("你行不行啊，别光说"))
-        val prompt = engine.prompt("你行不行啊，别光说", ChatCharacterState())
-        assertTrue(prompt.contains("【中文双关】"))
-        assertTrue(prompt.contains("言外之意"))
-    }
-
-    @Test
-    fun recentInteractionTagsRestoreVariationWithoutRetiredCooldowns() {
-        val state = ChatCharacterState(interactionIntensity = 5, recentActionTags = listOf("靠近"),
-            recentPoseTags = listOf("坐近"), interactionCooldowns = mapOf("动作:靠近" to 3))
-        val prompt = engine.prompt("今晚撩我一下", state)
-        assertTrue(prompt.contains("动作=靠近"))
-        assertTrue(prompt.contains("姿态=坐近"))
-        assertFalse(prompt.contains("【冷却】"))
-    }
-
-    @Test
     fun relationshipFactsOnlyAppearWithEvidenceAndCommandsDoNotRoute() {
         val empty = ChatCharacterState()
-        assertTrue(engine.prompt("今天怎么样", empty).contains("【互动倾向】"))
+        assertEquals("", engine.prompt("今天怎么样", empty))
         assertEquals(engine.prompt("今天怎么样", empty), engine.prompt("/reply", empty))
         val recorded = ChatCharacterState(dynamics = RelationshipDynamics(
             facts = listOf(RelationshipEvidence("师父答应下周带我练剑", confidence = 95, source = "dialogue")),
@@ -196,39 +169,6 @@ class ChatRelationshipEngineTest {
         assertTrue(prompt.contains("师父答应下周带我练剑"))
         assertTrue(prompt.contains("一起修好的木剑"))
         assertEquals(prompt, engine.prompt("/reply", recorded))
-    }
-
-    @Test
-    fun ordinaryChatRestoresDefaultRelationalBias() {
-        val prompt = engine.prompt("今天工作有点累", ChatCharacterState())
-        assertTrue(prompt.contains("【互动倾向】"))
-        assertFalse(prompt.contains("【本轮意图优先：成年亲密互动】"))
-        assertFalse(prompt.contains("【互动变化】"))
-    }
-
-    @Test
-    fun adultIntimacyRestoresExplicitPriorityAndUnifiedBoundary() {
-        val prompt = engine.prompt("我们都是成年人，过来抱住我亲一下", ChatCharacterState())
-        assertTrue(prompt.contains("【本轮意图优先：成年亲密互动】"))
-        assertTrue(prompt.contains("优先级规则"))
-        assertTrue(prompt.contains("【统一安全边界】"))
-        assertTrue(prompt.contains("仅限成年角色"))
-    }
-
-    @Test
-    fun adultIntimacyRestoresPoseContinuity() {
-        val prompt = engine.prompt("过来抱住我亲一下", ChatCharacterState())
-        assertTrue(prompt.contains("【亲密姿态连续性】"))
-        assertTrue(prompt.contains("避免连续多轮复用"))
-    }
-
-    @Test
-    fun existingIntimacyRestoresProactiveGuidanceOnRequest() {
-        val state = ChatCharacterState(interactionIntent = ChatInteractionIntent.INTIMATE.name,
-            interactionIntentStrength = 100)
-        val prompt = engine.prompt("这次你主动一点，别躲", state)
-        assertTrue(prompt.contains("【主动亲密意图】"))
-        assertTrue(prompt.contains("【统一安全边界】"))
     }
 
     @Test
