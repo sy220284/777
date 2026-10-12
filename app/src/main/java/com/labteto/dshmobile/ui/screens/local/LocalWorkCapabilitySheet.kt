@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.material3.Checkbox
+import com.labteto.dshmobile.ui.components.DsCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
@@ -110,7 +110,7 @@ internal fun LocalWorkCapabilitySheet(
             visible.forEach { message ->
                 val checked = message.id in selectedMessageIds
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
+                    DsCheckbox(
                         checked = checked,
                         modifier = Modifier.testTag("handoff_message_${message.id}"),
                         enabled = !switching,

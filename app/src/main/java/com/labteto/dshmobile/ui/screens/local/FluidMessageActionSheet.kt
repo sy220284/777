@@ -20,7 +20,7 @@ internal fun FluidMessageActionSheet(expanded: Boolean, onDismiss: () -> Unit, i
     DsBottomSheet(title = stringResource(R.string.fluid_message_actions), onDismiss = onDismiss) {
         items.forEach { item ->
             DsButton(text = item.text, icon = item.icon, modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
+                variant = if (item.danger) DsButtonVariant.Danger else DsButtonVariant.Ghost,
                 onClick = { onDismiss(); item.onClick() })
         }
     }
