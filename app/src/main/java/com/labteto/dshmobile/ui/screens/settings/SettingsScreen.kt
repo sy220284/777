@@ -293,7 +293,7 @@ fun SettingsScreen(
             } else {
                 page = usageDetailReturnPage
             }
-        } else if (page == SettingsDestination.MINIMAX_QUOTA && initialDestination == page) {
+        } else if (page in setOf(SettingsDestination.MINIMAX_QUOTA, SettingsDestination.USAGE) && initialDestination == page) {
             onClose()
         } else {
             page.parentDestination()?.let { page = it } ?: onClose()
@@ -393,8 +393,8 @@ fun SettingsScreen(
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
                             AppSettingsRow(
                                 icon = FeatherIcons.Bell,
-                                title = stringResource(R.string.settings_page_notifications),
-                                onClick = { page = SettingsDestination.NOTIFICATIONS },
+                                title = stringResource(R.string.settings_page_memory),
+                                onClick = { page = SettingsDestination.MEMORY },
                                 compact = true,
                             )
                             AppSettingsDivider()
@@ -437,8 +437,8 @@ fun SettingsScreen(
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,
-                                title = stringResource(R.string.settings_page_memory),
-                                onClick = { page = SettingsDestination.MEMORY },
+                                title = stringResource(R.string.settings_page_notifications),
+                                onClick = { page = SettingsDestination.NOTIFICATIONS },
                                 compact = true,
                             )
                         }

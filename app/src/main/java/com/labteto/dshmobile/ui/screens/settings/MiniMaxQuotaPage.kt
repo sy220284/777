@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
+import com.labteto.dshmobile.ui.components.DsProgressBar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -140,10 +140,7 @@ private fun MiniMaxQuotaWindow(
         Text(title, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.labelPrimary)
         window.remainingFraction()?.let { fraction ->
-            LinearProgressIndicator(
-                progress = { fraction }, modifier = Modifier.fillMaxWidth(),
-                color = colors.successSecondary, trackColor = colors.borderL3,
-            )
+            DsProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.successSecondary)
         }
         resetMillis?.takeIf { it >= 0 }?.let {
             Text(stringResource(R.string.minimax_quota_reset_after, it.durationDisplay()),

@@ -44,34 +44,38 @@ internal fun FluidSectionNavigation(
     modifier: Modifier = Modifier,
     counts: List<String> = emptyList(),
     numbered: Boolean = false,
+    enabled: Boolean = true,
     attention: Int? = null,
     tag: String = "fluidSection",
 ) {
     val colors = DsTheme.colors
     val pulse = rememberHapticPulse()
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+    val tabs: @Composable () -> Unit = {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (numbered) 5.dp else 2.dp)) {
         labels.forEachIndexed { index, label ->
             val active = index == selected
             val fill by animateColorAsState(
-                if (active) colors.accentTertiary
-                else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                tween(140), label = "sectionFill",
+                if (active && numbered) colors.accentTertiary
+                else if (active) colors.bgLayer1
+                else if (numbered) colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+                else androidx.compose.ui.graphics.Color.Transparent,
+                tween(if (numbered) 140 else 200), label = "sectionFill",
             )
             val radius by animateDpAsState(if (active) 13.dp else 8.dp, tween(500), label = "sectionShape")
             Surface(
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     .testTag("$tag:$index")
-                    .selectable(active, role = Role.Tab, onClick = {
+                    .selectable(active, enabled = enabled, role = Role.Tab, onClick = {
                         if (!active) pulse()
                         onSelect(index)
                     }),
                 shape = RoundedCornerShape(radius),
                 color = fill,
-                border = BorderStroke(1.dp, when {
+                border = if (numbered) BorderStroke(1.dp, when {
                     active -> colors.accent
                     attention == index -> colors.warnLabel
                     else -> colors.borderL1
-                }),
+                }) else null,
             ) {
                 Column(Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -85,6 +89,11 @@ internal fun FluidSectionNavigation(
             }
         }
     }
+    }
+    if (numbered) tabs() else Surface(
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, colors.borderL1),
+    ) { tabs() }
 }
 
 /** Swap preserves the selected section identity and uses the supplied 380 ms curve. */

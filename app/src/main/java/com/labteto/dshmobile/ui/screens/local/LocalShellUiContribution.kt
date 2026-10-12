@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
@@ -40,16 +41,27 @@ internal fun localShellFeatureUiContribution(
     onLocateMemoryForMessage: (String) -> Unit,
     onConsumeComposerHandoff: () -> Unit,
     onOpenDrawer: () -> Unit,
+    onOpenFromDrawer: (LocalFeaturePage) -> Unit,
+    onCloseDrawer: () -> Unit,
 ): LocalFeatureUiContribution {
+    var readerRequest by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableLongStateOf(0L)
+    }
     val scope = rememberCoroutineScope()
     val surface by state.collectAsStateWithLifecycle()
     return LocalFeatureUiContribution(
         moduleId = LocalFeatureModuleId.SHELL,
+        drawerActions = mapOf(LocalFeatureDrawerEntry.IMMERSIVE_READER to {
+            readerRequest++
+            onOpenFromDrawer(LocalFeaturePage.HOME)
+            onCloseDrawer()
+        }),
         restorePage = ::localFeatureRestoreOwnedPage,
     ) { page ->
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = surface,
+            readRequest = readerRequest,
             workActions = workActions,
             onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,

@@ -473,6 +473,8 @@ fun LocalHarnessScreen(
             onPushFeature = ::pushFeature,
             onNewSession = { showNewSessionMode = true },
             onOpenDrawer = { scope.launch { drawerState.open() } },
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
             onUseWorkCapability = ::useWorkCapability,
             onLocateMemoryForMessage = { messageId ->
                 memorySourceSessionId = shell.sessionId
@@ -745,6 +747,8 @@ fun LocalHarnessScreen(
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
                 onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
+                onUsage = { openDrawerEntry(LocalFeatureDrawerEntry.USAGE) },
+                onImmersiveReader = { openDrawerEntry(LocalFeatureDrawerEntry.IMMERSIVE_READER) },
                 onMiniMaxQuota = if (activeModelProfile?.canQueryMiniMaxQuota() == true) {
                     { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
                 } else null,

@@ -55,6 +55,8 @@ internal fun LocalWorkDesignSurface(
     val projected by actions.workState.collectAsStateWithLifecycle()
     // Never show the previous session's asynchronously switching projection.
     val state = projected.takeIf { it.sessionId == sessionId }
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val colors = DsTheme.colors
     var artifacts by remember(sessionId) { mutableStateOf<List<LocalArtifactUiItem>>(emptyList()) }
     var outputError by remember(sessionId) { mutableStateOf(false) }
@@ -162,7 +164,15 @@ internal fun LocalWorkDesignSurface(
                                     subtitle = if (artifact.currentlyAvailable == false)
                                         stringResource(R.string.fluid_output_missing) else artifact.category,
                                     icon = FeatherIcons.FileText,
-                                    onClick = { onOpenArtifact(artifact.reference) })
+                                    enabled = artifact.currentlyAvailable != false,
+                                    onClick = {
+                                        when (artifact.category) {
+                                            "file" -> onOpenArtifact(artifact.reference)
+                                            "link" -> runCatching { uriHandler.openUri(artifact.reference) }
+                                                .onFailure { outputError = true }
+                                            else -> clipboard.setText(androidx.compose.ui.text.AnnotatedString(artifact.reference))
+                                        }
+                                    })
                             }
                             DsButton(stringResource(R.string.fluid_tool_output), onOpenEvidence,
                                 variant = DsButtonVariant.Outline, modifier = Modifier.fillMaxWidth())

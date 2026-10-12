@@ -110,7 +110,8 @@ class PersonaGalleryDetailActionsTest {
     fun stageEditorBlocksStorySwitchAndSavesThroughTheRealCallback() {
         savedStoryStage = null
         openDetail()
-        compose.onNodeWithTag("personaGalleryStoryStageInput").performTextInput("act-2")
+        compose.onNodeWithTag("personaDesignSection:3").performClick()
+        compose.onNodeWithTag("personaGalleryStoryStageInput").performScrollTo().performTextInput("act-2")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
         compose.onNodeWithText("保存剧情提要").performScrollTo().performClick()
         compose.waitForIdle()

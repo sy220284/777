@@ -2132,5 +2132,22 @@
     <string name="fluid_persona_no_memories">暂无已记录记忆</string>
     <string name="fluid_persona_stories">故事线</string>
     <string name="fluid_persona_archive">查看完整故事档案</string>
+    <string name="fluid_board_running">在跑</string>
+    <string name="fluid_board_attention">等你</string>
+    <string name="fluid_board_history">历史</string>
+    <string name="fluid_board_empty">当前没有任务</string>
+    <string name="fluid_board_open_decision">处理决策</string>
+    <string name="fluid_capability_title">能力面板</string>
+    <string name="fluid_capability_hint">目录来自当前工具注册表；已注册不代表已授权或可立即执行。</string>
+    <string name="fluid_capability_count">%1$d 个工具 · %2$d 个能力组 · %3$d 个连接</string>
+    <string name="fluid_capability_manage">连接与权限</string>
+    <string name="fluid_capability_registered">已注册</string>
+    <string name="fluid_capability_requirements">前置条件</string>
+    <string name="fluid_capability_none">尚未发现可显示的工具</string>
+    <string name="fluid_copy_tool_id">复制 ID</string>
+    <string name="fluid_copy_tool_output">复制原话</string>
+    <string name="fluid_reader_title">沉浸阅读</string>
+    <string name="fluid_reader_empty">暂无可阅读的回复</string>
+    <string name="fluid_model_composition">模型累计 Token 构成</string>
 </resources>
 

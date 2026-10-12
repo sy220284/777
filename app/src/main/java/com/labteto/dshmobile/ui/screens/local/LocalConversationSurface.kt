@@ -134,6 +134,7 @@ internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
+    readRequest: Long = 0L,
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -196,6 +197,16 @@ internal fun LocalConversationSurface(
         loadTurn = loadTurnUsage,
         loadRequest = loadUsageRequest,
     )
+    var readerOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var readerMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var consumedReadRequest by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(0L) }
+    LaunchedEffect(readRequest) {
+        if (readRequest > consumedReadRequest) {
+            consumedReadRequest = readRequest
+            readerOpen = true
+            readerMessageId = state.messages.lastOrNull { it.role == "assistant" }?.id
+        }
+    }
     var workDesignSection by rememberSaveable(state.sessionId) { mutableStateOf(3) }
     val colors = DsTheme.colors
     val rootSurfaceColor = colors.rootSurface()
@@ -210,9 +221,8 @@ internal fun LocalConversationSurface(
         LocalReasoningControls.attach(appContext)
         mutableStateOf(LocalReasoningControls.mode(state.sessionId, state.usageMode))
     }
-    val workTemperatureRange = activeModelProfile?.let {
-        LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
-    }
+    val temperatureUi = localConversationTemperatureUi(activeModelProfile, reasoningMode == LocalReasoningUiMode.FAST)
+    val workTemperatureRange = temperatureUi.range
     var workTemperatureLevel by remember(state.sessionId, activeModelProfile?.id, workTemperatureRange, performanceCeiling) {
         LocalWorkTemperatureControls.attach(appContext)
         androidx.compose.runtime.mutableIntStateOf(
@@ -758,6 +768,7 @@ internal fun LocalConversationSurface(
                                     null
                                 },
                                 onEdit = { message -> editingUserMessage = message },
+                                onReadMessage = { message -> readerOpen = true; readerMessageId = message.id },
                                  onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
@@ -994,13 +1005,11 @@ internal fun LocalConversationSurface(
                 workTemperatureLevel
             } else {
                 state.chatState.behaviorTuning.composerTemperatureLevel(
-                    activeModelProfile?.let { LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl) },
+                    temperatureUi.range,
                 )
             },
             temperaturePosition = if (state.usageMode == LocalUsageMode.CHAT) {
-                activeModelProfile?.let {
-                    LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
-                }?.let { state.chatState.behaviorTuning.temperaturePosition(it) }
+                temperatureUi.range?.let { state.chatState.behaviorTuning.temperaturePosition(it) }
             } else null,
             temperatureSaveFailed = temperatureSaveFailed,
             temperatureSaving = temperatureSaving,
@@ -1045,6 +1054,15 @@ internal fun LocalConversationSurface(
             },
         )
 
+    }
+
+    if (readerOpen) {
+        val message = (transcriptHistory.olderMessages + state.messages).firstOrNull { it.id == readerMessageId }
+        FluidMessageReader(
+            title = message?.speakerName ?: sessionTitle,
+            content = message?.content?.let(::visibleAssistantText).orEmpty(),
+            onDismiss = { readerOpen = false; readerMessageId = null },
+        )
     }
 
     state.pendingApproval
@@ -1099,19 +1117,8 @@ internal fun LocalConversationSurface(
         persona = state.chatPersona,
         portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
         state = state.chatState,
-        temperatureTuningAvailable = activeModelProfile?.let { profile ->
-            val range = LocalModelPresets.chatTemperatureRangeFor(profile.model, profile.baseUrl)
-            LocalModelPresets.runtimeCapabilitiesFor(
-                model = profile.model,
-                baseUrl = profile.baseUrl,
-                protocol = profile.protocol,
-                authKind = profile.authKind,
-            ).temperature && range != null &&
-                (!range.requiresDisabledThinking || reasoningMode == LocalReasoningUiMode.FAST)
-        } ?: false,
-        temperatureRange = activeModelProfile?.let {
-            LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
-        },
+        temperatureTuningAvailable = temperatureUi.tuningAvailable,
+        temperatureRange = temperatureUi.range,
         onConfigurePersona = onConfigureChatPersona,
         onDismiss = { showCharacterTuning = false },
     )

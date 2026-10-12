@@ -144,6 +144,7 @@ internal fun LocalMessageRow(
     streaming: Boolean = false,
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
+    onReadMessage: ((LocalHarnessMessage) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -261,7 +262,7 @@ internal fun LocalMessageRow(
             val readingLayer = chatMode && (backgroundState.hasImage || backgroundState.fluidGlass)
             val readingModifier = if (readingLayer) {
                 Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.80f)
                     .background(
                         backgroundState.wallpaperSurface(
                             base = colors.bgLayer1,
@@ -326,6 +327,11 @@ internal fun LocalMessageRow(
                             },
                         )
                     }
+                    onReadMessage?.let { read -> CompactMessageAction(
+                        icon = FeatherIcons.BookOpen, iconSize = 22.dp,
+                        contentDescription = stringResource(R.string.fluid_reader_title),
+                        onClick = { read(message) },
+                    ) }
                     if (canRegenerate) CompactMessageAction(
                         icon = FeatherIcons.Retry,
                         iconSize = 22.dp,
