@@ -48,7 +48,7 @@ import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsCheckbox
+import com.shenyan.designsystem.components.SyCheckboxControl
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -361,7 +361,7 @@ internal fun LocalSessionDrawerRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionOpen) {
-                DsCheckbox(checked = selected, onCheckedChange = { onClick() })
+                SyCheckboxControl(checked = selected, onCheckedChange = { onClick() })
             }
 
             Column(
