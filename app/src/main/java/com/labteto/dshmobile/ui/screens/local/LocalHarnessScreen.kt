@@ -730,8 +730,9 @@ fun LocalHarnessScreen(
         scope.launch { drawerState.close() }
     }
     BackHandler(
-        enabled = !syWideViewport && !drawerState.isOpen &&
-            featurePage == LocalFeaturePage.HOME && conversationOpenedFromDrawer,
+        enabled = localConversationShouldReturnToDrawer(
+            featurePage, drawerState.isOpen, syWideViewport, conversationOpenedFromDrawer,
+        ),
     ) {
         conversationOpenedFromDrawer = false
         scope.launch { drawerState.open() }
