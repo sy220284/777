@@ -50,38 +50,42 @@ internal class CharacterRuntimeProjector(
         val activePersona = persona.forRuntimeStoryStage(context)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val runtimeState = privateState
+        val attention = context.attention
         val relevantRelationshipState = runtimeState.copy(
             dynamics = runtimeState.dynamics.copy(
                 unresolvedConflict = runtimeState.dynamics.unresolvedConflict.takeIf {
-                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                    ChatTurnContextPolicy.relevant(userInput, it, attention)
                 }.orEmpty(),
                 unknowns = runtimeState.dynamics.unknowns.filter {
-                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                    ChatTurnContextPolicy.relevant(userInput, it, attention)
                 },
                 sharedMoments = runtimeState.dynamics.sharedMoments.filter {
-                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                    ChatTurnContextPolicy.relevant(userInput, it, attention)
                 },
                 sharedObjects = runtimeState.dynamics.sharedObjects.filter {
-                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                    ChatTurnContextPolicy.relevant(userInput, it, attention)
+                },
+                facts = runtimeState.dynamics.facts.filter {
+                    ChatTurnContextPolicy.relevant(userInput, it.text, attention)
+                },
+                hypotheses = runtimeState.dynamics.hypotheses.filter {
+                    ChatTurnContextPolicy.relevant(userInput, it.text, attention)
                 },
             ),
         )
-        val storyPrompt = storyContext?.takeUnless { ChatMemorySelector.isExplicitTopicShift(userInput) }
-            ?.takeIf(String::isNotBlank)?.let {
-            """
-            【连续性摘要｜已发生】
-            ${it.take(MAX_STORY_CONTEXT_CHARS)}
-            """.trimIndent()
+        val selectedStory = ChatTurnContextPolicy.storyLines(storyContext, userInput, attention)
+        val storyPrompt = selectedStory.takeIf(String::isNotBlank)?.let {
+            "【连续性摘要｜已发生】\n${it.take(MAX_STORY_CONTEXT_CHARS)}"
         }.orEmpty()
 
         return CharacterRuntimeProjection(
             stablePrompt = stablePrompt(activePersona),
             dynamicPrompt = listOf(
-                momentPrompt(activePersona, runtimeState, userInput),
+                momentPrompt(activePersona, runtimeState, userInput, attention),
                 renderCharacterLifePrompt(runtimeState.lifeState),
                 renderChatContextForModel(context, focusQuery = userInput),
                 relevantBackgroundPrompt(activePersona, userInput),
-                relevantCharacterFactPrompt(persona, context, userInput, storyContext),
+                relevantCharacterFactPrompt(persona, context, userInput, selectedStory),
                 context.storyStage.takeIf(String::isNotBlank)
                     ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
                 storyPrompt,
@@ -143,6 +147,7 @@ internal class CharacterRuntimeProjector(
         persona: PersonaProfile,
         state: ChatCharacterState,
         userInput: String,
+        attention: ChatAttentionState,
     ): String {
         val lines = mutableListOf<String>()
         state.physicalState.takeIf(String::isNotBlank)?.let { lines += "身体：${it.take(140)}" }
@@ -163,8 +168,9 @@ internal class CharacterRuntimeProjector(
             // A future plan ("稍后展示...") is not. Explicit topic shifts suppress both.
             val presentAction = label == "正在做" &&
                 Regex("""^(?:正在|正|在)[^，。]{2,}""").containsMatchIn(value.trim())
-            val relevant = ChatMemorySelector.isRelevantToTurn(userInput, value) ||
-                (presentAction && !ChatMemorySelector.isExplicitTopicShift(userInput))
+            val relevant = ChatTurnContextPolicy.relevant(userInput, value, attention) ||
+                (presentAction && attention.pausedSubject.isBlank() &&
+                    !ChatTurnContextPolicy.isTopicRedirect(userInput))
             if (selected.size >= 2 || value.isBlank() || !relevant) return@forEach
             if (selected.none { ChatContextAssembler.semanticallySimilar(it.substringAfter('：'), value) }) {
                 selected += "$label：${value.take(180)}"
@@ -176,7 +182,7 @@ internal class CharacterRuntimeProjector(
         } ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
             ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         val open = state.unresolvedThreads.filter {
-            ChatMemorySelector.isRelevantToTurn(userInput, it) &&
+            ChatTurnContextPolicy.relevant(userInput, it, attention) &&
                 selected.none { selectedLine ->
                     ChatContextAssembler.semanticallySimilar(selectedLine.substringAfter('：'), it)
                 }
@@ -227,7 +233,8 @@ internal class CharacterRuntimeProjector(
         storyContext: String?,
     ): String {
         val query = listOf(ChatMemorySelector.continuityQuery(userInput, context),
-            storyContext.orEmpty().takeLast(450)).joinToString(" ")
+            ChatTurnContextPolicy.storyLines(storyContext, userInput, context.attention))
+            .filter(String::isNotBlank).joinToString(" ")
         if (query.isBlank()) return ""
         val core = setOf(
             CharacterFactCategories.PERSONALITY,
