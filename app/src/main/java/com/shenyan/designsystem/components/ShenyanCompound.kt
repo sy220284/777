@@ -91,7 +91,11 @@ fun SyCategoryRow(
                     (textMeasurer.measure(title, style = titleStyle, softWrap = false, maxLines = 1).size.width +
                         textMeasurer.measure(value, style = valueStyle, softWrap = false, maxLines = 1).size.width).toDp() + 10.dp
                 }
-                val stackValue = value != null && requiredInlineWidth > maxWidth
+                // At accessibility font scales use a stable stacked layout, even if a
+                // one-line text measurement suggests the inline row might fit.
+                // Font fallback and paragraph shaping can exceed intrinsic width.
+                val stackValue = value != null &&
+                    (LocalDensity.current.fontScale >= 1.2f || requiredInlineWidth > maxWidth)
                 if (stackValue) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(title, color = p.text, style = titleStyle)
