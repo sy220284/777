@@ -24,15 +24,15 @@ class LocalMediaStudioViewModel @Inject constructor(
     fun resultFile(item: LocalMediaResult): File? = creation.resultFile(item)
     suspend fun removeResult(id: String) = creation.removeResult(id)
 
-    suspend fun image(route: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImage =
-        creation.image(route, prompt, ratio)
+    suspend fun image(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null): LocalMediaImage =
+        creation.image(route, prompt, ratio, sessionId)
     suspend fun voices(route: LocalMediaOffer): List<LocalMediaVoice> = creation.voices(route)
-    suspend fun speech(route: LocalMediaOffer, text: String, voiceId: String): File =
-        creation.speech(route, text, voiceId)
-    suspend fun transcribe(route: LocalMediaOffer, uri: Uri): String =
-        creation.transcribe(route, uri)
-    suspend fun createVideo(route: LocalMediaOffer, prompt: String): LocalMediaVideoTask =
-        creation.createVideo(route, prompt)
+    suspend fun speech(route: LocalMediaOffer, text: String, voiceId: String, sessionId: String? = null): File =
+        creation.speech(route, text, voiceId, sessionId)
+    suspend fun transcribe(route: LocalMediaOffer, uri: Uri, sessionId: String? = null): String =
+        creation.transcribe(route, uri, sessionId)
+    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null): LocalMediaVideoTask =
+        creation.createVideo(route, prompt, sessionId)
     suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) =
         creation.refreshVideo(route, taskId)
 }
