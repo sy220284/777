@@ -36,7 +36,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.ChatDiaryDisclosure
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
@@ -44,16 +44,16 @@ import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatRelationshipSubjectKey
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsSegmentedTabs
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -210,7 +210,7 @@ internal fun CharacterDiaryScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            DsTopBar(
+            SyTopBar(
                 title = stringResource(R.string.chat_diary_title),
                 subtitle = stringResource(R.string.chat_diary_subtitle),
                 onBack = onDismiss,
@@ -255,7 +255,7 @@ internal fun CharacterDiaryScreen(
                     }
                 }
                 item(key = "diary-search") {
-                    DsTextField(
+                    SyTextField(
                         value = query,
                         onValueChange = { query = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -278,7 +278,7 @@ internal fun CharacterDiaryScreen(
                     }
                 }
                 item(key = "diary-filters") {
-                    DsSegmentedTabs(
+                    SySegmentedTabs(
                         labels = listOf(
                             stringResource(R.string.chat_diary_filter_all),
                             stringResource(R.string.chat_diary_filter_direct),
@@ -355,14 +355,14 @@ internal fun CharacterDiaryScreen(
         }
     }
     editingEntry?.let { entry ->
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.chat_diary_edit_title),
             subtitle = stringResource(R.string.chat_diary_edit_hint),
             onDismiss = { if (!mutating) editingEntry = null },
             dismissEnabled = !mutating,
             scrollable = true,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
                         mutating = true
@@ -384,37 +384,37 @@ internal fun CharacterDiaryScreen(
                     modifier = Modifier.fillMaxWidth().testTag("diary_save"),
                     loading = mutating,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { editingEntry = null },
                     enabled = !mutating,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
         ) {
-            DsTextField(
+            SyTextField(
                 value = editDraft.event, onValueChange = { editDraft = editDraft.copy(event = it) },
                 label = { Text(stringResource(R.string.chat_diary_edit_event)) },
                 modifier = Modifier.fillMaxWidth().testTag("diary_edit_event"), enabled = !mutating, maxLines = 5,
             )
-            DsTextField(
+            SyTextField(
                 value = editDraft.feeling, onValueChange = { editDraft = editDraft.copy(feeling = it) },
                 label = { Text(stringResource(R.string.chat_diary_feeling)) },
                 modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
             )
-            DsTextField(
+            SyTextField(
                 value = editDraft.innerThought, onValueChange = { editDraft = editDraft.copy(innerThought = it) },
                 label = { Text(stringResource(R.string.chat_diary_inner_thought)) },
                 modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
             )
-            DsTextField(
+            SyTextField(
                 value = editDraft.relationshipMeaning,
                 onValueChange = { editDraft = editDraft.copy(relationshipMeaning = it) },
                 label = { Text(stringResource(R.string.chat_diary_relationship_meaning)) },
                 modifier = Modifier.fillMaxWidth(), enabled = !mutating, maxLines = 4,
             )
-            DsTextField(
+            SyTextField(
                 value = editDraft.unresolvedEcho,
                 onValueChange = { editDraft = editDraft.copy(unresolvedEcho = it) },
                 label = { Text(stringResource(R.string.chat_diary_unresolved_echo)) },
@@ -427,12 +427,12 @@ internal fun CharacterDiaryScreen(
         }
     }
     deactivatingEntry?.let { entry ->
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.chat_diary_deactivate),
             onDismiss = { if (!mutating) deactivatingEntry = null },
             dismissEnabled = !mutating,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.chat_diary_deactivate),
                     onClick = {
                         mutating = true
@@ -454,10 +454,10 @@ internal fun CharacterDiaryScreen(
                     enabled = !mutating,
                     loading = mutating,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { deactivatingEntry = null },
-                    enabled = !mutating, variant = DsButtonVariant.Ghost,
+                    enabled = !mutating, variant = SyButtonVariant.Ghost,
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -484,7 +484,7 @@ private fun CharacterDiaryEntryCard(
     // Reference screen 09: a centered reading sheet, with real recorded diary fields.
     // Never synthesize first-person thoughts or comments that do not exist in the diary store.
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-    DsCard(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
+    SyGlassCard(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
         Text(
             dateText,
@@ -547,19 +547,19 @@ private fun CharacterDiaryEntryCard(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.chat_diary_open_source),
                 onClick = { onOpenSource(source.sessionId) },
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("diary_source_${entry.id}"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(text = stringResource(R.string.chat_diary_edit_title),
-                onClick = onEdit, variant = DsButtonVariant.Ghost,
+            SyButton(text = stringResource(R.string.chat_diary_edit_title),
+                onClick = onEdit, variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("diary_edit_${entry.id}"))
-            DsButton(text = stringResource(R.string.chat_diary_deactivate),
-                onClick = onDeactivate, variant = DsButtonVariant.Ghost,
+            SyButton(text = stringResource(R.string.chat_diary_deactivate),
+                onClick = onDeactivate, variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("diary_deactivate_${entry.id}"))
         }
         Text(
