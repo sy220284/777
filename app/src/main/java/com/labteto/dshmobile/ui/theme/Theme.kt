@@ -310,12 +310,25 @@ fun DshTheme(
                 ThemePreference.MATTE_BLACK -> SyMode.MATTE
                 ThemePreference.SYSTEM -> SyMode.SYSTEM
             }) {
-                MaterialTheme(
-                    colorScheme = scheme,
-                    typography = dsTypography(readingPreferences.textWeightAdjustment),
-                    shapes = DsMaterialShapes,
-                    content = content,
-                )
+                // Canonical V5 component library receives exactly the persisted app mode.
+                // Legacy Material3 typography remains nested until every screen is migrated.
+                com.shenyan.designsystem.foundation.ShenyanTheme(
+                    mode = when (preference) {
+                        ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+                        ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                        ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+                        ThemePreference.SYSTEM -> if (systemDark)
+                            com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                            else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+                    },
+                ) {
+                    MaterialTheme(
+                        colorScheme = scheme,
+                        typography = dsTypography(readingPreferences.textWeightAdjustment),
+                        shapes = DsMaterialShapes,
+                        content = content,
+                    )
+                }
             }
         }
     }
