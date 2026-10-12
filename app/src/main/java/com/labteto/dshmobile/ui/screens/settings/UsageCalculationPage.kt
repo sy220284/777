@@ -48,11 +48,11 @@ import com.labteto.dshmobile.local.TokenUsageGroupSummary
 import com.labteto.dshmobile.local.TokenUsageModeAnalytics
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
-import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -135,10 +135,10 @@ internal fun UsageCalculationPage(
             modifier = Modifier.weight(1f),
         )
         Box {
-            DsButton(
+            SyButton(
                 text = (selectedModel ?: stringResource(R.string.usage_model_all)) + " ▾",
                 onClick = { modelMenuExpanded = true },
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
             DsPopupMenu(
                 expanded = modelMenuExpanded,
@@ -161,7 +161,7 @@ internal fun UsageCalculationPage(
         )
     }
 
-    DsSegmentedTabs(
+    SySegmentedTabs(
         labels = listOf(
             stringResource(R.string.usage_mode_chat),
             stringResource(R.string.usage_mode_work),
@@ -188,7 +188,7 @@ internal fun UsageCalculationPage(
     }
 
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
-        com.labteto.dshmobile.ui.components.DsCard {
+        com.labteto.dshmobile.ui.components.SyGlassCard {
             Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
                 color = colors.labelPrimary)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
@@ -224,7 +224,7 @@ internal fun UsageCalculationPage(
                                         color = colors.labelSecondary,
                                     )
                                 }
-                                com.labteto.dshmobile.ui.components.DsProgressBar(
+                                com.labteto.dshmobile.ui.components.SyProgressBar(
                                     (entry.value.tracked.totalTokens.toDouble() / total).toFloat(),
                                 )
                             }
@@ -320,14 +320,14 @@ internal fun UsageCalculationPage(
             }
         }
         if (groups.size > 12) {
-            DsButton(
+            SyButton(
                 text = if (showAllGroups) {
                     stringResource(R.string.usage_show_recent)
                 } else {
                     stringResource(R.string.usage_show_all, groups.size)
                 },
                 onClick = { showAllGroups = !showAllGroups },
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -401,10 +401,10 @@ internal fun UsageCalculationPage(
         style = DsType.caption11.withReadingWeight(),
         color = colors.labelTertiary,
     )
-    DsButton(
+    SyButton(
         text = stringResource(R.string.usage_calculation_view_prices),
         onClick = onOpenPricing,
-        variant = DsButtonVariant.Ghost,
+        variant = SyButtonVariant.Ghost,
         modifier = Modifier.fillMaxWidth(),
     )
 }
