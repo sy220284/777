@@ -659,4 +659,35 @@ class ChatContextStateTest {
         assertEquals(previous.unfinished, notRetiredByPlanner.unfinished)
     }
 
+    @Test
+    fun archivedFalseArrivalPlaceIsHealedWithoutInventingALocation() {
+        val invalid = ChatSceneEvent(
+            sequence = 2L,
+            kind = ChatSceneEventKind.LOCATION,
+            actor = "角色",
+            from = "房间",
+            to = "才讲",
+            evidence = "到了才讲",
+        )
+        val previous = ChatContextState(
+            scene = ChatSceneState(location = "才讲"),
+            sceneEvents = listOf(invalid),
+        )
+        val noPrior = previous.normalized()
+        assertEquals("", noPrior.scene.location)
+        assertTrue(noPrior.sceneEvents.isEmpty())
+
+        val valid = ChatSceneEvent(
+            sequence = 1L,
+            kind = ChatSceneEventKind.LOCATION,
+            actor = "角色",
+            from = "",
+            to = "房间",
+            evidence = "走进房间",
+        )
+        val repaired = previous.copy(sceneEvents = listOf(valid, invalid)).normalized()
+        assertEquals("房间", repaired.scene.location)
+        assertEquals(listOf(valid), repaired.sceneEvents)
+    }
+
 }
