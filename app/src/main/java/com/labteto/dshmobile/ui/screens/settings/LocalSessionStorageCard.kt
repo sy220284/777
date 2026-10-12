@@ -12,10 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsProgressBar
-import com.labteto.dshmobile.ui.components.DsProgressStatus
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyProgressBar
+import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -55,10 +55,10 @@ internal fun LocalSessionStorageCard(
                 )
                 // Design #25: truthful occupancy of the session archive only;
                 // workspace/media/cache breakdowns require separate measured owners.
-                DsProgressBar(
+                SyProgressBar(
                     value = sessionStorageUsageFraction(status.totalBytes, status.budgetBytes),
                     color = if (status.warning) colors.warnLabel else colors.accent,
-                    status = DsProgressStatus.Running,
+                    status = SyProgressStatus.Running,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
@@ -97,26 +97,26 @@ internal fun LocalSessionStorageCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.settings_local_session_storage_compact),
                 onClick = onCompact,
                 enabled = !busy && status != null,
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
                 modifier = Modifier.weight(1f),
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.settings_local_session_storage_export),
                 onClick = onExport,
                 enabled = !busy && status != null,
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
                 modifier = Modifier.weight(1f),
             )
         }
-        DsButton(
+        SyButton(
             text = stringResource(R.string.settings_local_session_storage_cleanup),
             onClick = onCleanup,
             enabled = !busy,
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
     }
