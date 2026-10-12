@@ -29,7 +29,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -169,7 +169,7 @@ internal fun LocalWorkDesignSurface(
                             } else if (artifacts.isEmpty()) Text(stringResource(R.string.fluid_outputs_empty),
                                 style = DsType.std14, color = colors.labelSecondary)
                             artifacts.forEach { artifact ->
-                                DsSheetChoiceRow(title = artifact.reference,
+                                SySheetChoiceRow(title = artifact.reference,
                                     subtitle = if (artifact.currentlyAvailable == false)
                                         stringResource(R.string.fluid_output_missing) else artifact.category,
                                     icon = FeatherIcons.FileText,
