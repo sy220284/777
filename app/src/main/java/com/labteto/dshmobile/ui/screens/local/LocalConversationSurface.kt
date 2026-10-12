@@ -89,12 +89,12 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
-import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.MenuItem
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
@@ -608,13 +608,13 @@ internal fun LocalConversationSurface(
                         color = colors.labelSecondary,
                         modifier = Modifier.weight(1f),
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_persona_correction_undo),
                         onClick = {
                             onUndoPersonaCorrection(notice.id, notice.personaId, notice.correction)
                         },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -650,11 +650,11 @@ internal fun LocalConversationSurface(
                             color = colors.labelSecondary,
                         )
                     }
-                    DsButton(
+                    SyButton(
                         stringResource(R.string.common_close),
                         onDisableDeviceTurn,
                         modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
                 if (approvalNoticeExpanded) {
@@ -705,13 +705,13 @@ internal fun LocalConversationSurface(
                 }
                 if (showEmptyGroupSetup) {
                     item {
-                        DsCard {
+                        SyGlassCard {
                             Text(
                                 stringResource(R.string.local_group_chat_setup_required),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_group_chat_manage_members),
                                 onClick = { showGroupMemberPicker = true },
                                 modifier = Modifier.fillMaxWidth(),
@@ -900,10 +900,10 @@ internal fun LocalConversationSurface(
                             color = colors.labelSecondary,
                         )
                     }
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_welcome_connect_action),
                         onClick = onConfigure,
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -1193,7 +1193,7 @@ internal fun LocalConversationSurface(
         !state.groupChat.enabled &&
         state.replySuggestions.any { it.text.isNotBlank() }
     ) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
         ) {
@@ -1259,7 +1259,7 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = null,
             onDismiss = { showAttachmentPicker = false },
             showDragHandle = false,
@@ -1343,7 +1343,7 @@ internal fun LocalConversationSurface(
     }
 
     if (showMediaStudio) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
             scrollable = true,
@@ -1441,10 +1441,10 @@ private fun EmptyLocalHarness(
             modifier = Modifier.widthIn(max = 280.dp),
         )
         Box {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_suggestions_title),
                 icon = FeatherIcons.Sparkles,
-                variant = DsButtonVariant.Info,
+                variant = SyButtonVariant.Info,
                 onClick = { suggestionsOpen = true },
             )
             DsPopupMenu(
