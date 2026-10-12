@@ -16,6 +16,8 @@ data class ChatContextState(
     /** Plot stages explicitly visited in this story branch, in visit order. */
     val unlockedStoryStages: List<String> = emptyList(),
     val continuity: ChatContinuityState = ChatContinuityState(),
+    /** User-authored, branch-local attention; independent of durable fact lifecycle. */
+    val attention: ChatAttentionState = ChatAttentionState(),
     val processedThroughSequence: Long = -1L,
     val pendingTurns: List<ChatPendingTurn> = emptyList(),
     val pendingThroughSequence: Long = -1L,
@@ -126,6 +128,10 @@ internal fun ChatContextState.normalized(): ChatContextState {
             evidence = groundedEvidence,
         ),
         sceneEvents = validSceneEvents,
+        attention = attention.copy(
+            lastUserSubject = attention.lastUserSubject.trim().take(260),
+            pausedSubject = attention.pausedSubject.trim().take(80),
+        ),
     )
 }
 
@@ -137,8 +143,11 @@ internal fun ChatContextState.enqueuePending(turn: ChatPendingTurn): ChatContext
     val next = (pendingTurns + turn)
         .distinctBy { pending -> pending.sequence to pending.assistantMessageId }
         .sortedBy(ChatPendingTurn::sequence)
-    return copy(pendingTurns = next, pendingThroughSequence = maxOf(pendingThroughSequence, turn.sequence))
-        .boundedPendingWindow()
+    return copy(
+        pendingTurns = next,
+        pendingThroughSequence = maxOf(pendingThroughSequence, turn.sequence),
+        attention = ChatTurnContextPolicy.advance(attention, turn.userMessage, turn.sequence),
+    ).boundedPendingWindow()
 }
 
 internal fun ChatContextState.boundedPendingWindow(): ChatContextState = copy(
@@ -239,6 +248,7 @@ internal fun ChatContextState.hasUsefulFacts(): Boolean =
         continuity.decisions.isNotEmpty() ||
         continuity.unfinished.isNotEmpty() ||
         pendingTurns.isNotEmpty() ||
+        attention.pausedSubject.isNotBlank() ||
         sceneEvents.isNotEmpty()
 
 internal fun ChatContextState.withLegacyFallback(state: ChatCharacterState): ChatContextState {
@@ -707,7 +717,7 @@ internal fun renderChatContextForModel(
             .filter { it.generation == normalized.generation }
             .sortedBy(ChatPendingTurn::sequence)
         if (pending.isNotEmpty() && (focusQuery == null ||
-                !ChatMemorySelector.isExplicitTopicShift(focusQuery))) {
+                !ChatTurnContextPolicy.isTopicRedirect(focusQuery))) {
             appendLine("【尚未归并｜最高连续性优先】")
             appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
             val overflowFallback = pending
@@ -747,13 +757,16 @@ internal fun renderChatContextForModel(
         val continuity = normalized.continuity
         // Preserve all facts in storage; only relevant facts participate in this model request.
         fun relevant(value: String): Boolean =
-            focusQuery == null || ChatMemorySelector.isRelevantToTurn(focusQuery, value)
+            focusQuery == null || ChatTurnContextPolicy.relevant(focusQuery, value, normalized.attention)
         // A latest completed event is a continuity checkpoint, not another to-do.
         // Keep it available unless the user explicitly redirects the conversation.
-        val events = if (focusQuery != null && ChatMemorySelector.isExplicitTopicShift(focusQuery)) {
+        val events = if (focusQuery != null && ChatTurnContextPolicy.isTopicRedirect(focusQuery)) {
             emptyList()
         } else {
-            (continuity.recentEvents.filter(::relevant) + continuity.recentEvents.takeLast(1)).distinct()
+            val latestCheckpoint = if (normalized.attention.pausedSubject.isBlank()) {
+                continuity.recentEvents.takeLast(1)
+            } else emptyList()
+            (continuity.recentEvents.filter(::relevant) + latestCheckpoint).distinct()
         }
         val decisions = continuity.decisions.filter(::relevant)
         val unfinished = continuity.unfinished.filter(::relevant)
