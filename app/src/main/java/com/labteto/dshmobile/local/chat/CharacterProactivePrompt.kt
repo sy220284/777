@@ -4,10 +4,22 @@ internal fun characterProactiveDirective(
     trigger: String,
     persona: PersonaProfile,
     state: ChatCharacterState,
+    context: ChatContextState = ChatContextState(),
 ): String {
-    val lifeReason = characterLifeProactiveReason(persona, state)
-    val unfinished = state.unresolvedThreads.takeLast(2).joinToString("；").take(220)
-    val agenda = state.currentAgenda.take(120)
+    // Automated messages must not bypass the same attention policy used for direct replies.
+    val attention = context.attention
+    val unfinished = state.unresolvedThreads
+        .filter { ChatTurnContextPolicy.relevant(trigger, it, attention) }
+        .takeLast(2).joinToString("；").take(220)
+    val agenda = state.currentAgenda.takeIf {
+        ChatTurnContextPolicy.relevant(trigger, it, attention)
+    }.orEmpty().take(120)
+    val lifeReason = state.lifeState.activeEvents
+        .asReversed()
+        .firstOrNull {
+            it.active && it.source !in setOf("agenda", "concern", "unfinished", "persona") &&
+                ChatTurnContextPolicy.relevant(trigger, it.summary, attention)
+        }?.summary
     return """
         【定时主动互动】
         这是用户提前为当前角色设置的主动互动意图，时间到了。它只是幕后触发条件，不是用户刚发来的消息。
