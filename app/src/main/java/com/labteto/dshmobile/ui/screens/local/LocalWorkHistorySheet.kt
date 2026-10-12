@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -40,6 +41,7 @@ internal fun LocalWorkHistorySheet(
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: Exception) { evidenceFailed = true }
     }
+    var recordFilter by remember(sessionId) { mutableStateOf("all") }
     var cursor by remember(sessionId) { mutableStateOf<LocalWorkHistoryCursor?>(null) }
     var page by remember(sessionId) { mutableStateOf<LocalWorkHistoryPageUi?>(null) }
     var failed by remember(sessionId) { mutableStateOf(false) }
@@ -78,9 +80,41 @@ internal fun LocalWorkHistorySheet(
             current.invalidated -> Text(stringResource(R.string.local_run_history_changed))
             current.records.isEmpty() -> Text(stringResource(R.string.local_run_history_page_empty))
             else -> key(cursor, retry) {
-                LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
-                    items(current.records, key = { it.sequence }) { record ->
+                // Reference screen 15: real event categories only. History records do
+                // not carry a trustworthy success/cost aggregate, so never invent one.
+                val displayed = current.records.filter { record ->
+                    when (recordFilter) {
+                        "call" -> record.type == "tool/call"
+                        "started" -> record.type == "tool/execution-started"
+                        "result" -> record.type != "tool/call" &&
+                            record.type != "tool/execution-started"
+                        else -> true
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                    DsSegmented(
+                        segments = listOf(
+                            DsSegment("all", stringResource(R.string.local_run_history_filter_all)),
+                            DsSegment("call", stringResource(R.string.local_run_history_call)),
+                            DsSegment("started", stringResource(R.string.local_run_history_started)),
+                            DsSegment("result", stringResource(R.string.local_run_history_result)),
+                        ),
+                        selectedKey = recordFilter,
+                        onSelect = { recordFilter = it },
+                        role = Role.Tab,
+                        stretch = true,
+                        hapticOnChange = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (displayed.isEmpty()) {
+                        Text(stringResource(R.string.local_run_history_page_empty),
+                            style = DsType.small13.withReadingWeight(),
+                            color = DsTheme.colors.labelSecondary)
+                    } else LazyColumn(
+                        Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                    ) {
+                        items(displayed, key = { it.sequence }) { record ->
                         Column {
                             Text(stringResource(R.string.local_run_history_record, record.sequence, record.name,
                                 when (record.type) {
@@ -105,6 +139,8 @@ internal fun LocalWorkHistorySheet(
                                 { selected = record }, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
                         }
                     }
+                    }
+                }
                 }
             }
         }
