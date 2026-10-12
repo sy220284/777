@@ -268,6 +268,18 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun collapsedRailLabelsAndTargetsMatchExpandedDrawerModes() {
+        assertEquals(LocalFeatureDrawerEntry.PERSONA_GALLERY,
+            localCollapsedRailPrimaryEntry(LocalUsageMode.CHAT))
+        assertEquals(LocalFeatureDrawerEntry.PROJECT,
+            localCollapsedRailPrimaryEntry(LocalUsageMode.WORK))
+        assertEquals(com.labteto.dshmobile.R.string.tasks_chat_title,
+            localCollapsedRailTaskTitle(LocalUsageMode.CHAT))
+        assertEquals(com.labteto.dshmobile.R.string.tasks_title,
+            localCollapsedRailTaskTitle(LocalUsageMode.WORK))
+    }
+
+    @Test
     fun featureCatalogAssignsEveryRouteToExactlyOneModule() {
         val registered = LocalFeatureCatalog.modules.flatMap { it.routes }
 
