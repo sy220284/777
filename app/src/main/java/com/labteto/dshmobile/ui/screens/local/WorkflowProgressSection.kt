@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
+import com.labteto.dshmobile.local.work.WorkflowStage
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -24,20 +25,20 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun workflowStageLabel(stage: String): String = stringResource(when (stage) {
-    "执行中" -> R.string.local_workflow_executing
-    "重新指派" -> R.string.local_workflow_reassigning
-    "验收中" -> R.string.local_workflow_verifying
-    "已完成" -> R.string.local_workflow_completed
-    "受阻" -> R.string.local_workflow_stalled
+    WorkflowStage.EXECUTING -> R.string.local_workflow_executing
+    WorkflowStage.REASSIGNING -> R.string.local_workflow_reassigning
+    WorkflowStage.VERIFYING -> R.string.local_workflow_verifying
+    WorkflowStage.COMPLETED -> R.string.local_workflow_completed
+    WorkflowStage.STALLED -> R.string.local_workflow_stalled
     else -> R.string.local_workflow_stalled
 })
 
 /** Explicitly derive color/motion from real execution state, not percentage alone. */
 internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): DsProgressStatus {
-    val blocked = progress.blockedReason != null || progress.stage == "受阻"
+    val blocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     return when {
         blocked -> DsProgressStatus.Failed
-        progress.stage == "已完成" && progress.total > 0 &&
+        progress.stage == WorkflowStage.COMPLETED && progress.total > 0 &&
             progress.completed >= progress.total -> DsProgressStatus.Done
         progress.total <= 0 -> DsProgressStatus.Idle
         else -> DsProgressStatus.Running
@@ -47,7 +48,7 @@ internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): DsPr
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors
-    val isBlocked = progress.blockedReason != null || progress.stage == "受阻"
+    val isBlocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     val progressStatus = workflowProgressVisualStatus(progress)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
         // The stage changes in place rather than posting an unconditional completion toast.
