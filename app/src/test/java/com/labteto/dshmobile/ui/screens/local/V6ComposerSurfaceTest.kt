@@ -19,6 +19,6 @@ class V6ComposerSurfaceTest {
     @Test fun matteComposerRemainsOpaqueAndUsesItsOwnMaterial() {
         val matte = ShenyanPalettes.matte
         assertEquals(matte.materialL2, v6ConversationComposerSurface(AppBackgroundState(), matte))
-        assertEquals(1f, matte.materialL2.alpha)
+        assertEquals(1f, matte.materialL2.alpha, 0f)
     }
 }
