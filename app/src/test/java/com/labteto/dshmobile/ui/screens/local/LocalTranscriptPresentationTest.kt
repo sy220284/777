@@ -9,6 +9,26 @@ import org.junit.Test
 
 class LocalTranscriptPresentationTest {
     @Test
+    fun workArtifactsAppearInConversationWithoutDuplicateFiles() {
+        val transcript = listOf(LocalTranscriptItem.Message(
+            LocalHarnessMessage("answer", "assistant", "文件已生成", createdAt = 10L),
+        ))
+        val artifact = com.labteto.dshmobile.local.presentation.LocalArtifactUiItem(
+            reference = "reports/analysis.md",
+            category = "file",
+            sourceCallId = "write-file",
+            asOfSequence = 10L,
+            currentlyAvailable = true,
+        )
+        val repeated = artifact.copy(asOfSequence = 30L)
+        val out = appendWorkArtifactsToTranscript(transcript, listOf(artifact, repeated))
+        assertEquals(2, out.size)
+        assertEquals("message:answer", out.first().key)
+        assertEquals(artifact, (out.last() as LocalTranscriptItem.WorkArtifact).artifact)
+        assertEquals(out.map { it.key }, appendWorkArtifactsToTranscript(transcript, listOf(artifact)).map { it.key })
+    }
+
+    @Test
     fun mediaTimelineAppearsInlineInOwningSessionOnlyAndRetainsStableIdentity() {
         val chat = listOf(
             LocalTranscriptItem.Message(LocalHarnessMessage("u", "user", "画一幅", createdAt = 100L)),
