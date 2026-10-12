@@ -84,6 +84,8 @@ class LocalSubagentContextTest {
                 put("content", "确认了模块 A 的接口")
                 put("reasoning_content", "parent hidden reasoning")
                 put("reasoning_details", "parent private replay")
+                put("_dsh_model_replay", "opaque-provider-payload")
+                put("_dsh_responses_output", "opaque-response-payload")
             },
         )
         val seed = buildLocalSubagentInitialHistory(
@@ -100,6 +102,8 @@ class LocalSubagentContextTest {
         assertEquals(false, serialized.contains("private token from parent tool"))
         assertEquals(false, serialized.contains("parent hidden reasoning"))
         assertEquals(false, serialized.contains("parent private replay"))
+        assertEquals(false, serialized.contains("opaque-provider-payload"))
+        assertEquals(false, serialized.contains("opaque-response-payload"))
         assertEquals(false, seed.any { it["role"]?.jsonPrimitive?.contentOrNull == "tool" })
         assertEquals("只读核查接口是否仍存在", seed.last()["content"]?.jsonPrimitive?.contentOrNull)
     }
