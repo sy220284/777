@@ -51,9 +51,10 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     // The provider request belongs to the media capability, not a disposable Compose sheet.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
         CoroutineExceptionHandler { _, failure -> AppLog.failure("MediaCreation", "submit_video", failure) })
-    val storageError: StateFlow<String?> = combine(videoStore.recoveryErrors, resultStore.recoveryErrors) {
-        videoError, resultError -> videoError ?: resultError
-    }.stateIn(scope, SharingStarted.Eagerly, null)
+    val storageError: StateFlow<String?> = combine(
+        videoStore.recoveryErrors, resultStore.recoveryErrors, creationJobs.recoveryErrors,
+    ) { videoError, resultError, jobError -> videoError ?: resultError ?: jobError }
+        .stateIn(scope, SharingStarted.Eagerly, null)
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
     val activeCreationJobs: StateFlow<List<LocalMediaCreationJob>> get() = creationJobs.jobs
     suspend fun dismissCreationJob(id: String) = withContext(Dispatchers.IO) { creationJobs.dismiss(id) }
