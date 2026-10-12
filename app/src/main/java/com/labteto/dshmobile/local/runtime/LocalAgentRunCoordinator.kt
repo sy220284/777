@@ -108,6 +108,7 @@ internal data class LocalAgentRunRecoveryDecision(
     val runId: String,
     val queuedInput: QueuedAgentInput? = null,
     val blockedReason: String? = null,
+    val blockedCode: String? = null,
     val completedOutput: String? = null,
     val route: LocalAgentRunRouteIdentity? = null,
 )
@@ -314,6 +315,7 @@ internal class LocalAgentRunCoordinator(
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 blockedReason = "上次任务来自旧版检查点，缺少完整模型路由身份，已停止自动续跑。请手动确认后继续。",
+                blockedCode = "RECOVERY_ROUTE_IDENTITY_MISSING",
             )
         }
 
@@ -330,6 +332,7 @@ internal class LocalAgentRunCoordinator(
                 runId = runId,
                 blockedReason = data["reason"]?.jsonPrimitive?.contentOrNull
                     ?: "上次执行已被恢复保护阻断，请先检查外部状态后再继续。",
+                blockedCode = data["reason_code"]?.jsonPrimitive?.contentOrNull,
                 route = route,
             )
         }
@@ -353,6 +356,7 @@ internal class LocalAgentRunCoordinator(
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
+                blockedCode = "RECOVERY_TOOL_EFFECT_UNKNOWN",
                 route = route,
             )
         }
@@ -364,6 +368,7 @@ internal class LocalAgentRunCoordinator(
                 return LocalAgentRunRecoveryDecision(
                     runId = runId,
                     blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
+                    blockedCode = "RECOVERY_MUTATION_REPLAY_UNSAFE",
                     route = route,
                 )
             }
@@ -461,6 +466,7 @@ internal class LocalAgentRunCoordinator(
         runId: String,
         reason: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+        reasonCode: String? = null,
     ) {
         if (kind == LocalAgentRunKind.FOREGROUND) {
             foregroundOwners.remove(sessionId, runId)
@@ -471,6 +477,7 @@ internal class LocalAgentRunCoordinator(
             kind = kind,
             status = LocalAgentRunCheckpointStatus.RECOVERY_BLOCKED,
             reason = reason,
+            reasonCode = reasonCode,
         )
     }
 
@@ -597,6 +604,7 @@ internal class LocalAgentRunCoordinator(
         kind: LocalAgentRunKind,
         status: LocalAgentRunCheckpointStatus,
         reason: String,
+        reasonCode: String? = null,
     ) {
         val log = eventLogFor(sessionId)
         val latestRunId = log.latest(eventType(kind))
@@ -615,6 +623,7 @@ internal class LocalAgentRunCoordinator(
                 put("phase", LocalAgentRunPhase.TURN_FINISHED.name.lowercase())
                 put("updated_at", now())
                 put("reason", reason.take(2_000))
+                reasonCode?.takeIf(String::isNotBlank)?.let { put("reason_code", it) }
             },
         )
     }

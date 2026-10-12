@@ -157,6 +157,7 @@ class LocalAgentRunCoordinatorTest {
             assertNotNull(decision)
             assertNull(decision!!.queuedInput)
             assertTrue(decision.blockedReason.orEmpty().contains("副作用"))
+            assertEquals("RECOVERY_TOOL_EFFECT_UNKNOWN", decision.blockedCode)
         }
     }
 
@@ -409,12 +410,16 @@ class LocalAgentRunCoordinatorTest {
                 input = "修改外部状态",
                 memoryInput = "修改外部状态",
             )
-            coordinator.markRecoveryBlocked("s1", context.runId, "需要人工确认")
+            coordinator.markRecoveryBlocked(
+                "s1", context.runId, "需要人工确认",
+                reasonCode = "RECOVERY_MANUAL_CHECK",
+            )
 
             val decision = coordinator.recoveryDecision("s1", SessionRepairResult())
 
             assertNotNull(decision)
             assertEquals("需要人工确认", decision!!.blockedReason)
+            assertEquals("RECOVERY_MANUAL_CHECK", decision.blockedCode)
             assertNull(decision.queuedInput)
         }
     }
@@ -441,6 +446,7 @@ class LocalAgentRunCoordinatorTest {
 
             assertNull(decision.queuedInput)
             assertTrue(decision.blockedReason.orEmpty().contains("旧版检查点"))
+            assertEquals("RECOVERY_ROUTE_IDENTITY_MISSING", decision.blockedCode)
             assertTrue(decision.blockedReason.orEmpty().contains("模型路由身份"))
         }
     }
