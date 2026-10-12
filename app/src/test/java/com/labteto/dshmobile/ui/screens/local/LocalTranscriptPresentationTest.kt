@@ -29,6 +29,13 @@ class LocalTranscriptPresentationTest {
             )))
         assertEquals(waiting.map { it.key }, delivered.map { it.key })
         assertTrue(delivered.first() is LocalTranscriptItem.MediaResult)
+        val nextChatMessage = LocalTranscriptItem.Message(
+            LocalHarnessMessage("later", "user", "下一条消息", createdAt = 70L),
+        )
+        val ordered = mergeLocalMediaTimeline(listOf(nextChatMessage), "session-a",
+            listOf(completed), emptyList(), listOf(job))
+        assertEquals(listOf("media-result:operation-1", "message:later"),
+            ordered.map { it.key })
         assertTrue(mergeLocalMediaTimeline(emptyList(), "session-b", listOf(completed),
             emptyList(), listOf(job)).isEmpty())
     }
