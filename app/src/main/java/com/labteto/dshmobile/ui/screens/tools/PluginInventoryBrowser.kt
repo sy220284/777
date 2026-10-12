@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.labteto.dshmobile.ui.components.DsSearchField
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -28,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,17 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+
+/** Real connection-transport categories; unknown future transports remain under All. */
+internal enum class PluginTransportFilter { ALL, HTTP, STDIO }
+
+internal fun pluginTransportMatches(transport: String, filter: PluginTransportFilter): Boolean =
+    when (filter) {
+        PluginTransportFilter.ALL -> true
+        PluginTransportFilter.HTTP -> transport.contains("http", ignoreCase = true) ||
+            transport.contains("sse", ignoreCase = true)
+        PluginTransportFilter.STDIO -> transport.contains("stdio", ignoreCase = true)
+    }
 
 private data class InventoryRow(
     val id: String,
@@ -93,6 +107,7 @@ internal fun PluginInventoryBrowser(
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
+    var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
@@ -150,6 +165,10 @@ internal fun PluginInventoryBrowser(
             icon = FeatherIcons.Globe,
         )
     }
+    val filteredConnections = connected.filter { row ->
+        val server = connectedServices.firstOrNull { "service:${it.id}" == row.id }
+        server != null && pluginTransportMatches(server.transport.toString(), transportFilter)
+    }
     val installedSkills = skills.map { skill ->
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
@@ -162,7 +181,7 @@ internal fun PluginInventoryBrowser(
             available = false, installablePreset = true)
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
-        1 -> connected
+        1 -> filteredConnections
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
@@ -233,7 +252,7 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     DsFilterChip(
                         text = when (category) {
-                            1 -> connectionStatus
+                            1 -> "${connectionStatus} · ${connectedServices.size}"
                             2 -> stringResource(R.string.plugin_category_work)
                             3 -> stringResource(R.string.plugin_category_device)
                             4 -> stringResource(R.string.plugin_category_design)
@@ -243,6 +262,44 @@ internal fun PluginInventoryBrowser(
                         onClick = { selectedCategory = category },
                     )
                 }
+            }
+            if (!skillsOnly && selectedCategory == 1) {
+                // Design screen 18: connection transport is a real property from
+                // the service handshake, never an invented plugin-store category.
+                val options = PluginTransportFilter.entries
+                val counts = options.map { filter ->
+                    connectedServices.count { pluginTransportMatches(it.transport.toString(), filter) }
+                }
+                DsSegmented(
+                    segments = options.mapIndexed { index, filter ->
+                        DsSegment(
+                            filter.name,
+                            "${stringResource(
+                                when (filter) {
+                                    PluginTransportFilter.ALL -> R.string.plugin_transport_all
+                                    PluginTransportFilter.HTTP -> R.string.plugin_transport_http
+                                    PluginTransportFilter.STDIO -> R.string.plugin_transport_stdio
+                                },
+                            )} · ${counts[index]}",
+                        )
+                    },
+                    selectedKey = transportFilter.name,
+                    onSelect = { key ->
+                        transportFilter = options.firstOrNull { it.name == key } ?: PluginTransportFilter.ALL
+                    },
+                    role = Role.Tab,
+                    hapticOnChange = true,
+                    stretch = true,
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small)
+                        .testTag("plugin-transport-tabs"),
+                )
+                DsButton(
+                    text = stringResource(R.string.tools_external_services),
+                    variant = DsButtonVariant.Ghost,
+                    onClick = onManageConnections,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.comfortable),
+                )
             }
             if (loading || error != null || list.isEmpty()) {
                 Column(

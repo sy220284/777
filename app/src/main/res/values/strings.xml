@@ -2178,5 +2178,8 @@
     <string name="tasks_filter_running">执行中</string>
     <string name="tasks_filter_paused">已暂停</string>
     <string name="tasks_filter_empty">此状态下没有任务</string>
+    <string name="plugin_transport_all">全部连接</string>
+    <string name="plugin_transport_http">HTTP</string>
+    <string name="plugin_transport_stdio">stdio</string>
 </resources>
 
