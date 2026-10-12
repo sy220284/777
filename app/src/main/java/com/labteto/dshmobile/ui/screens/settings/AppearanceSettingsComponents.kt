@@ -40,10 +40,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsSlider
+import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.connection.AppSettings
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
@@ -101,7 +101,7 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        DsSlider(
+        SySlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
             valueRange = 0.9f..1.3f,
@@ -121,11 +121,11 @@ internal fun ReadingPreferencesRow(
         style = DsType.std14Strong.withReadingWeight(),
         color = colors.labelPrimary,
     )
-    DsSegmented(
+    SySegmented(
         segments = listOf(
-            DsSegment("0", stringResource(R.string.settings_text_weight_standard)),
-            DsSegment("1", stringResource(R.string.settings_text_weight_medium)),
-            DsSegment("2", stringResource(R.string.settings_text_weight_bold)),
+            SySegment("0", stringResource(R.string.settings_text_weight_standard)),
+            SySegment("1", stringResource(R.string.settings_text_weight_medium)),
+            SySegment("2", stringResource(R.string.settings_text_weight_bold)),
         ),
         selectedKey = settings.textWeightAdjustment.toString(),
         hapticOnChange = true,
@@ -145,7 +145,7 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        DsSlider(
+        SySlider(
             value = settings.wallpaperSurfaceTransparency,
             onValueChange = onTransparencyChange,
             valueRange = 0f..1f,
@@ -166,12 +166,12 @@ internal fun ReadingPreferencesRow(
 internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
     // Screen 26: theme modes are a four-position choice track, not four unrelated
     // preview cards. Real previews remain in AppearanceReadingPreview below.
-    DsSegmented(
+    SySegmented(
         segments = listOf(
-            DsSegment("light", stringResource(R.string.settings_appearance_light)),
-            DsSegment("dark", stringResource(R.string.settings_appearance_dark)),
-            DsSegment("matte_black", stringResource(R.string.settings_appearance_matte_black)),
-            DsSegment("system", stringResource(R.string.settings_appearance_system)),
+            SySegment("light", stringResource(R.string.settings_appearance_light)),
+            SySegment("dark", stringResource(R.string.settings_appearance_dark)),
+            SySegment("matte_black", stringResource(R.string.settings_appearance_matte_black)),
+            SySegment("system", stringResource(R.string.settings_appearance_system)),
         ),
         selectedKey = settings.themePreference,
         onSelect = onSelect,
