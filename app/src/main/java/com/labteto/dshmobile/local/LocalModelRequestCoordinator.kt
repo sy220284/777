@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheMode
+import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
@@ -165,12 +166,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
         )
-        val softProjectionScale = if (baselinePressure.estimatedInputTokens.toDouble() >= operationalLimit * 0.85) {
-            // Never defer context recovery near the real uncalibrated admission boundary.
-            1.0
-        } else {
-            pressureStore.softProjectionScale(routeFingerprint)
-        }
+        val softProjectionScale = pressureStore.softProjectionScale(
+            routeFingerprint = routeFingerprint,
+            rawEstimatedInputTokens = baselinePressure.estimatedInputTokens,
+            operationalLimitTokens = operationalLimit,
+        )
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
             workProjectionEnabled = contextPolicy != null,
@@ -217,16 +217,21 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 modelContextWindowTokens = modelContextWindow,
             )
         } else baselinePressure
+        // Use the same 85% cutoff for the assessment as for the projection itself.
+        val softAssessmentPressure: (LocalPromptPressure) -> LocalPromptPressure = { raw ->
+            if (softProjectionScale == 1.0) raw
+            else pressureStore.forSoftProjection(routeFingerprint, raw)
+        }
         val contextAssessment = if (
             contextPolicy != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
             contextPolicy.assess(
                 LocalRequestContextAssessmentInput(
-                    current = pressureStore.forSoftProjection(routeFingerprint, pressure),
-                    previous = previousSourcePressure?.let { pressureStore.forSoftProjection(routeFingerprint, it) },
+                    current = softAssessmentPressure(pressure),
+                    previous = previousSourcePressure?.let(softAssessmentPressure),
                     operationalLimitTokens = operationalLimit,
                     cachePolicy = cachePolicy,
-                    growthCurrent = pressureStore.forSoftProjection(routeFingerprint, baselinePressure),
+                    growthCurrent = softAssessmentPressure(baselinePressure),
                 ),
             )
         } else {
