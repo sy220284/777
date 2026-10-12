@@ -349,6 +349,24 @@ private val NEGATED_INTIMACY_HINTS = listOf(
  * receive these prompts; explicit intent or evidence of continuing intimacy activates it.
  */
 internal class ChatIntimacyMode {
+    /** The reply-suggestion path delegates all intimacy-specific context to this mode. */
+    fun suggestionContext(input: String, state: ChatCharacterState): String {
+        if (!hasFlirtingOrIntimateIntent(input, state)) return ""
+        return buildString {
+            if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
+                appendLine(
+                    "互动状态：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
+                        "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "近期称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
+                )
+            }
+            appendLine("当前为亲密语境：建议承接当前互动，避免复用近期动作、称呼和表达套路。")
+            if (hasChineseSuggestiveFlirtingIntent(input)) {
+                appendLine("存在中文双关时接住言外之意，不做词义解释。")
+            }
+        }.trim()
+    }
     fun prompt(input: String, state: ChatCharacterState): String {
         val mode = resolveChatInteractionIntent(input, state)
         // No intimacy mode for a normal or relationship-progress-only turn.
