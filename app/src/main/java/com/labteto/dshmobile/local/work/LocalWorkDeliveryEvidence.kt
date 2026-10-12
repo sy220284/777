@@ -59,7 +59,7 @@ internal fun localWorkDeliveryEvidence(
         log.latestMatching(setOf("tool/result")) { event ->
             event.value("is_error") == "false" &&
                 event.value("name") in setOf("bash", "run_shell", "terminal_exec", "run_command") &&
-                Regex("""(?i)(BUILD SUCCESSFUL|tests? passed|\d+ passed|0 failed)""")
+                Regex("""(?i)(BUILD SUCCESSFUL|tests? passed|[1-9]\d* passed)""")
                     .containsMatchIn(event.value("content").orEmpty()) &&
                 !event.value("id").isNullOrBlank()
         }?.takeIf { result ->
