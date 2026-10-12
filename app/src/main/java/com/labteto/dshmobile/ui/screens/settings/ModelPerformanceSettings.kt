@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import com.labteto.dshmobile.ui.components.DsRadioButton
-import com.labteto.dshmobile.ui.components.DsSlider
+import com.shenyan.designsystem.components.SyRadioControl
+import com.labteto.dshmobile.ui.shenyan.SySlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -70,7 +70,7 @@ internal fun ModelPerformanceSettingsPage() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsRadioButton(
+                SyRadioControl(
                     selected = limits.reasoningCeiling == ceiling,
                     onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) },
                 )
@@ -96,7 +96,7 @@ internal fun ModelPerformanceSettingsPage() {
             stringResource(R.string.settings_model_performance_temperature_value, rounded),
             style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
         )
-        DsSlider(
+        SySlider(
             value = draft,
             onValueChange = { draft = (it * 20).roundToInt() / 20f },
             onValueChangeFinished = {
