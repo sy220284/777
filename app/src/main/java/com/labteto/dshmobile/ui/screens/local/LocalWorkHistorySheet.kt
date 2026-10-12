@@ -57,21 +57,21 @@ internal fun LocalWorkHistorySheet(
             failed = true
         }
     }
-    DsBottomSheet(title = stringResource(R.string.local_run_full_history), onDismiss = onDismiss,
+    SyResponsiveSheet(title = stringResource(R.string.local_run_full_history), onDismiss = onDismiss,
         footer = {
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(stringResource(R.string.local_run_history_latest), { selected = null; cursor = null; retry++ },
-                    variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
-                if (failed) DsButton(stringResource(R.string.common_retry), { retry++ }, size = DsButtonSize.Small)
-                else DsButton(stringResource(R.string.local_run_history_older), { selected = null; cursor = page?.older },
-                    enabled = page?.older != null, size = DsButtonSize.Small)
+                SyButton(stringResource(R.string.local_run_history_latest), { selected = null; cursor = null; retry++ },
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                if (failed) SyButton(stringResource(R.string.common_retry), { retry++ }, size = SyButtonSize.Small)
+                else SyButton(stringResource(R.string.local_run_history_older), { selected = null; cursor = page?.older },
+                    enabled = page?.older != null, size = SyButtonSize.Small)
             }
         }) {
         val current = page
         val detail = selected
         if (artifactFailed) Text(stringResource(R.string.local_artifact_open_failed), color = DsTheme.colors.error)
         if (detail != null) {
-            DsButton(stringResource(R.string.common_back), { selected = null }, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+            SyButton(stringResource(R.string.common_back), { selected = null }, variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
             if (evidenceFailed) Text(stringResource(R.string.local_tool_activity_evidence_error))
             SelectionContainer { Text(evidence ?: detail.content, Modifier.weight(1f, fill = false).heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()), style = DsType.small13) }
         } else when {
@@ -92,12 +92,12 @@ internal fun LocalWorkHistorySheet(
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                    DsSegmented(
+                    SySegmented(
                         segments = listOf(
-                            DsSegment("all", stringResource(R.string.local_run_history_filter_all)),
-                            DsSegment("call", stringResource(R.string.local_run_history_call)),
-                            DsSegment("started", stringResource(R.string.local_run_history_started)),
-                            DsSegment("result", stringResource(R.string.local_run_history_result)),
+                            SySegment("all", stringResource(R.string.local_run_history_filter_all)),
+                            SySegment("call", stringResource(R.string.local_run_history_call)),
+                            SySegment("started", stringResource(R.string.local_run_history_started)),
+                            SySegment("result", stringResource(R.string.local_run_history_result)),
                         ),
                         selectedKey = recordFilter,
                         onSelect = { recordFilter = it },
@@ -135,8 +135,8 @@ internal fun LocalWorkHistorySheet(
                                     })
                             }
                             SelectionContainer { Text(record.content, style = DsType.small13.withReadingWeight()) }
-                            if (record.callId != null) DsButton(stringResource(R.string.local_tool_activity_details),
-                                { selected = record }, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
+                            if (record.callId != null) SyButton(stringResource(R.string.local_tool_activity_details),
+                                { selected = record }, variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                         }
                     }
                 }
