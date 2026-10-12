@@ -79,14 +79,7 @@ fun SyMaterialFrame(
     )
     val fill = palette.colorFor(resolved)
     val nextDepth = if (resolved == SyMaterialTier.L5_SOLID) depth else depth + 1
-    Surface(
-        modifier = base,
-        shape = shape,
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, palette.border),
-        onClick = onClick ?: {},
-        enabled = onClick != null,
-    ) {
+    @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
             if (backdrop != null && resolved.blurRadius() > 0.dp) {
                 Box(Modifier.matchParentSize().blur(
@@ -104,6 +97,14 @@ fun SyMaterialFrame(
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth(.93f).height(1.dp)
                 .background(palette.rim))
         }
+    }
+    // A display-only card is not an invisible disabled button for TalkBack.
+    if (onClick == null) {
+        Surface(modifier = base, shape = shape, color = Color.Transparent,
+            border = BorderStroke(1.dp, palette.border)) { Interior() }
+    } else {
+        Surface(onClick = onClick, modifier = base, shape = shape,
+            color = Color.Transparent, border = BorderStroke(1.dp, palette.border)) { Interior() }
     }
 }
 
