@@ -96,6 +96,11 @@ internal fun LocalModelSettingsCard(
 ) {
     val colors = DsTheme.colors
     val modelSavedMessage = stringResource(R.string.advanced_model_saved)
+    val catalogEmptyMessage = stringResource(R.string.local_model_catalog_empty)
+    val catalogSuccessFormat = stringResource(R.string.local_model_catalog_success)
+    val catalogFailureFormat = stringResource(R.string.local_model_catalog_failure)
+    val catalogUnavailable = stringResource(R.string.local_model_catalog_unavailable)
+    val catalogTestFailureFormat = stringResource(R.string.local_model_catalog_test_failure)
     val scope = rememberCoroutineScope()
     val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
     var showEditor by remember { mutableStateOf(false) }
@@ -162,9 +167,9 @@ internal fun LocalModelSettingsCard(
                 if (showEditor && editorGeneration == generation) {
                     discoveredModels = found
                     catalogStatus = if (found.isEmpty()) {
-                        "接口返回了空模型目录；仍可手动填写模型 ID"
+                        catalogEmptyMessage
                     } else {
-                        "已从接口获取 ${found.size} 个模型，点击模型名称即可选择"
+                        catalogSuccessFormat.format(found.size)
                     }
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -173,7 +178,7 @@ internal fun LocalModelSettingsCard(
                 if (showEditor && editorGeneration == generation) {
                     discoveredModels = emptyList()
                     catalogError = true
-                    catalogStatus = "模型目录获取失败：${error.message ?: "接口未响应"}；可以继续手动填写模型"
+                    catalogStatus = catalogFailureFormat.format(error.message ?: catalogUnavailable)
                 }
             } finally {
                 refreshingModels = false
@@ -365,7 +370,7 @@ internal fun LocalModelSettingsCard(
                         }
                     },
                     items = discoveredModels.map { discovered ->
-                        MenuItem("接口可用 · $discovered") {
+                        MenuItem(stringResource(R.string.local_model_catalog_option, discovered)) {
                             // A new discovered model is a new route. Preserve the original
                             // credential reference, without exposing or copying its key into UI.
                             if (editingProfileId != null) credentialSourceProfileId = editingProfileId
@@ -444,7 +449,8 @@ internal fun LocalModelSettingsCard(
                     supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
                     visualTransformation = PasswordVisualTransformation())
                 DsButton(
-                    if (refreshingModels) "正在获取模型列表…" else "从接口刷新模型列表",
+                    if (refreshingModels) stringResource(R.string.local_model_catalog_fetching)
+                    else stringResource(R.string.local_model_catalog_refresh),
                     onClick = refreshModels,
                     enabled = !refreshingModels && !testing && !saving && baseUrl.isNotBlank() &&
                         (apiKey.isNotBlank() || credentialSourceProfileId != null),
@@ -463,7 +469,7 @@ internal fun LocalModelSettingsCard(
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                     verticalAlignment = Alignment.CenterVertically) {
-                                    Text("选择接口返回的模型（${discoveredModels.size}）",
+                                    Text(stringResource(R.string.local_model_catalog_selector, discoveredModels.size),
                                         style = DsType.std14Strong.withReadingWeight(),
                                         color = colors.labelPrimary, modifier = Modifier.weight(1f))
                                     Icon(FeatherIcons.ChevronRight, contentDescription = null)
@@ -481,7 +487,7 @@ internal fun LocalModelSettingsCard(
                             }
                         },
                     )
-                    Text("目录来自 API 服务端，列出不代表该模型一定支持对话；可用下方连接测试验证。",
+                    Text(stringResource(R.string.local_model_catalog_hint),
                         style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
                 testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
@@ -505,7 +511,7 @@ internal fun LocalModelSettingsCard(
                                 throw cancelled
                             } catch (error: Exception) {
                                 if (showEditor && editorGeneration == testedGeneration) {
-                                    testStatus = "连接测试失败：${error.message ?: "接口未响应"}"
+                                    testStatus = catalogTestFailureFormat.format(error.message ?: catalogUnavailable)
                                 }
                             } finally {
                                 testing = false
