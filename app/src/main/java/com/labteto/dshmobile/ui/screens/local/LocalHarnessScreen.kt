@@ -481,7 +481,7 @@ fun LocalHarnessScreen(
         updateInstructions = viewModel::updateProjectInstructions,
     )
     val automationActions = LocalAutomationFeatureUiActions(
-        switchSession = ::switchToSessionAndShowConversation,
+        switchSession = { switchToSessionAndShowConversation(it) },
     )
     val activeConversationState = when (shell.usageMode) {
         LocalUsageMode.CHAT -> viewModel.chatSurfaceState
