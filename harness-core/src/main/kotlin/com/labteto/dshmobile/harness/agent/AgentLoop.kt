@@ -42,6 +42,8 @@ data class AgentToolResult(
     val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
     val recoveryHint: String? = null,
     val retention: ToolResultRetention = ToolResultRetention.DURABLE,
+    val processExitCode: Int? = null,
+    val fileVersions: Map<String, String> = emptyMap(),
 )
 
 fun AgentToolResult.modelVisibleContent(): String {
@@ -106,6 +108,8 @@ sealed interface AgentEvent {
         val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
         val recoveryHint: String? = null,
         val retention: ToolResultRetention = ToolResultRetention.DURABLE,
+        val processExitCode: Int? = null,
+        val fileVersions: Map<String, String> = emptyMap(),
     ) : AgentEvent
 
     data class StepFinished(
@@ -254,6 +258,8 @@ class AgentLoop(
                                 sideEffect = result.sideEffect,
                                 recoveryHint = result.recoveryHint,
                                 retention = result.retention,
+                                processExitCode = result.processExitCode,
+                                fileVersions = result.fileVersions,
                             ),
                         )
                         messages += AgentMessage(
@@ -289,6 +295,8 @@ class AgentLoop(
                                 sideEffect = result.sideEffect,
                                 recoveryHint = result.recoveryHint,
                                 retention = result.retention,
+                                processExitCode = result.processExitCode,
+                                fileVersions = result.fileVersions,
                             ),
                         )
                         messages += AgentMessage(

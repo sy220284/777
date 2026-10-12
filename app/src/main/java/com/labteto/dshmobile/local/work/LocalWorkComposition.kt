@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import java.io.File
 import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
@@ -81,6 +82,7 @@ internal class LocalWorkComposition @Inject constructor(
         schemas = tools.schemas,
         approvalPreferences = approvalPreferences,
         githubConfigured = tools.plugins::githubConfigured,
+        workspaceRoot = File(sessionStorage.files.workspace.path),
     )
     private val subagentFactory by lazy {
         LocalSubagentRunnerFactory(
@@ -174,6 +176,7 @@ internal class LocalWorkComposition @Inject constructor(
         )
     }
     private val taskBuiltins = LocalWorkBuiltinToolRuntime(
+        workspaceRoot = File(sessionStorage.files.workspace.path),
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
         updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
     )

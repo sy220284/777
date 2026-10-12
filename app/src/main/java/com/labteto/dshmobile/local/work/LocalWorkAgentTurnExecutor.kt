@@ -426,7 +426,7 @@ internal class LocalWorkAgentTurnExecutor(
                             step = modelStep + 1,
                         )
                     }
-                    val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog)
+                    val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog, File(workspacePath))
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
                     return@AgentModel AgentModelReply(
@@ -525,6 +525,7 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         is AgentEvent.ToolStarted -> {
                             runEventLog.append("tool/call", buildJsonObject {
+                                put("goal_id", binding.workState.snapshot().goal?.id ?: "")
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
@@ -560,6 +561,8 @@ internal class LocalWorkAgentTurnExecutor(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
+                                event.processExitCode?.let { put("process_exit_code", it) }
+                                put("file_versions", kotlinx.serialization.json.JsonObject(event.fileVersions.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
@@ -598,7 +601,7 @@ internal class LocalWorkAgentTurnExecutor(
                             completedToolCallIds.clear()
                         }
                         is AgentEvent.TurnCompleted -> {
-                            recordWorkCompletionQuality(event.answer, runState.value, runEventLog)
+                            recordWorkCompletionQuality(event.answer, runState.value, runEventLog, File(workspacePath))
                             runEventLog.append("turn/end", buildJsonObject {
                                 put("reason", "completed")
                                 put("steps", event.steps)

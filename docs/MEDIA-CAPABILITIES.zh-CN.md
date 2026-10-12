@@ -63,7 +63,7 @@
 2. Qwen Image 3.0 OpenAI 兼容接口仅对 `qwen-image-3.0`/`qwen-image-3.0-pro` 开放；旧 `qwen-image-plus` 未沿用该协议。参见 2026-10-10 官方说明：https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference 。
 3. 新媒体请求复用 Android 可取消的 OkHttp 调用，但不再继承共享短请求 30 秒读取超时。媒体服务 HTTP 200 但返回 `error`/`code` 时标记失败；Gemini Base64 图像依据实际 `inlineData.mimeType` 保存和分享。
 4. OpenAI 音频上传优先根据 Android SAF 提供的原始文件名识别合法扩展名，在原始 MIME 缺失时仍允许已明确支持的格式，拒绝将其他音频伪装为 MP3。文档：https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create 。
-5. 同一视频创作模型可以连续提交多个任务，`LocalMediaVideoTaskStore` 统一持久保存任务身份、原账户路由指纹、服务商任务 ID、终态与错误。面板退出后进程内媒体运行时仍继续提交。进程崩溃恰在远端接受付费请求但尚未拿到任务编号的极端窗口，记录会恢复为 `OUTCOME_UNKNOWN`，不自动重试；只有用户向服务商核对才可确定远端是否接收。这一风险无法仅靠本机存储完全消除。
+5. 同一视频创作模型可以连续提交多个任务，`LocalMediaStore` 统一持久保存任务身份、原账户路由指纹、服务商任务 ID、终态与错误。面板退出后进程内媒体运行时仍继续提交。进程崩溃恰在远端接受付费请求但尚未拿到任务编号的极端窗口，记录会恢复为 `OUTCOME_UNKNOWN`，不自动重试；只有用户向服务商核对才可确定远端是否接收。这一风险无法仅靠本机存储完全消除。
 
 ## 2026-10-11 复查订正
 
@@ -74,18 +74,22 @@
 
 ## 统一多模态运行时：任务与成果持久化（2026-10-11）
 
-- **业务所有者唯一**：`LocalMediaCreationRuntime` 是主动多模态创作唯一执行入口；`LocalMediaVideoTaskStore` 只负责视频任务事实，`LocalMediaResultStore` 只负责图片/配音成果索引。聊天界面不再维护重复的视频任务 Map。Work/Agent 运行中心暂不接管外部媒体任务，避免双写和跨 Feature 所有权冲突。
-- **视频提交顺序**：冻结创作路由 → `SharedPreferences.commit` 先持久化 SUBMITTING 与原账户路线指纹 → 进程级 SupervisorJob 发出外部生成请求 → 成功获取远端 task ID 后持久化为 QUEUED → 手动只读查询 → 持久化终态和视频 URL。失败、取消或断电处于不确定提交时不盲目自动重试。
+- **业务所有者唯一**：`LocalMediaCreationRuntime` 是主动多模态创作唯一执行入口；`LocalMediaStore` 的 SQLite 数据库统一保存视频任务及创作回执/成果，回执与成果共用同一事务记录。聊天界面不再维护重复的视频任务 Map。Work/Agent 运行中心暂不接管外部媒体任务，避免双写和跨 Feature 所有权冲突。
+- **视频提交顺序**：冻结创作路由 → SQLite 先持久化 SUBMITTING 与原账户路线指纹 → 进程级 SupervisorJob 发出外部生成请求 → 成功获取远端 task ID 后持久化为 QUEUED → 手动只读查询 → 持久化终态和视频 URL。失败、取消或断电处于不确定提交时不盲目自动重试。
 - **无法消除的崩溃窗口**：服务商已接受收费请求但客户端未收到其 task ID 时，本机无法判断远端是否完成。冷恢复会标记 `OUTCOME_UNKNOWN` 并要求去服务商平台核对；要彻底消除这段风险，需要服务商支持幂等提交键或可查询的请求身份。
 - **账户身份匹配**：恢复查询绑定创作账户 ID、路由指纹、服务商、专业模型，不能自动改用当前聊天模型或其他账户。账户已移除时任务档案仍可查看，但查询会要求恢复原配置。
-- **成果文件**：本轮新生成的 GPT/Gemini 图片和 MiniMax/OpenAI MP3 配音保存于 `filesDir/media-studio/`，而非会被系统清理的 `cacheDir`；按 provider/model/kind 记入 `LocalMediaResultStore`，支持跨会话查看、分享和确认删除。应用卸载或清数据仍会删除本地文件，重要成果可使用系统分享另行导出。
+- **成果文件**：本轮新生成的 GPT/Gemini 图片和 MiniMax/OpenAI MP3 配音保存于 `filesDir/media-studio/`，而非会被系统清理的 `cacheDir`；按 provider/model/kind 记入 `LocalMediaStore`，支持跨会话查看、分享和确认删除。应用卸载或清数据仍会删除本地文件，重要成果可使用系统分享另行导出。
 - **服务商在线图片**：MiniMax/Qwen 等返回的 HTTPS URL 只作为*临时成果链接*记录，不宣称图片已经离线保存。过期后仍需服务商续签 URL 或用户先前手动下载。
 - **诊断与隐私**：状态与失败原因回到持久视频任务记录，不保存提示词或明文 API Key。图片/视频/语音消费和费用不可从文字 Token 账本推算，仍需服务商权威响应对接。
 - **验证**：`LocalMediaPersistenceRulesTest` 覆盖崩溃保守恢复、远端 ID 身份附着、终态防迟到覆盖、账户匹配以及文件/链接序列化，仍需真实付费账户与 Android 设备测试。
 
 ## 媒体记录恢复与视频状态
 
-视频任务与成果索引复用 Shared 的 RecoveringDocumentFile，正常提交使用原子替换、备份及损坏隔离。旧 SharedPreferences JSON 首次读取先完整解码，成功提交到应用私有媒体目录后由新文档接管；损坏旧记录保留原文，不迁移为空表。主文件与备份都不可恢复时，媒体页面显示恢复错误，并在对应计费生成之前阻止覆盖原记录。临时图片链接仍不冒充永久下载。
+媒体正常读写由 `LocalMediaStore` 的 SQLite 事务数据库接管。旧 JSON/SharedPreferences 首次读取先完整解码，回执、成果、视频任务与迁移标记在一次数据库事务中提交；失败回滚，不迁移为空历史。成功后旧 JSON 主备文件移动到 `media-studio/migration-archive/`，旧 preferences 保留但不再读取。归档仅供人工恢复，不是正常运行的第二事实源。已建立的数据库缺失或损坏会显示恢复错误，不能删除损坏数据库后假装空历史继续收费生成。
+
+成果与回执在同一记录中原子完成；删除先提交逻辑删除，再清理本地文件，文件清理失败保留可重试标记。删除或重启均不会重读旧归档而复活卡片；运行中收费任务拒绝删除。所有媒体历史保留，页面按会话/时间索引默认读取 50 条，通过“加载更早记录”扩展，不再冷启动全量解析历史。
+
+视频的服务商状态与本地交付状态分开：服务商成功但本地保存中断时可以恢复或手动重试下载，同一任务的下载合并为一次；可以用原账户查询已成功任务更新过期链接。这些操作不重新提交收费生成。临时图片链接仍不冒充永久下载。
 
 MiniMax 原始视频状态 Preparing、Queueing、Processing、Success、Fail 在供应商边界归一化；Preparing 映射到排队中，Fail 映射到失败。依据：[MiniMax 官方视频状态查询](https://platform.minimax.io/docs/api-reference/video-generation-query)。
 
@@ -102,7 +106,7 @@ MiniMax 原始视频状态 Preparing、Queueing、Processing、Success、Fail �
 
 **真实代码路径**：创作面板 `submitImage/submitSpeech/submitTranscribe` 先在 `LocalMediaCreationJobStore` 持久化 `sessionId + 任务ID + 原始能力 + 模型 + 简短提示词`，由 `LocalMediaCreationRuntime` 的应用级 `SupervisorJob` 执行服务商请求。弹层关闭或转去其他会话不撤销已提交的付费请求。提交即以 `media-result:<任务ID>` 在对话中显示阶段卡；结果文件的 `LocalMediaResult.id` 与任务 ID 相同，成功后保留卡片稳定 key 原位替换为图片/音频/转写成果。此机制不会把创作成果伪造成模型对话文本。
 
-**异常恢复与费用安全**：进程意外结束时将尚未确认的 `SUBMITTING` 回执恢复为 `OUTCOME_UNKNOWN`，记录原账户模型、会话及错误，明确提示用户先核对服务商记录，**不自动再次提交付费请求**。当前只保证任务事实可恢复，不表示可以在被系统杀进程时继续云端 HTTP 请求，也不能在服务商不支持幂等/任务查询时自动取回未知结果。删除媒体时一并清理关联回执，防止已删成果残留幽灵卡片。
+**异常恢复与费用安全**：同步创作先持久化 `PREPARING`，发送 HTTP 前提交 `SUBMITTING`，确认服务商成果后提交 `SAVING`。准备阶段失败/重启为 `NOT_SENT`；明确拒绝为 `REQUEST_REJECTED`；服务商成功后的保存失败为 `SAVE_FAILED`；未确认请求结果的 `SUBMITTING` 在重启时恢复为 `OUTCOME_UNKNOWN`。记录原账户模型、会话及错误，明确提示用户先核对服务商记录，**不自动再次提交付费请求**。当前只保证任务事实可恢复，不表示可以在被系统杀进程时继续云端 HTTP 请求，也不能在服务商不支持幂等/任务查询时自动取回未知结果。删除媒体时一并清理关联回执，防止已删成果残留幽灵卡片。
 
 **聊天内显示精修**：
 - 图片按真实宽高显示纵图/横图；本机图片通过采样解码文件，不再因体积大于 12MB 直接当作无缩略图；可点图查看原图，加载与失败状态分离。

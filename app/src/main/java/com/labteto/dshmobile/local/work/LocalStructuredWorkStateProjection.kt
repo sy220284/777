@@ -20,6 +20,8 @@ internal fun structuredWorkState(
     val goals = buildList {
         work.goal?.description?.takeIf(String::isNotBlank)?.let(::add)
         work.goal?.note?.takeIf(String::isNotBlank)?.let { add("目标备注：$it") }
+        work.goal?.artifactPaths?.takeIf(List<String>::isNotEmpty)?.let { add("目标验收成果：${it.joinToString()}") }
+        work.goal?.verificationCommands?.takeIf(List<String>::isNotEmpty)?.let { add("目标验收命令：${it.joinToString()}") }
     }
     val plan = work.plan
         .map(String::trim)

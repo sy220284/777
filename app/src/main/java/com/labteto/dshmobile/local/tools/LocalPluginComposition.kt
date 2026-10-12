@@ -83,7 +83,7 @@ class LocalPluginCompositionFactory @Inject constructor(
         resourceScheduler: HarnessResourceScheduler,
         routeProvider: () -> LocalVisionRoute?,
         imageSupportProvider: (LocalVisionRoute) -> Boolean?,
-        executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> String,
+        executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
         usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
     ): LocalPluginComposition = LocalPluginComposition(
         context = context,
@@ -134,7 +134,7 @@ internal class LocalPluginComposition(
     resourceScheduler: HarnessResourceScheduler,
     routeProvider: () -> LocalVisionRoute?,
     imageSupportProvider: (LocalVisionRoute) -> Boolean?,
-    executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> String,
+    executeBuiltin: suspend (LocalToolCall, Boolean, String?) -> com.labteto.dshmobile.harness.tools.ToolResult,
     usageContextProvider: (String?, String?) -> TokenUsageContext? = { _, _ -> null },
 ) {
     val tools = ToolRegistry()

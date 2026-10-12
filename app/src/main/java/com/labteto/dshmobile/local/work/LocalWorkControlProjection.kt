@@ -9,6 +9,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.longOrNull
 
 /** Work alone interprets plan, todo and goal events, including atomic plan approval. */
 internal fun projectWorkSessionControls(
@@ -47,7 +49,7 @@ internal fun projectWorkSessionControls(
                         val description = (fields["description"] as? JsonPrimitive)?.contentOrNull
                         val status = (fields["status"] as? JsonPrimitive)?.contentOrNull
                         if (description.isNullOrBlank() || status.isNullOrBlank()) null
-                        else LocalGoal(description, status, (fields["note"] as? JsonPrimitive)?.contentOrNull)
+                        else decodeWorkGoal(fields, event.sequence)
                     }
                     planMode = (event.data["plan_mode"] as? JsonPrimitive)?.booleanOrNull ?: planMode
                 }
@@ -64,11 +66,7 @@ internal fun projectWorkSessionControls(
                         !description.isNullOrBlank() &&
                         status in setOf("active", "paused", "completed", "blocked")
                     ) {
-                        goal = LocalGoal(
-                            description = description.take(2_000),
-                            status = status,
-                            note = (event.data["note"] as? JsonPrimitive)?.contentOrNull?.take(2_000),
-                        )
+                        goal = decodeWorkGoal(event.data, event.sequence)
                     }
                 }
                 "plan/mode" -> {
@@ -107,3 +105,9 @@ private fun decodeTodoState(data: JsonObject): List<LocalTodoItem>? {
     }
     return decoded.take(50)
 }
+
+private fun decodeWorkGoal(fields: JsonObject, sequence: Long): LocalGoal? = runCatching {
+    Json { ignoreUnknownKeys = true }.decodeFromJsonElement(LocalGoal.serializer(), fields).let { goal ->
+        if (goal.startedAtSequence >= 0L || goal.id.isBlank()) goal else goal.copy(startedAtSequence = sequence)
+    }
+}.getOrNull()

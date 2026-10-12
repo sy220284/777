@@ -61,6 +61,6 @@ internal fun isRevokedWorkConstraint(constraint: String, tombstones: Collection<
     // "必须兼容旧接口" must not silently delete "平板端必须兼容旧接口".
     return tombstones.any { target ->
         val phrase = normalizedWorkConstraint(target)
-        phrase.length >= 4 && normalized == phrase
+        phrase.isNotEmpty() && normalized == phrase
     }
 }

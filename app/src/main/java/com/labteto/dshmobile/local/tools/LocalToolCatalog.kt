@@ -140,7 +140,9 @@ object LocalToolCatalog {
         ), listOf("items")))
         add(tool("create_goal", "维护跨多轮任务的目标与验收条件。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
             "description" to string("目标和完成标准"),
-        ), listOf("description")))
+            "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务可省略")) },
+            "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整验收命令；通过真实进程退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务可省略")) },
+        ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
         add(tool("update_goal", "更新目标状态", properties(
             "status" to string("active、paused、completed 或 blocked"),

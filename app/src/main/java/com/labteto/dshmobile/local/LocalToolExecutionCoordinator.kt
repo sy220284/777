@@ -256,6 +256,7 @@ internal class LocalToolExecutionCoordinator(
         planModeEnabled: Boolean,
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
         beforeExecution: () -> Boolean = { true },
+        observeFileVersions: (() -> Map<String, String>)? = null,
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
@@ -339,7 +340,15 @@ internal class LocalToolExecutionCoordinator(
                         executionStarted = true
                     },
                 ),
-            )
+            ).let { invocation ->
+                // Observe while the real workspace lease is still held. The caller owns
+                // what to observe; this neutral coordinator never interprets goal semantics.
+                if (invocation.executionStarted && !readLike && !invocation.result.isError) {
+                    invocation.copy(result = invocation.result.copy(
+                        fileVersions = invocation.result.fileVersions + observeFileVersions?.invoke().orEmpty(),
+                    ))
+                } else invocation
+            }
         } catch (cancelled: CancellationException) {
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
@@ -400,6 +409,8 @@ internal class LocalToolExecutionCoordinator(
             return AgentToolResult(
                 content = result.content,
                 retention = result.retention,
+                processExitCode = result.processExitCode,
+                fileVersions = result.fileVersions,
                 sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
         }
@@ -437,6 +448,8 @@ internal class LocalToolExecutionCoordinator(
             sideEffect = if (mutationMayHaveSideEffect) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             recoveryHint = recoveryHint,
             retention = result.retention,
+            processExitCode = result.processExitCode,
+            fileVersions = result.fileVersions,
         )
     }
 

@@ -40,7 +40,7 @@ internal object LocalMediaApiResponse {
             ?: root["message"]?.jsonPrimitive?.contentOrNull
         if (error != null || code != null) {
             val label = code?.take(80)?.let { " ($it)" }.orEmpty()
-            throw IllegalStateException("创作服务返回错误$label：${reason?.take(320) ?: "请检查模型和账户权限"}")
+            throw LocalMediaRequestRejected("创作服务返回错误$label：${reason?.take(320) ?: "请检查模型和账户权限"}")
         }
         return root
     }
@@ -299,8 +299,10 @@ internal class LocalMediaApiClient @Inject constructor(
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         return withContext(Dispatchers.IO) {
+            markMediaRequestStarted()
             withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
-                if (!response.isSuccessful) error("OpenAI 配音请求失败（HTTP ${response.code}）")
+                if (!response.isSuccessful) throwMediaHttpFailure("OpenAI 配音", response.code)
+                markMediaProviderSucceeded()
                 val file = outputFile("mp3")
                 try {
                     response.body?.byteStream()?.use { inputStream ->
@@ -408,8 +410,9 @@ internal class LocalMediaApiClient @Inject constructor(
         readJson(authorizedRequest(offer, url).post(body).build())
 
     private suspend fun readJson(request: Request): JsonObject = withContext(Dispatchers.IO) {
+        if (request.method == "POST") markMediaRequestStarted()
         withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
-            if (!response.isSuccessful) error("创作服务请求失败（HTTP ${response.code}）")
+            if (!response.isSuccessful) throwMediaHttpFailure("创作服务", response.code)
             val payload = response.body?.string() ?: error("创作服务未返回数据")
             LocalMediaApiResponse.checked(json.parseToJsonElement(payload).jsonObject)
         }
@@ -430,6 +433,7 @@ internal class LocalMediaApiClient @Inject constructor(
             "created-${UUID.randomUUID()}.$extension")
 
     private suspend fun saveEncodedImage(encoded: String, extension: String = "png"): File = withContext(Dispatchers.IO) {
+        markMediaProviderSucceeded()
         val file = outputFile(extension)
         try {
             file.writeBytes(Base64.decode(encoded, Base64.DEFAULT))

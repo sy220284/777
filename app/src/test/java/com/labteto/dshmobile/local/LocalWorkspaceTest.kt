@@ -321,6 +321,17 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun shellEvidenceUsesExitCodeInsteadOfSuccessLookingOutput() = runBlocking {
+        val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
+        val failed = isolated.shellResult("echo BUILD SUCCESSFUL; exit 1", 5)
+        assertTrue(failed.isError)
+        assertEquals(1, failed.processExitCode)
+        val succeeded = isolated.shellResult("true", 5)
+        assertFalse(succeeded.isError)
+        assertEquals(0, succeeded.processExitCode)
+    }
+
+    @Test
     fun backgroundShellFailureModeRejectsNonZeroExit() = runBlocking {
         val isolated = LocalWorkspace(root = root, shellExecutable = "/bin/sh")
 

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -40,7 +41,10 @@ internal class LocalWorkspaceReadWriteGate {
      * block unrelated reads or writers. The registry has already validated input and authority.
      */
     suspend fun acquire(tool: HarnessTool): Lease? = when {
-        requiresSharedWorkspaceMutationLease(tool) -> acquireWrite()
+        tool.metadata.workspaceAccess == ToolWorkspaceAccess.WRITE ||
+            requiresSharedWorkspaceMutationLease(tool) -> acquireWrite()
+        tool.metadata.workspaceAccess == ToolWorkspaceAccess.READ ->
+            if (isParallelSafeReadTool(tool)) acquireRead() else acquireWrite()
         isParallelSafeReadTool(tool) -> acquireRead()
         else -> null
     }

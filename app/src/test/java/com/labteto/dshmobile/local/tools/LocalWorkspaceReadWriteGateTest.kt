@@ -64,4 +64,37 @@ class LocalWorkspaceReadWriteGateTest {
         laterReader.await()
         assertEquals(listOf("write", "read"), order)
     }
+    @Test fun lspReaderWaitsForAnActiveWriterWithoutBeingParallelReadSafe() = runTest {
+        val gate = LocalWorkspaceReadWriteGate()
+        val tool = com.labteto.dshmobile.harness.tools.HarnessTool(
+            "lsp_hover", com.labteto.dshmobile.harness.tools.functionToolSchema("lsp_hover", "read source"),
+            com.labteto.dshmobile.harness.tools.ToolAccess.READ_ONLY,
+            com.labteto.dshmobile.harness.tools.ToolApprovalPolicy.NEVER,
+            com.labteto.dshmobile.harness.tools.ToolExposure.CORE,
+            com.labteto.dshmobile.harness.tools.ToolMetadata("LSP", workspaceAccess = com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess.READ),
+            executor = com.labteto.dshmobile.harness.tools.HarnessToolExecutor { _, _, _ -> com.labteto.dshmobile.harness.tools.ToolResult("source") })
+        val hold = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val writer = async { gate.withWrite { entered.complete(Unit); hold.await() } }
+        entered.await()
+        var read = false
+        val reader = async { gate.execute(tool) { read = true } }
+        runCurrent()
+        assertFalse(read)
+        hold.complete(Unit); writer.await(); reader.await()
+        assertTrue(read)
+    }
+    @Test fun unrelatedRemoteReadDoesNotWaitForWorkspaceWriter() = runTest {
+        val gate = LocalWorkspaceReadWriteGate()
+        val remote = com.labteto.dshmobile.harness.tools.HarnessTool(
+            "remote_read", com.labteto.dshmobile.harness.tools.functionToolSchema("remote_read", "remote"),
+            com.labteto.dshmobile.harness.tools.ToolAccess.READ_ONLY,
+            com.labteto.dshmobile.harness.tools.ToolApprovalPolicy.NEVER,
+            com.labteto.dshmobile.harness.tools.ToolExposure.CORE,
+            com.labteto.dshmobile.harness.tools.ToolMetadata("Remote"),
+            executor = com.labteto.dshmobile.harness.tools.HarnessToolExecutor { _, _, _ -> com.labteto.dshmobile.harness.tools.ToolResult("remote") })
+        var read = false
+        gate.withWrite { gate.execute(remote) { read = true } }
+        assertTrue(read)
+    }
 }

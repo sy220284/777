@@ -136,7 +136,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
                 }
             },
             executeBuiltin = { call: LocalToolCall, allowMutation: Boolean, sessionId: String? ->
-                builtinRuntime.get().execute(call, allowMutation, sessionId)
+                builtinRuntime.get().executeResult(call, allowMutation, sessionId)
             },
             usageContextProvider = { sessionId, callId ->
                 usageBridge.resolve(sessionId, callId, TokenUsageAction.VISION)

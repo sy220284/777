@@ -37,6 +37,7 @@ internal class LocalWorkTurnToolRuntime(
     private val schemas: LocalToolSchemaProjection,
     private val approvalPreferences: LocalApprovalPreferences,
     private val githubConfigured: suspend () -> Boolean,
+    private val workspaceRoot: java.io.File? = null,
 ) {
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
@@ -112,16 +113,22 @@ internal class LocalWorkTurnToolRuntime(
         call: LocalToolCall,
         allowMutation: Boolean = true,
         stillCurrent: () -> Boolean = { true },
-    ): AgentToolResult = execution.executeScoped(
+    ): AgentToolResult {
+        val paths = binding.workState.snapshot().goal?.artifactPaths.orEmpty()
+        return execution.executeScoped(
         original = call,
         sessionId = binding.sessionId,
         allowMutation = allowMutation,
         planModeEnabled = binding.state.value.work.planMode,
         beforeExecution = stillCurrent,
+        observeFileVersions = { paths.mapNotNull { path ->
+            workspaceRoot?.let { localWorkFileSha256(it, path) }?.let { path to it }
+        }.toMap() },
         approval = { normalized, tool, summary ->
             approve(binding, normalized, summary, tool)
         },
-    )
+        )
+    }
 
     internal suspend fun executeBatch(
         binding: LocalWorkRunBinding,

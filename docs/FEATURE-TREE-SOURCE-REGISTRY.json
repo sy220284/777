@@ -16,6 +16,22 @@
       "entry": "LocalSkillStore",
       "owner": "TOOLS",
       "test": "app/src/test/java/com/labteto/dshmobile/local/tools/LocalMiniMaxSkillBundleTest.kt#upgradeInstallsCompleteBundlesAndPreservesEditsAndDeletions"
+    },
+    {
+      "id": "tools.media.paged-history",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+      "entry": "page",
+      "owner": "TOOLS",
+      "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#indexedPagesKeepAllHistoryAndSeparateSessions"
+    },
+    {
+      "id": "tools.media.transactional-recovery",
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+      "entry": "LocalMediaStore",
+      "owner": "TOOLS",
+      "test": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt#receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion"
     }
   ]
 }

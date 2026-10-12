@@ -2,47 +2,44 @@ package com.labteto.dshmobile.ui.screens.local
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime
-import com.labteto.dshmobile.local.presentation.LocalMediaImage
-import com.labteto.dshmobile.local.presentation.LocalMediaVoice
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.model.LocalMediaResult
-import com.labteto.dshmobile.local.model.LocalMediaCreationJob
-import kotlinx.coroutines.flow.StateFlow
+import com.labteto.dshmobile.local.model.LocalMediaPage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.File
 import javax.inject.Inject
 
-/** One UI-facing entry for creation; each action freezes its own chosen account/model. */
+/** One UI-facing operation boundary; archive and conversation reads are indexed, explicit pages. */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class LocalMediaStudioViewModel @Inject constructor(
-    private val creation: LocalMediaCreationRuntime,
-) : ViewModel() {
-    val storageError: StateFlow<String?> get() = creation.storageError
-    val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = creation.videoTasks
-    val generatedResults: StateFlow<List<LocalMediaResult>> get() = creation.generatedResults
-    val creationJobs: StateFlow<List<LocalMediaCreationJob>> get() = creation.activeCreationJobs
+class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalMediaCreationRuntime) : ViewModel() {
+    val storageError get() = creation.storageError
+    private val archiveLimit = MutableStateFlow(LocalMediaCreationRuntime.PAGE_SIZE)
+    val archive = archiveLimit.flatMapLatest { creation.observe(null, it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalMediaPage())
+    fun loadOlderArchive() { archiveLimit.value = Math.addExact(archiveLimit.value, LocalMediaCreationRuntime.PAGE_SIZE) }
+    fun sessionPage(sessionId: String, limit: Int): Flow<LocalMediaPage> = creation.observe(sessionId, limit)
+    suspend fun retryStorage() {
+        try { creation.retryStorage() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { /* The store keeps its actionable recovery error visible. */ }
+    }
     suspend fun dismissCreationJob(id: String) = creation.dismissCreationJob(id)
-    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String): LocalMediaCreationJob =
-        creation.submitImage(route, prompt, ratio, sessionId)
-    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String): LocalMediaCreationJob =
-        creation.submitSpeech(route, text, voice, sessionId)
-    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String): LocalMediaCreationJob =
-        creation.submitTranscribe(route, uri, sessionId)
-    fun resultFile(item: LocalMediaResult): File? = creation.resultFile(item)
-    fun videoFile(task: LocalMediaVideoTask): File? = creation.videoFile(task)
+    suspend fun submitImage(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String) = creation.submitImage(route, prompt, ratio, sessionId)
+    suspend fun submitSpeech(route: LocalMediaOffer, text: String, voice: String, sessionId: String) = creation.submitSpeech(route, text, voice, sessionId)
+    suspend fun submitTranscribe(route: LocalMediaOffer, uri: Uri, sessionId: String) = creation.submitTranscribe(route, uri, sessionId)
+    fun resultFile(item: LocalMediaResult) = creation.resultFile(item)
+    fun videoFile(task: LocalMediaVideoTask) = creation.videoFile(task)
     suspend fun removeResult(id: String) = creation.removeResult(id)
-
-    suspend fun image(route: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null): LocalMediaImage =
-        creation.image(route, prompt, ratio, sessionId)
-    suspend fun voices(route: LocalMediaOffer): List<LocalMediaVoice> = creation.voices(route)
-    suspend fun speech(route: LocalMediaOffer, text: String, voiceId: String, sessionId: String? = null): File =
-        creation.speech(route, text, voiceId, sessionId)
-    suspend fun transcribe(route: LocalMediaOffer, uri: Uri, sessionId: String? = null): String =
-        creation.transcribe(route, uri, sessionId)
-    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null): LocalMediaVideoTask =
-        creation.createVideo(route, prompt, sessionId)
-    suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) =
-        creation.refreshVideo(route, taskId)
+    suspend fun retryVideoSave(id: String) = creation.retryVideoSave(id)
+    suspend fun voices(route: LocalMediaOffer) = creation.voices(route)
+    suspend fun createVideo(route: LocalMediaOffer, prompt: String, sessionId: String? = null) = creation.createVideo(route, prompt, sessionId)
+    suspend fun refreshVideo(route: LocalMediaOffer, taskId: String) = creation.refreshVideo(route, taskId)
 }

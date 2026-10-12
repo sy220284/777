@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "snapshot": "4e97c66a4edd",
+  "snapshot": "499542b3467f",
   "scope": "全部仓库代码文件、全部生产源码，按产品真实入口复核",
-  "code_files_scanned": 1383,
-  "production_sources_scanned": 803,
-  "feature_nodes": 542,
-  "functional_leaves": 445,
+  "code_files_scanned": 1451,
+  "production_sources_scanned": 827,
+  "feature_nodes": 544,
+  "functional_leaves": 447,
   "existing_executable_test_mappings": 128,
   "leaf_evidence": [
     {
@@ -320,12 +320,18 @@
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
+      ],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "DsBottomSheet",
+          "declaration_found": false
+        },
+        {
+          "symbol": "SyResponsiveSheet",
           "declaration_found": true
         }
       ],
@@ -342,12 +348,18 @@
       "test_reference_count": 0,
       "historical_grade": "源码入口及处理分支已核（静态）",
       "existing_production_sources": [
+        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
+      ],
+      "missing_production_sources": [
         "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt"
       ],
-      "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "DsButton",
+          "declaration_found": false
+        },
+        {
+          "symbol": "SyButton",
           "declaration_found": true
         }
       ],
@@ -1886,22 +1898,34 @@
     },
     {
       "path": "第一层｜产品功能与界面 / 工作与智能体功能 / 规划与任务管理 / 目标管理 / 目标结果核验",
-      "verification": "具名源码声明存在（静态，待调用链复核）",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
       "test_reference_count": 0,
       "historical_grade": "具名业务入口已核（静态）",
       "existing_production_sources": [
-        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt"
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt"
       ],
       "missing_production_sources": [],
       "named_symbols": [
         {
           "symbol": "resolveWorkGoalTransition",
           "declaration_found": true
+        },
+        {
+          "symbol": "localWorkDeliveryEvidence",
+          "declaration_found": true
         }
       ],
-      "explicit_source_anchor": false,
-      "explicit_static_scope": null,
-      "explicit_test_candidates": [],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "目标显式契约、真实退出码与当前成果版本证据入口和故障测试存在，方法级源码关联不等于完整产品验收",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/test/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidenceTest.kt",
+          "method": "sourceChangeOrDeletionMakesEarlierVerificationStale",
+          "references": "localWorkDeliveryEvidence",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
       "workflow_evidence": []
     },
     {
@@ -4730,6 +4754,60 @@
       "explicit_source_anchor": false,
       "explicit_static_scope": null,
       "explicit_test_candidates": [],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "LocalMediaStore",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "媒体索引分页和会话隔离的实际存储入口与 SQLite 索引测试源码存在，设备执行须由当前 CI 证明",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt",
+          "method": "indexedPagesKeepAllHistoryAndSeparateSessions",
+          "references": "LocalMediaStore",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
+      "workflow_evidence": []
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
+      "verification": "具名源码及仪表测试声明存在（静态，未执行）",
+      "test_reference_count": 0,
+      "historical_grade": null,
+      "existing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt"
+      ],
+      "missing_production_sources": [],
+      "named_symbols": [
+        {
+          "symbol": "LocalMediaStore",
+          "declaration_found": true
+        }
+      ],
+      "explicit_source_anchor": true,
+      "explicit_static_scope": "媒体唯一存储入口持有回执及成果事务，删除与迟到写入故障测试已具名登记，设备执行须由当前 CI 证明",
+      "explicit_test_candidates": [
+        {
+          "path": "app/src/androidTest/java/com/labteto/dshmobile/local/model/LocalMediaStoreAndroidTest.kt",
+          "method": "receiptAndResultCommitTogetherAndLateWriterCannotResurrectDeletion",
+          "references": "LocalMediaStore",
+          "status": "仅发现测试源码，未验证CI是否执行通过"
+        }
+      ],
       "workflow_evidence": []
     },
     {
@@ -8258,15 +8336,15 @@
   ],
   "evidence_grade_summary": {
     "真实测试映射（仅局部）": 128,
-    "具名源码声明存在（静态，待调用链复核）": 210,
+    "具名源码声明存在（静态，待调用链复核）": 209,
     "历史生产文件仍存在（待入口复核）": 73,
     "没有可确认的现行入口证据": 14,
-    "具名源码及仪表测试声明存在（静态，未执行）": 3,
+    "具名源码及仪表测试声明存在（静态，未执行）": 6,
     "CI或发布工作流中存在对应任务和命令（静态，执行结果另核）": 14,
     "候选生产文件仍存在（不足以证明功能）": 3
   },
   "workflow_evidence_features": 14,
-  "declared_unexecuted_test_methods": 3,
+  "declared_unexecuted_test_methods": 6,
   "tracked_legacy_identities": 117,
   "stale_legacy_identities": [],
   "ambiguous_named_entry_paths": [
@@ -8314,6 +8392,8 @@
     "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / Python 执行",
     "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 托管后台进程",
     "第一层｜产品功能与界面 / 工具与扩展功能 / 终端运行环境 / 持久终端会话",
+    "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
+    "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离",
     "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 流式回复、状态指示和过渡动效",
     "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 图片、文件与工作成果查看",
     "第一层｜产品功能与界面 / 应用外壳与统一交互 / 会话通用交互 / 消息展示、Markdown 与代码块",
@@ -8410,6 +8490,14 @@
       "features": [
         "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物与会话绑定",
         "第一层｜产品功能与界面 / 聊天功能 / 人物与人设 / 人物图集 / 人物头像、立绘和预置素材"
+      ]
+    },
+    {
+      "source": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaStore.kt",
+      "symbol": "LocalMediaStore",
+      "features": [
+        "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体创作回执与成果恢复",
+        "第一层｜产品功能与界面 / 工具与扩展功能 / 视觉与媒体工具 / 媒体档案分页与会话隔离"
       ]
     },
     {
@@ -9021,22 +9109,11 @@
   "followup_production_or_compatibility": 7,
   "followup_test_only_descriptions": 7,
   "observed_code_delta": {
-    "baseline": "9e150cecd43f",
-    "added_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionEvidence.kt"
-    ],
+    "baseline": "196b2375fb90",
+    "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolRouter.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalAgentTeamRuntime.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalStructuredWorkStateProjection.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkCompletionClaimGuard.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkGoalTransitionPolicy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistoryCheckpoint.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkHistorySummaryStrategy.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt",
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStateCueExtractor.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],
@@ -9044,7 +9121,7 @@
     "added_ui": [],
     "removed_ui": []
   },
-  "source_verified_registrations": 2,
+  "source_verified_registrations": 4,
   "explicit_retirements": 0,
   "changes_applied": [],
   "pending_changes": [],
@@ -9192,8 +9269,41 @@
       "assessment": "不在现行树内且历史生产来源全部消失；高度疑似已退役"
     }
   ],
-  "current_tree_outdated_source_count": 0,
-  "current_tree_outdated_sources": [],
+  "current_tree_outdated_source_count": 2,
+  "current_tree_outdated_sources": [
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt",
+        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt"
+      ],
+      "remaining_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    },
+    {
+      "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
+      "historical_grade": "源码入口及处理分支已核（静态）",
+      "historical_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt",
+        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
+      ],
+      "missing_production_sources": [
+        "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt"
+      ],
+      "remaining_production_sources": [
+        "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt"
+      ],
+      "historical_test_files": [],
+      "assessment": "在现行树内：旧源码证据已失效，可能迁移或退役，须追踪新入口"
+    }
+  ],
   "approved_legacy_retirements": [],
   "legacy_retirements_requiring_review": [],
   "verification_limits": "源码入口、所有权、中文名称、@Test 引用与双视图一致性已静态检查；无法据此证明测试在真实设备或服务上的行为完整。没有声明和证据的历史节点继续保留原状。"
