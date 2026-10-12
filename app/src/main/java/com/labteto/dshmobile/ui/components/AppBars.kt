@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.ui.platform.LocalConfiguration
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -56,11 +61,18 @@ fun DsTopBar(
     plainBackButton: Boolean = false,
 ) {
     val colors = DsTheme.colors
-    Column(modifier = modifier.fillMaxWidth()) {
+    val sy = LocalSyPalette.current
+    // V5: the global toolbar is a SOLID chrome layer, never another glass plate.
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = sy.topBar,
+        border = BorderStroke(1.dp, sy.border.copy(alpha = .5f)),
+    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         // Reserve an equal 48dp slot at either end. Unlike a centered overlay, this
         // gives the title a real width constraint and lets large text grow vertically.
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
+            modifier = Modifier.fillMaxWidth().heightIn(min = if (LocalConfiguration.current.screenWidthDp >= 600) SyDimensions.toolbarExpanded else SyDimensions.toolbarPhone),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DsIconButton(
@@ -102,6 +114,7 @@ fun DsTopBar(
             )
         }
     }
+    }
 }
 
 /** 统一 compact peer selector: neutral track, white selected segment, no chromatic category fill. */
@@ -113,25 +126,26 @@ fun DsSegmentedTabs(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(DsShapes.row)
-            .background(colors.bgModulePlatform)
+            .background(sy.l2)
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex
             val segmentColor by animateColorAsState(
-                targetValue = if (selected) colors.bgLayer1 else Color.Transparent,
+                targetValue = if (selected) sy.l3 else Color.Transparent,
                 animationSpec = DsAnimations.interactionColor,
                 label = "segmentedTabBackground",
             )
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = DsSpacing.touchTarget)
+                    .heightIn(min = SyDimensions.minimumTouch)
                     .clip(DsShapes.row)
                     .background(segmentColor)
                     .selectable(
@@ -145,7 +159,7 @@ fun DsSegmentedTabs(
                 Text(
                     label,
                     style = (if (selected) DsType.small13Strong else DsType.small13).withReadingWeight(),
-                    color = if (selected) colors.labelPrimary else colors.labelTertiary,
+                    color = if (selected) sy.text else sy.secondaryText,
                     maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 )
