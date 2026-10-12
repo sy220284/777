@@ -79,6 +79,14 @@ internal fun localFeatureBack(
 
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
 
+/** Conversation selected from the sidebar has one one-shot return to its source drawer. */
+internal fun localConversationShouldReturnToDrawer(
+    page: LocalFeaturePage,
+    drawerOpen: Boolean,
+    wideViewport: Boolean,
+    enteredFromDrawer: Boolean,
+): Boolean = enteredFromDrawer && page == LocalFeaturePage.HOME && !drawerOpen && !wideViewport
+
 internal fun acceptLocalSessionNavigation(
     currentSessionId: String,
     targetSessionId: String,
