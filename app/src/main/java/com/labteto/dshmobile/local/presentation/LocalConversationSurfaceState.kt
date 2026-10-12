@@ -80,6 +80,10 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
         groupActiveSpeakerName = chat.groupActiveSpeakerName,
         conversationMode = conversationMode,
         personaCorrectionNotice = chat.personaCorrectionNotice,
+        // Shared model catalog must reach Chat's media panel, as it already does in Work.
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
+        modelProfiles = modelProfiles,
     )
 
 internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
