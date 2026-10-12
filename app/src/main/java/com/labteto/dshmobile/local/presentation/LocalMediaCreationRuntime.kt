@@ -54,6 +54,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
     fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
+    fun videoFile(task: LocalMediaVideoTask): File? = videoStore.fileFor(task)
     suspend fun removeResult(id: String) = withContext(Dispatchers.IO) { resultStore.remove(id) }
 
 
@@ -175,6 +176,19 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 else -> error("不认识的视频任务状态：${status.state}")
             }
             videoStore.checked(record.id, phase, status.downloadUrl)
+            if (phase == LocalMediaVideoPhase.SUCCEEDED && status.downloadUrl != null) {
+                val url = status.downloadUrl
+                scope.launch {
+                    try {
+                        val file = api.downloadGeneratedVideo(url)
+                        videoStore.savedFile(record.id, file)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        videoStore.downloadFailure(record.id, failure.message ?: "无法读取视频")
+                    }
+                }
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
