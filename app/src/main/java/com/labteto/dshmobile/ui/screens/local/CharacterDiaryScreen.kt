@@ -172,29 +172,39 @@ internal fun CharacterDiaryScreen(
                 ?: subjects.firstOrNull()?.key
         }
     }
+    // Subject changes must never expose a previous character's diary while the new
+    // projection is loading. Cancellation is not a load failure; let Compose stop it.
+    var loadedSubjectKey by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedSubjectKey, reloadNonce) {
         val key = selectedSubjectKey
+        loadedSubjectKey = null
+        entries = emptyList()
+        loadFailed = false
         if (key == null) {
-            entries = emptyList()
-            loadFailed = false
             loading = false
         } else {
             loading = true
-            loadFailed = false
-            runCatching { loadEntries(key) }
-                .onSuccess { entries = it }
-                .onFailure {
-                    entries = emptyList()
-                    loadFailed = true
-                }
-            loading = false
+            try {
+                val fresh = loadEntries(key)
+                entries = fresh
+                loadedSubjectKey = key
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                entries = emptyList()
+                loadFailed = true
+            } finally {
+                loading = false
+            }
         }
     }
 
     val filters = CharacterDiaryFilter.entries
     val selectedFilter = filters.getOrElse(selectedFilterIndex) { CharacterDiaryFilter.ALL }
-    val visibleEntries = remember(entries, query, selectedFilter) {
-        filterCharacterDiaryEntries(entries, query, selectedFilter)
+    val visibleEntries = remember(entries, query, selectedFilter, selectedSubjectKey, loadedSubjectKey) {
+        if (loadedSubjectKey == selectedSubjectKey && selectedSubjectKey != null) {
+            filterCharacterDiaryEntries(entries, query, selectedFilter)
+        } else emptyList()
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
