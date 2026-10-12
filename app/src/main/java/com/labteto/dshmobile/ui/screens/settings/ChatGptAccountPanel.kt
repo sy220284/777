@@ -38,13 +38,13 @@ import com.labteto.dshmobile.local.model.chatgpt.shouldRequestChatGptPlanConsent
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenu
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -187,7 +187,7 @@ internal fun ChatGptAccountPanel(
                         modifier = Modifier.weight(1f),
                     )
                     if (!busy) {
-                        DsMenu(
+                        SyMenu(
                             anchor = {
                                 Icon(
                                     FeatherIcons.MoreVertical,
@@ -197,7 +197,7 @@ internal fun ChatGptAccountPanel(
                                 )
                             },
                             items = listOf(
-                                MenuItem(text = removeRegistrationLabel, danger = true) {
+                                SyMenuItem(text = removeRegistrationLabel, danger = true) {
                                     removeAccountId = selected.id
                                 },
                             ),
@@ -283,7 +283,7 @@ internal fun ChatGptAccountPanel(
                                 variant = SyButtonVariant.Ghost,
                             )
                             if (!busy) {
-                                DsMenu(
+                                SyMenu(
                                     anchor = {
                                         Icon(
                                             FeatherIcons.MoreVertical,
@@ -294,11 +294,11 @@ internal fun ChatGptAccountPanel(
                                     },
                                     items = buildList {
                                         if (account.sharingEnabled) {
-                                            add(MenuItem(text = reauthorizeLabel) {
+                                            add(SyMenuItem(text = reauthorizeLabel) {
                                                 viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
                                             })
                                         }
-                                        add(MenuItem(text = removeRegistrationLabel, danger = true) {
+                                        add(SyMenuItem(text = removeRegistrationLabel, danger = true) {
                                             removeAccountId = account.id
                                         })
                                     },
@@ -498,7 +498,7 @@ internal fun ChatGptAccountPanel(
     }
 
     removeAccountId?.let { accountId ->
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.chatgpt_remove_registration_title),
             onDismiss = { removeAccountId = null },
         ) {
