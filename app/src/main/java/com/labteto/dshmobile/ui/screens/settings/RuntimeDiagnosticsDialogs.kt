@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
@@ -22,6 +23,8 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.isDiagnosticFailure
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -125,10 +128,24 @@ internal fun EnvironmentInfoDialog(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
-        Text(stringResource(R.string.settings_diagnostic_events, events.size), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        DsButton(
-            text = stringResource(if (errorsOnly) R.string.settings_diagnostic_show_all else R.string.settings_diagnostic_errors_only),
-            onClick = { errorsOnly = !errorsOnly },
+        // Design #29: count comes from actual AppLog records, not a demo counter.
+        val failureCount = events.count { it.isDiagnosticFailure() }
+        DsSegmented(
+            segments = listOf(
+                DsSegment(
+                    "all",
+                    "${stringResource(R.string.settings_diagnostic_show_all)} · ${events.size}",
+                ),
+                DsSegment(
+                    "errors",
+                    "${stringResource(R.string.settings_diagnostic_errors_only)} · ${failureCount}",
+                ),
+            ),
+            selectedKey = if (errorsOnly) "errors" else "all",
+            onSelect = { errorsOnly = it == "errors" },
+            role = Role.Tab,
+            stretch = true,
+            hapticOnChange = true,
             modifier = Modifier.fillMaxWidth(),
         )
         SelectionContainer {
