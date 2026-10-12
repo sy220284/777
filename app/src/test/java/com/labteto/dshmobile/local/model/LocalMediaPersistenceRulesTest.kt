@@ -8,6 +8,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalMediaPersistenceRulesTest {
+    @Test fun pendingCreationReceiptSurvivesRestartWithoutRepeatingPaidRequest() {
+        val job = LocalMediaCreationJob(
+            id = "operation", sessionId = "chat-one", kind = "SPEECH",
+            provider = "OPENAI", model = "gpt-4o-mini-tts",
+            prompt = "朗读一下", createdAtMillis = 100L,
+        )
+        val stored = Json.encodeToString(LocalMediaCreationJobList.serializer(), LocalMediaCreationJobList(listOf(job)))
+        val restored = Json.decodeFromString(LocalMediaCreationJobList.serializer(), stored)
+        val recovered = LocalMediaCreationJobRecovery.recover(restored.jobs)
+        assertEquals(LocalMediaCreationPhase.OUTCOME_UNKNOWN, recovered.single().phase)
+        assertEquals("chat-one", recovered.single().sessionId)
+        assertEquals(job.id, recovered.single().id)
+        assertEquals(recovered, LocalMediaCreationJobRecovery.recover(recovered))
+        val done = LocalMediaCreationJobRecovery.recover(listOf(job.copy(phase = LocalMediaCreationPhase.SUCCEEDED)))
+        assertEquals(LocalMediaCreationPhase.SUCCEEDED, done.single().phase)
+    }
+
     @Test fun mediaResultsKeepSessionAndTranscribedTextAcrossSerialization() {
         val transcript = LocalMediaResult(
             id = "asr", model = "whisper-1", provider = "OPENAI", kind = "TRANSCRIBE",
