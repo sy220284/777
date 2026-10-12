@@ -186,7 +186,6 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             你在单聊与群聊中亲历的记忆属于自己；其他成员只知道已经公开的发言与事件。
             当前输出对应本人的群聊发言。$silenceRule
             """.trimIndent()),
-            ),
         )
         return prepared.copy(
             dynamicPrompt = ChatUnifiedTurnContext.compose(input, sharedContext, parts),
