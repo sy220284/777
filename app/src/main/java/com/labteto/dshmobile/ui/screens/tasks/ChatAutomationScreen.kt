@@ -41,11 +41,11 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsSwitch
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.shenyan.designsystem.components.SySwitchControl
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
@@ -56,9 +56,9 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -151,7 +151,7 @@ internal fun ChatAutomationScreen(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Box(Modifier.padding(horizontal = DsSpacing.large)) {
-                DsTopBar(
+                SyTopBar(
                     title = stringResource(R.string.tasks_chat_title),
                     subtitle = stringResource(R.string.tasks_chat_subtitle),
                     onBack = onClose,
@@ -181,10 +181,10 @@ internal fun ChatAutomationScreen(
                 }
                 if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) {
                     item("event-session-filter") {
-                        DsSegmented(
+                        SySegmented(
                             segments = listOf(
-                                DsSegment("all", stringResource(R.string.tasks_chat_filter_all, tasks.size)),
-                                DsSegment(
+                                SySegment("all", stringResource(R.string.tasks_chat_filter_all, tasks.size)),
+                                SySegment(
                                     "current",
                                     stringResource(R.string.tasks_chat_filter_current, currentSessionEvents),
                                 ),
@@ -412,13 +412,13 @@ private fun ChatAutomationEventRow(
                 task.scheduleType == AutomationScheduleType.SILENCE ||
                 task.scheduleType == AutomationScheduleType.WINDOW
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause,
                     ),
                     onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             }
             if (task.targetSessionId == currentSessionId) {
@@ -427,43 +427,43 @@ private fun ChatAutomationEventRow(
                     task.scheduleType == AutomationScheduleType.SILENCE ||
                     task.scheduleType == AutomationScheduleType.WINDOW
                 ) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_policy_action),
                         onClick = onPolicy,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             } else {
                 task.targetSessionId?.let { sessionId ->
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_open_conversation),
                         onClick = { onOpenSession(sessionId) },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.tasks_delete_confirm),
                 onClick = { confirmDelete = true },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
     }
     if (task.targetSessionId == currentSessionId) {
-        DsButton(
+        SyButton(
             text = stringResource(R.string.tasks_chat_optimize),
             onClick = onOptimize,
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -481,18 +481,18 @@ private fun ChatAutomationEventRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmDelete = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_delete_confirm),
                     onClick = {
                         confirmDelete = false
                         onDelete()
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
@@ -532,7 +532,7 @@ private fun ChatAutomationPolicySheet(
         )
         return
     }
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.tasks_chat_policy_title),
         subtitle = stringResource(R.string.tasks_chat_policy_subtitle),
         onDismiss = onDismiss,
@@ -565,7 +565,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = quietEnabled,
                 onCheckedChange = { quietEnabled = it },
             )
@@ -575,7 +575,7 @@ private fun ChatAutomationPolicySheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(
                         R.string.tasks_chat_quiet_start,
                         formatMinute(quietStartMinute),
@@ -584,10 +584,10 @@ private fun ChatAutomationPolicySheet(
                         editingQuietStart = true
                     },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                    size = SyButtonSize.Small,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(
                         R.string.tasks_chat_quiet_end,
                         formatMinute(quietEndMinute),
@@ -596,8 +596,8 @@ private fun ChatAutomationPolicySheet(
                         editingQuietStart = false
                     },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                    size = SyButtonSize.Small,
                 )
             }
         }
@@ -613,16 +613,16 @@ private fun ChatAutomationPolicySheet(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 row.forEach { minutes ->
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_gap_hours, minutes / 60L),
                         onClick = { minGapMinutes = minutes },
                         modifier = Modifier.weight(1f),
                         variant = if (minGapMinutes == minutes) {
-                            DsButtonVariant.Info
+                            SyButtonVariant.Info
                         } else {
-                            DsButtonVariant.Outline
+                            SyButtonVariant.Outline
                         },
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -643,16 +643,16 @@ private fun ChatAutomationPolicySheet(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
             (1..5).forEach { count ->
-                DsButton(
+                SyButton(
                     text = count.toString(),
                     onClick = { maxUnanswered = count },
                     modifier = Modifier.weight(1f),
                     variant = if (maxUnanswered == count) {
-                        DsButtonVariant.Info
+                        SyButtonVariant.Info
                     } else {
-                        DsButtonVariant.Outline
+                        SyButtonVariant.Outline
                     },
-                    size = DsButtonSize.Small,
+                    size = SyButtonSize.Small,
                 )
             }
         }
@@ -679,7 +679,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = notify,
                 onCheckedChange = { notify = it },
             )
@@ -697,13 +697,13 @@ private fun ChatAutomationPolicySheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.tasks_save),
                 onClick = {
                     val saved = viewModel.updateChatPolicy(
@@ -723,7 +723,7 @@ private fun ChatAutomationPolicySheet(
                         saveError = saveFailedMessage
                     }
                 },
-                size = DsButtonSize.Small,
+                size = SyButtonSize.Small,
             )
         }
     }
