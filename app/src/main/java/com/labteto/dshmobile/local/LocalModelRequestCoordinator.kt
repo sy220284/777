@@ -166,6 +166,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
         )
+        val softProjectionScale = pressureStore.softProjectionScale(routeFingerprint)
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
             workProjectionEnabled = contextPolicy != null,
@@ -182,6 +183,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             previousPressure = previousSourcePressure,
                             cachePolicy = cachePolicy,
                             allowSemanticProjection = step <= 1,
+                            softProjectionScale = softProjectionScale,
                         ),
                     )
                 }
@@ -216,11 +218,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         ) {
             contextPolicy.assess(
                 LocalRequestContextAssessmentInput(
-                    current = pressure,
-                    previous = previousSourcePressure,
+                    current = pressureStore.forSoftProjection(routeFingerprint, pressure),
+                    previous = previousSourcePressure?.let { pressureStore.forSoftProjection(routeFingerprint, it) },
                     operationalLimitTokens = operationalLimit,
                     cachePolicy = cachePolicy,
-                    growthCurrent = baselinePressure,
+                    growthCurrent = pressureStore.forSoftProjection(routeFingerprint, baselinePressure),
                 ),
             )
         } else {
@@ -855,10 +857,25 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     diagnosticSurface = cacheDiagnosticSurface,
                                 )
                             }
+                            val rawAcceptedEstimate = LocalPromptPressureMeter.measure(
+                                messages = activeMessages,
+                                tools = tools,
+                                operationalLimitTokens = operationalLimit,
+                                modelContextWindowTokens = modelContextWindow,
+                            ).estimatedInputTokens
                             if (reply.usage.reported) {
-                                pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                                pressureStore.recordReportedUsage(
+                                    snapshot.sessionId, reply.usage.promptTokens,
+                                    routeFingerprint = routeFingerprint,
+                                    rawEstimatedInputTokens = rawAcceptedEstimate,
+                                )
                             }
                             log.append("request/completed", buildJsonObject {
+                                put("raw_estimated_prompt_tokens", rawAcceptedEstimate)
+                                pressureStore.routeCalibration(routeFingerprint)?.let { (samples, permille) ->
+                                    put("route_calibration_samples", samples)
+                                    put("route_soft_estimate_scale_permille", permille)
+                                }
                                 put("request_uid", requestUid)
                                 put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                                 put("header_seq", requestHeader.sequence)
