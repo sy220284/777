@@ -92,6 +92,9 @@ object DsLight {
     val warn = Color(0xFFE0A458)
     val warnSecondary = Color(0xFFE0A458)
     val warnTertiary = Color(0xFFF8EDD9)
+    // Progress failure is muted clay from the Shenyan visual specification, not danger red.
+    val progressFailedStart = Color(0xFFC98B6B)
+    val progressFailedEnd = Color(0xFF9C6247)
     val toastBg = Color(0xFF3A342D)
     val tooltipBg = Color(0xFF3A342D)
     val userBubble = Color(0xFFF2C7A8)
@@ -150,6 +153,9 @@ object DsDark {
     val warn = Ds.Amber500
     val warnSecondary = Ds.Amber400
     val warnTertiary = Ds.Amber900
+    // Progress failure is muted clay from the Shenyan visual specification, not danger red.
+    val progressFailedStart = Color(0xFFC98B6B)
+    val progressFailedEnd = Color(0xFF9C6247)
     val toastBg = Ds.Bluish750
     val tooltipBg = Ds.Bluish750
     val userBubble = Color(0xFF2C2C2E)

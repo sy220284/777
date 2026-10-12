@@ -45,7 +45,7 @@ fun DsProgressBar(
             listOf(color, if (color == colors.accent) colors.brandPrimary else color.copy(alpha = .85f)))
         DsProgressStatus.Done -> Brush.horizontalGradient(listOf(colors.successSecondary, colors.success))
         DsProgressStatus.Failed -> Brush.horizontalGradient(
-            listOf(Color(0xFFC98B6B), Color(0xFF9C6247)))
+            listOf(colors.progressFailedStart, colors.progressFailedEnd))
         DsProgressStatus.Idle -> Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
     }
     Box(

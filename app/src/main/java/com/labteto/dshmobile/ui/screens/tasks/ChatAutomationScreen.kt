@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.tasks
 
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
@@ -281,27 +279,16 @@ internal fun ChatAutomationScreen(
                         maxLines = 5,
                     )
                     val canSubmitPlan = canPlan && draft.isNotBlank() && !state.planning
-                    val dark = colors.bgBase.luminance() < 0.5f
-                    val sendRes = when {
-                        !canSubmitPlan && dark -> R.drawable.ic_ui_button_send_disabled_dark
-                        !canSubmitPlan -> R.drawable.ic_ui_button_send_disabled_light
-                        dark -> R.drawable.ic_ui_button_send_dark
-                        else -> R.drawable.ic_ui_button_send_light
-                    }
                     DsComposerAction(
                         icon = null,
+                        iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+                        iconSize = 32.dp,
+                        tint = if (canSubmitPlan) colors.onAccent else colors.labelPrimary,
                         contentDescription = stringResource(R.string.tasks_chat_plan_send),
                         onClick = { viewModel.submitChatPlan(draft, editingTaskId) },
                         enabled = canSubmitPlan,
-                        containerColor = Color.Transparent,
+                        containerColor = colors.accent,
                         visualSize = 32.dp,
-                        content = {
-                            Image(
-                                painter = painterResource(sendRes),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                            )
-                        },
                     )
                 }
                 if (state.planning) {

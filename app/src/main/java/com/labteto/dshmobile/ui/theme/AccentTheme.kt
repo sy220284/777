@@ -46,18 +46,25 @@ fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
     val on = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)
-    val hover = accent.copy(alpha = 0.85f)
+    val primaryHover = accent.copy(alpha = 0.85f)
+    // Only light-mode generic hover is accent-tinted; dark generic hover stays neutral.
+    val interactionHover = if (dark) this.hover else accent.copy(alpha = 0.06f)
+    val interactionPressed = accent.copy(alpha = if (dark) 0.24f else 0.19f)
+    val interactionActive = accent.copy(alpha = if (dark) 0.14f else 0.15f)
     return copy(
         brandPrimary = accent,
         onBrandPrimary = on,
-        buttonPrimaryHover = hover,
+        buttonPrimaryHover = primaryHover,
         accent = accent,
         onAccent = on,
         accentTertiary = tertiary,
-        accentHover = hover,
+        accentHover = primaryHover,
+        hover = interactionHover,
+        hoverAccent = interactionPressed,
+        active = interactionActive,
         buttonInfoFill = accent,
-        buttonInfoHover = hover,
+        buttonInfoHover = primaryHover,
         userBubble = if (dark) userBubble else accent.copy(alpha = 0.10f),
-        sidebarNavAccent = if (dark) sidebarNavAccent else accent.copy(alpha = 0.10f),
+        sidebarNavAccent = accent.copy(alpha = if (dark) 0.16f else 0.10f),
     )
 }

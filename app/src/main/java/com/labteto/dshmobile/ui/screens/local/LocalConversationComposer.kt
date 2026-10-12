@@ -27,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -225,15 +224,11 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun SendControl(queue: Boolean = false) {
-        val dark = colors.bgBase.luminance() < 0.5f
-        val buttonRes = when {
-            !canSend && dark -> R.drawable.ic_ui_button_send_disabled_dark
-            !canSend -> R.drawable.ic_ui_button_send_disabled_light
-            dark -> R.drawable.ic_ui_button_send_dark
-            else -> R.drawable.ic_ui_button_send_light
-        }
         DsComposerAction(
             icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+            iconSize = 32.dp,
+            tint = if (canSend) colors.onAccent else colors.labelPrimary,
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -243,37 +238,22 @@ internal fun LocalConversationComposer(
             },
             onClick = ::submit,
             enabled = canSend,
-            containerColor = Color.Transparent,
+            containerColor = colors.accent,
             visualSize = 32.dp,
-            content = {
-                Image(
-                    painter = painterResource(buttonRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            },
         )
     }
 
     @Composable
     fun StopControl() {
-        val dark = colors.bgBase.luminance() < 0.5f
         DsComposerAction(
             icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
+            iconSize = 32.dp,
+            tint = colors.onAccent,
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
-            containerColor = Color.Transparent,
+            containerColor = colors.accent,
             visualSize = 32.dp,
-            content = {
-                Image(
-                    painter = painterResource(
-                        if (dark) R.drawable.ic_ui_button_stop_dark
-                        else R.drawable.ic_ui_button_stop_light,
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            },
         )
     }
 
