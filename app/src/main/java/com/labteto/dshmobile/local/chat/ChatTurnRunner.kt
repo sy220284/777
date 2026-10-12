@@ -56,10 +56,13 @@ class ChatTurnRunner @Inject constructor(
             return ChatTurnContext(
                 persona = persona,
                 stablePrompt = UNBOUND_CHAT_PROMPT,
-                dynamicPrompt = listOf(
-                    renderChatContextForModel(context, focusQuery = userInput),
-                    continuationPrompt,
-                ).filter(String::isNotBlank).joinToString("\n\n"),
+                dynamicPrompt = ChatUnifiedTurnContext.compose(
+                    userMessage = userInput, context = context,
+                    parts = listOf(
+                        ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
+                        ChatContextPart(ChatContextLayer.HISTORICAL, continuationPrompt),
+                    ),
+                ),
             )
         }
 

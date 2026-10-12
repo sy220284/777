@@ -80,21 +80,25 @@ internal class CharacterRuntimeProjector(
 
         return CharacterRuntimeProjection(
             stablePrompt = stablePrompt(activePersona),
-            dynamicPrompt = listOf(
-                momentPrompt(activePersona, runtimeState, userInput, attention),
-                renderCharacterLifePrompt(runtimeState.lifeState),
-                renderChatContextForModel(context, focusQuery = userInput),
-                relevantBackgroundPrompt(activePersona, userInput),
-                relevantCharacterFactPrompt(persona, context, userInput, selectedStory),
-                context.storyStage.takeIf(String::isNotBlank)
-                    ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty(),
-                storyPrompt,
-                loreEngine.prompt(
-                    activePersona, userInput, storyStage = context.storyStage,
-                    unlockedStages = context.visibleStoryStages(),
+            dynamicPrompt = ChatUnifiedTurnContext.compose(
+                userMessage = userInput,
+                context = context,
+                parts = listOf(
+                    ChatContextPart(ChatContextLayer.LIVE, momentPrompt(activePersona, runtimeState, userInput, attention)),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, renderCharacterLifePrompt(runtimeState.lifeState)),
+                    ChatContextPart(ChatContextLayer.LIVE, renderChatContextForModel(context, focusQuery = userInput)),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, relevantBackgroundPrompt(activePersona, userInput)),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, relevantCharacterFactPrompt(persona, context, userInput, selectedStory)),
+                    ChatContextPart(ChatContextLayer.INSTRUCTION, context.storyStage.takeIf(String::isNotBlank)
+                        ?.let { "【当前剧情阶段】${it.take(160)}" }.orEmpty()),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, storyPrompt),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, loreEngine.prompt(
+                        activePersona, userInput, storyStage = context.storyStage,
+                        unlockedStages = context.visibleStoryStages(),
+                    )),
+                    ChatContextPart(ChatContextLayer.HISTORICAL, relationshipEngine.prompt(userInput, relevantRelationshipState)),
                 ),
-                relationshipEngine.prompt(userInput, relevantRelationshipState),
-            ).filter(String::isNotBlank).joinToString("\n\n"),
+            ),
         )
     }
 
@@ -169,8 +173,10 @@ internal class CharacterRuntimeProjector(
             val presentAction = label == "正在做" &&
                 Regex("""^(?:正在|正|在)[^，。]{2,}""").containsMatchIn(value.trim())
             val relevant = ChatTurnContextPolicy.relevant(userInput, value, attention) ||
-                (presentAction && attention.pausedSubject.isBlank() &&
-                    !ChatTurnContextPolicy.isTopicRedirect(userInput))
+                (presentAction && !ChatTurnContextPolicy.isTopicRedirect(userInput) &&
+                    (attention.pausedSubject.isBlank() ||
+                        attention.pausedSubject == "*" ||
+                        !value.contains(attention.pausedSubject, ignoreCase = true)))
             if (selected.size >= 2 || value.isBlank() || !relevant) return@forEach
             if (selected.none { ChatContextAssembler.semanticallySimilar(it.substringAfter('：'), value) }) {
                 selected += "$label：${value.take(180)}"

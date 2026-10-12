@@ -175,19 +175,22 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = "若本轮没有发言，使用 $silentToken 表示。"
-        val groupDynamic = listOf(
-            prepared.dynamicPrompt,
-            memoryContext,
-            announcement.takeIf(String::isNotBlank)?.let { text ->
+        val groupDynamic = ChatUnifiedTurnContext.compose(
+            userMessage = input, context = sharedContext,
+            parts = listOf(
+            ChatContextPart(ChatContextLayer.LIVE, prepared.dynamicPrompt),
+            ChatContextPart(ChatContextLayer.RECALL, memoryContext),
+            ChatContextPart(ChatContextLayer.INSTRUCTION, announcement.takeIf(String::isNotBlank)?.let { text ->
                 "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你真实知道的内容和当前状态判断；不要把公告当成你已经做过或说过的事。"
-            }.orEmpty(),
-            """
+            }.orEmpty()),
+            ChatContextPart(ChatContextLayer.INSTRUCTION, """
             【群聊身份】
             你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言只是公开事件，不改变你的固定人物生命资料、知识边界或你自己的关系经历。
             你在单聊与群聊中亲历的记忆属于自己；其他成员只知道已经公开的发言与事件。
             当前输出对应本人的群聊发言。$silenceRule
-            """.trimIndent(),
-        ).filter(String::isNotBlank).joinToString("\n\n")
+            """.trimIndent()),
+            ),
+        )
         return prepared.copy(dynamicPrompt = groupDynamic)
     }
 
