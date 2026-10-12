@@ -50,6 +50,19 @@ internal class CharacterRuntimeProjector(
         val activePersona = persona.forRuntimeStoryStage(context)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val runtimeState = privateState
+        val relevantRelationshipState = runtimeState.copy(
+            dynamics = runtimeState.dynamics.copy(
+                unresolvedConflict = runtimeState.dynamics.unresolvedConflict.takeIf {
+                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                }.orEmpty(),
+                unknowns = runtimeState.dynamics.unknowns.filter {
+                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                },
+                sharedObjects = runtimeState.dynamics.sharedObjects.filter {
+                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                },
+            ),
+        )
         val storyPrompt = storyContext?.takeUnless { ChatMemorySelector.isExplicitTopicShift(userInput) }
             ?.takeIf(String::isNotBlank)?.let {
             """
@@ -73,7 +86,7 @@ internal class CharacterRuntimeProjector(
                     activePersona, userInput, storyStage = context.storyStage,
                     unlockedStages = context.visibleStoryStages(),
                 ),
-                relationshipEngine.prompt(userInput, runtimeState),
+                relationshipEngine.prompt(userInput, relevantRelationshipState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }
