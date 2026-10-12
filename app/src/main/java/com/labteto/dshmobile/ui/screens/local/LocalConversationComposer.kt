@@ -257,7 +257,7 @@ internal fun LocalConversationComposer(
     }
 
     SyConversationComposer(
-        surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
+        surfaceColor = if (backgroundState.hasImage) colors.composerCard.copy(alpha = 0.90f) else colors.composerCard,
         shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
         // the IME is already animating the whole surface.

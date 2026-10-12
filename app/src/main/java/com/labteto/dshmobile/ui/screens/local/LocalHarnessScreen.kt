@@ -818,7 +818,11 @@ fun LocalHarnessScreen(
             }
         }
     } else {
-        ModalNavigationDrawer(drawerState = drawerState, drawerContent = syDrawerContent) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = syDrawerContent,
+            scrimColor = LocalSyPalette.current.scrim,
+        ) {
             sySceneContent()
         }
     }

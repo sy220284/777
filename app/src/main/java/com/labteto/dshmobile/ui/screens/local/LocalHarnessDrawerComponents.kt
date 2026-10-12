@@ -48,6 +48,8 @@ import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyIconBox
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
@@ -147,7 +149,7 @@ internal fun DrawerQuickActions(
                     onClick = onOpenGroupChat,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Clock,
+                    icon = FeatherIcons.CheckSquare,
                     title = stringResource(R.string.tasks_chat_title),
                     onClick = onTasks,
                 )
@@ -169,13 +171,13 @@ internal fun DrawerQuickActions(
                     onClick = onOpenRunCenter,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Folder,
+                    icon = FeatherIcons.FileText,
                     title = stringResource(R.string.chatlist_workspace_files),
                     subtitle = stringResource(R.string.local_drawer_workspace_plain_hint),
                     onClick = onWorkspaceFiles,
                 )
                 DrawerQuickAction(
-                    icon = FeatherIcons.Clock,
+                    icon = FeatherIcons.CheckSquare,
                     title = stringResource(R.string.tasks_title),
                     onClick = onTasks,
                 )
@@ -205,13 +207,14 @@ internal fun DrawerQuickAction(
     subtitle: String? = null,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val feedbackColor by animateColorAsState(
         targetValue = when {
-            pressed -> colors.hoverAccent
-            hovered -> colors.hover
+            pressed -> sy.peach.copy(alpha = 0.17f)
+            hovered -> sy.l3
             else -> Color.Transparent
         },
         animationSpec = DsAnimations.interactionColor,
@@ -233,12 +236,7 @@ internal fun DrawerQuickAction(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = colors.labelSecondary,
-            modifier = Modifier.size(22.dp),
-        )
+        SyIconBox(icon = icon)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),

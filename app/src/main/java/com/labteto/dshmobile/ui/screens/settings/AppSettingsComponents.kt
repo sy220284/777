@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.shenyan.designsystem.components.SyIconBox
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -108,14 +109,7 @@ internal fun AppSettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
     ) {
-        icon?.let {
-            Icon(
-                it,
-                contentDescription = null,
-                tint = if (compact) colors.labelSecondary else colors.labelPrimary,
-                modifier = Modifier.size(if (compact) 22.dp else 24.dp),
-            )
-        }
+        icon?.let { SyIconBox(icon = it) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
             Text(
                 title,

@@ -26,6 +26,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -40,14 +42,14 @@ internal fun LocalUsageModePill(
     enabled: Boolean,
     onSelect: (LocalUsageMode) -> Unit,
 ) {
-    val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 216.dp)
             .height(48.dp),
         shape = DsShapes.row,
-        color = colors.bgModulePlatform,
+        color = sy.l2.compositeOver(sy.canvas),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
@@ -64,7 +66,7 @@ internal fun LocalUsageModePill(
                     .width(segmentWidth)
                     .fillMaxHeight(),
                 shape = DsShapes.row,
-                color = colors.bgLayer1,
+                color = sy.l4.compositeOver(sy.canvas),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
             ) {}
@@ -89,9 +91,9 @@ internal fun LocalUsageModePill(
                             stringResource(labelRes),
                             style = DsType.navigationSupporting.withReadingWeight(),
                             color = when {
-                                !enabled -> colors.labelCaption
-                                selected == mode -> colors.labelPrimary
-                                else -> colors.labelSecondary
+                                !enabled -> sy.tertiaryText
+                                selected == mode -> sy.text
+                                else -> sy.secondaryText
                             },
                         )
                     }

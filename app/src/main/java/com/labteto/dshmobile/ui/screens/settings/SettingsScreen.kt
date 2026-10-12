@@ -392,7 +392,7 @@ fun SettingsScreen(
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = page == SettingsDestination.ROOT,
                     plainBackButton = page == SettingsDestination.ROOT,
-                    modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small),
+                    modifier = Modifier.fillMaxWidth(),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
@@ -419,7 +419,7 @@ fun SettingsScreen(
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
-                            AppSettingsRow(icon = FeatherIcons.Eye,
+                            AppSettingsRow(icon = FeatherIcons.Palette,
                                 title = stringResource(R.string.settings_page_appearance),
                                 onClick = { page = SettingsDestination.APPEARANCE }, compact = true)
                             AppSettingsDivider()
@@ -427,20 +427,20 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_memory),
                                 onClick = { page = SettingsDestination.MEMORY }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(icon = FeatherIcons.Folder,
+                            AppSettingsRow(icon = FeatherIcons.Archive,
                                 title = stringResource(R.string.fluid_settings_session_storage),
                                 onClick = { page = SettingsDestination.SESSION_STORAGE }, compact = true)
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
                             AppSettingsRow(
-                                icon = FeatherIcons.Globe,
+                                icon = FeatherIcons.Sparkles,
                                 title = stringResource(R.string.settings_page_models),
                                 onClick = { page = SettingsDestination.MODELS },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.Sliders,
+                                icon = FeatherIcons.Gauge,
                                 title = stringResource(R.string.settings_model_performance_title),
                                 subtitle = stringResource(R.string.settings_model_performance_subtitle),
                                 onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
@@ -455,7 +455,7 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.BookOpen,
+                                icon = FeatherIcons.Bell,
                                 title = stringResource(R.string.settings_page_notifications),
                                 onClick = { page = SettingsDestination.NOTIFICATIONS },
                                 compact = true,
@@ -477,7 +477,7 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.SettingsOutline,
+                                icon = FeatherIcons.Gear,
                                 title = stringResource(R.string.settings_page_advanced),
                                 onClick = { page = SettingsDestination.ADVANCED },
                                 compact = true,

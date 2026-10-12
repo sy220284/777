@@ -279,7 +279,18 @@ fun DshTheme(
     }
     // 旧 celadon 持久值由 AccentPalettes.of 跟随流体杏默认；显式色卡覆盖 accent 家族
     val palette = AccentPalettes.of(accentKey)
-    val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
+    val canonicalPalette = com.shenyan.designsystem.foundation.ShenyanPalettes.forMode(
+        when (preference) {
+            ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+            ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+            ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+            ThemePreference.SYSTEM -> if (systemDark)
+                com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+        }
+    )
+    val themed = (if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark))
+        .harmonizeV6(canonicalPalette, preserveAccent = palette.key != AccentPalettes.DEFAULT.key)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
     val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)

@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import androidx.compose.ui.graphics.compositeOver
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -106,6 +108,10 @@ internal fun LocalModeDrawer(
 ) {
     val colors = DsTheme.colors
     val sy = LocalSyPalette.current
+    // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
+    // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
+    val drawerSurface = if (LocalAppBackgroundState.current.hasImage)
+        sy.topBar.copy(alpha = 0.92f) else sy.l2.compositeOver(sy.canvas)
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
     val collapseLabel = stringResource(R.string.sy_v5_nav_collapse)
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
@@ -114,16 +120,20 @@ internal fun LocalModeDrawer(
         // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
         Column(
             Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
-                .background(sy.l2).safeDrawingPadding(),
+                .background(drawerSurface).safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(onClick = { syRailCollapsed = false }, modifier = Modifier.semantics { contentDescription = expandLabel }) { Text("»", color = sy.text) }
+            SyIconButton(
+                icon = FeatherIcons.ChevronRight,
+                contentDescription = expandLabel,
+                onClick = { syRailCollapsed = false }, tint = sy.text,
+            )
             SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
             SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
                 onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.Search, contentDescription = stringResource(R.string.sy_v5_tasks),
+            SyIconButton(icon = FeatherIcons.CheckSquare, contentDescription = stringResource(R.string.sy_v5_tasks),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
             SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
@@ -233,7 +243,7 @@ internal fun LocalModeDrawer(
 
     ModalDrawerSheet(
         drawerShape = androidx.compose.ui.graphics.RectangleShape,
-        drawerContainerColor = sy.l2,
+        drawerContainerColor = drawerSurface,
         modifier = Modifier.fillMaxHeight().width(
             if (docked) SyDimensions.navigationExpanded
             else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
@@ -251,9 +261,11 @@ internal fun LocalModeDrawer(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (docked) {
-                        TextButton(onClick = { syRailCollapsed = true }, modifier = Modifier.semantics { contentDescription = collapseLabel }) {
-                            Text("«", color = sy.text)
-                        }
+                        SyIconButton(
+                            icon = FeatherIcons.ChevronLeft,
+                            contentDescription = collapseLabel,
+                            onClick = { syRailCollapsed = true }, tint = sy.text,
+                        )
                     }
                     SidebarAvatarPicker()
                     Spacer(Modifier.width(DsSpacing.small))
@@ -275,15 +287,15 @@ internal fun LocalModeDrawer(
                                 keyboardController?.hide()
                             }
                         },
-                        containerColor = colors.bgLayer1,
-                        tint = colors.labelPrimary,
+                        containerColor = sy.l3.compositeOver(sy.canvas),
+                        tint = sy.text,
                     )
                     SyIconButton(
                         icon = FeatherIcons.Plus,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
-                        containerColor = colors.bgLayer1,
-                        tint = colors.labelPrimary,
+                        containerColor = sy.l3.compositeOver(sy.canvas),
+                        tint = sy.text,
                     )
 
                 }
