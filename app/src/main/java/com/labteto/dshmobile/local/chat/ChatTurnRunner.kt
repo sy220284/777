@@ -45,7 +45,9 @@ class ChatTurnRunner @Inject constructor(
         storyContext: String? = null,
     ): ChatTurnContext {
         if (persona.isUnboundChatPersona()) {
-            val continuationPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
+            val continuationPrompt = ChatTurnContextPolicy.storyLines(
+                storyContext, userInput, context.attention,
+            ).takeIf(String::isNotBlank)?.let {
                 """
                 【对话连续性摘要｜已发生】
                 ${it.take(MAX_STORY_CONTEXT_CHARS)}
@@ -55,7 +57,7 @@ class ChatTurnRunner @Inject constructor(
                 persona = persona,
                 stablePrompt = UNBOUND_CHAT_PROMPT,
                 dynamicPrompt = listOf(
-                    renderChatContextForModel(context),
+                    renderChatContextForModel(context, focusQuery = userInput),
                     continuationPrompt,
                 ).filter(String::isNotBlank).joinToString("\n\n"),
             )
