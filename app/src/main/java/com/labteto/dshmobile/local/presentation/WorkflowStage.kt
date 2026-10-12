@@ -8,4 +8,3 @@ internal object WorkflowStage {
     const val COMPLETED = "已完成"
     const val STALLED = "受阻"
 }
-
