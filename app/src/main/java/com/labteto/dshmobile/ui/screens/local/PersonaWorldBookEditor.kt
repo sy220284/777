@@ -39,7 +39,7 @@ internal fun PersonaWorldBookEditor(
     onChange: (List<PersonaLoreEntry>) -> Unit,
 ) {
     val colors = DsTheme.colors
-    var expandedIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var expandedIndex by rememberSaveable { mutableIntStateOf(0) }
     Text(
         stringResource(R.string.local_persona_lore_title),
         style = DsType.base16Strong.withReadingWeight(),
@@ -50,6 +50,17 @@ internal fun PersonaWorldBookEditor(
         style = DsType.small13.withReadingWeight(),
         color = colors.labelSecondary,
     )
+    // The reference layout has a stable entry list and a separate editing panel.
+    // Keep the original PersonaProfile draft callback as the single owner of data.
+    Surface(
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
     if (entries.isEmpty()) {
         Text(
             stringResource(R.string.local_persona_lore_empty),
@@ -75,7 +86,22 @@ internal fun PersonaWorldBookEditor(
                 variant = DsButtonVariant.Ghost,
             )
         }
-        if (expandedIndex == index) Surface(
+    }
+    DsButton(
+        text = stringResource(R.string.local_persona_lore_add),
+        onClick = {
+            onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
+            expandedIndex = entries.size
+        },
+        enabled = entries.size < 80,
+        variant = DsButtonVariant.Ghost,
+        modifier = Modifier.fillMaxWidth(),
+    )        }
+    }
+
+    expandedIndex.takeIf { it in entries.indices }?.let { index ->
+        val entry = entries[index]
+        Surface(
             shape = DsShapes.block,
             color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
@@ -173,16 +199,7 @@ internal fun PersonaWorldBookEditor(
             }
         }
     }
-    DsButton(
-        text = stringResource(R.string.local_persona_lore_add),
-        onClick = {
-            onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
-            expandedIndex = entries.size
-        },
-        enabled = entries.size < 80,
-        variant = DsButtonVariant.Ghost,
-        modifier = Modifier.fillMaxWidth(),
-    )
+
 }
 
 private fun splitLoreEditorLines(value: String): List<String> =
