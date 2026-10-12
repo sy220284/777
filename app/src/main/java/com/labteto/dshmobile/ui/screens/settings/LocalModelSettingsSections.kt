@@ -116,6 +116,11 @@ internal fun LocalModelSettingsCard(
     var testStatus by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var discoveredModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var catalogSearch by remember { mutableStateOf("") }
+    val visibleCatalogModels = discoveredModels.asSequence()
+        .filter { it.contains(catalogSearch.trim(), ignoreCase = true) }
+        .take(60)
+        .toList()
     var catalogStatus by remember { mutableStateOf<String?>(null) }
     var catalogError by remember { mutableStateOf(false) }
     var refreshingModels by remember { mutableStateOf(false) }
@@ -135,6 +140,7 @@ internal fun LocalModelSettingsCard(
         editingProfileId = id
         credentialSourceProfileId = id
         discoveredModels = emptyList()
+        catalogSearch = ""
         catalogStatus = null
         model = name
         baseUrl = url
@@ -166,6 +172,7 @@ internal fun LocalModelSettingsCard(
                 )
                 if (showEditor && editorGeneration == generation) {
                     discoveredModels = found
+                    catalogSearch = ""
                     catalogStatus = if (found.isEmpty()) {
                         catalogEmptyMessage
                     } else {
@@ -369,7 +376,7 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                     },
-                    items = discoveredModels.map { discovered ->
+                    items = visibleCatalogModels.map { discovered ->
                         MenuItem(stringResource(R.string.local_model_catalog_option, discovered)) {
                             // A new discovered model is a new route. Preserve the original
                             // credential reference, without exposing or copying its key into UI.
@@ -462,6 +469,15 @@ internal fun LocalModelSettingsCard(
                         color = if (catalogError) colors.error else colors.labelSecondary)
                 }
                 if (discoveredModels.isNotEmpty()) {
+                    if (discoveredModels.size > 20) {
+                        DsTextField(catalogSearch, onValueChange = { catalogSearch = it.take(128) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                            label = { Text(stringResource(R.string.local_model_catalog_search)) })
+                        if (discoveredModels.size > 60) {
+                            Text(stringResource(R.string.local_model_catalog_search_hint),
+                                style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                        }
+                    }
                     DsMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
@@ -476,7 +492,7 @@ internal fun LocalModelSettingsCard(
                                 }
                             }
                         },
-                        items = discoveredModels.map { discovered ->
+                        items = visibleCatalogModels.map { discovered ->
                             MenuItem(discovered) {
                                 if (editingProfileId != null) credentialSourceProfileId = editingProfileId
                                 editingProfileId = null
