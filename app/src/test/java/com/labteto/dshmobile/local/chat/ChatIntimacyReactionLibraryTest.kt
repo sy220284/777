@@ -82,7 +82,7 @@ class ChatIntimacyReactionLibraryTest {
         assertFalse(flirting.contains("【本轮反应素材"))
         val intimate = mode.prompt("她亲吻我的额头", ChatCharacterState())
         assertTrue(intimate.contains("【本轮反应素材"))
-        assertTrue(intimate.contains("情境=forehead-kiss"))
+        assertTrue(intimate.contains("情境=额头亲吻"))
         assertTrue(intimate.contains("【身体反应强度】当前=5/5"))
     }
 
