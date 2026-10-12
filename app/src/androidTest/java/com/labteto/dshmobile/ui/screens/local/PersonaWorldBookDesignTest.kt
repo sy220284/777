@@ -44,6 +44,34 @@ class PersonaWorldBookDesignTest {
         }
     }
 
+
+    @Test
+    fun changingCharacterResetsEditorSelectionToItsOwnFirstLoreEntry() {
+        val draft = mutableStateOf(listOf(
+            PersonaLoreEntry(id = "first", title = "甲一"),
+            PersonaLoreEntry(id = "second", title = "甲二"),
+        ))
+        compose.setContent {
+            DshTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    PersonaWorldBookEditor(draft.value) { draft.value = it }
+                }
+            }
+        }
+        compose.onNodeWithTag("personaLoreSelect:1").performScrollTo().performClick()
+        compose.runOnIdle {
+            draft.value = listOf(
+                PersonaLoreEntry(id = "other-first", title = "乙一"),
+                PersonaLoreEntry(id = "other-second", title = "乙二"),
+            )
+        }
+        compose.onNodeWithTag("personaLoreContent").performScrollTo().performTextReplacement("新人物的独立背景")
+        compose.runOnIdle {
+            assertEquals("新人物的独立背景", draft.value[0].content)
+            assertEquals("", draft.value[1].content)
+        }
+    }
+
     @Test
     fun newEntryUsesTheSameDraftOwnerAndOpensItsEditor() {
         val draft = mutableStateOf(listOf(PersonaLoreEntry(id = "a", title = "阁楼")))
