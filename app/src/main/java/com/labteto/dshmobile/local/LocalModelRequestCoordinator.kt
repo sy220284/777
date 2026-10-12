@@ -154,12 +154,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             null
         }
         val promptCacheTtl = if (cachePolicy.supportsCacheOptions) "30m" else null
-        val operationalLimit = operationalInputLimitTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
-        val modelContextWindow = documentedContextWindowTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
+        val operationalLimit = runSurface.contract.operationalInputLimitTokens
+        val modelContextWindow = runSurface.contract.documentedContextWindowTokens
         val previousSourcePressure = pressureStore.latestSource(
             snapshot.sessionId,
             snapshot.usageMode,
