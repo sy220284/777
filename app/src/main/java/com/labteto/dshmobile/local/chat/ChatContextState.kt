@@ -656,7 +656,10 @@ internal fun ChatContextState.canonicalFactLines(): List<String> {
     }.distinct()
 }
 
-internal fun renderChatContextForModel(context: ChatContextState): String {
+internal fun renderChatContextForModel(
+    context: ChatContextState,
+    focusQuery: String? = null,
+): String {
     val normalized = context.normalized()
     if (!normalized.hasUsefulFacts()) return ""
 
@@ -665,7 +668,8 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
             .filter { it.sequence > normalized.processedThroughSequence }
             .filter { it.generation == normalized.generation }
             .sortedBy(ChatPendingTurn::sequence)
-        if (pending.isNotEmpty()) {
+        if (pending.isNotEmpty() && (focusQuery == null ||
+                !ChatMemorySelector.isExplicitTopicShift(focusQuery))) {
             appendLine("【尚未归并｜最高连续性优先】")
             appendLine("最近 ${minOf(pending.size, HOT_WINDOW_PENDING_TURNS)} 个未归并回合的原文已在对话热窗口中，直接以原文为准，不重复注入。")
             val overflowFallback = pending
@@ -703,15 +707,17 @@ internal fun renderChatContextForModel(context: ChatContextState): String {
 
     val continuitySection = buildString {
         val continuity = normalized.continuity
-        if (
-            continuity.recentEvents.isNotEmpty() ||
-            continuity.decisions.isNotEmpty() ||
-            continuity.unfinished.isNotEmpty()
-        ) {
+        // Preserve all facts in storage; only relevant facts participate in this model request.
+        fun relevant(value: String): Boolean =
+            focusQuery == null || ChatMemorySelector.isRelevantToTurn(focusQuery, value)
+        val events = continuity.recentEvents.filter(::relevant)
+        val decisions = continuity.decisions.filter(::relevant)
+        val unfinished = continuity.unfinished.filter(::relevant)
+        if (events.isNotEmpty() || decisions.isNotEmpty() || unfinished.isNotEmpty()) {
             appendLine("【剧情连续性｜当前有效】")
-            if (continuity.recentEvents.isNotEmpty()) appendLine("近期：${continuity.recentEvents.joinToString("；")}")
-            if (continuity.decisions.isNotEmpty()) appendLine("已定：${continuity.decisions.joinToString("；")}")
-            if (continuity.unfinished.isNotEmpty()) append("待续：${continuity.unfinished.joinToString("；")}")
+            if (events.isNotEmpty()) appendLine("近期：${events.joinToString("；")}")
+            if (decisions.isNotEmpty()) appendLine("已定：${decisions.joinToString("；")}")
+            if (unfinished.isNotEmpty()) append("待续：${unfinished.joinToString("；")}")
         }
     }.trim().take(MAX_SOFT_CONTINUITY_CHARS)
 
