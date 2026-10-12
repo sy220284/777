@@ -189,7 +189,15 @@ internal class LocalRequestPressureStore(
     }
 
     @Synchronized
-    fun softProjectionScale(routeFingerprint: String): Double {
+    fun softProjectionScale(
+        routeFingerprint: String,
+        rawEstimatedInputTokens: Int = 0,
+        operationalLimitTokens: Int = Int.MAX_VALUE,
+    ): Double {
+        // Above 85% of the raw context boundary, soft planning must not discount tokens.
+        if (rawEstimatedInputTokens.toDouble() >= operationalLimitTokens.coerceAtLeast(1) * 0.85) {
+            return 1.0
+        }
         val calibration = routeCalibrations[routeFingerprint] ?: return 1.0
         return if (calibration.samples >= 4) calibration.scale else 1.0
     }
