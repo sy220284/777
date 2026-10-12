@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
+import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 
 /**
@@ -46,6 +47,10 @@ internal sealed interface LocalTranscriptItem {
     /** Sidecar media timeline rows are visible but never replayed as model/persona dialogue. */
     data class MediaResult(val result: LocalMediaResult) : LocalTranscriptItem {
         override val key: String = "media-result:${result.id}"
+    }
+
+    data class CreationJob(val job: LocalMediaCreationJob) : LocalTranscriptItem {
+        override val key: String = "media-result:${job.id}"
     }
 
     data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
@@ -221,9 +226,14 @@ internal fun mergeLocalMediaTimeline(
     sessionId: String,
     results: List<LocalMediaResult>,
     videoTasks: List<LocalMediaVideoTask>,
+    jobs: List<LocalMediaCreationJob> = emptyList(),
 ): List<LocalTranscriptItem> {
     if (sessionId.isBlank()) return transcript
-    val media = results.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.MediaResult(it) } +
+    val delivered = results.filter { it.sessionId == sessionId }
+    val finishedIds = delivered.mapTo(mutableSetOf()) { it.id }
+    val media = delivered.map { LocalTranscriptItem.MediaResult(it) } +
+        jobs.filter { it.sessionId == sessionId && it.id !in finishedIds }
+            .map { LocalTranscriptItem.CreationJob(it) } +
         videoTasks.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.VideoTask(it) }
     if (media.isEmpty()) return transcript
     fun timestamp(item: LocalTranscriptItem): Long = when (item) {
@@ -232,6 +242,7 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkStep -> item.message.createdAt
         is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis
+        is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
