@@ -10,8 +10,8 @@ class ChatIntimacyReactionLibraryTest {
     private val mode = ChatIntimacyMode()
 
     @Test
-    fun coversEighteenScenesAndNineVocalFamilies() {
-        assertEquals(18, library.sceneCount)
+    fun coversNineteenScenesAndNineVocalFamilies() {
+        assertEquals(19, library.sceneCount)
         assertEquals(9, library.vocalFamilyCount)
     }
 
@@ -40,6 +40,17 @@ class ChatIntimacyReactionLibraryTest {
         assertTrue(chosen.guidance.contains("不重演上轮的开始动作"))
         assertTrue(chosen.guidance.contains("近期已用：拥抱"))
         assertTrue(chosen.guidance.contains("并肩"))
+    }
+
+    @Test
+    fun adultIntimacyHasItsOwnNonPrescriptiveReactionContext() {
+        val chosen = library.select("我们想做爱", ChatCharacterState())
+        assertEquals("adult-closeness", chosen.sceneId)
+        assertTrue(chosen.guidance.contains("成年亲密互动"))
+        assertTrue(chosen.guidance.contains("呼吸节奏"))
+        assertTrue(chosen.guidance.contains("轻声低吟"))
+        assertTrue(chosen.guidance.contains("需要休息"))
+        assertTrue(chosen.guidance.contains("也可不发声"))
     }
 
     @Test
