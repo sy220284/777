@@ -76,8 +76,10 @@ internal class LocalChatSendCoordinator @Inject constructor(
                 pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected -> reject(sessionId, rejected) },
                 onAccepted = {
+                    // Queuing another user input must not cancel durable background consolidation.
+                    // The actual foreground runner, edit and session transitions retain ownership
+                    // of preemption when scarce resources really need to be reclaimed.
                     runtimeStateStore.clearSendFeedback()
-                    LocalChatPostTurnJobOwner.cancel()
                 },
                 enqueue = {
                     pending.offer(queuedInput) {
