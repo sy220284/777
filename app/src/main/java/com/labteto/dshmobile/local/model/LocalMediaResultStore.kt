@@ -58,19 +58,21 @@ class LocalMediaResultStore @Inject constructor(
     fun addFile(
         offer: LocalMediaOffer, kind: LocalMediaKind, file: File,
         sessionId: String? = null, description: String? = null,
+        operationId: String? = null,
     ): LocalMediaResult {
         require(kind in setOf(LocalMediaKind.IMAGE, LocalMediaKind.SPEECH))
         require(file.isFile) { "生成文件不存在" }
         require(file.canonicalFile.parentFile == directory.canonicalFile) {
             "生成结果没有存入受管理的持久目录"
         }
-        return append(offer, kind, fileName = file.name, sessionId = sessionId, description = description)
+        return append(offer, kind, fileName = file.name, sessionId = sessionId, description = description, operationId = operationId)
     }
 
     @Synchronized
     fun addLink(
         offer: LocalMediaOffer, kind: LocalMediaKind, url: String,
         sessionId: String? = null, description: String? = null,
+        operationId: String? = null,
     ): LocalMediaResult {
         require(kind == LocalMediaKind.IMAGE)
         val location = URI(url)
@@ -78,14 +80,14 @@ class LocalMediaResultStore @Inject constructor(
             !location.host.isNullOrBlank() && location.port == -1) {
             "服务商未返回安全的媒体链接"
         }
-        return append(offer, kind, remoteUrl = url, sessionId = sessionId, description = description)
+        return append(offer, kind, remoteUrl = url, sessionId = sessionId, description = description, operationId = operationId)
     }
 
     /** Transcripts are media deliverables, not model-authored dialogue turns. */
     @Synchronized
-    fun addText(offer: LocalMediaOffer, sessionId: String?, text: String): LocalMediaResult {
+    fun addText(offer: LocalMediaOffer, sessionId: String?, text: String, operationId: String? = null): LocalMediaResult {
         require(offer.kind == LocalMediaKind.TRANSCRIBE && text.isNotBlank())
-        return append(offer, LocalMediaKind.TRANSCRIBE, textOutput = text, sessionId = sessionId)
+        return append(offer, LocalMediaKind.TRANSCRIBE, textOutput = text, sessionId = sessionId, operationId = operationId)
     }
 
     @Synchronized
@@ -117,10 +119,12 @@ class LocalMediaResultStore @Inject constructor(
         textOutput: String? = null,
         sessionId: String? = null,
         description: String? = null,
+        operationId: String? = null,
     ): LocalMediaResult {
         LocalMediaCatalog.requireValid(offer)
         val record = LocalMediaResult(
-            id = UUID.randomUUID().toString(),
+            id = operationId?.also { require(it.matches(Regex("[a-fA-F0-9-]{36}"))) }
+                ?: UUID.randomUUID().toString(),
             model = offer.model,
             provider = offer.provider.name,
             kind = kind.name,
