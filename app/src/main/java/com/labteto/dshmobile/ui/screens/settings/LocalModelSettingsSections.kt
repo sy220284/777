@@ -58,14 +58,14 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenu
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -299,21 +299,21 @@ internal fun LocalModelSettingsCard(
                             )
                         }
                     }
-                    DsMenu(
+                    SyMenu(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
                             modifier = Modifier.padding(horizontal = DsSpacing.small)) },
                         items = listOfNotNull(
                             if (!local.modelSelection.isActive(profile))
-                                MenuItem(text = stringResource(R.string.local_model_use),
+                                SyMenuItem(text = stringResource(R.string.local_model_use),
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
-                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                            SyMenuItem(text = stringResource(R.string.local_model_edit), onClick = {
                                 editRoute(profile.model, profile.baseUrl, profile.id)
                                 custom = LocalModelPresets.entries.none {
                                     it.model == profile.model && it.baseUrl == profile.baseUrl
                                 }
                                 showEditor = true
                             }),
-                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                            SyMenuItem(text = stringResource(R.string.local_model_remove), danger = true,
                                 onClick = { pendingRemoveId = profile.id }),
                         ),
                     )
@@ -397,7 +397,7 @@ internal fun LocalModelSettingsCard(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelPrimary)
-                DsMenu(
+                SyMenu(
                     anchor = {
                         Surface(shape = DsShapes.row,
                             color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
@@ -415,11 +415,11 @@ internal fun LocalModelSettingsCard(
                         }
                     },
                     items = LocalModelPresets.entries.map { preset ->
-                        MenuItem("${preset.provider} · ${preset.model}") {
+                        SyMenuItem("${preset.provider} · ${preset.model}") {
                             custom = false
                             editRoute(preset.model, preset.baseUrl, null)
                         }
-                    } + MenuItem(stringResource(R.string.local_model_custom)) {
+                    } + SyMenuItem(stringResource(R.string.local_model_custom)) {
                         custom = true
                         editRoute("", "", null)
                     },
@@ -505,7 +505,7 @@ internal fun LocalModelSettingsCard(
                                 style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                         }
                     }
-                    DsMenu(
+                    SyMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
                                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
@@ -520,7 +520,7 @@ internal fun LocalModelSettingsCard(
                             }
                         },
                         items = visibleCatalogModels.map { discovered ->
-                            MenuItem(discovered) {
+                            SyMenuItem(discovered) {
                                 if (editingProfileId != null) credentialSourceProfileId = editingProfileId
                                 editingProfileId = null
                                 model = discovered
