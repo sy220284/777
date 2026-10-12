@@ -20,11 +20,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 
 /** Explicit visual states from the reference; never infer success from a number alone. */
 enum class DsProgressStatus { Idle, Running, Done, Failed }
 
-/** Reference: 7dp/5dp track; running amber, done mint, failed clay (not destructive red). */
+/** Compatibility signature: rendered colours and states are now sourced from V5 tokens. */
+@Deprecated("V5: replace with SyProgress on migrated pages")
 @Composable
 fun DsProgressBar(
     value: Float,
@@ -33,6 +35,7 @@ fun DsProgressBar(
     status: DsProgressStatus = DsProgressStatus.Running,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val bounded = if (value.isFinite()) value.coerceIn(0f, 1f) else 0f
     val target = if (status == DsProgressStatus.Idle) 0f else bounded
     val width by animateFloatAsState(
@@ -42,15 +45,15 @@ fun DsProgressBar(
     )
     val brush = when (status) {
         DsProgressStatus.Running -> Brush.horizontalGradient(
-            listOf(color, if (color == colors.accent) colors.brandPrimary else color.copy(alpha = .85f)))
-        DsProgressStatus.Done -> Brush.horizontalGradient(listOf(colors.successSecondary, colors.success))
+            listOf(if (color == colors.accent) sy.peach else color, if (color == colors.accent) sy.peachPressed else color.copy(alpha = .85f)))
+        DsProgressStatus.Done -> Brush.horizontalGradient(listOf(sy.mint.copy(alpha = .8f), sy.mint))
         DsProgressStatus.Failed -> Brush.horizontalGradient(
-            listOf(colors.progressFailedStart, colors.progressFailedEnd))
+            listOf(sy.clay.copy(alpha = .8f), sy.clay))
         DsProgressStatus.Idle -> Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
     }
     Box(
         modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(5.dp))
-            .background(colors.borderL2)
+            .background(sy.border)
             .semantics { progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) },
     ) {
         Box(Modifier.fillMaxHeight().fillMaxWidth(width).background(brush))
