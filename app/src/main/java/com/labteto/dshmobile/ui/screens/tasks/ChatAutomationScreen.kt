@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -114,6 +115,7 @@ internal fun ChatAutomationScreen(
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
     handleRootSystemBack: Boolean,
+    initialSelectedTaskId: String? = null,
 ) {
     val colors = DsTheme.colors
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
@@ -126,8 +128,14 @@ internal fun ChatAutomationScreen(
     // This filter is a view concern, not an automation policy; ALL always stays available.
     var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
     val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
+    val listState = rememberLazyListState()
     val visibleTasks = tasks.filter {
         chatAutomationInSession(it.targetSessionId, harnessState.sessionId, currentSessionOnly)
+    }
+    LaunchedEffect(initialSelectedTaskId, visibleTasks) {
+        val index = visibleTasks.indexOfFirst { it.id == initialSelectedTaskId }
+        if (index >= 0) listState.scrollToItem(1 +
+            (if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) 1 else 0) + index)
     }
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -159,6 +167,7 @@ internal fun ChatAutomationScreen(
                 )
             }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {

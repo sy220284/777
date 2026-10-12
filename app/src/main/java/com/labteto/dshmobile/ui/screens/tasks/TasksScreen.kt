@@ -77,6 +77,7 @@ fun TasksScreen(
     onOpenSession: (String) -> Unit = {},
     onCreateViaChat: ((String) -> Unit)? = null,
     initialMode: AutomationMode? = null,
+    initialSelectedTaskId: String? = null,
     handleRootSystemBack: Boolean = true,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -95,6 +96,7 @@ fun TasksScreen(
             onClose = onClose,
             onOpenSession = onOpenSession,
             handleRootSystemBack = handleRootSystemBack,
+            initialSelectedTaskId = initialSelectedTaskId,
         )
         return
     }
@@ -106,6 +108,7 @@ fun TasksScreen(
         onOpenSession = onOpenSession,
         onCreateViaChat = onCreateViaChat,
         handleRootSystemBack = handleRootSystemBack,
+        initialSelectedTaskId = initialSelectedTaskId,
     )
 }
 
@@ -117,6 +120,7 @@ private fun WorkTasksScreen(
     onOpenSession: (String) -> Unit,
     onCreateViaChat: ((String) -> Unit)?,
     handleRootSystemBack: Boolean,
+    initialSelectedTaskId: String?,
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
@@ -126,7 +130,7 @@ private fun WorkTasksScreen(
     val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by rememberSaveable { mutableStateOf(false) }
-    var selectedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTaskId by rememberSaveable(initialSelectedTaskId) { mutableStateOf(initialSelectedTaskId) }
     val selectedTask = visibleTasks.firstOrNull { it.id == selectedTaskId }
     LaunchedEffect(visibleTasks, selectedTaskId) {
         if (selectedTaskId != null && selectedTask == null) selectedTaskId = null

@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
@@ -76,6 +78,25 @@ internal fun localDrawerMatchingPersonas(
         entry.persona.name.contains(needle, ignoreCase = true) ||
             entry.persona.coreIdentity.contains(needle, ignoreCase = true)
     }
+}
+
+/** Search the actual scheduler records and only user-visible workspace paths. */
+internal fun localDrawerMatchingTasks(tasks: List<AutomationTask>, query: String): List<AutomationTask> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return tasks.filter {
+        it.prompt.contains(needle, ignoreCase = true) ||
+            it.actorName?.contains(needle, ignoreCase = true) == true ||
+            it.id.contains(needle, ignoreCase = true)
+    }
+}
+
+internal fun localDrawerMatchingFiles(files: List<LocalWorkspaceFile>, query: String): List<LocalWorkspaceFile> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return files.filter { file ->
+        isShareableWorkspacePath(file.path) && file.path.contains(needle, ignoreCase = true)
+    }.distinctBy(LocalWorkspaceFile::path).sortedBy(LocalWorkspaceFile::path)
 }
 
 internal data class LocalDrawerSessionSections(

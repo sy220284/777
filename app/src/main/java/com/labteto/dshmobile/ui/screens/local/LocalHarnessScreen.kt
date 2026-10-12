@@ -67,6 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.labteto.dshmobile.ui.screens.tasks.TasksViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -149,6 +150,8 @@ fun LocalHarnessScreen(
     updateStatus: String? = null,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
+    val searchTaskViewModel: TasksViewModel = hiltViewModel()
+    val searchTaskState by searchTaskViewModel.state.collectAsStateWithLifecycle()
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
     val chatSurface by viewModel.chatSurfaceState.collectAsStateWithLifecycle()
     val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
@@ -196,6 +199,7 @@ fun LocalHarnessScreen(
     var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
+    var searchedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var pendingWorkCapability by rememberSaveable { mutableStateOf<String?>(null) }
@@ -540,6 +544,7 @@ fun LocalHarnessScreen(
         ),
         localAutomationFeatureUiContribution(
             taskMode = taskMode,
+            searchedTaskId = searchedTaskId,
             onCreateViaChat = ::useWorkCapability,
             actions = automationActions,
             onTaskModeChange = { taskMode = it },
@@ -750,6 +755,20 @@ fun LocalHarnessScreen(
                 onRenameSession = viewModel::renameSession,
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
+                searchTasks = searchTaskState.tasks,
+                loadSearchFiles = viewModel::workspaceFiles,
+                onSearchTask = { task ->
+                    openDrawerEntry(LocalFeatureDrawerEntry.TASKS)
+                    taskMode = task.mode
+                    searchedTaskId = task.id
+                },
+                onSearchFile = { path ->
+                    // The ordinary drawer action clears pending file selection. Set the exact
+                    // search target AFTER that action so the workspace preview opens it.
+                    openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE)
+                    filesMode = LocalFilesMode.WORKSPACE
+                    requestedFilePath = path
+                },
                 onProjects = { openDrawerEntry(LocalFeatureDrawerEntry.PROJECT) },
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,

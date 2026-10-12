@@ -50,6 +50,11 @@ import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -93,6 +98,10 @@ internal fun LocalModeDrawer(
     onRenameSession: (String, String) -> Boolean,
     onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
+    searchTasks: List<AutomationTask>,
+    loadSearchFiles: suspend () -> List<LocalWorkspaceFile>,
+    onSearchTask: (AutomationTask) -> Unit,
+    onSearchFile: (String) -> Unit,
     onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
@@ -208,6 +217,29 @@ internal fun LocalModeDrawer(
         }?.takeIf(String::isNotBlank)
     }
     val crossModeSearch = searchOpen && historyQuery.isNotBlank()
+    var searchableFiles by remember { mutableStateOf<List<LocalWorkspaceFile>>(emptyList()) }
+    var fileSearchFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(searchOpen, drawerOpen) {
+        if (searchOpen && drawerOpen) {
+            fileSearchFailed = false
+            try {
+                searchableFiles = withContext(Dispatchers.IO) { loadSearchFiles() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                searchableFiles = emptyList()
+                fileSearchFailed = true
+            }
+        } else if (!searchOpen) {
+            searchableFiles = emptyList()
+        }
+    }
+    val matchedTasks = remember(searchTasks, historyQuery, crossModeSearch) {
+        if (crossModeSearch) localDrawerMatchingTasks(searchTasks, historyQuery) else emptyList()
+    }
+    val matchedFiles = remember(searchableFiles, historyQuery, crossModeSearch) {
+        if (crossModeSearch) localDrawerMatchingFiles(searchableFiles, historyQuery) else emptyList()
+    }
     val sessionSections = remember(
         sessions,
         usageMode,
@@ -378,6 +410,40 @@ internal fun LocalModeDrawer(
                     }
                 }
 
+                if (matchedTasks.isNotEmpty()) {
+                    item(key = "drawer-task-search-heading") {
+                        DrawerSectionTitle(stringResource(R.string.tasks_title), matchedTasks.size)
+                    }
+                    items(matchedTasks, key = { "task-search:" + it.id }) { task ->
+                        SyCategoryRow(
+                            icon = FeatherIcons.CheckSquare,
+                            title = task.prompt,
+                            subtitle = task.actorName ?: task.id,
+                            onClick = { onSearchTask(task) },
+                        )
+                    }
+                }
+                if (matchedFiles.isNotEmpty()) {
+                    item(key = "drawer-file-search-heading") {
+                        DrawerSectionTitle(stringResource(R.string.chatlist_workspace_files), matchedFiles.size)
+                    }
+                    items(matchedFiles, key = { "file-search:" + it.path }) { file ->
+                        SyCategoryRow(
+                            icon = FeatherIcons.FileText,
+                            title = file.path.substringAfterLast('/'),
+                            subtitle = file.path,
+                            onClick = { onSearchFile(file.path) },
+                        )
+                    }
+                }
+                if (crossModeSearch && fileSearchFailed) {
+                    item(key = "drawer-file-search-error") {
+                        Text(stringResource(R.string.local_files_read_failed),
+                            color = colors.labelTertiary,
+                            style = DsType.navigationSupporting.withReadingWeight())
+                    }
+                }
+
                 if (sessionSections.pinned.isNotEmpty()) {
                     item(key = "drawer-pinned-heading") {
                         DrawerSectionTitle(
@@ -458,7 +524,9 @@ internal fun LocalModeDrawer(
                     }
                 }
 
-                if (searchOpen && historyQuery.isNotBlank() && matchedPersonas.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty()) {
+                if (crossModeSearch && matchedPersonas.isEmpty() && matchedTasks.isEmpty() &&
+                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty() &&
+                    !fileSearchFailed) {
                     item(key = "drawer-no-sessions") {
                         Text(
                             stringResource(R.string.local_drawer_search_empty_both),
