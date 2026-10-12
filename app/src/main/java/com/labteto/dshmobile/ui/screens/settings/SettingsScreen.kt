@@ -72,16 +72,16 @@ import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.DsHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.components.UserBubble
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -220,7 +220,7 @@ fun SettingsScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = settingsInkColors(DsTheme.colors)
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     val context = LocalContext.current
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -983,7 +983,7 @@ fun SettingsScreen(
                 }
                 }
             }
-            DsToastHost(toast, modifier = Modifier.fillMaxWidth())
+            SyToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
         }
     }
