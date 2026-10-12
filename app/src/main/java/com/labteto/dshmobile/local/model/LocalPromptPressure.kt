@@ -189,6 +189,12 @@ internal class LocalRequestPressureStore(
     }
 
     @Synchronized
+    fun softProjectionScale(routeFingerprint: String): Double {
+        val calibration = routeCalibrations[routeFingerprint] ?: return 1.0
+        return if (calibration.samples >= 4) calibration.scale else 1.0
+    }
+
+    @Synchronized
     fun routeCalibration(routeFingerprint: String): Pair<Int, Int>? =
         routeCalibrations[routeFingerprint]?.let {
             it.samples to (it.scale * 1_000).toInt()
