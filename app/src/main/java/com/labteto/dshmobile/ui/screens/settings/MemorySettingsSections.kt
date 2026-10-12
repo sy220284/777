@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsSwitch
+import com.shenyan.designsystem.components.SySwitchControl
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -40,9 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -58,10 +58,10 @@ import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -142,7 +142,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, next, local.autoMemory)
@@ -159,7 +159,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, local.autoRecall, next)
@@ -170,13 +170,13 @@ internal fun LocalMemorySettingsCard(
     }
 
     if (showRulesEditor) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.advanced_user_rules),
             subtitle = stringResource(R.string.advanced_user_rules_hint),
             onDismiss = { showRulesEditor = false },
             scrollable = true,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
                         viewModel.configureLocalMemory(userRules, local.autoRecall, local.autoMemory)
@@ -184,11 +184,11 @@ internal fun LocalMemorySettingsCard(
                         showRulesEditor = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Large,
+                    size = SyButtonSize.Large,
                 )
             },
         ) {
-            DsTextField(
+            SyTextField(
                 value = userRules,
                 onValueChange = { userRules = it.take(6_000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -242,10 +242,10 @@ internal fun MemoryManagementCard(
                 stringResource(R.string.advanced_memory_from_message),
                 style = DsType.small13.withReadingWeight(), color = colors.labelSecondary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.advanced_memory_show_all),
                 onClick = onShowAll,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -266,19 +266,19 @@ internal fun MemoryManagementCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        com.labteto.dshmobile.ui.components.DsSearchField(
+        com.labteto.dshmobile.ui.components.SySearchField(
             value = query,
             onValueChange = { query = it.take(200) },
             modifier = Modifier.fillMaxWidth(),
             placeholder = stringResource(R.string.advanced_memory_search),
         )
 
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (vaultMode) R.string.advanced_memory_flat_view else R.string.advanced_memory_vault_view
             ),
             onClick = { vaultMode = !vaultMode },
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -290,9 +290,9 @@ internal fun MemoryManagementCard(
         )
         // Screen 24: persistent four-category track. All counts are derived from
         // MemoryRecord; the reference's six demo counters are not production data.
-        DsSegmented(
+        SySegmented(
             segments = filterOptions.map { (candidate, label) ->
-                DsSegment(
+                SySegment(
                     candidate.name,
                     stringResource(
                         R.string.advanced_memory_filter_count,
@@ -371,21 +371,21 @@ internal fun MemoryManagementCard(
                             color = colors.labelCaption,
                             modifier = Modifier.weight(1f),
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.advanced_edit_memory),
                             onClick = { editingId = record.id },
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.advanced_deactivate),
                             onClick = {
                                 viewModel.forgetMemory(record.id) { error ->
                                     report(error ?: memoryDeactivatedMessage)
                                 }
                             },
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                 }
@@ -393,7 +393,7 @@ internal fun MemoryManagementCard(
         }
         if (visibleRecords.size < filteredRecords.size) {
             val remaining = filteredRecords.size - visibleRecords.size
-            DsButton(
+            SyButton(
                 text = stringResource(
                     R.string.advanced_memory_show_more,
                     minOf(20, remaining),
@@ -402,8 +402,8 @@ internal fun MemoryManagementCard(
                     visibleLimit = (visibleLimit + 20).coerceAtMost(filteredRecords.size)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
     }
@@ -414,7 +414,7 @@ internal fun MemoryManagementCard(
         var pinned by remember(editing.id) { mutableStateOf(editing.pinned) }
         var saving by remember(editing.id) { mutableStateOf(false) }
         var saveError by remember(editing.id) { mutableStateOf<String?>(null) }
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.advanced_edit_memory),
             subtitle = memoryScopeLabel(editing.scope) + " · " + memoryKindLabel(editing.kind),
             onDismiss = { editingId = null },
@@ -422,7 +422,7 @@ internal fun MemoryManagementCard(
             scrollable = true,
             footer = {
                 saveError?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
                         saving = true
@@ -439,13 +439,13 @@ internal fun MemoryManagementCard(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Large,
+                    size = SyButtonSize.Large,
                     enabled = !saving,
                     loading = saving,
                 )
             },
         ) {
-            DsTextField(
+            SyTextField(
                 value = content,
                 onValueChange = { content = it.take(2_000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -463,7 +463,7 @@ internal fun MemoryManagementCard(
                     Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
-                DsSwitch(checked = pinned, onCheckedChange = { pinned = it }, enabled = !saving)
+                SySwitchControl(checked = pinned, onCheckedChange = { pinned = it }, enabled = !saving)
             }
 
         }
