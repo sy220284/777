@@ -278,10 +278,49 @@ fun SyAvatar(name: String, modifier: Modifier = Modifier) {
 fun SySwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Row(modifier.fillMaxWidth().heightIn(min = SyMetric.touch), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), color = LocalSyColors.current.text)
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled,
-            modifier = Modifier.semantics { contentDescription = label })
+        SySwitchControl(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            modifier = Modifier.semantics { contentDescription = label },
+        )
     }
 }
+
+/**
+ * Canonical V5 switch paint and interaction. Used by both labelled rows and existing
+ * 777 setting cells to avoid two implementations of checked/disabled colour semantics.
+ */
+@Composable
+fun SySwitchControl(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val p = LocalSyColors.current
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = p.onPrimary,
+            checkedTrackColor = p.primary,
+            checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = p.textTertiary,
+            uncheckedTrackColor = p.materialL2,
+            uncheckedBorderColor = p.border,
+            disabledCheckedThumbColor = p.onPrimary.copy(alpha = .58f),
+            disabledCheckedTrackColor = p.primary.copy(alpha = .36f),
+            disabledCheckedBorderColor = Color.Transparent,
+            disabledUncheckedThumbColor = p.textTertiary.copy(alpha = .55f),
+            disabledUncheckedTrackColor = p.materialL2.copy(alpha = .6f),
+            disabledUncheckedBorderColor = p.border.copy(alpha = .5f),
+        ),
+    )
+}
+
 
 @Composable
 fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
