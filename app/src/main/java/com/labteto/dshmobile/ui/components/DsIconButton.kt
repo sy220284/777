@@ -26,8 +26,11 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
 
 /**
+ * Transitional API: V5 owns actual icon surface semantics.
  * Icon button with guaranteed 48dp touch target for accessibility.
  * Shows visual feedback on hover and press.
  *
@@ -36,6 +39,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
  * directly inside it inherits a 48dp *minimum* and an ordinary `size` modifier is clamped straight
  * back up to the touch target. That is what made every icon in the app render at 48dp.
  */
+@Deprecated("V5: migrate callers to Sy icon controls")
 @Composable
 fun DsIconButton(
     icon: ImageVector?,
@@ -51,6 +55,7 @@ fun DsIconButton(
     iconPainter: Painter? = null,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -61,12 +66,12 @@ fun DsIconButton(
         label = "iconButtonScale"
     )
     
-    val restingBackground = if (selected) colors.accentTertiary else containerColor
-    val resolvedTint = if (selected) colors.accent else tint
+    val restingBackground = if (selected) sy.l3 else containerColor
+    val resolvedTint = if (selected) sy.peachPressed else tint
     val targetBackground = when {
         !enabled -> Color.Transparent
-        isPressed -> colors.hover.compositeOver(restingBackground)
-        isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(restingBackground)
+        isPressed -> sy.l2.compositeOver(restingBackground)
+        isHovered -> sy.l1.copy(alpha = 0.5f).compositeOver(restingBackground)
         else -> restingBackground
     }
     val background by animateColorAsState(
@@ -77,7 +82,7 @@ fun DsIconButton(
     
     Surface(
         onClick = onClick,
-        modifier = modifier.size(DsSpacing.touchTarget),
+        modifier = modifier.size(SyDimensions.minimumTouch),
         enabled = enabled,
         color = background,
         shape = androidx.compose.foundation.shape.CircleShape,
