@@ -96,7 +96,13 @@ internal class ChatInteractionStateReducer {
             }
         }
         if (clearThreads || clearMood) changed = true
-        if (!changed) return previous
+        val rawDynamics = rawState["dynamics"]?.let {
+            runCatching { it.jsonObject }.getOrNull()
+        }
+        val unknownsPatched = rawDynamics?.containsKey("unknowns") == true
+        val resolvedConflict = rawDynamics?.containsKey("unresolvedConflict") == true &&
+            value.dynamics.unresolvedConflict.isBlank()
+        if (!changed && !unknownsPatched && !resolvedConflict) return previous
 
         return previous.copy(
             mood = if (clearMood) "自然" else previous.mood,
@@ -107,6 +113,12 @@ internal class ChatInteractionStateReducer {
             internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
             immediateConcern = if (clearImmediateConcern) "" else previous.immediateConcern,
             unresolvedThreads = if (clearThreads) emptyList() else previous.unresolvedThreads,
+            dynamics = previous.dynamics.copy(
+                unknowns = if (unknownsPatched) {
+                    mergeStrings(emptyList(), value.dynamics.unknowns, 6, 160)
+                } else previous.dynamics.unknowns,
+                unresolvedConflict = if (resolvedConflict) "" else previous.dynamics.unresolvedConflict,
+            ),
             transientAges = ages,
             unresolvedThreadAges = if (clearThreads) emptyMap() else previous.unresolvedThreadAges,
             updatedAt = System.currentTimeMillis(),
@@ -241,7 +253,7 @@ internal class ChatInteractionStateReducer {
                 value.physicalState.trim().take(120)
             } else previous.physicalState,
             mood = if (rawState?.containsKey("mood") == true) {
-                value.mood.trim().take(80).ifBlank { "自然" }
+                value.mood.trim().take(240).ifBlank { "自然" }
             } else previous.mood,
             relationshipState = relationshipDescription,
             currentFocus = if (rawState?.containsKey("currentFocus") == true) {
