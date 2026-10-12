@@ -18,13 +18,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.isDiagnosticFailure
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -45,7 +45,7 @@ internal fun NetworkDiagnosticDialog(
     var result by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
     val failedText = stringResource(R.string.settings_runtime_network_diagnostic_failed)
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.settings_runtime_network_diagnostic_title),
         onDismiss = { if (!running) onDismiss() },
         scrollable = true,
@@ -56,14 +56,14 @@ internal fun NetworkDiagnosticDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsTextField(
+        SyTextField(
             value = target,
             onValueChange = { target = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.settings_runtime_network_target_label)) },
             singleLine = true,
         )
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (running) R.string.settings_runtime_network_diagnosing
                 else R.string.settings_runtime_network_start_diagnostic,
@@ -110,7 +110,7 @@ internal fun EnvironmentInfoDialog(
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     val eventTime = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()) }
     val emptyEvents = stringResource(R.string.settings_diagnostic_empty)
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.settings_runtime_environment_title),
         onDismiss = onDismiss,
         scrollable = true,
@@ -130,13 +130,13 @@ internal fun EnvironmentInfoDialog(
         }
         // Design #29: count comes from actual AppLog records, not a demo counter.
         val failureCount = events.count { it.isDiagnosticFailure() }
-        DsSegmented(
+        SySegmented(
             segments = listOf(
-                DsSegment(
+                SySegment(
                     "all",
                     "${stringResource(R.string.settings_diagnostic_show_all)} · ${events.size}",
                 ),
-                DsSegment(
+                SySegment(
                     "errors",
                     "${stringResource(R.string.settings_diagnostic_errors_only)} · ${failureCount}",
                 ),
@@ -159,7 +159,7 @@ internal fun EnvironmentInfoDialog(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
             )
         }
-        DsButton(text = stringResource(R.string.settings_diagnostic_refresh), onClick = { events = AppLog.snapshot() }, modifier = Modifier.fillMaxWidth())
-        DsButton(text = stringResource(R.string.settings_export_diagnostics), onClick = onExport, modifier = Modifier.fillMaxWidth())
+        SyButton(text = stringResource(R.string.settings_diagnostic_refresh), onClick = { events = AppLog.snapshot() }, modifier = Modifier.fillMaxWidth())
+        SyButton(text = stringResource(R.string.settings_export_diagnostics), onClick = onExport, modifier = Modifier.fillMaxWidth())
     }
 }
