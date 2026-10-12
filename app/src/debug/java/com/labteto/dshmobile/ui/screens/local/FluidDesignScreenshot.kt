@@ -61,7 +61,7 @@ private fun FluidWorkScreenshot(page: String) {
     Column(Modifier.fillMaxSize()) {
         DsTopBar("工作执行 · 设计样例", onBack = {}, backContentDescription = "返回")
         Column(Modifier.weight(1f)) {
-            LocalWorkDesignSurface(actions, state.value.sessionId, "迁移鉴权模块", section, {},
+            LocalWorkDesignSurface(actions, "design-work", "迁移鉴权模块", section, {},
                 { _, _ -> false }, {}, {}, {}, execution = {
                     Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
                         WorkTimelineStepRow(LocalHarnessMessage("design-step", "progress", "已检查现有入口，接下来确认鉴权方案。", createdAt = 1))
