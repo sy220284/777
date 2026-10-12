@@ -371,6 +371,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     trigger = trigger,
                     persona = persona,
                     state = sessionCharacterState,
+                    context = sessionContext,
                 )
                 val localHistory = buildList {
                     add(buildJsonObject {
