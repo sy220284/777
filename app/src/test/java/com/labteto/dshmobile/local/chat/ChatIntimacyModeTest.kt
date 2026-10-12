@@ -109,6 +109,69 @@ class ChatIntimacyModeTest {
     }
 
     @Test
+    fun hugsKissesAndCaressesImmediatelyEnterHighestIntimacyLevel() {
+        listOf(
+            "过来拥抱我", "她搂抱了我", "他伸手搂住你", "我抱住了她",
+            "轻轻亲吻了她", "两人接吻", "她轻吻了我",
+            "她抚摸我的头发", "他轻抚我的脸颊", "她摩挲着我的手",
+        ).forEach { message ->
+            assertEquals(message, ChatInteractionIntent.INTIMATE,
+                classifyExplicitInteractionIntent(message))
+            assertEquals(message, 5, nextInteractionIntensity(message))
+            val prompt = mode.prompt(message, ChatCharacterState())
+            assertTrue(message, prompt.contains("【亲密模式】"))
+            assertTrue(message, prompt.contains("当前=5/5"))
+            assertTrue(message, prompt.contains("【亲密姿态连续性】"))
+        }
+    }
+
+    @Test
+    fun negatedActionsAndDiscussionDoNotEnterIntimacyMode() {
+        listOf(
+            "不要抚摸我", "别拥抱我", "不想亲吻", "医生解释抚摸的定义",
+            "分析一下亲吻是什么意思", "测试拥抱动作识别",
+        ).forEach { message ->
+            assertEquals(message, ChatInteractionIntent.NORMAL,
+                classifyExplicitInteractionIntent(message))
+            assertEquals(message, "", mode.prompt(message, ChatCharacterState()))
+        }
+    }
+
+    @Test
+    fun assistantPerformedIntimateActionUpgradesPersistentInteractionState() {
+        val reducer = ChatInteractionStateReducer()
+        listOf("她抱住我的肩膀", "她吻了我的额头", "她轻抚我的头发").forEach { reply ->
+            val state = reducer.applyDeterministicInteractionState(
+                previous = ChatCharacterState(),
+                userMessage = "今天有点累",
+                assistantMessage = reply,
+            )
+            assertEquals(reply, ChatInteractionIntent.INTIMATE.name, state.interactionIntent)
+            assertEquals(reply, 100, state.interactionIntentStrength)
+            assertEquals(reply, 5, state.interactionIntensity)
+            assertTrue(reply, mode.prompt("继续刚才的", state).contains("当前=5/5"))
+        }
+    }
+
+    @Test
+    fun explicitTopicChangeBlocksHighIntensityResponseCarryover() {
+        val reducer = ChatInteractionStateReducer()
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+        val current = reducer.applyDeterministicInteractionState(
+            previous = previous,
+            userMessage = "换个话题，说正事",
+            assistantMessage = "好，先聊工作。",
+        )
+        assertEquals(ChatInteractionIntent.NORMAL.name, current.interactionIntent)
+        assertEquals(0, current.interactionIntensity)
+        assertEquals("", mode.prompt("今天工作怎么样", current))
+    }
+
+    @Test
     fun runtimeProjectionIncludesIntimacyOnlyForActiveTurn() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
         val persona = PersonaProfile(name = "阿青")
