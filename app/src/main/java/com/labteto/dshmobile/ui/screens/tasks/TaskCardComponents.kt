@@ -49,9 +49,9 @@ import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -59,7 +59,7 @@ import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsTimeline
 import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -295,17 +295,17 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_try_now),
                     onClick = onRunNow,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }
@@ -316,21 +316,21 @@ internal fun TaskCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (task.recurringMinutes != null) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(
                             if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume
                             else R.string.tasks_pause,
                         ),
                         onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_open_result),
                     onClick = { onOpenSession(sessionId) },
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
                 )
             }
         }
@@ -353,18 +353,18 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmDelete = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_delete_confirm),
                     onClick = {
                         confirmDelete = false
                         onCancel()
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
