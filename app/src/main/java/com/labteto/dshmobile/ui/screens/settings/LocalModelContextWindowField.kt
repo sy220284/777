@@ -6,14 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 
 @Composable
 internal fun LocalModelContextWindowField(
     value: String,
     onValueChange: (String) -> Unit,
 ) {
-    DsTextField(
+    SyTextField(
         value = value,
         onValueChange = { raw -> onValueChange(raw.filter(Char::isDigit).take(8)) },
         modifier = Modifier.fillMaxWidth(),
