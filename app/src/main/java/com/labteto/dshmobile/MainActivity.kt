@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
@@ -28,12 +27,6 @@ class MainActivity : AppCompatActivity() {
 
     private val requestedLocalSession = mutableStateOf<String?>(null)
     private var appliedApplicationNightMode: Int? = null
-    private var requestedNotificationPermission = false
-
-    private val notificationPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* granted or not — notifications degrade gracefully */ }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -64,13 +57,8 @@ class MainActivity : AppCompatActivity() {
                 },
             )
         }
-        requestNotificationPermissionOnce()
-    }
-
-    private fun requestNotificationPermissionOnce() {
-        if (requestedNotificationPermission) return
-        requestedNotificationPermission = true
-        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        // Permission is requested by an explicit user action in Settings,
+        // after an explanation, rather than interrupting first launch.
     }
 
     override fun onResume() {
