@@ -20,6 +20,7 @@ internal data class LocalStructuredWorkState(
     val decisions: List<String> = emptyList(),
     val decisionEpoch: Long = 0L,
     val constraintEpoch: Long = 0L,
+    val revokedConstraints: List<String> = emptyList(),
     val failures: List<String> = emptyList(),
     val unfinished: List<String> = emptyList(),
     val progress: List<String> = emptyList(),
@@ -36,6 +37,7 @@ internal data class LocalWorkCheckpoint(
     val decisions: List<String>,
     val decisionEpoch: Long = 0L,
     val constraintEpoch: Long = 0L,
+    val revokedConstraints: List<String> = emptyList(),
     val userDecisionsVerified: Boolean = false,
     val failures: List<String>,
     val unfinished: List<String>,
@@ -47,10 +49,11 @@ internal data class LocalWorkCheckpoint(
     val hasTypedToolReferences: Boolean = true,
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
-        put("version", 5)
+        put("version", 6)
         put("goals", JsonArray(goals.map(::JsonPrimitive)))
         put("plan", JsonArray(plan.map(::JsonPrimitive)))
         put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
+        put("revoked_constraints", JsonArray(revokedConstraints.map(::JsonPrimitive)))
         put("decisions", JsonArray(decisions.map(::JsonPrimitive)))
         put("decision_epoch", decisionEpoch)
         put("constraint_epoch", constraintEpoch)
@@ -105,6 +108,7 @@ internal data class LocalWorkCheckpoint(
                 goals = list("goals"),
                 plan = list("plan"),
                 constraints = list("constraints"),
+                revokedConstraints = list("revoked_constraints"),
                 decisions = list("decisions"),
                 decisionEpoch = value["decision_epoch"]?.jsonPrimitive?.longOrNull ?: 0L,
                 constraintEpoch = value["constraint_epoch"]?.jsonPrimitive?.longOrNull ?: 0L,
