@@ -4,7 +4,7 @@ import android.content.Context
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalReasoningMode
-import com.labteto.dshmobile.local.model.LocalReasoningRequestPolicy
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalModelPerformanceStore
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
@@ -45,7 +45,7 @@ internal object LocalReasoningControls {
         ceiling: ModelReasoningCeiling = LocalModelPerformanceStore.current().reasoningCeiling,
     ): List<LocalReasoningUiMode> {
         val supported = profile ?: return emptyList()
-        val policy = LocalReasoningRequestPolicy.resolve(supported, mode == LocalUsageMode.WORK)
+        val policy = LocalEffectiveModelContracts.forProfile(supported, mode == LocalUsageMode.WORK).reasoning
             ?: return emptyList()
         return buildList {
             // Default means no request override, independently of the provider's current default.
@@ -95,7 +95,9 @@ internal object LocalReasoningControls {
     fun restoreDefault(sessionId: String) = LocalReasoningModeStore.setMode(sessionId, LocalReasoningMode.DEFAULT)
 
     fun requiresBasicReasoning(profile: LocalModelProfile?, mode: LocalUsageMode): Boolean =
-        LocalReasoningRequestPolicy.resolve(profile, mode == LocalUsageMode.WORK)?.disabledEffort == "low"
+        profile?.let {
+            LocalEffectiveModelContracts.forProfile(it, mode == LocalUsageMode.WORK).reasoning?.disabledEffort == "low"
+        } ?: false
     fun attach(context: Context) = LocalReasoningModeStore.attach(context)
 
     fun enabled(sessionId: String): Boolean = LocalReasoningModeStore.enabled(sessionId)

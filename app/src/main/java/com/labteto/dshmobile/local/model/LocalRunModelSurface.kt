@@ -12,6 +12,8 @@ internal data class LocalRunModelSurface(
     val protocol: LocalModelProtocol,
     val capabilities: LocalModelRuntimeCapabilities,
     val routeFingerprint: String,
+    /** Frozen once for this run; downstream context and tools must not re-read settings. */
+    val contract: LocalEffectiveModelContract,
 ) {
     val promptCachePolicy: LocalPromptCachePolicy get() = capabilities.promptCachePolicy
     val model: String get() = profile.model
@@ -20,22 +22,13 @@ internal data class LocalRunModelSurface(
 }
 
 internal fun LocalModelProfile.toRunModelSurface(): LocalRunModelSurface {
-    val resolvedProtocol = resolveLocalModelProtocol(
-        authKind = authKind,
-        profile = this,
-        model = model,
-        baseUrl = baseUrl,
-    )
+    val contract = LocalEffectiveModelContracts.forProfile(this)
     return LocalRunModelSurface(
         profile = this,
-        protocol = resolvedProtocol,
-        capabilities = LocalModelPresets.runtimeCapabilitiesFor(
-            model = model,
-            baseUrl = baseUrl,
-            protocol = resolvedProtocol,
-            authKind = authKind,
-        ),
-        routeFingerprint = routeFingerprint(),
+        protocol = contract.protocol,
+        capabilities = contract.runtime,
+        routeFingerprint = contract.routeFingerprint ?: routeFingerprint(),
+        contract = contract,
     )
 }
 
@@ -44,10 +37,11 @@ internal fun LocalModelState.currentModelRuntimeCapabilities(): LocalModelRuntim
     val protocol = profile?.let {
         resolveLocalModelProtocol(it.authKind, it, model, baseUrl)
     } ?: LocalModelPresets.protocolFor(model, baseUrl)
-    return LocalModelPresets.runtimeCapabilitiesFor(
+    return LocalEffectiveModelContracts.resolve(
         model = model,
         baseUrl = baseUrl,
         protocol = protocol,
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
-    )
+        profile = profile,
+    ).runtime
 }

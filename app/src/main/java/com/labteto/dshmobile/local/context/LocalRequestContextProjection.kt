@@ -38,6 +38,8 @@ internal data class LocalRequestContextPolicyInput(
     val previousPressure: LocalPromptPressure?,
     val cachePolicy: LocalPromptCachePolicy,
     val allowSemanticProjection: Boolean,
+    /** Soft-only model usage calibration; hard provider limits must not use this ratio. */
+    val softProjectionScale: Double = 1.0,
 )
 
 internal data class LocalRequestContextAssessmentInput(

@@ -273,6 +273,8 @@ internal suspend fun executeWithModelAdmission(
     model: String,
     baseUrl: String,
     contextWindowTokensOverride: Int? = null,
+    operationalInputLimitSnapshot: Int? = null,
+    contextWindowSnapshot: Int? = null,
     messages: List<kotlinx.serialization.json.JsonObject>,
     tools: kotlinx.serialization.json.JsonArray,
     block: suspend () -> LocalModelReply,
@@ -280,8 +282,10 @@ internal suspend fun executeWithModelAdmission(
     val pressure = LocalPromptPressureMeter.measure(
         messages = messages,
         tools = tools,
-        operationalLimitTokens = operationalInputLimitTokens(model, baseUrl, contextWindowTokensOverride),
-        modelContextWindowTokens = documentedContextWindowTokens(model, baseUrl, contextWindowTokensOverride),
+        operationalLimitTokens = operationalInputLimitSnapshot
+            ?: operationalInputLimitTokens(model, baseUrl, contextWindowTokensOverride),
+        modelContextWindowTokens = contextWindowSnapshot
+            ?: documentedContextWindowTokens(model, baseUrl, contextWindowTokensOverride),
     )
     if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
         throw LocalModelException(

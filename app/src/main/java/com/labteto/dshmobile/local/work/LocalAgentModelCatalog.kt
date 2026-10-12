@@ -1,9 +1,8 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelProtocol
 import java.net.URI
 
 /**
@@ -26,12 +25,9 @@ internal fun renderAgentModelCatalog(
     appendLine("共 ${profiles.size} 个已保存模型，${credentialReadyIds.size} 个凭据就绪。")
     profiles.forEach { profile ->
         val ready = profile.id in credentialReadyIds
-        val protocol = if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-            LocalModelProtocol.RESPONSES
-        } else profile.protocol
-        val caps = LocalModelPresets.runtimeCapabilitiesFor(
-            profile.model, profile.baseUrl, protocol, profile.authKind,
-        )
+        val contract = LocalEffectiveModelContracts.forProfile(profile, withTools = true)
+        val protocol = contract.protocol
+        val caps = contract.runtime
         val host = runCatching { URI(profile.baseUrl).host }.getOrNull()
             ?.takeIf(String::isNotBlank) ?: "自定义地址"
         val imageInput = when (caps.imageInput) {

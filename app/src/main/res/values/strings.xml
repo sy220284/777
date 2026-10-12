@@ -2171,5 +2171,8 @@
     <string name="local_model_catalog_test_failure">连接测试失败：%1$s</string>
     <string name="local_model_catalog_search">搜索接口模型</string>
     <string name="local_model_catalog_search_hint">为保证菜单流畅，一次展示前 60 条匹配结果；可输入名称查找完整目录。</string>
+    <string name="local_model_policy_known_context">上下文 %1$d Token</string>
+    <string name="local_model_policy_unknown_context">上下文容量未确认</string>
+    <string name="local_model_policy_work_budget">%1$s · Work 每片 %2$d 次请求</string>
 </resources>
 

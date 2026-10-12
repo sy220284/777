@@ -93,7 +93,7 @@ internal object LocalWorkTemperatureStore {
     }
 
     fun requestTemperature(sessionId: String, model: String, baseUrl: String): Double? {
-        val range = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl) ?: return null
+        val range = LocalEffectiveModelContracts.resolve(model, baseUrl).temperature ?: return null
         val selected = level(sessionId, range)
         if (selected * 25 == range.defaultPosition && range.omitAtChatDefault) return null
         return LocalModelPerformanceStore.current().constrainTemperature(range.at(selected * 25))
@@ -117,7 +117,7 @@ internal object LocalReasoningModeStore {
     }
 
     fun isSupported(profile: LocalModelProfile?, withTools: Boolean = false): Boolean =
-        LocalReasoningRequestPolicy.resolve(profile, withTools) != null
+        profile?.let { LocalEffectiveModelContracts.forProfile(it, withTools).reasoning != null } ?: false
 
     /**
      * Chat starts in FAST when no preference exists. Explicit DEFAULT still restores provider
@@ -145,7 +145,7 @@ internal object LocalReasoningModeStore {
         withTools: Boolean = false,
         defaultChatFast: Boolean = false,
     ): String? =
-        LocalReasoningRequestPolicy.resolve(profile, withTools)?.let { policy ->
+        profile?.let { LocalEffectiveModelContracts.forProfile(it, withTools).reasoning }?.let { policy ->
             val requested = when (mode(sessionId, defaultChatFast)) {
                 LocalReasoningMode.DEFAULT -> null
                 LocalReasoningMode.DEEP -> policy.enabledEffort

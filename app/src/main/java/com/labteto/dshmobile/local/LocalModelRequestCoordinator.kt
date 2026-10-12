@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheMode
+import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestReconstruction
 import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
@@ -153,12 +154,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             null
         }
         val promptCacheTtl = if (cachePolicy.supportsCacheOptions) "30m" else null
-        val operationalLimit = operationalInputLimitTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
-        val modelContextWindow = documentedContextWindowTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
+        val operationalLimit = runSurface.contract.operationalInputLimitTokens
+        val modelContextWindow = runSurface.contract.documentedContextWindowTokens
         val previousSourcePressure = pressureStore.latestSource(
             snapshot.sessionId,
             snapshot.usageMode,
@@ -168,6 +165,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             tools = tools,
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
+        )
+        val softProjectionScale = pressureStore.softProjectionScale(
+            routeFingerprint = routeFingerprint,
+            rawEstimatedInputTokens = baselinePressure.estimatedInputTokens,
+            operationalLimitTokens = operationalLimit,
         )
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
@@ -185,6 +187,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             previousPressure = previousSourcePressure,
                             cachePolicy = cachePolicy,
                             allowSemanticProjection = step <= 1,
+                            softProjectionScale = softProjectionScale,
                         ),
                     )
                 }
@@ -214,16 +217,21 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 modelContextWindowTokens = modelContextWindow,
             )
         } else baselinePressure
+        // Use the same 85% cutoff for the assessment as for the projection itself.
+        val softAssessmentPressure: (LocalPromptPressure) -> LocalPromptPressure = { raw ->
+            if (softProjectionScale == 1.0) raw
+            else pressureStore.forSoftProjection(routeFingerprint, raw)
+        }
         val contextAssessment = if (
             contextPolicy != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
             contextPolicy.assess(
                 LocalRequestContextAssessmentInput(
-                    current = pressure,
-                    previous = previousSourcePressure,
+                    current = softAssessmentPressure(pressure),
+                    previous = previousSourcePressure?.let(softAssessmentPressure),
                     operationalLimitTokens = operationalLimit,
                     cachePolicy = cachePolicy,
-                    growthCurrent = baselinePressure,
+                    growthCurrent = softAssessmentPressure(baselinePressure),
                 ),
             )
         } else {
@@ -344,6 +352,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("auth_kind", frozenProfile.authKind.name)
             put("protocol", runSurface.protocol.name)
             put("route_fingerprint", routeFingerprint)
+            put("model_contract_version", 1)
+            put("contract_operational_input_limit", runSurface.contract.operationalInputLimitTokens)
+            runSurface.contract.documentedContextWindowTokens?.let { put("contract_documented_context_window", it) }
+            put("contract_work_requests_per_slice", runSurface.contract.executionBudget.workRequestsPerSlice)
+            put("contract_image_input_status", runSurface.contract.imageInput.status.name.lowercase())
+            put("contract_tool_calling_status", runSurface.contract.toolCalling.status.name.lowercase())
+            put("soft_projection_scale_permille", (softProjectionScale * 1_000).toInt())
             put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
             put("prompt_cache_key_enabled", promptCacheKey != null)
             put("prompt_cache_ttl_enabled", promptCacheTtl != null)
@@ -847,10 +862,25 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     diagnosticSurface = cacheDiagnosticSurface,
                                 )
                             }
+                            val rawAcceptedEstimate = LocalPromptPressureMeter.measure(
+                                messages = activeMessages,
+                                tools = tools,
+                                operationalLimitTokens = operationalLimit,
+                                modelContextWindowTokens = modelContextWindow,
+                            ).estimatedInputTokens
                             if (reply.usage.reported) {
-                                pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                                pressureStore.recordReportedUsage(
+                                    snapshot.sessionId, reply.usage.promptTokens,
+                                    routeFingerprint = routeFingerprint,
+                                    rawEstimatedInputTokens = rawAcceptedEstimate,
+                                )
                             }
                             log.append("request/completed", buildJsonObject {
+                                put("raw_estimated_prompt_tokens", rawAcceptedEstimate)
+                                pressureStore.routeCalibration(routeFingerprint)?.let { (samples, permille) ->
+                                    put("route_calibration_samples", samples)
+                                    put("route_soft_estimate_scale_permille", permille)
+                                }
                                 put("request_uid", requestUid)
                                 put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                                 put("header_seq", requestHeader.sequence)
