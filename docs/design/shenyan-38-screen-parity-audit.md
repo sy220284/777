@@ -29,18 +29,18 @@
 | 19 | 任务计划 | `tasks/TasksScreen.kt` | 本轮修改 | 全部/待执行/执行中/暂停玻璃选项及动态计数、空态恢复已接；单任务成本/预算不可取时不显示 |
 | 20 | 设置首页 | `settings/SettingsScreen.kt` | 部分 | 三组分区已接，保留额外入口仍须归一同款列表行和图标 |
 | 21 | 模型设置 | `settings/LocalModelSettingsSections.kt` | 待改 | 模型档案/协议/上下文层级与可用模型动态展示 |
-| 22 | 性能设置 | `settings/ModelPerformanceSettings.kt` | 待改 | 参考速度/成本/稳定性分组；仅修改已有真实配置能力 |
+| 22 | 性能设置 | `settings/ModelPerformanceSettings.kt` | 本轮修改 | 自定义玻璃单选行及触觉温度滑块已接，真实配置持久化保留；速率/成本指标只在可得时展示 |
 | 23 | ChatGPT账户 | `settings/ChatGptAccountPanel.kt` | 部分 | 登录授权来源与套餐用量不得写死，账户状态需实机验 |
 | 24 | 记忆 | `settings/MemorySettingsSections.kt` | 本轮修改 | 真实记录分类切到玻璃页签，保留编辑和来源作用域；六类独立开关无独立底座，不伪造 |
-| 25 | 会话存储 | `settings/LocalSessionStorageCard.kt` | 待改 | 目录/空间/清理行为必须来自本机统计而非设计示例 |
+| 25 | 会话存储 | `settings/LocalSessionStorageCard.kt` | 本轮修改 | 会话归档的真实占用/预算进度条、清理与导出入口已接；其余存储分类缺真实统计，不展示设计稿示例数字 |
 | 26 | 外观阅读 | `settings/AppearanceSettingsComponents.kt` | 本轮修改 | 四态主题玻璃单选/触觉已接并复用持久化；实际 Light/Dark/Matte 渲染仍待截图回归 |
-| 27 | 权限设备 | `settings/DeviceCapabilitiesController.kt` | 待改 | 动态查询 Android 权限，说明用途、系统授权入口和拒绝恢复 |
-| 28 | 通知设置 | `settings/SettingsScreen.kt` | 待改 | 实际通知类别、免打扰及权限映射，禁止空 UI 开关 |
-| 29 | 高级诊断 | `settings/RuntimeDiagnosticsDialogs.kt` | 待改 | 真实诊断日志及运行时状态，与错误动作关联 |
+| 27 | 权限设备 | `settings/DeviceCapabilitiesController.kt` | 本轮修改 | 实测无障碍、通知监听及应用通知发布权限分开展示，虚拟屏仅标 API 可用而非已授权；其余系统权限待逐项接入 |
+| 28 | 通知设置 | `settings/SettingsScreen.kt` | 本轮修改 | 实际系统通知发布授权、跳转设置、现有本机任务通知开关与用途说明已接；六类独立开关/免打扰业务链未接 |
+| 29 | 高级诊断 | `settings/RuntimeDiagnosticsDialogs.kt` | 本轮修改 | 真实环境信息、网络诊断及 AppLog 错误/全部玻璃筛选、计数和导出已接；运行时字段详细卡布局待验 |
 | 30 | 检查更新 | `settings/SettingsScreen.kt` | 待改 | 版本/签名/hash 实值、不伪造更新/未来发布日期 |
 | 31 | 首次引导 | `local/LocalHarnessScreen.kt；local/LocalModeIntroBanner.kt` | 待改 | 三步引导和先体验后授权的真实导航状态 |
-| 32 | 权限申请 | `settings/DeviceCapabilitiesController.kt` | 待改 | 单项权限按需解释/拒绝/重试，不批量抢授权 |
-| 33 | 全局搜索 | `local/LocalHarnessDrawerComponents.kt` | 待接通 | 会话/人物/任务/文件跨域入口及高亮，无独立统一可验证闭环 |
+| 32 | 权限申请 | `settings/DeviceCapabilitiesController.kt` | 本轮修改 | Android 13+ 可在用户点击时请求 POST_NOTIFICATIONS，拒绝后保留系统设置恢复路径；完整首启浮层未按稿交付 |
+| 33 | 全局搜索 | `local/LocalHarnessDrawerComponents.kt` | 本轮修改 | 会话+人物真实搜索、分类计数、跳转图集和无结果提示已接；任务/文件索引及精确人物直达尚未实现 |
 | 34 | 空态合集 | `components/DsPageEmptyState.kt` | 本轮修改 | 共用空态真实动作升级为主按钮，复杂空态分支与屏幕布局仍需验收 |
 | 35 | 错误态合集 | `components/Overlays.kt；components/DsPageEmptyState.kt` | 部分 | 网络/权限/设备/语义故障需真实诊断与对应操作 |
 | 36 | 通知样式 | `components/Overlays.kt；settings/SettingsScreen.kt` | 待改 | 应用内 toast 与系统通知分别验颜色、跳转和免打扰 |
@@ -101,3 +101,14 @@
 - 最新 head 的构建、两代 Android 仪表测试及视觉截图/录屏未通过前仍保持 Draft。
 
 - 第 17 屏（第四组）：代理团队进度改用 `DsProgressBar` 的实际运行/完成/失败颜色，成员和任务详情使用触觉反馈；不改变调度、代理日志和审批语义。
+
+## 五轮核查与新提交（2026-10-12 / PR #654）
+
+当前按代码与原稿逐页核对：共 38 屏，按本轮进展分类为“本轮修改”18、“部分”13、“待改”7、“待接通”0。**这些不是完成率：38 屏尚无一项取得完整的多状态截图、动效、Android16/17 设备验收证据。**
+
+- 第 27/28 屏：加入 postingNotifications（真正在 Android 中发送通知的应用级状态），与现有通知监听服务严格分开；System Settings 返回和切页均会刷新；VirtualDisplay API 支持≠录屏已授权。
+- 第 32 屏：RequestPermission(POST_NOTIFICATIONS) 由用户明确点击触发，Android 13+ 适用；用户拒绝后提供系统设置入口。没有擅自把权限开关伪造成立即授权成功。
+- 第 33 屏：先接会话、人物两类真实内容检索和人物图集路由。任务、文件、跨模式全文搜索及结果精确跳转待后续能力接入，不应称全局搜索已完成。测试：LocalDrawerPersonaSearchTest。
+- 第 25 屏：真实会话存储占用/预算比例，sessionStorageUsageFraction 保证范围并对无效预算返回 0；测试：LocalSessionStorageVisualTest。
+- 第 29 屏：真实 AppLog 全部/异常计数与分组标签，保留刷新、完整诊断导出。
+- Figma MCP 仍受 Starter 额度阻塞，已上传的 HTML/Compose 设计包为可用的原始对照依据；最新 CI 尚未证实通过，不把组件一致当做全页面验收完成。
