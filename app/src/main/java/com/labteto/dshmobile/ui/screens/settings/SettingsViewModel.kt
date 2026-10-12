@@ -258,8 +258,8 @@ class SettingsViewModel @Inject constructor(
     }
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null): String =
-        localHarness.testModel(apiKey, model, baseUrl, protocol, profileId)
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null): String =
+        localHarness.testModel(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
 
     suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> =
         withContext(Dispatchers.IO) { localHarness.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId) }
