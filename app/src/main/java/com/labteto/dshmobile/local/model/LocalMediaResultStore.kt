@@ -22,8 +22,12 @@ data class LocalMediaResult(
     val createdAtMillis: Long,
     val fileName: String? = null,
     val remoteUrl: String? = null,
+    /** Null for legacy/unassigned results, which stay in the global media archive. */
+    val sessionId: String? = null,
+    val description: String? = null,
+    val textOutput: String? = null,
 ) {
-    init { require((fileName != null) != (remoteUrl != null)) }
+    init { require(listOf(fileName, remoteUrl, textOutput).count { it != null } == 1) }
 }
 
 @Serializable
@@ -51,24 +55,37 @@ class LocalMediaResultStore @Inject constructor(
     val results: StateFlow<List<LocalMediaResult>> = mutableResults
 
     @Synchronized
-    fun addFile(offer: LocalMediaOffer, kind: LocalMediaKind, file: File): LocalMediaResult {
+    fun addFile(
+        offer: LocalMediaOffer, kind: LocalMediaKind, file: File,
+        sessionId: String? = null, description: String? = null,
+    ): LocalMediaResult {
         require(kind in setOf(LocalMediaKind.IMAGE, LocalMediaKind.SPEECH))
         require(file.isFile) { "生成文件不存在" }
         require(file.canonicalFile.parentFile == directory.canonicalFile) {
             "生成结果没有存入受管理的持久目录"
         }
-        return append(offer, kind, fileName = file.name)
+        return append(offer, kind, fileName = file.name, sessionId = sessionId, description = description)
     }
 
     @Synchronized
-    fun addLink(offer: LocalMediaOffer, kind: LocalMediaKind, url: String): LocalMediaResult {
+    fun addLink(
+        offer: LocalMediaOffer, kind: LocalMediaKind, url: String,
+        sessionId: String? = null, description: String? = null,
+    ): LocalMediaResult {
         require(kind == LocalMediaKind.IMAGE)
         val location = URI(url)
         require(location.scheme.equals("https", true) && location.userInfo == null &&
             !location.host.isNullOrBlank() && location.port == -1) {
             "服务商未返回安全的媒体链接"
         }
-        return append(offer, kind, remoteUrl = url)
+        return append(offer, kind, remoteUrl = url, sessionId = sessionId, description = description)
+    }
+
+    /** Transcripts are media deliverables, not model-authored dialogue turns. */
+    @Synchronized
+    fun addText(offer: LocalMediaOffer, sessionId: String?, text: String): LocalMediaResult {
+        require(offer.kind == LocalMediaKind.TRANSCRIBE && text.isNotBlank())
+        return append(offer, LocalMediaKind.TRANSCRIBE, textOutput = text, sessionId = sessionId)
     }
 
     @Synchronized
@@ -97,6 +114,9 @@ class LocalMediaResultStore @Inject constructor(
         kind: LocalMediaKind,
         fileName: String? = null,
         remoteUrl: String? = null,
+        textOutput: String? = null,
+        sessionId: String? = null,
+        description: String? = null,
     ): LocalMediaResult {
         LocalMediaCatalog.requireValid(offer)
         val record = LocalMediaResult(
@@ -107,6 +127,9 @@ class LocalMediaResultStore @Inject constructor(
             createdAtMillis = System.currentTimeMillis(),
             fileName = fileName,
             remoteUrl = remoteUrl,
+            sessionId = sessionId?.takeIf(String::isNotBlank),
+            description = description?.take(600),
+            textOutput = textOutput,
         )
         persist(mutableResults.value + record)
         return record
