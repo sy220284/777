@@ -1,0 +1,135 @@
+package com.shenyan.designsystem.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.foundation.SyMetric
+
+@Composable
+fun SyGroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) = SyMaterialFrame(
+    modifier = modifier.fillMaxWidth(),
+    tier = SyMaterialTier.L3_CARD,
+    horizontalPadding = 14.dp, verticalPadding = 8.dp,
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+    content = content,
+)
+
+/** V5 navigation cell; respects image/icon, metadata, action slot and text sizing. */
+@Composable
+fun SyCategoryRow(
+    icon: ImageVector? = null,
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    value: String? = null,
+    onClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    iconPainter: Painter? = null,
+    titleTextStyle: TextStyle? = null,
+) {
+    val p = LocalSyColors.current
+    val shape = RoundedCornerShape(SyMetric.radiusControl)
+    val surface = if (onClick != null) p.materialL2 else Color.Transparent
+    val row: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (icon != null || iconPainter != null) {
+                Surface(
+                    color = p.materialL3,
+                    shape = RoundedCornerShape(SyMetric.radiusControl),
+                    modifier = Modifier.size(42.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (iconPainter != null) Icon(iconPainter, contentDescription = null,
+                            modifier = Modifier.size(22.dp), tint = p.textSecondary)
+                        else if (icon != null) Icon(icon, contentDescription = null,
+                            modifier = Modifier.size(22.dp), tint = p.textSecondary)
+                    }
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, color = p.text,
+                    style = titleTextStyle ?: MaterialTheme.typography.bodyMedium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (!subtitle.isNullOrBlank()) Text(subtitle,
+                    color = p.textSecondary, style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+            if (value != null) Text(value, color = p.textTertiary,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            trailing?.invoke()
+        }
+    }
+    if (onClick == null) {
+        Surface(modifier, shape = shape, color = Color.Transparent) { row() }
+    } else {
+        Surface(onClick = onClick, modifier = modifier,
+            shape = shape, color = surface) { row() }
+    }
+}
+
+/** Touch target is 92dp high. No demo action, permission or business data is generated. */
+@Composable
+fun SyQuickActionTile(
+    icon: ImageVector?,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    iconPainter: Painter? = null,
+) {
+    val p = LocalSyColors.current
+    Surface(
+        onClick = onClick, enabled = enabled, modifier = modifier,
+        color = p.materialL3,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+    ) {
+        Column(
+            Modifier.heightIn(min = 92.dp).padding(horizontal = 14.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            when {
+                iconPainter != null -> Icon(iconPainter, contentDescription = null,
+                    tint = if (enabled) p.textSecondary else p.textTertiary,
+                    modifier = Modifier.size(22.dp))
+                icon != null -> Icon(icon, contentDescription = null,
+                    tint = if (enabled) p.textSecondary else p.textTertiary,
+                    modifier = Modifier.size(22.dp))
+            }
+            Text(label, color = if (enabled) p.text else p.textTertiary,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
