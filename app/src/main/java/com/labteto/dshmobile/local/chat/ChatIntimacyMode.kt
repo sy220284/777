@@ -37,13 +37,8 @@ internal fun isInteractionResetIntent(input: String): Boolean {
  * activates INTIMATE at intensity 5 even without a sexual-keyword request.
  * Shared by user-intent detection and assistant-output state projection.
  */
-internal fun hasHighIntensityIntimacyAction(input: String): Boolean {
-    val text = input.trim().lowercase()
-    if (text.isBlank() || isInteractionResetIntent(text)) return false
-    if (NON_INTERACTION_INTENT_HINTS.any { text.contains(it) } &&
-        DIRECT_INTIMATE_ACTION_HINTS.none { text.contains(it) }) return false
-
-    return HIGH_INTIMACY_ACTION_HINTS.any { action ->
+private fun containsAffirmedIntimacyHint(text: String, hints: List<String>): Boolean =
+    hints.any { action ->
         var index = text.indexOf(action)
         while (index >= 0) {
             val before = text.substring(0, index)
@@ -61,6 +56,13 @@ internal fun hasHighIntensityIntimacyAction(input: String): Boolean {
         }
         false
     }
+
+internal fun hasHighIntensityIntimacyAction(input: String): Boolean {
+    val text = input.trim().lowercase()
+    if (text.isBlank() || isInteractionResetIntent(text)) return false
+    if (NON_INTERACTION_INTENT_HINTS.any { text.contains(it) } &&
+        DIRECT_INTIMATE_ACTION_HINTS.none { text.contains(it) }) return false
+    return containsAffirmedIntimacyHint(text, HIGH_INTIMACY_ACTION_HINTS)
 }
 
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
@@ -79,12 +81,12 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     ) {
         return ChatInteractionIntent.NORMAL
     }
-    val directIntimateAction = DIRECT_INTIMATE_ACTION_HINTS.any { text.contains(it) }
+    val directIntimateAction = containsAffirmedIntimacyHint(text, DIRECT_INTIMATE_ACTION_HINTS)
     if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
 
     val intimateRequested =
         directIntimateAction || hasHighIntensityIntimacyAction(input) ||
-            ADULT_INTIMACY_HINTS.any { text.contains(it) }
+            containsAffirmedIntimacyHint(text, ADULT_INTIMACY_HINTS)
 
     return when {
         intimateRequested ->
