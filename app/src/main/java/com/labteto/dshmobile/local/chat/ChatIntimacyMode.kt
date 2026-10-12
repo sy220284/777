@@ -292,7 +292,7 @@ private val HIGH_INTIMACY_ACTION_HINTS = listOf(
 )
 private val INTIMATE_ACTION_NEGATION = listOf(
     "不要", "别", "不许", "禁止", "停止", "拒绝", "不能", "没有",
-    "并未", "不再", "未曾", "不想", "不",
+    "并未", "不再", "未曾", "不想", "不会",
 )
 private val DIRECT_INTIMATE_ACTION_HINTS = listOf(
     "亲我", "亲一下", "亲一口", "抱我", "抱住我", "搂住我", "吻我", "吻一下",
@@ -367,7 +367,7 @@ private val RELATIONSHIP_PROGRESS_HINTS = listOf(
 )
 private val NON_INTERACTION_INTENT_HINTS = listOf(
     "解释", "是什么", "什么意思", "分析", "医学", "医生", "科普", "项目", "代码", "文档",
-    "小说", "剧情", "台词", "设定", "翻译",
+    "小说", "剧情", "台词", "设定", "翻译", "测试", "研究",
 )
 private val CONTINUATION_HINTS = listOf(
     "继续", "接着", "就这样", "别停", "然后呢", "再来", "刚才的", "还是刚才", "换个姿势",
