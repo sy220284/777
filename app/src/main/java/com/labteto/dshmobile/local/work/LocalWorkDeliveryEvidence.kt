@@ -43,6 +43,7 @@ internal fun localWorkDeliveryEvidence(
     val startSequence = log.latestMatching(setOf("goal/state")) { event ->
         event.value("description") == goalDescription && event.value("status") == "active"
     }?.sequence ?: -1L
+    if (startSequence < 0L) return LocalWorkDeliveryEvidence(needsArtifact, needsTest)
 
     val successful = log.latestMatching(setOf("tool/result")) { event ->
         event.value("is_error") == "false" && !event.value("id").isNullOrBlank()
@@ -50,7 +51,7 @@ internal fun localWorkDeliveryEvidence(
     val artifact = if (needsArtifact) log.latestMatching(setOf("tool/result")) { event ->
         event.value("is_error") == "false" &&
             !event.value("artifact_path").isNullOrBlank() &&
-            !event.value("artifact_sha256").isNullOrBlank() &&
+            event.value("artifact_sha256")?.matches(Regex("""^[a-fA-F0-9]{64}$""")) == true &&
             !event.value("id").isNullOrBlank()
     }?.takeIf { it.sequence > startSequence } else null
 
