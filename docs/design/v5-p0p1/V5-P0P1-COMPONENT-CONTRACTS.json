@@ -1,0 +1,483 @@
+{
+  "schema": "shenyan.v5.p0p1.components.20261012",
+  "source": "V5-SCENE-DESIGN-SYSTEM.zh-CN.md",
+  "materials": "L1/L2/L3/L4/L5",
+  "themes": [
+    "light",
+    "dark",
+    "matte"
+  ],
+  "components": [
+    {
+      "id": "p0-01",
+      "name": "SyRichMessage",
+      "priority": "P0",
+      "variants": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "file",
+        "mixed",
+        "sending",
+        "ready",
+        "failed"
+      ],
+      "screens": [
+        1,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-02",
+      "name": "SyDeliverableCard",
+      "priority": "P0",
+      "variants": [
+        "ready",
+        "pending",
+        "error",
+        "expired"
+      ],
+      "screens": [
+        1,
+        2,
+        16
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-03",
+      "name": "SyArtifactGallery",
+      "priority": "P0",
+      "variants": [
+        "image",
+        "video",
+        "file",
+        "mixed",
+        "empty"
+      ],
+      "screens": [
+        1,
+        16,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-04",
+      "name": "SyExecutionTimeline",
+      "priority": "P0",
+      "variants": [
+        "queued",
+        "running",
+        "done",
+        "blocked",
+        "failed",
+        "cancelled"
+      ],
+      "screens": [
+        2,
+        3,
+        15,
+        37
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-05",
+      "name": "SyParallelToolGroup",
+      "priority": "P0",
+      "variants": [
+        "queued",
+        "running",
+        "done",
+        "error",
+        "paused"
+      ],
+      "screens": [
+        2,
+        3,
+        15
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-06",
+      "name": "SyDecisionCard",
+      "priority": "P0",
+      "variants": [
+        "awaiting",
+        "selected",
+        "confirmed",
+        "cancelled",
+        "expired"
+      ],
+      "screens": [
+        2,
+        14
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-07",
+      "name": "SyRecoveryNotice",
+      "priority": "P0",
+      "variants": [
+        "network",
+        "auth",
+        "permission",
+        "timeout",
+        "file-expired",
+        "recovered"
+      ],
+      "screens": [
+        1,
+        2,
+        29,
+        35
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-08",
+      "name": "SyPartialResult",
+      "priority": "P0",
+      "variants": [
+        "all",
+        "partial",
+        "none"
+      ],
+      "screens": [
+        2,
+        15,
+        37
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-09",
+      "name": "SyResumeBanner",
+      "priority": "P0",
+      "variants": [
+        "paused",
+        "restartable",
+        "conflict",
+        "expired"
+      ],
+      "screens": [
+        2,
+        3,
+        19
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p0-10",
+      "name": "SyGenerationProgress",
+      "priority": "P0",
+      "variants": [
+        "queued",
+        "running",
+        "ready",
+        "error",
+        "cancelled"
+      ],
+      "screens": [
+        1,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-01",
+      "name": "SyPersonaCard",
+      "priority": "P1",
+      "variants": [
+        "has-image",
+        "loading",
+        "no-image",
+        "failed"
+      ],
+      "screens": [
+        6,
+        7
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-02",
+      "name": "SyPortraitFallback",
+      "priority": "P1",
+      "variants": [
+        "no-image",
+        "loading",
+        "corrupt"
+      ],
+      "screens": [
+        6,
+        7,
+        10
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-03",
+      "name": "SyImageViewer",
+      "priority": "P1",
+      "variants": [
+        "fit",
+        "fill",
+        "loading",
+        "error"
+      ],
+      "screens": [
+        1,
+        6,
+        16,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-04",
+      "name": "SyVideoViewer",
+      "priority": "P1",
+      "variants": [
+        "poster",
+        "loading",
+        "playing",
+        "paused",
+        "muted",
+        "error",
+        "unsupported"
+      ],
+      "screens": [
+        1,
+        16,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-05",
+      "name": "SyAudioPlayer",
+      "priority": "P1",
+      "variants": [
+        "loading",
+        "playing",
+        "paused",
+        "error"
+      ],
+      "screens": [
+        1,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-06",
+      "name": "SyTranscript",
+      "priority": "P1",
+      "variants": [
+        "selected",
+        "editing",
+        "corrected",
+        "error"
+      ],
+      "screens": [
+        1,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-07",
+      "name": "SyAttachmentRow",
+      "priority": "P1",
+      "variants": [
+        "ready",
+        "loading",
+        "error",
+        "locked",
+        "unknown"
+      ],
+      "screens": [
+        1,
+        16,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-08",
+      "name": "SyFileThumbnail",
+      "priority": "P1",
+      "variants": [
+        "ready",
+        "loading",
+        "broken",
+        "unknown"
+      ],
+      "screens": [
+        16,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-09",
+      "name": "SyMediaQueue",
+      "priority": "P1",
+      "variants": [
+        "queued",
+        "running",
+        "ready",
+        "error",
+        "cancelled"
+      ],
+      "screens": [
+        2,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    },
+    {
+      "id": "p1-10",
+      "name": "SyAttachmentPicker",
+      "priority": "P1",
+      "variants": [
+        "idle",
+        "selected",
+        "uploading",
+        "failed",
+        "rejected"
+      ],
+      "screens": [
+        1,
+        38
+      ],
+      "designSource": "v5-p0p1-components.html",
+      "responsive": {
+        "narrow": "stack; >=44px target",
+        "medium": "grid, independently fluid",
+        "wide": "respect 777 shell"
+      },
+      "implementationContract": "design specimen only; real data/state/permissions owned by host"
+    }
+  ]
+}
