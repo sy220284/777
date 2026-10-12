@@ -248,7 +248,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "sha256": "24b36097bc294ef2"
+      "sha256": "ee8975af3f10e9b0"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
@@ -3380,9 +3380,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "eed5668da1ea",
+  "source_snapshot": "d7675e0b7db4",
   "observed_delta": {
-    "baseline": "a3b53c8578ef",
+    "baseline": "5dd46cf4c75d",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],

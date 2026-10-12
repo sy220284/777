@@ -345,7 +345,7 @@ internal class LocalToolExecutionCoordinator(
             ).let { invocation ->
                 // Observe while the real workspace lease is still held. The caller owns
                 // what to observe; this neutral coordinator never interprets goal semantics.
-                if (invocation.executionStarted && !readLike && !invocation.result.isError) {
+                if (invocation.executionStarted && executionLease != null && !invocation.result.isError) {
                     invocation.copy(result = invocation.result.copy(
                         fileVersions = invocation.result.fileVersions + observeFileVersions?.invoke().orEmpty(),
                     ))

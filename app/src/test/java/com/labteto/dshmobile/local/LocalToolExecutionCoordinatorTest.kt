@@ -1183,6 +1183,34 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
     }
 
+    @Test
+    fun existingFileDeliveryCanBeObservedUnderReadLeaseWithoutInventingWrites() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("existing document") }
+                .copy(metadata = ToolMetadata("files", workspaceAccess = com.labteto.dshmobile.harness.tools.ToolWorkspaceAccess.READ)))
+            register(tool("remote_lookup", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER) { ToolResult("remote data") })
+        }
+        val coordinator = coordinator(registry)
+        var observations = 0
+        val read = coordinator.executeScoped(LocalToolCall("read-existing", "read", JsonObject(emptyMap()), "{}"),
+            "s1", false, false, approval = { _, _, _ -> true }, observeFileVersions = {
+                observations++
+                mapOf("README.md" to "current-version")
+            })
+        assertFalse(read.isError)
+        assertEquals(mapOf("README.md" to "current-version"), read.fileVersions)
+        assertEquals(AgentToolSideEffect.NONE, read.sideEffect)
+        assertEquals(1, observations)
+        val remote = coordinator.executeScoped(LocalToolCall("remote", "remote_lookup", JsonObject(emptyMap()), "{}"),
+            "s1", true, false, approval = { _, _, _ -> true }, observeFileVersions = {
+                observations++
+                mapOf("README.md" to "unsafe-outside-lease")
+            })
+        assertFalse(remote.isError)
+        assertTrue(remote.fileVersions.isEmpty())
+        assertEquals(1, observations)
+    }
+
     private fun coordinator(
         registry: ToolRegistry,
         planMode: Boolean = false,
