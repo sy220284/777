@@ -48,9 +48,9 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsPageEmptyState
-import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.shenyan.designsystem.components.SyPill
+import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
@@ -219,7 +219,7 @@ internal fun CharacterDiaryScreen(
             )
 
             if (subjects.isEmpty()) {
-                DsPageEmptyState(
+                SyEmptyState(
                     icon = FeatherIcons.BookOpen,
                     title = stringResource(R.string.chat_diary_no_character_title),
                     body = stringResource(R.string.chat_diary_no_character_body),
@@ -241,7 +241,7 @@ internal fun CharacterDiaryScreen(
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             items(subjects, key = CharacterDiarySubject::key) { subject ->
                                 val selected = subject.key == selectedSubjectKey
-                                DsPill(
+                                SyPill(
                                     text = subject.name,
                                     modifier = Modifier.semantics { this.selected = selected },
                                     selected = selected,
@@ -292,14 +292,14 @@ internal fun CharacterDiaryScreen(
 
                 when {
                     loading -> item(key = "diary-loading") {
-                        DsPageLoadingState(
+                        SyLoadingState(
                             icon = FeatherIcons.BookOpen,
                             label = stringResource(R.string.chat_diary_loading),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     loadFailed -> item(key = "diary-load-failed") {
-                        DsPageEmptyState(
+                        SyEmptyState(
                             icon = FeatherIcons.AlertTriangle,
                             title = stringResource(R.string.chat_diary_load_failed_title),
                             body = stringResource(R.string.chat_diary_load_failed_body),
@@ -309,7 +309,7 @@ internal fun CharacterDiaryScreen(
                         )
                     }
                     visibleEntries.isEmpty() -> item(key = "diary-empty") {
-                        DsPageEmptyState(
+                        SyEmptyState(
                             icon = if (query.isNotBlank()) FeatherIcons.Search else FeatherIcons.BookOpen,
                             title = stringResource(
                                 if (query.isNotBlank()) R.string.chat_diary_no_match_title
@@ -505,7 +505,7 @@ private fun CharacterDiaryEntryCard(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DsPill(
+            SyPill(
                 text = stringResource(
                     if (entry.sourceMode == ChatDiarySourceMode.GROUP) {
                         R.string.chat_diary_source_group
@@ -514,7 +514,7 @@ private fun CharacterDiaryEntryCard(
                     },
                 ),
             )
-            DsPill(text = diaryDisclosureLabel(entry.disclosure))
+            SyPill(text = diaryDisclosureLabel(entry.disclosure))
         }
 
         CharacterDiaryNarrativeBlock(
@@ -535,7 +535,7 @@ private fun CharacterDiaryEntryCard(
         )
 
         if (entry.revisions.lastOrNull()?.userCorrected == true) {
-            DsPill(text = stringResource(R.string.chat_diary_user_corrected))
+            SyPill(text = stringResource(R.string.chat_diary_user_corrected))
         }
         entry.sources.lastOrNull()?.takeIf { it.sessionId.isNotBlank() }?.let { source ->
             Text(
