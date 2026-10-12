@@ -92,10 +92,10 @@ import com.labteto.dshmobile.local.session.workHandoffDialogueCandidates
 import com.labteto.dshmobile.local.session.workHandoffSummaryWithSelectedMessages
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
@@ -822,10 +822,10 @@ fun LocalHarnessScreen(
                         color = syInk.secondaryText,
                         style = DsType.small13,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.sy_v5_persona_data),
                         onClick = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
             }
