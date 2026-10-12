@@ -485,6 +485,7 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             previous = baseContext.continuity,
             candidate = plan.state.continuity,
             pendingTurns = pending,
+            resolvedContinuityIds = plan.resolvedContinuityIds,
         )
         val diaryDecisions = diaryStore.decisionsForExperience(
             chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId), baseContext,
