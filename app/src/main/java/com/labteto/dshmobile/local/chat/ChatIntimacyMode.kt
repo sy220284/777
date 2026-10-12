@@ -355,17 +355,17 @@ internal class ChatIntimacyMode {
         if (mode != ChatInteractionIntent.FLIRTING && mode != ChatInteractionIntent.INTIMATE) return ""
         val interaction = mutableListOf(CHAT_DEFAULT_RELATIONAL_BIAS)
         interaction += CHAT_FLIRT_ACTION_REPERTOIRE
-            interaction += "【互动强度】当前=${nextInteractionIntensity(input, state)}/5；随明确意图和连续证据变化，不因模糊信号跨级。"
-            if (state.recentActionTags.isNotEmpty() || state.recentPoseTags.isNotEmpty() ||
-                state.recentVerbalTags.isNotEmpty() || state.recentAddressTerms.isNotEmpty()) {
-                interaction += "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
-                    "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}"
-            }
-            if (hasChineseSuggestiveFlirtingIntent(input)) {
-                interaction += CHAT_CHINESE_INNUENDO_GUIDANCE
-            }
+        interaction += "【互动强度】当前=${nextInteractionIntensity(input, state)}/5；随明确意图和连续证据变化，不因模糊信号跨级。"
+        if (state.recentActionTags.isNotEmpty() || state.recentPoseTags.isNotEmpty() ||
+            state.recentVerbalTags.isNotEmpty() || state.recentAddressTerms.isNotEmpty()) {
+            interaction += "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}｜" +
+                "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
+                "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}"
+        }
+        if (hasChineseSuggestiveFlirtingIntent(input)) {
+            interaction += CHAT_CHINESE_INNUENDO_GUIDANCE
+        }
         if (mode == ChatInteractionIntent.INTIMATE) {
             interaction += "【本轮意图优先：成年亲密互动】"
             interaction += "优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。"
