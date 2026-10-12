@@ -535,7 +535,7 @@ internal fun LocalMediaStudioSheetContent(
     }
 }
 
-private fun openMediaUrl(context: Context, url: String, onError: (String) -> Unit) {
+internal fun openMediaUrl(context: Context, url: String, onError: (String) -> Unit) {
     if (!url.startsWith("https://")) {
         onError(context.getString(R.string.minimax_media_invalid_url))
         return
@@ -544,7 +544,7 @@ private fun openMediaUrl(context: Context, url: String, onError: (String) -> Uni
         .onFailure { onError(it.message.orEmpty()) }
 }
 
-private fun viewMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
+internal fun viewMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         context.startActivity(Intent(Intent.ACTION_VIEW).apply {
@@ -554,7 +554,7 @@ private fun viewMediaFile(context: Context, file: File, mime: String, onError: (
     }.onFailure { onError(it.message.orEmpty()) }
 }
 
-private fun shareMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
+internal fun shareMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
