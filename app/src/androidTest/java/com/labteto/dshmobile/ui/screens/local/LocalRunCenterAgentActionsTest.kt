@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
@@ -217,18 +218,13 @@ class LocalRunCenterAgentActionsTest {
             }
         }
 
-        val attention = compose
-            .onNodeWithText(context.getString(R.string.local_run_needs_attention, 1))
-            .fetchSemanticsNode()
-            .boundsInRoot
-            .top
-        val goal = compose
-            .onNodeWithText(context.getString(R.string.local_run_current_goal))
-            .fetchSemanticsNode()
-            .boundsInRoot
-            .top
-
-        assertTrue(attention < goal)
+        // Compact screens separate the attention and current-goal panels into tabs.
+        compose.onNodeWithText(context.getString(R.string.local_run_needs_attention, 1))
+            .assertIsDisplayed()
+        compose.onNodeWithTag("runBoardSection:0").performClick()
+        compose.onNodeWithText(context.getString(R.string.local_run_current_goal))
+            .assertIsDisplayed()
+        compose.onNodeWithText("整理发布材料").assertIsDisplayed()
     }
 
     @Test
