@@ -33,6 +33,8 @@ data class LocalMediaVideoTask(
     val providerTaskId: String? = null,
     val downloadUrl: String? = null,
     val lastError: String? = null,
+    val sessionId: String? = null,
+    val description: String? = null,
 ) {
     /** A removed, replaced or re-keyed account must not be used to poll an old task. */
     fun belongsTo(offer: LocalMediaOffer): Boolean =
@@ -109,7 +111,10 @@ class LocalMediaVideoTaskStore @Inject constructor(
     val tasks: StateFlow<List<LocalMediaVideoTask>> = mutableTasks
 
     @Synchronized
-    fun begin(offer: LocalMediaOffer, now: Long = System.currentTimeMillis()): LocalMediaVideoTask {
+    fun begin(
+        offer: LocalMediaOffer, now: Long = System.currentTimeMillis(),
+        sessionId: String? = null, description: String? = null,
+    ): LocalMediaVideoTask {
         document.requireAvailable()
         LocalMediaCatalog.requireValid(offer)
         require(offer.kind == LocalMediaKind.VIDEO)
@@ -123,6 +128,8 @@ class LocalMediaVideoTaskStore @Inject constructor(
             startedAtMillis = now,
             updatedAtMillis = now,
             phase = LocalMediaVideoPhase.SUBMITTING,
+            sessionId = sessionId?.takeIf(String::isNotBlank),
+            description = description?.take(600),
         )
         persist(mutableTasks.value + task)
         return task
