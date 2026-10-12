@@ -45,7 +45,7 @@ internal fun workSteadyStateHistoryBudget(
         it.model == selected.model &&
             normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(selected.baseUrl)
     }
-    val effective = matchingProfile?.let(LocalEffectiveModelContracts::forProfile)
+    val effective = matchingProfile?.let { LocalEffectiveModelContracts.forProfile(it) }
         ?: LocalEffectiveModelContracts.resolve(selected.model, selected.baseUrl)
     return workSteadyStateHistoryBudget(
         base = base,
