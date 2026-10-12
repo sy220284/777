@@ -69,14 +69,14 @@ import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.DsHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
@@ -385,7 +385,7 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .safeDrawingPadding(),
             ) {
-                DsTopBar(
+                SyTopBar(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
@@ -611,7 +611,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
-                                DsTextField(
+                                SyTextField(
                                     value = customChatFilterDraft,
                                     onValueChange = {
                                         customChatFilterDraft = it
@@ -622,7 +622,7 @@ fun SettingsScreen(
                                     placeholder = { Text(stringResource(R.string.settings_chat_custom_filter_hint)) },
                                     singleLine = true,
                                 )
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.settings_chat_custom_filter_add),
                                     onClick = {
                                         if (viewModel.addChatStyleGuardPhrase(candidate)) {
@@ -630,7 +630,7 @@ fun SettingsScreen(
                                         }
                                     },
                                     enabled = canAddFilter,
-                                    size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+                                    size = com.labteto.dshmobile.ui.components.SyButtonSize.Small,
                                 )
                             }
                             customFilters.forEach { phrase ->
@@ -657,7 +657,7 @@ fun SettingsScreen(
                             }
 
                             if (localHarness.styleGuardHits.isNotEmpty()) {
-                                DsButton(
+                                SyButton(
                                     text = stringResource(
                                         if (showChatPreferenceDiagnostics) {
                                             R.string.settings_chat_guard_hits_hide
@@ -669,7 +669,7 @@ fun SettingsScreen(
                                     onClick = {
                                         showChatPreferenceDiagnostics = !showChatPreferenceDiagnostics
                                     },
-                                    variant = DsButtonVariant.Ghost,
+                                    variant = SyButtonVariant.Ghost,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                                 if (showChatPreferenceDiagnostics) {
@@ -681,13 +681,13 @@ fun SettingsScreen(
                                     localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
                                         ChatFilterPhraseRow(phrase = hit)
                                     }
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.settings_chat_guard_hits_clear),
                                         onClick = {
                                             viewModel.clearChatStyleGuardHits()
                                             showChatPreferenceDiagnostics = false
                                         },
-                                        variant = DsButtonVariant.Ghost,
+                                        variant = SyButtonVariant.Ghost,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
@@ -704,7 +704,7 @@ fun SettingsScreen(
 
                     SettingsDestination.MODELS -> {
                         var addModelRequested by remember { mutableStateOf(false) }
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_api_model_add),
                             onClick = { addModelRequested = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -840,11 +840,11 @@ fun SettingsScreen(
                                 style = DsType.small13.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
-                            DsSegmented(
+                            SySegmented(
                                 segments = listOf(
-                                    DsSegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
-                                    DsSegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
-                                    DsSegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
+                                    SySegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
+                                    SySegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
+                                    SySegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
                                 ),
                                 selectedKey = approvalMode.name,
                                 onSelect = { selected ->
@@ -945,10 +945,10 @@ fun SettingsScreen(
                                 style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.settings_update_check),
                                 onClick = onCheckUpdate,
-                                variant = DsButtonVariant.Primary,
+                                variant = SyButtonVariant.Primary,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -1026,11 +1026,11 @@ private fun ChatFilterPhraseRow(
             modifier = Modifier.weight(1f),
         )
         if (removeLabel != null && onRemove != null) {
-            DsButton(
+            SyButton(
                 text = removeLabel,
                 onClick = onRemove,
-                variant = DsButtonVariant.Ghost,
-                size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = com.labteto.dshmobile.ui.components.SyButtonSize.Small,
             )
         }
     }
