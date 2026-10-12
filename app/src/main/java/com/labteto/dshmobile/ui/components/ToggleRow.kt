@@ -1,9 +1,17 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.components.SySheetChoiceRow
 
-/** Controlled setting action; the canonical row owns Switch semantics and painting. */
+/** A single-line switch entry retains the former two-line touch target. */
 @Composable
-fun ToggleRow(label: String, checked: Boolean, hint: String? = null, onChange: () -> Unit) =
-    SySheetChoiceRow(title = label, subtitle = hint, switchChecked = checked, onClick = onChange)
+fun ToggleRow(label: String, checked: Boolean, onChange: () -> Unit) =
+    SySheetChoiceRow(
+        title = label,
+        modifier = Modifier.heightIn(min = 72.dp),
+        switchChecked = checked,
+        onClick = onChange,
+    )
