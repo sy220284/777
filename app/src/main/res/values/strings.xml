@@ -2159,5 +2159,15 @@
     <string name="fluid_message_media_speech">基于此消息合成语音</string>
     <string name="fluid_files_search">搜索文件名或路径</string>
     <string name="fluid_files_no_matches">没有匹配的文件</string>
+    <string name="local_model_catalog_success">已从接口获取 %1$d 个模型，点击模型名称即可选择</string>
+    <string name="local_model_catalog_empty">接口返回了空模型目录；仍可手动填写模型 ID</string>
+    <string name="local_model_catalog_failure">模型目录获取失败：%1$s；可以继续手动填写模型</string>
+    <string name="local_model_catalog_unavailable">接口未响应</string>
+    <string name="local_model_catalog_refresh">从接口刷新模型列表</string>
+    <string name="local_model_catalog_fetching">正在获取模型列表…</string>
+    <string name="local_model_catalog_option">接口可用 · %1$s</string>
+    <string name="local_model_catalog_selector">选择接口返回的模型（%1$d）</string>
+    <string name="local_model_catalog_hint">目录来自 API 服务端，列出不代表该模型一定支持对话；可用下方连接测试验证。</string>
+    <string name="local_model_catalog_test_failure">连接测试失败：%1$s</string>
 </resources>
 
