@@ -55,11 +55,30 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.AppBackgroundState
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.foundation.SyColors
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Preserve the V6 L2 material instead of pre-compositing an opaque input slab.
+ * Wallpaper mode reuses the existing bottom-region contrast analysis. Matte is always solid.
+ */
+internal fun v6ConversationComposerSurface(background: AppBackgroundState, palette: SyColors): Color =
+    if (!background.hasImage || palette.materialL2.alpha == 1f) {
+        palette.materialL2
+    } else {
+        background.wallpaperSurface(
+            base = palette.materialL5,
+            level = WallpaperSurfaceLevel.INPUT,
+            region = BackgroundRegion.BOTTOM,
+        )
+    }
 
 @Composable
 internal fun LocalConversationComposer(
@@ -257,7 +276,7 @@ internal fun LocalConversationComposer(
     }
 
     SyConversationComposer(
-        surfaceColor = if (backgroundState.hasImage) colors.composerCard.copy(alpha = 0.90f) else colors.composerCard,
+        surfaceColor = v6ConversationComposerSurface(backgroundState, LocalSyColors.current),
         shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
         // the IME is already animating the whole surface.
