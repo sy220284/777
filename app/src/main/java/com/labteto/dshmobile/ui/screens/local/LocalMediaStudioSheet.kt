@@ -460,7 +460,11 @@ internal fun LocalMediaStudioSheetContent(
                                     R.string.media_studio_history_item,
                                     asset.provider,
                                     asset.model,
-                                    if (asset.kind == LocalMediaKind.SPEECH.name) stringResource(R.string.media_studio_kind_speech) else stringResource(R.string.media_studio_kind_image),
+                                    when (asset.kind) {
+                                        LocalMediaKind.SPEECH.name -> stringResource(R.string.media_studio_kind_speech)
+                                        LocalMediaKind.TRANSCRIBE.name -> stringResource(R.string.minimax_media_asr)
+                                        else -> stringResource(R.string.media_studio_kind_image)
+                                    },
                                 ),
                                 color = colors.labelPrimary,
                                 style = DsType.caption11.withReadingWeight(),
@@ -485,6 +489,15 @@ internal fun LocalMediaStudioSheetContent(
                                         size = DsButtonSize.Small,
                                         variant = DsButtonVariant.Ghost,
                                         onClick = { shareMediaFile(context, file, mime) { historyError = it } },
+                                    )
+                                } else if (asset.textOutput != null) {
+                                    DsButton(
+                                        text = stringResource(R.string.minimax_media_copy_text),
+                                        size = DsButtonSize.Small,
+                                        onClick = {
+                                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                                .setPrimaryClip(ClipData.newPlainText("transcription", asset.textOutput))
+                                        },
                                     )
                                 } else if (asset.remoteUrl != null) {
                                     DsButton(
