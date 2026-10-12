@@ -165,8 +165,8 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsData.refreshDeepSeekPricing() }
     }
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
-        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) =
+        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId) }
 
     internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage =
         withContext(Dispatchers.IO) { localHarness.queryMiniMaxQuota(profile) }
@@ -260,6 +260,9 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null): String =
         localHarness.testModel(apiKey, model, baseUrl, protocol, profileId)
+
+    suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> =
+        withContext(Dispatchers.IO) { localHarness.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId) }
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
