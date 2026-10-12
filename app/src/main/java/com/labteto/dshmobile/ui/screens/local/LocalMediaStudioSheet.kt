@@ -122,11 +122,8 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                val answer = viewModel.transcribe(chosen, uri, sessionId)
-                if (chosen.id == activeOfferId) {
-                    transcript = answer
-                    onDelivered()
-                }
+                viewModel.submitTranscribe(chosen, uri, sessionId)
+                if (chosen.id == activeOfferId) onDelivered()
             }
         }
     }
@@ -205,8 +202,8 @@ internal fun LocalMediaStudioSheetContent(
                     DsButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val result = viewModel.image(selected, prompt, ratio, sessionId)
-                            if (selected.id == activeOfferId) { image = result; onDelivered() }
+                            viewModel.submitImage(selected, prompt, ratio, sessionId)
+                            if (selected.id == activeOfferId) onDelivered()
                         } })
                     image?.url?.let { url ->
                         DsButton(text = stringResource(R.string.minimax_media_open_image),
@@ -329,8 +326,8 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val file = viewModel.speech(selected, prompt, voiceId, sessionId)
-                            if (selected.id == activeOfferId) { audioFile = file; onDelivered() }
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId)
+                            if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
                         DsButton(text = stringResource(R.string.minimax_media_share_speech),
