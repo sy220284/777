@@ -45,7 +45,7 @@ import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -222,7 +222,7 @@ private fun WorkTasksScreen(
                     )
                     if (!showCreate && selectedTask == null) {
                         Box(Modifier.align(Alignment.CenterEnd)) {
-                            DsIconButton(
+                            SyIconButton(
                                 icon = FeatherIcons.Plus,
                                 contentDescription = stringResource(R.string.tasks_new),
                                 onClick = { createMenuOpen = true },
