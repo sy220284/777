@@ -77,7 +77,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
                 source?.let { apiKeys.getFor(it.id) }
             } else null
             val suppliedKey = apiKey.ifBlank { inheritedKey.orEmpty() }
-            val draft = resolveLocalModelApiKeyDraft(suppliedKey, normalizeModel(model), baseUrl, protocol,
+            val draft = resolveLocalModelApiKeyDraft(suppliedKey, model.trim(), baseUrl, protocol,
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
@@ -169,7 +169,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
                 apiKeys.getFor(source.id)
             }
         } else null
-        return tester.testStoredRoute(apiKey.ifBlank { sourceKey.orEmpty() }, normalizeModel(model),
+        return tester.testStoredRoute(apiKey.ifBlank { sourceKey.orEmpty() }, model.trim(),
             baseUrl, protocol, saved, apiKeys::getFor, profileId)
     }
 
