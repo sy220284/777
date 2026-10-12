@@ -14,6 +14,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsProgressBar
+import com.labteto.dshmobile.ui.components.DsProgressStatus
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -50,6 +52,14 @@ internal fun LocalSessionStorageCard(
                     ),
                     style = DsType.std14Strong.withReadingWeight(),
                     color = if (status.warning) colors.warnLabel else colors.labelPrimary,
+                )
+                // Design #25: truthful occupancy of the session archive only;
+                // workspace/media/cache breakdowns require separate measured owners.
+                DsProgressBar(
+                    value = sessionStorageUsageFraction(status.totalBytes, status.budgetBytes),
+                    color = if (status.warning) colors.warnLabel else colors.accent,
+                    status = DsProgressStatus.Running,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
                     text = stringResource(
@@ -124,3 +134,8 @@ internal fun formatStorageBytes(bytes: Long): String {
         else -> "$safe B"
     }
 }
+
+/** Inclusive [0, 1] display fraction: zero/invalid budgets cannot produce NaN. */
+internal fun sessionStorageUsageFraction(used: Long, budget: Long): Float =
+    if (budget <= 0L) 0f else (used.coerceAtLeast(0L).toDouble() / budget.toDouble())
+        .coerceIn(0.0, 1.0).toFloat()
