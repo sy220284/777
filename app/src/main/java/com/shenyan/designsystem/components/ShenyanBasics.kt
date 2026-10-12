@@ -15,6 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -190,12 +193,46 @@ fun SyConfirmDialog(title: String, body: String, dangerous: Boolean, onConfirm: 
 }
 
 @Composable
-fun SySearchBar(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedTextField(query, onQueryChange, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-        placeholder = { Text("搜索会话、人物、任务") }, singleLine = true,
+fun SySearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    shortcut: String? = null,
+) {
+    val colors = LocalSyColors.current
+    var focused by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
+            .onFocusChanged { focused = it.isFocused },
+        placeholder = if (placeholder.isBlank()) null else {
+            { Text(placeholder, color = colors.textTertiary) }
+        },
+        leadingIcon = {
+            Icon(Icons.Outlined.Search, contentDescription = null,
+                tint = colors.textTertiary, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = if (shortcut.isNullOrBlank()) null else {
+            { Text(shortcut, style = MaterialTheme.typography.labelSmall,
+                color = colors.textSecondary) }
+        },
+        singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        shape = RoundedCornerShape(SyMetric.radiusControl))
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = colors.surfaceSolid,
+            unfocusedContainerColor = colors.materialL3,
+            focusedBorderColor = colors.primary,
+            unfocusedBorderColor = colors.border,
+            focusedTextColor = colors.text,
+            unfocusedTextColor = colors.text,
+            cursorColor = colors.primary,
+        ),
+    )
 }
 
 @Composable
