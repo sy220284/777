@@ -52,8 +52,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyCheckboxControl
-import com.labteto.dshmobile.ui.components.DsPageEmptyState
-import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -385,14 +385,14 @@ internal fun LocalWorkspaceFilesDialog(
                 ) {
                 when {
                     loading -> {
-                        DsPageLoadingState(
+                        SyLoadingState(
                             icon = FeatherIcons.Folder,
                             label = stringResource(R.string.local_files_loading),
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
                     error != null -> {
-                        DsPageEmptyState(
+                        SyEmptyState(
                             icon = FeatherIcons.AlertTriangle,
                             title = readFilesFailed,
                             body = error.orEmpty(),
@@ -551,7 +551,7 @@ private fun LocalFileList(
     val filesByPath = files.associateBy(LocalWorkspaceFile::path)
     var showInternalOnly by remember(directory, files) { mutableStateOf(false) }
     if (directory.isEmpty() && children == listOf(".adsh") && !showInternalOnly) {
-        DsPageEmptyState(
+        SyEmptyState(
             icon = FeatherIcons.Folder,
             title = stringResource(R.string.local_workspace_internal_only_title),
             body = stringResource(R.string.local_workspace_internal_only_body),
