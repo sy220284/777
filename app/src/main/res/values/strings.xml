@@ -2218,5 +2218,24 @@
     <string name="local_model_policy_known_context">上下文 %1$d Token</string>
     <string name="local_model_policy_unknown_context">上下文容量未确认</string>
     <string name="local_model_policy_work_budget">%1$s · Work 每片 %2$d 次请求</string>
+    <string name="sy_v5_phase_idle">未开始</string>
+    <string name="sy_v5_phase_waiting">等待中</string>
+    <string name="sy_v5_phase_running">执行中</string>
+    <string name="sy_v5_phase_done">已完成</string>
+    <string name="sy_v5_phase_failed">执行失败</string>
+    <string name="sy_v5_phase_cancelled">已取消</string>
+    <string name="sy_v5_phase_blocked">等待批准</string>
+    <string name="sy_v5_session_current">当前会话</string>
+    <string name="sy_v5_persona_unbound">未绑定人物</string>
+    <string name="sy_v5_model_unconfigured">尚未选择模型</string>
+    <string name="sy_v5_chat_mode">聊天模式</string>
+    <string name="sy_v5_work_mode">工作模式</string>
+    <string name="sy_v5_persona_data">人物与资料</string>
+    <string name="sy_v5_new_session">新建会话</string>
+    <string name="sy_v5_gallery">人物图集</string>
+    <string name="sy_v5_tasks">工作与任务</string>
+    <string name="sy_v5_settings">设置</string>
+    <string name="sy_v5_nav_expand">展开导航</string>
+    <string name="sy_v5_nav_collapse">收起导航</string>
 </resources>
 
