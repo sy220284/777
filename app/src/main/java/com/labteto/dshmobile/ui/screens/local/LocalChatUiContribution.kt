@@ -19,6 +19,7 @@ internal fun localChatFeatureUiContribution(
     onPopFeature: () -> Unit,
     sessions: List<LocalSessionSummary>,
     onSwitchSession: (String) -> Boolean,
+    onSwitchSessionFromDrawer: (String) -> Boolean,
     onOpenGroupSetup: () -> Unit,
     onPromptPersonaSave: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
@@ -31,7 +32,7 @@ internal fun localChatFeatureUiContribution(
             LocalFeatureDrawerEntry.GROUP_CHAT to {
                 val establishedSessionId = findEstablishedGroupChatSession(sessions)?.id
                 if (establishedSessionId != null) {
-                    if (onSwitchSession(establishedSessionId) && establishedSessionId == surface.sessionId) {
+                    if (onSwitchSessionFromDrawer(establishedSessionId) && establishedSessionId == surface.sessionId) {
                         onCloseDrawer()
                     }
                 } else {
