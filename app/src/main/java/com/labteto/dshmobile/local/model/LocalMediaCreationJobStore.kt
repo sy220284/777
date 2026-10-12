@@ -23,7 +23,7 @@ enum class LocalMediaCreationPhase { SUBMITTING, OUTCOME_UNKNOWN, FAILED, SUCCEE
 data class LocalMediaCreationJob(
     val id: String,
     val sessionId: String,
-    val kind: LocalMediaKind,
+    val kind: String,
     val provider: String,
     val model: String,
     val prompt: String?,
@@ -68,7 +68,7 @@ class LocalMediaCreationJobStore @Inject constructor(
         LocalMediaCatalog.requireValid(offer)
         val item = LocalMediaCreationJob(
             id = UUID.randomUUID().toString(), sessionId = sessionId,
-            kind = offer.kind, provider = offer.provider.name, model = offer.model,
+            kind = offer.kind.name, provider = offer.provider.name, model = offer.model,
             prompt = prompt?.take(600), createdAtMillis = System.currentTimeMillis(),
         )
         persist(mutableJobs.value + item)
