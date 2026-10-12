@@ -845,6 +845,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
+                        NotificationPostingPermissionCard(deviceCapabilities, viewModel)
                         SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),

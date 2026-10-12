@@ -702,7 +702,7 @@
     <string name="advanced_device_status_error">设备能力检查失败</string>
     <string name="advanced_accessibility_hint">用于执行常规界面点击、输入与导航。</string>
     <string name="advanced_notification_access_hint">任务需要通知上下文时读取本机通知。</string>
-    <string name="advanced_virtual_display_hint">允许设备任务在隔离的虚拟屏幕中持续执行。</string>
+    <string name="advanced_virtual_display_hint">提供隔离虚拟屏 API；实际屏幕捕获或投屏仍需在使用时单独取得授权。</string>
     <string name="advanced_discover_models">发现可用模型</string>
     <string name="advanced_discovering_models">正在发现…</string>
     <string name="advanced_enable_accessibility">开启无障碍控制</string>
@@ -2181,5 +2181,11 @@
     <string name="plugin_transport_all">全部连接</string>
     <string name="plugin_transport_http">HTTP</string>
     <string name="plugin_transport_stdio">stdio</string>
+    <string name="settings_notifications_system_group">系统通知权限</string>
+    <string name="settings_notifications_posting_permission">应用通知</string>
+    <string name="settings_notifications_posting_hint">允许本应用发送任务结果和审批提醒；与读取其他应用通知是两项独立权限。</string>
+    <string name="settings_notifications_open_system">打开通知设置</string>
+    <string name="settings_notifications_only_events">仅事件完成、失败、需要审批等真正需要关注的结果才应触发通知；运行过程的进度刷新不应反复提醒。</string>
+    <string name="settings_device_supported_not_granted">API 可用 · 非屏幕授权</string>
 </resources>
 

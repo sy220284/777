@@ -85,7 +85,7 @@ internal fun DeviceCapabilitiesCard(
     val overallState = when {
         state.loading -> DsStatus.Running
         state.error != null -> DsStatus.Failed
-        state.accessibility && state.notifications && state.virtualDisplay -> DsStatus.Done
+        state.accessibility && state.notifications && state.postingNotifications == true -> DsStatus.Done
         else -> DsStatus.Warning
     }
     val overallLabel = stringResource(
@@ -113,10 +113,20 @@ internal fun DeviceCapabilitiesCard(
             actionLabel = stringResource(R.string.advanced_enable_notifications),
             onAction = viewModel::openNotificationAccessSettings,
         )
+        state.postingNotifications?.let { enabled ->
+            CapabilityRow(
+                label = stringResource(R.string.settings_notifications_posting_permission),
+                enabled = enabled,
+                hint = stringResource(R.string.settings_notifications_posting_hint),
+                actionLabel = stringResource(R.string.settings_notifications_open_system),
+                onAction = viewModel::openAppNotificationSettings,
+            )
+        }
         CapabilityRow(
             label = stringResource(R.string.advanced_virtual_display),
             enabled = state.virtualDisplay,
             hint = stringResource(R.string.advanced_virtual_display_hint),
+            successLabel = stringResource(R.string.settings_device_supported_not_granted),
         )
         DsButton(
             text = stringResource(R.string.common_refresh),
@@ -129,6 +139,28 @@ internal fun DeviceCapabilitiesCard(
     }
 }
 
+/** Screen 28: posting permission is not the notification-listener permission. */
+@Composable
+internal fun NotificationPostingPermissionCard(
+    state: DeviceCapabilitiesState,
+    viewModel: SettingsViewModel,
+) {
+    SettingsCard(stringResource(R.string.settings_notifications_system_group)) {
+        CapabilityRow(
+            label = stringResource(R.string.settings_notifications_posting_permission),
+            enabled = state.postingNotifications == true,
+            hint = stringResource(R.string.settings_notifications_posting_hint),
+            actionLabel = stringResource(R.string.settings_notifications_open_system),
+            onAction = viewModel::openAppNotificationSettings,
+        )
+        Text(
+            stringResource(R.string.settings_notifications_only_events),
+            style = DsType.caption11.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+        )
+    }
+}
+
 @Composable
 private fun CapabilityRow(
     label: String,
@@ -136,6 +168,7 @@ private fun CapabilityRow(
     hint: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    successLabel: String? = null,
 ) {
     val colors = DsTheme.colors
     Row(
@@ -152,7 +185,7 @@ private fun CapabilityRow(
         }
         if (enabled) {
             Text(
-                stringResource(R.string.advanced_available),
+                successLabel ?: stringResource(R.string.advanced_available),
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.success,
             )
