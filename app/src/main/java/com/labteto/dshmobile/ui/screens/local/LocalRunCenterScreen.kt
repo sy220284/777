@@ -38,7 +38,7 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsComposerField
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.shenyan.designsystem.components.SyEmptyState
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -611,7 +611,7 @@ internal fun LocalRunCenterScreen(
                 }
             },
         ) {
-            DsComposerField(
+            SyComposerField(
                 value = agentTask,
                 onValueChange = {
                     agentTask = it
