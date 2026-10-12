@@ -40,6 +40,8 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.onNodeWithText(context.getString(R.string.local_project_management_title)).assertExists()
         compose.onNodeWithText(context.getString(R.string.local_run_center)).assertExists()
         compose.onNodeWithText(context.getString(R.string.chatlist_workspace_files)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.local_drawer_projects_plain_hint)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_drawer_workspace_plain_hint)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.tasks_title)).assertExists()
         compose.onNodeWithText(context.getString(R.string.tools_title)).performClick()
         compose.runOnIdle { assertEquals(1, openToolsCount) }
