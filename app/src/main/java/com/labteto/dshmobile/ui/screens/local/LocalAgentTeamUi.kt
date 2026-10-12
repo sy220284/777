@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -87,10 +88,12 @@ internal fun LocalAgentSwarmLaunchEntry(
         tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.padding(
-                horizontal = DsSpacing.medium,
-                vertical = DsSpacing.small,
-            ),
+            modifier = Modifier
+                .heightIn(min = 72.dp)
+                .padding(
+                    horizontal = DsSpacing.medium,
+                    vertical = DsSpacing.small,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
