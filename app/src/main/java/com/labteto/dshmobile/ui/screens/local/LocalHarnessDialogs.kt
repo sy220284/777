@@ -86,34 +86,21 @@ internal fun NewSessionModeDialog(
     onSelect: (LocalConversationMode) -> Unit,
     projectAvailable: Boolean = true,
 ) {
-    val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
     SyResponsiveSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
     ) {
-        if (!chatMode) {
-            Text(
-                stringResource(R.string.local_new_session_dialog_intro),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-            )
-        }
         SySheetChoiceRow(
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_continue
                 else R.string.local_new_session_continue,
-            ),
-            subtitle = stringResource(
-                if (chatMode) R.string.local_new_session_chat_continue_hint
-                else R.string.local_new_session_continue_hint,
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
         if (!chatMode && projectAvailable) {
             SySheetChoiceRow(
                 title = stringResource(R.string.local_project_start_work_session),
-                subtitle = stringResource(R.string.local_project_new_session_hint),
                 onClick = { onSelect(LocalConversationMode.PROJECT) },
             )
         }
@@ -121,10 +108,6 @@ internal fun NewSessionModeDialog(
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_new
                 else R.string.local_new_session_independent,
-            ),
-            subtitle = stringResource(
-                if (chatMode) R.string.local_new_session_chat_independent_hint
-                else R.string.local_new_session_independent_hint,
             ),
             onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
         )
