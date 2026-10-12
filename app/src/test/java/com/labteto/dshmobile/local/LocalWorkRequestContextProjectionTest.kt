@@ -396,4 +396,25 @@ class LocalWorkRequestContextProjectionTest {
         put("role", role)
         put("content", content)
     }
+    @Test
+    fun calibratedWorkPlanningScalesSoftPressureWithoutLosingFullMessages() {
+        val messages = listOf(
+            message("system", "稳定系统提示"),
+            message("user", "校准只影响压缩时机，不应该动正文"),
+        )
+        val baseline = LocalPromptPressureMeter.measure(messages, JsonArray(emptyList()), 192_000)
+        val projected = projectWorkRequestContext(
+            messages = messages,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(summaries = LocalFeatureHistorySummaries),
+            operationalLimitTokens = 192_000,
+            measuredPressure = baseline,
+            softProjectionScale = 0.75,
+        )
+        assertEquals(false, projected.projected)
+        assertEquals((baseline.estimatedInputTokens * 0.75).toInt(), projected.estimatedTokensBefore)
+        assertEquals(messages, projected.messages)
+    }
+
+
 }
