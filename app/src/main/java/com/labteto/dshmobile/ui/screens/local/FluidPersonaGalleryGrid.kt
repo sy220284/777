@@ -60,7 +60,9 @@ private fun FluidPersonaGalleryCard(entry: PersonaGalleryEntry, onClick: () -> U
                 val portrait = image
                 if (portrait != null) Image(portrait, entry.persona.name, contentScale = ContentScale.Fit)
                 else Box(contentAlignment = Alignment.Center) {
-                    Text(entry.persona.name.take(1), style = DsType.largeTitle28, color = colors.characterAccent)
+                    Text(entry.persona.name.let { name ->
+                        if (name.isEmpty()) "" else String(Character.toChars(name.codePointAt(0)))
+                    }, style = DsType.largeTitle28, color = colors.characterAccent)
                 }
             }
             Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {

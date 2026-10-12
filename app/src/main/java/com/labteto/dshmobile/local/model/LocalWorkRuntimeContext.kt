@@ -21,6 +21,8 @@ internal fun withWorkRuntimeContext(
         resolveLocalModelProtocol(it.authKind, it, routedModel, baseUrl)
     }
     val runtime = buildString {
+        appendLine(WORK_USER_DIRECTIVE_PRIORITY)
+        appendLine()
         appendLine("【当前运行时事实】")
         appendLine("- 产品：777 本机 Harness · 工作模式")
         appendLine("- 工作区：$workspacePath")

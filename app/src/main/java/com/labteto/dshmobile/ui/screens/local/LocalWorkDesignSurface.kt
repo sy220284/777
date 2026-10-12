@@ -61,13 +61,22 @@ internal fun LocalWorkDesignSurface(
     var artifacts by remember(sessionId) { mutableStateOf<List<LocalArtifactUiItem>>(emptyList()) }
     var outputError by remember(sessionId) { mutableStateOf(false) }
     var refresh by remember(sessionId) { mutableStateOf(0) }
-    LaunchedEffect(sessionId, section, projected.running, projected.todos, refresh) {
+    LaunchedEffect(sessionId, section, refresh) {
         if (section != 4) return@LaunchedEffect
-        try {
-            artifacts = withContext(Dispatchers.IO) { actions.artifactsForUi(sessionId) }
-            outputError = false
-        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: Exception) { outputError = true }
+        var lastSequence = Long.MIN_VALUE
+        while (true) {
+            try {
+                val snapshot = withContext(Dispatchers.IO) {
+                    val sequence = actions.eventSequenceForUi(sessionId)
+                    sequence to if (sequence != lastSequence) actions.artifactsForUi(sessionId) else null
+                }
+                snapshot.second?.let { artifacts = it }
+                lastSequence = snapshot.first
+                outputError = false
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { outputError = true }
+            kotlinx.coroutines.delay(750)
+        }
     }
     LaunchedEffect(sessionId, state?.pendingQuestion?.callId, state?.pendingApproval?.callId) {
         if (state?.pendingQuestion != null || state?.pendingApproval != null) onSelectSection(2)
@@ -77,8 +86,8 @@ internal fun LocalWorkDesignSurface(
         .map { stringResource(it) }
     val counts = listOf(state?.goal?.let { 1 } ?: 0, state?.plan?.size ?: 0,
         (if (state?.pendingQuestion != null) 1 else 0) + (if (state?.pendingApproval != null) 1 else 0),
-        state?.todos?.size ?: 0)
-        .map { stringResource(R.string.fluid_item_count, it) } +
+        )
+        .map { stringResource(R.string.fluid_item_count, it) } + listOf("—") +
         listOf(if (section == 4) stringResource(R.string.fluid_item_count, artifacts.size) else "—")
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         Column(Modifier.padding(horizontal = DsSpacing.medium),

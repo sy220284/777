@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
@@ -100,10 +101,11 @@ internal fun FluidSectionNavigation(
 @Composable
 internal fun FluidSectionSwap(section: Int, modifier: Modifier = Modifier,
     content: @Composable (Int) -> Unit) {
+    val offset = with(LocalDensity.current) { 60.dp.roundToPx() }
     AnimatedContent(targetState = section, modifier = modifier, label = "fluidSectionSwap",
         transitionSpec = {
             val direction = if (targetState > initialState) 1 else -1
-            (slideInHorizontally(DsAnimations.featurePagePeer) { direction * 60 } + fadeIn(tween(380)))
-                .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * 60 } + fadeOut(tween(140)))
+            (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
+                .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
         }, content = { content(it) })
 }

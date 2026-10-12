@@ -95,7 +95,13 @@ internal fun LocalRunCenterScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
-    var boardSection by rememberSaveable(state.sessionId) { mutableStateOf(0) }
+    var boardSection by rememberSaveable(state.sessionId) {
+        mutableStateOf(when {
+            state.pendingQuestion != null || state.pendingApproval != null || state.jobs.any { it.needsUserAttention() } -> 1
+            state.running || state.jobs.any { it.status == "running" } -> 0
+            else -> 2
+        })
+    }
     var showFullHistory by remember(state.sessionId) { mutableStateOf(false) }
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
