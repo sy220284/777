@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
 
 /**
  * One field-level authority policy for all post-turn updates.

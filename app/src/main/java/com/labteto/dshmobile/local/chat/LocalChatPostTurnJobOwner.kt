@@ -64,7 +64,7 @@ internal object LocalChatPostTurnJobOwner {
             queued = null
             taken
         }
-        jobs.forEach(Job::cancel)
+        jobs.forEach { it.cancel() }
         return jobs.isNotEmpty()
     }
 
