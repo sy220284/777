@@ -139,7 +139,6 @@ internal fun LocalWorkHistorySheet(
                                 { selected = record }, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small)
                         }
                     }
-                    }
                 }
                 }
             }
