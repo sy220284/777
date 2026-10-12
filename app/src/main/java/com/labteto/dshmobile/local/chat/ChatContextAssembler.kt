@@ -15,11 +15,11 @@ internal object ChatMemorySelector {
         val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
             .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
             .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
-        val unresolved = context.continuity.unfinished.takeLast(2)
         val referents = if (text in LOW_INFORMATION_REPLIES ||
             IMPLICIT_CONTINUITY_HINTS.any(text::contains)) {
-            ongoing.ifEmpty { context.continuity.recentEvents.takeLast(1) +
-                context.continuity.decisions.takeLast(1) } + unresolved
+            // The discourse referent comes from lived conversation, not every old to-do.
+            ongoing.ifEmpty { listOf(context.attention.lastUserSubject).filter(String::isNotBlank) }
+                .ifEmpty { context.continuity.recentEvents.takeLast(1) }
         } else emptyList()
         return (listOf(text) + referents).filter(String::isNotBlank).distinct()
             .joinToString(" ").takeLast(1_200)
@@ -31,25 +31,13 @@ internal object ChatMemorySelector {
         return candidate.takeIf { it.length >= 2 && it.trim() !in LOW_INFORMATION_REPLIES }
     }
 
-    /** A topic shift changes present attention, not the durable history of the story. */
-    fun isExplicitTopicShift(query: String): Boolean {
-        val text = query.trim()
-        return RESET_HINTS.any(text::contains) ||
-            Regex("""(?:别|不要|先别|不想)(?:再)?(?:提|聊|说)[^，。！？\n]{1,24}""").containsMatchIn(text)
-    }
+    /** One policy is used for chat generation, recall and scheduled proactive messages. */
+    fun isExplicitTopicShift(query: String): Boolean =
+        ChatTurnContextPolicy.isTopicRedirect(query)
 
-    /** Recall unfinished business only when the user's actual subject overlaps that business. */
-    fun isRelevantToTurn(query: String, fact: String): Boolean {
-        val a = query.trim().lowercase()
-            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
-        val b = fact.trim().lowercase()
-            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
-        if (a.length < 4 || b.length < 4 || isExplicitTopicShift(query)) return false
-        val left = (0 until a.length - 1).mapTo(linkedSetOf()) { a.substring(it, it + 2) }
-        val right = (0 until b.length - 1).mapTo(linkedSetOf()) { b.substring(it, it + 2) }
-        val overlap = left.count(right::contains)
-        return overlap >= 2 && overlap.toDouble() / minOf(left.size, right.size) >= 0.28
-    }
+    fun isRelevantToTurn(query: String, fact: String): Boolean =
+        ChatTurnContextPolicy.relevant(query, fact)
+
 
     fun shouldRecall(query: String): Boolean {
         val text = query.trim().lowercase()
@@ -77,6 +65,7 @@ internal object ChatMemorySelector {
             context.pendingForRequest(limit = 8).sortedBy(ChatPendingTurn::sequence)
                 .lastOrNull { it.userMessage.isNotBlank() && it.userMessage.trim() != query.trim() }
                 ?.userMessage
+                ?: context.attention.lastUserSubject.takeIf(String::isNotBlank)
                 ?: context.continuity.unfinished.lastOrNull()
                 ?: context.continuity.decisions.lastOrNull()
                 ?: context.continuity.recentEvents.lastOrNull()
