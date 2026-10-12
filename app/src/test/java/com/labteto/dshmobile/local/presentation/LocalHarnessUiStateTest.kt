@@ -135,12 +135,79 @@ class LocalHarnessUiStateTest {
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
         val workOnlyUpdate = base.copy(
-            modelState = base.modelState.copy(model = "another-model"),
             work = LocalWorkState(planMode = true),
             safeAutoApprovalEnabled = true,
             kernel = base.kernel.copy(contextChars = 48_000, queuedInputCount = 4),
         )
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
+    }
+
+    @Test
+    fun configuredCreativeAccountsReachChatAndWorkMessageMediaEntry() {
+        val miniMax = com.labteto.dshmobile.local.model.LocalModelProfile(
+            id = "minimax-account",
+            model = "MiniMax-M2.7",
+            baseUrl = "https://api.minimaxi.com/v1",
+        )
+        val openAi = com.labteto.dshmobile.local.model.LocalModelProfile(
+            id = "openai-account",
+            model = "gpt-6",
+            baseUrl = "https://api.openai.com/v1",
+        )
+        val state = LocalHarnessState(
+            usageMode = LocalUsageMode.CHAT,
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(
+                configured = true,
+                model = miniMax.model,
+                baseUrl = miniMax.baseUrl,
+                modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(
+                    listOf(miniMax, openAi), miniMax.id,
+                ),
+            ),
+        )
+        val chat = state.toChatSurfaceUiState()
+        val work = state.toWorkSurfaceUiState()
+
+        assertEquals(state.modelProfiles, chat.modelProfiles)
+        assertEquals(state.modelProfiles, work.modelProfiles)
+        assertEquals(state.modelState.model, chat.model)
+        assertEquals(state.modelState.baseUrl, chat.baseUrl)
+        assertEquals(work.model, chat.model)
+        assertEquals(work.baseUrl, chat.baseUrl)
+        val offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(chat.modelProfiles)
+        assertTrue(offers.any {
+            it.profile.id == miniMax.id &&
+                it.kind == com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE
+        })
+        assertTrue(offers.any {
+            it.profile.id == miniMax.id &&
+                it.kind == com.labteto.dshmobile.local.model.LocalMediaKind.VIDEO
+        })
+        assertTrue(offers.any {
+            it.profile.id == openAi.id &&
+                it.kind == com.labteto.dshmobile.local.model.LocalMediaKind.SPEECH
+        })
+        assertEquals(offers, com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(work.modelProfiles))
+    }
+
+    @Test
+    fun chatMediaEntryTracksModelConfigurationChanges() {
+        val profile = com.labteto.dshmobile.local.model.LocalModelProfile(
+            id = "minimax-account",
+            model = "MiniMax-M2.7",
+            baseUrl = "https://api.minimaxi.com/v1",
+        )
+        val before = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
+        val after = before.copy(modelState = before.modelState.copy(
+            model = profile.model,
+            baseUrl = profile.baseUrl,
+            modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(
+                listOf(profile), profile.id,
+            ),
+        ))
+        assertTrue(before.toChatSurfaceUiState().modelProfiles.isEmpty())
+        assertNotEquals(before.toChatSurfaceUiState(), after.toChatSurfaceUiState())
+        assertEquals(listOf(profile), after.toChatSurfaceUiState().modelProfiles)
     }
 
     @Test
