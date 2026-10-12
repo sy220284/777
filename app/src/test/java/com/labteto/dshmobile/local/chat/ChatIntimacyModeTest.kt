@@ -60,6 +60,8 @@ class ChatIntimacyModeTest {
         val prompt = mode.prompt("过来抱住我亲一下", ChatCharacterState())
         assertTrue(prompt.contains("【亲密姿态连续性】"))
         assertTrue(prompt.contains("避免连续多轮复用"))
+        assertTrue(prompt.contains("【身体反应强度】当前=5/5"))
+        assertTrue(prompt.contains("呼吸停顿或变化"))
     }
 
 
@@ -122,6 +124,7 @@ class ChatIntimacyModeTest {
             assertTrue(message, prompt.contains("【亲密模式】"))
             assertTrue(message, prompt.contains("当前=5/5"))
             assertTrue(message, prompt.contains("【亲密姿态连续性】"))
+            assertTrue(message, prompt.contains("【身体反应强度】当前=5/5"))
         }
     }
 
@@ -169,6 +172,30 @@ class ChatIntimacyModeTest {
         assertEquals(ChatInteractionIntent.NORMAL.name, current.interactionIntent)
         assertEquals(0, current.interactionIntensity)
         assertEquals("", mode.prompt("今天工作怎么样", current))
+    }
+
+    @Test
+    fun maximumBodyReactionGuidanceAppearsOnlyAtIntimateLevel() {
+        val intimate = mode.prompt("她轻抚我的脸颊", ChatCharacterState())
+        assertTrue(intimate.contains("【身体反应强度】当前=5/5"))
+        assertTrue(intimate.contains("可观察反馈"))
+        assertTrue(intimate.contains("不把身体反射当作同意"))
+
+        val flirting = mode.prompt("今晚撩我一下", ChatCharacterState())
+        assertTrue(flirting.contains("【互动强度】"))
+        assertFalse(flirting.contains("【身体反应强度】"))
+
+        val neutral = mode.prompt("今天工作怎么样", ChatCharacterState())
+        assertEquals("", neutral)
+        assertFalse(neutral.contains("身体反应强度"))
+
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+        )
+        assertTrue(mode.prompt("继续刚才的", previous).contains("【身体反应强度】当前=5/5"))
+        assertEquals("", mode.prompt("换个话题，说正事", previous))
     }
 
     @Test
