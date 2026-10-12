@@ -193,6 +193,7 @@ fun LocalHarnessScreen(
     var settledSessionId by rememberSaveable { mutableStateOf("") }
     var settledUsageMode by rememberSaveable { mutableStateOf("") }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
@@ -255,6 +256,7 @@ fun LocalHarnessScreen(
     }
 
     fun openFeatureFromDrawer(page: LocalFeaturePage) {
+        conversationOpenedFromDrawer = false
         val navigation = localFeatureOpenFromDrawer(
             stack = featureStack,
             originStack = drawerFeatureOriginStack,
@@ -283,8 +285,12 @@ fun LocalHarnessScreen(
         featureStack = localFeatureHome()
     }
 
-    fun switchToSessionAndShowConversation(sessionId: String): Boolean {
+    fun switchToSessionAndShowConversation(
+        sessionId: String,
+        fromDrawer: Boolean = false,
+    ): Boolean {
         val accepted = viewModel.switchSession(sessionId)
+        if (accepted) conversationOpenedFromDrawer = fromDrawer
         if (accepted && sessionId == shell.sessionId) {
             // Tapping the current conversation must return to its conversation surface.
             resetFeatureNavigation()
@@ -536,7 +542,8 @@ fun LocalHarnessScreen(
             onNewPersona = { showNewPersona = true },
             onPopFeature = ::popFeature,
             sessions = shell.sessions,
-            onSwitchSession = ::switchToSessionAndShowConversation,
+            onSwitchSession = { switchToSessionAndShowConversation(it) },
+            onSwitchSessionFromDrawer = { switchToSessionAndShowConversation(it, fromDrawer = true) },
             onOpenGroupSetup = {
                 groupSetupOpenedFromDrawer = true
                 showGroupSetup = true
@@ -718,6 +725,13 @@ fun LocalHarnessScreen(
     BackHandler(enabled = !syWideViewport && drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
+    BackHandler(
+        enabled = !syWideViewport && !drawerState.isOpen &&
+            featurePage == LocalFeaturePage.HOME && conversationOpenedFromDrawer,
+    ) {
+        conversationOpenedFromDrawer = false
+        scope.launch { drawerState.open() }
+    }
 
     PredictiveBackHandler(
         enabled = (syWideViewport || !drawerState.isOpen) && featurePage != LocalFeaturePage.HOME,
@@ -786,7 +800,7 @@ fun LocalHarnessScreen(
                 },
                 onSwitchSession = { sessionId ->
                     // Different sessions close the drawer only once the shell activates them.
-                    switchToSessionAndShowConversation(sessionId)
+                    switchToSessionAndShowConversation(sessionId, fromDrawer = true)
                 },
                 onDeleteSessions = ::deleteSessionsAndNavigate,
                 onRenameSession = viewModel::renameSession,
@@ -976,6 +990,7 @@ fun LocalHarnessScreen(
                 onNewSingle = {
                     if (viewModel.createSingleChatSession()) {
                         showNewSessionMode = false
+                        conversationOpenedFromDrawer = newSessionOpenedFromDrawer
                         newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
@@ -989,6 +1004,7 @@ fun LocalHarnessScreen(
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
                         showNewSessionMode = false
+                        conversationOpenedFromDrawer = newSessionOpenedFromDrawer
                         newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
@@ -1016,6 +1032,8 @@ fun LocalHarnessScreen(
                 val created = viewModel.createGroupChatSession(ids)
                 if (created) {
                     showGroupSetup = false
+                    conversationOpenedFromDrawer = groupSetupOpenedFromDrawer
+                    groupSetupOpenedFromDrawer = false
                     // Wait for the committed group session before resetting feature navigation.
                 }
                 created
