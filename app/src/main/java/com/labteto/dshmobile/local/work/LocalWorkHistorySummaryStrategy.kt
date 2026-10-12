@@ -132,17 +132,32 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             constraintReset -> previousConstraintEpoch + 1L
             else -> previousConstraintEpoch
         }
-        // Explicit revocation invalidates the *old* checkpoint. It must not become valid
-        // again merely because a second compaction no longer sees the revocation text.
+        // A scoped edit is authoritative only if the user quoted the precise superseded
+        // requirement. Preserve tombstones across compactions; do not revoke unrelated rules.
+        val currentScopedEdits = extractionMessages
+            .drop(if (lastConstraintReset >= 0) lastConstraintReset else 0)
+            .asSequence()
+            .filter { it["role"].asText() == "user" }
+            .mapNotNull(::messageText)
+            .mapNotNull(::parseLocalWorkScopedConstraintEdit)
+            .toList()
+        val revokedConstraints = (
+            (if (constraintReset) emptyList() else previousCheckpoint?.revokedConstraints.orEmpty()) +
+                structuredWorkState?.revokedConstraints.orEmpty() +
+                currentScopedEdits.map(LocalWorkScopedConstraintEdit::previous)
+            ).map(String::trim).filter(String::isNotBlank).distinct().takeLast(64)
+        val explicitReplacements = currentScopedEdits.mapNotNull(LocalWorkScopedConstraintEdit::replacement)
         val constraints = mergeStructured(
             structuredWorkState?.constraints.orEmpty() +
+                explicitReplacements +
                 if (constraintReset) emptyList() else previousCheckpoint?.constraints.orEmpty(),
             if (constraintReset && lastConstraintReset < 0) emptyList() else
                 select(role = "user", cues = WORK_CONSTRAINT_CUES, maxItems = 6,
                     constraintsAfterResetOnly = true)
-                    .filterNot { isExplicitWorkConstraintReset(it) && !hasNewWorkConstraintAfterReset(it) },
-            maxItems = 8,
-        )
+                    .filterNot { isExplicitWorkConstraintReset(it) && !hasNewWorkConstraintAfterReset(it) }
+                    .filterNot { parseLocalWorkScopedConstraintEdit(it) != null },
+            maxItems = 16,
+        ).filterNot { isRevokedWorkConstraint(it, revokedConstraints) }.takeLast(8)
         val failures = mergeStructured(
             structuredWorkState?.failures.orEmpty() + previousCheckpoint?.failures.orEmpty(),
             select(cues = WORK_FAILURE_CUES, maxItems = 4),
@@ -245,6 +260,7 @@ internal object LocalWorkHistorySummaryStrategy : com.labteto.dshmobile.local.mo
             decisions = decisions,
             decisionEpoch = decisionEpoch,
             constraintEpoch = constraintEpoch,
+            revokedConstraints = revokedConstraints,
             userDecisionsVerified = true,
             failures = failures,
             unfinished = unfinished,
