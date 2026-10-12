@@ -309,7 +309,7 @@ internal fun LocalModelSettingsCard(
             scrollable = true,
             footer = {
                 DsButton(stringResource(R.string.advanced_save_model_settings), onClick = {
-                    if (!savedRoute && apiKey.isBlank()) {
+                    if (!savedRoute && apiKey.isBlank() && credentialSourceProfileId == null) {
                         testStatus = "请填写该模型的密钥"
                     } else {
                         saving = true
@@ -495,10 +495,11 @@ internal fun LocalModelSettingsCard(
                         val testedKey = apiKey
                         val testedProtocol = protocol
                         val testedProfileId = editingProfileId
+                        val testedCredentialSourceProfileId = credentialSourceProfileId
                         val testedGeneration = editorGeneration
                         scope.launch {
                             try {
-                                val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId)
+                                val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId, testedCredentialSourceProfileId)
                                 if (showEditor && editorGeneration == testedGeneration) testStatus = result
                             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                 throw cancelled
