@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
+import com.shenyan.designsystem.foundation.LocalSyColors
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -58,15 +59,15 @@ internal fun FluidSectionNavigation(
     tag: String = "fluidSection",
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyColors.current
     val pulse = rememberHapticPulse()
     val tabs: @Composable () -> Unit = {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (numbered) 5.dp else 2.dp)) {
         labels.forEachIndexed { index, label ->
             val active = index == selected
             val fill by animateColorAsState(
-                if (active && numbered) colors.accentTertiary
-                else if (active) colors.bgLayer1
-                else if (numbered) colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+                if (active) colors.accentTertiary
+                else if (numbered) sy.materialL1
                 else androidx.compose.ui.graphics.Color.Transparent,
                 tween(if (numbered) 140 else 200), label = "sectionFill",
             )
@@ -100,7 +101,7 @@ internal fun FluidSectionNavigation(
     }
     }
     if (numbered) tabs() else Surface(
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = sy.materialL2,
         shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, colors.borderL1),
     ) { tabs() }
 }
