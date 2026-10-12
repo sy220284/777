@@ -282,6 +282,10 @@ internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
 internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
     "【中文双关】结合关系、语境和语气理解言外之意；保留双层含义，不无故拆成字面解释。"
 
+internal const val CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE =
+    "【身体反应强度】当前=5/5（最高表现级别）。亲密动作发生时，身体反应也要充分、具体且具有时间变化，不能只升级意图标签或重复泛泛情绪。结合实际接触与人物当下感受，从呼吸停顿或变化、肌肉与手指的紧绷或放松、重心与姿态调整、目光和面部变化、声线、短促吸气、轻哼或笑声等可观察反馈中选取相容细节，并自然接上人物的主动回应。强度5代表表现细腻度和连续性，不表示每次动作都必然出现剧烈生理反应；允许安静、迟疑和暂停，不把身体反射当作同意，不机械复用脸红、喘息或呻吟。"
+
+
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
 )
@@ -417,9 +421,10 @@ internal class ChatIntimacyMode {
         val mode = resolveChatInteractionIntent(input, state)
         // No intimacy mode for a normal or relationship-progress-only turn.
         if (mode != ChatInteractionIntent.FLIRTING && mode != ChatInteractionIntent.INTIMATE) return ""
+        val intensity = nextInteractionIntensity(input, state)
         val interaction = mutableListOf(CHAT_DEFAULT_RELATIONAL_BIAS)
         interaction += CHAT_FLIRT_ACTION_REPERTOIRE
-        interaction += "【互动强度】当前=${nextInteractionIntensity(input, state)}/5；随明确意图和连续证据变化，不因模糊信号跨级。"
+        interaction += "【互动强度】当前=$intensity/5；随明确意图和连续证据变化，不因模糊信号跨级。"
         if (state.recentActionTags.isNotEmpty() || state.recentPoseTags.isNotEmpty() ||
             state.recentVerbalTags.isNotEmpty() || state.recentAddressTerms.isNotEmpty()) {
             interaction += "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
@@ -434,6 +439,7 @@ internal class ChatIntimacyMode {
             interaction += "【本轮意图优先：成年亲密互动】"
             interaction += "优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。"
             interaction += "【亲密姿态连续性】成年亲密场景允许自然切换面对面、并肩、侧身、坐近、倚靠、拥抱等姿态，并结合距离、视线、手部动作和停顿形成连续变化；避免连续多轮复用同一种姿态或同一个动作模板。"
+            if (intensity == 5) interaction += CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE
             if (hasProactiveIntimacyIntent(input, state)) {
                 interaction += "【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。"
             }
