@@ -40,6 +40,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.ui.shenyan.SySegment
@@ -60,12 +62,11 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun AppearanceReadingPreview() {
     val colors = DsTheme.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD), DsShapes.block)
-            .border(1.dp, colors.borderL2, DsShapes.block)
-            .padding(DsSpacing.medium),
+    SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
+        horizontalPadding = DsSpacing.medium,
+        verticalPadding = DsSpacing.medium,
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(

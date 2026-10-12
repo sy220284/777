@@ -77,6 +77,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -1093,21 +1095,18 @@ internal fun SettingsCard(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    val colors = DsTheme.colors
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         SettingsGroupTitle(title)
-        Surface(
+        // The settings groups sample the same V6 wallpaper / light field as the page.
+        // Keep content crisp; only the material backing layer is blurred.
+        SyMaterialFrame(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-            tonalElevation = 0.dp,
+            tier = SyMaterialTier.L3_CARD,
+            horizontalPadding = DsSpacing.medium,
+            verticalPadding = DsSpacing.medium,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                content()
-            }
+            content()
         }
     }
 }

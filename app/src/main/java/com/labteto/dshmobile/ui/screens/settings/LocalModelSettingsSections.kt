@@ -56,6 +56,8 @@ import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -645,10 +647,11 @@ internal fun DeepSeekPricingCard(
         )
 
         state.models.forEach { model ->
-            Surface(
+            SyMaterialFrame(
                 modifier = Modifier.fillMaxWidth(),
-                shape = DsShapes.block,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                tier = SyMaterialTier.L3_CARD,
+                horizontalPadding = 0.dp,
+                verticalPadding = 0.dp,
             ) {
                 Column(
                     modifier = Modifier.padding(DsSpacing.medium),

@@ -35,6 +35,8 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.local.model.chatgpt.shouldRequestChatGptPlanConsent
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -101,10 +103,11 @@ internal fun ChatGptAccountPanel(
     val authorizationCanRestart = state.phase == ChatGptAuthPhase.PREPARING ||
         state.phase == ChatGptAuthPhase.WAITING_FOR_BROWSER
 
-    Surface(
+    SyMaterialFrame(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        tier = SyMaterialTier.L3_CARD,
+        horizontalPadding = 0.dp,
+        verticalPadding = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
