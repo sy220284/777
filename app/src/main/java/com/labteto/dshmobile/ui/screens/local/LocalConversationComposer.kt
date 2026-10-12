@@ -48,8 +48,8 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -271,7 +271,7 @@ internal fun LocalConversationComposer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_team_title),
                     selected = true,
                 )
@@ -281,7 +281,7 @@ internal fun LocalConversationComposer(
                     color = colors.labelSecondary,
                     modifier = Modifier.weight(1f),
                 )
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.X,
                     contentDescription = stringResource(R.string.local_team_mode_clear),
                     onClick = onClearTeamDispatch,
@@ -296,12 +296,12 @@ internal fun LocalConversationComposer(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_work_next_turn),
                     selected = !steerCurrentRun,
                     onClick = { steerCurrentRun = false },
                 )
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_work_steer_now),
                     selected = steerCurrentRun,
                     onClick = { steerCurrentRun = true },
@@ -470,7 +470,7 @@ private fun ImportedImageAttachmentTile(
                 modifier = Modifier.fillMaxWidth().size(88.dp).clip(DsShapes.block),
             )
         }
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove),
             onClick = onRemove,
