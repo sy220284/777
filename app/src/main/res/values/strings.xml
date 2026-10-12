@@ -2196,5 +2196,8 @@
     <string name="tasks_chat_filter_current">当前会话 · %1$d</string>
     <string name="tasks_chat_filter_empty">当前会话没有安排事件。切换到“全部事件”可以查看其他会话的计划。</string>
     <string name="local_model_inventory_summary">已配置 %1$d 个 API 模型 · 使用中 %2$d 个</string>
+    <string name="settings_update_installed_version">当前版本：%1$s（构建 %2$d）</string>
+    <string name="settings_update_not_checked">尚未执行版本检查</string>
+    <string name="settings_update_action_description">仅在点击后检查更新。发现可安装版本时，沿用应用已有的下载安装与确认流程。</string>
 </resources>
 

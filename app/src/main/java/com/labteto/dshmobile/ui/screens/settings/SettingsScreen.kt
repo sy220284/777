@@ -128,6 +128,7 @@ enum class SettingsDestination {
     ADVANCED,
     SESSION_STORAGE,
     DIAGNOSTICS,
+    UPDATE,
 }
 
 internal fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
@@ -143,7 +144,8 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.MEMORY,
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
-    SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.ADVANCED,
+    SettingsDestination.UPDATE -> SettingsDestination.ROOT
     SettingsDestination.MEMORY_SETTINGS,
     SettingsDestination.MEMORY_MANAGEMENT -> SettingsDestination.MEMORY
     SettingsDestination.CHAT -> SettingsDestination.SESSION
@@ -372,6 +374,7 @@ fun SettingsScreen(
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
         SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
+        SettingsDestination.UPDATE -> stringResource(R.string.settings_update_check)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -464,7 +467,8 @@ fun SettingsScreen(
                                 value = stringResource(when {
                                     deviceCapabilities.loading -> R.string.common_loading
                                     deviceCapabilities.error != null -> R.string.settings_permissions_check_failed
-                                    deviceCapabilities.accessibility && deviceCapabilities.notifications && deviceCapabilities.virtualDisplay -> R.string.settings_permissions_ready
+                                    deviceCapabilities.accessibility && deviceCapabilities.notifications &&
+                                        deviceCapabilities.postingNotifications == true -> R.string.settings_permissions_ready
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
                                 onClick = { page = SettingsDestination.PERMISSIONS },
@@ -482,7 +486,7 @@ fun SettingsScreen(
                                 icon = FeatherIcons.RefreshCw,
                                 title = stringResource(R.string.settings_update_check),
                                 value = updateStatus,
-                                onClick = onCheckUpdate,
+                                onClick = { page = SettingsDestination.UPDATE },
                                 compact = true,
                             )
                         }
@@ -918,6 +922,36 @@ fun SettingsScreen(
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onCleanup = onClose,
                         )
+                    }
+
+                    SettingsDestination.UPDATE -> {
+                        SettingsCard(stringResource(R.string.settings_update_check)) {
+                            Text(
+                                stringResource(
+                                    R.string.settings_update_installed_version,
+                                    BuildConfig.VERSION_NAME,
+                                    BuildConfig.VERSION_CODE,
+                                ),
+                                style = DsType.std14Strong.withReadingWeight(),
+                                color = colors.labelPrimary,
+                            )
+                            Text(
+                                updateStatus ?: stringResource(R.string.settings_update_not_checked),
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                            Text(
+                                stringResource(R.string.settings_update_action_description),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelTertiary,
+                            )
+                            DsButton(
+                                text = stringResource(R.string.settings_update_check),
+                                onClick = onCheckUpdate,
+                                variant = DsButtonVariant.Primary,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
 
                     SettingsDestination.DIAGNOSTICS -> {
