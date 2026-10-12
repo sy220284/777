@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -375,7 +376,9 @@ fun DsPopupMenu(
                     onDismiss()
                     item.onClick()
                 },
-                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(DsShapes.row),
+                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget)
+                    .clip(DsShapes.row)
+                    .testTag("menu-item:" + item.text),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
             )
         }
