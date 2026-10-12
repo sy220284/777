@@ -200,6 +200,8 @@ fun LocalHarnessScreen(
     var settingsEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var drawerGalleryTargetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var drawerGalleryEntryVersion by rememberSaveable { mutableIntStateOf(0) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var installedSkillDisplayNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -537,6 +539,8 @@ fun LocalHarnessScreen(
         ),
         localChatFeatureUiContribution(
             gallery = gallery,
+            initialGalleryEntryId = drawerGalleryTargetId,
+            galleryEntryOpenVersion = drawerGalleryEntryVersion,
             state = viewModel.chatSurfaceState,
             actions = chatActions,
             onNewPersona = { showNewPersona = true },
@@ -815,7 +819,16 @@ fun LocalHarnessScreen(
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
-                onOpenPersonaGallery = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
+                onOpenPersonaGallery = {
+                    drawerGalleryTargetId = null
+                    drawerGalleryEntryVersion++
+                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
+                },
+                onOpenPersonaSearchResult = { galleryId ->
+                    drawerGalleryTargetId = galleryId
+                    drawerGalleryEntryVersion++
+                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
+                },
                 onOpenDiary = { openDrawerEntry(LocalFeatureDrawerEntry.DIARY) },
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
