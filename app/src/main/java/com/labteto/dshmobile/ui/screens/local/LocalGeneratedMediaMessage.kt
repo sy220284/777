@@ -11,6 +11,7 @@ import android.widget.VideoView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,7 +149,13 @@ internal fun LocalGeneratedMediaResultRow(
         }
         when (result.kind) {
             LocalMediaKind.IMAGE.name -> {
-                MediaInlinePicture(file = file, remoteUrl = result.remoteUrl)
+                MediaInlinePicture(
+                    file = file, remoteUrl = result.remoteUrl,
+                    onOpen = {
+                        if (file != null) viewMediaFile(context, file, imageMime(file)) { error = it }
+                        else result.remoteUrl?.let { url -> openMediaUrl(context, url) { error = it } }
+                    },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     if (file != null) {
                         DsButton(text = resources.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
@@ -259,8 +267,11 @@ internal fun LocalGeneratedVideoTaskRow(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(text = if (showingPlayer) resources.getString(R.string.media_chat_collapse_video) else resources.getString(R.string.media_chat_play_video), size = DsButtonSize.Small,
-                    onClick = { showingPlayer = !showingPlayer })
+                if (showingPlayer) DsButton(
+                    text = resources.getString(R.string.media_chat_collapse_video),
+                    size = DsButtonSize.Small,
+                    onClick = { showingPlayer = false },
+                )
                 if (savedVideo != null) {
                     DsButton(text = resources.getString(R.string.media_chat_share_video), size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
@@ -330,24 +341,37 @@ private fun MediaMessageCard(
 }
 
 @Composable
-private fun MediaInlinePicture(file: File?, remoteUrl: String?) {
+private fun MediaInlinePicture(
+    file: File?, remoteUrl: String?, onOpen: (() -> Unit)? = null,
+) {
     val resources = LocalResources.current
-    val context = LocalContext.current
     var bitmap by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
+    var loading by remember(file?.absolutePath, remoteUrl) { mutableStateOf(true) }
     LaunchedEffect(file?.absolutePath, remoteUrl) {
+        loading = true
         bitmap = withContext(Dispatchers.IO) { decodeMediaPreview(file, remoteUrl) }
+        loading = false
     }
-    val modifier = Modifier.fillMaxWidth().aspectRatio(1.2f)
-        .background(DsTheme.colors.bgLayer1, DsShapes.block)
+    val image = bitmap
+    val ratio = image?.let { it.width.toFloat() / it.height.coerceAtLeast(1) }
+        ?.coerceIn(0.62f, 1.9f) ?: 1.2f
+    val surface = Modifier.fillMaxWidth().aspectRatio(ratio)
+        .clip(DsShapes.block)
+        .background(DsTheme.colors.bgLayer1)
         .border(1.dp, DsTheme.colors.borderL3, DsShapes.block)
-    if (bitmap != null) {
-        Image(bitmap = bitmap!!, contentDescription = resources.getString(R.string.media_chat_generated_image),
+    val modifier = if (onOpen != null) surface.clickable(onClick = onOpen) else surface
+    if (image != null) {
+        Image(bitmap = image, contentDescription = resources.getString(R.string.media_chat_generated_image),
             contentScale = ContentScale.Fit, modifier = modifier)
     } else {
         androidx.compose.foundation.layout.Box(modifier,
             contentAlignment = androidx.compose.ui.Alignment.Center) {
-            Text(resources.getString(R.string.media_chat_preview_pending), style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary)
+            Text(
+                resources.getString(if (loading) R.string.media_chat_preview_pending
+                    else R.string.media_chat_preview_unavailable),
+                style = DsType.caption11.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary,
+            )
         }
     }
 }
@@ -361,8 +385,15 @@ private fun imageMime(file: File): String = when (file.extension.lowercase()) {
 private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = runCatching {
     val bytes = when {
         file?.isFile == true -> {
-            if (file.length() > 12_000_000L) return@runCatching null
-            file.readBytes()
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            require(bounds.outWidth > 0 && bounds.outHeight > 0)
+            var sample = 1
+            while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
+            return@runCatching BitmapFactory.decodeFile(
+                file.absolutePath,
+                BitmapFactory.Options().apply { inSampleSize = sample },
+            )?.asImageBitmap()
         }
         remoteUrl != null -> {
             val uri = URI(remoteUrl)
