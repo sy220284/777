@@ -314,6 +314,7 @@ internal class LocalToolExecutionCoordinator(
                         executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
                         currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                     },
+                    expectedRegistration = registered,
                     approval = { tool ->
                         val granted = approval(call, tool, approvalSummary(call, tool))
                         if (!granted) approvalDenied = true
@@ -329,6 +330,11 @@ internal class LocalToolExecutionCoordinator(
                         // Admission can suspend behind another read/write operation. A correction
                         // committed during that wait must invalidate this still-unstarted call.
                         if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                        // Approval may outlive the exact plugin registration. Re-check after waiting
+                        // for the shared read/write gate and before writing the started fact.
+                        if (registry.get(call.name) !== admittedTool) {
+                            throw LocalToolRegistrationChanged()
+                        }
                         recordExecutionStarted(sessionId, call, executionIdentity)
                         executionStarted = true
                     },
@@ -338,6 +344,15 @@ internal class LocalToolExecutionCoordinator(
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
             return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
+        } catch (changed: LocalToolRegistrationChanged) {
+            return AgentToolResult(
+                content = "工具已在执行接纳期间更新或卸载：${call.name}；旧审批与旧调用不再有效。",
+                isError = true,
+                errorCode = "TOOL_REGISTRATION_CHANGED",
+                retryable = false,
+                sideEffect = AgentToolSideEffect.NONE,
+                recoveryHint = "重新发现当前工具并核对权限；此调用没有进入工具执行器。",
+            )
         } catch (superseded: LocalToolSampleSuperseded) {
             return AgentToolResult(
                 content = "用户已要求立即调整，本次旧工具调用尚未开始执行：" + call.name,
@@ -493,3 +508,6 @@ private fun JsonObject.optionalStringForCoordinator(key: String): String? =
 
 /** Work-owned revision guard rejected a stale call before it entered the registered executor. */
 internal class LocalToolSampleSuperseded : IllegalStateException("Work model sample superseded by user")
+
+/** Registry revision changed during admission/resource wait; handler was never entered. */
+internal class LocalToolRegistrationChanged : IllegalStateException("Tool registration changed before execution")
