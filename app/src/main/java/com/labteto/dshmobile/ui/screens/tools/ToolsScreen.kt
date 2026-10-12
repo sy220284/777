@@ -56,16 +56,16 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.shenyan.designsystem.components.SySwitchControl
-import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
 import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
@@ -455,7 +455,7 @@ fun ToolsScreen(
         else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
     }
     val colors = DsTheme.colors
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
     var stdioCommand by remember { mutableStateOf("") }
@@ -541,7 +541,7 @@ fun ToolsScreen(
                 ) {
                     LocalAgentSettingsCard(agentSettings, settingsViewModel, toast.second)
                 }
-                DsToastHost(toast)
+                SyToastHost(toast)
             }
         }
     } else if (showPluginBrowser) {
@@ -717,7 +717,7 @@ fun ToolsScreen(
                 }
             }
         }
-        DsToastHost(toast, Modifier.safeDrawingPadding())
+        SyToastHost(toast, Modifier.safeDrawingPadding())
     }
     }
 
@@ -918,7 +918,7 @@ fun ToolsScreen(
     }
 
     if (confirmAutoApproval) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.cap_center_auto_approval_confirm_title),
             onDismiss = { confirmAutoApproval = false },
         ) {
@@ -946,7 +946,7 @@ fun ToolsScreen(
     }
 
     if (confirmClearGitHub) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.tools_github_clear_confirm_title),
             onDismiss = { confirmClearGitHub = false },
         ) {
