@@ -38,7 +38,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
+import com.shenyan.designsystem.components.SyCategoryRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -129,7 +129,7 @@ internal fun FirstLaunchOnboarding(
                             color = colors.bgLayer1,
                         ) {
                             Column(Modifier.padding(DsSpacing.small)) {
-                                DsCategoryRow(
+                                SyCategoryRow(
                                     icon = FeatherIcons.MessageCircle,
                                     title = stringResource(R.string.shenyan_onboarding_chat),
                                     subtitle = stringResource(R.string.shenyan_onboarding_chat_hint),
@@ -138,7 +138,7 @@ internal fun FirstLaunchOnboarding(
                                     } else null,
                                     onClick = { mode = LocalUsageMode.CHAT },
                                 )
-                                DsCategoryRow(
+                                SyCategoryRow(
                                     icon = FeatherIcons.Zap,
                                     title = stringResource(R.string.shenyan_onboarding_work),
                                     subtitle = stringResource(R.string.shenyan_onboarding_work_hint),
