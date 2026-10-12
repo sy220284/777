@@ -718,9 +718,10 @@ fun LocalHarnessScreen(
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
+    // V5: only the mobile/tablet presentation is modal. At >=1024dp, real
+    // sessions and business routes remain reachable through a persistent 258dp rail.
+    val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
+    val syDrawerContent: @Composable () -> Unit = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
                 sessions = shell.sessions,
@@ -728,7 +729,7 @@ fun LocalHarnessScreen(
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
                 modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
-                drawerOpen = drawerState.isOpen,
+                drawerOpen = syWideViewport || drawerState.isOpen,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 currentGalleryId = shell.galleryId,
@@ -772,8 +773,8 @@ fun LocalHarnessScreen(
                     { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
                 } else null,
             )
-        },
-    ) {
+    }
+    val sySceneContent: @Composable () -> Unit = {
         LocalFeatureAnimatedHost(
             stack = featureStack,
             predictiveBackProgress = predictiveBackProgress.value,
@@ -782,6 +783,16 @@ fun LocalHarnessScreen(
             featureStateHolder.SaveableStateProvider(renderedPage.name) {
                 LocalFeaturePageContent(renderedPage, featureContributions)
             }
+        }
+    }
+    if (syWideViewport) {
+        Row(Modifier.fillMaxSize()) {
+            syDrawerContent()
+            Box(Modifier.weight(1f)) { sySceneContent() }
+        }
+    } else {
+        ModalNavigationDrawer(drawerState = drawerState, drawerContent = syDrawerContent) {
+            sySceneContent()
         }
     }
 
