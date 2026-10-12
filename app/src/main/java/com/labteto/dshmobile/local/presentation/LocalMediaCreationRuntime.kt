@@ -8,6 +8,8 @@ import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
 import com.labteto.dshmobile.local.model.LocalMediaResultStore
+import com.labteto.dshmobile.local.model.LocalMediaCreationJobStore
+import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTaskStore
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
@@ -44,6 +46,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val api: LocalMediaApiClient,
     private val videoStore: LocalMediaVideoTaskStore,
     private val resultStore: LocalMediaResultStore,
+    private val creationJobs: LocalMediaCreationJobStore,
 ) {
     // The provider request belongs to the media capability, not a disposable Compose sheet.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
@@ -52,6 +55,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         videoError, resultError -> videoError ?: resultError
     }.stateIn(scope, SharingStarted.Eagerly, null)
     val videoTasks: StateFlow<List<LocalMediaVideoTask>> get() = videoStore.tasks
+    val activeCreationJobs: StateFlow<List<LocalMediaCreationJob>> get() = creationJobs.jobs
+    suspend fun dismissCreationJob(id: String) = withContext(Dispatchers.IO) { creationJobs.dismiss(id) }
     val generatedResults: StateFlow<List<LocalMediaResult>> get() = resultStore.results
     fun resultFile(item: LocalMediaResult): File? = resultStore.fileFor(item)
     fun videoFile(task: LocalMediaVideoTask): File? = videoStore.fileFor(task)
@@ -60,7 +65,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
 
     fun models(profiles: List<LocalModelProfile>): List<LocalMediaOffer> = LocalMediaCatalog.offers(profiles)
 
-    suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null): LocalMediaImage {
+    suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String? = null, operationId: String? = null): LocalMediaImage {
         validate(offer, LocalMediaKind.IMAGE)
         resultStore.requireAvailable()
         val result = when (offer.provider) {
@@ -81,8 +86,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             if (file != null) result.copy(file = file) else result
         } else result
         withContext(Dispatchers.IO) {
-            durable.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
-                ?: durable.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
+            durable.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it, sessionId, prompt, operationId) }
+                ?: durable.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it, sessionId, prompt, operationId) }
                 ?: error("生成服务没有返回可保存的图片成果")
         }
         return durable
@@ -102,7 +107,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
 
-    suspend fun speech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String? = null): File {
+    suspend fun speech(offer: LocalMediaOffer, text: String, voice: String, sessionId: String? = null, operationId: String? = null): File {
         validate(offer, LocalMediaKind.SPEECH)
         resultStore.requireAvailable()
         val file = when (offer.provider) {
@@ -110,11 +115,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             LocalMediaProvider.OPENAI -> api.speech(offer, text, voice)
             else -> error("此服务商未接入配音")
         }
-        withContext(Dispatchers.IO) { resultStore.addFile(offer, LocalMediaKind.SPEECH, file, sessionId, text) }
+        withContext(Dispatchers.IO) { resultStore.addFile(offer, LocalMediaKind.SPEECH, file, sessionId, text, operationId) }
         return file
     }
 
-    suspend fun transcribe(offer: LocalMediaOffer, uri: Uri, sessionId: String? = null): String {
+    suspend fun transcribe(offer: LocalMediaOffer, uri: Uri, sessionId: String? = null, operationId: String? = null): String {
         validate(offer, LocalMediaKind.TRANSCRIBE)
         resultStore.requireAvailable()
         val text = when (offer.provider) {
@@ -122,8 +127,75 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             LocalMediaProvider.OPENAI -> api.transcription(offer, uri)
             else -> error("此服务商未接入语音转写")
         }
-        withContext(Dispatchers.IO) { resultStore.addText(offer, sessionId, text) }
+        withContext(Dispatchers.IO) { resultStore.addText(offer, sessionId, text, operationId) }
         return text
+    }
+
+    /**
+     * A paid request is owned by the singleton media runtime, not the creator sheet.
+     * Once the receipt is saved the UI is free to navigate, close, or switch sessions.
+     * An ambiguous HTTP outcome is deliberately NOT re-submitted.
+     */
+    suspend fun submitImage(
+        offer: LocalMediaOffer, prompt: String, ratio: String, sessionId: String,
+    ): LocalMediaCreationJob {
+        validate(offer, LocalMediaKind.IMAGE)
+        require(prompt.isNotBlank())
+        resultStore.requireAvailable()
+        val job = withContext(Dispatchers.IO) { creationJobs.begin(offer, sessionId, prompt) }
+        scope.launch {
+            try {
+                image(offer, prompt, ratio, sessionId, job.id)
+                creationJobs.finish(job.id)
+            } catch (cancelled: CancellationException) {
+                creationJobs.uncertain(job.id, "生成已中断，服务商是否受理尚未确认，请先查询服务商记录。")
+                throw cancelled
+            } catch (failure: Exception) {
+                creationJobs.uncertain(job.id, failure.message ?: "请求结果未确认，请先核对服务商记录。")
+            }
+        }
+        return job
+    }
+
+    suspend fun submitSpeech(
+        offer: LocalMediaOffer, text: String, voice: String, sessionId: String,
+    ): LocalMediaCreationJob {
+        validate(offer, LocalMediaKind.SPEECH)
+        require(text.isNotBlank() && voice.isNotBlank())
+        resultStore.requireAvailable()
+        val job = withContext(Dispatchers.IO) { creationJobs.begin(offer, sessionId, text) }
+        scope.launch {
+            try {
+                speech(offer, text, voice, sessionId, job.id)
+                creationJobs.finish(job.id)
+            } catch (cancelled: CancellationException) {
+                creationJobs.uncertain(job.id, "生成已中断，服务商是否受理尚未确认，请勿盲目重试。")
+                throw cancelled
+            } catch (failure: Exception) {
+                creationJobs.uncertain(job.id, failure.message ?: "语音任务结果未确认")
+            }
+        }
+        return job
+    }
+
+    suspend fun submitTranscribe(
+        offer: LocalMediaOffer, uri: Uri, sessionId: String,
+    ): LocalMediaCreationJob {
+        validate(offer, LocalMediaKind.TRANSCRIBE)
+        resultStore.requireAvailable()
+        val job = withContext(Dispatchers.IO) { creationJobs.begin(offer, sessionId, null) }
+        scope.launch {
+            try {
+                transcribe(offer, uri, sessionId, job.id)
+                creationJobs.finish(job.id)
+            } catch (cancelled: CancellationException) {
+                creationJobs.uncertain(job.id, "转写已中断，服务商是否受理尚未确认，请勿盲目重试。")
+                throw cancelled
+            } catch (failure: Exception) {
+                creationJobs.uncertain(job.id, failure.message ?: "转写任务结果未确认")
+            }
+        }
+        return job
     }
 
     /** Persist before submitting the request. Never retry if provider acceptance is uncertain. */
