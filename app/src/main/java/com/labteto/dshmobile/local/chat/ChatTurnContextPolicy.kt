@@ -106,8 +106,24 @@ internal object ChatTurnContextPolicy {
         if (story.isNullOrBlank() || isTopicRedirect(userMessage)) return ""
         return story.lineSequence().filter { line ->
             val text = line.trim()
-            text.isNotBlank() && relevant(userMessage, text, attention)
+            text.isNotBlank() && (
+                relevant(userMessage, text, attention) ||
+                    // A live shared-scene cue may have only one clear topic anchor (e.g. 周末).
+                    // This never bypasses an explicit pause of that same subject.
+                    (attention.pausedSubject.isBlank() && hasSingleTopicAnchor(userMessage, text))
+                )
         }.take(6).joinToString("\n").take(900)
+
+    }
+
+    private fun hasSingleTopicAnchor(query: String, fact: String): Boolean {
+        val a = normalize(query)
+        val b = normalize(fact)
+        if (a.length < 4 || b.length < 4) return false
+        return a.windowed(2).any { pair ->
+            pair !in setOf("我们", "他们", "你们", "一起", "什么", "怎么", "现在", "时候", "这个", "那个") &&
+                b.contains(pair)
+        }
     }
 
     private fun normalize(text: String): String = text.lowercase().replace(separator, "")
