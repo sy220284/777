@@ -282,11 +282,20 @@ internal fun LocalConversationSurface(
     val transcriptMessages = remember(pagedOlderMessages, state.messages) {
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode) {
-        buildLocalDisplayTranscript(buildLocalTranscript(
-            transcriptMessages,
-            includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-        ))
+    // Media is a persistent chat/Work timeline projection, not an assistant text message.
+    val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
+    val generatedMedia by mediaStudioViewModel.generatedResults.collectAsStateWithLifecycle()
+    val videoMediaTasks by mediaStudioViewModel.videoTasks.collectAsStateWithLifecycle()
+    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks) {
+        mergeLocalMediaTimeline(
+            buildLocalDisplayTranscript(buildLocalTranscript(
+                transcriptMessages,
+                includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
+            )),
+            state.sessionId,
+            generatedMedia,
+            videoMediaTasks,
+        )
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -788,6 +797,22 @@ internal fun LocalConversationSurface(
                                 }
                             }
                         }
+                        is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
+                            result = transcriptItem.result,
+                            viewModel = mediaStudioViewModel,
+                            onInsertText = { text ->
+                                val previous = drafts[state.sessionId].orEmpty()
+                                drafts.putBoundedLocalDraft(
+                                    state.sessionId,
+                                    listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
+                                )
+                            },
+                        )
+                        is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
+                            task = transcriptItem.task,
+                            offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
+                            viewModel = mediaStudioViewModel,
+                        )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkStep -> Box(
@@ -1349,6 +1374,9 @@ internal fun LocalConversationSurface(
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
                 preferredProfileId = activeModelProfile?.id,
+                sessionId = state.sessionId,
+                viewModel = mediaStudioViewModel,
+                onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
