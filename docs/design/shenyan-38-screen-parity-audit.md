@@ -19,7 +19,7 @@
 | 09 | 人物日记 | `local/CharacterDiaryScreen.kt` | 部分 | 阅读布局、隐私隔离已接；编辑/停用/来源返回的实际设备交互需验 |
 | 10 | 群聊成员 | `local/GroupChatMemberPicker.kt` | 本轮修改 | 增加记忆隔离卡；仍需视觉比对、人数上下限与双向状态验证 |
 | 11 | 消息操作 | `local/FluidMessageActionSheet.kt；local/LocalChatEditMessageSheet.kt` | 部分 | 复制/编辑重发/分支的独立语义、触觉与撤销需验 |
-| 12 | 人物定时互动 | `tasks/ChatAutomationScreen.kt；local/LocalAutomationUiContribution.kt` | 待改 | 按人物/触发时间/内容组织；不得伪造亲密度与长期计数 |
+| 12 | 人物定时互动 | `tasks/ChatAutomationScreen.kt；local/LocalAutomationUiContribution.kt` | 本轮修改 | 按当前会话/全部事件新增玻璃筛选和真实任务计数，保留原任务编辑/暂停/策略/会话跳转；多人物分组与首次提醒仍待验 |
 | 13 | 任务编辑器 | `tasks/TaskEditorComponents.kt` | 本轮修改 | 目标/计划/通知分组已改；设计中的步骤拆解需真实工作任务 API 支持，不能造假 |
 | 14 | 能力面板 | `local/LocalWorkCapabilitySheet.kt；tools/FluidCapabilityCatalogue.kt` | 部分 | 低中高授权等级与工具来源映射、审批不可逆交互待验 |
 | 15 | 工作历史 | `local/LocalWorkHistorySheet.kt` | 本轮修改 | 已接全部/调用/开始/结果真实事件页签与原证据回跳；状态聚合需可信数据源 |
@@ -28,7 +28,7 @@
 | 18 | 工具插件 | `tools/ToolsScreen.kt；tools/PluginInventoryBrowser.kt` | 本轮修改 | 实际连接 HTTP/stdio/全部分类、实时数量及连接管理已接；设计中的商店/Webhook 操作只有实态后可显示 |
 | 19 | 任务计划 | `tasks/TasksScreen.kt` | 本轮修改 | 全部/待执行/执行中/暂停玻璃选项及动态计数、空态恢复已接；单任务成本/预算不可取时不显示 |
 | 20 | 设置首页 | `settings/SettingsScreen.kt` | 部分 | 三组分区已接，保留额外入口仍须归一同款列表行和图标 |
-| 21 | 模型设置 | `settings/LocalModelSettingsSections.kt` | 待改 | 模型档案/协议/上下文层级与可用模型动态展示 |
+| 21 | 模型设置 | `settings/LocalModelSettingsSections.kt` | 本轮修改 | API 模型档案加入动态模型总数与正在使用的模型高亮边框，原协议/密钥/上下文/选择回调保持不变；列表层级与设备视觉仍需验收 |
 | 22 | 性能设置 | `settings/ModelPerformanceSettings.kt` | 本轮修改 | 自定义玻璃单选行及触觉温度滑块已接，真实配置持久化保留；速率/成本指标只在可得时展示 |
 | 23 | ChatGPT账户 | `settings/ChatGptAccountPanel.kt` | 部分 | 登录授权来源与套餐用量不得写死，账户状态需实机验 |
 | 24 | 记忆 | `settings/MemorySettingsSections.kt` | 本轮修改 | 真实记录分类切到玻璃页签，保留编辑和来源作用域；六类独立开关无独立底座，不伪造 |
@@ -37,14 +37,14 @@
 | 27 | 权限设备 | `settings/DeviceCapabilitiesController.kt` | 本轮修改 | 实测无障碍、通知监听及应用通知发布权限分开展示，虚拟屏仅标 API 可用而非已授权；其余系统权限待逐项接入 |
 | 28 | 通知设置 | `settings/SettingsScreen.kt` | 本轮修改 | 实际系统通知发布授权、跳转设置、现有本机任务通知开关与用途说明已接；六类独立开关/免打扰业务链未接 |
 | 29 | 高级诊断 | `settings/RuntimeDiagnosticsDialogs.kt` | 本轮修改 | 真实环境信息、网络诊断及 AppLog 错误/全部玻璃筛选、计数和导出已接；运行时字段详细卡布局待验 |
-| 30 | 检查更新 | `settings/SettingsScreen.kt` | 待改 | 版本/签名/hash 实值、不伪造更新/未来发布日期 |
+| 30 | 检查更新 | `settings/SettingsScreen.kt` | 本轮修改 | 更新检查入口独立成子页面，真实 VERSION_NAME/VERSION_CODE、运行状态和原有检查安装回调；版本签名与远程更新结果不得虚构 |
 | 31 | 首次引导 | `local/LocalHarnessScreen.kt；local/LocalModeIntroBanner.kt` | 待改 | 三步引导和先体验后授权的真实导航状态 |
 | 32 | 权限申请 | `settings/DeviceCapabilitiesController.kt` | 本轮修改 | Android 13+ 可在用户点击时请求 POST_NOTIFICATIONS，拒绝后保留系统设置恢复路径；完整首启浮层未按稿交付 |
 | 33 | 全局搜索 | `local/LocalHarnessDrawerComponents.kt` | 本轮修改 | 会话+人物真实搜索、分类计数、跳转图集和无结果提示已接；任务/文件索引及精确人物直达尚未实现 |
 | 34 | 空态合集 | `components/DsPageEmptyState.kt` | 本轮修改 | 共用空态真实动作升级为主按钮，复杂空态分支与屏幕布局仍需验收 |
 | 35 | 错误态合集 | `components/Overlays.kt；components/DsPageEmptyState.kt` | 部分 | 网络/权限/设备/语义故障需真实诊断与对应操作 |
-| 36 | 通知样式 | `components/Overlays.kt；settings/SettingsScreen.kt` | 待改 | 应用内 toast 与系统通知分别验颜色、跳转和免打扰 |
-| 37 | 完成转场 | `local/WorkflowProgressSection.kt；local/LocalWorkStateContent.kt` | 待改 | 原位 Morph/任务卡片出现，不能无条件弹成功提示 |
+| 36 | 通知样式 | `components/Overlays.kt；settings/SettingsScreen.kt` | 本轮修改 | 应用 Toast 增加无障碍读屏直播区域与阴影层次；系统通知用 BigText、私密锁屏可见性、避免重复提醒，真实会话跳转保留 |
+| 37 | 完成转场 | `local/WorkflowProgressSection.kt；local/LocalWorkStateContent.kt` | 本轮修改 | 工作流进度接实际 completed/total、阻塞与已完成状态；状态文字原位淡入淡出，完成必须满足阶段和计数；原位完整卡片 Morph 仍待补齐 |
 | 38 | 媒体创作 | `local/LocalMediaStudioSheet.kt` | 部分 | 图像/视频/语音/转录已有；模型能力、参数和历史仍需实际验证 |
 
 ## 跨页面 18 个组件对照
@@ -119,3 +119,13 @@
 - 第 31/32 屏关联的原生权限生命周期：已移除 MainActivity 的“开屏立刻请求通知权限”；通知渠道仍创建，用户可在权限/通知页面明确点击系统授权按钮。首次欢迎引导页的完整三步骤和转场仍属第 31 屏未完成。
 - 截至本轮代码提交，38 屏分类为：19 屏“本轮修改”、13 屏“部分”、6 屏“待改”。其含义仅为进展分类，**完整视觉/动效/Android16-17 回归验收为 0 屏**。
 - 还未进入本轮页面结构改造的六项：12 人物定时互动、21 模型设置、30 检查更新、31 首次引导、36 通知样式、37 完成转场。
+
+## 第六轮继续推进（2026-10-12，PR #654）
+
+- **第12屏：人物定时互动。** 真实的当前会话/全部事件筛选，复用原始任务列表、编辑、运行与通知策略，允许始终切回全部。用纯函数和 `ChatAutomationScopeFilterTest` 保证不误混其他故事和无会话记录。
+- **第21屏：模型设置。** 使用 API 模型实际配置数、实际活动档案数和选中边框增强层次。没有代替真实的密钥、模型协议、上下文存储逻辑。
+- **第30屏：检查更新。** 增加独立 UPDATE 页面、回退和真实 BuildConfig 版本信息，检查按钮直接调用现有检查与安装回调；不编造已更新或远程版本号。
+- **第36屏：通知样式。** 现有系统通知的实际渠道/会话跳转不变，长文本展开、私有内容锁屏隐藏、避免同一通知再次提醒；Toast 添加辅助技术实时播报。
+- **第37屏：完成阶段。** 从 LocalWorkflowProgress 的实际阶段、完成数、阻塞原因推导 idle/running/done/failed，原位切换阶段标签并展示真实占比，`WorkflowProgressVisualTest` 防误判成功。仍非完整共享元素形变。
+
+截至本次代码差异台账：**24 屏本轮修改，13 屏原有部分，1 屏未改造（31 首次引导）；完整多态实机/动效/截图验收仍为 0 屏**。新增代码已推送但 CI 处于 pending 且未创建执行作业，不能声称已编译通过。Figma Starter 限额持续阻断 Figma 节点读写，HTML/Compose 稿继续作为核对依据。
