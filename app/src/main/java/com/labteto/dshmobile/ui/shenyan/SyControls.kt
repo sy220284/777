@@ -21,6 +21,12 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.delay
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,11 +51,23 @@ fun SyButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     style: SyButtonStyle = SyButtonStyle.PRIMARY,
+    icon: ImageVector? = null,
+    height: Dp = SyDimensions.minimumTouch,
+    onHoldRepeat: (() -> Unit)? = null,
 ) {
     val p = LocalSyPalette.current
     val reduceMotion = LocalSyReducedMotion.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val latestHold by rememberUpdatedState(onHoldRepeat)
+    LaunchedEffect(pressed, enabled, loading) {
+        if (!pressed || !enabled || loading || latestHold == null) return@LaunchedEffect
+        delay(500L)
+        while (true) {
+            latestHold?.invoke() ?: break
+            delay(115L)
+        }
+    }
     val scale by animateFloatAsState(
         if (pressed && enabled) .97f else 1f,
         animationSpec = tween(if (reduceMotion) 0 else SyDurations.press),
@@ -68,7 +86,7 @@ fun SyButton(
     Surface(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.height(SyDimensions.minimumTouch).scale(scale),
+        modifier = modifier.height(height.coerceAtLeast(SyDimensions.minimumTouch)).scale(scale),
         color = bg,
         contentColor = ink,
         shape = RoundedCornerShape(SyDimensions.cornerControl),
@@ -81,6 +99,10 @@ fun SyButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp), color = ink, strokeWidth = 2.dp
                 )
+                Spacer(Modifier.size(8.dp))
+            }
+            if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
             }
             Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis,
