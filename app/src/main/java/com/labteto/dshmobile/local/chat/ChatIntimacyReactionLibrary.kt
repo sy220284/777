@@ -33,7 +33,7 @@ internal object ChatIntimacyReactionLibrary {
         IntimacyReactionScene("back-hug", listOf("从身后抱", "身后搂", "背后抱", "从背后搂"),
             "回头辨认、碰一碰搭在身前的手臂", "重心调整、短暂吸气或肩膀微缩",
             "笑着询问、轻声回应或要求先放开", "surprise"),
-        IntimacyReactionScene("gentle-hug", listOf("拥抱", "搂抱", "抱住", "搂住", "抱着", "环抱"),
+        IntimacyReactionScene("gentle-hug", listOf("拥抱", "搂抱", "抱住", "搂住", "抱着", "环抱", "抱我", "抱抱"),
             "调整双臂、回抱、轻拍后背或保持片刻距离", "手指与肩背逐渐放松、呼吸趋稳",
             "询问今天怎么了、直接说想陪一会儿", "hum"),
         IntimacyReactionScene("leaning", listOf("依偎", "靠在肩", "靠着肩", "倚在肩", "靠进怀里"),
@@ -45,7 +45,7 @@ internal object ChatIntimacyReactionLibrary {
         IntimacyReactionScene("cheek-kiss", listOf("亲脸颊", "吻脸颊", "脸颊亲吻", "脸颊轻吻", "亲在脸"),
             "偏头、轻碰脸颊、目光转回来", "脸颊可能发热、短暂睁大眼睛",
             "半句抱怨、害羞轻笑或坦率回应", "laugh"),
-        IntimacyReactionScene("brief-kiss", listOf("亲吻", "接吻", "轻吻", "吻住", "吻上", "亲一口", "亲一下", "亲我", "吻我"),
+        IntimacyReactionScene("brief-kiss", listOf("亲吻", "接吻", "轻吻", "吻住", "吻上", "亲一口", "亲一下", "亲我", "吻我", "吻一下", "过来亲"),
             "调整头部角度、片刻闭眼或重新看向对方", "呼吸与面部神情有短暂变化",
             "轻声回应、询问对方状态或停顿", "breath"),
         IntimacyReactionScene("hair-touch", listOf("抚摸头发", "轻抚头发", "摸头发", "发梢", "发丝", "理了理头发"),
@@ -77,6 +77,35 @@ internal object ChatIntimacyReactionLibrary {
             "轻声回顾、简单询问，也可以不说话", "sigh"),
     )
 
+    private val facePalette = mapOf(
+        "sudden-hug" to "微睁眼、错愕一瞬，再观察对方",
+        "reunion-hug" to "目光停留、笑意浮现或眼眶发热",
+        "comfort-hug" to "眉眼渐松、重新抬眼或闭眼片刻",
+        "back-hug" to "回头辨认、眉梢轻扬或露出笑意",
+        "gentle-hug" to "眼神柔和、缓慢眨眼或静静垂眼",
+        "leaning" to "半阖眼、嘴角放松或偶尔抬眼",
+        "forehead-kiss" to "微怔、重新抬眼对视",
+        "cheek-kiss" to "眼睛略睁大、忍笑或移开目光",
+        "brief-kiss" to "面部短暂停顿、重新对视",
+        "hair-touch" to "眯眼、抿唇笑或皱眉抗议",
+        "face-touch" to "认真看向对方、眉眼舒展或避开",
+        "hand-touch" to "低头看手、嘴角微扬或迟疑",
+        "caress" to "目光跟随触碰、停顿后回应",
+        "shy" to "耳根发热、垂眼、忍笑或抿唇",
+        "playful" to "眉梢扬起、憋笑失败或假装严肃",
+        "reconciliation" to "神情先谨慎，听完后才逐渐柔和",
+        "pause" to "皱眉、避开目光、直接表达需要",
+        "afterglow" to "平静对视、轻笑、目光放松",
+    )
+
+    private val unspecified = IntimacyReactionScene(
+        "unspecified", emptyList(),
+        "只依据已经发生的接触决定回应，不凭空补出拥抱、亲吻或新的动作",
+        "关注呼吸、姿态、肌肉放松与否等当前可观察的变化",
+        "直接交流当下感受和舒适度，允许停顿",
+        "quiet",
+    )
+
     /** Nine distinct nonverbal families. A scene suggests one; it never mandates a sound. */
     private val vocalPalette = mapOf(
         "surprise" to "短促吸气、惊呼或一声意外的笑",
@@ -101,13 +130,13 @@ internal object ChatIntimacyReactionLibrary {
     ): IntimacyReactionPlan {
         val current = input.trim().lowercase()
         val fallback = state.recentActionTags.takeLast(2).joinToString(" ").lowercase()
-        val chosen = bestScene(current) ?: bestScene(fallback) ?: scenes.first { it.id == "gentle-hug" }
+        val chosen = bestScene(current) ?: bestScene(fallback) ?: unspecified
         val pace = when {
-            listOf("继续", "接着", "刚才", "再来").any(current::contains) ->
+            listOf("继续", "接着", "刚才", "再来").any { current.contains(it) } ->
                 "沿接触后的当前动作自然接续，不重演上轮的开始动作"
-            listOf("突然", "猛地", "一下", "意外").any(current::contains) ->
+            listOf("突然", "猛地", "一下", "意外").any { current.contains(it) } ->
                 "先呈现瞬间反射，再按感受选择是否回应"
-            listOf("结束", "松开", "分开").any(current::contains) ->
+            listOf("结束", "松开", "分开").any { current.contains(it) } ->
                 "重在松开之后的呼吸、表情和后续交流"
             else -> "沿接触瞬间、短暂适应、回应、余韵的时间顺序，只择其中一两拍"
         }
@@ -120,6 +149,7 @@ internal object ChatIntimacyReactionLibrary {
         val notes = buildList {
             add("【本轮反应素材｜候选，不是固定动作脚本】情境=${chosen.id}。")
             add("微动作：${chosen.microAction}；身体：${chosen.bodySignal}。")
+            add("表情/目光：${facePalette[chosen.id] ?: "遵循已发生的场景与人物感受"}。")
             add("语言：${chosen.dialogue}；可能的自然声音：$sound（也可不发声）。")
             add("节奏：$pace。")
             if (personality.isNotBlank()) add("人物表达：$personality。")
@@ -133,7 +163,7 @@ internal object ChatIntimacyReactionLibrary {
 
     private fun bestScene(text: String): IntimacyReactionScene? =
         scenes.mapIndexedNotNull { index, scene ->
-            val match = scene.cues.filter(text::contains).maxOfOrNull(String::length) ?: return@mapIndexedNotNull null
+            val match = scene.cues.filter { text.contains(it) }.maxOfOrNull(String::length) ?: return@mapIndexedNotNull null
             Triple(scene, match, index)
         }.maxWithOrNull(compareBy<Triple<IntimacyReactionScene, Int, Int>> { it.second }
             .thenBy { -it.third })?.first
@@ -144,13 +174,13 @@ internal object ChatIntimacyReactionLibrary {
             persona.trustedFactText(CharacterFactCategories.PERSONALITY))
             .joinToString(" ").take(600)
         return when {
-            listOf("害羞", "内敛", "慢热", "腼腆").any(traits::contains) ->
+            listOf("害羞", "内敛", "慢热", "腼腆").any { traits.contains(it) } ->
                 "可先停顿、移开目光、再用小动作回应；不要强制脸红"
-            listOf("活泼", "调皮", "开朗", "俏皮").any(traits::contains) ->
+            listOf("活泼", "调皮", "开朗", "俏皮").any { traits.contains(it) } ->
                 "可先笑着打趣，再表现认真或安静的反差"
-            listOf("克制", "沉稳", "冷静", "理性").any(traits::contains) ->
+            listOf("克制", "沉稳", "冷静", "理性").any { traits.contains(it) } ->
                 "外显动作可少，但停顿、手势和简短语言仍传递差异"
-            listOf("直率", "坦率", "主动").any(traits::contains) ->
+            listOf("直率", "坦率", "主动").any { traits.contains(it) } ->
                 "可直接说出感受和需要，不必套用羞怯模板"
             else -> ""
         }
@@ -160,10 +190,10 @@ internal object ChatIntimacyReactionLibrary {
         val location = scene.location.take(100)
         val time = scene.sceneTime.take(40)
         return when {
-            listOf("厨房", "灶台").any(location::contains) -> "留意手边物件及身体站位"
-            listOf("室外", "街", "公园", "院", "路边").any(location::contains) -> "依据室外距离、温度及周围人群调整动作"
-            listOf("沙发", "客厅").any(location::contains) -> "注意坐姿、肩膀与支撑点"
-            listOf("卧室", "床边").any(location::contains) -> "尊重实际姿势与双方表达，不无端改变地点"
+            listOf("厨房", "灶台").any { location.contains(it) } -> "留意手边物件及身体站位"
+            listOf("室外", "街", "公园", "院", "路边").any { location.contains(it) } -> "依据室外距离、温度及周围人群调整动作"
+            listOf("沙发", "客厅").any { location.contains(it) } -> "注意坐姿、肩膀与支撑点"
+            listOf("卧室", "床边").any { location.contains(it) } -> "尊重实际姿势与双方表达，不无端改变地点"
             time.contains("夜") -> "夜间可自然放低声量，不自动改变人物情绪"
             else -> ""
         }
