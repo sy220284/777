@@ -2154,5 +2154,7 @@
     <string name="fluid_message_media_image">基于此消息生成图像</string>
     <string name="fluid_message_media_video">基于此消息生成视频</string>
     <string name="fluid_message_media_speech">基于此消息合成语音</string>
+    <string name="fluid_files_search">搜索文件名或路径</string>
+    <string name="fluid_files_no_matches">没有匹配的文件</string>
 </resources>
 
