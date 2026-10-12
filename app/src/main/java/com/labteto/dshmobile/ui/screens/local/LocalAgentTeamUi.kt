@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +43,8 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsProgressBar
+import com.labteto.dshmobile.ui.components.DsProgressStatus
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -51,6 +52,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -485,11 +487,14 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
             )
         }
         if (team.tasks.isNotEmpty()) {
-            LinearProgressIndicator(
-                progress = progress,
+            DsProgressBar(
+                value = progress,
                 modifier = Modifier.fillMaxWidth(),
-                color = colors.accent,
-                trackColor = colors.borderL3,
+                status = when {
+                    team.failure != null || team.failedMemberCount > 0 -> DsProgressStatus.Failed
+                    team.completedTaskCount == team.tasks.size -> DsProgressStatus.Done
+                    else -> DsProgressStatus.Running
+                },
             )
         }
         if (team.returnedMemberCount > 0 && team.tasks.isNotEmpty()) {
@@ -517,8 +522,9 @@ private fun TeamMemberRow(
 ) {
     val colors = DsTheme.colors
     val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
+    val pulse = rememberHapticPulse()
     Surface(
-        onClick = onClick,
+        onClick = { pulse(); onClick() },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
         color = if (selected) colors.accent.copy(alpha = 0.06f) else {
@@ -781,6 +787,7 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
     val colors = DsTheme.colors
     var expanded by rememberSaveable(task.id) { mutableStateOf(false) }
     val expansionLabel = stringResource(if (expanded) R.string.local_team_expanded else R.string.local_team_collapsed)
+    val pulse = rememberHapticPulse()
     val blocked = task.status == "pending" && !task.ready && task.blockedByTitles.isNotEmpty()
     val details = buildList {
         task.ownerName?.let { add(stringResource(R.string.local_team_owner, it)) }
@@ -789,7 +796,7 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         if (task.description.isNotBlank()) add(task.description)
     }
     Surface(
-        onClick = { expanded = !expanded },
+        onClick = { pulse(); expanded = !expanded },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.row,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
