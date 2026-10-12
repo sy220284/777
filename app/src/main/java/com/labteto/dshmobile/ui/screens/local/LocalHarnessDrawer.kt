@@ -179,6 +179,11 @@ internal fun LocalModeDrawer(
             sessionTitleOverrides = sessionTitleOverrides,
         )
     }
+    val matchedPersonas = remember(gallery, historyQuery, searchOpen, usageMode) {
+        if (searchOpen && usageMode == LocalUsageMode.CHAT)
+            localDrawerMatchingPersonas(gallery, historyQuery)
+        else emptyList()
+    }
     val hasVisibleSessions = remember(sessions, usageMode) {
         sessions.any { !it.blank && it.usageMode == usageMode }
     }
@@ -254,7 +259,7 @@ internal fun LocalModeDrawer(
                         value = historyQuery,
                         onValueChange = { historyQuery = it },
                         modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                        placeholder = { Text(stringResource(R.string.local_drawer_search_people_sessions)) },
                         leadingIcon = {
                             Icon(FeatherIcons.Search, contentDescription = null, tint = colors.labelTertiary)
                         },
@@ -278,7 +283,7 @@ internal fun LocalModeDrawer(
                 contentPadding = PaddingValues(bottom = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                item(key = "drawer-feature-actions") {
+                if (!searchOpen || historyQuery.isBlank()) item(key = "drawer-feature-actions") {
                     Column(
                         modifier = Modifier.padding(top = DsSpacing.medium),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
@@ -298,6 +303,26 @@ internal fun LocalModeDrawer(
                             onMiniMaxQuota = onMiniMaxQuota,
                             onUsage = onUsage,
                             onImmersiveReader = onImmersiveReader,
+                        )
+                    }
+                }
+
+                if (matchedPersonas.isNotEmpty()) {
+                    item(key = "drawer-persona-heading") {
+                        DrawerSectionTitle(
+                            title = stringResource(R.string.local_drawer_search_people_heading),
+                            count = matchedPersonas.size,
+                        )
+                    }
+                    items(matchedPersonas, key = { "persona:" + it.id }) { entry ->
+                        DsCategoryRow(
+                            icon = FeatherIcons.User,
+                            title = entry.persona.name,
+                            subtitle = entry.persona.coreIdentity.ifBlank {
+                                stringResource(R.string.local_drawer_search_open_gallery)
+                            },
+                            value = stringResource(R.string.local_drawer_search_open_gallery),
+                            onClick = onOpenPersonaGallery,
                         )
                     }
                 }
@@ -374,10 +399,10 @@ internal fun LocalModeDrawer(
                     }
                 }
 
-                if (hasVisibleSessions && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty()) {
+                if (searchOpen && historyQuery.isNotBlank() && matchedPersonas.isEmpty() && sessionSections.pinned.isEmpty() && sessionSections.recent.isEmpty()) {
                     item(key = "drawer-no-sessions") {
                         Text(
-                            stringResource(R.string.chatlist_search_empty),
+                            stringResource(R.string.local_drawer_search_empty_both),
                             style = DsType.navigationSupporting.withReadingWeight(),
                             color = colors.labelTertiary,
                             modifier = Modifier.padding(

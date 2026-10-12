@@ -2187,5 +2187,9 @@
     <string name="settings_notifications_open_system">打开通知设置</string>
     <string name="settings_notifications_only_events">仅事件完成、失败、需要审批等真正需要关注的结果才应触发通知；运行过程的进度刷新不应反复提醒。</string>
     <string name="settings_device_supported_not_granted">API 可用 · 非屏幕授权</string>
+    <string name="local_drawer_search_people_sessions">搜索会话与人物…</string>
+    <string name="local_drawer_search_people_heading">人物</string>
+    <string name="local_drawer_search_open_gallery">在人物图集中查看</string>
+    <string name="local_drawer_search_empty_both">没有匹配的会话或人物。试试其他关键词。</string>
 </resources>
 

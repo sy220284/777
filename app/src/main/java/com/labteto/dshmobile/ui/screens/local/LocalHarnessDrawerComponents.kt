@@ -63,6 +63,19 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
 
+/** The drawer uses only public persona-card fields; private dialogue/diaries are never searched here. */
+internal fun localDrawerMatchingPersonas(
+    gallery: List<PersonaGalleryEntry>,
+    query: String,
+): List<PersonaGalleryEntry> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return gallery.filter { entry ->
+        entry.persona.name.contains(needle, ignoreCase = true) ||
+            entry.persona.coreIdentity.contains(needle, ignoreCase = true)
+    }
+}
+
 internal data class LocalDrawerSessionSections(
     val pinned: List<LocalSessionSummary>,
     val recent: List<LocalSessionSummary>,
