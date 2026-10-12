@@ -156,8 +156,13 @@ internal class CharacterRuntimeProjector(
         )
         val selected = mutableListOf<String>()
         candidates.forEach { (label, value) ->
-            if (selected.size >= 2 || value.isBlank() ||
-                !ChatMemorySelector.isRelevantToTurn(userInput, value)) return@forEach
+            // "正在收拾桌子" is a live scene action even if the user asks about mood.
+            // A future plan ("稍后展示...") is not. Explicit topic shifts suppress both.
+            val presentAction = label == "正在做" &&
+                Regex("""^(?:正在|正|在)[^，。]{2,}""").containsMatchIn(value.trim())
+            val relevant = ChatMemorySelector.isRelevantToTurn(userInput, value) ||
+                (presentAction && !ChatMemorySelector.isExplicitTopicShift(userInput))
+            if (selected.size >= 2 || value.isBlank() || !relevant) return@forEach
             if (selected.none { ChatContextAssembler.semanticallySimilar(it.substringAfter('：'), value) }) {
                 selected += "$label：${value.take(180)}"
             }
