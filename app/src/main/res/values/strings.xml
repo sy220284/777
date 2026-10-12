@@ -2199,5 +2199,21 @@
     <string name="settings_update_installed_version">当前版本：%1$s（构建 %2$d）</string>
     <string name="settings_update_not_checked">尚未执行版本检查</string>
     <string name="settings_update_action_description">仅在点击后检查更新。发现可安装版本时，沿用应用已有的下载安装与确认流程。</string>
+    <string name="shenyan_onboarding_welcome">装进口袋的 Agent 终端</string>
+    <string name="shenyan_onboarding_intro">它能陪你聊天、记住设定，也能在这台手机上帮你完成真实任务。先体验，再决定开放哪些设备能力。</string>
+    <string name="shenyan_onboarding_choose">选择你的开始方式</string>
+    <string name="shenyan_onboarding_mode_intro">两种模式共用同一套能力。之后仍可随时在侧栏切换。</string>
+    <string name="shenyan_onboarding_chat">聊天与人物</string>
+    <string name="shenyan_onboarding_chat_hint">先对话、创建人物、积累独立的故事记忆</string>
+    <string name="shenyan_onboarding_work">工作与任务</string>
+    <string name="shenyan_onboarding_work_hint">运行任务、管理工具、查看真实执行状态</string>
+    <string name="shenyan_onboarding_selected">已选择</string>
+    <string name="shenyan_onboarding_permission_later">需要时再授权</string>
+    <string name="shenyan_onboarding_privacy_intro">聊天和基础功能无需先授予设备管理权限。只有使用通知、无障碍或其他设备功能时，才会解释用途并请求对应权限。</string>
+    <string name="shenyan_onboarding_try_chat">先开始体验</string>
+    <string name="shenyan_onboarding_continue">继续</string>
+    <string name="shenyan_onboarding_start">进入应用</string>
+    <string name="shenyan_onboarding_skip">我之前用过</string>
+    <string name="shenyan_onboarding_setup_model">先配置模型</string>
 </resources>
 

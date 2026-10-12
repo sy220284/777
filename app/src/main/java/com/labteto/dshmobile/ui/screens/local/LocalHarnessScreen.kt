@@ -174,6 +174,25 @@ fun LocalHarnessScreen(
     val drawerFocusManager = LocalFocusManager.current
     val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
+    val onboardingPreferences = remember(context) {
+        context.getSharedPreferences("shenyan_first_launch", android.content.Context.MODE_PRIVATE)
+    }
+    var onboardingDecided by rememberSaveable { mutableStateOf(false) }
+    var presentFirstLaunch by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(shell.loading, shell.sessions, activeModelProfile) {
+        if (!onboardingDecided && !shell.loading) {
+            presentFirstLaunch = shouldPresentFirstLaunch(
+                dismissed = onboardingPreferences.getBoolean("completed", false),
+                hasUserContent = shell.sessions.any { !it.blank },
+                hasConfiguredModel = activeModelProfile != null,
+            )
+            onboardingDecided = true
+        }
+    }
+    fun finishFirstLaunch() {
+        onboardingPreferences.edit().putBoolean("completed", true).apply()
+        presentFirstLaunch = false
+    }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var settledSessionId by rememberSaveable { mutableStateOf("") }
@@ -835,6 +854,22 @@ fun LocalHarnessScreen(
             onDismiss = {
                 pendingWorkCapability = null
                 workCapabilityConfirmed = false
+            },
+        )
+    }
+
+    if (presentFirstLaunch && !shell.loading) {
+        FirstLaunchOnboarding(
+            onSkip = ::finishFirstLaunch,
+            onStart = { selectedMode ->
+                finishFirstLaunch()
+                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+            },
+            onConfigureModel = { selectedMode ->
+                finishFirstLaunch()
+                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+                settingsDestination = SettingsDestination.MODELS
+                pushFeature(LocalFeaturePage.SETTINGS)
             },
         )
     }
