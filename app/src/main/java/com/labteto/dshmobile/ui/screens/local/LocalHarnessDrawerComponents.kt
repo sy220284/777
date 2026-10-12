@@ -50,8 +50,8 @@ import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.shenyan.designsystem.components.SyPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
@@ -400,26 +400,26 @@ internal fun LocalSessionDrawerRow(
                 }
             }
         }
-        DsPopupMenu(
+        SyPopupMenu(
             expanded = menuOpen,
             onDismiss = { menuOpen = false },
             items = listOf(
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.common_rename),
                     icon = FeatherIcons.Edit3,
                     onClick = onRename,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.local_drawer_multi_select),
                     icon = FeatherIcons.List,
                     onClick = onSelectMultiple,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
                     icon = FeatherIcons.Pin,
                     onClick = onTogglePinned,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.local_delete_session),
                     icon = FeatherIcons.Trash2,
                     danger = true,
