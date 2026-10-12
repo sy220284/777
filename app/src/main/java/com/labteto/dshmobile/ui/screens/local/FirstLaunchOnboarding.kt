@@ -132,8 +132,7 @@ internal fun FirstLaunchOnboarding(
                                 SyCategoryRow(
                                     icon = FeatherIcons.MessageCircle,
                                     title = stringResource(R.string.shenyan_onboarding_chat),
-                                    subtitle = stringResource(R.string.shenyan_onboarding_chat_hint),
-                                    value = if (mode == LocalUsageMode.CHAT) {
+                                                        value = if (mode == LocalUsageMode.CHAT) {
                                         stringResource(R.string.shenyan_onboarding_selected)
                                     } else null,
                                     onClick = { mode = LocalUsageMode.CHAT },
@@ -141,8 +140,7 @@ internal fun FirstLaunchOnboarding(
                                 SyCategoryRow(
                                     icon = FeatherIcons.Zap,
                                     title = stringResource(R.string.shenyan_onboarding_work),
-                                    subtitle = stringResource(R.string.shenyan_onboarding_work_hint),
-                                    value = if (mode == LocalUsageMode.WORK) {
+                                                        value = if (mode == LocalUsageMode.WORK) {
                                         stringResource(R.string.shenyan_onboarding_selected)
                                     } else null,
                                     onClick = { mode = LocalUsageMode.WORK },

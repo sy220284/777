@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -97,12 +98,13 @@ internal fun AppSettingsRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     compact: Boolean = false,
+    reservedEntryHeight: Dp? = null,
 ) {
     val colors = DsTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = if (compact) 56.dp else 64.dp)
+            .heightIn(min = reservedEntryHeight ?: if (compact) 56.dp else 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = DsSpacing.comfortable, vertical = if (compact) DsSpacing.small else DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,

@@ -160,7 +160,6 @@ internal fun DrawerQuickActions(
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.local_project_management_title),
-                    subtitle = stringResource(R.string.local_drawer_projects_plain_hint),
                     onClick = onProjects,
                 )
                 DrawerQuickAction(
@@ -171,7 +170,6 @@ internal fun DrawerQuickActions(
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.chatlist_workspace_files),
-                    subtitle = stringResource(R.string.local_drawer_workspace_plain_hint),
                     onClick = onWorkspaceFiles,
                 )
                 DrawerQuickAction(
@@ -202,7 +200,6 @@ internal fun DrawerQuickAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     badge: String? = null,
-    subtitle: String? = null,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -239,27 +236,14 @@ internal fun DrawerQuickAction(
             tint = colors.labelSecondary,
             modifier = Modifier.size(22.dp),
         )
-        Column(
+        Text(
+            title,
+            style = DsType.drawerItem.withReadingWeight(),
+            color = colors.labelPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-        ) {
-            Text(
-                title,
-                style = DsType.drawerItem.withReadingWeight(),
-                color = colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.let {
-                Text(
-                    it,
-                    style = DsType.navigationSupporting.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        )
         badge?.let { SyPill(text = it) }
     }
 }
