@@ -26,6 +26,15 @@ class ChatIntimacyReactionLibraryTest {
     }
 
     @Test
+    fun usesBothActionAndBodyPartWithoutChangingCaressToKiss() {
+        val state = ChatCharacterState()
+        assertEquals("face-touch", library.select("她抚摸我的脸颊", state).sceneId)
+        assertEquals("caress", library.select("她轻抚我的额头", state).sceneId)
+        assertEquals("brief-kiss", library.select("她亲吻我的头发", state).sceneId)
+        assertEquals("forehead-kiss", library.select("她拥抱我又亲吻额头", state).sceneId)
+    }
+
+    @Test
     fun choosesConversationEvidenceForContinuation() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,
