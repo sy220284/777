@@ -417,7 +417,12 @@ internal class ChatIntimacyMode {
             }
         }.trim()
     }
-    fun prompt(input: String, state: ChatCharacterState): String {
+    fun prompt(
+        input: String,
+        state: ChatCharacterState,
+        context: ChatContextState = ChatContextState(),
+        persona: PersonaProfile? = null,
+    ): String {
         val mode = resolveChatInteractionIntent(input, state)
         // No intimacy mode for a normal or relationship-progress-only turn.
         if (mode != ChatInteractionIntent.FLIRTING && mode != ChatInteractionIntent.INTIMATE) return ""
@@ -439,7 +444,10 @@ internal class ChatIntimacyMode {
             interaction += "【本轮意图优先：成年亲密互动】"
             interaction += "优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。"
             interaction += "【亲密姿态连续性】成年亲密场景允许自然切换面对面、并肩、侧身、坐近、倚靠、拥抱等姿态，并结合距离、视线、手部动作和停顿形成连续变化；避免连续多轮复用同一种姿态或同一个动作模板。"
-            if (intensity == 5) interaction += CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE
+            if (intensity == 5) {
+                interaction += CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE
+                interaction += ChatIntimacyReactionLibrary.select(input, state, context, persona).guidance
+            }
             if (hasProactiveIntimacyIntent(input, state)) {
                 interaction += "【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。"
             }
