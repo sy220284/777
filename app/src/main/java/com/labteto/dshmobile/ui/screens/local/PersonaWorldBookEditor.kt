@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
@@ -39,7 +40,8 @@ internal fun PersonaWorldBookEditor(
     onChange: (List<PersonaLoreEntry>) -> Unit,
 ) {
     val colors = DsTheme.colors
-    var expandedIndex by rememberSaveable { mutableIntStateOf(-1) }
+    // A different character's world-book must not inherit the previous editor selection.
+    var expandedIndex by rememberSaveable(entries.firstOrNull()?.id) { mutableIntStateOf(0) }
     Text(
         stringResource(R.string.local_persona_lore_title),
         style = DsType.base16Strong.withReadingWeight(),
@@ -50,32 +52,72 @@ internal fun PersonaWorldBookEditor(
         style = DsType.small13.withReadingWeight(),
         color = colors.labelSecondary,
     )
-    if (entries.isEmpty()) {
-        Text(
-            stringResource(R.string.local_persona_lore_empty),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-    }
-    entries.forEachIndexed { index, entry ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+    // The reference layout has a stable entry list and a separate editing panel.
+    // Keep the original PersonaProfile draft callback as the single owner of data.
+    Surface(
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Text(
-                entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
-                modifier = Modifier.weight(1f),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelPrimary,
-            )
+            if (entries.isEmpty()) {
+                Text(
+                    stringResource(R.string.local_persona_lore_empty),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
+            entries.forEachIndexed { index, entry ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        Text(
+                            entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                        )
+                        if (entry.keywords.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.local_persona_lore_entry_keywords) + " · " +
+                                    entry.keywords.take(3).joinToString(" · "),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelTertiary,
+                            )
+                        }
+                    }
+                    DsButton(
+                        text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
+                        onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
+                        variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.testTag("personaLoreSelect:$index"),
+                    )
+                }
+            }
             DsButton(
-                text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
-                onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
+                text = stringResource(R.string.local_persona_lore_add),
+                onClick = {
+                    onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
+                    expandedIndex = entries.size
+                },
+                enabled = entries.size < 80,
                 variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth().testTag("personaLoreAdd"),
             )
         }
-        if (expandedIndex == index) Surface(
+    }
+
+    expandedIndex.takeIf { it in entries.indices }?.let { index ->
+        val entry = entries[index]
+        Surface(
             shape = DsShapes.block,
             color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             modifier = Modifier.fillMaxWidth(),
@@ -96,14 +138,14 @@ internal fun PersonaWorldBookEditor(
                     value = entry.title,
                     onValueChange = { change(entry.copy(title = it)) },
                     label = { Text(stringResource(R.string.local_persona_lore_entry_title)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("personaLoreTitle"),
                     singleLine = true,
                 )
                 DsTextField(
                     value = entry.content,
                     onValueChange = { change(entry.copy(content = it)) },
                     label = { Text(stringResource(R.string.local_persona_lore_entry_content)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("personaLoreContent"),
                     minLines = 3,
                     maxLines = 8,
                 )
@@ -169,20 +211,12 @@ internal fun PersonaWorldBookEditor(
                         expandedIndex = -1
                     },
                     variant = DsButtonVariant.Ghost,
+                    modifier = Modifier.testTag("personaLoreRemove"),
                 )
             }
         }
     }
-    DsButton(
-        text = stringResource(R.string.local_persona_lore_add),
-        onClick = {
-            onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
-            expandedIndex = entries.size
-        },
-        enabled = entries.size < 80,
-        variant = DsButtonVariant.Ghost,
-        modifier = Modifier.fillMaxWidth(),
-    )
+
 }
 
 private fun splitLoreEditorLines(value: String): List<String> =

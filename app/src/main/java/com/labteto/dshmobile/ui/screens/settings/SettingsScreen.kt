@@ -109,6 +109,7 @@ enum class SettingsDestination {
     CHAT,
     MODELS,
     MODEL_PERFORMANCE,
+    ACCOUNT,
     MODEL_USAGE,
     MINIMAX_QUOTA,
     PRICING,
@@ -131,6 +132,8 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
     SettingsDestination.MODEL_PERFORMANCE,
+    SettingsDestination.ACCOUNT,
+    SettingsDestination.SESSION_STORAGE,
     SettingsDestination.MODEL_USAGE,
     SettingsDestination.MINIMAX_QUOTA,
     SettingsDestination.MEMORY,
@@ -144,7 +147,6 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
-    SettingsDestination.SESSION_STORAGE,
     SettingsDestination.DIAGNOSTICS -> SettingsDestination.ADVANCED
 }
 
@@ -293,7 +295,7 @@ fun SettingsScreen(
             } else {
                 page = usageDetailReturnPage
             }
-        } else if (page == SettingsDestination.MINIMAX_QUOTA && initialDestination == page) {
+        } else if (page in setOf(SettingsDestination.MINIMAX_QUOTA, SettingsDestination.USAGE) && initialDestination == page) {
             onClose()
         } else {
             page.parentDestination()?.let { page = it } ?: onClose()
@@ -329,6 +331,7 @@ fun SettingsScreen(
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
+        SettingsDestination.ACCOUNT -> stringResource(R.string.chatgpt_account_title)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_PERFORMANCE -> stringResource(R.string.settings_model_performance_title)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
@@ -391,26 +394,17 @@ fun SettingsScreen(
                 when (shownPage) {
                     SettingsDestination.ROOT -> {
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_common)) {
-                            AppSettingsRow(
-                                icon = FeatherIcons.Bell,
-                                title = stringResource(R.string.settings_page_notifications),
-                                onClick = { page = SettingsDestination.NOTIFICATIONS },
-                                compact = true,
-                            )
-                            AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = FeatherIcons.Eye,
+                            AppSettingsRow(icon = FeatherIcons.Eye,
                                 title = stringResource(R.string.settings_page_appearance),
-                                onClick = { page = SettingsDestination.APPEARANCE },
-                                compact = true,
-                            )
+                                onClick = { page = SettingsDestination.APPEARANCE }, compact = true)
                             AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = FeatherIcons.MessageCircle,
-                                title = stringResource(R.string.settings_page_session),
-                                onClick = { page = SettingsDestination.SESSION },
-                                compact = true,
-                            )
+                            AppSettingsRow(icon = FeatherIcons.BookOpen,
+                                title = stringResource(R.string.settings_page_memory),
+                                onClick = { page = SettingsDestination.MEMORY }, compact = true)
+                            AppSettingsDivider()
+                            AppSettingsRow(icon = FeatherIcons.Folder,
+                                title = stringResource(R.string.fluid_settings_session_storage),
+                                onClick = { page = SettingsDestination.SESSION_STORAGE }, compact = true)
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_models_experience)) {
                             AppSettingsRow(
@@ -430,15 +424,15 @@ fun SettingsScreen(
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.CreditCard,
-                                title = stringResource(R.string.settings_page_model_usage),
-                                onClick = { page = SettingsDestination.MODEL_USAGE },
+                                title = stringResource(R.string.chatgpt_account_title),
+                                onClick = { page = SettingsDestination.ACCOUNT },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.BookOpen,
-                                title = stringResource(R.string.settings_page_memory),
-                                onClick = { page = SettingsDestination.MEMORY },
+                                title = stringResource(R.string.settings_page_notifications),
+                                onClick = { page = SettingsDestination.NOTIFICATIONS },
                                 compact = true,
                             )
                         }
@@ -678,16 +672,22 @@ fun SettingsScreen(
 
                     SettingsDestination.MODEL_PERFORMANCE -> ModelPerformanceSettingsPage()
 
+                    SettingsDestination.ACCOUNT -> {
+                        val account by viewModel.chatGptState.collectAsStateWithLifecycle()
+                        ChatGptAccountPanel(account, localHarness, viewModel, toast.second)
+                    }
+
                     SettingsDestination.MODELS -> {
                         var addModelRequested by remember { mutableStateOf(false) }
-                        val account by viewModel.chatGptState.collectAsStateWithLifecycle()
                         DsButton(
                             text = stringResource(R.string.local_api_model_add),
                             onClick = { addModelRequested = true },
                             modifier = Modifier.fillMaxWidth(),
                             icon = FeatherIcons.Plus,
                         )
-                        ChatGptAccountPanel(account, localHarness, viewModel, toast.second)
+                        AppSettingsRow(icon = FeatherIcons.CreditCard,
+                            title = stringResource(R.string.settings_page_model_usage),
+                            onClick = { page = SettingsDestination.MODEL_USAGE })
                         LocalModelSettingsCard(
                             local = localHarness,
                             viewModel = viewModel,
@@ -871,6 +871,11 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.SESSION_STORAGE -> {
+                        AppSettingsSection {
+                            AppSettingsRow(icon = FeatherIcons.MessageCircle,
+                                title = stringResource(R.string.settings_page_session),
+                                onClick = { page = SettingsDestination.SESSION })
+                        }
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
                             busy = localSessionStorageBusy,

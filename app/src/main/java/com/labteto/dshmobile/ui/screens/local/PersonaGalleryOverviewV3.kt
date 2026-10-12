@@ -410,6 +410,11 @@ internal fun PersonaGalleryOverviewV3(
                 )
             }
             else -> {
+                if (!managing) {
+                    FluidPersonaGalleryGrid(pinnedEntries + regularEntries, onSelectEntry,
+                        onLongClick = { id -> managing = true; if (id !in selectedIds) selectedIds.add(id) },
+                        modifier = Modifier.weight(1f).fillMaxWidth())
+                } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
@@ -490,6 +495,7 @@ internal fun PersonaGalleryOverviewV3(
                             )
                         }
                     }
+                }
                 }
             }
         }

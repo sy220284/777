@@ -255,17 +255,6 @@ internal fun ColumnScope.TaskEditorPane(
             onDismiss = { showSchedulePicker = false },
         )
     }
-    if (showSchedulePicker) {
-        TaskSchedulePicker(
-            initialMillis = firstRunAt,
-            onPicked = { picked ->
-                firstRunAt = picked
-                createError = null
-                showSchedulePicker = false
-            },
-            onDismiss = { showSchedulePicker = false },
-        )
-    }
 }
 
 @Composable

@@ -59,6 +59,8 @@ internal fun LocalMediaStudioSheetContent(
     preferredProfileId: String?,
     onInsertTranscript: (String) -> Unit,
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
+    initialPrompt: String = "",
+    initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
 ) {
     val colors = DsTheme.colors
     val context = LocalContext.current
@@ -67,12 +69,12 @@ internal fun LocalMediaStudioSheetContent(
     val videoTasks by viewModel.videoTasks.collectAsState()
     val generatedResults by viewModel.generatedResults.collectAsState()
     val storageError by viewModel.storageError.collectAsState()
-    var showHistory by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(true) }
     var showVideoArchive by remember { mutableStateOf(false) }
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
-    var mode by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
+    var mode by rememberSaveable { mutableStateOf(initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode) { mutableStateOf("") }
@@ -81,7 +83,7 @@ internal fun LocalMediaStudioSheetContent(
         ?: available.firstOrNull()
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
-    var prompt by rememberSaveable { mutableStateOf("") }
+    var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
     var ratio by rememberSaveable { mutableStateOf("1:1") }
     var voiceId by rememberSaveable(selected?.id) {
         mutableStateOf(if (selected?.provider == LocalMediaProvider.OPENAI) "alloy" else "male-qn-qingse")
@@ -130,22 +132,15 @@ internal fun LocalMediaStudioSheetContent(
     ) {
         Text(stringResource(R.string.media_studio_notice), color = colors.labelSecondary,
             style = DsType.caption11.withReadingWeight())
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            listOf(
-                LocalMediaKind.IMAGE to R.string.minimax_media_image,
-                LocalMediaKind.VIDEO to R.string.minimax_media_video,
-                LocalMediaKind.SPEECH to R.string.minimax_media_speech,
-                LocalMediaKind.TRANSCRIBE to R.string.minimax_media_asr,
-            ).forEach { (kindOption, title) ->
-                DsButton(
-                    text = stringResource(title),
-                    onClick = { if (!busy) { mode = kindOption.name; showModelChoices = false } },
-                    variant = if (kindOption.name == mode) DsButtonVariant.Primary else DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
-                    enabled = !busy,
-                )
-            }
-        }
+        val mediaKinds = listOf(LocalMediaKind.IMAGE, LocalMediaKind.VIDEO,
+            LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE)
+        FluidSectionNavigation(
+            labels = listOf(R.string.minimax_media_image, R.string.minimax_media_video,
+                R.string.minimax_media_speech, R.string.minimax_media_asr).map { stringResource(it) },
+            selected = mediaKinds.indexOf(kind),
+            onSelect = { if (!busy) { mode = mediaKinds[it].name; showModelChoices = false } },
+            tag = "mediaDesignSection", enabled = !busy,
+        )
 
         if (selected == null) {
             Text(stringResource(R.string.media_studio_no_model), color = colors.labelSecondary)

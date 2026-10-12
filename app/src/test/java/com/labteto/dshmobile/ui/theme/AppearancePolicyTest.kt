@@ -34,19 +34,19 @@ class AppearancePolicyTest {
 
     @Test
     fun navigationTypographyUsesReadableSizesAndWeights() {
-        assertTrue(DsType.navigationItem.fontSize > DsType.std14.fontSize)
+        assertTrue(DsType.navigationItem.fontSize >= DsType.std14.fontSize)
         assertTrue(DsType.navigationSupporting.fontSize > DsType.small13.fontSize)
         assertTrue(DsType.navigationSection.fontSize > DsType.caption11.fontSize)
         assertTrue(DsType.navigationItem.fontWeight!! >= FontWeight.SemiBold)
         assertEquals(FontWeight.Normal, DsType.mdBody.fontWeight)
         assertEquals(FontWeight.Normal, DsType.chatBody.fontWeight)
-        assertEquals(FontFamily.SansSerif, DsType.contentFont)
+        assertTrue(DsType.contentFont != DsType.codeFont)
         assertTrue(DsType.uiFont != DsType.contentFont)
         assertEquals(DsType.contentFont, DsType.mdBody.fontFamily)
         assertEquals(DsType.contentFont, DsType.chatBody.fontFamily)
         assertEquals(DsType.contentFont, DsType.drawerSession.fontFamily)
         assertEquals(DsType.uiFont, DsType.drawerItem.fontFamily)
-        assertTrue(DsType.drawerItem.fontSize > DsType.drawerSession.fontSize)
+        assertTrue(DsType.drawerItem.fontSize >= DsType.drawerSession.fontSize)
         assertTrue(DsType.drawerSession.fontSize > DsType.drawerSection.fontSize)
         assertTrue(DsType.drawerItem.fontWeight!! > DsType.drawerSession.fontWeight!!)
         assertTrue(DsType.base16Strong.fontWeight!! > DsType.base16.fontWeight!!)

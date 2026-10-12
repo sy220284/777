@@ -242,7 +242,7 @@ class LocalWorkCapabilitySheetRegressionTest {
         compose.onNodeWithTag("handoff_message_msg-1").assertIsOn()
         compose.runOnIdle { assertEquals(listOf("msg-1"), selected.value) }
         compose.onNodeWithTag("handoff_search").performTextReplacement("")
-        compose.onNodeWithTag("handoff_message_msg-1").assertIsDisplayed()
+        compose.onNodeWithTag("handoff_message_msg-1").performScrollTo().assertIsDisplayed().assertIsOn()
         // The search field keeps the IME open. Explicitly scroll the real button into
         // the visible bottom-sheet viewport before testing the user click.
         compose.onNodeWithTag("handoff_load_older").performScrollTo().assertIsDisplayed().performClick()

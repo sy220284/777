@@ -105,11 +105,20 @@ internal fun DrawerQuickActions(
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
     onMiniMaxQuota: (() -> Unit)? = null,
+    onUsage: (() -> Unit)? = null,
+    onImmersiveReader: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+            onUsage?.let { openUsage ->
+                DrawerQuickAction(icon = FeatherIcons.Activity,
+                    title = stringResource(R.string.usage_calculation_title), onClick = openUsage)
+            }
+            onImmersiveReader?.let { read ->
+                DrawerQuickAction(FeatherIcons.BookOpen, stringResource(R.string.fluid_reader_title), read)
+            }
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
@@ -197,7 +206,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)

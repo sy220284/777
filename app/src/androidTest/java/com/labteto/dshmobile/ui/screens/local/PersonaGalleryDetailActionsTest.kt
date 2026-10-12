@@ -110,7 +110,8 @@ class PersonaGalleryDetailActionsTest {
     fun stageEditorBlocksStorySwitchAndSavesThroughTheRealCallback() {
         savedStoryStage = null
         openDetail()
-        compose.onNodeWithTag("personaGalleryStoryStageInput").performTextInput("act-2")
+        compose.onNodeWithTag("personaDesignSection:3").performClick()
+        compose.onNodeWithTag("personaGalleryStoryStageInput").performScrollTo().performTextInput("act-2")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()
         compose.onNodeWithText("保存剧情提要").performScrollTo().performClick()
         compose.waitForIdle()
@@ -123,6 +124,7 @@ class PersonaGalleryDetailActionsTest {
         compose.onNodeWithContentDescription("更多操作").performClick()
         compose.onNodeWithText("保存本次对话进展").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1, saves) }
+        compose.onNodeWithTag("personaDesignSection:3").performScrollTo().performClick()
         compose.onNodeWithText("添加").performScrollTo().performClick()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("必须保存的剧情提要")
         compose.onNodeWithText("继续这条故事").assertIsNotEnabled()

@@ -93,6 +93,8 @@ internal fun LocalModeDrawer(
     onTools: () -> Unit,
     onSettings: () -> Unit,
     onMiniMaxQuota: (() -> Unit)? = null,
+    onUsage: (() -> Unit)? = null,
+    onImmersiveReader: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
@@ -294,6 +296,8 @@ internal fun LocalModeDrawer(
                             onOpenRunCenter = onOpenRunCenter,
                             onTools = onTools,
                             onMiniMaxQuota = onMiniMaxQuota,
+                            onUsage = onUsage,
+                            onImmersiveReader = onImmersiveReader,
                         )
                     }
                 }

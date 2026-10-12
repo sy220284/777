@@ -18,6 +18,11 @@ internal fun localSettingsFeatureUiContribution(
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(
     moduleId = LocalFeatureModuleId.SETTINGS,
     drawerActions = mapOf(
+        LocalFeatureDrawerEntry.USAGE to {
+            onSettingsDestinationChange(SettingsDestination.USAGE)
+            onOpenFromDrawer(LocalFeaturePage.SETTINGS)
+            onCloseDrawer()
+        },
         LocalFeatureDrawerEntry.MINIMAX_QUOTA to {
             onSettingsDestinationChange(SettingsDestination.MINIMAX_QUOTA)
             onOpenFromDrawer(LocalFeaturePage.SETTINGS)

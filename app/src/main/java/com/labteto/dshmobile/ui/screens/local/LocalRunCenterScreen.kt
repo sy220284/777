@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -94,6 +95,13 @@ internal fun LocalRunCenterScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
+    var boardSection by rememberSaveable(state.sessionId) {
+        mutableStateOf(when {
+            state.pendingQuestion != null || state.pendingApproval != null || state.jobs.any { it.needsUserAttention() } -> 1
+            state.running || state.jobs.any { it.status == "running" } -> 0
+            else -> 2
+        })
+    }
     var showFullHistory by remember(state.sessionId) { mutableStateOf(false) }
     var showAgentLauncher by remember(state.sessionId) { mutableStateOf(false) }
     var agentTask by remember(state.sessionId) { mutableStateOf("") }
@@ -164,6 +172,19 @@ internal fun LocalRunCenterScreen(
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
+            FluidSectionNavigation(
+                labels = listOf(R.string.fluid_board_running, R.string.fluid_board_attention,
+                    R.string.fluid_board_history).map { stringResource(it) },
+                selected = boardSection, onSelect = { boardSection = it },
+                counts = listOf(
+                    state.jobs.count { it.status == "running" } + if (state.running) 1 else 0,
+                    state.jobs.count { it.needsUserAttention() } +
+                        (if (state.pendingQuestion != null) 1 else 0) + (if (state.pendingApproval != null) 1 else 0),
+                    toolActivities.count { it.phase !in listOf(LocalToolUiPhase.RUNNING, LocalToolUiPhase.DECLARED) },
+                ).map { stringResource(R.string.fluid_item_count, it) },
+                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                tag = "runBoardSection",
+            )
             if (onOpenSourceSession != null) {
                 DsButton(
                     text = stringResource(R.string.local_work_handoff_return_source),
@@ -214,14 +235,17 @@ internal fun LocalRunCenterScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 ) {
-                    ExecutionStatusCard(
-                        state = state,
-                        onJobOutput = onJobOutput,
-                        onStopJob = onStopJob,
-                        onSendAgentMessage = onSendAgentMessage,
-                        onOpenResults = onOpenResults,
-                        showHeader = false,
-                    )
+                    if (boardSection != 2) {
+                        FluidRunBoardColumn(
+                            state, boardSection,
+                            onJobOutput = onJobOutput, onStopJob = onStopJob,
+                            onSendAgentMessage = onSendAgentMessage, onOpenDecision = onDismiss,
+                        )
+                    }
+                    if (boardSection == 2) {
+                    val completedJobs = state.jobs.filter { it.status != "running" && !it.needsUserAttention() }
+                    if (completedJobs.isNotEmpty()) RunCenterJobsSection(
+                        state.sessionId, completedJobs, false, true, onJobOutput, onStopJob, onSendAgentMessage)
                     if (activityRefreshFailed) {
                         Text(stringResource(R.string.local_run_center_refresh_failed), color = colors.error)
                     }
@@ -405,6 +429,7 @@ internal fun LocalRunCenterScreen(
                             variant = DsButtonVariant.Ghost,
                         )
                     }
+                    }
                 }
             }
         }
@@ -456,8 +481,10 @@ internal fun LocalRunCenterScreen(
     var fullArguments by remember(state.sessionId, selectedToolCallId) { mutableStateOf<String?>(null) }
     var fullResult by remember(state.sessionId, selectedToolCallId) { mutableStateOf<String?>(null) }
     var evidenceError by remember(state.sessionId, selectedToolCallId) { mutableStateOf(false) }
-    LaunchedEffect(state.sessionId, selectedToolCallId, selectedActivity?.finishedSequence) {
+    var evidenceRetry by remember(state.sessionId, selectedToolCallId) { mutableStateOf(0) }
+    LaunchedEffect(state.sessionId, selectedToolCallId, selectedActivity?.finishedSequence, evidenceRetry) {
         if (selectedActivity != null) {
+            evidenceError = false
             try {
                 val evidence = withContext(Dispatchers.IO) {
                     val arguments = selectedActivity.declaredSequence?.let {
@@ -494,7 +521,18 @@ internal fun LocalRunCenterScreen(
             selectedActivity.errorCode?.let { code ->
                 Text(stringResource(R.string.local_tool_activity_error, code), color = colors.error)
             }
-            if (evidenceError) Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.error)
+            if (evidenceError) {
+                Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.error)
+                DsButton(stringResource(R.string.common_retry), { evidenceRetry++ })
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                DsButton(stringResource(R.string.fluid_copy_tool_id), {
+                    clipboard.setText(AnnotatedString(selectedActivity.callId))
+                }, variant = DsButtonVariant.Ghost)
+                DsButton(stringResource(R.string.fluid_copy_tool_output), {
+                    fullResult?.let { clipboard.setText(AnnotatedString(it)) }
+                }, enabled = fullResult != null, variant = DsButtonVariant.Ghost)
+            }
             (fullArguments ?: selectedActivity.argumentsPreview)?.let { arguments ->
                 Text(stringResource(R.string.local_tool_activity_arguments), style = DsType.small13Strong)
                 SelectionContainer { Text(arguments, style = DsType.small13) }

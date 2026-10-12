@@ -288,11 +288,11 @@ internal fun ExecutionStatusCard(
         }
     }
 
-private fun LocalJobInfo.needsUserAttention(): Boolean =
+internal fun LocalJobInfo.needsUserAttention(): Boolean =
     isAgent && (status == "dormant" || pendingMessageCount > 0)
 
 @Composable
-private fun RunCenterJobsSection(
+internal fun RunCenterJobsSection(
     sessionId: String,
     jobs: List<LocalJobInfo>,
     attention: Boolean,

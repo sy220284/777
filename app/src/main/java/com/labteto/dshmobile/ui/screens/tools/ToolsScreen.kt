@@ -96,6 +96,7 @@ enum class ToolsNotice {
 
 data class ToolsUiState(
     val loading: Boolean = false,
+    val capabilities: List<com.labteto.dshmobile.local.presentation.LocalCapabilityUiEntry> = emptyList(),
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
@@ -178,6 +179,7 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
+                    capabilities = localTools.capabilityCatalogue(),
                     skills = skills,
                     presets = presets,
                 )
@@ -315,6 +317,7 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
+                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -338,6 +341,7 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
+                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -361,6 +365,7 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     githubConfigured = true,
                     localPlugins = localTools.installedPluginIds(),
+                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -406,6 +411,7 @@ class ToolsViewModel @Inject constructor(
                     loading = false,
                     servers = localTools.servers(),
                     localPlugins = localTools.installedPluginIds(),
+                    capabilities = localTools.capabilityCatalogue(),
                     notice = ToolsNotice.DISCONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -461,6 +467,10 @@ fun ToolsScreen(
     var showAgentSettings by remember { mutableStateOf(false) }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     var showPluginBrowser by remember(startAtPlugins, startAtSkills) { mutableStateOf(startAtPlugins || startAtSkills) }
+    var capabilityCatalogueVisible by remember { mutableStateOf(true) }
+    var catalogueFailure by remember { mutableStateOf(false) }
+    LaunchedEffect(state.notice) { if (state.notice == ToolsNotice.LOAD_FAILED) catalogueFailure = true }
+    LaunchedEffect(state.loading) { if (state.loading) catalogueFailure = false }
     var skillsOnly by remember(startAtSkills) { mutableStateOf(startAtSkills) }
     LaunchedEffect(showPluginBrowser, skillsOnly) {
         if (showPluginBrowser && skillsOnly) viewModel.refresh()
@@ -562,6 +572,15 @@ fun ToolsScreen(
             onCloseSkillEditor = viewModel::closeSkillEditor,
             onSaveSkillDocument = viewModel::saveSkillDocument,
             onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
+        )
+    } else if (capabilityCatalogueVisible) {
+        FluidCapabilityCatalogue(
+            entries = state.capabilities, loading = state.loading, failed = catalogueFailure,
+            connections = state.servers.size, onRefresh = viewModel::refresh, onBack = onClose,
+            onManage = { capabilityCatalogueVisible = false },
+            onPlugins = { skillsOnly = false; showPluginBrowser = true },
+            onSkills = { skillsOnly = true; showPluginBrowser = true },
+            onUseCapability = onUseCapability,
         )
     } else {
     Box(Modifier.fillMaxSize()) {

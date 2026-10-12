@@ -186,6 +186,32 @@ internal fun UsageCalculationPage(
         )
     }
 
+    if (selectedModel == null && analytics.byModel.isNotEmpty()) {
+        com.labteto.dshmobile.ui.components.DsCard {
+            Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
+                color = colors.labelPrimary)
+            val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxWidth().heightIn(max = 260.dp),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                analytics.byModel.entries.sortedByDescending { it.value.tracked.totalTokens }.forEach { entry ->
+                    item(key = entry.key) {
+                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                            Row {
+                                Text(entry.key, style = DsType.small13, modifier = Modifier.weight(1f), color = colors.labelPrimary)
+                                Text(formatTokens(entry.value.tracked.totalTokens),
+                                    style = DsType.caption11.copy(fontFeatureSettings = "tnum"), color = colors.labelSecondary)
+                            }
+                            com.labteto.dshmobile.ui.components.DsProgressBar(
+                                (entry.value.tracked.totalTokens.toDouble() / total).toFloat())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,

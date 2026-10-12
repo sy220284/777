@@ -7,33 +7,33 @@ import androidx.compose.ui.unit.dp
  * Use these tokens instead of hardcoded dp values to maintain visual consistency.
  */
 object DsSpacing {
-    /** 4dp - Minimal spacing between tightly related elements (e.g., icon and label) */
-    val tiny = 4.dp
+    /** 2dp - Minimal spacing between tightly related elements (e.g., icon and label) */
+    val tiny = 2.dp
     
     /** 6dp - Extra small spacing */
     val xsmall = 6.dp
     
-    /** 8dp - Small spacing for related items within a component */
-    val small = 8.dp
+    /** 10dp - Small spacing for related items within a component */
+    val small = 10.dp
     
 
     
-    /** 12dp - Medium spacing between component elements */
-    val medium = 12.dp
+    /** 14dp - Medium spacing between component elements */
+    val medium = 14.dp
     
 
     
-    /** 16dp - Comfortable spacing for screen padding and section content */
-    val comfortable = 16.dp
+    /** 22dp - Comfortable spacing for screen padding and section content */
+    val comfortable = 22.dp
     
-    /** 20dp - Large spacing between major UI sections */
-    val large = 20.dp
+    /** 22dp - Large spacing between major UI sections */
+    val large = 22.dp
     
-    /** 24dp - Extra large spacing for distinct content blocks */
-    val xlarge = 24.dp
+    /** 34dp - Extra large spacing for distinct content blocks */
+    val xlarge = 34.dp
     
-    /** 32dp - Major section spacing for clear visual separation */
-    val xxlarge = 32.dp
+    /** 54dp - Major section spacing for clear visual separation */
+    val xxlarge = 54.dp
     
     /** 48dp - Minimum touch target size per Material Design guidelines */
     val touchTarget = 48.dp
@@ -42,7 +42,7 @@ object DsSpacing {
 /** Semantic layout metrics shared by chat and work surfaces. */
 object DsMetrics {
     const val drawerWidthFraction = 0.85f
-    val screenHorizontal = 16.dp
+    val screenHorizontal = 22.dp
 
     val topBarHeight = 56.dp
 

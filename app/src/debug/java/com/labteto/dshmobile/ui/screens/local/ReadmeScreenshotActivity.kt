@@ -85,6 +85,8 @@ class ReadmeScreenshotActivity : ComponentActivity() {
             "character-tuning",
             "usage",
             "quota",
+            "design-work-goal", "design-work-plan", "design-work-decision", "design-work-execution", "design-work-outputs",
+            "design-persona-0", "design-persona-1", "design-persona-2", "design-persona-3", "design-gallery", "design-capability",
         )
     }
 }
@@ -99,10 +101,11 @@ private fun ScreenshotReadySignal(screen: String) {
 
 @Composable
 private fun ReadmeScreenshotSurface(screen: String) {
+    if (screen.startsWith("design-")) { FluidDesignScreenshot(screen.removePrefix("design-")); return }
     when (screen) {
         "navigation" -> NavigationScreenshot()
         "chat" -> ChatScreenshot()
-        "work" -> WorkScreenshot()
+        "work" -> FluidDesignScreenshot("work-execution")
         "character-tuning" -> CharacterTuningScreenshot()
         "usage" -> UsageScreenshot()
         "quota" -> QuotaScreenshot()

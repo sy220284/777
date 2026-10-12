@@ -182,6 +182,17 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override suspend fun servers(): List<McpServerSnapshot> = plugins.mcpServers()
 
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
+    override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
+        registry.names().sorted().mapNotNull { name ->
+            registry.get(name)?.takeUnless {
+                it.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.INTERNAL
+            }?.let { tool ->
+                com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry(
+                    tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
+                    tool.metadata.requirements,
+                )
+            }
+        }
 
     override fun installedSkills() = skillManager.installed()
     override fun presetSkills() = skillManager.presets()

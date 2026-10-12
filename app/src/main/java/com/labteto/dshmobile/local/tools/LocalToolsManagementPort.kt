@@ -7,6 +7,7 @@ internal interface LocalToolsManagementPort {
     suspend fun servers(): List<McpServerSnapshot>
 
     fun installedPluginIds(): List<String>
+    fun capabilityCatalogue(): List<LocalToolCatalogueEntry> = emptyList()
 
     fun installedSkills(): List<LocalInstalledSkill>
     fun presetSkills(): List<LocalPresetSkill>
@@ -28,3 +29,7 @@ internal interface LocalToolsManagementPort {
 
     suspend fun disconnect(serverId: String): String
 }
+
+/** Read-only registry metadata; registration never grants invocation or Android permissions. */
+internal data class LocalToolCatalogueEntry(val name: String, val family: String,
+    val access: String, val approval: String, val requirements: List<String>)

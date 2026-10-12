@@ -53,7 +53,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
-import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.components.DsSearchField
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -101,6 +101,7 @@ internal fun LocalWorkspaceFilesDialog(
     var section by rememberSaveable(mode, sessionId) {
         mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
     }
+    var query by rememberSaveable(mode, sessionId) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
@@ -112,12 +113,12 @@ internal fun LocalWorkspaceFilesDialog(
     val limitText = stringResource(R.string.local_files_share_limit, MAX_LOCAL_SHARE_FILES)
     val shareableFiles = when (mode) {
         LocalFilesMode.WORKSPACE -> when (section) {
-            0 -> workspace.filter { it.path.substringBeforeLast('/', "") == directory }
+            0 -> workspace.filter { query.isNotBlank() || it.path.substringBeforeLast('/', "") == directory }
             1 -> conversation.involved
             else -> conversation.artifacts
         }
         LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).distinctBy { it.path }
-    }.filter { isShareableWorkspacePath(it.path) }
+    }.filter { isShareableWorkspacePath(it.path) && (query.isBlank() || it.path.contains(query.trim(), ignoreCase = true)) }
     val visibleSharePaths = shareableFiles.map { it.path }.distinct()
 
     LaunchedEffect(visibleSharePaths) {
@@ -223,6 +224,7 @@ internal fun LocalWorkspaceFilesDialog(
                 previewPath = null
                 error = null
             }
+            query.isNotBlank() -> query = ""
             mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
                 directory = directory.substringBeforeLast('/', "")
             else -> onDismiss()
@@ -233,7 +235,7 @@ internal fun LocalWorkspaceFilesDialog(
         preview != null ||
             previewPath != null ||
             (mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty()) ||
-            selecting
+            selecting || query.isNotBlank()
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
     Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
@@ -269,13 +271,13 @@ internal fun LocalWorkspaceFilesDialog(
                 )
 
                 if (preview == null && mode == LocalFilesMode.WORKSPACE) {
-                    DsSegmentedTabs(
+                    FluidSectionNavigation(
                         labels = listOf(
                             stringResource(R.string.app_project_materials),
                             stringResource(R.string.app_project_context),
                             stringResource(R.string.panel_artifacts),
                         ),
-                        selectedIndex = section,
+                        selected = section,
                         onSelect = { selected ->
                             section = selected
                             directory = ""
@@ -286,6 +288,10 @@ internal fun LocalWorkspaceFilesDialog(
                         ),
                     )
                 }
+
+                if (preview == null) DsSearchField(query, { query = it },
+                    placeholder = stringResource(R.string.fluid_files_search),
+                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small))
 
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {
@@ -395,6 +401,11 @@ internal fun LocalWorkspaceFilesDialog(
                         )
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
+                    query.isNotBlank() -> {
+                        if (shareableFiles.isEmpty()) LocalFilesEmpty(
+                            stringResource(R.string.fluid_files_no_matches), query.trim())
+                        else LocalFlatFileList(shareableFiles) { file -> openPreview(file.path) }
+                    }
                     mode == LocalFilesMode.WORKSPACE -> {
                         val files = when (section) {
                             1 -> conversation.involved

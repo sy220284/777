@@ -5,6 +5,9 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class LocalCapabilityUiEntry(val name: String, val family: String, val access: String,
+    val approval: String, val requirements: List<String>)
+
 data class LocalSkillUiEntry(val name: String, val description: String, val modelInvocable: Boolean, val displayName: String = name)
 data class LocalPresetSkillUiEntry(val id: String, val title: String, val description: String, val installed: Boolean)
 data class LocalSkillEditorUiEntry(val id: String, val document: String)
@@ -34,6 +37,9 @@ class LocalToolsUiFacade @Inject constructor(
     )
     internal suspend fun configureGitHub(token: String) = tools.configureGitHub(token)
     internal suspend fun clearGitHub() = tools.clearGitHub()
+    internal fun capabilityCatalogue() = tools.capabilityCatalogue().map {
+        LocalCapabilityUiEntry(it.name, it.family, it.access, it.approval, it.requirements)
+    }
     internal fun installedPluginIds() = tools.installedPluginIds()
     /** Registry presence is a configuration hint, not an execution grant. */
     internal suspend fun handoffExternalReadiness(): Pair<Boolean, Boolean> {
