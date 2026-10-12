@@ -6,6 +6,8 @@ import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import com.labteto.dshmobile.connection.AppDisplayLimits
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -30,7 +32,8 @@ class MobileLayoutRegressionTest {
 
     // Representative phone window widths in dp. Emulator viewports must be >= 412dp:
     // otherwise a 412dp test would silently be constrained to the physical screen width.
-    private val phoneWidthsDp = listOf(360, 393, 412)
+    // Support starts at 393dp; 360dp is intentionally outside the compatibility matrix.
+    private val phoneWidthsDp = listOf(AppDisplayLimits.MIN_SUPPORTED_WIDTH_DP, 412)
 
     @Test
     fun mainstreamPhoneLargeTypeHeaderKeepsActionsOutsideText() {
@@ -79,11 +82,11 @@ class MobileLayoutRegressionTest {
     }
 
     @Test
-    fun extraLargeTypeHeaderWrapsWithoutClippingOnMainstreamPhones() {
+    fun maximumSupportedTypeHeaderWrapsWithoutClippingOnMainstreamPhones() {
         val widthDp = mutableIntStateOf(phoneWidthsDp.first())
         compose.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
                         SyTopBar(
@@ -154,7 +157,7 @@ class MobileLayoutRegressionTest {
     }
 
     @Test
-    fun categoryAdaptsLongLocalizedLabelsAndCountsAtExtraLargeType() {
+    fun categoryAdaptsLongLocalizedLabelsAndCountsAtMaximumSupportedType() {
         val titleText = "来自工作区的长期项目文件"
         val subtitleText = "这里会展示当前保存的项目文件和相关信息"
         val valueText = "123456 个已保存文件"
@@ -162,7 +165,7 @@ class MobileLayoutRegressionTest {
         val widthDp = mutableIntStateOf(phoneWidthsDp.first())
         compose.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
                         SyCategoryRow(
@@ -190,6 +193,24 @@ class MobileLayoutRegressionTest {
             assertTextFits(valueText)
             compose.onNodeWithText(titleText).performClick()
             compose.runOnIdle { assertEquals(index + 1, opened) }
+        }
+    }
+
+    @Test
+    fun themeCapsCombinedSystemAndReadingFontScaleAtOnePointFive() {
+        var observedScale = -1f
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+                DshTheme(textScale = AppDisplayLimits.MAX_READING_SCALE) {
+                    val renderedFontScale = LocalDensity.current.fontScale
+                    SideEffect { observedScale = renderedFontScale }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE, observedScale, 0.0001f)
         }
     }
 
