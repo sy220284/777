@@ -96,6 +96,7 @@ internal fun LocalModeDrawer(
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
+    onOpenPersonaSearchResult: (String) -> Unit,
     onOpenDiary: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
@@ -121,9 +122,15 @@ internal fun LocalModeDrawer(
             TextButton(onClick = { syRailCollapsed = false }, modifier = Modifier.semantics { contentDescription = expandLabel }) { Text("»", color = sy.text) }
             SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
-                onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.Search, contentDescription = stringResource(R.string.sy_v5_tasks),
+            if (usageMode == LocalUsageMode.CHAT) {
+                SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.persona_gallery_title),
+                    onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
+            } else {
+                SyIconButton(icon = FeatherIcons.Folder, contentDescription = stringResource(R.string.local_project_management_title),
+                    onClick = onProjects, containerColor = sy.l3, tint = sy.text)
+            }
+            SyIconButton(icon = FeatherIcons.Clock, contentDescription = stringResource(
+                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
             SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
@@ -361,7 +368,7 @@ internal fun LocalModeDrawer(
                                 stringResource(R.string.local_drawer_search_open_gallery)
                             },
                             value = stringResource(R.string.local_drawer_search_open_gallery),
-                            onClick = onOpenPersonaGallery,
+                            onClick = { onOpenPersonaSearchResult(entry.id) },
                         )
                     }
                 }
