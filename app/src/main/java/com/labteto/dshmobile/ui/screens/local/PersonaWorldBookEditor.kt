@@ -61,42 +61,43 @@ internal fun PersonaWorldBookEditor(
             modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-    if (entries.isEmpty()) {
-        Text(
-            stringResource(R.string.local_persona_lore_empty),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
-    }
-    entries.forEachIndexed { index, entry ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
-                modifier = Modifier.weight(1f),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelPrimary,
-            )
+            if (entries.isEmpty()) {
+                Text(
+                    stringResource(R.string.local_persona_lore_empty),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
+            entries.forEachIndexed { index, entry ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
+                        modifier = Modifier.weight(1f),
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.labelPrimary,
+                    )
+                    DsButton(
+                        text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
+                        onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
+            }
             DsButton(
-                text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
-                onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
+                text = stringResource(R.string.local_persona_lore_add),
+                onClick = {
+                    onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
+                    expandedIndex = entries.size
+                },
+                enabled = entries.size < 80,
                 variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-    }
-    DsButton(
-        text = stringResource(R.string.local_persona_lore_add),
-        onClick = {
-            onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
-            expandedIndex = entries.size
-        },
-        enabled = entries.size < 80,
-        variant = DsButtonVariant.Ghost,
-        modifier = Modifier.fillMaxWidth(),
-    )        }
     }
 
     expandedIndex.takeIf { it in entries.indices }?.let { index ->
