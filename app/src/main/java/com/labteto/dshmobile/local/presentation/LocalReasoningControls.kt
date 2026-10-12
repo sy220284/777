@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalReasoningMode
 import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
-import com.labteto.dshmobile.local.model.LocalReasoningRequestPolicy
 import com.labteto.dshmobile.local.model.LocalReasoningModeStore
 import com.labteto.dshmobile.local.model.LocalModelPerformanceStore
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
