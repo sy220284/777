@@ -59,11 +59,11 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
-import com.labteto.dshmobile.ui.components.DsPill
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
@@ -250,7 +250,7 @@ internal fun LocalModelSettingsCard(
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
                             if (local.modelSelection.isActive(profile)) {
-                                DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
+                                SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
                         val duplicateApiRoute = apiProfiles.count {
@@ -597,7 +597,7 @@ internal fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
         verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {
         capabilities.sortedBy { it.ordinal }.forEach { capability ->
-            DsPill(text = stringResource(modelCapabilityLabel(capability)))
+            SyPill(text = stringResource(modelCapabilityLabel(capability)))
         }
     }
 }
