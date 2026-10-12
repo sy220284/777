@@ -48,7 +48,9 @@ internal class LocalForegroundRecoveryCoordinator(
                     ),
                 )
             }
-            agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
+            agentRunCoordinator.markRecoveryBlocked(
+                sessionId, decision.runId, blocked, reasonCode = decision.blockedCode,
+            )
             return LocalForegroundRecoveryResult(error = blocked, autoResumeAllowed = false)
         }
 
