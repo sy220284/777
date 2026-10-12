@@ -58,6 +58,9 @@ internal class CharacterRuntimeProjector(
                 unknowns = runtimeState.dynamics.unknowns.filter {
                     ChatMemorySelector.isRelevantToTurn(userInput, it)
                 },
+                sharedMoments = runtimeState.dynamics.sharedMoments.filter {
+                    ChatMemorySelector.isRelevantToTurn(userInput, it)
+                },
                 sharedObjects = runtimeState.dynamics.sharedObjects.filter {
                     ChatMemorySelector.isRelevantToTurn(userInput, it)
                 },
