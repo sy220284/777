@@ -702,12 +702,12 @@ fun LocalHarnessScreen(
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen) {
+    BackHandler(enabled = !syWideViewport && drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
 
     PredictiveBackHandler(
-        enabled = !drawerState.isOpen && featurePage != LocalFeaturePage.HOME,
+        enabled = (syWideViewport || !drawerState.isOpen) && featurePage != LocalFeaturePage.HOME,
     ) { progress ->
         var swipeEdge: Int? = null
         try {
