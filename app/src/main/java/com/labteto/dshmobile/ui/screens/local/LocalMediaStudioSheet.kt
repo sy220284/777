@@ -57,7 +57,9 @@ import kotlinx.coroutines.launch
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
     preferredProfileId: String?,
+    sessionId: String,
     onInsertTranscript: (String) -> Unit,
+    onDelivered: () -> Unit = {},
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
     initialPrompt: String = "",
     initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
@@ -120,8 +122,8 @@ internal fun LocalMediaStudioSheetContent(
         if (uri != null && selected != null) {
             val chosen = selected
             submit(chosen) {
-                val answer = viewModel.transcribe(chosen, uri)
-                if (chosen.id == activeOfferId) transcript = answer
+                viewModel.submitTranscribe(chosen, uri, sessionId)
+                if (chosen.id == activeOfferId) onDelivered()
             }
         }
     }
@@ -200,8 +202,8 @@ internal fun LocalMediaStudioSheetContent(
                     DsButton(text = stringResource(R.string.minimax_media_create_image),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val result = viewModel.image(selected, prompt, ratio)
-                            if (selected.id == activeOfferId) image = result
+                            viewModel.submitImage(selected, prompt, ratio, sessionId)
+                            if (selected.id == activeOfferId) onDelivered()
                         } })
                     image?.url?.let { url ->
                         DsButton(text = stringResource(R.string.minimax_media_open_image),
@@ -227,8 +229,9 @@ internal fun LocalMediaStudioSheetContent(
                     DsButton(text = stringResource(R.string.minimax_media_start_video),
                         enabled = !busy && prompt.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val task = viewModel.createVideo(selected, prompt)
+                            val task = viewModel.createVideo(selected, prompt, sessionId)
                             viewedVideoTaskId = task.id
+                            onDelivered()
                         } })
                     val taskRecords = videoTasks.filter { it.belongsTo(selected) }.asReversed()
                     val currentTask = taskRecords.firstOrNull { it.id == viewedVideoTaskId }
@@ -323,8 +326,8 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy && prompt.isNotBlank() && voiceId.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submit(selected) {
-                            val file = viewModel.speech(selected, prompt, voiceId)
-                            if (selected.id == activeOfferId) audioFile = file
+                            viewModel.submitSpeech(selected, prompt, voiceId, sessionId)
+                            if (selected.id == activeOfferId) onDelivered()
                         } })
                     audioFile?.let { file ->
                         DsButton(text = stringResource(R.string.minimax_media_share_speech),
@@ -454,7 +457,11 @@ internal fun LocalMediaStudioSheetContent(
                                     R.string.media_studio_history_item,
                                     asset.provider,
                                     asset.model,
-                                    if (asset.kind == LocalMediaKind.SPEECH.name) stringResource(R.string.media_studio_kind_speech) else stringResource(R.string.media_studio_kind_image),
+                                    when (asset.kind) {
+                                        LocalMediaKind.SPEECH.name -> stringResource(R.string.media_studio_kind_speech)
+                                        LocalMediaKind.TRANSCRIBE.name -> stringResource(R.string.minimax_media_asr)
+                                        else -> stringResource(R.string.media_studio_kind_image)
+                                    },
                                 ),
                                 color = colors.labelPrimary,
                                 style = DsType.caption11.withReadingWeight(),
@@ -479,6 +486,15 @@ internal fun LocalMediaStudioSheetContent(
                                         size = DsButtonSize.Small,
                                         variant = DsButtonVariant.Ghost,
                                         onClick = { shareMediaFile(context, file, mime) { historyError = it } },
+                                    )
+                                } else if (asset.textOutput != null) {
+                                    DsButton(
+                                        text = stringResource(R.string.minimax_media_copy_text),
+                                        size = DsButtonSize.Small,
+                                        onClick = {
+                                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                                .setPrimaryClip(ClipData.newPlainText("transcription", asset.textOutput))
+                                        },
                                     )
                                 } else if (asset.remoteUrl != null) {
                                     DsButton(
@@ -529,7 +545,7 @@ internal fun LocalMediaStudioSheetContent(
     }
 }
 
-private fun openMediaUrl(context: Context, url: String, onError: (String) -> Unit) {
+internal fun openMediaUrl(context: Context, url: String, onError: (String) -> Unit) {
     if (!url.startsWith("https://")) {
         onError(context.getString(R.string.minimax_media_invalid_url))
         return
@@ -538,7 +554,7 @@ private fun openMediaUrl(context: Context, url: String, onError: (String) -> Uni
         .onFailure { onError(it.message.orEmpty()) }
 }
 
-private fun viewMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
+internal fun viewMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         context.startActivity(Intent(Intent.ACTION_VIEW).apply {
@@ -548,7 +564,7 @@ private fun viewMediaFile(context: Context, file: File, mime: String, onError: (
     }.onFailure { onError(it.message.orEmpty()) }
 }
 
-private fun shareMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
+internal fun shareMediaFile(context: Context, file: File, mime: String, onError: (String) -> Unit) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         val intent = Intent(Intent.ACTION_SEND).apply {

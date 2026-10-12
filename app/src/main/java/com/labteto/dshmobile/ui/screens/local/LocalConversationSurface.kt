@@ -282,11 +282,48 @@ internal fun LocalConversationSurface(
     val transcriptMessages = remember(pagedOlderMessages, state.messages) {
         mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode) {
-        buildLocalDisplayTranscript(buildLocalTranscript(
-            transcriptMessages,
-            includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
-        ))
+    // Media is a persistent chat/Work timeline projection, not an assistant text message.
+    val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
+    val generatedMedia by mediaStudioViewModel.generatedResults.collectAsStateWithLifecycle()
+    val videoMediaTasks by mediaStudioViewModel.videoTasks.collectAsStateWithLifecycle()
+    val pendingMediaJobs by mediaStudioViewModel.creationJobs.collectAsStateWithLifecycle()
+    var workArtifacts by remember(state.sessionId) {
+        mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
+    }
+    LaunchedEffect(state.sessionId, state.usageMode, workActions) {
+        workArtifacts = emptyList()
+        if (state.usageMode == LocalUsageMode.WORK && workActions != null) {
+            var lastSequence = Long.MIN_VALUE
+            while (true) {
+                try {
+                    val (sequence, next) = withContext(Dispatchers.IO) {
+                        val current = workActions.eventSequenceForUi(state.sessionId)
+                        current to if (current != lastSequence) workActions.artifactsForUi(state.sessionId) else null
+                    }
+                    next?.let { workArtifacts = it }
+                    lastSequence = sequence
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Keep already-visible deliverables; a transient read failure is not deletion.
+                }
+                delay(2500)
+            }
+        }
+    }
+    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts) {
+        val mediaTimeline = mergeLocalMediaTimeline(
+            buildLocalDisplayTranscript(buildLocalTranscript(
+                transcriptMessages,
+                includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
+            )),
+            state.sessionId,
+            generatedMedia,
+            videoMediaTasks,
+            pendingMediaJobs,
+        )
+        if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
+        else mediaTimeline
     }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
@@ -788,6 +825,32 @@ internal fun LocalConversationSurface(
                                 }
                             }
                         }
+                        is LocalTranscriptItem.MediaResult -> LocalGeneratedMediaResultRow(
+                            result = transcriptItem.result,
+                            viewModel = mediaStudioViewModel,
+                            onInsertText = { text ->
+                                val previous = drafts[state.sessionId].orEmpty()
+                                drafts.putBoundedLocalDraft(
+                                    state.sessionId,
+                                    listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
+                                )
+                            },
+                        )
+                        is LocalTranscriptItem.CreationJob -> LocalCreationJobMessageRow(
+                            job = transcriptItem.job,
+                            viewModel = mediaStudioViewModel,
+                        )
+                        is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
+                            task = transcriptItem.task,
+                            offers = com.labteto.dshmobile.local.model.LocalMediaCatalog.offers(state.modelProfiles),
+                            viewModel = mediaStudioViewModel,
+                        )
+                        is LocalTranscriptItem.WorkArtifact -> LocalWorkArtifactMessageRow(
+                            artifact = transcriptItem.artifact,
+                            workspacePath = state.workspacePath,
+                            actions = workActions,
+                            onOpen = { onOpenWorkArtifact(transcriptItem.artifact.reference) },
+                        )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
                         is LocalTranscriptItem.WorkStep -> Box(
@@ -1349,6 +1412,9 @@ internal fun LocalConversationSurface(
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
                 preferredProfileId = activeModelProfile?.id,
+                sessionId = state.sessionId,
+                viewModel = mediaStudioViewModel,
+                onDelivered = { showMediaStudio = false },
                 initialPrompt = mediaInitialPrompt,
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->

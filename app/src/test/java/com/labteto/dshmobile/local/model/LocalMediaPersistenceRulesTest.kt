@@ -8,6 +8,59 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalMediaPersistenceRulesTest {
+    @Test fun pendingCreationReceiptSurvivesRestartWithoutRepeatingPaidRequest() {
+        val job = LocalMediaCreationJob(
+            id = "operation", sessionId = "chat-one", kind = "SPEECH",
+            provider = "OPENAI", model = "gpt-4o-mini-tts",
+            prompt = "朗读一下", createdAtMillis = 100L,
+        )
+        val stored = Json.encodeToString(LocalMediaCreationJobList.serializer(), LocalMediaCreationJobList(listOf(job)))
+        val restored = Json.decodeFromString(LocalMediaCreationJobList.serializer(), stored)
+        val recovered = LocalMediaCreationJobRecovery.recover(restored.jobs)
+        assertEquals(LocalMediaCreationPhase.OUTCOME_UNKNOWN, recovered.single().phase)
+        assertEquals("chat-one", recovered.single().sessionId)
+        assertEquals(job.id, recovered.single().id)
+        assertEquals(recovered, LocalMediaCreationJobRecovery.recover(recovered))
+        val done = LocalMediaCreationJobRecovery.recover(listOf(job.copy(phase = LocalMediaCreationPhase.SUCCEEDED)))
+        assertEquals(LocalMediaCreationPhase.SUCCEEDED, done.single().phase)
+    }
+
+    @Test fun mediaResultsKeepSessionAndTranscribedTextAcrossSerialization() {
+        val transcript = LocalMediaResult(
+            id = "asr", model = "whisper-1", provider = "OPENAI", kind = "TRANSCRIBE",
+            createdAtMillis = 500L, textOutput = "语音内容", sessionId = "chat-1",
+        )
+        val image = LocalMediaResult(
+            id = "image", model = "image-01", provider = "MINIMAX", kind = "IMAGE",
+            createdAtMillis = 300L, remoteUrl = "https://cdn.example.com/image.png",
+            sessionId = "chat-1", description = "山间茶室",
+        )
+        val encoded = Json.encodeToString(LocalMediaResultList.serializer(), LocalMediaResultList(listOf(image, transcript)))
+        val restored = Json.decodeFromString(LocalMediaResultList.serializer(), encoded).results
+        assertEquals(listOf(image, transcript), restored)
+        assertTrue(runCatching { transcript.copy(remoteUrl = "https://invalid.example/duplicate") }.isFailure)
+
+        // Old global archive results must never appear in an unrelated conversation.
+        val legacy = Json.decodeFromString(LocalMediaResult.serializer(),
+            """{"id":"old","model":"image-01","provider":"MINIMAX","kind":"IMAGE","createdAtMillis":1,"remoteUrl":"https://cdn.example.com/old.png"}""")
+        assertNull(legacy.sessionId)
+    }
+
+    @Test fun videoTasksRetainOriginalSessionWhenPollingAndRestoring() {
+        val pending = job(LocalMediaVideoPhase.SUBMITTING).copy(
+            sessionId = "chat-1", description = "视频提示词",
+        )
+        val recorded = Json.decodeFromString(LocalMediaVideoTask.serializer(),
+            Json.encodeToString(LocalMediaVideoTask.serializer(), pending))
+        val queued = LocalMediaVideoTransitions.accepted(recorded, "task-id", 200L)
+        val finished = LocalMediaVideoTransitions.polled(
+            queued, LocalMediaVideoPhase.SUCCEEDED, "https://cdn.example.com/movie.mp4", 300L
+        )
+        assertEquals("chat-1", finished.sessionId)
+        assertEquals("视频提示词", finished.description)
+        assertEquals(pending.id, finished.id)
+    }
+
     private fun job(phase: LocalMediaVideoPhase, id: String? = null) = LocalMediaVideoTask(
         id = "local-1",
         offerId = "profile-a:MINIMAX:VIDEO:MiniMax-Hailuo-2.3",
