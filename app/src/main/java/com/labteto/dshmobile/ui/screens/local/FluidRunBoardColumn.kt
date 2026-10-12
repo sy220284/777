@@ -32,11 +32,16 @@ internal fun FluidRunBoardColumn(
     }
     Column(Modifier.fillMaxWidth().animateContentSize(tween(500)),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
-        if (section == 0 && state.running) DsCard {
-            FluidPanelTitle(state.goal?.description ?: stringResource(R.string.local_run_center))
-            state.workflowProgress?.let { WorkflowProgressSection(it) }
-                ?: Text(stringResource(R.string.local_tool_phase_running),
-                    style = DsType.small13, color = DsTheme.colors.success)
+        if (section == 0 && (state.running || state.goal != null)) DsCard {
+            FluidPanelTitle(stringResource(R.string.local_run_current_goal))
+            state.goal?.description?.takeIf(String::isNotBlank)?.let { goal ->
+                Text(goal, style = DsType.std14, color = DsTheme.colors.labelPrimary)
+            }
+            if (state.running) {
+                state.workflowProgress?.let { WorkflowProgressSection(it) }
+                    ?: Text(stringResource(R.string.local_tool_phase_running),
+                        style = DsType.small13, color = DsTheme.colors.success)
+            }
         }
         if (section == 1 && (state.pendingQuestion != null || state.pendingApproval != null)) DsCard {
             FluidPanelTitle(stringResource(R.string.fluid_decision_checkpoint))
