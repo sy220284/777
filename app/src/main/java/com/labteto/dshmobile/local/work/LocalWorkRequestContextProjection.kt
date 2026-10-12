@@ -95,13 +95,14 @@ internal fun projectWorkRequestContext(
     structuredWorkState: LocalStructuredWorkState? = null,
     cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
     allowSemanticProjection: Boolean = true,
+    softProjectionScale: Double = 1.0,
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
-    val beforePressure = measuredPressure ?: LocalPromptPressureMeter.measure(
+    val beforePressure = (measuredPressure ?: LocalPromptPressureMeter.measure(
         messages = messages,
         tools = tools,
         operationalLimitTokens = limit,
-    )
+    )).scaledSoft(softProjectionScale)
     val budget = workRequestBudget(limit, cachePolicy)
 
     // Large command/file outputs are the fastest-growing part of Work history. Only the newest
@@ -119,7 +120,7 @@ internal fun projectWorkRequestContext(
             messages = toolProjectedMessages,
             tools = tools,
             operationalLimitTokens = limit,
-        )
+        ).scaledSoft(softProjectionScale)
     } else {
         beforePressure
     }
@@ -187,7 +188,8 @@ internal fun projectWorkRequestContext(
         tools = tools,
         operationalLimitTokens = limit,
     )
-    if (afterPressure.estimatedInputTokens >= toolProjectedPressure.estimatedInputTokens) {
+    val calibratedAfterPressure = afterPressure.scaledSoft(softProjectionScale)
+    if (calibratedAfterPressure.estimatedInputTokens >= toolProjectedPressure.estimatedInputTokens) {
         return LocalWorkRequestProjection(
             messages = toolProjectedMessages,
             projected = staleToolProjection != null,
@@ -200,7 +202,7 @@ internal fun projectWorkRequestContext(
         messages = projectedMessages,
         projected = true,
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
-        estimatedTokensAfter = afterPressure.estimatedInputTokens,
+        estimatedTokensAfter = calibratedAfterPressure.estimatedInputTokens,
         omittedMessages = compacted.omittedMessages,
         preProjectionAssessment = assessment,
     )
@@ -277,6 +279,20 @@ private fun workRequestBudget(
         ),
         maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
         adaptiveCompactionTrigger = cachePolicy.allowAdaptiveEarlyCompaction,
+    )
+}
+
+/** Calibrated estimate informs Work soft compaction only; raw request admission stays unchanged. */
+private fun LocalPromptPressure.scaledSoft(scale: Double): LocalPromptPressure {
+    if (scale == 1.0) return this
+    fun tokens(value: Int): Int =
+        if (value <= 0) 0 else (value * scale).toInt().coerceAtLeast(1)
+    return copy(
+        estimatedInputTokens = tokens(estimatedInputTokens),
+        systemTokens = tokens(systemTokens),
+        historyTokens = tokens(historyTokens),
+        currentUserTokens = tokens(currentUserTokens),
+        toolDefinitionTokens = tokens(toolDefinitionTokens),
     )
 }
 
