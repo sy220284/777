@@ -127,6 +127,12 @@ internal fun normalizeChatPostTurnPatch(root: JsonObject): JsonObject {
             quote is JsonPrimitive && quote.isString
         })
     }
+    result["resolvedContinuityIds"]?.let { raw ->
+        val ids = (raw as? JsonArray)?.filterIsInstance<JsonPrimitive>()
+            ?.filter(JsonPrimitive::isString)
+        if (ids == null) result.remove("resolvedContinuityIds")
+        else result["resolvedContinuityIds"] = JsonArray(ids.take(8))
+    }
     result["turnSignificance"]?.let { value ->
         if (value !is JsonPrimitive || !value.isString) result.remove("turnSignificance")
     }
