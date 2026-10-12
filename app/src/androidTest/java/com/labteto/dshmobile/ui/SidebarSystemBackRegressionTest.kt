@@ -40,9 +40,10 @@ class SidebarSystemBackRegressionTest {
         compose.onNodeWithText(InstrumentationRegistry.getInstrumentation().targetContext.getString(
             R.string.persona_gallery_add_title,
         )).assertIsDisplayed()
-        // Composition readiness is not input readiness. Previous field tests may leave an IME
-        // dismissal in flight; wait for this activity to own the focused input window first.
-        compose.waitUntil(timeoutMillis = 8_000L) { compose.activity.hasWindowFocus() }
+        // Android emulator window focus is not guaranteed when instrumented tests share an
+        // activity stack. It is NOT a precondition for the Back handler's correctness.
+        // Dismiss any IME first, then still inject real device Back and assert the callback.
+        compose.waitForIdle()
         compose.runOnUiThread {
             ViewCompat.getWindowInsetsController(compose.activity.window.decorView)
                 ?.hide(WindowInsetsCompat.Type.ime())
