@@ -42,16 +42,16 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -273,7 +273,7 @@ internal fun LocalAgentTeamSheet(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     var selectedMemberId by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmStopAll by remember { mutableStateOf(false) }
     var stopAllBusy by remember { mutableStateOf(false) }
@@ -401,13 +401,13 @@ internal fun LocalAgentTeamSheet(
                 )
             }
         }
-        DsToastHost(toast)
+        SyToastHost(toast)
     }
 
     val actionFailedText = stringResource(R.string.local_team_action_failed)
 
     if (confirmStopAll) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.local_team_stop_confirm_title),
             onDismiss = { if (!stopAllBusy) confirmStopAll = false },
             dismissOnScrimTap = !stopAllBusy,
