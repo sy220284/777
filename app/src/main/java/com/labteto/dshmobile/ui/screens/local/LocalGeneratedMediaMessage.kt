@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.model.LocalMediaCreationJob
+import com.labteto.dshmobile.local.model.LocalMediaCreationPhase
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaResult
@@ -72,6 +74,55 @@ import kotlinx.coroutines.withContext
  * Chat-native presentation of persisted media work. The attached result is NOT a text turn,
  * so a fictional persona/model never gets a fabricated speech message in its history.
  */
+/**
+ * Pending receipts live in the same lazy list slot as the eventual generated result.
+ * A process restart replaces SUBMITTING by OUTCOME_UNKNOWN, never by a fake success.
+ */
+@Composable
+internal fun LocalCreationJobMessageRow(
+    job: LocalMediaCreationJob,
+    viewModel: LocalMediaStudioViewModel,
+) {
+    val resources = LocalResources.current
+    val phase = when (job.phase) {
+        LocalMediaCreationPhase.SUBMITTING -> R.string.media_chat_creating_now
+        LocalMediaCreationPhase.OUTCOME_UNKNOWN -> R.string.media_chat_creation_uncertain
+        LocalMediaCreationPhase.FAILED -> R.string.media_chat_creation_failed
+        LocalMediaCreationPhase.SUCCEEDED -> R.string.media_chat_creation_saved
+    }
+    MediaMessageCard(
+        title = resources.getString(phase),
+        subtitle = "${job.provider} · ${job.model}",
+    ) {
+        job.prompt?.let { prompt ->
+            Text(prompt, style = DsType.small13.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary, maxLines = 2,
+                overflow = TextOverflow.Ellipsis)
+        }
+        when (job.phase) {
+            LocalMediaCreationPhase.SUBMITTING -> {
+                androidx.compose.material3.LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = DsTheme.colors.labelSecondary,
+                    trackColor = DsTheme.colors.bgLayer1,
+                )
+                Text(resources.getString(R.string.media_chat_creating_hint),
+                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            }
+            LocalMediaCreationPhase.OUTCOME_UNKNOWN, LocalMediaCreationPhase.FAILED -> {
+                Text(job.error ?: resources.getString(R.string.media_chat_creation_uncertain_hint),
+                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+                Text(resources.getString(R.string.media_chat_creation_safe_retry),
+                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            }
+            LocalMediaCreationPhase.SUCCEEDED -> {
+                Text(resources.getString(R.string.media_chat_creation_saved),
+                    style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun LocalGeneratedMediaResultRow(
     result: LocalMediaResult,
