@@ -286,6 +286,7 @@ internal fun LocalConversationSurface(
     val mediaStudioViewModel: LocalMediaStudioViewModel = hiltViewModel()
     val generatedMedia by mediaStudioViewModel.generatedResults.collectAsStateWithLifecycle()
     val videoMediaTasks by mediaStudioViewModel.videoTasks.collectAsStateWithLifecycle()
+    val pendingMediaJobs by mediaStudioViewModel.creationJobs.collectAsStateWithLifecycle()
     var workArtifacts by remember(state.sessionId) {
         mutableStateOf<List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>>(emptyList())
     }
@@ -310,7 +311,7 @@ internal fun LocalConversationSurface(
             }
         }
     }
-    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks, workArtifacts) {
+    val transcriptItems = remember(transcriptMessages, state.usageMode, state.sessionId, generatedMedia, videoMediaTasks, pendingMediaJobs, workArtifacts) {
         val mediaTimeline = mergeLocalMediaTimeline(
             buildLocalDisplayTranscript(buildLocalTranscript(
                 transcriptMessages,
@@ -319,6 +320,7 @@ internal fun LocalConversationSurface(
             state.sessionId,
             generatedMedia,
             videoMediaTasks,
+            pendingMediaJobs,
         )
         if (state.usageMode == LocalUsageMode.WORK) appendWorkArtifactsToTranscript(mediaTimeline, workArtifacts)
         else mediaTimeline
@@ -833,6 +835,10 @@ internal fun LocalConversationSurface(
                                     listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
                                 )
                             },
+                        )
+                        is LocalTranscriptItem.CreationJob -> LocalCreationJobMessageRow(
+                            job = transcriptItem.job,
+                            viewModel = mediaStudioViewModel,
                         )
                         is LocalTranscriptItem.VideoTask -> LocalGeneratedVideoTaskRow(
                             task = transcriptItem.task,
