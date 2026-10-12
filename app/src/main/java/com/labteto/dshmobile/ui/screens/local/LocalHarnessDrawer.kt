@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.DsMetrics
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -97,6 +103,29 @@ internal fun LocalModeDrawer(
     onImmersiveReader: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
+    val docked = LocalConfiguration.current.screenWidthDp >= 1024
+    var syRailCollapsed by rememberSaveable { mutableStateOf(false) }
+    if (docked && syRailCollapsed) {
+        // A functional 64dp rail: never leave a collapsed sidebar full of clipped labels.
+        Column(
+            Modifier.width(SyDimensions.navigationCollapsed).fillMaxHeight()
+                .background(sy.l2).safeDrawingPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TextButton(onClick = { syRailCollapsed = false }) { Text("»", color = sy.text) }
+            DsIconButton(icon = FeatherIcons.Plus, contentDescription = "新建会话",
+                onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
+            DsIconButton(icon = FeatherIcons.User, contentDescription = "人物图集",
+                onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
+            DsIconButton(icon = FeatherIcons.Search, contentDescription = "工作与任务",
+                onClick = onTasks, containerColor = sy.l3, tint = sy.text)
+            DsIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = "设置",
+                onClick = onSettings, containerColor = sy.l3, tint = sy.text)
+        }
+        return
+    }
     var historyQuery by rememberSaveable(usageMode) { mutableStateOf("") }
     var searchOpen by rememberSaveable(usageMode) { mutableStateOf(false) }
     var selectionOpen by remember { mutableStateOf(false) }
@@ -200,11 +229,11 @@ internal fun LocalModeDrawer(
 
     ModalDrawerSheet(
         drawerShape = androidx.compose.ui.graphics.RectangleShape,
-        drawerContainerColor = colors.wallpaperSurface(
-            WallpaperSurfaceLevel.DRAWER,
-            base = colors.sidebar,
+        drawerContainerColor = sy.l2,
+        modifier = Modifier.fillMaxHeight().width(
+            if (docked) SyDimensions.navigationExpanded
+            else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
         ),
-        modifier = Modifier.fillMaxHeight().width(LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
@@ -217,6 +246,11 @@ internal fun LocalModeDrawer(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (docked) {
+                        TextButton(onClick = { syRailCollapsed = true }) {
+                            Text("«", color = sy.text)
+                        }
+                    }
                     SidebarAvatarPicker()
                     Spacer(Modifier.width(DsSpacing.small))
                     Text(
