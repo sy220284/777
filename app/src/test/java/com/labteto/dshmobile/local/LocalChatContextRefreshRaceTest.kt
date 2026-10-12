@@ -197,4 +197,15 @@ class LocalChatContextRefreshRaceTest {
         assertNull(generation)
         assertEquals(0, fixture.persisted())
     }
+    @Test fun restoringExistingPendingStartsConsolidationWithoutNewUserInput() = runTest {
+        val fixture = fixture(backgroundScope)
+        val original = fixture.state.value.chat.chatContext
+        assertTrue(original.pendingThroughSequence > original.processedThroughSequence)
+        assertTrue(fixture.coordinator.resumePending("s", fixture.log, fixture.profile, PersonaProfile()))
+        advanceUntilIdle()
+        assertEquals(original.pendingThroughSequence,
+            fixture.state.value.chat.chatContext.processedThroughSequence)
+        assertFalse(fixture.coordinator.resumePending("other", fixture.log, fixture.profile, PersonaProfile()))
+    }
+
 }
