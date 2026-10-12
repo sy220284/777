@@ -199,9 +199,13 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     internal fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
         profiles.active(model, baseUrl, all)
 
+    /** Legacy startup migration must never rename an explicitly configured API model ID. */
     internal fun normalizeModel(model: String): String =
-        model.trim().ifBlank { LocalModelConfigContract.DEFAULT_MODEL }.let {
-            if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) LocalModelConfigContract.DEFAULT_MODEL else it
+        model.trim().ifBlank { LocalModelConfigContract.DEFAULT_MODEL }.let { name ->
+            if (profiles.read().any { it.model == name }) name
+            else if (name.equals("deepseek-chat", true) || name.equals("deepseek-reasoner", true))
+                LocalModelConfigContract.DEFAULT_MODEL
+            else name
         }
 
     private suspend fun finishRemoval(
