@@ -443,7 +443,6 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_model_performance_title),
-                                subtitle = stringResource(R.string.settings_model_performance_subtitle),
                                 onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
                                 compact = true,
                             )
