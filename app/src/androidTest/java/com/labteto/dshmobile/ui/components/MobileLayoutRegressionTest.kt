@@ -153,6 +153,46 @@ class MobileLayoutRegressionTest {
         }
     }
 
+    @Test
+    fun categoryAdaptsLongLocalizedLabelsAndCountsAtExtraLargeType() {
+        val titleText = "来自工作区的长期项目文件"
+        val subtitleText = "这里会展示当前保存的项目文件和相关信息"
+        val valueText = "123456 个已保存文件"
+        var opened = 0
+        val widthDp = mutableIntStateOf(phoneWidthsDp.first())
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+                DshTheme {
+                    Box(Modifier.width(widthDp.intValue.dp)) {
+                        SyCategoryRow(
+                            icon = FeatherIcons.Folder,
+                            title = titleText,
+                            subtitle = subtitleText,
+                            value = valueText,
+                            onClick = { opened++ },
+                        )
+                    }
+                }
+            }
+        }
+        phoneWidthsDp.forEachIndexed { index, viewport ->
+            compose.runOnIdle { widthDp.intValue = viewport }
+            compose.waitForIdle()
+            val titleBounds = compose.onNodeWithText(titleText, useUnmergedTree = true)
+                .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val valueBounds = compose.onNodeWithText(valueText, useUnmergedTree = true)
+                .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue("宽度 ${viewport}dp：长标题和数量必须分行显示",
+                titleBounds.bottom <= valueBounds.top)
+            assertTextFits(titleText)
+            assertTextFits(subtitleText)
+            assertTextFits(valueText)
+            compose.onNodeWithText(titleText).performClick()
+            compose.runOnIdle { assertEquals(index + 1, opened) }
+        }
+    }
+
     private fun assertTextFits(text: String) {
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithText(text, useUnmergedTree = true)
