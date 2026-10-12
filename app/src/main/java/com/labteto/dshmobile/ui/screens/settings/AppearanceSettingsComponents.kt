@@ -104,9 +104,9 @@ internal fun ReadingPreferencesRow(
         SySlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
-            valueRange = 0.9f..1.3f,
-            steps = 7,
-            hapticSegments = 8,
+            valueRange = com.labteto.dshmobile.connection.AppDisplayLimits.MIN_READING_SCALE..com.labteto.dshmobile.connection.AppDisplayLimits.MAX_READING_SCALE,
+            steps = 5,
+            hapticSegments = 6,
             modifier = Modifier.weight(1f),
         )
         Text(
