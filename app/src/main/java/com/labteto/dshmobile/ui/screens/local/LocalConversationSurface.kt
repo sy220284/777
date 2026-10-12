@@ -90,7 +90,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
@@ -103,7 +103,7 @@ import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -1447,13 +1447,13 @@ private fun EmptyLocalHarness(
                 variant = SyButtonVariant.Info,
                 onClick = { suggestionsOpen = true },
             )
-            DsPopupMenu(
+            SyPopupMenu(
                 expanded = suggestionsOpen,
                 onDismiss = { suggestionsOpen = false },
                 items = listOf(
-                    MenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
-                    MenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
-                    MenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
                 ),
             )
         }
