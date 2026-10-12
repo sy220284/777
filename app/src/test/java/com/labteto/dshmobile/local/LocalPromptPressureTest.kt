@@ -137,4 +137,53 @@ class LocalPromptPressureTest {
         assertEquals(null, store.window("a"))
     }
 
+    @Test
+    fun routeCalibrationNeedsFourRealUsageSamplesAndNeverChangesHardAdmission() {
+        val store = LocalRequestPressureStore()
+        val pressure = LocalPromptPressure(
+            contextChars = 80_000,
+            estimatedInputTokens = 40_000,
+            systemTokens = 4_000,
+            historyTokens = 30_000,
+            currentUserTokens = 2_000,
+            toolDefinitionTokens = 4_000,
+            operationalLimitTokens = 45_000,
+        )
+        repeat(3) { store.recordReportedUsage("s", 30_000, "route-a", 40_000) }
+        assertEquals(pressure, store.forSoftProjection("route-a", pressure))
+        store.recordReportedUsage("s", 30_000, "route-a", 40_000)
+        assertEquals(30_000, store.forSoftProjection("route-a", pressure).estimatedInputTokens)
+        assertEquals(1.0, store.softProjectionScale("route-b"), 0.00001)
+        assertEquals(pressure, store.forSoftProjection("route-b", pressure))
+        assertEquals(pressure.operationalLimitTokens, store.forSoftProjection("route-a", pressure).operationalLimitTokens)
+
+        val request = LocalModelAdmissionRequest(
+            routeFingerprint = "route-a",
+            model = "custom-model",
+            baseUrl = "https://proxy.example/v1",
+            contextWindowTokensOverride = null,
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "x".repeat(25_000))
+            }),
+            tools = JsonArray(emptyList()),
+            operationalInputLimitSnapshot = 1_000,
+        )
+        val hardFailure = runCatching { validateModelRequestAdmission(request) }.exceptionOrNull()
+        assertTrue(hardFailure is LocalModelException)
+        assertEquals("MODEL_CONTEXT_BUDGET_EXCEEDED", (hardFailure as LocalModelException).code)
+    }
+
+    @Test
+    fun reportedUsageCalibrationIsBoundedAndDoesNotApplyToMissingUsage() {
+        val store = LocalRequestPressureStore()
+        store.recordReportedUsage("s", 0, "route-a", 10_000)
+        assertEquals(null, store.routeCalibration("route-a"))
+        repeat(5) { store.recordReportedUsage("s", 3, "route-a", 50_000) }
+        assertEquals(0.70, store.softProjectionScale("route-a"), 0.00001)
+        repeat(6) { store.recordReportedUsage("s", 500_000, "route-b", 50_000) }
+        assertEquals(1.15, store.softProjectionScale("route-b"), 0.00001)
+    }
+
+
 }
