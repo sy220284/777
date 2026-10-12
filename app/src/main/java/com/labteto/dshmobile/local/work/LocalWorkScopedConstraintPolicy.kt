@@ -10,6 +10,11 @@ internal data class LocalWorkScopedConstraintEdit(
 )
 
 internal fun parseLocalWorkScopedConstraintEdit(text: String): LocalWorkScopedConstraintEdit? {
+    val normalized = text.trim()
+    // A question, hypothetical or proposal is not a committed user directive.
+    if (normalized.endsWith("?") || normalized.endsWith("？") ||
+        Regex("""^(?:建议|讨论|考虑|假设|是否|能否)""").containsMatchIn(normalized)
+    ) return null
     val replace = Regex(
         """(?:将|把)\s*[「『“"]([^」』”"]{1,240})[」』”"]\s*(?:改为|替换为|调整为)\s*[「『“"]([^」』”"]{1,240})[」』”"]""",
     ).find(text)
