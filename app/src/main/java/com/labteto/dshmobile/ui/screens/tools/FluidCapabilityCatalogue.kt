@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -82,7 +83,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                     }
                     items(visible, key = { it.name }) { entry ->
                         SySheetChoiceRow(title = entry.name,
-                            subtitle = stringResource(R.string.fluid_capability_registered),
+                            modifier = Modifier.heightIn(min = 72.dp),
                             icon = FeatherIcons.Tool, onClick = { selected = entry })
                     }
                 }
