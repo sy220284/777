@@ -811,6 +811,99 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun pluginReplacedDuringApprovalDoesNotExecuteUnapprovedNewHandler() = runBlocking {
+        var oldExecuted = 0
+        var newExecuted = 0
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.ALWAYS,
+            ) {
+                oldExecuted++
+                ToolResult("old handler")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("stale-reg", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "work",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ ->
+                registry.register(tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                ) {
+                    newExecuted++
+                    ToolResult("new handler")
+                }, replace = true)
+                true
+            },
+        )
+        assertEquals("TOOL_REGISTRATION_CHANGED", result.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertFalse(result.retryable)
+        assertEquals(0, oldExecuted)
+        assertEquals(0, newExecuted)
+    }
+
+    @Test
+    fun pluginUninstalledWhileWaitingForWorkspaceResourceDoesNotRunAfterLock() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val secondWaiting = CompletableDeferred<Unit>()
+        var oldExecuted = 0
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.NEVER,
+            ) {
+                entered.complete(Unit)
+                release.await()
+                ToolResult("first completed")
+            })
+            register(tool(
+                name = "edit",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.NEVER,
+            ) {
+                oldExecuted++
+                ToolResult("stale handler")
+            })
+        }
+        val coordinator = coordinator(registry)
+        val first = async {
+            coordinator.executeScoped(
+                original = LocalToolCall("first", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "work", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> true },
+            )
+        }
+        entered.await()
+        val second = async {
+            coordinator.executeScoped(
+                original = LocalToolCall("second", "edit", JsonObject(emptyMap()), "{}"),
+                sessionId = "work", allowMutation = true, planModeEnabled = false,
+                approval = { _, _, _ -> true },
+                beforeExecution = {
+                    secondWaiting.complete(Unit)
+                    true
+                },
+            )
+        }
+        secondWaiting.await()
+        registry.unregister("edit")
+        release.complete(Unit)
+        assertFalse(first.await().isError)
+        val rejected = second.await()
+        assertEquals("TOOL_REGISTRATION_CHANGED", rejected.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, rejected.sideEffect)
+        assertEquals(0, oldExecuted)
+    }
+
+    @Test
     fun scopedExecutionUsesOwningSessionInsteadOfForegroundSession() = runBlocking {
         var observedSessionId = ""
         val registry = ToolRegistry().apply {
