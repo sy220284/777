@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.text.selection.SelectionContainer
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,7 +39,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsPageEmptyState
+import com.shenyan.designsystem.components.SyEmptyState
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -211,7 +211,7 @@ internal fun LocalRunCenterScreen(
             }
             if (!state.hasRunCenterContent() && artifacts.isEmpty() && toolActivities.isEmpty()) {
                 Column(Modifier.fillMaxSize()) {
-                    DsPageEmptyState(
+                    SyEmptyState(
                         icon = FeatherIcons.Activity,
                         title = stringResource(R.string.local_run_center_empty_title),
                         body = stringResource(R.string.local_run_center_empty_body),
@@ -289,7 +289,7 @@ internal fun LocalRunCenterScreen(
                                 LocalToolUiPhase.OUTCOME_UNKNOWN -> R.string.local_tool_phase_unknown
                                 LocalToolUiPhase.CANCELLED -> R.string.local_tool_phase_cancelled
                             }
-                            DsSheetChoiceRow(
+                            SySheetChoiceRow(
                                 title = activity.name,
                                 subtitle = stringResource(phase) + activity.errorCode?.let { " · " + it }.orEmpty(),
                                 onClick = { selectedToolCallId = activity.callId },
@@ -339,7 +339,7 @@ internal fun LocalRunCenterScreen(
                                     artifact.currentlyAvailable == false -> stringResource(R.string.local_delivery_file_missing)
                                     else -> stringResource(R.string.local_delivery_file_unknown)
                                 }
-                                DsSheetChoiceRow(
+                                SySheetChoiceRow(
                                     title = artifact.reference,
                                     subtitle = "$label · $detail",
                                     modifier = Modifier.weight(1f),
