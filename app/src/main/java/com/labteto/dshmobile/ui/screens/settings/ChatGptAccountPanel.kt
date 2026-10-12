@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE
@@ -405,7 +406,7 @@ internal fun ChatGptAccountPanel(
                     planModels.forEach { model ->
                         Surface(
                             shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            color = LocalSyColors.current.materialL1,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
@@ -577,7 +578,7 @@ private fun ChatGptAccountAction(
         enabled = enabled,
         modifier = modifier.heightIn(min = 64.dp),
         shape = DsShapes.row,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.bgModulePlatform),
+        color = LocalSyColors.current.materialL1,
         contentColor = labelColor,
         border = BorderStroke(1.dp, colors.borderL2),
     ) {

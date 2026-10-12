@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
@@ -253,7 +254,7 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
         modifier = Modifier
             .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.cube)
-            .background(if (selected) colors.accentTertiary else colors.bgModulePlatform)
+            .background(if (selected) colors.accentTertiary else LocalSyColors.current.materialL1)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = DsSpacing.small),
     ) {

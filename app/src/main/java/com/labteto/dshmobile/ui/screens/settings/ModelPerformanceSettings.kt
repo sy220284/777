@@ -63,7 +63,7 @@ internal fun ModelPerformanceSettingsPage() {
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .clip(DsShapes.row)
-                    .background(if (limits.reasoningCeiling == ceiling) colors.bgModulePlatform
+                    .background(if (limits.reasoningCeiling == ceiling) colors.accentTertiary
                         else androidx.compose.ui.graphics.Color.Transparent)
                     .clickable { LocalModelPerformanceControls.setReasoningCeiling(ceiling) }
                     .padding(horizontal = DsSpacing.small),

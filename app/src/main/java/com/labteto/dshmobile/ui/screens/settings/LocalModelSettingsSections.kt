@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -235,7 +236,7 @@ internal fun LocalModelSettingsCard(
             Surface(
                 shape = DsShapes.row,
                 color = if (isSelectedProfile) colors.accentTertiary
-                    else colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                    else LocalSyColors.current.materialL1,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
                     if (isSelectedProfile) colors.accent.copy(alpha = 0.45f) else colors.borderL1,
@@ -402,7 +403,7 @@ internal fun LocalModelSettingsCard(
                 SyMenu(
                     anchor = {
                         Surface(shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                            color = LocalSyColors.current.materialL1,
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                 verticalAlignment = Alignment.CenterVertically) {
@@ -510,7 +511,7 @@ internal fun LocalModelSettingsCard(
                     SyMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
-                                color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                                color = LocalSyColors.current.materialL1,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                     verticalAlignment = Alignment.CenterVertically) {
