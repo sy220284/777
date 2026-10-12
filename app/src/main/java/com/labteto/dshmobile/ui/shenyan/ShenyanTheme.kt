@@ -1,11 +1,6 @@
 package com.labteto.dshmobile.ui.shenyan
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -101,54 +96,65 @@ object SyDurations {
     const val sidebarDelay = 60
 }
 
-/** Attach new V5 tokens at the app theme root while old business screens migrate. */
+/**
+ * The only runtime palette comes from canonical V5 LocalSyColors.
+ * This object adapts old call sites that still expect semantic SyPalette properties.
+ * Always install this bridge INSIDE com.shenyan.designsystem.foundation.ShenyanTheme.
+ */
 @Composable
 fun SyThemeProvider(
     mode: SyMode,
     reduceMotion: Boolean = false,
     reduceTransparency: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val palette = SyPalettes.forMode(mode, isSystemInDarkTheme())
+    val tokens = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val base = SyPalettes.forMode(mode, isSystemInDarkTheme())
+    val adapted = base.copy(
+        canvas = tokens.canvas,
+        l1 = tokens.materialL1, l2 = tokens.materialL2,
+        l3 = tokens.materialL3, l4 = tokens.materialL4,
+        solid = tokens.materialL5, rim = tokens.materialSheen,
+        border = tokens.border,
+        text = tokens.text,
+        secondaryText = tokens.textSecondary,
+        tertiaryText = tokens.textTertiary,
+        peach = tokens.primary, peachPressed = tokens.primaryPressed,
+        onPeach = tokens.onPrimary, mint = tokens.mint,
+        lilac = tokens.lilac, clay = tokens.clay,
+        warning = tokens.warning, danger = tokens.danger,
+        scrim = tokens.overlay,
+    )
     CompositionLocalProvider(
-        LocalSyPalette provides palette,
+        LocalSyPalette provides adapted,
         LocalSyReducedMotion provides reduceMotion,
         LocalSyReducedTransparency provides reduceTransparency,
         content = content,
     )
 }
 
-/** Standalone rendering entry; unlike the temporary provider, this owns Material3 appearance. */
+/** Standalone entry shares exactly the same canonical Material3 V5 theme. */
 @Composable
 fun ShenyanTheme(
     mode: SyMode,
     reduceMotion: Boolean = false,
     reduceTransparency: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val palette = SyPalettes.forMode(mode, isSystemInDarkTheme())
-    val scheme = if (mode == SyMode.LIGHT || (mode == SyMode.SYSTEM && !isSystemInDarkTheme())) {
-        lightColorScheme(primary=palette.peach, onPrimary=palette.onPeach,
-            background=palette.canvas, onBackground=palette.text,
-            surface=palette.solid, onSurface=palette.text,
-            surfaceVariant=palette.l3, onSurfaceVariant=palette.secondaryText,
-            secondary=palette.mint, tertiary=palette.lilac, error=palette.danger)
-    } else {
-        darkColorScheme(primary=palette.peach, onPrimary=palette.onPeach,
-            background=palette.canvas, onBackground=palette.text,
-            surface=palette.solid, onSurface=palette.text,
-            surfaceVariant=palette.l3, onSurfaceVariant=palette.secondaryText,
-            secondary=palette.mint, tertiary=palette.lilac, error=palette.danger)
+    val systemDark = isSystemInDarkTheme()
+    val canonicalMode = when (mode) {
+        SyMode.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+        SyMode.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+        SyMode.MATTE -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+        SyMode.SYSTEM -> if (systemDark)
+            com.shenyan.designsystem.foundation.ShenyanMode.DARK
+            else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
     }
-    SyThemeProvider(mode, reduceMotion, reduceTransparency) {
-        MaterialTheme(
-            colorScheme=scheme,
-            shapes=Shapes(
-                small=RoundedCornerShape(SyDimensions.cornerControl),
-                medium=RoundedCornerShape(SyDimensions.cornerCard),
-                large=RoundedCornerShape(SyDimensions.cornerOverlay),
-            ),
-            content=content,
-        )
+    com.shenyan.designsystem.foundation.ShenyanTheme(
+        mode = canonicalMode,
+        reduceMotion = reduceMotion,
+        reduceTransparency = reduceTransparency,
+    ) {
+        SyThemeProvider(mode, reduceMotion, reduceTransparency, content)
     }
 }
