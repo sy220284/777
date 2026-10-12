@@ -26,7 +26,7 @@ class LocalEffectiveModelContractAndroidTest {
             baseUrl = "https://api.minimaxi.com/v1",
             credentialRef = "test-account",
         )
-        val model = LocalEffectiveModelContracts.forProfile(profile, withTools = true)
+        val model = LocalEffectiveModelContracts.forProfile(profile)
         val frozen = profile.toRunModelSurface()
         assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, model.protocol)
         assertEquals(model, frozen.contract)
