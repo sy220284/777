@@ -23,6 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
+import com.shenyan.designsystem.foundation.SySceneBackdrop
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
@@ -223,11 +230,33 @@ fun AppBackgroundHost(
         surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
         fluidGlass = fluidGlass,
     )
-    CompositionLocalProvider(
-        LocalAppBackground provides loaded?.image,
-        LocalAppBackgroundState provides state,
-    ) {
-        Box(modifier.fillMaxSize().background(surfaceBase)) {
+    var viewportOrigin by remember { mutableStateOf(IntOffset.Zero) }
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val dsColors = DsTheme.colors
+    val sceneBackdrop = if (viewportSize.width > 0 && viewportSize.height > 0 &&
+        (loaded != null || fluidGlass)
+    ) SySceneBackdrop(
+        viewportOrigin = viewportOrigin,
+        viewportSize = viewportSize,
+        canvas = surfaceBase,
+        image = loaded?.image,
+        veil = adaptiveGlobalVeil(state, surfaceBase),
+        glowColors = if (loaded == null && fluidGlass) listOf(
+            dsColors.brandPrimary, dsColors.successSecondary, dsColors.characterAccentTertiary,
+        ) else emptyList(),
+        dark = darkTheme,
+    ) else null
+    Box(modifier.fillMaxSize().background(surfaceBase).onGloballyPositioned { coordinates ->
+        val point = coordinates.positionInWindow()
+        val nextOrigin = IntOffset(point.x.roundToInt(), point.y.roundToInt())
+        if (viewportOrigin != nextOrigin) viewportOrigin = nextOrigin
+        if (viewportSize != coordinates.size) viewportSize = coordinates.size
+    }) {
+        CompositionLocalProvider(
+            LocalAppBackground provides loaded?.image,
+            LocalAppBackgroundState provides state,
+            LocalSySceneBackdrop provides sceneBackdrop,
+        ) {
             if (loaded == null && fluidGlass) FluidGlassBackdrop(darkTheme)
             loaded?.let { background ->
                 Image(
@@ -237,11 +266,7 @@ fun AppBackgroundHost(
                     contentScale = ContentScale.Crop,
                 )
                 adaptiveGlobalVeil(state, surfaceBase)?.let { veil ->
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(veil),
-                    )
+                    Box(Modifier.fillMaxSize().background(veil))
                 }
             }
             content()
