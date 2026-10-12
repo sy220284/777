@@ -432,27 +432,69 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = 
 @Composable
 private fun InlineSpeechPlayer(file: File) {
     val resources = LocalResources.current
-    val context = LocalContext.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     var player by remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
+    var durationMs by remember(file.absolutePath) { mutableStateOf(0) }
+    var positionMs by remember(file.absolutePath) { mutableStateOf(0) }
     DisposableEffect(file.absolutePath) {
         onDispose { player?.release(); player = null }
     }
-    DsButton(text = if (playing) resources.getString(R.string.media_chat_pause_audio) else resources.getString(R.string.media_chat_play_audio), size = DsButtonSize.Small,
-        onClick = {
-            runCatching {
-                val current = player ?: MediaPlayer().apply {
-                    setDataSource(file.absolutePath)
-                    prepare()
-                    setOnCompletionListener { playing = false }
-                }.also { player = it }
-                if (playing) current.pause() else current.start()
-                playing = !playing
-            }.onFailure { error = it.message ?: resources.getString(R.string.media_chat_audio_failed) }
-        })
+    LaunchedEffect(playing, file.absolutePath) {
+        while (playing) {
+            positionMs = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+            delay(300)
+        }
+    }
+    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        DsButton(
+            text = if (playing) resources.getString(R.string.media_chat_pause_audio)
+                else resources.getString(R.string.media_chat_play_audio),
+            size = DsButtonSize.Small,
+            onClick = {
+                runCatching {
+                    val current = player ?: MediaPlayer().apply {
+                        setDataSource(file.absolutePath)
+                        prepare()
+                        setOnCompletionListener {
+                            playing = false
+                            positionMs = durationMs
+                        }
+                    }.also {
+                        player = it
+                        durationMs = it.duration.coerceAtLeast(0)
+                    }
+                    if (playing) current.pause() else {
+                        if (positionMs >= durationMs && durationMs > 0) current.seekTo(0)
+                        current.start()
+                    }
+                    playing = !playing
+                }.onFailure { error = it.message ?: resources.getString(R.string.media_chat_audio_failed) }
+            },
+        )
+        Text(
+            "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
+            style = DsType.caption11.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+        )
+    }
+    androidx.compose.material3.Slider(
+        value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
+        onValueChange = { fraction ->
+            val target = (durationMs * fraction).toInt().coerceIn(0, durationMs)
+            runCatching { player?.seekTo(target) }.onSuccess { positionMs = target }
+        },
+        enabled = durationMs > 0,
+        modifier = Modifier.fillMaxWidth(),
+    )
     error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
         color = DsTheme.colors.labelSecondary) }
+}
+
+private fun formatMediaDuration(ms: Int): String {
+    val seconds = ms.coerceAtLeast(0) / 1000
+    return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 }
 
 @Composable
