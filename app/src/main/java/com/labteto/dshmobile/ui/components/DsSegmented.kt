@@ -37,6 +37,8 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
 
 /** One choice in a [DsSegmented] track. */
 data class DsSegment(val key: String, val label: String)
@@ -71,16 +73,17 @@ fun DsSegmented(
     hapticOnChange: Boolean = false,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier
             .clip(DsShapes.row)
-            .background(colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, base = colors.hoverSolid))
+            .background(sy.l2)
             // Outlined as well as filled, because the fill alone cannot be trusted to show. The
             // track's grey is a step off `bgLayer1`, but in dark mode it is the *same* colour as
             // `bgLayer2` — so on a sheet the fill vanishes and the control collapses back into the
             // row of bare words this component exists to stop being.
-            .border(1.dp, colors.borderL2, DsShapes.row)
+            .border(1.dp, sy.border, DsShapes.row)
             .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -112,8 +115,9 @@ private fun DsSegment(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     val thumb by animateColorAsState(
-        targetValue = if (selected) colors.bgLayer1 else androidx.compose.ui.graphics.Color.Transparent,
+        targetValue = if (selected) sy.l3 else androidx.compose.ui.graphics.Color.Transparent,
         animationSpec = DsAnimations.tabBackground,
         label = "segmentGlassThumb",
     )
@@ -125,7 +129,7 @@ private fun DsSegment(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = SyDimensions.minimumTouch)
             .shadow(if (selected) 2.dp else 0.dp, DsShapes.row)
             .clip(DsShapes.row)
             .background(thumb)
@@ -136,16 +140,16 @@ private fun DsSegment(
             label,
             style = DsType.tabText.withReadingWeight(),
             color = when {
-                !enabled -> colors.labelDimmed
-                selected -> colors.labelPrimary
-                else -> colors.labelSecondary
+                !enabled -> sy.tertiaryText
+                selected -> sy.text
+                else -> sy.secondaryText
             },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         if (role == Role.Tab) {
             Spacer(Modifier.height(DsSpacing.tiny))
-            Spacer(Modifier.width(underline).height(2.dp).background(colors.accent, DsShapes.chip))
+            Spacer(Modifier.width(underline).height(2.dp).background(sy.peach, DsShapes.chip))
         }
     }
 }
