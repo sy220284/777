@@ -366,7 +366,7 @@ internal fun LocalModelSettingsCard(
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (custom) stringResource(R.string.local_model_custom)
+                                Text(if (custom) model.ifBlank { stringResource(R.string.local_model_custom) }
                                     else LocalModelPresets.entries.firstOrNull {
                                         it.model == model && it.baseUrl == baseUrl
                                     }?.let { "${it.provider} · ${it.model}" } ?: model,
