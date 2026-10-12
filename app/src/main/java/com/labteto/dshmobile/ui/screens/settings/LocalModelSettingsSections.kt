@@ -78,6 +78,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -178,6 +179,12 @@ internal fun LocalModelSettingsCard(
                     } else {
                         catalogSuccessFormat.format(found.size)
                     }
+                }
+            } catch (timeout: TimeoutCancellationException) {
+                if (showEditor && editorGeneration == generation) {
+                    discoveredModels = emptyList()
+                    catalogError = true
+                    catalogStatus = catalogFailureFormat.format(catalogUnavailable)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
