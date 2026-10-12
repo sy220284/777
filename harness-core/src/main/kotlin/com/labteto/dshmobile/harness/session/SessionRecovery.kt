@@ -37,6 +37,7 @@ object SessionRecovery {
     private const val MODEL_TOOL_CALLS_EVENT_KEY = "model_tool_calls"
     const val TOOL_NOT_STARTED = "TOOL_NOT_STARTED"
     const val TOOL_OUTCOME_UNKNOWN = "TOOL_OUTCOME_UNKNOWN"
+    const val TOOL_READ_RESULT_UNKNOWN = "TOOL_READ_RESULT_UNKNOWN"
 
     private data class PendingCall(
         val id: String,
@@ -56,18 +57,25 @@ object SessionRecovery {
         name: String?,
         step: Int?,
         started: Boolean,
+        verifiedReadOnly: Boolean = false,
     ): RecoveredToolResult {
-        val code = if (started) TOOL_OUTCOME_UNKNOWN else TOOL_NOT_STARTED
-        val content = if (started) {
-            "该工具调用在中断前已记录为开始，但没有持久化结果。实际副作用未知；若工具可能改变状态，先检查外部状态，禁止盲目重试。"
-        } else {
-            "该工具调用在中断前尚未记录为开始。如任务仍需要，可重新执行。"
+        val code = when {
+            !started -> TOOL_NOT_STARTED
+            verifiedReadOnly -> TOOL_READ_RESULT_UNKNOWN
+            else -> TOOL_OUTCOME_UNKNOWN
+        }
+        val content = when (code) {
+            TOOL_OUTCOME_UNKNOWN ->
+                "工具已开始执行，但缺少持久化结果。可能存在外部副作用，先核实真实状态，不得盲目重复写入。"
+            TOOL_READ_RESULT_UNKNOWN ->
+                "已核验此工具是只读调用，但中断前没有完整结果；原结果不能宣称成功。可按当前需求重新读取。"
+            else -> "工具在中断前尚未开始。如任务仍需要，可重新执行。"
         }
         val modelContent = AgentToolResult(
             content = content,
             isError = true,
             errorCode = code,
-            retryable = code == TOOL_NOT_STARTED,
+            retryable = code != TOOL_OUTCOME_UNKNOWN,
             sideEffect = if (code == TOOL_OUTCOME_UNKNOWN) {
                 AgentToolSideEffect.POSSIBLE
             } else {
@@ -76,7 +84,7 @@ object SessionRecovery {
             recoveryHint = if (code == TOOL_OUTCOME_UNKNOWN) {
                 "先检查外部状态，再决定是否重试。"
             } else {
-                "如任务仍需要，可重新执行该工具。"
+                "本次操作尚无成功结果，可安全重新执行只读操作或未开始的调用。"
             },
         ).modelVisibleContent()
         return RecoveredToolResult(callId, name, step, code, content, modelContent)
