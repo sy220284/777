@@ -237,4 +237,19 @@ class ChatSceneRuntimeTest {
         assertEquals(original, result)
     }
 
+    @Test
+    fun arrivingBeforeSpeakingIsNotAPlaceAndRealNextMovementStillWorks() {
+        val previous = ChatSceneState(location = "房间")
+        val noMove = ChatSceneRuntime.extractTurnEvents(
+            previous, "不能你到了才讲，我会不安的。", "", 40L,
+        )
+        assertTrue(noMove.none { it.kind == ChatSceneEventKind.LOCATION })
+        assertEquals("房间", ChatSceneRuntime.reduce(previous, noMove).location)
+
+        val moved = ChatSceneRuntime.extractTurnEvents(
+            previous, "你到了才讲，然后我们走进茶室。", "", 41L,
+        )
+        assertEquals("茶室", ChatSceneRuntime.reduce(previous, moved).location)
+    }
+
 }
