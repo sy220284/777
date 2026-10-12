@@ -71,7 +71,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     internal suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
     fun selectModel(id: String) = modelRuntime.selectModel(id)
     fun removeModel(id: String) = modelRuntime.removeModel(id)
-    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId)
+    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
     suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> = modelRuntime.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
     fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
