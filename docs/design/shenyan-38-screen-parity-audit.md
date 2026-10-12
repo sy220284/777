@@ -11,7 +11,7 @@
 | 01 | 聊天三栏 | `local/LocalConversationSurface.kt；local/LocalHarnessDrawer.kt` | 部分 | 三栏/单栏投影、头像、消息布局、滚动和连续回复仍需设备逐状态截图 |
 | 02 | 工作执行 | `local/LocalWorkDesignSurface.kt；local/LocalWorkProcessComponents.kt` | 部分 | 五区已接，审批与输出片段需要逐状态/转场验收 |
 | 03 | 运行中心 | `local/LocalRunCenterScreen.kt；local/FluidRunBoardColumn.kt` | 部分 | 三看板已接，长列表、空态、等待审批进入后动效未验 |
-| 04 | 消耗与用量 | `settings/UsageCalculationPage.kt；settings/UsageCalculationComponents.kt` | 待改 | 参考趋势/模型构成/单笔详情三层布局；仅能展示真实 provider 统计 |
+| 04 | 消耗与用量 | `settings/UsageCalculationPage.kt；settings/UsageCalculationComponents.kt` | 本轮修改 | 真实模型构成行可以直接点击筛选，保留真实趋势、单笔账本及历史不足提示；图形/布局/设备验收待完工 |
 | 05 | 沉浸阅读 | `local/FluidMessageReader.kt；local/LocalFeatureAnimatedHost.kt` | 部分 | 抽屉收起/返回/消息原位恢复需实机验证 |
 | 06 | 人物图集 | `local/FluidPersonaGalleryGrid.kt；local/PersonaGalleryOverviewV3.kt` | 本轮修改 | 首十卡 360ms/80ms Cascade 已接，长按有震动；照片适配/进入后动作仍需设备比对 |
 | 07 | 人物档案 | `local/FluidPersonaSections.kt；local/PersonaGalleryDialog.kt` | 部分 | 关系/故事线/记忆/档案四段必须与现有状态分离一致 |
@@ -112,3 +112,10 @@
 - 第 25 屏：真实会话存储占用/预算比例，sessionStorageUsageFraction 保证范围并对无效预算返回 0；测试：LocalSessionStorageVisualTest。
 - 第 29 屏：真实 AppLog 全部/异常计数与分组标签，保留刷新、完整诊断导出。
 - Figma MCP 仍受 Starter 额度阻塞，已上传的 HTML/Compose 设计包为可用的原始对照依据；最新 CI 尚未证实通过，不把组件一致当做全页面验收完成。
+
+## 最新差异校准（2026-10-12 / PR #654）
+
+- 第 04 屏：真实模型构成列表支持直接切换模型用量视图；原有全部/单模型筛选共用唯一回调。
+- 第 31/32 屏关联的原生权限生命周期：已移除 MainActivity 的“开屏立刻请求通知权限”；通知渠道仍创建，用户可在权限/通知页面明确点击系统授权按钮。首次欢迎引导页的完整三步骤和转场仍属第 31 屏未完成。
+- 截至本轮代码提交，38 屏分类为：19 屏“本轮修改”、13 屏“部分”、6 屏“待改”。其含义仅为进展分类，**完整视觉/动效/Android16-17 回归验收为 0 屏**。
+- 还未进入本轮页面结构改造的六项：12 人物定时互动、21 模型设置、30 检查更新、31 首次引导、36 通知样式、37 完成转场。
