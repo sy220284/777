@@ -26,7 +26,10 @@ internal object ChatMemorySelector {
             IMPLICIT_CONTINUITY_HINTS.any(text::contains)) {
             // The discourse referent comes from lived conversation, not every old to-do.
             ongoing.ifEmpty { listOf(context.attention.lastUserSubject).filter(String::isNotBlank) }
-                .ifEmpty { context.continuity.recentEvents.takeLast(1) }
+                .ifEmpty {
+                    context.continuity.recentEvents.takeLast(1) +
+                        context.continuity.decisions.takeLast(1)
+                }
         } else emptyList()
         return (listOf(text) + referents).filter(String::isNotBlank).distinct()
             .joinToString(" ").takeLast(1_200)
