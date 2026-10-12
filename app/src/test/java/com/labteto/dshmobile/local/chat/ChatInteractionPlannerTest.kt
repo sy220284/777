@@ -1660,4 +1660,22 @@ class ChatInteractionPlannerTest {
         assertTrue(closed.dynamics.unknowns.isEmpty())
     }
 
+    @Test
+    fun noneSignificanceStillReconcilesExplicitlyAnsweredUnknownsAndClearedConflict() {
+        val previous = ChatCharacterState(
+            dynamics = RelationshipDynamics(
+                unknowns = listOf("是否接受保密条件", "明天去哪"),
+                unresolvedConflict = "是否愿意遵守约定",
+            ),
+        )
+        val state = planner.parse(
+            """{"state":{"dynamics":{"unknowns":["明天去哪"],"unresolvedConflict":""}},"turnSignificance":"NONE"}""",
+            previous,
+            userMessage = "我答应你遵守保密约定。",
+            assistantMessage = "谢谢，我知道你已经同意。",
+        )!!.state
+        assertEquals(listOf("明天去哪"), state.dynamics.unknowns)
+        assertEquals("", state.dynamics.unresolvedConflict)
+    }
+
 }
