@@ -236,12 +236,15 @@ internal fun mergeLocalMediaTimeline(
             .map { LocalTranscriptItem.CreationJob(it) } +
         videoTasks.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.VideoTask(it) }
     if (media.isEmpty()) return transcript
+    // A pending media card must not jump below newer chat messages after completion.
+    val operationTimestamps = jobs.associate { it.id to it.createdAtMillis }
     fun timestamp(item: LocalTranscriptItem): Long = when (item) {
         is LocalTranscriptItem.Message -> item.message.createdAt
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
         is LocalTranscriptItem.WorkStep -> item.message.createdAt
-        is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis
+        is LocalTranscriptItem.MediaResult ->
+            operationTimestamps[item.result.id] ?: item.result.createdAtMillis
         is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
