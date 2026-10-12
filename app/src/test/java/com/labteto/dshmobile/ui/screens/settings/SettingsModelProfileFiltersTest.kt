@@ -15,8 +15,11 @@ import org.junit.Test
 
 class SettingsModelProfileFiltersTest {
     @Test
-    fun modelAndAccountShareOneNavigationDestination() {
-        assertTrue(SettingsDestination.entries.none { it.name == "ACCOUNT" })
+    fun uploadedDesignKeepsModelAccountAndStorageAsRootDestinations() {
+        assertEquals(SettingsDestination.ROOT, SettingsDestination.ACCOUNT.parentDestination())
+        assertEquals(1, SettingsDestination.ACCOUNT.navigationDepth())
+        assertEquals(SettingsDestination.ROOT, SettingsDestination.SESSION_STORAGE.parentDestination())
+        assertEquals(1, SettingsDestination.SESSION_STORAGE.navigationDepth())
         assertEquals(SettingsDestination.ROOT, SettingsDestination.MODELS.parentDestination())
         assertEquals(SettingsDestination.ROOT, SettingsDestination.MODEL_PERFORMANCE.parentDestination())
         assertEquals(1, SettingsDestination.MODEL_PERFORMANCE.navigationDepth())

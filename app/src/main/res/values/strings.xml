@@ -2149,5 +2149,6 @@
     <string name="fluid_reader_title">沉浸阅读</string>
     <string name="fluid_reader_empty">暂无可阅读的回复</string>
     <string name="fluid_model_composition">模型累计 Token 构成</string>
+    <string name="fluid_settings_session_storage">会话与存储</string>
 </resources>
 
