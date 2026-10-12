@@ -430,7 +430,13 @@ while frontier_sources:
         reachable_scripts.add(relative)
         frontier_sources.append(script_sources[relative])
 
+# Feature-tree maintenance was deliberately retired from Actions. Its verification
+# script remains available to developers for manual audits, not as a CI gate.
+# This one explicit exception preserves the fail-closed rule for all active gates.
+manual_only_checks = {"check-feature-tree-sync.py"}
 for guard in sorted(SCRIPTS.glob("check-*.py")):
+    if guard.name in manual_only_checks:
+        continue
     if guard.relative_to(ROOT).as_posix() not in reachable_scripts:
         violations.append(f"{guard.name}: gate is not invoked by any reachable workflow run step")
 
