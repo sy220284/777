@@ -44,10 +44,10 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyComposerMetrics
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -188,7 +188,7 @@ internal fun LocalConversationComposer(
     @Composable
     fun AttachmentControl() {
         if (state.running) return
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
@@ -208,7 +208,7 @@ internal fun LocalConversationComposer(
     @Composable
     fun ReplySuggestionsControl() {
         if (!replySuggestionsAvailable) return
-        DsComposerAction(
+        SyComposerAction(
             icon = FeatherIcons.Activity,
             contentDescription = if (replySuggestionsLoading) {
                 stringResource(R.string.common_loading)
@@ -224,7 +224,7 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun SendControl(queue: Boolean = false) {
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
             iconSize = 32.dp,
@@ -245,7 +245,7 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun StopControl() {
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
             iconSize = 32.dp,
@@ -257,7 +257,7 @@ internal fun LocalConversationComposer(
         )
     }
 
-    DsConversationComposer(
+    SyConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
         shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
@@ -359,7 +359,7 @@ internal fun LocalConversationComposer(
                     ReplySuggestionsControl()
                 }
             }
-            DsComposerField(
+            SyComposerField(
                 value = input,
                 onValueChange = onInputChange,
                 visualTransformation = if (state.usageMode == LocalUsageMode.WORK) {
