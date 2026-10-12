@@ -19,7 +19,7 @@ import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
-import com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput
+import com.labteto.dshmobile.local.model.LocalModelAttemptStreamEvidence
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
@@ -35,7 +35,6 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
-import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.LOCAL_NATIVE_TOOL_IMAGE_GENERATION
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
 import com.labteto.dshmobile.local.model.resolveLocalNativeToolNames
@@ -452,22 +451,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         var providerStartedNanos: Long? = null
-        var attemptStreamTail = ""
-        var attemptStreamChars = 0
-
-        fun appendAttemptStream(delta: String) {
-            if (delta.isEmpty()) return
-            attemptStreamChars += delta.length
-            attemptStreamTail = takeLastWithoutSplittingSurrogatePair(
-                attemptStreamTail + delta,
-                MAX_ATTEMPT_STREAM_TAIL_CHARS,
-            )
-        }
+        val attemptEvidence = LocalModelAttemptStreamEvidence()
         val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
-                canRetryModelAttemptAfterOutput(error, attemptStreamChars)
+                attemptEvidence.retryable(error)
             },
             backoffMillis = { failedAttempt, error ->
                 (error as? LocalModelException)?.providerRetryAfterMs
@@ -480,8 +469,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         attemptStartedNanos = System.nanoTime()
                         providerStartedNanos = null
                         lastProviderError = null
-                        attemptStreamTail = ""
-                        attemptStreamChars = 0
+                        attemptEvidence.beginAttempt()
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
@@ -580,10 +568,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "failed")
-                            put("stream_total_chars", attemptStreamChars)
-                            if (attemptStreamTail.isNotEmpty()) {
-                                put("stream_tail", attemptStreamTail)
-                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            put("stream_total_chars", attemptEvidence.emittedChars)
+                            if (attemptEvidence.tail.isNotEmpty()) {
+                                put("stream_tail", attemptEvidence.tail)
+                                put("stream_tail_truncated", attemptEvidence.truncated)
                             }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
@@ -606,10 +594,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "cancelled")
-                            put("stream_total_chars", attemptStreamChars)
-                            if (attemptStreamTail.isNotEmpty()) {
-                                put("stream_tail", attemptStreamTail)
-                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            put("stream_total_chars", attemptEvidence.emittedChars)
+                            if (attemptEvidence.tail.isNotEmpty()) {
+                                put("stream_tail", attemptEvidence.tail)
+                                put("stream_tail_truncated", attemptEvidence.truncated)
                             }
                             put("will_retry", false)
                             event.reason?.let { put("detail", it.take(2_000)) }
@@ -808,7 +796,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             },
                             onDelta = { delta ->
                                     val visible = delta.content
-                                    appendAttemptStream(visible)
+                                    attemptEvidence.append(visible)
                                     streamPreview.append(visible)
                                 },
                             )
@@ -1015,6 +1003,5 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private companion object {
         const val REQUEST_EVIDENCE_VERSION = 3
         const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 2
-        const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
     }
 }
