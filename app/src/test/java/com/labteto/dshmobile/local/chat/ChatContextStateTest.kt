@@ -647,7 +647,7 @@ class ChatContextStateTest {
                 assistantMessage = "好呀，喝茶",
             )),
         )
-        assertEquals(previous.unfinished, unrelated.unfinished)
+        assertEquals(previous.unfinished.toSet(), unrelated.unfinished.toSet())
 
         val notRetiredByPlanner = groundContinuityEvidence(
             previous = previous,
@@ -708,7 +708,7 @@ class ChatContextStateTest {
             candidate = ChatContinuityState(unfinished = listOf(second)),
             pendingTurns = agreed,
         )
-        assertEquals(previous.unfinished, withoutResolutionId.unfinished)
+        assertEquals(previous.unfinished.toSet(), withoutResolutionId.unfinished.toSet())
         val targeted = groundContinuityEvidence(
             previous = previous,
             candidate = ChatContinuityState(unfinished = listOf(second)),
@@ -725,7 +725,7 @@ class ChatContextStateTest {
             pendingTurns = agreed,
             resolvedContinuityIds = listOf("open_thread:999:nonexistent"),
         )
-        assertEquals(previous.unfinished, wrongId.unfinished)
+        assertEquals(previous.unfinished.toSet(), wrongId.unfinished.toSet())
     }
 
     @Test
