@@ -73,7 +73,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                         Text(family, style = DsType.caption11Strong, color = DsTheme.colors.labelTertiary)
                     }
                     items(visible, key = { it.name }) { entry ->
-                        DsSheetChoiceRow(title = entry.name,
+                        SySheetChoiceRow(title = entry.name,
                             subtitle = stringResource(R.string.fluid_capability_registered),
                             icon = FeatherIcons.Tool, onClick = { selected = entry })
                     }
