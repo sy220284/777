@@ -34,12 +34,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -285,19 +288,28 @@ internal fun MemoryManagementCard(
             MemoryFilter.PREFERENCE to R.string.advanced_kind_preference,
             MemoryFilter.FACT to R.string.advanced_kind_fact,
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            filterOptions.forEach { (candidate, label) ->
-                com.labteto.dshmobile.ui.components.DsFilterChip(
-                    text = stringResource(R.string.advanced_memory_filter_count,
-                        stringResource(label), records.count { it.kind.matchesFilter(candidate) }),
-                    selected = filter == candidate,
-                    onClick = { filter = candidate },
+        // Screen 24: persistent four-category track. All counts are derived from
+        // MemoryRecord; the reference's six demo counters are not production data.
+        DsSegmented(
+            segments = filterOptions.map { (candidate, label) ->
+                DsSegment(
+                    candidate.name,
+                    stringResource(
+                        R.string.advanced_memory_filter_count,
+                        stringResource(label),
+                        records.count { it.kind.matchesFilter(candidate) },
+                    ),
                 )
-            }
-        }
+            },
+            selectedKey = filter.name,
+            onSelect = { value ->
+                filter = MemoryFilter.entries.firstOrNull { it.name == value } ?: MemoryFilter.ALL
+            },
+            role = Role.Tab,
+            hapticOnChange = true,
+            stretch = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Text(
             stringResource(R.string.advanced_memory_visible_count, filteredRecords.size, records.size),
