@@ -44,9 +44,11 @@ internal object ChatTurnContextPolicy {
 
     fun isTopicRedirect(message: String): Boolean = redirectedTopic(message) != null
 
+    fun isWeakReply(message: String): Boolean = message.trim() in weakResponses
+
     fun isContinuation(message: String): Boolean {
         val text = message.trim()
-        return text in weakResponses || references.any(text::contains)
+        return isWeakReply(text) || references.any(text::contains)
     }
 
     /** Applies only committed user turns; editing/branching restores its saved snapshot. */
