@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -197,14 +198,36 @@ internal fun UsageCalculationPage(
             ) {
                 analytics.byModel.entries.sortedByDescending { it.value.tracked.totalTokens }.forEach { entry ->
                     item(key = entry.key) {
-                        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                            Row {
-                                Text(entry.key, style = DsType.small13, modifier = Modifier.weight(1f), color = colors.labelPrimary)
-                                Text(formatTokens(entry.value.tracked.totalTokens),
-                                    style = DsType.caption11.copy(fontFeatureSettings = "tnum"), color = colors.labelSecondary)
+                        // Design #04: the model-composition rows are functional filter
+                        // entrances backed by the same selectedModel source as the menu.
+                        Surface(
+                            onClick = { onSelectModel(entry.key) },
+                            modifier = Modifier.fillMaxWidth()
+                                .testTag("usage-model-select:" + entry.key),
+                            shape = DsShapes.row,
+                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(DsSpacing.small),
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                Row {
+                                    Text(
+                                        entry.key,
+                                        style = DsType.small13Strong.withReadingWeight(),
+                                        modifier = Modifier.weight(1f),
+                                        color = colors.labelPrimary,
+                                    )
+                                    Text(
+                                        formatTokens(entry.value.tracked.totalTokens),
+                                        style = DsType.caption11.copy(fontFeatureSettings = "tnum"),
+                                        color = colors.labelSecondary,
+                                    )
+                                }
+                                com.labteto.dshmobile.ui.components.DsProgressBar(
+                                    (entry.value.tracked.totalTokens.toDouble() / total).toFloat(),
+                                )
                             }
-                            com.labteto.dshmobile.ui.components.DsProgressBar(
-                                (entry.value.tracked.totalTokens.toDouble() / total).toFloat())
                         }
                     }
                 }
