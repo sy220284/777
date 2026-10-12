@@ -10,6 +10,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import com.labteto.dshmobile.ui.shenyan.SyMode
+import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
 
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
@@ -300,12 +302,21 @@ fun DshTheme(
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
             fluidGlass = preference != ThemePreference.MATTE_BLACK,
         ) {
-            MaterialTheme(
-                colorScheme = scheme,
-                typography = dsTypography(readingPreferences.textWeightAdjustment),
-                shapes = DsMaterialShapes,
-                content = content,
-            )
+            // V5 tokens are available to every screen while business callbacks migrate.
+            // Material3's existing legacy scheme remains only as a compatibility layer.
+            SyThemeProvider(mode = when (preference) {
+                ThemePreference.LIGHT -> SyMode.LIGHT
+                ThemePreference.DARK -> SyMode.DARK
+                ThemePreference.MATTE_BLACK -> SyMode.MATTE
+                ThemePreference.SYSTEM -> SyMode.SYSTEM
+            }) {
+                MaterialTheme(
+                    colorScheme = scheme,
+                    typography = dsTypography(readingPreferences.textWeightAdjustment),
+                    shapes = DsMaterialShapes,
+                    content = content,
+                )
+            }
         }
     }
 }
