@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -480,18 +481,30 @@ private fun CharacterDiaryEntryCard(
     val dateText = remember(entry.updatedAt) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(entry.updatedAt)
     }
-    DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    // Reference screen 09: a centered reading sheet, with real recorded diary fields.
+    // Never synthesize first-person thoughts or comments that do not exist in the diary store.
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    DsCard(modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
+        Text(
+            dateText,
+            style = DsType.caption11.withReadingWeight(),
+            color = colors.labelTertiary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            entry.event,
+            style = DsType.base16Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
+            color = colors.labelPrimary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().testTag("diary_paper_event_${entry.id}"),
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            Text(
-                dateText,
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
-                modifier = Modifier.weight(1f),
-            )
             DsPill(
                 text = stringResource(
                     if (entry.sourceMode == ChatDiarySourceMode.GROUP) {
@@ -503,12 +516,6 @@ private fun CharacterDiaryEntryCard(
             )
             DsPill(text = diaryDisclosureLabel(entry.disclosure))
         }
-
-        Text(
-            entry.event,
-            style = DsType.base16Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
-            color = colors.labelPrimary,
-        )
 
         CharacterDiaryNarrativeBlock(
             label = stringResource(R.string.chat_diary_feeling),
@@ -560,6 +567,7 @@ private fun CharacterDiaryEntryCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelCaption,
         )
+    }
     }
 }
 
