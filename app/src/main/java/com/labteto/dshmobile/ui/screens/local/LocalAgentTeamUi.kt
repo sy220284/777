@@ -45,7 +45,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -696,14 +696,14 @@ private fun TeamMemberDetail(
                         )
                     },
                 )
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.ArrowUp,
                     contentDescription = stringResource(R.string.local_team_send_message),
                     enabled = member.canReceiveMessage && draft.isNotBlank() && !sending,
                     selected = draft.isNotBlank(),
                     onClick = {
                         val text = draft.trim()
-                        if (!member.canReceiveMessage || text.isEmpty() || sending) return@DsIconButton
+                        if (!member.canReceiveMessage || text.isEmpty() || sending) return@SyIconButton
                         sending = true
                         scope.launch {
                             val result = try {
