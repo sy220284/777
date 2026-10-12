@@ -356,13 +356,23 @@ internal fun groundContinuityEvidence(
         preserveUnrelatedPrevious: Boolean = false,
         limit: Int,
     ): List<String> {
+        val pendingQuestions = previousValues.count { old ->
+            Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(old)
+        }
         val retainedPrevious = previousValues.filterNot { previousFact ->
+            val plannerOmittedFact = values.none { incoming ->
+                normalizeContinuityFact(incoming) == normalizeContinuityFact(previousFact) ||
+                    (kind == ChatContinuityFactKind.OPEN_THREAD &&
+                        continuityOpenThreadsShareSubject(previousFact, incoming))
+            }
             continuityRemovalGrounded(
                 kind = kind,
                 fact = previousFact,
                 turns = orderedTurns,
                 activeFactCount = previousValues.size,
-            )
+            ) || (kind == ChatContinuityFactKind.OPEN_THREAD && plannerOmittedFact &&
+                pendingQuestions == 1 &&
+                confirmationClosesPendingQuestion(previousFact, orderedTurns))
         }
         if (values.isEmpty()) return retainedPrevious.takeLast(limit)
         val previousKeys = retainedPrevious.associateBy(::normalizeContinuityFact)
@@ -473,6 +483,22 @@ internal fun groundContinuityEvidence(
             .distinctBy { item -> item.kind to normalizeContinuityFact(item.text) }
             .takeLast(MAX_CONTINUITY_EVIDENCE),
     )
+}
+
+/**
+ * A short acceptance is evidence for an unresolved yes/no question only when the character
+ * acknowledges that acceptance AND the planner independently retires the question. Never
+ * treat a bare "好" or an unrelated topic change as completion.
+ */
+private fun confirmationClosesPendingQuestion(
+    fact: String,
+    turns: List<ChatPendingTurn>,
+): Boolean {
+    if (!Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(fact)) return false
+    return turns.any { turn ->
+        Regex("""(?:我答应|答应你|同意|说定了|说好了)""").containsMatchIn(turn.userMessage) &&
+            Regex("""(?:答应|同意|说定|约定)""").containsMatchIn(turn.assistantMessage)
+    }
 }
 
 private fun continuityRemovalGrounded(
