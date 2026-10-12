@@ -72,3 +72,21 @@ Codex：读取持久 rollout、最近有效 compaction 和 WorldState baseline�
 本分支以 `LocalSubagentContextTest` 验证：无效 fork call-id 不能扩大继承范围；父级 tool/result、tool_calls、隐藏 reasoning/replay 字段不进入 child 模型输入；用户可见父对话与当前子任务仍保留。
 
 最终合并需以**本分支最新 head** 的 Kotlin 单测、静态/架构、Android ARM64 与需要的仪表测试为准，不得拿此前 #651/#656/#658 的 CI 代替。本报告是静态源码语义对照，不代表实测出具体性能加速或完整平台沙箱隔离。
+
+## 4. 执行器复审后的实装修复：注册身份、审批及资源锁三阶段一致性
+
+Codex 的 `ToolCallRuntime` 绑定发起工具调用时的 `StepContext.tool_router` 快照，执行准入完成后才进入 handler；不能让一次工具审批悄悄授权新的处理器。
+
+777 原来的 `LocalToolExecutionCoordinator.executeScoped` 先检查注册表中的工具权限、计划模式和 read-only 特征，`ToolRegistry.executeTracked` 再获取处理器。此间若工具被热替换，或者人工审批过程中插件被卸载，旧审批可能匹配上新的 handler，乃至继续执行已撤销的 handler。这属于**运行时 TOCTOU（检查与使用分离）漏洞**，不能仅靠工具名字或提示词解决。
+
+本 PR 除 fork 语义外，现已增加以下**真正的执行器修复**：
+
+- `ToolContext.expectedRegistration` 将权限预检时的原始注册对象交给真正的 registry，工具变动立即返回 `TOOL_REGISTRATION_CHANGED`、`executionStarted=false`。
+- `ToolRegistry` 在用户审批返回后核实 handler 仍然属于原注册对象；如果审批过程中注销或替换工具，不会继续调用旧 handler，也不会把旧批准转借给替代工具。
+- 在 Android `onExecutionStarted` 中，经过公平读写锁等待后，**写入持久的 execution-started 事件之前**再检查工具身份。资源等待期间热卸载也不会执行过期工具，不会错误声称已执行。
+- 错误为明确的**未开始、无副作用、不可自动重试**，要求重新发现工具及核验权限。已经开始的工具执行沿原有事实和未知副作用恢复，不伪造撤销。
+- `ToolRegistrationAdmissionTest` 覆盖审批期间卸载、替换及原始权限快照失效；`LocalToolExecutionCoordinatorTest` 覆盖审批阶段以及读写锁排队期间注册变动，无旧 handler 执行。
+
+这与 Codex 的工具 handler/StepContext 快照目标对齐，同时保留 Android 单一 `ToolRegistry` 与 `LocalToolExecutionCoordinator`，不增设第二个执行注册中心。
+
+**尚未实现**：Codex 基于工具能力的 `finishes_on_cancellation` 模式与独立 Worktree 沙箱。此 PR 不以固定等待超时假装完成有副作用工具，也不宣称插件卸载能撤销已经进入执行器的副作用。真正宿主取消终态仍需按工具/进程能力分别验证。
