@@ -34,13 +34,13 @@ import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.local.work.LocalRequirementEvidenceLink
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -161,7 +161,7 @@ internal fun LocalRunCenterScreen(
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            DsTopBar(
+            SyTopBar(
                 title = stringResource(R.string.local_run_center),
                 onBack = onDismiss,
                 backContentDescription = stringResource(R.string.common_back),
@@ -186,11 +186,11 @@ internal fun LocalRunCenterScreen(
                 tag = "runBoardSection",
             )
             if (onOpenSourceSession != null) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_work_handoff_return_source),
                     onClick = onOpenSourceSession,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium),
                 )
             } else if (sourceSessionMissing) {
@@ -202,8 +202,8 @@ internal fun LocalRunCenterScreen(
                 )
             }
             if (onHistoryPage != null) {
-                DsButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
-                    variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                SyButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium))
             }
             if (usageRevision != null && sessionUsage != null) {
@@ -220,10 +220,10 @@ internal fun LocalRunCenterScreen(
                         onAction = { showAgentLauncher = true },
                     )
                     if (artifactScanLimit < 4_096) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_artifact_more_history),
                             onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                             modifier = Modifier.padding(DsSpacing.medium),
                         )
                     }
@@ -359,39 +359,39 @@ internal fun LocalRunCenterScreen(
                                 )
                                 artifact.sourceCallId?.let { callId ->
                                     if (toolActivities.any { it.callId == callId }) {
-                                        DsButton(
+                                        SyButton(
                                             text = stringResource(R.string.local_delivery_open_evidence),
                                             onClick = { selectedToolCallId = callId },
-                                            variant = DsButtonVariant.Ghost,
-                                            size = DsButtonSize.Small,
+                                            variant = SyButtonVariant.Ghost,
+                                            size = SyButtonSize.Small,
                                         )
                                     }
                                 }
                                 if (artifact.category == "file" && artifact.currentlyAvailable == true &&
                                     state.todos.isNotEmpty()) {
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.local_delivery_link_action),
                                         onClick = {
                                             pendingRequirementArtifact = artifact
                                             requirementLinkFeedback = ""
                                         },
-                                        variant = DsButtonVariant.Ghost,
-                                        size = DsButtonSize.Small,
+                                        variant = SyButtonVariant.Ghost,
+                                        size = SyButtonSize.Small,
                                     )
                                 }
                                 if (artifact.category == "file" && artifact.currentlyAvailable != false) {
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.local_artifact_continue),
                                         onClick = { onContinueArtifact(artifact.reference) },
-                                        variant = DsButtonVariant.Ghost,
-                                        size = DsButtonSize.Small,
+                                        variant = SyButtonVariant.Ghost,
+                                        size = SyButtonSize.Small,
                                     )
                                 }
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.common_copy),
                                     onClick = { clipboard.setText(AnnotatedString(artifact.reference)) },
-                                    variant = DsButtonVariant.Ghost,
-                                    size = DsButtonSize.Small,
+                                    variant = SyButtonVariant.Ghost,
+                                    size = SyButtonSize.Small,
                                 )
                             }
                         }
@@ -416,17 +416,17 @@ internal fun LocalRunCenterScreen(
                         if (artifactActionFailed) {
                             Text(stringResource(R.string.local_artifact_open_failed), color = colors.error)
                         }
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_artifacts_open_files),
                             onClick = onOpenResults,
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                     if (artifactScanLimit < 4_096) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_artifact_more_history),
                             onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                     }
@@ -436,7 +436,7 @@ internal fun LocalRunCenterScreen(
     }
 
     pendingRequirementArtifact?.let { artifact ->
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.local_delivery_link_title),
             subtitle = stringResource(R.string.local_delivery_link_hint),
             onDismiss = { if (!linkingRequirement) pendingRequirementArtifact = null },
@@ -448,7 +448,7 @@ internal fun LocalRunCenterScreen(
                     color = colors.labelSecondary)
             }
             state.todos.forEachIndexed { index, todo ->
-                DsButton(
+                SyButton(
                     text = "${index + 1}. ${todo.content.take(100)}",
                     enabled = !linkingRequirement,
                     onClick = {
@@ -471,7 +471,7 @@ internal fun LocalRunCenterScreen(
                             } else requirementLinkFailureText
                         }
                     },
-                    variant = DsButtonVariant.Ghost, modifier = Modifier.fillMaxWidth(),
+                    variant = SyButtonVariant.Ghost, modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -505,7 +505,7 @@ internal fun LocalRunCenterScreen(
         }
     }
     if (selectedActivity != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = selectedActivity.name,
             subtitle = stringResource(R.string.local_tool_activity_details),
             scrollable = true,
@@ -523,15 +523,15 @@ internal fun LocalRunCenterScreen(
             }
             if (evidenceError) {
                 Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.error)
-                DsButton(stringResource(R.string.common_retry), { evidenceRetry++ })
+                SyButton(stringResource(R.string.common_retry), { evidenceRetry++ })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(stringResource(R.string.fluid_copy_tool_id), {
+                SyButton(stringResource(R.string.fluid_copy_tool_id), {
                     clipboard.setText(AnnotatedString(selectedActivity.callId))
-                }, variant = DsButtonVariant.Ghost)
-                DsButton(stringResource(R.string.fluid_copy_tool_output), {
+                }, variant = SyButtonVariant.Ghost)
+                SyButton(stringResource(R.string.fluid_copy_tool_output), {
                     fullResult?.let { clipboard.setText(AnnotatedString(it)) }
-                }, enabled = fullResult != null, variant = DsButtonVariant.Ghost)
+                }, enabled = fullResult != null, variant = SyButtonVariant.Ghost)
             }
             (fullArguments ?: selectedActivity.argumentsPreview)?.let { arguments ->
                 Text(stringResource(R.string.local_tool_activity_arguments), style = DsType.small13Strong)
@@ -556,7 +556,7 @@ internal fun LocalRunCenterScreen(
     }
 
     if (showAgentLauncher) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.local_run_agent_direct_title),
             subtitle = stringResource(R.string.local_run_agent_direct_body),
             scrollable = true,
@@ -566,18 +566,18 @@ internal fun LocalRunCenterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.common_cancel),
                         onClick = {
                             showAgentLauncher = false
                             agentFeedback = ""
                         },
                         enabled = !startingAgent,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Large,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Large,
                         modifier = Modifier.weight(1f),
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_run_agent_start),
                         onClick = {
                             val task = agentTask.trim()
@@ -599,7 +599,7 @@ internal fun LocalRunCenterScreen(
                         },
                         enabled = agentTask.isNotBlank() && !startingAgent,
                         loading = startingAgent,
-                        size = DsButtonSize.Large,
+                        size = SyButtonSize.Large,
                         modifier = Modifier.weight(1f),
                     )
                 }
