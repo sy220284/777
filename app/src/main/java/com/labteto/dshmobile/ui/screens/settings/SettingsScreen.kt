@@ -443,6 +443,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_model_performance_title),
+                                reservedEntryHeight = 72.dp,
                                 onClick = { page = SettingsDestination.MODEL_PERFORMANCE },
                                 compact = true,
                             )
@@ -506,6 +507,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_chat_style_guard),
+                                reservedEntryHeight = 88.dp,
                                 value = stringResource(
                                     if (localHarness.chatStyleGuardEnabled) {
                                         R.string.common_enabled
@@ -727,11 +729,13 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_pricing),
+                                reservedEntryHeight = 80.dp,
                                 onClick = { page = SettingsDestination.PRICING },
                             )
                             AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
+                                reservedEntryHeight = 80.dp,
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
@@ -969,6 +973,7 @@ fun SettingsScreen(
                             AppSettingsRow(
                                 icon = FeatherIcons.Info,
                                 title = stringResource(R.string.settings_export_diagnostics),
+                                reservedEntryHeight = 88.dp,
                                 onClick = { diagnosticExporter.launch("777-diagnostics.txt") },
                             )
                         }
