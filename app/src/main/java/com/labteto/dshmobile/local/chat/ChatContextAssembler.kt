@@ -41,9 +41,9 @@ internal object ChatMemorySelector {
     /** Recall unfinished business only when the user's actual subject overlaps that business. */
     fun isRelevantToTurn(query: String, fact: String): Boolean {
         val a = query.trim().lowercase()
-            .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
+            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
         val b = fact.trim().lowercase()
-            .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
+            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
         if (a.length < 4 || b.length < 4 || isExplicitTopicShift(query)) return false
         val left = (0 until a.length - 1).mapTo(linkedSetOf()) { a.substring(it, it + 2) }
         val right = (0 until b.length - 1).mapTo(linkedSetOf()) { b.substring(it, it + 2) }
