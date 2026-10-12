@@ -99,23 +99,12 @@ internal fun LocalAgentSwarmLaunchEntry(
                 contentDescription = null,
                 tint = if (selected) colors.accent else colors.labelPrimary,
             )
-            Column(
+            Text(
+                stringResource(R.string.local_team_title),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                Text(
-                    stringResource(R.string.local_team_title),
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = colors.labelPrimary,
-                )
-                Text(
-                    stringResource(R.string.local_team_high_usage_tip),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            )
             if (selected) {
                 Icon(
                     painter = painterResource(R.drawable.ic_ui_check),
