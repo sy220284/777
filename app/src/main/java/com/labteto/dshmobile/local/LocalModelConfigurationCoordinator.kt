@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelConnectionTester
+import com.labteto.dshmobile.local.model.LocalApiModelCatalog
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -48,6 +49,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     private val apiKeys: LocalApiKeyStore,
     private val gateway: LocalModelGateway,
     private val tester: LocalModelConnectionTester,
+    private val catalog: LocalApiModelCatalog,
     private val json: Json,
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
@@ -58,16 +60,28 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         profiles::transactionId, ::restoreJournal,
         { failure -> AppLog.warn("ModelConfiguration", "model/configuration-journal-cleanup-pending", failure) },
     )
-    internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
+    internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             transactions.recover()
             require(model.isNotBlank()) { "模型名称不能为空" }
             val existingProfiles = profiles.read()
-            val draft = resolveLocalModelApiKeyDraft(apiKey, normalizeModel(model), baseUrl, protocol,
+            // A model selected from discovery may reuse the credential of the saved route
+            // that was queried. Never reuse one from a different API origin.
+            val source = credentialSourceProfileId?.let { id ->
+                existingProfiles.firstOrNull {
+                    it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
+                        normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                } ?: error("来源模型配置已变化，请重新查询模型")
+            }
+            val inheritedKey = if (apiKey.isBlank() && profileId == null) {
+                source?.let { apiKeys.getFor(it.id) }
+            } else null
+            val suppliedKey = apiKey.ifBlank { inheritedKey.orEmpty() }
+            val draft = resolveLocalModelApiKeyDraft(suppliedKey, normalizeModel(model), baseUrl, protocol,
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
-            persistConfiguration(all, profile, if (apiKey.isNotBlank()) mapOf(profile.id to draft.key) else emptyMap())
+            persistConfiguration(all, profile, if (suppliedKey.isNotBlank()) mapOf(profile.id to draft.key) else emptyMap())
             LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
         }
 
@@ -146,6 +160,23 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
         if (model.isBlank()) return "请选择模型"
         return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor, profileId)
+    }
+
+    /** User-initiated catalog lookup from the settings editor, including unsaved API drafts. */
+    internal suspend fun discoverApiModels(
+        apiKey: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol,
+        credentialSourceProfileId: String? = null,
+    ): List<String> {
+        val source = credentialSourceProfileId?.let { id ->
+            profiles.read().firstOrNull {
+                it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
+                    normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+            } ?: error("已保存的密钥来源无效，请重新输入密钥")
+        }
+        val key = apiKey.trim().ifBlank { source?.let { apiKeys.getFor(it.id) }.orEmpty() }
+        return catalog.query(key, baseUrl, protocol)
     }
 
     internal fun readProfiles(): List<LocalModelProfile> = profiles.read()
