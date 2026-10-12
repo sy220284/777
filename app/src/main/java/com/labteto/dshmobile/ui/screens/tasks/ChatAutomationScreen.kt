@@ -53,9 +53,9 @@ import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
@@ -263,7 +263,7 @@ internal fun ChatAutomationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DsPill(text = stringResource(R.string.tasks_chat_plan_mention))
+                    SyPill(text = stringResource(R.string.tasks_chat_plan_mention))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -320,14 +320,14 @@ internal fun ChatAutomationScreen(
 @Composable
 private fun AutomationCardSurface(
     modifier: Modifier = Modifier,
-    status: DsStatus = DsStatus.Neutral,
+    status: SyStatus = SyStatus.Neutral,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
     val borderColor = when (status) {
-        DsStatus.Running -> colors.accent.copy(alpha = 0.28f)
-        DsStatus.Warning -> colors.warn.copy(alpha = 0.32f)
-        DsStatus.Failed -> colors.error.copy(alpha = 0.28f)
+        SyStatus.Running -> colors.accent.copy(alpha = 0.28f)
+        SyStatus.Warning -> colors.warn.copy(alpha = 0.32f)
+        SyStatus.Failed -> colors.error.copy(alpha = 0.28f)
         else -> colors.borderL1
     }
     Surface(
@@ -388,7 +388,7 @@ private fun ChatAutomationEventRow(
                 style = DsType.small13Strong.withReadingWeight(),
                 color = colors.labelSecondary,
             )
-            DsStatusPill(
+            SyStatusPill(
                 state = visualStatus.dsStatus(),
                 label = visualStatus.label(),
             )
@@ -744,12 +744,12 @@ private fun ChatAutomationVisualStatus.label(): String = stringResource(
     },
 )
 
-private fun ChatAutomationVisualStatus.dsStatus(): DsStatus = when (this) {
-    ChatAutomationVisualStatus.RUNNING -> DsStatus.Running
-    ChatAutomationVisualStatus.COMPLETED -> DsStatus.Done
-    ChatAutomationVisualStatus.BLOCKED -> DsStatus.Warning
-    ChatAutomationVisualStatus.FAILED -> DsStatus.Failed
-    else -> DsStatus.Neutral
+private fun ChatAutomationVisualStatus.dsStatus(): SyStatus = when (this) {
+    ChatAutomationVisualStatus.RUNNING -> SyStatus.Running
+    ChatAutomationVisualStatus.COMPLETED -> SyStatus.Done
+    ChatAutomationVisualStatus.BLOCKED -> SyStatus.Warning
+    ChatAutomationVisualStatus.FAILED -> SyStatus.Failed
+    else -> SyStatus.Neutral
 }
 
 @Composable
