@@ -625,6 +625,7 @@ class ChatContextStateTest {
         val question = "对方是否接受保密与提前告知条件尚未明确"
         val previous = ChatContinuityState(unfinished = listOf("还要收拾桌子", question))
         val candidate = ChatContinuityState(unfinished = listOf("还要收拾桌子"))
+        val eventId = chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, question)
         val confirmed = groundContinuityEvidence(
             previous = previous,
             candidate = candidate,
@@ -633,6 +634,7 @@ class ChatContextStateTest {
                 userMessage = "好，我答应你了",
                 assistantMessage = "谢谢你答应我，我们说定了",
             )),
+            resolvedContinuityIds = listOf(eventId),
         )
         assertEquals(listOf("还要收拾桌子"), confirmed.unfinished)
 
@@ -688,6 +690,61 @@ class ChatContextStateTest {
         val repaired = previous.copy(sceneEvents = listOf(valid, invalid)).normalized()
         assertEquals("房间", repaired.scene.location)
         assertEquals(listOf(valid), repaired.sceneEvents)
+    }
+
+
+    @Test
+    fun twoPendingAgreementsRequireExactEventIdentityNotBroadAcceptance() {
+        val first = "对方是否同意保密尚未明确"
+        val second = "对方是否同意公开照片尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf(first, second))
+        val agreed = listOf(ChatPendingTurn(
+            sequence = 129L,
+            userMessage = "保密这件事我答应你。",
+            assistantMessage = "谢谢你答应保密的约定。",
+        ))
+        val withoutResolutionId = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(second)),
+            pendingTurns = agreed,
+        )
+        assertEquals(previous.unfinished, withoutResolutionId.unfinished)
+        val targeted = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(second)),
+            pendingTurns = agreed,
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, first,
+            )),
+        )
+        assertEquals(listOf(second), targeted.unfinished)
+
+        val wrongId = groundContinuityEvidence(
+            previous = previous,
+            candidate = ChatContinuityState(unfinished = listOf(first)),
+            pendingTurns = agreed,
+            resolvedContinuityIds = listOf("open_thread:999:nonexistent"),
+        )
+        assertEquals(previous.unfinished, wrongId.unfinished)
+    }
+
+    @Test
+    fun evidenceIdentityPersistsAcrossStateNormalization() {
+        val fact = "还有一次约定待确认"
+        val source = ChatContinuityEvidence(
+            kind = ChatContinuityFactKind.OPEN_THREAD,
+            text = fact,
+            sourceSequence = 199L,
+            sourceUserMessageId = "u199",
+        )
+        val context = ChatContextState(continuity = ChatContinuityState(
+            unfinished = listOf(fact), evidence = listOf(source),
+        )).normalized()
+        assertEquals(
+            chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, fact, 199L),
+            context.continuity.evidence.single().eventId,
+        )
+        assertEquals(context, context.normalized())
     }
 
 }
