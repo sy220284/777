@@ -31,6 +31,13 @@ class HostsStore @Inject constructor(
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
         val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
         val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
+        val NOTIFY_JOB_RESULTS = booleanPreferencesKey("notify_job_results")
+        val NOTIFY_JOB_FAILURES = booleanPreferencesKey("notify_job_failures")
+        val NOTIFY_NEEDS_ACTION = booleanPreferencesKey("notify_needs_action")
+        val NOTIFY_CHAT_MESSAGES = booleanPreferencesKey("notify_chat_messages")
+        val NOTIFICATION_QUIET_ENABLED = booleanPreferencesKey("notification_quiet_enabled")
+        val NOTIFICATION_QUIET_START = intPreferencesKey("notification_quiet_start")
+        val NOTIFICATION_QUIET_END = intPreferencesKey("notification_quiet_end")
         val THEME = stringPreferencesKey("theme")
         val ACCENT_THEME = stringPreferencesKey("accent_theme")
         val RETIRED_LOCALE = stringPreferencesKey("locale")
@@ -76,6 +83,13 @@ class HostsStore @Inject constructor(
     private fun decodeSettings(prefs: Preferences): AppSettings =
         AppSettings(
             notifyLocalJobs = prefs[Keys.NOTIFY_LOCAL_JOBS] ?: true,
+            notifyJobResults = prefs[Keys.NOTIFY_JOB_RESULTS] ?: true,
+            notifyJobFailures = prefs[Keys.NOTIFY_JOB_FAILURES] ?: true,
+            notifyNeedsAction = prefs[Keys.NOTIFY_NEEDS_ACTION] ?: true,
+            notifyChatMessages = prefs[Keys.NOTIFY_CHAT_MESSAGES] ?: true,
+            notificationQuietHoursEnabled = prefs[Keys.NOTIFICATION_QUIET_ENABLED] ?: false,
+            notificationQuietStartMinute = (prefs[Keys.NOTIFICATION_QUIET_START] ?: 1380).coerceIn(0, 1439),
+            notificationQuietEndMinute = (prefs[Keys.NOTIFICATION_QUIET_END] ?: 420).coerceIn(0, 1439),
             themePreference = prefs[Keys.THEME] ?: "system",
             accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
@@ -92,6 +106,13 @@ class HostsStore @Inject constructor(
         dataStore.edit { prefs ->
             val next = transform(decodeSettings(prefs))
             prefs[Keys.NOTIFY_LOCAL_JOBS] = next.notifyLocalJobs
+            prefs[Keys.NOTIFY_JOB_RESULTS] = next.notifyJobResults
+            prefs[Keys.NOTIFY_JOB_FAILURES] = next.notifyJobFailures
+            prefs[Keys.NOTIFY_NEEDS_ACTION] = next.notifyNeedsAction
+            prefs[Keys.NOTIFY_CHAT_MESSAGES] = next.notifyChatMessages
+            prefs[Keys.NOTIFICATION_QUIET_ENABLED] = next.notificationQuietHoursEnabled
+            prefs[Keys.NOTIFICATION_QUIET_START] = next.notificationQuietStartMinute.coerceIn(0, 1439)
+            prefs[Keys.NOTIFICATION_QUIET_END] = next.notificationQuietEndMinute.coerceIn(0, 1439)
             prefs[Keys.THEME] = next.themePreference
             prefs[Keys.ACCENT_THEME] = next.accentTheme
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }

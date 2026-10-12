@@ -1194,8 +1194,21 @@
 
 
     <string name="notif_channel_local_jobs">本机任务</string>
-    <string name="settings_notifications_local_jobs">本机任务完成通知</string>
-    <string name="settings_notifications_local_jobs_hint">工作模式的本机任务结束、失败或取消时发送通知。</string>
+    <string name="settings_notifications_local_jobs">本机通知总开关</string>
+    <string name="settings_notifications_local_jobs_hint">本机任务、自动化与主动消息通知总开关；具体类型可单独关闭。</string>
+    <string name="settings_notification_results">任务完成和取消</string>
+    <string name="settings_notification_results_hint">工作任务与自动化完成、取消时提醒。</string>
+    <string name="settings_notification_failures">执行失败</string>
+    <string name="settings_notification_failures_hint">任务失败时提醒，不受免打扰时间限制。</string>
+    <string name="settings_notification_needs_action">需要处理</string>
+    <string name="settings_notification_needs_action_hint">自动化阻塞或需处理时提醒，不受免打扰时间限制。</string>
+    <string name="settings_notification_chat_messages">人物主动消息</string>
+    <string name="settings_notification_chat_messages_hint">聊天自动化成功送达的消息通知；不影响消息本身执行。</string>
+    <string name="settings_notification_quiet_title">通知免打扰</string>
+    <string name="settings_notification_quiet_enabled">按时段静音普通通知</string>
+    <string name="settings_notification_quiet_hint">仅静音任务结果和人物消息；失败、待处理继续提醒。人物主动互动自身的执行时段仍在对应任务里设置。</string>
+    <string name="settings_notification_quiet_23_7">23:00–07:00</string>
+    <string name="settings_notification_quiet_22_8">22:00–08:00</string>
     <string name="local_execution_notification_running">正在执行</string>
     <string name="local_execution_notification_step">正在执行 · 第 %1$d 步</string>
     <string name="local_execution_notification_jobs">%1$d 个后台任务仍在运行</string>

@@ -878,6 +878,56 @@ fun SettingsScreen(
                                 settings.notifyLocalJobs,
                                 stringResource(R.string.settings_notifications_local_jobs_hint),
                             ) { viewModel.set { it.copy(notifyLocalJobs = !it.notifyLocalJobs) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_results),
+                                settings.notifyJobResults,
+                                stringResource(R.string.settings_notification_results_hint),
+                            ) { viewModel.set { it.copy(notifyJobResults = !it.notifyJobResults) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_failures),
+                                settings.notifyJobFailures,
+                                stringResource(R.string.settings_notification_failures_hint),
+                            ) { viewModel.set { it.copy(notifyJobFailures = !it.notifyJobFailures) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_needs_action),
+                                settings.notifyNeedsAction,
+                                stringResource(R.string.settings_notification_needs_action_hint),
+                            ) { viewModel.set { it.copy(notifyNeedsAction = !it.notifyNeedsAction) } }
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_chat_messages),
+                                settings.notifyChatMessages,
+                                stringResource(R.string.settings_notification_chat_messages_hint),
+                            ) { viewModel.set { it.copy(notifyChatMessages = !it.notifyChatMessages) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_notification_quiet_title)) {
+                            ToggleRow(
+                                stringResource(R.string.settings_notification_quiet_enabled),
+                                settings.notificationQuietHoursEnabled,
+                                stringResource(R.string.settings_notification_quiet_hint),
+                            ) { viewModel.set { it.copy(notificationQuietHoursEnabled = !it.notificationQuietHoursEnabled) } }
+                            if (settings.notificationQuietHoursEnabled) {
+                                SySegmented(
+                                    segments = listOf(
+                                        SySegment("23-7", stringResource(R.string.settings_notification_quiet_23_7)),
+                                        SySegment("22-8", stringResource(R.string.settings_notification_quiet_22_8)),
+                                    ),
+                                    selectedKey = if (settings.notificationQuietStartMinute == 1320 &&
+                                        settings.notificationQuietEndMinute == 480) "22-8" else "23-7",
+                                    onSelect = { selected ->
+                                        viewModel.set {
+                                            if (selected == "22-8") it.copy(
+                                                notificationQuietStartMinute = 1320,
+                                                notificationQuietEndMinute = 480,
+                                            ) else it.copy(
+                                                notificationQuietStartMinute = 1380,
+                                                notificationQuietEndMinute = 420,
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    stretch = true,
+                                )
+                            }
                         }
                     }
 

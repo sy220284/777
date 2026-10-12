@@ -7,6 +7,7 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.local.automation.LocalAutomationRunResult
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.notify.DshNotifications
+import com.labteto.dshmobile.notify.LocalNotificationKind
 import com.labteto.dshmobile.notify.stableNotificationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -271,8 +272,8 @@ internal class AutomationWorkerSettlementCoordinator(
         resultText: String? = null,
     ) {
         if (!task.notify) return
-        val enabled = try {
-            hostsStore.settingsOnce().notifyLocalJobs
+        val settings = try {
+            hostsStore.settingsOnce()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -280,10 +281,10 @@ internal class AutomationWorkerSettlementCoordinator(
                 "AutomationWorkerSettlement", "read_notification_preference", error,
                 sessionId = sessionId,
             )
-            true
+            return
         }
         currentCoroutineContext().ensureActive()
-        if (!enabled) return
+        if (!settings.notifyLocalJobs) return
         val chatSuccess = task.mode == AutomationMode.CHAT &&
             titleRes == R.string.tasks_notification_complete
         val title = if (chatSuccess) {
@@ -310,6 +311,13 @@ internal class AutomationWorkerSettlementCoordinator(
                     text = text,
                     sessionId = sessionId,
                     notificationKey = "automation:${task.id}",
+                    settings = settings,
+                    kind = when {
+                        chatSuccess -> LocalNotificationKind.CHAT_MESSAGE
+                        titleRes == R.string.tasks_notification_failed -> LocalNotificationKind.FAILURE
+                        titleRes == R.string.tasks_notification_blocked -> LocalNotificationKind.NEEDS_ACTION
+                        else -> LocalNotificationKind.RESULT
+                    },
                 )
             }
         }
