@@ -192,6 +192,30 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun historyAndModeChosenFromDrawerReturnToTheDrawerOnlyOnce() {
+        assertTrue(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = false,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = true, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.SETTINGS, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = true,
+            enteredFromDrawer = true,
+        ))
+    }
+
+    @Test
     fun drawerEntryPopsEveryFeatureBeforeReturningToDrawer() {
         val origin = localFeatureHome()
         val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
