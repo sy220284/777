@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,8 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -117,6 +120,12 @@ internal fun ChatAutomationScreen(
         sortChatAutomationTasks(state.tasks.filter { it.mode == AutomationMode.CHAT })
     }
     var draft by rememberSaveable { mutableStateOf("") }
+    // This filter is a view concern, not an automation policy; ALL always stays available.
+    var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
+    val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
+    val visibleTasks = if (currentSessionOnly) {
+        tasks.filter { it.targetSessionId == harnessState.sessionId }
+    } else tasks
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
@@ -165,20 +174,43 @@ internal fun ChatAutomationScreen(
                         },
                     )
                 }
-                if (tasks.isEmpty()) {
+                if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) {
+                    item("event-session-filter") {
+                        DsSegmented(
+                            segments = listOf(
+                                DsSegment("all", stringResource(R.string.tasks_chat_filter_all, tasks.size)),
+                                DsSegment(
+                                    "current",
+                                    stringResource(R.string.tasks_chat_filter_current, currentSessionEvents),
+                                ),
+                            ),
+                            selectedKey = if (currentSessionOnly) "current" else "all",
+                            onSelect = { currentSessionOnly = it == "current" },
+                            role = Role.Tab,
+                            hapticOnChange = true,
+                            stretch = true,
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+                        )
+                    }
+                }
+                if (visibleTasks.isEmpty()) {
                     item("events-empty") {
                         AutomationCardSurface(
                             modifier = Modifier.padding(horizontal = DsSpacing.large),
                         ) {
                             Text(
-                                stringResource(R.string.tasks_chat_events_empty),
+                                stringResource(
+                                    if (tasks.isEmpty()) R.string.tasks_chat_events_empty
+                                    else R.string.tasks_chat_filter_empty,
+                                ),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
                         }
                     }
                 } else {
-                    items(tasks, key = AutomationTask::id) { task ->
+                    items(visibleTasks, key = AutomationTask::id) { task ->
                         val scheduleDescription = chatScheduleDescription(task)
                         val editSeed = stringResource(
                             R.string.tasks_chat_edit_seed,

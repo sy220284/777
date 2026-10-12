@@ -210,6 +210,16 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.local_api_models_title)) {
+        val selectedProfiles = apiProfiles.count { local.modelSelection.isActive(it) }
+        Text(
+            stringResource(
+                R.string.local_model_inventory_summary,
+                apiProfiles.size,
+                selectedProfiles,
+            ),
+            style = DsType.small13Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (apiProfiles.isEmpty()) {
@@ -218,8 +228,17 @@ internal fun LocalModelSettingsCard(
         }
         local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
         apiProfiles.forEach { profile ->
-            Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                modifier = Modifier.fillMaxWidth()) {
+            val isSelectedProfile = local.modelSelection.isActive(profile)
+            Surface(
+                shape = DsShapes.row,
+                color = if (isSelectedProfile) colors.accentTertiary
+                    else colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isSelectedProfile) colors.accent.copy(alpha = 0.45f) else colors.borderL1,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {

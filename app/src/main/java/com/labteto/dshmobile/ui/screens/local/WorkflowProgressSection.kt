@@ -2,6 +2,15 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.Modifier
+import com.labteto.dshmobile.ui.components.DsProgressBar
+import com.labteto.dshmobile.ui.components.DsProgressStatus
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -26,10 +35,41 @@ internal fun workflowStageLabel(stage: String): String = stringResource(when (st
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors
+    val isBlocked = progress.blockedReason != null || progress.stage == "受阻"
+    val isDone = !isBlocked && progress.stage == "已完成" &&
+        progress.total > 0 && progress.completed >= progress.total
+    val progressStatus = when {
+        isBlocked -> DsProgressStatus.Failed
+        isDone -> DsProgressStatus.Done
+        progress.total <= 0 -> DsProgressStatus.Idle
+        else -> DsProgressStatus.Running
+    }
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-        Text(stringResource(R.string.local_workflow_stage, workflowStageLabel(progress.stage)), style = DsType.caption11Strong.withReadingWeight(), color = colors.labelTertiary)
+        // The stage changes in place rather than posting an unconditional completion toast.
+        AnimatedContent(
+            targetState = progress.stage,
+            transitionSpec = {
+                fadeIn(animationSpec = DsAnimations.tabSwap) togetherWith
+                    fadeOut(animationSpec = DsAnimations.fade)
+            },
+            label = "workflowStageMorph",
+        ) { stage ->
+            Text(
+                stringResource(R.string.local_workflow_stage, workflowStageLabel(stage)),
+                style = DsType.caption11Strong.withReadingWeight(),
+                color = if (isBlocked) colors.warnLabel else colors.labelTertiary,
+            )
+        }
         Text(progress.task, style = DsType.small13.withReadingWeight(), color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+        if (progress.total > 0) {
+            DsProgressBar(
+                value = progress.completed.coerceAtLeast(0).toFloat() /
+                    progress.total.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+                status = progressStatus,
+            )
+        }
         progress.blockedReason?.let { reason ->
             Text(stringResource(R.string.local_workflow_blocked, reason), style = DsType.small13.withReadingWeight(), color = colors.error)
             if (progress.needsUserAction) Text(stringResource(R.string.local_workflow_user_action), style = DsType.caption11.withReadingWeight(), color = colors.error)

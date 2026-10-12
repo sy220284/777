@@ -2192,5 +2192,9 @@
     <string name="local_drawer_search_open_gallery">在人物图集中查看</string>
     <string name="local_drawer_search_empty_both">没有匹配的会话或人物。试试其他关键词。</string>
     <string name="settings_notifications_request">允许通知</string>
+    <string name="tasks_chat_filter_all">全部事件 · %1$d</string>
+    <string name="tasks_chat_filter_current">当前会话 · %1$d</string>
+    <string name="tasks_chat_filter_empty">当前会话没有安排事件。切换到“全部事件”可以查看其他会话的计划。</string>
+    <string name="local_model_inventory_summary">已配置 %1$d 个 API 模型 · 使用中 %2$d 个</string>
 </resources>
 
