@@ -35,6 +35,7 @@ data class LocalMediaVideoTask(
     val lastError: String? = null,
     val sessionId: String? = null,
     val description: String? = null,
+    val fileName: String? = null,
 ) {
     /** A removed, replaced or re-keyed account must not be used to poll an old task. */
     fun belongsTo(offer: LocalMediaOffer): Boolean =
@@ -98,7 +99,7 @@ internal object LocalMediaVideoTransitions {
 
 @Singleton
 class LocalMediaVideoTaskStore @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val json: Json,
 ) {
     private val prefs = context.getSharedPreferences("local_media_video_tasks", Context.MODE_PRIVATE)
@@ -171,6 +172,34 @@ class LocalMediaVideoTaskStore @Inject constructor(
     }
 
     fun find(id: String): LocalMediaVideoTask? = mutableTasks.value.firstOrNull { it.id == id }
+
+    /** A completed video can be played/shared without depending on an expiring CDN URL. */
+    fun fileFor(task: LocalMediaVideoTask): File? {
+        val name = task.fileName?.takeIf {
+            it.matches(Regex("[A-Za-z0-9._-]{1,180}")) && it != "." && it != ".."
+        } ?: return null
+        val dir = File(context.filesDir, "media-studio").canonicalFile
+        return File(dir, name).takeIf { it.canonicalFile.parentFile == dir && it.isFile }
+    }
+
+    @Synchronized
+    fun savedFile(id: String, file: File) {
+        val dir = File(context.filesDir, "media-studio").canonicalFile
+        require(file.isFile && file.canonicalFile.parentFile == dir)
+        transition(id) { previous ->
+            require(previous.phase == LocalMediaVideoPhase.SUCCEEDED)
+            previous.copy(fileName = file.name, lastError = null,
+                updatedAtMillis = System.currentTimeMillis())
+        }
+    }
+
+    @Synchronized
+    fun downloadFailure(id: String, reason: String) {
+        transition(id) { previous ->
+            if (previous.phase != LocalMediaVideoPhase.SUCCEEDED || previous.fileName != null) previous
+            else previous.copy(lastError = "本地保存失败：${reason.take(180)}（可暂时在线播放）")
+        }
+    }
 
     @Synchronized
     private fun transition(id: String, operation: (LocalMediaVideoTask) -> LocalMediaVideoTask) {
