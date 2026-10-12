@@ -157,9 +157,20 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         withContext(Dispatchers.IO) { transactions.recover(); startup.prepare(model, baseUrl) }
     }
 
-    internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
+    internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null): String {
         if (model.isBlank()) return "请选择模型"
-        return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor, profileId)
+        val saved = profiles.read()
+        val sourceKey = if (apiKey.isBlank() && profileId == null) {
+            credentialSourceProfileId?.let { id ->
+                val source = saved.firstOrNull {
+                    it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
+                        normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                } ?: return "连接失败：原密钥来源已失效，请重新填写密钥"
+                apiKeys.getFor(source.id)
+            }
+        } else null
+        return tester.testStoredRoute(apiKey.ifBlank { sourceKey.orEmpty() }, normalizeModel(model),
+            baseUrl, protocol, saved, apiKeys::getFor, profileId)
     }
 
     /** User-initiated catalog lookup from the settings editor, including unsaved API drafts. */
