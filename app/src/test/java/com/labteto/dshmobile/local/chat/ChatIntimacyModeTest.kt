@@ -95,6 +95,20 @@ class ChatIntimacyModeTest {
     }
 
     @Test
+    fun replySuggestionsDoNotLeakPreviousIntimacyIntoOrdinaryTopics() {
+        val previous = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+            recentActionTags = listOf("靠近"),
+        )
+        assertEquals("", mode.suggestionContext("今天先聊工作", previous))
+        val active = mode.suggestionContext("继续刚才的", previous)
+        assertTrue(active.contains("当前为亲密语境"))
+        assertTrue(active.contains("近期动作=靠近"))
+    }
+
+    @Test
     fun runtimeProjectionIncludesIntimacyOnlyForActiveTurn() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
         val persona = PersonaProfile(name = "阿青")
