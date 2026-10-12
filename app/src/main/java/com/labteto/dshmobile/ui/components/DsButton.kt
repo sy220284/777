@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -118,8 +120,9 @@ fun DsButton(
             },
         enabled = interactionEnabled,
         shape = if (normal) DsShapes.buttonCapsule else DsShapes.buttonSmall,
-        color = background,
+        color = if (variant == DsButtonVariant.Primary) Color.Transparent else background,
         contentColor = contentColor,
+        shadowElevation = if (variant == DsButtonVariant.Primary && interactionEnabled && !pressed) 8.dp else 0.dp,
         border = if (variant == DsButtonVariant.Outline) BorderStroke(1.dp, colors.borderL2) else null,
         interactionSource = interaction,
     ) {
@@ -128,7 +131,18 @@ fun DsButton(
             // offered, which pushed the button itself out to full width whatever the caller asked
             // for — so any row of buttons rendered the first one and squeezed the rest to nothing.
             // A button that wants to span its parent says so through `modifier`, as several do.
-            modifier = Modifier.fillMaxHeight().padding(horizontal = if (normal) 16.dp else 12.dp),
+            modifier = Modifier.fillMaxHeight()
+                .then(
+                    if (variant == DsButtonVariant.Primary) Modifier.background(
+                        Brush.horizontalGradient(
+                            if (interactionEnabled) listOf(
+                                colors.brandPrimary,
+                                if (hovered) colors.buttonPrimaryHover else colors.accent,
+                            ) else listOf(colors.buttonPrimaryDimmed, colors.buttonPrimaryDimmed),
+                        ),
+                    ) else Modifier,
+                )
+                .padding(horizontal = if (normal) 16.dp else 12.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {

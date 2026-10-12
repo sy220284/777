@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,7 +56,7 @@ fun DsSearchField(
         animationSpec = DsAnimations.tabBackground, label = "searchFocusLine",
     )
     Surface(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         color = fill,
         shape = DsShapes.row,
         border = BorderStroke(1.dp, outline),

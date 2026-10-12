@@ -2159,5 +2159,6 @@
     <string name="fluid_message_media_speech">基于此消息合成语音</string>
     <string name="fluid_files_search">搜索文件名或路径</string>
     <string name="fluid_files_no_matches">没有匹配的文件</string>
+    <string name="local_group_chat_memory_isolation_hint">每个成员只使用自己有权访问的历史和当前群聊内容；其他成员的私聊不会共享到这个群聊。</string>
 </resources>
 
