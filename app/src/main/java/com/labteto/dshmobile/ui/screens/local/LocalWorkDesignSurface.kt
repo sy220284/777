@@ -81,6 +81,7 @@ internal fun LocalWorkDesignSurface(
     LaunchedEffect(sessionId, state?.pendingQuestion?.callId, state?.pendingApproval?.callId) {
         if (state?.pendingQuestion != null || state?.pendingApproval != null) onSelectSection(2)
     }
+    val completionMorphKey = workCompletionCardKey(sessionId, state?.workflowProgress)
     val labels = listOf(R.string.fluid_work_goal, R.string.fluid_work_plan,
         R.string.fluid_work_decision, R.string.fluid_work_execution, R.string.fluid_work_outputs)
         .map { stringResource(it) }
@@ -107,11 +108,12 @@ internal fun LocalWorkDesignSurface(
             // Keep the established paged event timeline and manual-scroll pause behavior.
             Column(Modifier.weight(1f)) { execution() }
         } else {
-            FluidSectionSwap(section, Modifier.weight(1f).fillMaxWidth()) { visibleSection ->
+            FluidSectionSwap(section, Modifier.weight(1f).fillMaxWidth(),
+                enableSharedBounds = completionMorphKey != null) { visibleSection ->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                     .padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
                     when (visibleSection) {
-                        0 -> SyGlassCard {
+                        0 -> SyGlassCard(modifier = Modifier.localWorkCompletionSharedBounds(completionMorphKey)) {
                             FluidPanelTitle(stringResource(R.string.fluid_work_goal))
                             Text(state?.goal?.description ?: stringResource(R.string.fluid_goal_empty),
                                 style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
@@ -161,7 +163,7 @@ internal fun LocalWorkDesignSurface(
                                     variant = SyButtonVariant.Ghost)
                             }
                         }
-                        4 -> SyGlassCard {
+                        4 -> SyGlassCard(modifier = Modifier.localWorkCompletionSharedBounds(completionMorphKey)) {
                             FluidPanelTitle(stringResource(R.string.fluid_work_outputs))
                             if (outputError) {
                                 Text(stringResource(R.string.fluid_outputs_failed), color = colors.error)

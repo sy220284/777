@@ -46,6 +46,12 @@ internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): SyPr
     }
 }
 
+/** Only the same completed Work session owns this card identity. */
+internal fun workCompletionCardKey(sessionId: String, progress: LocalWorkflowProgress?): String? =
+    if (sessionId.isNotBlank() && progress != null && progress.sessionId == sessionId &&
+        workflowProgressVisualStatus(progress) == SyProgressStatus.Done
+    ) "work-completion:$sessionId" else null
+
 @Composable
 internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
     val colors = DsTheme.colors

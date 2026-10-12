@@ -1,5 +1,13 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -97,15 +105,68 @@ internal fun FluidSectionNavigation(
     ) { tabs() }
 }
 
-/** Swap preserves the selected section identity and uses the supplied 380 ms curve. */
+/** Swap preserves section identity and the 380 ms peer motion.
+ * Work can opt into a shared transition scope without forcing other callers to pay its cost.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-internal fun FluidSectionSwap(section: Int, modifier: Modifier = Modifier,
-    content: @Composable (Int) -> Unit) {
+internal fun FluidSectionSwap(
+    section: Int,
+    modifier: Modifier = Modifier,
+    enableSharedBounds: Boolean = false,
+    content: @Composable (Int) -> Unit,
+) {
     val offset = with(LocalDensity.current) { 60.dp.roundToPx() }
-    AnimatedContent(targetState = section, modifier = modifier, label = "fluidSectionSwap",
-        transitionSpec = {
-            val direction = if (targetState > initialState) 1 else -1
-            (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
-                .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
-        }, content = { content(it) })
+    val reduceMotion = LocalSyReducedMotion.current
+    val host: @Composable (Modifier, SharedTransitionScope?) -> Unit = { surfaceModifier, sharedScope ->
+        AnimatedContent(targetState = section, modifier = surfaceModifier, label = "fluidSectionSwap",
+            transitionSpec = {
+                if (reduceMotion) {
+                    fadeIn(tween(80)).togetherWith(fadeOut(tween(80)))
+                } else {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(DsAnimations.featurePagePeer) { direction * offset } + fadeIn(tween(380)))
+                        .togetherWith(slideOutHorizontally(DsAnimations.featurePagePeer) { -direction * offset } + fadeOut(tween(140)))
+                }
+            },
+        ) { selectedSection ->
+            if (sharedScope != null) {
+                CompositionLocalProvider(
+                    LocalFluidSectionSharedScope provides sharedScope,
+                    LocalFluidSectionVisibilityScope provides this,
+                ) { content(selectedSection) }
+            } else {
+                content(selectedSection)
+            }
+        }
+    }
+    if (enableSharedBounds && !reduceMotion) {
+        SharedTransitionLayout(modifier = modifier) {
+            host(Modifier.fillMaxSize(), this)
+        }
+    } else {
+        host(modifier, null)
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val LocalFluidSectionSharedScope =
+    staticCompositionLocalOf<SharedTransitionScope?> { null }
+private val LocalFluidSectionVisibilityScope =
+    staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
+
+/** Only same-session completed work may morph from its goal/progress card to outputs. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+internal fun Modifier.localWorkCompletionSharedBounds(key: String?): Modifier {
+    if (key == null || LocalSyReducedMotion.current) return this
+    val shared = LocalFluidSectionSharedScope.current ?: return this
+    val visibility = LocalFluidSectionVisibilityScope.current ?: return this
+    return with(shared) {
+        this@localWorkCompletionSharedBounds.sharedBounds(
+            sharedContentState = rememberSharedContentState(key),
+            animatedVisibilityScope = visibility,
+            boundsTransform = { _, _ -> tween(380) },
+        )
+    }
 }
