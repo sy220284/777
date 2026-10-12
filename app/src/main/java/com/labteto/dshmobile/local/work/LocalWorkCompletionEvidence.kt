@@ -19,6 +19,7 @@ internal data class LocalWorkCompletionEvidence(
     val blockedGoal: Boolean,
     val pendingApproval: Boolean,
     val pendingQuestion: Boolean,
+    val deliveryEvidence: LocalWorkDeliveryEvidence? = null,
 ) {
     val findings: List<String> get() = buildList {
         if (openTodos > 0) add("完成声明与未完成任务清单冲突")
@@ -32,6 +33,7 @@ internal data class LocalWorkCompletionEvidence(
         if (blockedGoal) add("完成声明与阻塞目标状态冲突")
         if (pendingApproval) add("完成声明与待审批操作冲突")
         if (pendingQuestion) add("完成声明与待回答问题冲突")
+        deliveryEvidence?.missing?.forEach { add("完成声明缺少正向验收证据：$it") }
     }
 
     val userReasons: List<String> get() = buildList {
@@ -46,12 +48,16 @@ internal data class LocalWorkCompletionEvidence(
         if (blockedGoal) add("目标仍处于阻塞状态")
         if (pendingApproval) add("还有工具操作等待审批")
         if (pendingQuestion) add("还有待回答的问题")
+        deliveryEvidence?.missing?.let(::addAll)
     }
 
     val readyForGoalCompletion: Boolean get() = findings.isEmpty()
 }
 
-internal fun localWorkCompletionEvidence(work: LocalWorkState): LocalWorkCompletionEvidence {
+internal fun localWorkCompletionEvidence(
+    work: LocalWorkState,
+    deliveryEvidence: LocalWorkDeliveryEvidence? = null,
+): LocalWorkCompletionEvidence {
     val team = work.team
     val failedMemberCount = team.failedMemberCount.takeIf { count ->
         count > 0 && (team.tasks.isEmpty() ||
@@ -74,5 +80,6 @@ internal fun localWorkCompletionEvidence(work: LocalWorkState): LocalWorkComplet
         blockedGoal = work.goal?.status == "blocked",
         pendingApproval = work.pendingApproval != null,
         pendingQuestion = work.pendingQuestion != null,
+        deliveryEvidence = deliveryEvidence,
     )
 }
