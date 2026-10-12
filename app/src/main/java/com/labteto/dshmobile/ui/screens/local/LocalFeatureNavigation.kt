@@ -14,7 +14,8 @@ internal fun localFeaturePush(
     page: LocalFeaturePage,
 ): List<String> {
     if (localFeatureCurrent(stack) == page) return stack
-    return (stack.ifEmpty { listOf(LocalFeaturePage.HOME.name) } + page.name).takeLast(12)
+    // Do not truncate parent routes: a deep feature must still return to its true entry.
+    return stack.ifEmpty { listOf(LocalFeaturePage.HOME.name) } + page.name
 }
 
 internal data class LocalFeatureDrawerOpenResult(
