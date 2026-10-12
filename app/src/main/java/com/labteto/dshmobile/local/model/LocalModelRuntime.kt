@@ -52,9 +52,10 @@ class LocalModelRuntime @Inject constructor(
         protocol: LocalModelProtocol? = null,
         profileId: String? = null,
         contextWindowTokensOverride: Int? = null,
+        credentialSourceProfileId: String? = null,
     ) {
         check(!identityMutationLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
-        val result = configuration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
+        val result = configuration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride, credentialSourceProfileId)
         runtimeStateStore.imageCapabilities.clearRoute(result.baseUrl, result.model)
         commit(result)
     }
@@ -100,7 +101,15 @@ class LocalModelRuntime @Inject constructor(
         baseUrl: String,
         protocol: LocalModelProtocol? = null,
         profileId: String? = null,
-    ): String = configuration.test(apiKey, model, baseUrl, protocol, profileId)
+        credentialSourceProfileId: String? = null,
+    ): String = configuration.test(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
+
+    internal suspend fun discoverApiModels(
+        apiKey: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol,
+        credentialSourceProfileId: String? = null,
+    ): List<String> = configuration.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
 
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
         settings.configureImageInputMode(mode)

@@ -81,7 +81,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             ?: LocalModelConfigContract.DEFAULT_MODEL
         val baseUrl = preferences.getString(LocalModelConfigContract.KEY_BASE_URL, LocalModelConfigContract.DEFAULT_BASE_URL)
             ?: LocalModelConfigContract.DEFAULT_BASE_URL
-        val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
+        val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel, baseUrl), baseUrl)
         if (model != storedModel) {
             preferences.edit().putString(LocalModelConfigContract.KEY_MODEL, model).apply()
         }
