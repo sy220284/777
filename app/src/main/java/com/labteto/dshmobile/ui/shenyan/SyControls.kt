@@ -26,6 +26,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
 import kotlinx.coroutines.delay
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -147,14 +149,15 @@ fun SyTabs(
 
 enum class SyPhase { IDLE, WAITING, RUNNING, DONE, FAILED, CANCELLED, BLOCKED }
 
+@Composable
 fun SyPhase.label(): String = when(this) {
-    SyPhase.IDLE -> "未开始"
-    SyPhase.WAITING -> "等待中"
-    SyPhase.RUNNING -> "执行中"
-    SyPhase.DONE -> "已完成"
-    SyPhase.FAILED -> "执行失败"
-    SyPhase.CANCELLED -> "已取消"
-    SyPhase.BLOCKED -> "等待批准"
+    SyPhase.IDLE -> stringResource(R.string.sy_v5_phase_idle)
+    SyPhase.WAITING -> stringResource(R.string.sy_v5_phase_waiting)
+    SyPhase.RUNNING -> stringResource(R.string.sy_v5_phase_running)
+    SyPhase.DONE -> stringResource(R.string.sy_v5_phase_done)
+    SyPhase.FAILED -> stringResource(R.string.sy_v5_phase_failed)
+    SyPhase.CANCELLED -> stringResource(R.string.sy_v5_phase_cancelled)
+    SyPhase.BLOCKED -> stringResource(R.string.sy_v5_phase_blocked)
 }
 
 /** Muted clay is a recoverable failure; red is reserved for destructive actions. */
