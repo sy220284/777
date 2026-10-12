@@ -513,6 +513,7 @@ fun LocalHarnessScreen(
                 memorySourceSessionId = shell.sessionId
                 memorySourceMessageId = messageId
                 settingsDestination = SettingsDestination.MEMORY_MANAGEMENT
+                settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             composerHandoff = composerHandoff,
