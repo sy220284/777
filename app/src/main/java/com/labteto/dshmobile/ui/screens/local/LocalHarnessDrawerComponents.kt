@@ -87,10 +87,11 @@ internal fun localDrawerSessionSections(
     pinnedSessionIds: Set<String>,
     query: String,
     sessionTitleOverrides: Map<String, String>,
+    includeOtherModes: Boolean = false,
 ): LocalDrawerSessionSections {
     val normalizedQuery = query.trim()
     val visible = sessions.asSequence()
-        .filter { !it.blank && it.usageMode == usageMode }
+        .filter { !it.blank && (includeOtherModes || it.usageMode == usageMode) }
         .filter { session ->
             normalizedQuery.isEmpty() ||
                 (sessionTitleOverrides[session.id] ?: session.title)
@@ -306,6 +307,7 @@ internal fun LocalSessionDrawerRow(
     onRename: () -> Unit,
     onTogglePinned: () -> Unit,
     onDelete: () -> Unit,
+    searchModeLabel: String? = null,
 ) {
     val colors = DsTheme.colors
     var menuOpen by remember { mutableStateOf(false) }
@@ -388,8 +390,14 @@ internal fun LocalSessionDrawerRow(
                         )
                     }
                 }
-
-
+                searchModeLabel?.let { mode ->
+                    Text(
+                        mode,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelSecondary,
+                        maxLines = 1,
+                    )
+                }
             }
         }
         DsPopupMenu(

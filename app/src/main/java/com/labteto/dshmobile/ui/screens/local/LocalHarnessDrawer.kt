@@ -164,12 +164,14 @@ internal fun LocalModeDrawer(
             currentGalleryEntry?.stories?.firstOrNull { it.id == id }?.title
         }?.takeIf(String::isNotBlank)
     }
+    val crossModeSearch = searchOpen && historyQuery.isNotBlank()
     val sessionSections = remember(
         sessions,
         usageMode,
         pinnedSessionIds,
         historyQuery,
         sessionTitleOverrides,
+        crossModeSearch,
     ) {
         localDrawerSessionSections(
             sessions = sessions,
@@ -177,12 +179,11 @@ internal fun LocalModeDrawer(
             pinnedSessionIds = pinnedSessionIds,
             query = historyQuery,
             sessionTitleOverrides = sessionTitleOverrides,
+            includeOtherModes = crossModeSearch,
         )
     }
-    val matchedPersonas = remember(gallery, historyQuery, searchOpen, usageMode) {
-        if (searchOpen && usageMode == LocalUsageMode.CHAT)
-            localDrawerMatchingPersonas(gallery, historyQuery)
-        else emptyList()
+    val matchedPersonas = remember(gallery, historyQuery, crossModeSearch) {
+        if (crossModeSearch) localDrawerMatchingPersonas(gallery, historyQuery) else emptyList()
     }
     val hasVisibleSessions = remember(sessions, usageMode) {
         sessions.any { !it.blank && it.usageMode == usageMode }
@@ -359,6 +360,10 @@ internal fun LocalModeDrawer(
                             onRename = { renameTargetId = session.id },
                             onTogglePinned = { onTogglePinSession(session.id) },
                             onDelete = { deleteCandidateIds = setOf(session.id) },
+                            searchModeLabel = if (crossModeSearch) stringResource(
+                                if (session.usageMode == LocalUsageMode.CHAT)
+                                    R.string.usage_mode_chat else R.string.usage_mode_work,
+                            ) else null,
                         )
                     }
                 }
@@ -395,6 +400,10 @@ internal fun LocalModeDrawer(
                             onRename = { renameTargetId = session.id },
                             onTogglePinned = { onTogglePinSession(session.id) },
                             onDelete = { deleteCandidateIds = setOf(session.id) },
+                            searchModeLabel = if (crossModeSearch) stringResource(
+                                if (session.usageMode == LocalUsageMode.CHAT)
+                                    R.string.usage_mode_chat else R.string.usage_mode_work,
+                            ) else null,
                         )
                     }
                 }
