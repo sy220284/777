@@ -2150,5 +2150,9 @@
     <string name="fluid_reader_empty">暂无可阅读的回复</string>
     <string name="fluid_model_composition">模型累计 Token 构成</string>
     <string name="fluid_settings_session_storage">会话与存储</string>
+    <string name="fluid_message_actions">消息操作</string>
+    <string name="fluid_message_media_image">基于此消息生成图像</string>
+    <string name="fluid_message_media_video">基于此消息生成视频</string>
+    <string name="fluid_message_media_speech">基于此消息合成语音</string>
 </resources>
 

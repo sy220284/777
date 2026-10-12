@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -67,6 +68,8 @@ import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
+import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsContextActionMenu
@@ -145,8 +148,10 @@ internal fun LocalMessageRow(
     skillDisplayNames: Map<String, String> = emptyMap(),
     onLocateSourceMemory: ((LocalHarnessMessage) -> Unit)? = null,
     onReadMessage: ((LocalHarnessMessage) -> Unit)? = null,
+    onCreateMedia: ((LocalHarnessMessage, LocalMediaKind) -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
+    val pulse = rememberHapticPulse()
     val backgroundState = LocalAppBackgroundState.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -191,7 +196,7 @@ internal fun LocalMessageRow(
                     Box(
                         modifier = Modifier.combinedClickable(
                             onClick = { actionsOpen = false },
-                            onLongClick = { actionsOpen = true },
+                            onLongClick = { pulse(); actionsOpen = true },
                         ),
                     ) {
                         LocalUserMessageContent(
@@ -201,10 +206,13 @@ internal fun LocalMessageRow(
                             skillDisplayNames = skillDisplayNames,
                         )
                     }
-                    DsContextActionMenu(
-                        expanded = actionsOpen,
-                        onDismiss = { actionsOpen = false },
-                        items = buildList {
+                    val actionMenu: @Composable (Boolean, () -> Unit, List<MenuItem>) -> Unit =
+                        if (chatMode) { open, dismiss, items -> FluidMessageActionSheet(open, dismiss, items) }
+                        else { open, dismiss, items -> DsContextActionMenu(open, dismiss, items) }
+                    actionMenu(
+                        actionsOpen,
+                        { actionsOpen = false },
+                        buildList {
                             if (copyText.isNotBlank()) {
                                 add(
                                     MenuItem(
@@ -235,6 +243,9 @@ internal fun LocalMessageRow(
                                     ),
                                 )
                             }
+                            if (chatMode && copyText.isNotBlank()) onCreateMedia?.let { create ->
+                                addAll(fluidMessageMediaItems(message.copy(content = copyText), create))
+                            }
                         },
                     )
                 }
@@ -259,6 +270,7 @@ internal fun LocalMessageRow(
         "reasoning", "tool", "progress" -> WorkProcessRow(listOf(message))
 
         else -> {
+            var actionsOpen by remember(message.id) { mutableStateOf(false) }
             val readingLayer = chatMode && (backgroundState.hasImage || backgroundState.fluidGlass)
             val readingModifier = if (readingLayer) {
                 Modifier
@@ -281,7 +293,7 @@ internal fun LocalMessageRow(
                 Modifier.fillMaxWidth()
             }
             Column(
-                readingModifier,
+                readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(onClick = {}, onLongClick = { pulse(); actionsOpen = true }),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
                 if (groupMode) {
@@ -295,6 +307,21 @@ internal fun LocalMessageRow(
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
                 val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
+                FluidMessageActionSheet(actionsOpen, { actionsOpen = false }, buildList {
+                    if (copyableContent.isNotBlank()) add(MenuItem(
+                        text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
+                        onClick = { clipboard.setText(AnnotatedString(copyableContent)); copied = true }))
+                    onReadMessage?.let { read -> add(MenuItem(
+                        text = stringResource(R.string.fluid_reader_title), icon = FeatherIcons.BookOpen,
+                        onClick = { read(message) })) }
+                    if (canRegenerate) add(MenuItem(
+                        text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
+                        onClick = { if (!onRegenerate(message.id))
+                            Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show() }))
+                    onCreateMedia?.takeIf { !streaming && copyableContent.isNotBlank() }?.let { create ->
+                        addAll(fluidMessageMediaItems(message.copy(content = copyableContent), create))
+                    }
+                })
                 LocalAssistantMessageContent(
                     message = message,
                     streaming = streaming,

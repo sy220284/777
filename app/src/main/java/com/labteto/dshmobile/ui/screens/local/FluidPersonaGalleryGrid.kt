@@ -67,7 +67,7 @@ private fun FluidPersonaGalleryCard(entry: PersonaGalleryEntry, onClick: () -> U
             }
             Column(Modifier.padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                 Text(entry.persona.name, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
-                val saved = entry.story()?.chatState
+                val saved = entry.story(null)?.chatState
                 Text(saved?.takeIf { it.updatedAt > 0 }?.relationshipState
                     ?: stringResource(R.string.fluid_item_count, entry.stories.size),
                     style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)

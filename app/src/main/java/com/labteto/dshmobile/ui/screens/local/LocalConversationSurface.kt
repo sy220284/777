@@ -248,6 +248,10 @@ internal fun LocalConversationSurface(
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
     var showMediaStudio by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var mediaInitialPrompt by rememberSaveable(state.sessionId) { mutableStateOf("") }
+    var mediaInitialKind by rememberSaveable(state.sessionId) {
+        mutableStateOf(com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name)
+    }
     var teamDispatchSelected by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchPending by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var teamLaunchSawRunning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
@@ -769,6 +773,11 @@ internal fun LocalConversationSurface(
                                 },
                                 onEdit = { message -> editingUserMessage = message },
                                 onReadMessage = { message -> readerOpen = true; readerMessageId = message.id },
+                                onCreateMedia = { message, kind ->
+                                    mediaInitialPrompt = message.content
+                                    mediaInitialKind = kind.name
+                                    showMediaStudio = true
+                                },
                                  onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
@@ -1292,6 +1301,8 @@ internal fun LocalConversationSurface(
                         modifier = Modifier.width(96.dp),
                         onClick = {
                             showAttachmentPicker = false
+                            mediaInitialPrompt = ""
+                            mediaInitialKind = com.labteto.dshmobile.local.model.LocalMediaKind.IMAGE.name
                             showMediaStudio = true
                         },
                     )
@@ -1338,6 +1349,8 @@ internal fun LocalConversationSurface(
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
                 preferredProfileId = activeModelProfile?.id,
+                initialPrompt = mediaInitialPrompt,
+                initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
                     drafts.putBoundedLocalDraft(

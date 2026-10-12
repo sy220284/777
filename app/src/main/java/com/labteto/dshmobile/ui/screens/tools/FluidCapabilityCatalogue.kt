@@ -33,6 +33,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
     val families = entries.groupBy { it.family }.toSortedMap()
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         DsTopBar(stringResource(R.string.fluid_capability_title), onBack = onBack,
+            backContentDescription = stringResource(R.string.common_back),
             actionIcon = FeatherIcons.RefreshCw, onAction = onRefresh, actionEnabled = !loading,
             actionContentDescription = stringResource(R.string.tools_refresh))
         DsSearchField(query, { query = it }, placeholder = stringResource(R.string.tools_catalog_search),

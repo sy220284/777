@@ -59,7 +59,7 @@ private fun FluidWorkScreenshot(page: String) {
         )
     }
     Column(Modifier.fillMaxSize()) {
-        DsTopBar("工作执行 · 设计样例", onBack = {})
+        DsTopBar("工作执行 · 设计样例", onBack = {}, backContentDescription = "返回")
         Column(Modifier.weight(1f)) {
             LocalWorkDesignSurface(actions, state.value.sessionId, "迁移鉴权模块", section, {},
                 { _, _ -> false }, {}, {}, {}, execution = {
@@ -88,7 +88,7 @@ private fun fluidPersonaFixture() = PersonaGalleryEntry("design-persona",
 private fun FluidPersonaScreenshot(section: Int) {
     val entry = remember { fluidPersonaFixture() }
     Column(Modifier.fillMaxSize().padding(DsSpacing.medium), verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
-        DsTopBar("人物档案 · 设计样例", onBack = {})
+        DsTopBar("人物档案 · 设计样例", onBack = {}, backContentDescription = "返回")
         FluidPersonaIdentity(entry, "", false, {})
         FluidSectionNavigation(listOf("关系", "事件", "记忆", "设定"), section, {}, tag = "profileFixture")
         if (section == 3) PersonaDetails(entry.persona) else FluidPersonaStorySection(entry.stories.single(), section)
@@ -102,7 +102,7 @@ private fun FluidGalleryScreenshot() {
     val entries = remember { listOf(fluidPersonaFixture(), fluidPersonaFixture().copy(id = "design-persona-2",
         persona = PersonaProfile(id = "design-profile-2", name = "陆棠", portrait = "周末看展吗"))) }
     Column(Modifier.fillMaxSize().padding(DsSpacing.medium)) {
-        DsTopBar("人物图集 · 设计样例", onBack = {})
+        DsTopBar("人物图集 · 设计样例", onBack = {}, backContentDescription = "返回")
         DsSearchField("", {}, "搜索人物", Modifier.padding(bottom = 14.dp))
         FluidPersonaGalleryGrid(entries, {}, {}, Modifier.weight(1f))
     }

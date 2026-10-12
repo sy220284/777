@@ -18,7 +18,7 @@ internal fun FluidMessageReader(title: String, content: String, onDismiss: () ->
     DsFullScreenDialog(onDismiss = onDismiss) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DsTopBar(title, onBack = onDismiss)
+                DsTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
                 if (content.isBlank()) DsPageEmptyState(FeatherIcons.BookOpen,
                     stringResource(R.string.fluid_reader_empty), body = "", modifier = Modifier.weight(1f))
                 else SelectionContainer(Modifier.weight(1f)) {

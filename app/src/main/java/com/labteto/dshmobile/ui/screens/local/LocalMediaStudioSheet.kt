@@ -59,6 +59,8 @@ internal fun LocalMediaStudioSheetContent(
     preferredProfileId: String?,
     onInsertTranscript: (String) -> Unit,
     viewModel: LocalMediaStudioViewModel = hiltViewModel(),
+    initialPrompt: String = "",
+    initialKind: LocalMediaKind = LocalMediaKind.IMAGE,
 ) {
     val colors = DsTheme.colors
     val context = LocalContext.current
@@ -72,7 +74,7 @@ internal fun LocalMediaStudioSheetContent(
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
-    var mode by rememberSaveable { mutableStateOf(LocalMediaKind.IMAGE.name) }
+    var mode by rememberSaveable { mutableStateOf(initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val available = models.filter { it.kind == kind }
     var chosenId by rememberSaveable(mode) { mutableStateOf("") }
@@ -81,7 +83,7 @@ internal fun LocalMediaStudioSheetContent(
         ?: available.firstOrNull()
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
-    var prompt by rememberSaveable { mutableStateOf("") }
+    var prompt by rememberSaveable { mutableStateOf(initialPrompt) }
     var ratio by rememberSaveable { mutableStateOf("1:1") }
     var voiceId by rememberSaveable(selected?.id) {
         mutableStateOf(if (selected?.provider == LocalMediaProvider.OPENAI) "alloy" else "male-qn-qingse")

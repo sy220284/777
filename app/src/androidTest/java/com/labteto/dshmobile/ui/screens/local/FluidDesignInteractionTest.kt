@@ -9,10 +9,14 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.model.LocalMediaKind
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.RelationshipDynamics
@@ -60,4 +64,26 @@ class FluidDesignInteractionTest {
         compose.onNodeWithTag("profileTestSection:0").performClick()
         compose.onNodeWithTag("profileTestSection:0").assertIsSelected()
     }
+    @Test fun messageMediaActionCarriesTextAndDismissesWithoutRegenerating() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val requests = mutableListOf<Pair<String, LocalMediaKind>>()
+        var regenerationCount = 0
+        val message = LocalHarnessMessage("source", "assistant", "Describe a rainy street", createdAt = 1)
+        compose.setContent { DshTheme {
+            LocalMessageRow(message, chatMode = true, groupMode = false, canEdit = false,
+                canRegenerate = true, canSelectVariant = false, branchInfo = null,
+                onEdit = {}, onSelectVariant = { _, _ -> false },
+                onRegenerate = { regenerationCount++; true },
+                onCreateMedia = { source, kind -> requests += source.content to kind })
+        } }
+        compose.onNodeWithTag("messageActionSurface:source").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        compose.runOnIdle { assertEquals(emptyList<Pair<String, LocalMediaKind>>(), requests) }
+        compose.onNodeWithText(context.getString(R.string.fluid_message_media_video)).performClick()
+        compose.onNodeWithText(context.getString(R.string.fluid_message_actions)).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(listOf("Describe a rainy street" to LocalMediaKind.VIDEO), requests)
+            assertEquals(0, regenerationCount)
+        }
+    }
+
 }
