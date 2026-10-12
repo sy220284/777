@@ -58,7 +58,9 @@ internal fun parentConversationForSubagent(history: List<JsonObject>): MutableLi
         when (item["role"]?.jsonPrimitive?.contentOrNull) {
             "system", "developer", "user" -> item
             "assistant" -> {
-                if (LocalCanonicalModelCodec.canonicalToolCalls(item).isNotEmpty()) {
+                if (LocalCanonicalModelCodec.canonicalToolCalls(item).isNotEmpty() ||
+                    item["content"] == null
+                ) {
                     null
                 } else {
                     val visible = item.filterKeys { key ->
@@ -66,6 +68,7 @@ internal fun parentConversationForSubagent(history: List<JsonObject>): MutableLi
                             "reasoning", "reasoning_content", "reasoning_details",
                             "analysis", "thoughts", "provider_replay", "model_tool_calls",
                             "tool_calls", "function_call", "tool_call_id",
+                            "_dsh_model_replay", "_dsh_responses_output",
                         )
                     }
                     JsonObject(visible)
