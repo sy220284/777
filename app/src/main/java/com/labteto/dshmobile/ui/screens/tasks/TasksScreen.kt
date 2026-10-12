@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,11 +34,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.DsIconButton
@@ -53,6 +57,19 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import java.text.DateFormat
 import java.util.Date
+
+/** Device-side view filter only; never changes the persisted task's real status. */
+internal enum class WorkTaskListFilter { ALL, SCHEDULED, RUNNING, PAUSED }
+
+internal fun workTaskMatchesFilter(status: AutomationStatus, filter: WorkTaskListFilter): Boolean =
+    when (filter) {
+        WorkTaskListFilter.ALL -> true
+        WorkTaskListFilter.SCHEDULED ->
+            status == AutomationStatus.SCHEDULED || status == AutomationStatus.QUEUED
+        WorkTaskListFilter.RUNNING ->
+            status == AutomationStatus.RUNNING || status == AutomationStatus.WAITING_USER
+        WorkTaskListFilter.PAUSED -> status == AutomationStatus.PAUSED
+    }
 
 @Composable
 fun TasksScreen(
@@ -103,6 +120,8 @@ private fun WorkTasksScreen(
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
+    var listFilter by rememberSaveable { mutableStateOf(WorkTaskListFilter.ALL) }
+    val filteredTasks = visibleTasks.filter { workTaskMatchesFilter(it.status, listFilter) }
     val chatCreatePrompt = stringResource(R.string.tasks_create_chat_prompt)
     val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
@@ -253,12 +272,59 @@ private fun WorkTasksScreen(
                             onOpenSession = onOpenSession,
                         )
                     }
-                    else -> LazyColumn(
+                    else -> Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                     ) {
-                        items(visibleTasks, key = AutomationTask::id) { task ->
-                            TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                        // Screen 19: show the real schedule state in the same glass tab
+                        // language as the work/history pages; never fabricate budget figures.
+                        val statusFilters = WorkTaskListFilter.entries
+                        val titles = listOf(
+                            stringResource(R.string.tasks_filter_all),
+                            stringResource(R.string.tasks_filter_scheduled),
+                            stringResource(R.string.tasks_filter_running),
+                            stringResource(R.string.tasks_filter_paused),
+                        )
+                        DsSegmented(
+                            segments = statusFilters.mapIndexed { index, filter ->
+                                DsSegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
+                            },
+                            selectedKey = listFilter.name,
+                            onSelect = { key ->
+                                listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
+                                    ?: WorkTaskListFilter.ALL
+                            },
+                            role = Role.Tab,
+                            stretch = true,
+                            hapticOnChange = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (filteredTasks.isEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                Text(
+                                    stringResource(R.string.tasks_filter_empty),
+                                    style = DsType.small13.withReadingWeight(),
+                                    color = colors.labelSecondary,
+                                )
+                                DsButton(
+                                    text = stringResource(R.string.tasks_filter_all),
+                                    onClick = { listFilter = WorkTaskListFilter.ALL },
+                                    variant = DsButtonVariant.Outline,
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                            ) {
+                                items(filteredTasks, key = AutomationTask::id) { task ->
+                                    TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                                }
+                            }
                         }
                     }
                 }

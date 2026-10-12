@@ -2173,5 +2173,10 @@
     <string name="local_model_catalog_search_hint">为保证菜单流畅，一次展示前 60 条匹配结果；可输入名称查找完整目录。</string>
     <string name="local_group_chat_memory_isolation_hint">每个成员只使用自己有权访问的历史和当前群聊内容；其他成员的私聊不会共享到这个群聊。</string>
     <string name="local_run_history_filter_all">全部</string>
+    <string name="tasks_filter_all">全部</string>
+    <string name="tasks_filter_scheduled">待执行</string>
+    <string name="tasks_filter_running">执行中</string>
+    <string name="tasks_filter_paused">已暂停</string>
+    <string name="tasks_filter_empty">此状态下没有任务</string>
 </resources>
 
