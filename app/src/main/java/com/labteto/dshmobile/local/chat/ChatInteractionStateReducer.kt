@@ -459,8 +459,10 @@ internal class ChatInteractionStateReducer {
                 incoming = value.hypotheses.filter { evidenceGrounded(it, userMessage, assistantMessage) },
                 minimumConfidence = 10, maximumConfidence = 85, allowedSources = FACT_SOURCES, limit = 6,
             ) else previous.hypotheses,
+            // Unknowns are the full currently-open set, not append-only history. [] closes
+            // answered questions; omission preserves the previous state for partial patches.
             unknowns = if (raw.containsKey("unknowns")) {
-                mergeStrings(previous.unknowns, value.unknowns, 6, 160)
+                mergeStrings(emptyList(), value.unknowns, 6, 160)
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
                 mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->
