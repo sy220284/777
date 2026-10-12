@@ -9,6 +9,31 @@ import org.junit.Test
 
 class LocalTranscriptPresentationTest {
     @Test
+    fun creationReceiptStaysInChatAndBecomesResultAtSameStableKey() {
+        val job = com.labteto.dshmobile.local.model.LocalMediaCreationJob(
+            id = "operation-1", sessionId = "session-a", kind = "IMAGE",
+            provider = "MINIMAX", model = "image-01", prompt = "海边",
+            createdAtMillis = 50L,
+        )
+        val waiting = mergeLocalMediaTimeline(emptyList(), "session-a", emptyList(), emptyList(), listOf(job))
+        assertEquals(listOf("media-result:operation-1"), waiting.map { it.key })
+        assertTrue(waiting.first() is LocalTranscriptItem.CreationJob)
+        val completed = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = job.id, provider = job.provider, model = job.model, kind = job.kind,
+            createdAtMillis = job.createdAtMillis + 15L,
+            remoteUrl = "https://cdn.example.com/success.png", sessionId = job.sessionId,
+        )
+        val delivered = mergeLocalMediaTimeline(emptyList(), "session-a", listOf(completed),
+            emptyList(), listOf(job.copy(
+                phase = com.labteto.dshmobile.local.model.LocalMediaCreationPhase.SUCCEEDED,
+            )))
+        assertEquals(waiting.map { it.key }, delivered.map { it.key })
+        assertTrue(delivered.first() is LocalTranscriptItem.MediaResult)
+        assertTrue(mergeLocalMediaTimeline(emptyList(), "session-b", listOf(completed),
+            emptyList(), listOf(job)).isEmpty())
+    }
+
+    @Test
     fun workArtifactsAppearInConversationWithoutDuplicateFiles() {
         val transcript = listOf(LocalTranscriptItem.Message(
             LocalHarnessMessage("answer", "assistant", "文件已生成", createdAt = 10L),
@@ -24,7 +49,7 @@ class LocalTranscriptPresentationTest {
         val out = appendWorkArtifactsToTranscript(transcript, listOf(artifact, repeated))
         assertEquals(2, out.size)
         assertEquals("message:answer", out.first().key)
-        assertEquals(artifact, (out.last() as LocalTranscriptItem.WorkArtifact).artifact)
+        assertEquals(repeated, (out.last() as LocalTranscriptItem.WorkArtifact).artifact)
         assertEquals(out.map { it.key }, appendWorkArtifactsToTranscript(transcript, listOf(artifact)).map { it.key })
     }
 
