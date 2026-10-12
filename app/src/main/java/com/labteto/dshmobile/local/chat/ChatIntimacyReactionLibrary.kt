@@ -45,7 +45,7 @@ internal object ChatIntimacyReactionLibrary {
         IntimacyReactionScene("cheek-kiss", listOf("亲脸颊", "吻脸颊", "脸颊亲吻", "脸颊轻吻", "亲在脸", "脸颊", "侧脸"),
             "偏头、轻碰脸颊、目光转回来", "脸颊可能发热、短暂睁大眼睛",
             "半句抱怨、害羞轻笑或坦率回应", "laugh"),
-        IntimacyReactionScene("brief-kiss", listOf("亲吻", "接吻", "轻吻", "吻住", "吻上", "亲一口", "亲一下", "亲我", "吻我", "吻一下", "过来亲"),
+        IntimacyReactionScene("brief-kiss", listOf("亲吻", "接吻", "轻吻", "吻住", "吻上", "亲了", "吻了", "亲一口", "亲一下", "亲我", "吻我", "吻一下", "过来亲"),
             "调整头部角度、片刻闭眼或重新看向对方", "呼吸与面部神情有短暂变化",
             "轻声回应、询问对方状态或停顿", "breath"),
         IntimacyReactionScene("hair-touch", listOf("抚摸头发", "轻抚头发", "摸头发", "头发", "发梢", "发丝", "理了理头发"),
