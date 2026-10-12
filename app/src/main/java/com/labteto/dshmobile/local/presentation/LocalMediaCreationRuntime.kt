@@ -66,12 +66,25 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             LocalMediaProvider.MINIMAX -> LocalMediaImage(url = miniMax.generateImage(offer.profile, prompt, ratio))
             else -> api.image(offer, prompt, ratio).let(::imageResult)
         }
+        // Prefer a durable file to an expiring provider CDN URL. Failure to cache does not
+        // lose a paid result: keep the provider URL available for preview and manual recovery.
+        val durable = if (result.file == null && result.url != null) {
+            val file = try {
+                api.downloadGeneratedImage(result.url)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                AppLog.warn("MediaCreation", "cache_generated_image_failed", failure)
+                null
+            }
+            if (file != null) result.copy(file = file) else result
+        } else result
         withContext(Dispatchers.IO) {
-            result.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
-                ?: result.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
+            durable.file?.let { resultStore.addFile(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
+                ?: durable.url?.let { resultStore.addLink(offer, LocalMediaKind.IMAGE, it, sessionId, prompt) }
                 ?: error("生成服务没有返回可保存的图片成果")
         }
-        return result
+        return durable
     }
 
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice> {
