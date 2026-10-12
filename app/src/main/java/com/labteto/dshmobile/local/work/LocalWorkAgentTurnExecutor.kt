@@ -561,6 +561,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 java.io.File(sessionStorage.files.workspace.path), event.call.name, event.output,
                             ) else null
                             val toolEvent = runEventLog.append("tool/result", buildJsonObject {
+                                event.executionId?.let { put("execution_id", it) }
                                 event.processExitCode?.let { put("process_exit_code", it) }
                                 put("file_versions", kotlinx.serialization.json.JsonObject(event.fileVersions.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
                                 put("step", event.step)

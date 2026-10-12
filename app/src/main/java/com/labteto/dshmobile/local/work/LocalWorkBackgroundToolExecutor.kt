@@ -67,7 +67,7 @@ internal class LocalWorkBackgroundToolExecutor(
         })
         val result = try {
             executeUtility(normalized, sessionId, memoryTools, enabledOptionalTools)
-                ?: executeAutomationRegistered(normalized, allowMutation, sessionId, artifactPaths, onApprovalBlocked)
+                ?: executeAutomationRegistered(normalized, allowMutation, sessionId, goalId?.let { (it as? JsonPrimitive)?.contentOrNull }, artifactPaths, onApprovalBlocked)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -81,6 +81,7 @@ internal class LocalWorkBackgroundToolExecutor(
             java.io.File(sessionStorage.files.workspace.path), normalized.name, result.content,
         ) else null
         log.append("tool/result", buildJsonObject {
+            result.executionId?.let { put("execution_id", it) }
             result.processExitCode?.let { put("process_exit_code", it) }
             put("file_versions", JsonObject(result.fileVersions.mapValues { JsonPrimitive(it.value) }))
             put("id", normalized.id)
@@ -105,6 +106,7 @@ internal class LocalWorkBackgroundToolExecutor(
         original: LocalToolCall,
         allowMutation: Boolean,
         sessionId: String,
+        goalId: String?,
         artifactPaths: List<String>,
         onApprovalBlocked: (String) -> Unit,
     ): AgentToolResult {
@@ -113,6 +115,7 @@ internal class LocalWorkBackgroundToolExecutor(
             sessionId = sessionId,
             allowMutation = allowMutation,
             planModeEnabled = false,
+            executionAttributes = mapOf("goal_id" to goalId.orEmpty()),
             observeFileVersions = {
                 artifactPaths.mapNotNull { path ->
                     localWorkFileSha256(java.io.File(sessionStorage.files.workspace.path), path)?.let { path to it }

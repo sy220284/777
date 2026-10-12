@@ -24,11 +24,17 @@ class LocalWorkDeliveryEvidenceTest {
     }
     private fun result(log: LocalSessionEventLog, goal: LocalGoal, root: File, id: String, command: String = "go test ./...",
         exit: Int? = 0, error: Boolean = false, text: String = "", invoke: Boolean = true) {
+        val executionId = java.util.UUID.randomUUID().toString()
         if (invoke) log.append("tool/call", buildJsonObject {
             put("id", id); put("goal_id", goal.id); put("name", "bash")
             put("arguments", buildJsonObject { put("command", command) })
         })
+        if (invoke) log.append("tool/execution-started", buildJsonObject {
+            put("id", id); put("name", "bash"); put("execution_id", executionId)
+            put("attributes", buildJsonObject { put("goal_id", goal.id) })
+        })
         log.append("tool/result", buildJsonObject {
+            put("execution_id", executionId)
             put("id", id); put("name", "bash"); put("is_error", error); put("content", text)
             exit?.let { put("process_exit_code", it) }
             put("file_versions", JsonObject(goal.artifactPaths.mapNotNull { path ->
@@ -113,6 +119,70 @@ class LocalWorkDeliveryEvidenceTest {
         result(log, goal, root, "vet", command = "go vet ./...")
         assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.isEmpty())
     }
+    @Test fun shellBracketExpressionKeepsItsActualStringCommand() = scenario(commands = listOf("""[ "foo" ]""")) { log, goal, root ->
+        artifact(root); result(log, goal, root, "shell-test", command = """[ "foo" ]""")
+        assertEquals("shell-test", localWorkDeliveryEvidence(log, goal, root).testCallId)
+    }
+
+    @Test fun artifactHashObservedOutsideTheExecutionLeaseCannotProveDelivery() = scenario(commands = emptyList()) { log, goal, root ->
+        artifact(root)
+        log.append("tool/call", buildJsonObject {
+            put("id", "late-hash"); put("name", "write_file"); put("goal_id", goal.id)
+        })
+        log.append("tool/execution-started", buildJsonObject {
+            put("id", "late-hash"); put("name", "write_file"); put("execution_id", "exec-late-hash")
+            put("attributes", buildJsonObject { put("goal_id", goal.id) })
+        })
+        log.append("tool/result", buildJsonObject {
+            put("id", "late-hash"); put("name", "write_file"); put("execution_id", "exec-late-hash")
+            put("is_error", false); put("artifact_path", "src/main.kt")
+            put("artifact_sha256", localWorkFileSha256(root, "src/main.kt"))
+        })
+        assertNull(localWorkDeliveryEvidence(log, goal, root).artifactCallId)
+    }
+
+    @Test fun argvVerifierMatchesActualStructuredInvocation() = scenario(commands = listOf("""["go", "test", "./..."]""")) { log, goal, root ->
+        artifact(root)
+        log.append("tool/call", buildJsonObject {
+            put("id", "argv"); put("name", "process_exec"); put("goal_id", goal.id)
+            put("arguments", buildJsonObject { put("command", Json.parseToJsonElement("""["go","test","./..."]""")) })
+        })
+        log.append("tool/execution-started", buildJsonObject {
+            put("id", "argv"); put("name", "process_exec"); put("execution_id", "exec-argv")
+            put("attributes", buildJsonObject { put("goal_id", goal.id) })
+        })
+        log.append("tool/result", buildJsonObject {
+            put("id", "argv"); put("name", "process_exec"); put("execution_id", "exec-argv")
+            put("is_error", false); put("process_exit_code", 0)
+            put("file_versions", buildJsonObject { put("src/main.kt", localWorkFileSha256(root, "src/main.kt")) })
+        })
+        assertEquals("argv", localWorkDeliveryEvidence(log, goal, root).testCallId)
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.isEmpty())
+    }
+
+    @Test fun reusedModelCallIdCannotLaunderLateResultFromAnotherGoal() = scenario { log, goal, root ->
+        artifact(root)
+        log.append("tool/call", buildJsonObject {
+            put("id", "reused"); put("name", "bash"); put("goal_id", "old-goal")
+            put("arguments", buildJsonObject { put("command", "go test ./...") })
+        })
+        log.append("tool/execution-started", buildJsonObject {
+            put("id", "reused"); put("name", "bash"); put("execution_id", "old-execution")
+            put("attributes", buildJsonObject { put("goal_id", "old-goal") })
+        })
+        log.append("tool/call", buildJsonObject {
+            put("id", "reused"); put("name", "bash"); put("goal_id", goal.id)
+            put("arguments", buildJsonObject { put("command", "go test ./...") })
+        })
+        log.append("tool/result", buildJsonObject {
+            put("id", "reused"); put("name", "bash"); put("execution_id", "old-execution")
+            put("is_error", false); put("process_exit_code", 0)
+            put("file_versions", buildJsonObject { put("src/main.kt", localWorkFileSha256(root, "src/main.kt")) })
+        })
+        assertNull(localWorkDeliveryEvidence(log, goal, root).testCallId)
+        assertNull(localWorkDeliveryEvidence(log, goal, root).artifactCallId)
+    }
+
     @Test fun modelClaimCannotFabricatePositiveToolEvents() = scenario { log, goal, root ->
         log.append("assistant/message", buildJsonObject { put("content", "All done. BUILD SUCCESSFUL.") })
         assertEquals(2, localWorkDeliveryEvidence(log, goal, root).missing.size)

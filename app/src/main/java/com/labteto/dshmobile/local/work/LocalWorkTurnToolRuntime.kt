@@ -114,19 +114,21 @@ internal class LocalWorkTurnToolRuntime(
         allowMutation: Boolean = true,
         stillCurrent: () -> Boolean = { true },
     ): AgentToolResult {
-        val paths = binding.workState.snapshot().goal?.artifactPaths.orEmpty()
+        val goal = binding.workState.snapshot().goal
+        val paths = goal?.artifactPaths.orEmpty()
         return execution.executeScoped(
-        original = call,
-        sessionId = binding.sessionId,
-        allowMutation = allowMutation,
-        planModeEnabled = binding.state.value.work.planMode,
-        beforeExecution = stillCurrent,
-        observeFileVersions = { paths.mapNotNull { path ->
-            workspaceRoot?.let { localWorkFileSha256(it, path) }?.let { path to it }
-        }.toMap() },
-        approval = { normalized, tool, summary ->
-            approve(binding, normalized, summary, tool)
-        },
+            original = call,
+            sessionId = binding.sessionId,
+            allowMutation = allowMutation,
+            planModeEnabled = binding.state.value.work.planMode,
+            beforeExecution = stillCurrent,
+            executionAttributes = mapOf("goal_id" to goal?.id.orEmpty()),
+            observeFileVersions = { paths.mapNotNull { path ->
+                workspaceRoot?.let { localWorkFileSha256(it, path) }?.let { path to it }
+            }.toMap() },
+            approval = { normalized, tool, summary ->
+                approve(binding, normalized, summary, tool)
+            },
         )
     }
 

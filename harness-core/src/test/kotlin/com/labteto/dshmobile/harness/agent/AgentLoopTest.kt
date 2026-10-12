@@ -108,7 +108,8 @@ class AgentLoopTest {
             tools = AgentToolExecutor { error("批量执行器存在时不应走单调用执行器") },
             toolBatch = AgentToolBatchExecutor { calls ->
                 observedCalls = calls
-                listOf(AgentToolResult("结果甲"), AgentToolResult("结果乙"))
+                listOf(AgentToolResult("结果甲", processExitCode = 0, fileVersions = mapOf("a.kt" to "sha-a"), executionId = "exec-a"),
+                    AgentToolResult("结果乙", processExitCode = 0, fileVersions = mapOf("b.kt" to "sha-b"), executionId = "exec-b"))
             },
             isParallelTool = { true },
             eventSink = AgentEventSink { events += it },
@@ -123,6 +124,10 @@ class AgentLoopTest {
             listOf("call-a", "call-b"),
             events.filterIsInstance<AgentEvent.ToolFinished>().map { it.call.id },
         )
+        val finished = events.filterIsInstance<AgentEvent.ToolFinished>()
+        assertEquals(listOf("exec-a", "exec-b"), finished.map { it.executionId })
+        assertEquals(mapOf("a.kt" to "sha-a"), finished.first().fileVersions)
+        assertEquals(0, finished.last().processExitCode)
     }
 
     @Test
@@ -185,6 +190,8 @@ class AgentLoopTest {
                     retryable = true,
                     sideEffect = AgentToolSideEffect.NONE,
                     recoveryHint = "检查路径后重试",
+                    processExitCode = 7,
+                    executionId = "exec-failed",
                 )
             },
             eventSink = AgentEventSink { events += it },
@@ -194,6 +201,8 @@ class AgentLoopTest {
         val result = loop.run("读取文件")
 
         val toolEvent = events.filterIsInstance<AgentEvent.ToolFinished>().single()
+        assertEquals("exec-failed", toolEvent.executionId)
+        assertEquals(7, toolEvent.processExitCode)
         assertTrue(toolEvent.isError)
         assertEquals("读取失败", toolEvent.output)
         assertEquals("READ_FAILED", toolEvent.errorCode)

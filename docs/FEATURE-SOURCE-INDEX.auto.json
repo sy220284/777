@@ -244,11 +244,11 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolCompositionRoot.kt",
-      "sha256": "5e852b3964ab18d2"
+      "sha256": "601dc806bce46a8e"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
-      "sha256": "b010b5a6e59d7eb0"
+      "sha256": "24b36097bc294ef2"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/LocalToolOutputStore.kt",
@@ -1900,7 +1900,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt",
-      "sha256": "db422bc8c6f8483f"
+      "sha256": "1716a63d7b01700b"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolFailure.kt",
@@ -2108,7 +2108,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt",
-      "sha256": "3db1cf452bd97f1b"
+      "sha256": "6ac4f04fc9a5a865"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentUiPort.kt",
@@ -2144,7 +2144,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBackgroundToolExecutor.kt",
-      "sha256": "aaffa8eb4dfa83b5"
+      "sha256": "60728ebf1acf8cbf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt",
@@ -2176,7 +2176,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
-      "sha256": "e0ec17c93febdd62"
+      "sha256": "f3e0ff1d41f64ada"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDiagnosticsAdapter.kt",
@@ -2352,7 +2352,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt",
-      "sha256": "9559df4301d9254f"
+      "sha256": "ce2d2eb1d895e0a6"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkUserMessageEditor.kt",
@@ -3192,7 +3192,7 @@
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentLoop.kt",
-      "sha256": "d4cbe464f5a16bcb"
+      "sha256": "bdb7279dda26e71a"
     },
     {
       "path": "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/agent/AgentRequestExecutor.kt",
@@ -3380,13 +3380,14 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "499542b3467f",
+  "source_snapshot": "671f1bbb8e94",
   "observed_delta": {
-    "baseline": "196b2375fb90",
+    "baseline": "afbe939b5d82",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [
-      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt"
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkDeliveryEvidence.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnToolRuntime.kt"
     ],
     "moved_unchanged_files": [],
     "added_routes": [],

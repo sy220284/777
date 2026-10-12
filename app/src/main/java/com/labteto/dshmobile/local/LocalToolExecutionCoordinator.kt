@@ -257,6 +257,7 @@ internal class LocalToolExecutionCoordinator(
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
         beforeExecution: () -> Boolean = { true },
         observeFileVersions: (() -> Map<String, String>)? = null,
+        executionAttributes: Map<String, String> = emptyMap(),
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
@@ -297,6 +298,7 @@ internal class LocalToolExecutionCoordinator(
         val executionIdentity = LocalToolExecutionIdentity(
             executionId = executionIdFactory(),
             rootCallId = call.id,
+            attributes = executionAttributes.toMap(),
         )
         var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
@@ -411,6 +413,7 @@ internal class LocalToolExecutionCoordinator(
                 retention = result.retention,
                 processExitCode = result.processExitCode,
                 fileVersions = result.fileVersions,
+                executionId = executionIdentity.executionId.takeIf { executionStarted },
                 sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
         }
@@ -450,6 +453,7 @@ internal class LocalToolExecutionCoordinator(
             retention = result.retention,
             processExitCode = result.processExitCode,
             fileVersions = result.fileVersions,
+            executionId = executionIdentity.executionId.takeIf { executionStarted },
         )
     }
 
@@ -514,6 +518,7 @@ internal data class LocalToolExecutionIdentity(
     val executionId: String,
     val rootCallId: String,
     val parentExecutionId: String? = null,
+    val attributes: Map<String, String> = emptyMap(),
 )
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =

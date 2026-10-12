@@ -40,13 +40,23 @@ internal fun localWorkDeliveryEvidence(
 
     fun callFor(result: JsonObject, before: Long): LocalSessionEventLog.Event? {
         val id = result.value("id")?.takeIf(String::isNotBlank) ?: return null
-        return log.latestMatching(setOf("tool/call"), beforeSequenceExclusive = before) {
-            it.value("id") == id && (goal.id.isBlank() || it.value("goal_id") == goal.id)
+        val executionId = result.value("execution_id")
+        val admission = executionId?.let { identity ->
+            log.latestMatching(setOf("tool/execution-started"), beforeSequenceExclusive = before) {
+                it.value("execution_id") == identity && it.value("id") == id &&
+                    (it["attributes"] as? JsonObject)?.value("goal_id") == goal.id
+            }?.takeIf { it.sequence > start }
+        }
+        // Successful evidence must come from the real coordinator admission, not a model id.
+        // Unstarted failures may invalidate a previous verifier, but can never prove success.
+        if (admission == null && result.value("is_error") != "true") return null
+        return log.latestMatching(setOf("tool/call"), beforeSequenceExclusive = admission?.sequence ?: before) {
+            it.value("id") == id && it.value("name") == result.value("name") &&
+                it.value("goal_id") == goal.id
         }?.takeIf { it.sequence > start }
     }
     fun version(data: JsonObject, path: String): String? =
         (data["file_versions"] as? JsonObject)?.value(path)
-            ?: data.value("artifact_sha256")?.takeIf { data.value("artifact_path") == path }
     val now = goal.artifactPaths.associateWith { path -> workspaceRoot?.let { localWorkFileSha256(it, path) } }
     val missing = mutableListOf<String>()
     var artifactId: String? = null
@@ -61,6 +71,13 @@ internal fun localWorkDeliveryEvidence(
         if (result == null) missing += "成果尚未核验或版本已变化：$path"
         else artifactId = result.data.value("id")
     }
+    fun commandMatches(args: JsonObject, declared: String): Boolean = when (val command = args["command"]) {
+        is JsonPrimitive -> command.contentOrNull?.trim() == declared.trim()
+        is kotlinx.serialization.json.JsonArray -> try {
+            kotlinx.serialization.json.Json.parseToJsonElement(declared) == command
+        } catch (_: Exception) { false }
+        else -> false
+    }
     var verificationId: String? = null
     for (command in goal.verificationCommands) {
         // Match the actual invocation inside the predicate. A newer cat/echo result cannot
@@ -68,7 +85,7 @@ internal fun localWorkDeliveryEvidence(
         val result = log.latestMatching(setOf("tool/result")) { data ->
             val call = callFor(data, Long.MAX_VALUE) ?: return@latestMatching false
             val args = call.data["arguments"] as? JsonObject
-            args?.value("command")?.trim() == command.trim()
+            args?.let { commandMatches(it, command) } == true
         }?.takeIf { it.sequence > start && callFor(it.data, it.sequence) != null }
         val success = result != null && result.data.value("is_error") == "false" &&
             (result.data["process_exit_code"] as? JsonPrimitive)?.intOrNull == 0 &&
