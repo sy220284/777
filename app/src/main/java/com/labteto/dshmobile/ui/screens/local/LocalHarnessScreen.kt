@@ -623,7 +623,15 @@ fun LocalHarnessScreen(
         ),
     )
 
-    fun openDrawerEntry(entry: LocalFeatureDrawerEntry) {
+    fun openDrawerEntry(entry: LocalFeatureDrawerEntry, galleryTargetId: String? = null) {
+        if (entry == LocalFeatureDrawerEntry.PERSONA_GALLERY ||
+            entry == LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE
+        ) {
+            // All ordinary gallery entries must clear a previous search's selected persona.
+            // Only the explicit search-result entry carries its own target.
+            drawerGalleryTargetId = galleryTargetId
+            drawerGalleryEntryVersion++
+        }
         val action = localFeatureDrawerAction(entry, featureContributions)
             ?: error("Missing Feature drawer contribution: $entry")
         action()
@@ -820,14 +828,10 @@ fun LocalHarnessScreen(
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
                 onOpenPersonaGallery = {
-                    drawerGalleryTargetId = null
-                    drawerGalleryEntryVersion++
                     openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
                 },
                 onOpenPersonaSearchResult = { galleryId ->
-                    drawerGalleryTargetId = galleryId
-                    drawerGalleryEntryVersion++
-                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
+                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY, galleryId)
                 },
                 onOpenDiary = { openDrawerEntry(LocalFeatureDrawerEntry.DIARY) },
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
