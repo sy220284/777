@@ -4,8 +4,8 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
-import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
+import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
@@ -40,17 +40,18 @@ internal fun workSteadyStateHistoryBudget(
     extraTokens: Int,
     state: LocalHarnessState,
 ): LocalHistoryBudget {
-    val profile = state.modelState.modelSelection.activeProfile
+    val selected = state.modelState
+    val matchingProfile = selected.modelSelection.activeProfile?.takeIf {
+        it.model == selected.model &&
+            normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(selected.baseUrl)
+    }
+    val effective = matchingProfile?.let(LocalEffectiveModelContracts::forProfile)
+        ?: LocalEffectiveModelContracts.resolve(selected.model, selected.baseUrl)
     return workSteadyStateHistoryBudget(
         base = base,
         currentHistoryTokens = currentHistoryTokens,
         extraTokens = extraTokens,
-        cachePolicy = LocalModelPresets.promptCachePolicyFor(
-            model = state.modelState.model,
-            baseUrl = state.modelState.baseUrl,
-            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.modelState.model, state.modelState.baseUrl),
-            authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
-        ),
+        cachePolicy = effective.cache,
     )
 }
 
