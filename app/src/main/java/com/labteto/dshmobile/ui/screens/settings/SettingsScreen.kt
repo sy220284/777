@@ -581,8 +581,7 @@ fun SettingsScreen(
                             ToggleRow(
                                 stringResource(R.string.settings_chat_style_guard),
                                 localHarness.chatStyleGuardEnabled,
-                                stringResource(R.string.settings_chat_style_guard_hint),
-                            ) {
+                                            ) {
                                 viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
                             }
 
