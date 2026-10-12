@@ -11,7 +11,7 @@ internal object ChatMemorySelector {
     /** Search the ongoing public conversation, including when the user only says "嗯". */
     fun continuityQuery(query: String, context: ChatContextState): String {
         val text = query.trim()
-        if (RESET_HINTS.any(text::contains)) return text
+        if (isExplicitTopicShift(text)) return text
         val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
             .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
             .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
@@ -26,15 +26,35 @@ internal object ChatMemorySelector {
     }
 
     fun recallQuery(query: String, context: ChatContextState): String? {
-        if (RESET_HINTS.any(query.trim()::contains)) return null
+        if (isExplicitTopicShift(query)) return null
         val candidate = continuityQuery(query, context)
         return candidate.takeIf { it.length >= 2 && it.trim() !in LOW_INFORMATION_REPLIES }
+    }
+
+    /** A topic shift changes present attention, not the durable history of the story. */
+    fun isExplicitTopicShift(query: String): Boolean {
+        val text = query.trim()
+        return RESET_HINTS.any(text::contains) ||
+            Regex("""(?:别|不要|先别|不想)(?:再)?(?:提|聊|说)[^，。！？\n]{1,24}""").containsMatchIn(text)
+    }
+
+    /** Recall unfinished business only when the user's actual subject overlaps that business. */
+    fun isRelevantToTurn(query: String, fact: String): Boolean {
+        val a = query.trim().lowercase()
+            .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
+        val b = fact.trim().lowercase()
+            .replace(Regex("""[\\s，。！？；：、,.!?;:'"“”‘’()（）]+"""), "")
+        if (a.length < 4 || b.length < 4 || isExplicitTopicShift(query)) return false
+        val left = (0 until a.length - 1).mapTo(linkedSetOf()) { a.substring(it, it + 2) }
+        val right = (0 until b.length - 1).mapTo(linkedSetOf()) { b.substring(it, it + 2) }
+        val overlap = left.count(right::contains)
+        return overlap >= 2 && overlap.toDouble() / minOf(left.size, right.size) >= 0.28
     }
 
     fun shouldRecall(query: String): Boolean {
         val text = query.trim().lowercase()
         if (text.isBlank()) return false
-        if (RESET_HINTS.any { text.contains(it) }) return false
+        if (isExplicitTopicShift(text)) return false
         if (RECALL_HINTS.any { text.contains(it) }) return true
         if (text in LOW_INFORMATION_REPLIES) return false
         if (SHORT_RELATIONSHIP_RECALL_HINTS.any { text.contains(it) }) return true
