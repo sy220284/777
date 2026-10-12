@@ -58,7 +58,7 @@ internal sealed interface LocalTranscriptItem {
     }
 
     data class WorkArtifact(val artifact: LocalArtifactUiItem) : LocalTranscriptItem {
-        override val key: String = "work-artifact:${artifact.category}:${artifact.reference}:${artifact.asOfSequence}"
+        override val key: String = "work-artifact:${artifact.category}:${artifact.reference}"
     }
 
     data class WorkStep(
@@ -256,7 +256,9 @@ internal fun appendWorkArtifactsToTranscript(
     transcript: List<LocalTranscriptItem>,
     artifacts: List<LocalArtifactUiItem>,
 ): List<LocalTranscriptItem> {
-    val unique = artifacts.filter { it.reference.isNotBlank() }
-        .distinctBy { it.category to it.reference }.takeLast(20)
+    // Prefer the latest state of a file. Keep the lazy timeline complete; Work's
+    // dedicated artifact browser remains an index, not the only way to recover results.
+    val unique = artifacts.filter { it.reference.isNotBlank() }.asReversed()
+        .distinctBy { it.category to it.reference }.asReversed()
     return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
 }
