@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /** 统一 single-select control with neutral idle state and blue selection. */
+@Deprecated("V5: only the canonical Sy control draws the UI")
 @Composable
 fun DsRadioButton(
     selected: Boolean,
@@ -14,17 +15,8 @@ fun DsRadioButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val colors = DsTheme.colors
-    RadioButton(
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
+    com.shenyan.designsystem.components.SyRadioControl(
+        selected = selected, onClick = onClick, modifier = modifier,
         enabled = enabled,
-        colors = RadioButtonDefaults.colors(
-            selectedColor = colors.accent,
-            unselectedColor = colors.labelTertiary,
-            disabledSelectedColor = colors.accent.copy(alpha = 0.36f),
-            disabledUnselectedColor = colors.labelCaption,
-        ),
     )
 }

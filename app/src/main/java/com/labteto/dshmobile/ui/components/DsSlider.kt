@@ -10,6 +10,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 /**
  * 统一 value control: blue active rail, neutral inactive rail, no colored tick decoration.
  */
+@Deprecated("V5: migrate callers to SySliderControl")
 @Composable
 fun DsSlider(
     value: Float,
@@ -21,11 +22,10 @@ fun DsSlider(
     onValueChangeFinished: (() -> Unit)? = null,
     hapticSegments: Int = 0,
 ) {
-    val colors = DsTheme.colors
     val tick = rememberHapticTickFeedback(
         hapticTickIndex(value, valueRange.start, valueRange.endInclusive, hapticSegments),
     )
-    Slider(
+    com.shenyan.designsystem.components.SySliderControl(
         value = value,
         onValueChange = { next ->
             if (hapticSegments > 0) {
@@ -33,22 +33,7 @@ fun DsSlider(
             }
             onValueChange(next)
         },
-        modifier = modifier,
-        enabled = enabled,
-        valueRange = valueRange,
-        steps = steps,
-        onValueChangeFinished = onValueChangeFinished,
-        colors = SliderDefaults.colors(
-            thumbColor = colors.accent,
-            activeTrackColor = colors.accent,
-            inactiveTrackColor = colors.bgModulePlatform,
-            activeTickColor = Color.Transparent,
-            inactiveTickColor = Color.Transparent,
-            disabledThumbColor = colors.labelCaption,
-            disabledActiveTrackColor = colors.accent.copy(alpha = 0.32f),
-            disabledInactiveTrackColor = colors.bgModulePlatform.copy(alpha = 0.6f),
-            disabledActiveTickColor = Color.Transparent,
-            disabledInactiveTickColor = Color.Transparent,
-        ),
+        modifier = modifier, enabled = enabled, valueRange = valueRange,
+        steps = steps, onValueChangeFinished = onValueChangeFinished,
     )
 }

@@ -26,6 +26,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
  * platform primitive remains responsible for IME, focus and accessibility behavior while 777 owns
  * the visible surface, border, type and accent semantics.
  */
+@Deprecated("V5: migrate callers to SyTextField")
 @Composable
 fun DsTextField(
     value: String,
@@ -47,50 +48,18 @@ fun DsTextField(
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1,
     flat: Boolean = false,
-    shape: Shape = DsShapes.row,
+    shape: Shape = androidx.compose.foundation.shape.RoundedCornerShape(com.shenyan.designsystem.foundation.SyMetric.radiusControl),
     colors: TextFieldColors? = null,
 ) {
-    val ds = DsTheme.colors
-    val resolvedColors = colors ?: OutlinedTextFieldDefaults.colors(
-        focusedTextColor = ds.labelPrimary,
-        unfocusedTextColor = ds.labelPrimary,
-        disabledTextColor = ds.labelTertiary,
-        focusedContainerColor = if (flat) ds.bgModulePlatform else ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-        unfocusedContainerColor = if (flat) ds.bgModulePlatform else ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-        disabledContainerColor = ds.bgModulePlatform,
-        cursorColor = ds.accent,
-        focusedBorderColor = if (flat) Color.Transparent else ds.accent,
-        unfocusedBorderColor = if (flat) Color.Transparent else ds.borderL2,
-        disabledBorderColor = if (flat) Color.Transparent else ds.borderL1,
-        focusedLabelColor = ds.accent,
-        unfocusedLabelColor = ds.labelTertiary,
-        disabledLabelColor = ds.labelDimmed,
-        focusedPlaceholderColor = ds.labelTertiary,
-        unfocusedPlaceholderColor = ds.labelTertiary,
-        errorBorderColor = ds.error,
-        errorLabelColor = ds.error,
-        errorCursorColor = ds.error,
-    )
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier,
-        enabled = enabled,
-        readOnly = readOnly,
-        textStyle = textStyle.copy(color = if (enabled) ds.labelPrimary else ds.labelTertiary),
-        label = label,
-        placeholder = placeholder,
-        leadingIcon = leadingIcon,
-        trailingIcon = trailingIcon,
-        supportingText = supportingText,
-        isError = isError,
+    com.shenyan.designsystem.components.SyTextField(
+        value = value, onValueChange = onValueChange, modifier = modifier,
+        enabled = enabled, readOnly = readOnly, textStyle = textStyle,
+        label = label, placeholder = placeholder,
+        leadingIcon = leadingIcon, trailingIcon = trailingIcon,
+        supportingText = supportingText, isError = isError,
         visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        minLines = minLines,
-        shape = shape,
-        colors = resolvedColors,
+        keyboardOptions = keyboardOptions, keyboardActions = keyboardActions,
+        singleLine = singleLine, maxLines = maxLines, minLines = minLines,
+        flat = flat, shape = shape, colors = colors,
     )
 }

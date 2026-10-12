@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /** 统一 multi-select control with one shared selection color. */
+@Deprecated("V5: only the canonical Sy control draws the UI")
 @Composable
 fun DsCheckbox(
     checked: Boolean,
@@ -14,18 +15,8 @@ fun DsCheckbox(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val colors = DsTheme.colors
-    Checkbox(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier,
-        enabled = enabled,
-        colors = CheckboxDefaults.colors(
-            checkedColor = colors.accent,
-            uncheckedColor = colors.labelTertiary,
-            checkmarkColor = colors.onAccent,
-            disabledCheckedColor = colors.accent.copy(alpha = 0.36f),
-            disabledUncheckedColor = colors.labelCaption,
-        ),
+    com.shenyan.designsystem.components.SyCheckboxControl(
+        checked = checked, onCheckedChange = onCheckedChange,
+        modifier = modifier, enabled = enabled,
     )
 }
