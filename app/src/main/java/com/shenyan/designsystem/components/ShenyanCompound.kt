@@ -97,8 +97,9 @@ fun SyCategoryRow(
                 val stackValue = value != null &&
                     (LocalDensity.current.fontScale >= 1.2f || requiredInlineWidth > maxWidth)
                 if (stackValue) {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(title, color = p.text, style = titleStyle)
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(title, modifier = Modifier.fillMaxWidth(),
+                            color = p.text, style = titleStyle)
                         if (!subtitle.isNullOrBlank()) Text(subtitle,
                             color = p.textSecondary, style = valueStyle)
                         Text(value ?: "", modifier = Modifier.fillMaxWidth(),
