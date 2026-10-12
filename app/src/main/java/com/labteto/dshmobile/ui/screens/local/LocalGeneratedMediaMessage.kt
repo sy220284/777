@@ -44,6 +44,8 @@ import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -382,4 +384,111 @@ private fun shareMediaUrl(context: Context, url: String, onError: (String) -> Un
         }
         context.startActivity(android.content.Intent.createChooser(intent, "分享图片链接"))
     }.onFailure { onError(it.message.orEmpty()) }
+}
+
+/** Inline Work delivery: preview first, workspace/file browser is only an optional detail view. */
+@Composable
+internal fun LocalWorkArtifactMessageRow(
+    artifact: LocalArtifactUiItem,
+    workspacePath: String,
+    actions: LocalWorkFeatureUiActions?,
+    onOpen: () -> Unit,
+) {
+    val context = LocalContext.current
+    val file = remember(workspacePath, artifact.reference, artifact.versionNow) {
+        runCatching {
+            require(workspacePath.isNotBlank())
+            val root = File(workspacePath).canonicalFile
+            File(root, artifact.reference).canonicalFile.takeIf {
+                it.toPath().startsWith(root.toPath()) && it.isFile
+            }
+        }.getOrNull()
+    }
+    var preview by remember(artifact.reference, artifact.versionNow) {
+        mutableStateOf<LocalWorkspaceFilePreview?>(null)
+    }
+    var expanded by remember(artifact.reference) { mutableStateOf(false) }
+    var error by remember(artifact.reference) { mutableStateOf<String?>(null) }
+    LaunchedEffect(artifact.reference, artifact.versionNow, artifact.currentlyAvailable, actions) {
+        preview = null
+        if (artifact.category == "file" && artifact.currentlyAvailable != false && actions != null) {
+            try {
+                preview = withContext(Dispatchers.IO) {
+                    actions.previewWorkspaceFile(artifact.reference)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error = failure.message ?: "预览暂不可用"
+            }
+        }
+    }
+    val isImage = artifact.category == "file" &&
+        artifact.reference.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp")
+    val name = artifact.reference.substringAfterLast('/').ifBlank { artifact.reference }
+    MediaMessageCard(
+        title = if (artifact.category == "file") "生成的文件 · $name" else "生成的成果",
+        subtitle = if (artifact.currentlyAvailable == false) "原文件已不可用" else "工作成果 · 可在本对话直接查看",
+    ) {
+        if (isImage && file != null) {
+            MediaInlinePicture(file, null)
+        } else if (!preview?.text.isNullOrBlank()) {
+            val text = preview!!.text!!
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(if (expanded) text.take(16_000) else text.take(2500),
+                    style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                    color = DsTheme.colors.labelPrimary)
+            }
+            if (text.length > 2500) {
+                DsButton(
+                    text = if (expanded) "收起预览" else "展开内容",
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                    onClick = { expanded = !expanded },
+                )
+            }
+        } else if (artifact.category == "file") {
+            Text(if (file != null) "文件已准备好，可以直接查看或保存。"
+                else "暂无可直接预览的内容。",
+                style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
+        } else {
+            Text(artifact.reference.take(160),
+                style = DsType.small13.withReadingWeight(),
+                color = DsTheme.colors.labelPrimary)
+        }
+        if (artifact.versionAtCreation != null && artifact.versionNow != null &&
+            artifact.versionAtCreation != artifact.versionNow) {
+            Text("原成果已在工作区被修改", style = DsType.caption11.withReadingWeight(),
+                color = DsTheme.colors.labelSecondary)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            if (artifact.category == "file") {
+                DsButton("查看完整文件", onClick = onOpen, size = DsButtonSize.Small)
+                if (file != null) {
+                    DsButton("分享／保存", size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                        onClick = {
+                            shareMediaFile(context, file, localArtifactMime(file)) { error = it }
+                        })
+                }
+            } else if (artifact.reference.startsWith("https://")) {
+                DsButton("打开成果", size = DsButtonSize.Small,
+                    onClick = { openMediaUrl(context, artifact.reference) { error = it } })
+            }
+        }
+        error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary) }
+    }
+}
+
+private fun localArtifactMime(file: File): String = when (file.extension.lowercase()) {
+    "png" -> "image/png"
+    "jpg", "jpeg" -> "image/jpeg"
+    "webp" -> "image/webp"
+    "md", "txt", "log", "kt", "py", "js", "ts", "json" -> "text/plain"
+    "pdf" -> "application/pdf"
+    "mp3" -> "audio/mpeg"
+    "mp4" -> "video/mp4"
+    "zip" -> "application/zip"
+    else -> "application/octet-stream"
 }
