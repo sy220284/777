@@ -252,19 +252,21 @@ fun AppBackgroundHost(
 /** Static radial light fields: no bitmap, blur layer or perpetual animation. */
 @Composable
 private fun FluidGlassBackdrop(dark: Boolean) {
+    // Keep the three designed light fields while sourcing their hues from active semantic colors.
+    val colors = DsTheme.colors
     Canvas(Modifier.fillMaxSize()) {
         val opacity = if (dark) 0.10f else 0.38f
         val extent = maxOf(size.width, size.height)
         drawRect(Brush.radialGradient(
-            colors = listOf(Color(0xFFE8A87C).copy(alpha = opacity), Color.Transparent),
+            colors = listOf(colors.brandPrimary.copy(alpha = opacity), Color.Transparent),
             center = Offset(size.width * 0.06f, size.height * 0.08f), radius = extent * 0.72f,
         ))
         drawRect(Brush.radialGradient(
-            colors = listOf(Color(0xFF7FBFA8).copy(alpha = opacity), Color.Transparent),
+            colors = listOf(colors.successSecondary.copy(alpha = opacity), Color.Transparent),
             center = Offset(size.width * 0.98f, size.height * 0.36f), radius = extent * 0.65f,
         ))
         drawRect(Brush.radialGradient(
-            colors = listOf(Color(0xFFB9A0D4).copy(alpha = opacity * 0.45f), Color.Transparent),
+            colors = listOf(colors.characterAccentTertiary.copy(alpha = opacity * 0.45f), Color.Transparent),
             center = Offset(size.width * 0.24f, size.height * 0.92f), radius = extent * 0.55f,
         ))
     }

@@ -1,7 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsCheckbox
+import com.shenyan.designsystem.components.SyCheckboxControl
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
 import java.io.File
@@ -51,7 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
@@ -63,12 +64,11 @@ import com.labteto.dshmobile.local.presentation.PERSONA_WORD_MIME
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -141,7 +141,7 @@ internal fun DeletePresetConfirmDialog(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    DsDialog(
+    SyDialog(
         title = stringResource(R.string.persona_gallery_preset_delete_title),
         onDismiss = onCancel,
     ) {
@@ -156,16 +156,16 @@ internal fun DeletePresetConfirmDialog(
             color = DsTheme.colors.labelTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_cancel),
                 onClick = onCancel,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.weight(1f),
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_confirm_delete),
                 onClick = onConfirm,
-                variant = DsButtonVariant.Danger,
+                variant = SyButtonVariant.Danger,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -179,7 +179,7 @@ internal fun DeleteCharacterConfirm(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    DsCard {
+    SyGlassCard {
         Text(
             stringResource(
                 R.string.persona_gallery_delete_saved_confirm,
@@ -195,17 +195,17 @@ internal fun DeleteCharacterConfirm(
             color = DsTheme.colors.labelTertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_cancel),
                 onClick = onCancel,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_confirm_delete),
                 onClick = onConfirm,
-                variant = DsButtonVariant.Danger,
+                variant = SyButtonVariant.Danger,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
             )
@@ -229,7 +229,7 @@ internal fun StoryDetailSection(
     onDeleteHistoryMessage: (String) -> Unit,
 ) {
     if (story.chatState.updatedAt > 0L) {
-        DsCard {
+        SyGlassCard {
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -273,20 +273,20 @@ internal fun StoryDetailSection(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (showHistory) R.string.persona_gallery_history_hide
                 else R.string.persona_gallery_history_show,
             ),
             onClick = onToggleHistory,
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
             enabled = !busy,
         )
     }
 
     if (showHistory) {
-        DsCard {
+        SyGlassCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     FeatherIcons.Clock,
@@ -318,7 +318,7 @@ internal fun StoryDetailSection(
                 history.firstOrNull { galleryMessageArchiveKey(it) == key }
             }
             pendingHistory?.let { line ->
-                DsCard {
+                SyGlassCard {
                     Text(
                         stringResource(R.string.persona_gallery_delete_dialogue_confirm),
                         style = DsType.small13.withReadingWeight(),
@@ -337,17 +337,17 @@ internal fun StoryDetailSection(
                         color = DsTheme.colors.labelTertiary,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_cancel),
                             onClick = { onPendingHistoryDelete(null) },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                             modifier = Modifier.weight(1f),
                             enabled = !busy,
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_confirm_delete),
                             onClick = { onDeleteHistoryMessage(galleryMessageArchiveKey(line)) },
-                            variant = DsButtonVariant.Danger,
+                            variant = SyButtonVariant.Danger,
                             modifier = Modifier.weight(1f),
                             enabled = !busy,
                         )
@@ -355,18 +355,18 @@ internal fun StoryDetailSection(
                 }
             }
             if (history.size > visibleHistory) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_gallery_older_dialogue),
                     onClick = onMoreHistory,
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }
     }
 
     var editingNotes by rememberSaveable(entry.id, story.id) { mutableStateOf(false) }
-    DsCard {
+    SyGlassCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -377,20 +377,20 @@ internal fun StoryDetailSection(
                 style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(
                     if (editingNotes) R.string.persona_gallery_notes_done
                     else if (notes.isBlank()) R.string.persona_gallery_notes_add
                     else R.string.persona_gallery_notes_edit,
                 ),
                 onClick = { editingNotes = !editingNotes },
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
                 enabled = !busy,
             )
         }
         if (editingNotes) {
-            DsTextField(
+            SyTextField(
                 value = notes,
                 onValueChange = onNotesChange,
                 placeholder = { Text(stringResource(R.string.persona_gallery_story_placeholder)) },
@@ -491,7 +491,7 @@ private fun ArchivedDialogueRow(
 
 @Composable
 internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
-    DsCard {
+    SyGlassCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(persona.name, large = true)
             Spacer(Modifier.width(DsSpacing.medium))
@@ -559,7 +559,7 @@ internal fun PersonaDetails(persona: PersonaProfile) {
     ).filter { it.second.isNotBlank() }
     val details = persona.facts.filter { it.content.isNotBlank() }
     if (scalars.isEmpty() && details.isEmpty() && persona.loreEntries.isEmpty()) return
-    DsCard {
+    SyGlassCard {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
             style = DsType.std14Strong.withReadingWeight(),
@@ -633,7 +633,7 @@ internal fun PersonaInspectionPanel(
     onToggle: (PersonaAppendSuggestion) -> Unit,
 ) {
     if (result.conflicts.isEmpty() && result.suggestions.isEmpty()) {
-        DsCard {
+        SyGlassCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     FeatherIcons.User,
@@ -659,7 +659,7 @@ internal fun PersonaInspectionPanel(
             color = DsTheme.colors.labelPrimary,
         )
         result.conflicts.forEach { conflict ->
-            DsCard {
+            SyGlassCard {
                 Text(
                     personaFieldLabel(conflict.field),
                     style = DsType.caption11.withReadingWeight(),
@@ -696,9 +696,9 @@ internal fun PersonaInspectionPanel(
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
-            DsCard(onClick = { onToggle(suggestion) }) {
+            SyGlassCard(onClick = { onToggle(suggestion) }) {
                 Row(verticalAlignment = Alignment.Top) {
-                    DsCheckbox(
+                    SyCheckboxControl(
                         checked = key in selectedKeys,
                         onCheckedChange = { onToggle(suggestion) },
                     )

@@ -51,9 +51,9 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
-        compose.onNodeWithText("服务扩展").performClick()
+        compose.onNodeWithText("服务扩展 · 1").performClick()
         compose.onNodeWithText("local-mcp").assertIsDisplayed().performClick()
-        compose.onNodeWithText("外部工具服务").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
     }
 

@@ -40,12 +40,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsSlider
+import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.connection.AppSettings
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.ToggleRow
-import com.labteto.dshmobile.ui.components.UserBubble
+import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -73,7 +73,7 @@ internal fun AppearanceReadingPreview() {
             style = DsType.chatBody.withReadingWeight(),
             color = colors.labelPrimary,
         )
-        UserBubble(stringResource(R.string.settings_appearance_preview_user))
+        SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
         Text(
             stringResource(R.string.settings_appearance_preview_hint),
             style = DsType.small13.withReadingWeight(),
@@ -101,12 +101,12 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        DsSlider(
+        SySlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
-            valueRange = 0.9f..1.3f,
-            steps = 7,
-            hapticSegments = 8,
+            valueRange = com.labteto.dshmobile.connection.AppDisplayLimits.MIN_READING_SCALE..com.labteto.dshmobile.connection.AppDisplayLimits.MAX_READING_SCALE,
+            steps = 5,
+            hapticSegments = 6,
             modifier = Modifier.weight(1f),
         )
         Text(
@@ -121,11 +121,11 @@ internal fun ReadingPreferencesRow(
         style = DsType.std14Strong.withReadingWeight(),
         color = colors.labelPrimary,
     )
-    DsSegmented(
+    SySegmented(
         segments = listOf(
-            DsSegment("0", stringResource(R.string.settings_text_weight_standard)),
-            DsSegment("1", stringResource(R.string.settings_text_weight_medium)),
-            DsSegment("2", stringResource(R.string.settings_text_weight_bold)),
+            SySegment("0", stringResource(R.string.settings_text_weight_standard)),
+            SySegment("1", stringResource(R.string.settings_text_weight_medium)),
+            SySegment("2", stringResource(R.string.settings_text_weight_bold)),
         ),
         selectedKey = settings.textWeightAdjustment.toString(),
         hapticOnChange = true,
@@ -145,7 +145,7 @@ internal fun ReadingPreferencesRow(
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
         Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-        DsSlider(
+        SySlider(
             value = settings.wallpaperSurfaceTransparency,
             onValueChange = onTransparencyChange,
             valueRange = 0f..1f,
@@ -164,39 +164,22 @@ internal fun ReadingPreferencesRow(
 
 @Composable
 internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
-    val colors = DsTheme.colors
-    val options = listOf(
-        "light" to stringResource(R.string.settings_appearance_light),
-        "dark" to stringResource(R.string.settings_appearance_dark),
-        "matte_black" to stringResource(R.string.settings_appearance_matte_black),
-        "system" to stringResource(R.string.settings_appearance_system),
+    // Screen 26: theme modes are a four-position choice track, not four unrelated
+    // preview cards. Real previews remain in AppearanceReadingPreview below.
+    SySegmented(
+        segments = listOf(
+            SySegment("light", stringResource(R.string.settings_appearance_light)),
+            SySegment("dark", stringResource(R.string.settings_appearance_dark)),
+            SySegment("matte_black", stringResource(R.string.settings_appearance_matte_black)),
+            SySegment("system", stringResource(R.string.settings_appearance_system)),
+        ),
+        selectedKey = settings.themePreference,
+        onSelect = onSelect,
+        role = Role.RadioButton,
+        hapticOnChange = true,
+        stretch = true,
+        modifier = Modifier.fillMaxWidth(),
     )
-    Column(modifier = Modifier.padding(vertical = DsSpacing.small)) {
-        // 预览先行：每块内画出主题本身的底色与卡片条，选中块描 accent 边
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            options.take(2).forEach { (key, label) ->
-                ThemePreviewBlock(
-                    themeKey = key,
-                    label = label,
-                    selected = settings.themePreference == key,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(key) },
-                )
-            }
-        }
-        Spacer(Modifier.height(DsSpacing.small))
-        Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            options.takeLast(2).forEach { (key, label) ->
-                ThemePreviewBlock(
-                    themeKey = key,
-                    label = label,
-                    selected = settings.themePreference == key,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(key) },
-                )
-            }
-        }
-    }
 }
 
 @Composable

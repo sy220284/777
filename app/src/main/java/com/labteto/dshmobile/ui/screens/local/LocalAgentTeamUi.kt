@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,18 +38,21 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalAgentTeamMemberUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamTaskUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsToastHost
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.labteto.dshmobile.ui.shenyan.SyProgressBar
+import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -271,7 +273,7 @@ internal fun LocalAgentTeamSheet(
 ) {
     val colors = DsTheme.colors
     val scope = rememberCoroutineScope()
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     var selectedMemberId by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmStopAll by remember { mutableStateOf(false) }
     var stopAllBusy by remember { mutableStateOf(false) }
@@ -281,7 +283,7 @@ internal fun LocalAgentTeamSheet(
         }
     }
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_team_title),
         scrollable = true,
         subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
@@ -292,11 +294,11 @@ internal fun LocalAgentTeamSheet(
         ),
         trailing = {
             if (team.runningMemberCount > 0) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_team_stop_running),
                     onClick = { confirmStopAll = true },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                     icon = FeatherIcons.Square,
                 )
             }
@@ -312,21 +314,21 @@ internal fun LocalAgentTeamSheet(
                 return@Column
             }
             TeamProgressBlock(team)
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_team_collapse_after_view),
                 onClick = onCollapse,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
             Text(
                 stringResource(R.string.local_team_readonly_hint),
                 style = DsType.caption11, color = colors.labelSecondary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_team_lead_followup),
                 onClick = { onLeadFollowup("") },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
 
             Text(
@@ -399,13 +401,13 @@ internal fun LocalAgentTeamSheet(
                 )
             }
         }
-        DsToastHost(toast)
+        SyToastHost(toast)
     }
 
     val actionFailedText = stringResource(R.string.local_team_action_failed)
 
     if (confirmStopAll) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.local_team_stop_confirm_title),
             onDismiss = { if (!stopAllBusy) confirmStopAll = false },
             dismissOnScrimTap = !stopAllBusy,
@@ -419,16 +421,16 @@ internal fun LocalAgentTeamSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.End),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmStopAll = false },
                     enabled = !stopAllBusy,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_team_stop_running),
                     onClick = {
-                        if (stopAllBusy) return@DsButton
+                        if (stopAllBusy) return@SyButton
                         stopAllBusy = true
                         scope.launch {
                             val result = try {
@@ -446,7 +448,7 @@ internal fun LocalAgentTeamSheet(
                     },
                     enabled = !stopAllBusy,
                     loading = stopAllBusy,
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
@@ -485,11 +487,14 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
             )
         }
         if (team.tasks.isNotEmpty()) {
-            LinearProgressIndicator(
-                progress = progress,
+            SyProgressBar(
+                value = progress,
                 modifier = Modifier.fillMaxWidth(),
-                color = colors.accent,
-                trackColor = colors.borderL3,
+                status = when {
+                    team.failure != null || team.failedMemberCount > 0 -> SyProgressStatus.Failed
+                    team.completedTaskCount == team.tasks.size -> SyProgressStatus.Done
+                    else -> SyProgressStatus.Running
+                },
             )
         }
         if (team.returnedMemberCount > 0 && team.tasks.isNotEmpty()) {
@@ -517,8 +522,9 @@ private fun TeamMemberRow(
 ) {
     val colors = DsTheme.colors
     val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
+    val pulse = rememberHapticPulse()
     Surface(
-        onClick = onClick,
+        onClick = { pulse(); onClick() },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.block,
         color = if (selected) colors.accent.copy(alpha = 0.06f) else {
@@ -659,11 +665,11 @@ private fun TeamMemberDetail(
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.error,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_retry),
                     onClick = { outputRetry += 1 },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             }
 
@@ -677,7 +683,7 @@ private fun TeamMemberDetail(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsTextField(
+                SyTextField(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
@@ -690,14 +696,14 @@ private fun TeamMemberDetail(
                         )
                     },
                 )
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.ArrowUp,
                     contentDescription = stringResource(R.string.local_team_send_message),
                     enabled = member.canReceiveMessage && draft.isNotBlank() && !sending,
                     selected = draft.isNotBlank(),
                     onClick = {
                         val text = draft.trim()
-                        if (!member.canReceiveMessage || text.isEmpty() || sending) return@DsIconButton
+                        if (!member.canReceiveMessage || text.isEmpty() || sending) return@SyIconButton
                         sending = true
                         scope.launch {
                             val result = try {
@@ -720,19 +726,19 @@ private fun TeamMemberDetail(
                 Text(stringResource(R.string.local_team_message_unavailable), style = DsType.caption11, color = colors.labelTertiary)
             }
             if (member.phase == "failed" || member.activity in setOf("failed", "interrupted", "cancelled", "killed", "disabled", "dismissed")) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_team_lead_recover),
                     onClick = { onLeadFollowup(member.name) },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             }
 
             if (member.activity == "running") {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_team_stop_member),
                     onClick = {
-                        if (stopping) return@DsButton
+                        if (stopping) return@SyButton
                         stopping = true
                         scope.launch {
                             val result = try {
@@ -749,8 +755,8 @@ private fun TeamMemberDetail(
                     },
                     enabled = !stopping,
                     loading = stopping,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                     icon = FeatherIcons.Square,
                 )
             }
@@ -781,6 +787,7 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
     val colors = DsTheme.colors
     var expanded by rememberSaveable(task.id) { mutableStateOf(false) }
     val expansionLabel = stringResource(if (expanded) R.string.local_team_expanded else R.string.local_team_collapsed)
+    val pulse = rememberHapticPulse()
     val blocked = task.status == "pending" && !task.ready && task.blockedByTitles.isNotEmpty()
     val details = buildList {
         task.ownerName?.let { add(stringResource(R.string.local_team_owner, it)) }
@@ -789,7 +796,7 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         if (task.description.isNotBlank()) add(task.description)
     }
     Surface(
-        onClick = { expanded = !expanded },
+        onClick = { pulse(); expanded = !expanded },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = DsShapes.row,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
@@ -937,11 +944,11 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     if (team.activities.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        DsButton(
+        SyButton(
             text = stringResource(R.string.app_team_activity_feed),
             onClick = { expanded = !expanded },
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
             icon = if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
         )
         team.activities.takeLast(if (expanded) 12 else 3).forEach { activity ->
@@ -998,15 +1005,15 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
             }
             if (output.isNotBlank()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(if (expanded) R.string.local_team_collapse_output else R.string.local_team_expand_output),
                         onClick = { expanded = !expanded },
-                        variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.common_copy),
                         onClick = { clipboard.setText(AnnotatedString(output)) },
-                        variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
                     )
                 }
                 Text(stringResource(R.string.local_team_output_scope), style = DsType.caption11, color = colors.labelTertiary)

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsActions
@@ -16,18 +19,53 @@ class DsDialogOverflowTest {
     @get:Rule val compose = createComposeRule()
 
     @Test
+    fun scrimDismissesButBodyActionsDoNot() {
+        var dismissed = 0
+        var confirmed = 0
+        compose.setContent {
+            DshTheme {
+                SyDialog(title = "Dismiss regression", onDismiss = { dismissed++ }) {
+                    SyButton(text = "Confirm body", onClick = { confirmed++ })
+                }
+            }
+        }
+        compose.onNodeWithText("Confirm body").performClick()
+        compose.runOnIdle { assertEquals(1, confirmed); assertEquals(0, dismissed) }
+        compose.onNodeWithTag("sy-dialog-scrim").performTouchInput {
+            click(androidx.compose.ui.geometry.Offset(4f, 4f))
+        }
+        compose.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    @Test
+    fun protectedDialogDoesNotDismissOnScrimTap() {
+        var dismissed = 0
+        compose.setContent {
+            DshTheme {
+                SyDialog(title = "Protected", onDismiss = { dismissed++ }, dismissOnScrimTap = false) {
+                    Text("Protected body")
+                }
+            }
+        }
+        compose.onNodeWithTag("sy-dialog-scrim").performTouchInput {
+            click(androidx.compose.ui.geometry.Offset(4f, 4f))
+        }
+        compose.runOnIdle { assertEquals(0, dismissed) }
+    }
+
+    @Test
     fun longDialogContentCanScrollToFinalAction() {
         var confirmed = 0
 
         compose.setContent {
             DshTheme {
-                DsDialog(title = "Overflow regression", onDismiss = {}) {
+                SyDialog(title = "Overflow regression", onDismiss = {}) {
                     Text(
                         (1..120).joinToString("\n") { index ->
                             "Line $index — dialog content that must remain reachable on a phone."
                         },
                     )
-                    DsButton(
+                    SyButton(
                         text = "Finish",
                         onClick = { confirmed++ },
                     )

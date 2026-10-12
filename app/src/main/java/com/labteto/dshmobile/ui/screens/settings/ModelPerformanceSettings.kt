@@ -1,14 +1,15 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
+import com.shenyan.designsystem.components.SyRadioControl
+import com.labteto.dshmobile.ui.shenyan.SySlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,12 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -59,11 +62,15 @@ internal fun ModelPerformanceSettingsPage() {
             Row(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clickable { LocalModelPerformanceControls.setReasoningCeiling(ceiling) },
+                    .clip(DsShapes.row)
+                    .background(if (limits.reasoningCeiling == ceiling) colors.bgModulePlatform
+                        else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable { LocalModelPerformanceControls.setReasoningCeiling(ceiling) }
+                    .padding(horizontal = DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                RadioButton(
+                SyRadioControl(
                     selected = limits.reasoningCeiling == ceiling,
                     onClick = { LocalModelPerformanceControls.setReasoningCeiling(ceiling) },
                 )
@@ -89,7 +96,7 @@ internal fun ModelPerformanceSettingsPage() {
             stringResource(R.string.settings_model_performance_temperature_value, rounded),
             style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
         )
-        Slider(
+        SySlider(
             value = draft,
             onValueChange = { draft = (it * 20).roundToInt() / 20f },
             onValueChangeFinished = {
@@ -97,6 +104,8 @@ internal fun ModelPerformanceSettingsPage() {
             },
             valueRange = 1f..2f,
             steps = 19,
+            hapticSegments = 20,
+            modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("1.00", style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)

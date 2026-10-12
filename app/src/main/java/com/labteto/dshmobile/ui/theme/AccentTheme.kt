@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 
 /**
  * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
@@ -46,18 +49,33 @@ fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
     val on = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)
-    val hover = accent.copy(alpha = 0.85f)
+    val primaryHover = accent.copy(alpha = 0.85f)
+    // Only light-mode generic hover is accent-tinted; dark generic hover stays neutral.
+    val interactionHover = if (dark) this.hover else accent.copy(alpha = 0.06f)
+    val interactionPressed = accent.copy(alpha = if (dark) 0.24f else 0.19f)
+    val interactionActive = accent.copy(alpha = if (dark) 0.14f else 0.15f)
+    // Nudge the first gradient stop away from the accent while preserving foreground contrast.
+    val brandGradientStart = lerp(
+        accent,
+        if (on.luminance() < 0.5f) Color.White else Color.Black,
+        0.10f,
+    )
+    val dimmedPrimary = accent.copy(alpha = 0.30f).compositeOver(bgLayer2)
     return copy(
-        brandPrimary = accent,
+        brandPrimary = brandGradientStart,
         onBrandPrimary = on,
-        buttonPrimaryHover = hover,
+        buttonPrimaryHover = primaryHover,
+        buttonPrimaryDimmed = dimmedPrimary,
         accent = accent,
         onAccent = on,
         accentTertiary = tertiary,
-        accentHover = hover,
+        accentHover = primaryHover,
+        hover = interactionHover,
+        hoverAccent = interactionPressed,
+        active = interactionActive,
         buttonInfoFill = accent,
-        buttonInfoHover = hover,
+        buttonInfoHover = primaryHover,
         userBubble = if (dark) userBubble else accent.copy(alpha = 0.10f),
-        sidebarNavAccent = if (dark) sidebarNavAccent else accent.copy(alpha = 0.10f),
+        sidebarNavAccent = accent.copy(alpha = if (dark) 0.16f else 0.10f),
     )
 }

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,7 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -54,18 +55,17 @@ import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsMenu
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsValueRow
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyMenu
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -211,6 +211,16 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.local_api_models_title)) {
+        val selectedProfiles = apiProfiles.count { local.modelSelection.isActive(it) }
+        Text(
+            stringResource(
+                R.string.local_model_inventory_summary,
+                apiProfiles.size,
+                selectedProfiles,
+            ),
+            style = DsType.small13Strong.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (apiProfiles.isEmpty()) {
@@ -219,8 +229,17 @@ internal fun LocalModelSettingsCard(
         }
         local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
         apiProfiles.forEach { profile ->
-            Surface(shape = DsShapes.row, color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-                modifier = Modifier.fillMaxWidth()) {
+            val isSelectedProfile = local.modelSelection.isActive(profile)
+            Surface(
+                shape = DsShapes.row,
+                color = if (isSelectedProfile) colors.accentTertiary
+                    else colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isSelectedProfile) colors.accent.copy(alpha = 0.45f) else colors.borderL1,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Row(Modifier.fillMaxWidth().padding(DsSpacing.small),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -231,7 +250,7 @@ internal fun LocalModelSettingsCard(
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
                             if (local.modelSelection.isActive(profile)) {
-                                DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
+                                SyStatusPill(SyStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
                         val duplicateApiRoute = apiProfiles.count {
@@ -280,21 +299,21 @@ internal fun LocalModelSettingsCard(
                             )
                         }
                     }
-                    DsMenu(
+                    SyMenu(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
                             modifier = Modifier.padding(horizontal = DsSpacing.small)) },
                         items = listOfNotNull(
                             if (!local.modelSelection.isActive(profile))
-                                MenuItem(text = stringResource(R.string.local_model_use),
+                                SyMenuItem(text = stringResource(R.string.local_model_use),
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
-                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                            SyMenuItem(text = stringResource(R.string.local_model_edit), onClick = {
                                 editRoute(profile.model, profile.baseUrl, profile.id)
                                 custom = LocalModelPresets.entries.none {
                                     it.model == profile.model && it.baseUrl == profile.baseUrl
                                 }
                                 showEditor = true
                             }),
-                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                            SyMenuItem(text = stringResource(R.string.local_model_remove), danger = true,
                                 onClick = { pendingRemoveId = profile.id }),
                         ),
                     )
@@ -303,11 +322,11 @@ internal fun LocalModelSettingsCard(
         }
     }
     SettingsCard(stringResource(R.string.local_model_image_mode_title)) {
-        DsSegmented(
+        SySegmented(
             segments = listOf(
-                DsSegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
-                DsSegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.local_model_image_mode_native)),
-                DsSegment(LocalImageInputMode.TOOL.name, stringResource(R.string.local_model_image_mode_tool)),
+                SySegment(LocalImageInputMode.AUTO.name, stringResource(R.string.local_model_image_mode_auto)),
+                SySegment(LocalImageInputMode.NATIVE.name, stringResource(R.string.local_model_image_mode_native)),
+                SySegment(LocalImageInputMode.TOOL.name, stringResource(R.string.local_model_image_mode_tool)),
             ),
             selectedKey = local.imageInputMode.name,
             onSelect = { key ->
@@ -332,14 +351,14 @@ internal fun LocalModelSettingsCard(
     }
 
     if (showEditor) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(if (editingProfileId == null) R.string.local_model_add else R.string.local_model_edit),
             subtitle = stringResource(R.string.local_model_preset_hint),
             onDismiss = { showEditor = false; editorGeneration++ },
             dismissEnabled = !saving,
             scrollable = true,
             footer = {
-                DsButton(stringResource(R.string.advanced_save_model_settings), onClick = {
+                SyButton(stringResource(R.string.advanced_save_model_settings), onClick = {
                     if (!savedRoute && apiKey.isBlank() && credentialSourceProfileId == null) {
                         testStatus = "请填写该模型的密钥"
                     } else {
@@ -369,7 +388,7 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                     }
-                }, modifier = Modifier.fillMaxWidth(), size = DsButtonSize.Large, loading = saving,
+                }, modifier = Modifier.fillMaxWidth(), size = SyButtonSize.Large, loading = saving,
                     enabled = !testing && !saving && !refreshingModels && model.isNotBlank() && baseUrl.isNotBlank() &&
                         (savedRoute || apiKey.isNotBlank() || credentialSourceProfileId != null))
             },
@@ -378,7 +397,7 @@ internal fun LocalModelSettingsCard(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelPrimary)
-                DsMenu(
+                SyMenu(
                     anchor = {
                         Surface(shape = DsShapes.row,
                             color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
@@ -396,23 +415,23 @@ internal fun LocalModelSettingsCard(
                         }
                     },
                     items = LocalModelPresets.entries.map { preset ->
-                        MenuItem("${preset.provider} · ${preset.model}") {
+                        SyMenuItem("${preset.provider} · ${preset.model}") {
                             custom = false
                             editRoute(preset.model, preset.baseUrl, null)
                         }
-                    } + MenuItem(stringResource(R.string.local_model_custom)) {
+                    } + SyMenuItem(stringResource(R.string.local_model_custom)) {
                         custom = true
                         editRoute("", "", null)
                     },
                 )
                 if (custom) {
-                    DsTextField(model, onValueChange = {
+                    SyTextField(model, onValueChange = {
                         if (editingProfileId != null) credentialSourceProfileId = editingProfileId
                         model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null
                     },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_default_model)) })
-                    DsTextField(baseUrl, onValueChange = {
+                    SyTextField(baseUrl, onValueChange = {
                         baseUrl = it.take(1000); editingProfileId = null
                         credentialSourceProfileId = null
                         discoveredModels = emptyList(); catalogStatus = null
@@ -454,7 +473,7 @@ internal fun LocalModelSettingsCard(
                     protocol = it; editorGeneration++; testStatus = null
                     discoveredModels = emptyList(); catalogStatus = null
                 }
-                DsTextField(apiKey, onValueChange = {
+                SyTextField(apiKey, onValueChange = {
                     apiKey = it.take(8000); editorGeneration++; testStatus = null
                     discoveredModels = emptyList(); catalogStatus = null
                 },
@@ -463,14 +482,14 @@ internal fun LocalModelSettingsCard(
                         else R.string.advanced_model_key)) },
                     supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
                     visualTransformation = PasswordVisualTransformation())
-                DsButton(
+                SyButton(
                     if (refreshingModels) stringResource(R.string.local_model_catalog_fetching)
                     else stringResource(R.string.local_model_catalog_refresh),
                     onClick = refreshModels,
                     enabled = !refreshingModels && !testing && !saving && baseUrl.isNotBlank() &&
                         (apiKey.isNotBlank() || credentialSourceProfileId != null),
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Outline,
+                    variant = SyButtonVariant.Outline,
                 )
                 catalogStatus?.let { status ->
                     Text(status, style = DsType.small13.withReadingWeight(),
@@ -478,7 +497,7 @@ internal fun LocalModelSettingsCard(
                 }
                 if (discoveredModels.isNotEmpty()) {
                     if (discoveredModels.size > 20) {
-                        DsTextField(catalogSearch, onValueChange = { catalogSearch = it.take(128) },
+                        SyTextField(catalogSearch, onValueChange = { catalogSearch = it.take(128) },
                             modifier = Modifier.fillMaxWidth(), singleLine = true,
                             label = { Text(stringResource(R.string.local_model_catalog_search)) })
                         if (discoveredModels.size > 60) {
@@ -486,7 +505,7 @@ internal fun LocalModelSettingsCard(
                                 style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                         }
                     }
-                    DsMenu(
+                    SyMenu(
                         anchor = {
                             Surface(shape = DsShapes.row,
                                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
@@ -501,7 +520,7 @@ internal fun LocalModelSettingsCard(
                             }
                         },
                         items = visibleCatalogModels.map { discovered ->
-                            MenuItem(discovered) {
+                            SyMenuItem(discovered) {
                                 if (editingProfileId != null) credentialSourceProfileId = editingProfileId
                                 editingProfileId = null
                                 model = discovered
@@ -516,7 +535,7 @@ internal fun LocalModelSettingsCard(
                 }
                 testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
                     color = if (it.startsWith("连接成功")) colors.labelSecondary else colors.error) }
-                DsButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
+                SyButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
                     onClick = {
                         testing = true
                         testStatus = null
@@ -547,22 +566,22 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                     }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(), variant = DsButtonVariant.Outline)
+                    modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
 
             }
         }
     }
     pendingRemoveId?.let { id ->
-        DsBottomSheet(title = stringResource(R.string.local_model_remove),
+        SyResponsiveSheet(title = stringResource(R.string.local_model_remove),
             subtitle = stringResource(R.string.local_model_remove_confirm),
             onDismiss = { pendingRemoveId = null }) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(stringResource(R.string.common_cancel), onClick = { pendingRemoveId = null },
-                    modifier = Modifier.weight(1f), variant = DsButtonVariant.Ghost)
-                DsButton(stringResource(R.string.local_model_remove), onClick = {
+                SyButton(stringResource(R.string.common_cancel), onClick = { pendingRemoveId = null },
+                    modifier = Modifier.weight(1f), variant = SyButtonVariant.Ghost)
+                SyButton(stringResource(R.string.local_model_remove), onClick = {
                     viewModel.removeLocalModel(id)
                     pendingRemoveId = null
-                }, modifier = Modifier.weight(1f), variant = DsButtonVariant.Danger)
+                }, modifier = Modifier.weight(1f), variant = SyButtonVariant.Danger)
             }
         }
     }
@@ -578,7 +597,7 @@ internal fun ModelCapabilityTags(capabilities: Set<LocalModelCapability>) {
         verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
     ) {
         capabilities.sortedBy { it.ordinal }.forEach { capability ->
-            DsPill(text = stringResource(modelCapabilityLabel(capability)))
+            SyPill(text = stringResource(modelCapabilityLabel(capability)))
         }
     }
 }
@@ -695,13 +714,13 @@ internal fun DeepSeekPricingCard(
                 color = colors.error,
             )
         }
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (state.refreshing) R.string.pricing_refreshing else R.string.pricing_refresh,
             ),
             onClick = viewModel::refreshDeepSeekPricing,
             enabled = !state.refreshing,
-            variant = DsButtonVariant.Outline,
+            variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
     }

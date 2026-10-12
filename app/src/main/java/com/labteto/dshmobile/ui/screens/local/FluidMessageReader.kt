@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyEmptyState
+
+import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,11 +20,11 @@ import com.labteto.dshmobile.ui.theme.*
 /** Design 05: immersive reading occupies the display and keeps the conversation mounted beneath it. */
 @Composable
 internal fun FluidMessageReader(title: String, content: String, onDismiss: () -> Unit) {
-    DsFullScreenDialog(onDismiss = onDismiss) {
+    SyFullScreenDialog(onDismiss = onDismiss) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DsTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
-                if (content.isBlank()) DsPageEmptyState(FeatherIcons.BookOpen,
+                SyTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
+                if (content.isBlank()) SyEmptyState(FeatherIcons.BookOpen,
                     stringResource(R.string.fluid_reader_empty), body = "", modifier = Modifier.weight(1f))
                 else SelectionContainer(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())

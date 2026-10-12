@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,16 +27,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsCheckbox
+import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyCheckboxControl
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.presentation.personaMemberSearchText
 import com.labteto.dshmobile.local.presentation.personaMemberDescription
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -75,7 +78,7 @@ internal fun GroupChatMemberPickerSheet(
         )
     }
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_group_chat_members_title),
         onDismiss = onDismiss,
         scrollable = true,
@@ -89,7 +92,7 @@ internal fun GroupChatMemberPickerSheet(
             style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
-        DsButton(
+        SyButton(
             text = stringResource(R.string.local_group_chat_apply_members),
             onClick = {
                 if (onSave(selected.toList())) onDismiss()
@@ -97,11 +100,11 @@ internal fun GroupChatMemberPickerSheet(
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled && selected.size in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS,
         )
-        DsButton(
+        SyButton(
             text = stringResource(R.string.common_cancel),
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
         },
     ) {
@@ -115,6 +118,34 @@ internal fun GroupChatMemberPickerSheet(
             color = DsTheme.colors.labelSecondary,
         )
 
+        // The reference group-picker explicitly explains whose memory can be used.
+        // No invitation or selection may silently disclose another person's private thread.
+        Surface(
+            shape = DsShapes.row,
+            color = DsTheme.colors.wallpaperSurface(
+                WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgModulePlatform,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Icon(
+                    FeatherIcons.Shield,
+                    contentDescription = null,
+                    tint = DsTheme.colors.characterAccent,
+                )
+                Text(
+                    stringResource(R.string.local_group_chat_memory_isolation_hint),
+                    style = DsType.small13.withReadingWeight(),
+                    color = DsTheme.colors.labelSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_group_chat_no_characters),
@@ -122,7 +153,7 @@ internal fun GroupChatMemberPickerSheet(
                 color = DsTheme.colors.labelSecondary,
             )
         } else {
-            DsTextField(
+            SyTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -196,7 +227,7 @@ internal fun GroupChatMemberPickerSheet(
                                         )
                                     }
                                 }
-                                DsCheckbox(
+                                SyCheckboxControl(
                                     checked = checked,
                                     onCheckedChange = null,
                                     enabled = enabled && canAdd,

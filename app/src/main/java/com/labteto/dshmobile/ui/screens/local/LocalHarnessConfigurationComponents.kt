@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,13 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsRadioButton
+import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyRadioControl
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -69,11 +70,11 @@ internal fun LocalConfiguration(
                 modifier = Modifier.weight(1f),
             )
             if (canCancel) {
-                DsButton(stringResource(R.string.common_cancel), onCancel, variant = DsButtonVariant.Ghost)
+                SyButton(stringResource(R.string.common_cancel), onCancel, variant = SyButtonVariant.Ghost)
             }
         }
 
-        DsCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        SyGlassCard(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             Text(stringResource(R.string.local_on_device_execution_title), style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
             Text(
                 stringResource(R.string.local_on_device_execution_hint),
@@ -83,8 +84,8 @@ internal fun LocalConfiguration(
         }
 
         Text(stringResource(R.string.local_model_section_title), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
-        DsGroupCard {
-            DsTextField(
+        SyGroupCard {
+            SyTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -107,7 +108,7 @@ internal fun LocalConfiguration(
                 ModelChoice("deepseek-v4-pro", stringResource(R.string.local_model_pro_label), model) { model = it }
             }
             Spacer(Modifier.height(DsSpacing.medium))
-            DsTextField(
+            SyTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -119,18 +120,18 @@ internal fun LocalConfiguration(
 
         state.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.error) }
 
-        DsButton(
+        SyButton(
             text = stringResource(R.string.local_model_save_enter),
             onClick = { onSave(apiKey, model, baseUrl) },
             modifier = Modifier.fillMaxWidth(),
             enabled = (state.configured || apiKey.isNotBlank()) && baseUrl.isNotBlank(),
         )
         if (state.configured) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.advanced_clear_key),
                 onClick = onClearCredential,
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Danger,
+                variant = SyButtonVariant.Danger,
             )
         }
     }
@@ -145,7 +146,7 @@ internal fun ModelChoice(id: String, label: String, selected: String, onSelect: 
             .padding(vertical = DsSpacing.tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DsRadioButton(selected = selected == id, onClick = { onSelect(id) })
+        SyRadioControl(selected = selected == id, onClick = { onSelect(id) })
         Text(label, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelPrimary)
     }
 }

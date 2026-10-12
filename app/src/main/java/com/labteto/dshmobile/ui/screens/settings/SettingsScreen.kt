@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+
+import android.Manifest
+import android.os.Build
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -56,6 +60,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
 import com.labteto.dshmobile.observability.AppLog
@@ -65,19 +71,18 @@ import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
-import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.DsHierarchyPage
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ToggleRow
-import com.labteto.dshmobile.ui.components.UserBubble
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.SyUserBubble
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -124,6 +129,7 @@ enum class SettingsDestination {
     ADVANCED,
     SESSION_STORAGE,
     DIAGNOSTICS,
+    UPDATE,
 }
 
 internal fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
@@ -139,7 +145,8 @@ internal fun SettingsDestination.parentDestination(): SettingsDestination? = whe
     SettingsDestination.MEMORY,
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
-    SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.ADVANCED,
+    SettingsDestination.UPDATE -> SettingsDestination.ROOT
     SettingsDestination.MEMORY_SETTINGS,
     SettingsDestination.MEMORY_MANAGEMENT -> SettingsDestination.MEMORY
     SettingsDestination.CHAT -> SettingsDestination.SESSION
@@ -210,10 +217,22 @@ fun SettingsScreen(
     val deepSeekPricing by viewModel.deepSeekPricing.collectAsStateWithLifecycle()
     val usageAnalytics by viewModel.usageAnalytics.collectAsStateWithLifecycle()
     val deviceCapabilities by viewModel.deviceCapabilities.collectAsStateWithLifecycle()
+    // Re-probe after returning from Android settings; a stale permission badge is misleading.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDeviceCapabilities() }
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val colors = settingsInkColors(DsTheme.colors)
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.refreshDeviceCapabilities() }
+    val requestPostingPermission: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.openAppNotificationSettings()
+        }
+    }
     val scope = rememberCoroutineScope()
     val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
     val exportSuccess = stringResource(R.string.settings_export_diagnostics_success)
@@ -303,6 +322,11 @@ fun SettingsScreen(
     }
 
     BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
+    LaunchedEffect(page) {
+        if (page == SettingsDestination.PERMISSIONS || page == SettingsDestination.NOTIFICATIONS) {
+            viewModel.refreshDeviceCapabilities()
+        }
+    }
     LaunchedEffect(page, selectedMiniMaxProfile?.id) {
         if (page == SettingsDestination.MINIMAX_QUOTA && selectedMiniMaxProfile == null) page = SettingsDestination.ROOT
     }
@@ -351,6 +375,7 @@ fun SettingsScreen(
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
         SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
+        SettingsDestination.UPDATE -> stringResource(R.string.settings_update_check)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -361,7 +386,7 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .safeDrawingPadding(),
             ) {
-                DsTopBar(
+                SyTopBar(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
@@ -378,7 +403,7 @@ fun SettingsScreen(
                     },
                 )
 
-                DsHierarchyPage(
+                SyHierarchyPage(
                     page = page,
                     pageKey = { it.name },
                     depth = { it.navigationDepth() },
@@ -443,7 +468,8 @@ fun SettingsScreen(
                                 value = stringResource(when {
                                     deviceCapabilities.loading -> R.string.common_loading
                                     deviceCapabilities.error != null -> R.string.settings_permissions_check_failed
-                                    deviceCapabilities.accessibility && deviceCapabilities.notifications && deviceCapabilities.virtualDisplay -> R.string.settings_permissions_ready
+                                    deviceCapabilities.accessibility && deviceCapabilities.notifications &&
+                                        deviceCapabilities.postingNotifications == true -> R.string.settings_permissions_ready
                                     else -> R.string.settings_permissions_needs_setup
                                 }),
                                 onClick = { page = SettingsDestination.PERMISSIONS },
@@ -461,7 +487,7 @@ fun SettingsScreen(
                                 icon = FeatherIcons.RefreshCw,
                                 title = stringResource(R.string.settings_update_check),
                                 value = updateStatus,
-                                onClick = onCheckUpdate,
+                                onClick = { page = SettingsDestination.UPDATE },
                                 compact = true,
                             )
                         }
@@ -509,7 +535,7 @@ fun SettingsScreen(
                             ReadingPreferencesRow(
                                 settings,
                                 onTextScaleChange = { value ->
-                                    viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) }
+                                    viewModel.set { it.copy(textScale = value.coerceIn(com.labteto.dshmobile.connection.AppDisplayLimits.MIN_READING_SCALE, com.labteto.dshmobile.connection.AppDisplayLimits.MAX_READING_SCALE)) }
                                 },
                                 onTextWeightChange = { value ->
                                     viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
@@ -586,7 +612,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
-                                DsTextField(
+                                SyTextField(
                                     value = customChatFilterDraft,
                                     onValueChange = {
                                         customChatFilterDraft = it
@@ -597,7 +623,7 @@ fun SettingsScreen(
                                     placeholder = { Text(stringResource(R.string.settings_chat_custom_filter_hint)) },
                                     singleLine = true,
                                 )
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.settings_chat_custom_filter_add),
                                     onClick = {
                                         if (viewModel.addChatStyleGuardPhrase(candidate)) {
@@ -605,7 +631,7 @@ fun SettingsScreen(
                                         }
                                     },
                                     enabled = canAddFilter,
-                                    size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+                                    size = SyButtonSize.Small,
                                 )
                             }
                             customFilters.forEach { phrase ->
@@ -632,7 +658,7 @@ fun SettingsScreen(
                             }
 
                             if (localHarness.styleGuardHits.isNotEmpty()) {
-                                DsButton(
+                                SyButton(
                                     text = stringResource(
                                         if (showChatPreferenceDiagnostics) {
                                             R.string.settings_chat_guard_hits_hide
@@ -644,7 +670,7 @@ fun SettingsScreen(
                                     onClick = {
                                         showChatPreferenceDiagnostics = !showChatPreferenceDiagnostics
                                     },
-                                    variant = DsButtonVariant.Ghost,
+                                    variant = SyButtonVariant.Ghost,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                                 if (showChatPreferenceDiagnostics) {
@@ -656,13 +682,13 @@ fun SettingsScreen(
                                     localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
                                         ChatFilterPhraseRow(phrase = hit)
                                     }
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.settings_chat_guard_hits_clear),
                                         onClick = {
                                             viewModel.clearChatStyleGuardHits()
                                             showChatPreferenceDiagnostics = false
                                         },
-                                        variant = DsButtonVariant.Ghost,
+                                        variant = SyButtonVariant.Ghost,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
@@ -679,7 +705,7 @@ fun SettingsScreen(
 
                     SettingsDestination.MODELS -> {
                         var addModelRequested by remember { mutableStateOf(false) }
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_api_model_add),
                             onClick = { addModelRequested = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -815,11 +841,11 @@ fun SettingsScreen(
                                 style = DsType.small13.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
-                            DsSegmented(
+                            SySegmented(
                                 segments = listOf(
-                                    DsSegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
-                                    DsSegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
-                                    DsSegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
+                                    SySegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
+                                    SySegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
+                                    SySegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
                                 ),
                                 selectedKey = approvalMode.name,
                                 onSelect = { selected ->
@@ -841,10 +867,11 @@ fun SettingsScreen(
                                 color = colors.labelSecondary,
                             )
                         }
-                        DeviceCapabilitiesCard(deviceCapabilities, viewModel)
+                        DeviceCapabilitiesCard(deviceCapabilities, viewModel, requestPostingPermission)
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
+                        NotificationPostingPermissionCard(deviceCapabilities, viewModel, requestPostingPermission)
                         SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
@@ -898,6 +925,36 @@ fun SettingsScreen(
                         )
                     }
 
+                    SettingsDestination.UPDATE -> {
+                        SettingsCard(stringResource(R.string.settings_update_check)) {
+                            Text(
+                                stringResource(
+                                    R.string.settings_update_installed_version,
+                                    BuildConfig.VERSION_NAME,
+                                    BuildConfig.VERSION_CODE,
+                                ),
+                                style = DsType.std14Strong.withReadingWeight(),
+                                color = colors.labelPrimary,
+                            )
+                            Text(
+                                updateStatus ?: stringResource(R.string.settings_update_not_checked),
+                                style = DsType.small13.withReadingWeight(),
+                                color = colors.labelSecondary,
+                            )
+                            Text(
+                                stringResource(R.string.settings_update_action_description),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.labelTertiary,
+                            )
+                            SyButton(
+                                text = stringResource(R.string.settings_update_check),
+                                onClick = onCheckUpdate,
+                                variant = SyButtonVariant.Primary,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
                     SettingsDestination.DIAGNOSTICS -> {
                         AppSettingsSection {
                             AppSettingsRow(
@@ -927,7 +984,7 @@ fun SettingsScreen(
                 }
                 }
             }
-            DsToastHost(toast, modifier = Modifier.fillMaxWidth())
+            SyToastHost(toast, modifier = Modifier.fillMaxWidth())
         }
         }
     }
@@ -970,11 +1027,11 @@ private fun ChatFilterPhraseRow(
             modifier = Modifier.weight(1f),
         )
         if (removeLabel != null && onRemove != null) {
-            DsButton(
+            SyButton(
                 text = removeLabel,
                 onClick = onRemove,
-                variant = DsButtonVariant.Ghost,
-                size = com.labteto.dshmobile.ui.components.DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
     }

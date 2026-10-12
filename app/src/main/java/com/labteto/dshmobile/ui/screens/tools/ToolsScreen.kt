@@ -47,25 +47,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsSwitch
-import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.shenyan.designsystem.components.SySwitchControl
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
 import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
@@ -455,7 +455,7 @@ fun ToolsScreen(
         else settingsViewModel.configureApprovalMode(LocalApprovalMode.DEFAULT)
     }
     val colors = DsTheme.colors
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
     var stdioCommand by remember { mutableStateOf("") }
@@ -530,7 +530,7 @@ fun ToolsScreen(
         val agentSettings by settingsViewModel.localHarnessState.collectAsStateWithLifecycle()
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DsTopBar(
+                SyTopBar(
                     title = stringResource(R.string.advanced_agent_settings),
                     onBack = { showAgentSettings = false },
                     backContentDescription = stringResource(R.string.common_back),
@@ -541,7 +541,7 @@ fun ToolsScreen(
                 ) {
                     LocalAgentSettingsCard(agentSettings, settingsViewModel, toast.second)
                 }
-                DsToastHost(toast)
+                SyToastHost(toast)
             }
         }
     } else if (showPluginBrowser) {
@@ -586,7 +586,7 @@ fun ToolsScreen(
     Box(Modifier.fillMaxSize()) {
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DsTopBar(
+                SyTopBar(
                     title = stringResource(R.string.tools_title),
                     subtitle = stringResource(R.string.tools_subtitle),
                     onBack = onClose,
@@ -607,7 +607,7 @@ fun ToolsScreen(
                     state.servers.isEmpty() &&
                     !state.githubConfigured
                 if (initialLoading) {
-                    DsPageLoadingState(
+                    SyLoadingState(
                         icon = FeatherIcons.Tool,
                         label = stringResource(R.string.tools_loading),
                         modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -642,7 +642,7 @@ fun ToolsScreen(
                             state = if (networkSearchEnabled) StateDotState.Done else StateDotState.Idle,
                             onClick = { pulse(); viewModel.setNetworkSearchEnabled(!networkSearchEnabled) },
                             trailing = {
-                                DsSwitch(
+                                SySwitchControl(
                                     checked = networkSearchEnabled,
                                     onCheckedChange = { pulse(); viewModel.setNetworkSearchEnabled(it) },
                                 )
@@ -662,7 +662,7 @@ fun ToolsScreen(
                             state = if (autoApprovalEnabled) StateDotState.Done else StateDotState.Idle,
                             onClick = { toggleAutoApproval(!autoApprovalEnabled) },
                             trailing = {
-                                DsSwitch(
+                                SySwitchControl(
                                     checked = autoApprovalEnabled,
                                     onCheckedChange = toggleAutoApproval,
                                 )
@@ -717,12 +717,12 @@ fun ToolsScreen(
                 }
             }
         }
-        DsToastHost(toast, Modifier.safeDrawingPadding())
+        SyToastHost(toast, Modifier.safeDrawingPadding())
     }
     }
 
     if (showGitHubConfig) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.tools_github_connector),
             subtitle = stringResource(R.string.tools_github_connector_hint),
             onDismiss = { showGitHubConfig = false },
@@ -737,7 +737,7 @@ fun ToolsScreen(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            DsTextField(
+            SyTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
                 modifier = Modifier.fillMaxWidth(),
@@ -752,21 +752,21 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (state.loading) R.string.tools_processing else R.string.tools_github_save,
                     ),
                     onClick = { viewModel.configureGitHub(githubToken) },
                     enabled = !state.loading && githubToken.isNotBlank(),
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Primary,
+                    variant = SyButtonVariant.Primary,
                 )
                 if (state.githubConfigured) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tools_github_clear),
                         onClick = { confirmClearGitHub = true },
                         enabled = !state.loading,
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
             }
@@ -774,7 +774,7 @@ fun ToolsScreen(
     }
 
     if (showExternalConfig) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.tools_external_services),
             subtitle = stringResource(R.string.tools_external_services_hint),
             onDismiss = { showExternalConfig = false },
@@ -811,19 +811,19 @@ fun ToolsScreen(
                                 color = colors.labelTertiary,
                             )
                         }
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.cap_center_view_tools),
                             onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
                             enabled = server.tools.isNotEmpty(),
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
                             enabled = !state.loading,
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                     if (expandedMcpServer == server.id) {
@@ -837,7 +837,7 @@ fun ToolsScreen(
                 }
             }
 
-            DsTextField(
+            SyTextField(
                 value = serverId,
                 onValueChange = { serverId = it.take(24) },
                 modifier = Modifier.fillMaxWidth(),
@@ -846,7 +846,7 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
-            DsTextField(
+            SyTextField(
                 value = endpoint,
                 onValueChange = { endpoint = it.take(2000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -856,7 +856,7 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(
                     if (state.loading) R.string.tools_processing else R.string.tools_connect,
                 ),
@@ -864,7 +864,7 @@ fun ToolsScreen(
                     viewModel.connectHttp(serverId.trim(), endpoint.trim())
                 },
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
                 icon = FeatherIcons.Globe,
             )
@@ -873,7 +873,7 @@ fun ToolsScreen(
                 style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
             )
-            DsTextField(
+            SyTextField(
                 value = stdioCommand,
                 onValueChange = { stdioCommand = it.take(4000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -884,7 +884,7 @@ fun ToolsScreen(
                 maxLines = 6,
                 shape = DsShapes.row,
             )
-            DsTextField(
+            SyTextField(
                 value = stdioWorkingDirectory,
                 onValueChange = { stdioWorkingDirectory = it.take(1000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -898,7 +898,7 @@ fun ToolsScreen(
                 .map(String::trim)
                 .filter(String::isNotBlank)
                 .toList()
-            DsButton(
+            SyButton(
                 text = stringResource(
                     if (state.loading) R.string.tools_processing else R.string.tools_stdio_connect,
                 ),
@@ -910,7 +910,7 @@ fun ToolsScreen(
                     )
                 },
                 enabled = !state.loading && serverId.isNotBlank() && stdioArgs.isNotEmpty(),
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
                 icon = FeatherIcons.Terminal,
             )
@@ -918,7 +918,7 @@ fun ToolsScreen(
     }
 
     if (confirmAutoApproval) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.cap_center_auto_approval_confirm_title),
             onDismiss = { confirmAutoApproval = false },
         ) {
@@ -928,25 +928,25 @@ fun ToolsScreen(
                 color = colors.labelSecondary,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmAutoApproval = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.cap_center_auto_approval_confirm_action),
                     onClick = {
                         confirmAutoApproval = false
                         settingsViewModel.configureApprovalMode(LocalApprovalMode.AUTO)
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
     }
 
     if (confirmClearGitHub) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.tools_github_clear_confirm_title),
             onDismiss = { confirmClearGitHub = false },
         ) {
@@ -959,20 +959,20 @@ fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmClearGitHub = false },
                     enabled = !state.loading,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tools_github_clear),
                     onClick = {
                         confirmClearGitHub = false
                         viewModel.clearGitHub()
                     },
                     enabled = !state.loading,
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }

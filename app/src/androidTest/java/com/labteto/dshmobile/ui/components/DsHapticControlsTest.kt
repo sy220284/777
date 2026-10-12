@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SySlider
+
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,8 +39,8 @@ class DsHapticControlsTest {
         compose.setContent {
             CompositionLocalProvider(LocalHapticFeedback provides feedback) {
                 DshTheme {
-                    DsSegmented(
-                        segments = listOf(DsSegment("a", "A"), DsSegment("b", "B")),
+                    SySegmented(
+                        segments = listOf(SySegment("a", "A"), SySegment("b", "B")),
                         selectedKey = selected.value,
                         onSelect = { selected.value = it },
                         hapticOnChange = true,
@@ -58,7 +62,7 @@ class DsHapticControlsTest {
         compose.setContent {
             CompositionLocalProvider(LocalHapticFeedback provides feedback) {
                 DshTheme {
-                    DsSlider(
+                    SySlider(
                         value = value.floatValue,
                         onValueChange = { value.floatValue = it },
                         valueRange = 0f..1f,

@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import com.labteto.dshmobile.ui.components.DsProgressBar
+import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +18,7 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
-import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -58,7 +58,7 @@ internal fun MiniMaxQuotaPage(profile: LocalModelProfile, viewModel: SettingsVie
                 style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
             Text(stringResource(R.string.minimax_quota_disclaimer),
                 style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
-            DsButton(
+            SyButton(
                 text = stringResource(if (loading) R.string.minimax_quota_loading else R.string.minimax_quota_refresh),
                 onClick = { if (!loading) refresh++ },
                 enabled = !loading,
@@ -140,7 +140,7 @@ private fun MiniMaxQuotaWindow(
         Text(title, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.labelPrimary)
         window.remainingFraction()?.let { fraction ->
-            DsProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.successSecondary)
+            SyProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.successSecondary)
         }
         resetMillis?.takeIf { it >= 0 }?.let {
             Text(stringResource(R.string.minimax_quota_reset_after, it.durationDisplay()),

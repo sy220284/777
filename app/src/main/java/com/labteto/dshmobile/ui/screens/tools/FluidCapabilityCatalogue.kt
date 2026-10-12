@@ -1,5 +1,13 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SySearchField
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.shenyan.designsystem.components.SySheetChoiceRow
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,26 +40,26 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
     var selected by remember { mutableStateOf<LocalCapabilityUiEntry?>(null) }
     val families = entries.groupBy { it.family }.toSortedMap()
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        DsTopBar(stringResource(R.string.fluid_capability_title), onBack = onBack,
+        SyTopBar(stringResource(R.string.fluid_capability_title), onBack = onBack,
             backContentDescription = stringResource(R.string.common_back),
             actionIcon = FeatherIcons.RefreshCw, onAction = onRefresh, actionEnabled = !loading,
             actionContentDescription = stringResource(R.string.tools_refresh))
-        DsSearchField(query, { query = it }, placeholder = stringResource(R.string.tools_catalog_search),
+        SySearchField(query, { query = it }, placeholder = stringResource(R.string.tools_catalog_search),
             modifier = Modifier.padding(horizontal = DsSpacing.medium))
         Row(Modifier.fillMaxWidth().padding(DsSpacing.medium),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsButton(stringResource(R.string.tools_catalog_title), onPlugins,
-                variant = DsButtonVariant.Ghost, modifier = Modifier.weight(1f))
-            DsButton(stringResource(R.string.skills_title), onSkills,
-                variant = DsButtonVariant.Ghost, modifier = Modifier.weight(1f))
-            DsButton(stringResource(R.string.fluid_capability_manage), onManage,
-                variant = DsButtonVariant.Ghost, modifier = Modifier.weight(1f))
+            SyButton(stringResource(R.string.tools_catalog_title), onPlugins,
+                variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
+            SyButton(stringResource(R.string.skills_title), onSkills,
+                variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
+            SyButton(stringResource(R.string.fluid_capability_manage), onManage,
+                variant = SyButtonVariant.Ghost, modifier = Modifier.weight(1f))
         }
         LazyColumn(Modifier.weight(1f),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
             item {
-                DsCard {
+                SyGlassCard {
                     Text(stringResource(R.string.fluid_capability_count, entries.size, families.size, connections),
                         style = DsType.std14Strong, color = DsTheme.colors.labelPrimary)
                     Text(stringResource(R.string.fluid_capability_hint), style = DsType.small13,
@@ -59,7 +67,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                     if (loading) Text(stringResource(R.string.common_loading), color = DsTheme.colors.labelSecondary)
                     if (failed) {
                         Text(stringResource(R.string.tools_load_failed), color = DsTheme.colors.error)
-                        DsButton(stringResource(R.string.common_retry), onRefresh, enabled = !loading)
+                        SyButton(stringResource(R.string.common_retry), onRefresh, enabled = !loading)
                     }
                 }
             }
@@ -73,7 +81,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
                         Text(family, style = DsType.caption11Strong, color = DsTheme.colors.labelTertiary)
                     }
                     items(visible, key = { it.name }) { entry ->
-                        DsSheetChoiceRow(title = entry.name,
+                        SySheetChoiceRow(title = entry.name,
                             subtitle = stringResource(R.string.fluid_capability_registered),
                             icon = FeatherIcons.Tool, onClick = { selected = entry })
                     }
@@ -83,7 +91,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
     }
     selected?.let { entry ->
         val usePrompt = stringResource(R.string.plugin_use_prompt, entry.name, entry.name)
-        DsBottomSheet(title = entry.name, onDismiss = { selected = null }, scrollable = true) {
+        SyResponsiveSheet(title = entry.name, onDismiss = { selected = null }, scrollable = true) {
             Text(entry.family, style = DsType.std14Strong, color = DsTheme.colors.labelPrimary)
             Text(stringResource(R.string.fluid_capability_hint), style = DsType.small13,
                 color = DsTheme.colors.labelSecondary)
@@ -93,7 +101,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
             }
             Text(entry.access + " · " + entry.approval, style = DsType.caption11,
                 color = DsTheme.colors.labelTertiary)
-            onUseCapability?.let { use -> DsButton(stringResource(R.string.plugin_use), {
+            onUseCapability?.let { use -> SyButton(stringResource(R.string.plugin_use), {
                 selected = null; use(usePrompt)
             }, modifier = Modifier.fillMaxWidth()) }
         }

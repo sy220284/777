@@ -32,10 +32,10 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
-import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -167,13 +167,13 @@ private fun StepperRow(
                 color = colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
-            DsButton(
+            SyButton(
                 text = "−",
                 onClick = { applyDelta(-1, announce = true) },
                 onHoldRepeat = { applyDelta(-1, announce = false) },
                 enabled = value > range.first,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
             )
             Surface(
                 modifier = Modifier.width(64.dp),
@@ -214,24 +214,24 @@ private fun StepperRow(
                     )
                 }
             }
-            DsButton(
+            SyButton(
                 text = "＋",
                 onClick = { applyDelta(1, announce = true) },
                 onHoldRepeat = { applyDelta(1, announce = false) },
                 enabled = value < range.last,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
             )
             maximumLabel?.let { labelText ->
-                DsButton(
+                SyButton(
                     text = labelText,
                     onClick = {
                         if (value < range.last) tick()
                         applyValue(range.last, announce = true)
                     },
                     enabled = value < range.last,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }

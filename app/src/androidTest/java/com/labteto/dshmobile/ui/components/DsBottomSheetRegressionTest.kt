@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.shenyan.designsystem.components.SySheetChoiceRow
+
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -21,12 +25,12 @@ class DsBottomSheetRegressionTest {
         var saved = 0
         compose.setContent {
             DshTheme {
-                DsBottomSheet(
+                SyResponsiveSheet(
                     title = "人物编辑",
                     onDismiss = {},
                     scrollable = true,
                     footer = {
-                        DsButton(
+                        SyButton(
                             text = "保存更改",
                             onClick = { saved++ },
                             modifier = Modifier.fillMaxWidth(),
@@ -48,8 +52,8 @@ class DsBottomSheetRegressionTest {
         var selected = 0
         compose.setContent {
             DshTheme {
-                DsBottomSheet(title = "选择会话", onDismiss = {}) {
-                    DsSheetChoiceRow(
+                SyResponsiveSheet(title = "选择会话", onDismiss = {}) {
+                    SySheetChoiceRow(
                         title = "独立会话",
                         subtitle = "从空白上下文开始",
                         onClick = { selected++ },

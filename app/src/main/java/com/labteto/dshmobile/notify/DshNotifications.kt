@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -29,10 +30,13 @@ class DshNotifications @Inject constructor(
         )
     }
 
-    fun canPost(): Boolean = ContextCompat.checkSelfPermission(
-        context,
-        android.Manifest.permission.POST_NOTIFICATIONS,
-    ) == PackageManager.PERMISSION_GRANTED
+    fun canPost(): Boolean =
+        NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED)
 
     @android.annotation.SuppressLint("MissingPermission")
     fun postLocalSession(
@@ -68,6 +72,10 @@ class DshNotifications @Inject constructor(
                 .setSmallIcon(R.drawable.ic_notification_butterfly)
                 .setContentTitle(title)
                 .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setOnlyAlertOnce(true)
                 .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)

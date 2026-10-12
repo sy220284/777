@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.material3.Checkbox
+import com.shenyan.designsystem.components.SyCheckboxControl
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
@@ -16,11 +16,11 @@ import com.labteto.dshmobile.local.session.visibleWorkHandoffMessages
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -52,37 +52,37 @@ internal fun LocalWorkCapabilitySheet(
     onConfigureDevice: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.work_capability_title),
         onDismiss = onDismiss,
         dismissEnabled = !switching,
         scrollable = true,
         footer = {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.work_capability_continue),
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
-                size = DsButtonSize.Large,
+                size = SyButtonSize.Large,
                 enabled = enabled && !switching,
                 loading = switching,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
                 enabled = !switching,
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
         },
     ) {
         Text(stringResource(R.string.work_capability_hint), style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
-        DsTextField(
+        SyTextField(
             value = prompt, onValueChange = onPromptChange,
             label = { Text(stringResource(R.string.work_handoff_task)) }, enabled = !switching,
             modifier = Modifier.fillMaxWidth(),
             maxLines = 6,
         )
-        DsTextField(
+        SyTextField(
             value = summary, onValueChange = onSummaryChange,
             label = { Text(stringResource(R.string.work_handoff_summary)) }, enabled = !switching,
             modifier = Modifier.fillMaxWidth(),
@@ -93,7 +93,7 @@ internal fun LocalWorkCapabilitySheet(
             Text(stringResource(R.string.work_handoff_select_messages),
                 style = DsType.std14.withReadingWeight(), color = colors.labelPrimary)
             if (selectableMessages.size > 12 || hasEarlierMessages) {
-                DsTextField(
+                SyTextField(
                     value = messageSearch, onValueChange = onMessageSearchChange,
                     placeholder = { Text(stringResource(R.string.work_handoff_search_messages)) },
                     modifier = Modifier.fillMaxWidth().testTag("handoff_search"),
@@ -110,7 +110,7 @@ internal fun LocalWorkCapabilitySheet(
             visible.forEach { message ->
                 val checked = message.id in selectedMessageIds
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
+                    SyCheckboxControl(
                         checked = checked,
                         modifier = Modifier.testTag("handoff_message_${message.id}"),
                         enabled = !switching,
@@ -132,13 +132,13 @@ internal fun LocalWorkCapabilitySheet(
                 }
             }
             if (hasEarlierMessages && onLoadEarlierMessages != null) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.work_handoff_load_older),
                     onClick = onLoadEarlierMessages,
                     modifier = Modifier.fillMaxWidth().testTag("handoff_load_older"),
                     enabled = !switching && !loadingEarlierMessages,
                     loading = loadingEarlierMessages,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }
@@ -185,24 +185,24 @@ internal fun LocalWorkCapabilitySheet(
                         it.kind != LocalTaskCapabilityKind.SCREEN_CAPTURE &&
                         it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.work_capability_configure),
                     onClick = onConfigureCapabilities,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
             if (onConfigureModel != null && capabilities.any {
                     it.kind == LocalTaskCapabilityKind.MODEL &&
                         it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.work_capability_configure_model),
                     onClick = onConfigureModel,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
             if (onConfigureDevice != null && capabilities.any {
@@ -210,21 +210,21 @@ internal fun LocalWorkCapabilitySheet(
                         it.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
                         it.state != LocalTaskCapabilityState.CONFIGURED
                 }) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.work_capability_configure_device),
                     onClick = onConfigureDevice,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
             if (onRefreshCapabilities != null) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_refresh),
                     onClick = onRefreshCapabilities,
                     enabled = !switching,
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }

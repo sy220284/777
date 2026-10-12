@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.components.SyPill
+
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -41,7 +43,7 @@ class TouchTargetRegressionTest {
     fun tappablePillKeepsCompactVisualWithMinimumTouchTarget() {
         compose.setContent {
             DshTheme {
-                DsPill(
+                SyPill(
                     text = "Q",
                     onClick = {},
                 )

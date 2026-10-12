@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -16,10 +17,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.screens.settings.UsageGroupDetailPage
 import com.labteto.dshmobile.ui.screens.settings.UsageRequestDetailPage
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -79,7 +80,7 @@ internal fun LocalRunCenterUsageSection(
         }
     }
     Column(Modifier.padding(horizontal = DsSpacing.medium)) {
-        DsButton(
+        SyButton(
             text = if (failed) stringResource(R.string.local_run_usage_unavailable)
                 else snapshot?.let {
                     stringResource(if (it.tracked.unreportedRequestCount > 0L) R.string.local_run_usage_incomplete
@@ -87,20 +88,20 @@ internal fun LocalRunCenterUsageSection(
                 }
                     ?: stringResource(R.string.local_run_usage_loading),
             onClick = { open = true; taskId = null; requestId = null },
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
         )
     }
     if (open) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.local_run_usage_title),
             onDismiss = { open = false },
             scrollable = true,
         ) {
             Text(stringResource(R.string.local_run_usage_retained), style = DsType.small13, color = DsTheme.colors.labelSecondary)
-            if (taskId != null) DsButton(stringResource(R.string.common_back), onClick = {
+            if (taskId != null) SyButton(stringResource(R.string.common_back), onClick = {
                 if (requestId != null) requestId = null else taskId = null
-            }, variant = DsButtonVariant.Ghost)
+            }, variant = SyButtonVariant.Ghost)
             when {
                 loading -> Text(stringResource(R.string.local_run_usage_loading))
                 failed || detailFailed -> Text(stringResource(R.string.local_run_usage_unavailable))
@@ -118,15 +119,15 @@ internal fun LocalRunCenterUsageSection(
                         }
                     }
                     snapshot?.tasks?.take(visibleTasks)?.forEach { task ->
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_run_usage_task, task.title, task.aggregate.totalTokens),
                             onClick = { taskId = task.key },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
-                    if ((snapshot?.tasks?.size ?: 0) > visibleTasks) DsButton(
+                    if ((snapshot?.tasks?.size ?: 0) > visibleTasks) SyButton(
                         stringResource(R.string.local_artifact_more_history),
-                        onClick = { visibleTasks += 10 }, variant = DsButtonVariant.Ghost,
+                        onClick = { visibleTasks += 10 }, variant = SyButtonVariant.Ghost,
                     )
                     if (snapshot?.tasks.isNullOrEmpty()) Text(stringResource(R.string.local_run_usage_no_tasks))
                 }

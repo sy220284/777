@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
+
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,10 +39,10 @@ class DsHierarchyPageRegressionTest {
         compose.setContent {
             DshTheme {
                 Column(Modifier.fillMaxSize()) {
-                    DsButton(if (page == "parent") "进入" else "返回", onClick = {
+                    SyButton(if (page == "parent") "进入" else "返回", onClick = {
                         page = if (page == "parent") "child" else "parent"
                     })
-                    DsHierarchyPage(page, { it }, { if (it == "parent") 0 else 1 }, Modifier.weight(1f)) { shown ->
+                    SyHierarchyPage(page, { it }, { if (it == "parent") 0 else 1 }, Modifier.weight(1f)) { shown ->
                         var draft by rememberSaveable { mutableStateOf("") }
                         val scroll = rememberScrollState()
                         if (shown == "parent") parentScroll = scroll

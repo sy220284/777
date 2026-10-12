@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -47,14 +48,14 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCheckbox
-import com.labteto.dshmobile.ui.components.DsPageEmptyState
-import com.labteto.dshmobile.ui.components.DsPageLoadingState
-import com.labteto.dshmobile.ui.components.DsSearchField
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyCheckboxControl
+import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyLoadingState
+import com.labteto.dshmobile.ui.shenyan.SySearchField
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -251,7 +252,7 @@ internal fun LocalWorkspaceFilesDialog(
                         directory.takeIf(String::isNotEmpty)
                     else -> null
                 }
-                DsTopBar(
+                SyTopBar(
                     title = headerTitle,
                     subtitle = headerSubtitle,
                     onBack = ::navigateBack,
@@ -289,7 +290,7 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                 }
 
-                if (preview == null) DsSearchField(query, { query = it },
+                if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small))
 
@@ -306,11 +307,11 @@ internal fun LocalWorkspaceFilesDialog(
                                 style = DsType.small13Strong.withReadingWeight(),
                                 color = DsTheme.colors.labelPrimary,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.common_cancel),
                                 onClick = { selecting = false; selected.clear(); shareError = null },
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
                             )
                         }
                         Row(
@@ -319,7 +320,7 @@ internal fun LocalWorkspaceFilesDialog(
                             ),
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_select_all),
                                 onClick = {
                                     selected.clear()
@@ -327,15 +328,15 @@ internal fun LocalWorkspaceFilesDialog(
                                     shareError = if (visibleSharePaths.size > MAX_LOCAL_SHARE_FILES) limitText else null
                                 },
                                 modifier = Modifier.weight(1f),
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Outline,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Outline,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_share_selected),
                                 onClick = { share(selected.toList()) },
                                 modifier = Modifier.weight(1f),
                                 enabled = selected.isNotEmpty() && !sharing,
-                                size = DsButtonSize.Small,
+                                size = SyButtonSize.Small,
                             )
                         }
                     } else {
@@ -343,11 +344,11 @@ internal fun LocalWorkspaceFilesDialog(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_files_select),
                                 onClick = { selecting = true },
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
                             )
                         }
                     }
@@ -357,11 +358,11 @@ internal fun LocalWorkspaceFilesDialog(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_files_share_one),
                             onClick = { share(listOf(preview!!.file.path)) },
                             enabled = !sharing,
-                            size = DsButtonSize.Small,
+                            size = SyButtonSize.Small,
                         )
                     }
                 }
@@ -384,14 +385,14 @@ internal fun LocalWorkspaceFilesDialog(
                 ) {
                 when {
                     loading -> {
-                        DsPageLoadingState(
+                        SyLoadingState(
                             icon = FeatherIcons.Folder,
                             label = stringResource(R.string.local_files_loading),
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
                     error != null -> {
-                        DsPageEmptyState(
+                        SyEmptyState(
                             icon = FeatherIcons.AlertTriangle,
                             title = readFilesFailed,
                             body = error.orEmpty(),
@@ -465,6 +466,7 @@ private fun LocalFilesEmpty(title: String, body: String) {
         Image(
             painter = painterResource(R.drawable.ic_ui_project_empty),
             contentDescription = null,
+            colorFilter = ColorFilter.tint(DsTheme.colors.labelTertiary.copy(alpha = 0.72f)),
             modifier = Modifier.size(100.dp),
         )
         Text(
@@ -549,7 +551,7 @@ private fun LocalFileList(
     val filesByPath = files.associateBy(LocalWorkspaceFile::path)
     var showInternalOnly by remember(directory, files) { mutableStateOf(false) }
     if (directory.isEmpty() && children == listOf(".adsh") && !showInternalOnly) {
-        DsPageEmptyState(
+        SyEmptyState(
             icon = FeatherIcons.Folder,
             title = stringResource(R.string.local_workspace_internal_only_title),
             body = stringResource(R.string.local_workspace_internal_only_body),
@@ -650,20 +652,8 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     val selecting = canShare && controls?.active == true
     val selected = controls?.selected?.contains(file.path) == true
     val fileName = file.path.substringAfterLast('/')
-    val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
     val dark = colors.bgBase.luminance() < 0.5f
-    val fileIconRes = when (extension) {
-        "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "go", "rs", "swift",
-        "c", "cc", "cpp", "h", "hpp", "sh", "json", "xml", "yaml", "yml" ->
-            if (dark) R.drawable.ic_ui_filecode_dark else R.drawable.ic_ui_filecode_light
-        "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif", "avif" ->
-            if (dark) R.drawable.ic_ui_fileimage_dark else R.drawable.ic_ui_fileimage_light
-        "pdf" -> if (dark) R.drawable.ic_ui_filepdf_dark else R.drawable.ic_ui_filepdf_light
-        "doc", "docx", "odt", "rtf" -> if (dark) R.drawable.ic_ui_fileword_dark else R.drawable.ic_ui_fileword_light
-        "xls", "xlsx", "ods", "csv" -> if (dark) R.drawable.ic_ui_fileexcel_dark else R.drawable.ic_ui_fileexcel_light
-        else ->
-            if (dark) R.drawable.ic_ui_filetxt_dark else R.drawable.ic_ui_filetxt_light
-    }
+    val fileIconRes = workspaceFileIcon(fileName, dark)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -708,7 +698,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
                 )
             }
             if (selecting) {
-                DsCheckbox(
+                SyCheckboxControl(
                     checked = selected,
                     onCheckedChange = { controls?.toggle?.invoke(file.path) },
                 )

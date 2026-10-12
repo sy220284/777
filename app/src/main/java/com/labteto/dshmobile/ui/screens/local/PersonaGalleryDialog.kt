@@ -57,7 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
@@ -69,15 +69,14 @@ import com.labteto.dshmobile.local.presentation.PERSONA_WORD_MIME
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -105,7 +104,7 @@ internal fun PersonaGallerySavePromptDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(
             if (isUpdate) R.string.persona_gallery_unsaved_update_title
             else R.string.persona_gallery_new_character_title,
@@ -114,7 +113,7 @@ internal fun PersonaGallerySavePromptDialog(
         dismissEnabled = !busy,
         scrollable = true,
         footer = {
-            DsButton(
+            SyButton(
                 text = if (busy) {
                     stringResource(R.string.persona_gallery_saving)
                 } else {
@@ -135,14 +134,14 @@ internal fun PersonaGallerySavePromptDialog(
                 },
                 enabled = canSave && !busy,
                 modifier = Modifier.fillMaxWidth(),
-                size = DsButtonSize.Large,
+                size = SyButtonSize.Large,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_skip_save),
                 onClick = onContinue,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
                 modifier = Modifier.fillMaxWidth(),
-                size = DsButtonSize.Large,
+                size = SyButtonSize.Large,
                 enabled = !busy,
             )
             error?.let {
@@ -399,7 +398,7 @@ internal fun PersonaGalleryScreen(
     }
 
     if (showExportFormatDialog && selected != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_export_format_title),
             onDismiss = { showExportFormatDialog = false },
         ) {
@@ -408,25 +407,25 @@ internal fun PersonaGalleryScreen(
                 style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_export_json),
                 onClick = { requestExport(selected, PersonaTransferFormat.JSON) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_export_markdown),
                 onClick = { requestExport(selected, PersonaTransferFormat.MARKDOWN) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_export_word),
                 onClick = { requestExport(selected, PersonaTransferFormat.WORD) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
             )
         }
     }
@@ -440,17 +439,17 @@ internal fun PersonaGalleryScreen(
     }
 
     if (showMoreActions && selected != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_more_actions),
             subtitle = selected.persona.name,
             onDismiss = ::dismissMoreActions,
             dismissEnabled = !busy && !inspecting,
             scrollable = true,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_gallery_cancel),
                     onClick = ::dismissMoreActions,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !busy && !inspecting,
                 )
@@ -463,7 +462,7 @@ internal fun PersonaGalleryScreen(
                     color = DsTheme.colors.labelSecondary,
                 )
                 if (editingStoryTitle) {
-                    DsTextField(
+                    SyTextField(
                         value = storyTitle,
                         onValueChange = { storyTitle = it },
                         label = { Text(stringResource(R.string.persona_gallery_story_title_label)) },
@@ -472,17 +471,17 @@ internal fun PersonaGalleryScreen(
                         enabled = !busy,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_cancel),
                             onClick = {
                                 storyTitle = story.title
                                 editingStoryTitle = false
                             },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                             modifier = Modifier.weight(1f),
                             enabled = !busy,
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_save_story_title),
                             onClick = {
                                 busy = true
@@ -503,7 +502,7 @@ internal fun PersonaGalleryScreen(
                         )
                     }
                 } else {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_rename_story),
                         icon = FeatherIcons.Edit3,
                         onClick = { editingStoryTitle = true },
@@ -516,7 +515,7 @@ internal fun PersonaGalleryScreen(
                     currentGalleryStoryId == story.id &&
                     currentHasUnsavedChanges
                 ) {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_save_progress),
                         onClick = {
                             busy = true
@@ -543,7 +542,7 @@ internal fun PersonaGalleryScreen(
                 currentHasUnsavedChanges &&
                 canSave
             ) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_save_current_new_story),
                     onClick = {
                         busy = true
@@ -569,14 +568,14 @@ internal fun PersonaGalleryScreen(
                 style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_view_profile),
                 icon = FeatherIcons.User,
                 onClick = { dismissMoreActions(); showPersonaDetails = true },
                 enabled = !busy && !inspecting,
             )
             selectedStory?.let { story ->
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = if (inspecting) {
                         stringResource(R.string.persona_gallery_inspecting)
                     } else {
@@ -600,13 +599,13 @@ internal fun PersonaGalleryScreen(
                     enabled = !busy && !inspecting,
                 )
             }
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_portrait_actions_title),
                 icon = FeatherIcons.Image,
                 onClick = { dismissMoreActions(); showPortraitActions = true },
                 enabled = !busy && !inspecting,
             )
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_export_file),
                 icon = FeatherIcons.Download,
                 onClick = { dismissMoreActions(); showExportFormatDialog = true; error = null },
@@ -615,7 +614,7 @@ internal fun PersonaGalleryScreen(
             androidx.compose.material3.HorizontalDivider(color = DsTheme.colors.borderL3)
             selectedStory?.let { story ->
                 if (deletingStory) {
-                    DsCard {
+                    SyGlassCard {
                         Text(
                             stringResource(R.string.persona_gallery_delete_story_confirm, story.title),
                             style = DsType.small13.withReadingWeight(),
@@ -627,13 +626,13 @@ internal fun PersonaGalleryScreen(
                             color = DsTheme.colors.labelTertiary,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.persona_gallery_cancel),
                                 onClick = { deletingStory = false },
-                                variant = DsButtonVariant.Ghost,
+                                variant = SyButtonVariant.Ghost,
                                 modifier = Modifier.weight(1f),
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.persona_gallery_confirm_delete),
                                 onClick = {
                                     busy = true
@@ -648,14 +647,14 @@ internal fun PersonaGalleryScreen(
                                         busy = false
                                     }
                                 },
-                                variant = DsButtonVariant.Danger,
+                                variant = SyButtonVariant.Danger,
                                 modifier = Modifier.weight(1f),
                                 enabled = !busy,
                             )
                         }
                     }
                 } else {
-                    DsSheetChoiceRow(
+                    SySheetChoiceRow(
                         title = stringResource(R.string.persona_gallery_delete_story),
                         icon = FeatherIcons.Trash2,
                         danger = true,
@@ -681,7 +680,7 @@ internal fun PersonaGalleryScreen(
                     },
                 )
             } else {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_delete),
                     icon = FeatherIcons.Trash2,
                     danger = true,
@@ -693,7 +692,7 @@ internal fun PersonaGalleryScreen(
         }
     }
     if (showPersonaDetails && selected != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_view_profile),
             onDismiss = { showPersonaDetails = false },
             scrollable = true,
@@ -702,12 +701,12 @@ internal fun PersonaGalleryScreen(
         }
     }
     if (showPortraitActions && selected != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.persona_gallery_portrait_actions_title),
             onDismiss = { showPortraitActions = false },
             dismissEnabled = !busy,
         ) {
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.persona_gallery_portrait_replace),
                 icon = FeatherIcons.Image,
                 onClick = {
@@ -718,7 +717,7 @@ internal fun PersonaGalleryScreen(
                 enabled = !busy,
             )
             if (selected.portraitPath.isNotBlank()) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.persona_gallery_portrait_remove),
                     icon = FeatherIcons.Trash2,
                     danger = true,
@@ -748,7 +747,7 @@ internal fun PersonaGalleryScreen(
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            DsTopBar(
+            SyTopBar(
                 title = if (selected == null) stringResource(R.string.persona_gallery_title) else stringResource(R.string.persona_gallery_detail_title),
                 onBack = ::navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
@@ -860,11 +859,11 @@ internal fun PersonaGalleryScreen(
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             selected.stories.sortedByDescending(PersonaGalleryStory::updatedAt).forEach { story ->
-                                DsButton(story.title, {
+                                SyButton(story.title, {
                                     if (!hasLocalStoryEdits || story.id == selectedStoryId) selectedStoryId = story.id
                                     else error = saveEditsBeforeSwitchText
                                 }, enabled = !busy && !inspecting,
-                                    variant = if (story.id == selectedStoryId) DsButtonVariant.Primary else DsButtonVariant.Ghost)
+                                    variant = if (story.id == selectedStoryId) SyButtonVariant.Primary else SyButtonVariant.Ghost)
                             }
                         }
                     }
@@ -891,16 +890,16 @@ internal fun PersonaGalleryScreen(
                     }
 
                     if (personaDesignSection == 3) {
-                        DsButton(stringResource(R.string.persona_gallery_view_profile),
+                        SyButton(stringResource(R.string.persona_gallery_view_profile),
                             { showPersonaDetails = true }, modifier = Modifier.fillMaxWidth(),
-                            variant = DsButtonVariant.Outline)
+                            variant = SyButtonVariant.Outline)
                     Text(
                         stringResource(R.string.persona_gallery_storylines_title),
                         style = DsType.std14Strong.withReadingWeight(),
                         color = DsTheme.colors.labelPrimary,
                     )
                     if (selected.stories.isEmpty()) {
-                        DsCard {
+                        SyGlassCard {
                             Text(
                                 stringResource(R.string.persona_gallery_storylines_empty),
                                 style = DsType.small13.withReadingWeight(),
@@ -945,10 +944,10 @@ internal fun PersonaGalleryScreen(
                         canSave && currentGalleryId == selected.id && currentHasUnsavedChanges &&
                         (currentGalleryStoryId == null || currentGalleryStoryId == selectedStoryId)
                     ) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_pending_progress),
                             onClick = { showMoreActions = true },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !busy && !inspecting,
                         )
@@ -981,7 +980,7 @@ internal fun PersonaGalleryScreen(
                             },
                         )
 
-                        DsTextField(
+                        SyTextField(
                             value = storyStage,
                             onValueChange = { storyStage = it.take(160) },
                             label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
@@ -1020,12 +1019,12 @@ internal fun PersonaGalleryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                             ) {
                                 stageChoices.forEach { availableStage ->
-                                    DsButton(
+                                    SyButton(
                                         text = availableStage,
                                         onClick = { storyStage = availableStage },
                                         variant = if (storyStage.trim() == availableStage) {
-                                            DsButtonVariant.Primary
-                                        } else DsButtonVariant.Ghost,
+                                            SyButtonVariant.Primary
+                                        } else SyButtonVariant.Ghost,
                                         enabled = !busy && !inspecting,
                                     )
                                 }
@@ -1033,7 +1032,7 @@ internal fun PersonaGalleryScreen(
                         }
 
                         if (notes != story.notes || storyStage.trim() != story.chatContext.storyStage) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.persona_gallery_save_story),
                                 onClick = {
                                     busy = true
@@ -1061,7 +1060,7 @@ internal fun PersonaGalleryScreen(
                             )
                             if (result.suggestions.isNotEmpty()) {
                                 val chosen = result.suggestions.filter { suggestionKey(it) in selectedSuggestionKeys }
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.persona_gallery_append_selected, chosen.size),
                                     onClick = {
                                         busy = true
@@ -1103,19 +1102,19 @@ internal fun PersonaGalleryScreen(
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                     ) {
                         selectedStory?.let { story ->
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.persona_gallery_continue_story),
                                 onClick = { onStart(entry.id, story.id, false) },
                                 modifier = Modifier.fillMaxWidth(),
-                                size = DsButtonSize.Large,
+                                size = SyButtonSize.Large,
                                 enabled = canSave && !busy && !inspecting && !hasLocalStoryEdits,
                             )
                         }
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.persona_gallery_start_fresh_story),
                             onClick = { onStart(entry.id, null, true) },
                             modifier = Modifier.fillMaxWidth(),
-                            variant = if (selectedStory == null) DsButtonVariant.Primary else DsButtonVariant.Ghost,
+                            variant = if (selectedStory == null) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             enabled = canSave && !busy && !inspecting && !hasLocalStoryEdits,
                         )
                     }

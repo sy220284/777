@@ -781,8 +781,8 @@
     {
       "id": "existing.0098",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 底部弹层、确认框和长表单",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/components/DsBottomSheet.kt",
-      "entry": "DsBottomSheet",
+      "source": "app/src/main/java/com/labteto/dshmobile/ui/shenyan/SyResponsiveSheet.kt",
+      "entry": "SyResponsiveSheet",
       "owner": "SHELL",
       "evidence": "static_declaration_only"
     },
@@ -797,8 +797,8 @@
     {
       "id": "existing.0100",
       "path": "第一层｜产品功能与界面 / 应用外壳与统一交互 / 交互设计基础 / 统一按钮、输入框与列表组件",
-      "source": "app/src/main/java/com/labteto/dshmobile/ui/components/DsButton.kt",
-      "entry": "DsButton",
+      "source": "app/src/main/java/com/shenyan/designsystem/components/ShenyanBasics.kt",
+      "entry": "SyButton",
       "owner": "SHELL",
       "evidence": "static_declaration_only"
     },

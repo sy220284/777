@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SyExpandableColumn
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -25,7 +27,7 @@ class DsExpandableColumnInteractionTest {
                     Button(onClick = { visible = !visible }) {
                         Text("Toggle")
                     }
-                    DsExpandableColumn(visible = visible) {
+                    SyExpandableColumn(visible = visible) {
                         Text("Details")
                     }
                 }

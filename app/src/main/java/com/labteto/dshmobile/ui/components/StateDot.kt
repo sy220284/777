@@ -1,68 +1,24 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import com.labteto.dshmobile.R
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.R
+import com.shenyan.designsystem.foundation.SyPhase
 
-/** Semantic execution states shared by chat, work and utility surfaces. */
+/** Existing status projection; rendering is owned by the canonical design library. */
 enum class StateDotState { Idle, Running, Done, Warning, Error }
 
-/**
- * Clear Realm status dot.
- *
- * Only a genuinely live [Running] state keeps moving, using a restrained opacity breath.
- * Terminal states settle immediately so old history never competes with the current task.
- */
 @Composable
-fun StateDot(
-    state: StateDotState,
-    size: Dp = 8.dp,
-) {
-    val color = when (state) {
-        StateDotState.Idle -> DsTheme.colors.labelCaption
-        StateDotState.Running -> DsTheme.colors.success
-        StateDotState.Done -> DsTheme.colors.success
-        StateDotState.Warning -> DsTheme.colors.warn
-        StateDotState.Error -> DsTheme.colors.error
+fun StateDot(state: StateDotState, size: Dp = 8.dp) {
+    val phase = when (state) {
+        StateDotState.Idle -> SyPhase.IDLE
+        StateDotState.Running -> SyPhase.RUNNING
+        StateDotState.Done -> SyPhase.DONE
+        StateDotState.Warning -> SyPhase.BLOCKED
+        StateDotState.Error -> SyPhase.FAILED
     }
-    val alpha = if (state == StateDotState.Running) {
-        val transition = rememberInfiniteTransition(label = "stateDot")
-        val pulse by transition.animateFloat(
-            initialValue = 0.55f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "pulse",
-        )
-        pulse
-    } else {
-        1f
-    }
-
     val label = stringResource(when (state) {
         StateDotState.Idle -> R.string.audit_status_idle
         StateDotState.Running -> R.string.agent_operation_status_running
@@ -70,35 +26,5 @@ fun StateDot(
         StateDotState.Warning -> R.string.audit_status_warning
         StateDotState.Error -> R.string.agent_operation_status_failed
     })
-    Canvas(modifier = Modifier.size(size).semantics { contentDescription = label }) {
-        drawHalo(color, alpha)
-        drawCircle(
-            color = color.copy(alpha = alpha),
-            radius = this.size.minDimension * 0.34f,
-        )
-    }
-}
-
-private fun DrawScope.drawHalo(color: Color, alpha: Float) {
-    drawCircle(
-        color.copy(alpha = 0.10f * alpha),
-        radius = this.size.minDimension * 0.58f,
-    )
-}
-
-@Preview(showBackground = true, widthDp = 360)
-@Composable
-private fun StateDotPreview() {
-    DshTheme {
-        Row(
-            Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            StateDot(StateDotState.Idle)
-            StateDot(StateDotState.Running, size = 10.dp)
-            StateDot(StateDotState.Done)
-            StateDot(StateDotState.Warning)
-            StateDot(StateDotState.Error)
-        }
-    }
+    com.shenyan.designsystem.components.SyStateDot(phase, label, size = size)
 }

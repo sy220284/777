@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,7 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -64,10 +65,10 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.ui.agentApprovalPurposeRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -87,7 +88,7 @@ internal fun NewSessionModeDialog(
 ) {
     val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
     ) {
@@ -98,7 +99,7 @@ internal fun NewSessionModeDialog(
                 color = colors.labelSecondary,
             )
         }
-        DsSheetChoiceRow(
+        SySheetChoiceRow(
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_continue
                 else R.string.local_new_session_continue,
@@ -110,13 +111,13 @@ internal fun NewSessionModeDialog(
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
         if (!chatMode && projectAvailable) {
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = stringResource(R.string.local_project_start_work_session),
                 subtitle = stringResource(R.string.local_project_new_session_hint),
                 onClick = { onSelect(LocalConversationMode.PROJECT) },
             )
         }
-        DsSheetChoiceRow(
+        SySheetChoiceRow(
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_new
                 else R.string.local_new_session_independent,
@@ -137,7 +138,7 @@ internal fun GroupNewSessionDialog(
     onNewSingle: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
     ) {
@@ -146,11 +147,11 @@ internal fun GroupNewSessionDialog(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
-        DsSheetChoiceRow(
+        SySheetChoiceRow(
             title = stringResource(R.string.local_group_new_group),
             onClick = onNewGroup,
         )
-        DsSheetChoiceRow(
+        SySheetChoiceRow(
             title = stringResource(R.string.local_group_new_single),
             onClick = onNewSingle,
         )
@@ -169,19 +170,19 @@ internal fun ChatPersonaPickerDialog(
 ) {
     val colors = DsTheme.colors
     val isUnbound = currentPersona.id == PersonaProfile.DEFAULT_PERSONA_ID
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_persona_picker_title),
         subtitle = stringResource(R.string.local_persona_picker_intro),
         onDismiss = onDismiss,
         trailing = {
-            DsButton(
+            SyButton(
                 text = stringResource(
                     if (isUnbound) R.string.local_persona_picker_new
                     else R.string.local_persona_picker_edit_current,
                 ),
                 onClick = onEditCurrent,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
             )
         },
     ) {
@@ -354,7 +355,7 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    DsBottomSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
+    SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -405,23 +406,23 @@ internal fun ApprovalDialog(
             color = colors.labelTertiary,
         )
 
-        DsButton(
+        SyButton(
             stringResource(R.string.local_approval_once),
             onApprove,
             modifier = Modifier.fillMaxWidth(),
         )
-        DsButton(
+        SyButton(
             stringResource(R.string.local_approval_reject),
             onDeny,
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Outline,
+            variant = SyButtonVariant.Outline,
         )
         if (!safeAutoApprovalEnabled) {
-            DsButton(
+            SyButton(
                 stringResource(R.string.local_approval_enable_safe),
                 onAutoApprove,
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
         } else {
             Text(
@@ -431,11 +432,11 @@ internal fun ApprovalDialog(
             )
         }
         if (approval.canApproveDeviceTurn) {
-            DsButton(
+            SyButton(
                 stringResource(R.string.local_approval_device_turn),
                 onApproveDeviceTurn,
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
         }
     }
@@ -450,36 +451,36 @@ internal fun QuestionDialog(
 ) {
     val colors = DsTheme.colors
     var answer by rememberSaveable(question) { mutableStateOf("") }
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
         scrollable = true,
     ) {
         Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
         options.forEach { option ->
-            DsSheetChoiceRow(
+            SySheetChoiceRow(
                 title = option,
                 onClick = { onAnswer(option) },
             )
         }
-        DsTextField(
+        SyTextField(
             value = answer,
             onValueChange = { answer = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.local_question_custom_answer)) },
             maxLines = 4,
         )
-        DsButton(
+        SyButton(
             text = stringResource(R.string.local_question_submit),
             onClick = { onAnswer(answer) },
             modifier = Modifier.fillMaxWidth(),
             enabled = answer.isNotBlank(),
         )
-        DsButton(
+        SyButton(
             text = stringResource(R.string.common_cancel),
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
     }
 }
@@ -521,7 +522,7 @@ internal fun ChatPersonaDialog(
         loreEntries = generated.loreEntries
     }
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_persona_title),
         onDismiss = onDismiss,
         scrollable = true,
@@ -530,7 +531,7 @@ internal fun ChatPersonaDialog(
             saveError?.let {
                 Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
             }
-        DsButton(
+        SyButton(
             text = stringResource(R.string.local_persona_save),
             onClick = {
                 saving = true
@@ -582,7 +583,7 @@ internal fun ChatPersonaDialog(
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
-                DsTextField(
+                SyTextField(
                     value = aiDescription,
                     onValueChange = { aiDescription = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -592,14 +593,14 @@ internal fun ChatPersonaDialog(
                     maxLines = 5,
                     enabled = !aiGenerating,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (aiGenerating) R.string.local_persona_ai_generating
                         else if (creatingNew) R.string.local_persona_ai_generate_new
                         else R.string.local_persona_ai_generate
                     ),
                     onClick = {
-                        if (aiGenerating) return@DsButton
+                        if (aiGenerating) return@SyButton
                         aiGenerating = true
                         aiSucceeded = false
                         aiError = null
@@ -685,11 +686,11 @@ internal fun ChatPersonaDialog(
                 )
             }
         }
-        DsButton(
+        SyButton(
             text = stringResource(if (advancedOpen) R.string.persona_v4_hide_advanced else R.string.persona_v4_show_advanced),
             onClick = { advancedOpen = !advancedOpen },
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
         if (advancedOpen) {
             PersonaFormSection(stringResource(R.string.persona_v4_section_advanced)) {
@@ -715,7 +716,7 @@ internal fun ChatPersonaDialog(
                     }
                 PersonaTextField(stringResource(R.string.persona_v4_category_code), customCategory, { customCategory = it }, singleLine = true)
                 PersonaTextField(stringResource(R.string.persona_v4_category_content), customContent, { customContent = it })
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_v4_add_custom),
                     onClick = {
                         if (customCategory.isNotBlank() && customContent.isNotBlank()) {
@@ -730,28 +731,28 @@ internal fun ChatPersonaDialog(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     enabled = customCategory.isNotBlank() && customContent.isNotBlank(),
                 )
             }
             bundledPreset?.let { preset ->
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_v4_load_preset),
                     onClick = {
                         coreIdentity = preset.persona.coreIdentity
                         factDrafts = preset.persona.facts
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_v4_fill_lore),
                     onClick = {
                         val ids = loreEntries.map(PersonaLoreEntry::id).toSet()
                         loreEntries += preset.persona.loreEntries.filterNot { it.id in ids }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
             PersonaFormSection(stringResource(R.string.persona_v4_section_lore)) {
@@ -824,7 +825,7 @@ private fun PersonaFactCategoryEditor(
                 )
             }
         }
-        DsButton(
+        SyButton(
             text = stringResource(R.string.persona_v4_add_fact),
             onClick = {
                 onChange(facts + CharacterFact(
@@ -835,7 +836,7 @@ private fun PersonaFactCategoryEditor(
                 ))
             },
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
     }
 }
@@ -858,7 +859,7 @@ private fun PersonaTextField(
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
 ) {
-    DsTextField(
+    SyTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,13 +50,11 @@ import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.ui.components.DisclosureRow
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -81,24 +80,25 @@ import kotlinx.serialization.json.contentOrNull
 internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
+    onRequestPostingPermission: () -> Unit,
 ) {
     val overallState = when {
-        state.loading -> DsStatus.Running
-        state.error != null -> DsStatus.Failed
-        state.accessibility && state.notifications && state.virtualDisplay -> DsStatus.Done
-        else -> DsStatus.Warning
+        state.loading -> SyStatus.Running
+        state.error != null -> SyStatus.Failed
+        state.accessibility && state.notifications && state.postingNotifications == true -> SyStatus.Done
+        else -> SyStatus.Warning
     }
     val overallLabel = stringResource(
         when {
             state.loading -> R.string.advanced_device_status_checking
             state.error != null -> R.string.advanced_device_status_error
-            overallState == DsStatus.Done -> R.string.advanced_device_status_ready
+            overallState == SyStatus.Done -> R.string.advanced_device_status_ready
             else -> R.string.advanced_device_status_needs_setup
         },
     )
 
     SettingsCard(stringResource(R.string.advanced_device_capabilities)) {
-        DsStatusPill(state = overallState, label = overallLabel)
+        SyStatusPill(state = overallState, label = overallLabel)
         CapabilityRow(
             label = stringResource(R.string.advanced_accessibility),
             enabled = state.accessibility,
@@ -113,19 +113,61 @@ internal fun DeviceCapabilitiesCard(
             actionLabel = stringResource(R.string.advanced_enable_notifications),
             onAction = viewModel::openNotificationAccessSettings,
         )
+        state.postingNotifications?.let { enabled ->
+            CapabilityRow(
+                label = stringResource(R.string.settings_notifications_posting_permission),
+                enabled = enabled,
+                hint = stringResource(R.string.settings_notifications_posting_hint),
+                actionLabel = stringResource(R.string.settings_notifications_request),
+                onAction = onRequestPostingPermission,
+            )
+        }
         CapabilityRow(
             label = stringResource(R.string.advanced_virtual_display),
             enabled = state.virtualDisplay,
             hint = stringResource(R.string.advanced_virtual_display_hint),
+            successLabel = stringResource(R.string.settings_device_supported_not_granted),
         )
-        DsButton(
+        SyButton(
             text = stringResource(R.string.common_refresh),
             onClick = viewModel::refreshDeviceCapabilities,
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
+            size = SyButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
         state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
+    }
+}
+
+/** Screen 28: posting permission is not the notification-listener permission. */
+@Composable
+internal fun NotificationPostingPermissionCard(
+    state: DeviceCapabilitiesState,
+    viewModel: SettingsViewModel,
+    onRequestPostingPermission: () -> Unit,
+) {
+    SettingsCard(stringResource(R.string.settings_notifications_system_group)) {
+        CapabilityRow(
+            label = stringResource(R.string.settings_notifications_posting_permission),
+            enabled = state.postingNotifications == true,
+            hint = stringResource(R.string.settings_notifications_posting_hint),
+            actionLabel = stringResource(R.string.settings_notifications_request),
+            onAction = onRequestPostingPermission,
+        )
+        if (state.postingNotifications != true) {
+            SyButton(
+                text = stringResource(R.string.settings_notifications_open_system),
+                onClick = viewModel::openAppNotificationSettings,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Text(
+            stringResource(R.string.settings_notifications_only_events),
+            style = DsType.caption11.withReadingWeight(),
+            color = DsTheme.colors.labelSecondary,
+        )
     }
 }
 
@@ -136,6 +178,7 @@ private fun CapabilityRow(
     hint: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    successLabel: String? = null,
 ) {
     val colors = DsTheme.colors
     Row(
@@ -152,16 +195,16 @@ private fun CapabilityRow(
         }
         if (enabled) {
             Text(
-                stringResource(R.string.advanced_available),
+                successLabel ?: stringResource(R.string.advanced_available),
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.success,
             )
         } else if (actionLabel != null && onAction != null) {
-            DsButton(
+            SyButton(
                 text = actionLabel,
                 onClick = onAction,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Outline,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Outline,
             )
         } else {
             Text(

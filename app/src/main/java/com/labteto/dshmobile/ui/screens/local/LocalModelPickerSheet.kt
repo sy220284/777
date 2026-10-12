@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,9 +22,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -39,12 +40,12 @@ internal fun LocalModelPickerSheet(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.models_title),
         onDismiss = onDismiss,
         scrollable = true,
         footer = {
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (profiles.isEmpty()) R.string.local_model_picker_configure
                 else R.string.local_manage_model_config
@@ -54,7 +55,7 @@ internal fun LocalModelPickerSheet(
                 onConfigure()
             },
             modifier = Modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
         },
     ) {

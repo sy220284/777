@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
@@ -26,7 +28,7 @@ class DsSegmentedTabsInteractionTest {
         compose.setContent {
             DshTheme {
                 Box(Modifier.width(320.dp)) {
-                    DsSegmentedTabs(
+                    SySegmentedTabs(
                         labels = listOf("Chat", "Work"),
                         selectedIndex = selected,
                         onSelect = {

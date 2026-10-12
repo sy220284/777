@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -52,9 +53,9 @@ import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
 import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -158,16 +159,16 @@ internal fun LocalGeneratedMediaResultRow(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     if (file != null) {
-                        DsButton(text = resources.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
+                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
                             onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
-                        DsButton(text = resources.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                        SyButton(text = resources.getString(R.string.media_chat_share_save), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
                     } else result.remoteUrl?.let { url ->
-                        DsButton(text = resources.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
+                        SyButton(text = resources.getString(R.string.media_chat_view_image), size = SyButtonSize.Small,
                             onClick = { openMediaUrl(context, url) { error = it } })
-                        DsButton(text = resources.getString(R.string.media_chat_share_url), size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                        SyButton(text = resources.getString(R.string.media_chat_share_url), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                             onClick = { shareMediaUrl(context, url) { error = it } })
                     }
                 }
@@ -175,8 +176,8 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    DsButton(text = resources.getString(R.string.media_chat_share_audio), size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                    SyButton(text = resources.getString(R.string.media_chat_share_audio), size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
                 } else Text(resources.getString(R.string.media_chat_audio_missing), color = DsTheme.colors.labelSecondary)
             }
@@ -187,10 +188,10 @@ internal fun LocalGeneratedMediaResultRow(
                             color = DsTheme.colors.labelPrimary)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                        DsButton(text = resources.getString(R.string.media_chat_insert_text), size = DsButtonSize.Small,
+                        SyButton(text = resources.getString(R.string.media_chat_insert_text), size = SyButtonSize.Small,
                             onClick = { onInsertText(text) })
-                        DsButton(text = resources.getString(R.string.media_chat_copy), size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                        SyButton(text = resources.getString(R.string.media_chat_copy), size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                             onClick = {
                                 (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                                     .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.media_chat_transcription), text))
@@ -262,23 +263,23 @@ internal fun LocalGeneratedVideoTaskRow(
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
                     androidx.compose.foundation.layout.Box(
                         contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        DsButton(resources.getString(R.string.media_chat_play_video), onClick = { showingPlayer = true })
+                        SyButton(resources.getString(R.string.media_chat_play_video), onClick = { showingPlayer = true })
                     }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                if (showingPlayer) DsButton(
+                if (showingPlayer) SyButton(
                     text = resources.getString(R.string.media_chat_collapse_video),
-                    size = DsButtonSize.Small,
+                    size = SyButtonSize.Small,
                     onClick = { showingPlayer = false },
                 )
                 if (savedVideo != null) {
-                    DsButton(text = resources.getString(R.string.media_chat_share_video), size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                    SyButton(text = resources.getString(R.string.media_chat_share_video), size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
                 } else {
-                    DsButton(text = resources.getString(R.string.media_chat_open_video), size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                    SyButton(text = resources.getString(R.string.media_chat_open_video), size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                         onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
                 }
             }
@@ -288,10 +289,10 @@ internal fun LocalGeneratedVideoTaskRow(
                     color = DsTheme.colors.labelSecondary)
             }
             if (task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
-                DsButton(text = if (refreshing) resources.getString(R.string.media_chat_polling) else resources.getString(R.string.media_chat_refresh_progress),
+                SyButton(text = if (refreshing) resources.getString(R.string.media_chat_polling) else resources.getString(R.string.media_chat_refresh_progress),
                     enabled = !refreshing && offer != null,
-                    size = DsButtonSize.Small, onClick = {
-                        val bound = offer ?: return@DsButton
+                    size = SyButtonSize.Small, onClick = {
+                        val bound = offer ?: return@SyButton
                         scope.launch {
                             refreshing = true
                             error = null
@@ -448,10 +449,10 @@ private fun InlineSpeechPlayer(file: File) {
     }
     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-        DsButton(
+        SyButton(
             text = if (playing) resources.getString(R.string.media_chat_pause_audio)
                 else resources.getString(R.string.media_chat_play_audio),
-            size = DsButtonSize.Small,
+            size = SyButtonSize.Small,
             onClick = {
                 runCatching {
                     val current = player ?: MediaPlayer().apply {
@@ -586,10 +587,10 @@ internal fun LocalWorkArtifactMessageRow(
                     color = DsTheme.colors.labelPrimary)
             }
             if (text.length > 2500) {
-                DsButton(
+                SyButton(
                     text = if (expanded) resources.getString(R.string.media_chat_collapse_preview) else resources.getString(R.string.media_chat_expand_preview),
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                     onClick = { expanded = !expanded },
                 )
             }
@@ -609,16 +610,16 @@ internal fun LocalWorkArtifactMessageRow(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (artifact.category == "file") {
-                DsButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = DsButtonSize.Small)
+                SyButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = SyButtonSize.Small)
                 if (file != null) {
-                    DsButton(resources.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                    SyButton(resources.getString(R.string.media_chat_share_save), size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                         onClick = {
                             shareMediaFile(context, file, localArtifactMime(file)) { error = it }
                         })
                 }
             } else if (artifact.reference.startsWith("https://")) {
-                DsButton(resources.getString(R.string.media_chat_open_result), size = DsButtonSize.Small,
+                SyButton(resources.getString(R.string.media_chat_open_result), size = SyButtonSize.Small,
                     onClick = { openMediaUrl(context, artifact.reference) { error = it } })
             }
         }

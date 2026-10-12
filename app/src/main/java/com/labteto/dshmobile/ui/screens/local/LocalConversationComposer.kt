@@ -27,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -41,16 +40,15 @@ import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -189,7 +187,7 @@ internal fun LocalConversationComposer(
     @Composable
     fun AttachmentControl() {
         if (state.running) return
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
             contentDescription = moreActionsLabel,
@@ -209,7 +207,7 @@ internal fun LocalConversationComposer(
     @Composable
     fun ReplySuggestionsControl() {
         if (!replySuggestionsAvailable) return
-        DsComposerAction(
+        SyComposerAction(
             icon = FeatherIcons.Activity,
             contentDescription = if (replySuggestionsLoading) {
                 stringResource(R.string.common_loading)
@@ -225,15 +223,11 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun SendControl(queue: Boolean = false) {
-        val dark = colors.bgBase.luminance() < 0.5f
-        val buttonRes = when {
-            !canSend && dark -> R.drawable.ic_ui_button_send_disabled_dark
-            !canSend -> R.drawable.ic_ui_button_send_disabled_light
-            dark -> R.drawable.ic_ui_button_send_dark
-            else -> R.drawable.ic_ui_button_send_light
-        }
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+            iconSize = 32.dp,
+            tint = if (canSend) colors.onAccent else colors.labelPrimary,
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -243,41 +237,26 @@ internal fun LocalConversationComposer(
             },
             onClick = ::submit,
             enabled = canSend,
-            containerColor = Color.Transparent,
+            containerColor = colors.accent,
             visualSize = 32.dp,
-            content = {
-                Image(
-                    painter = painterResource(buttonRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            },
         )
     }
 
     @Composable
     fun StopControl() {
-        val dark = colors.bgBase.luminance() < 0.5f
-        DsComposerAction(
+        SyComposerAction(
             icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
+            iconSize = 32.dp,
+            tint = colors.onAccent,
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
-            containerColor = Color.Transparent,
+            containerColor = colors.accent,
             visualSize = 32.dp,
-            content = {
-                Image(
-                    painter = painterResource(
-                        if (dark) R.drawable.ic_ui_button_stop_dark
-                        else R.drawable.ic_ui_button_stop_light,
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            },
         )
     }
 
-    DsConversationComposer(
+    SyConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
         shadowElevation = 0.dp,
         // This composer owns a targeted row reveal. Avoid a second parent size animation while
@@ -291,7 +270,7 @@ internal fun LocalConversationComposer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_team_title),
                     selected = true,
                 )
@@ -301,7 +280,7 @@ internal fun LocalConversationComposer(
                     color = colors.labelSecondary,
                     modifier = Modifier.weight(1f),
                 )
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.X,
                     contentDescription = stringResource(R.string.local_team_mode_clear),
                     onClick = onClearTeamDispatch,
@@ -316,12 +295,12 @@ internal fun LocalConversationComposer(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_work_next_turn),
                     selected = !steerCurrentRun,
                     onClick = { steerCurrentRun = false },
                 )
-                DsPill(
+                SyPill(
                     text = stringResource(R.string.local_work_steer_now),
                     selected = steerCurrentRun,
                     onClick = { steerCurrentRun = true },
@@ -379,7 +358,7 @@ internal fun LocalConversationComposer(
                     ReplySuggestionsControl()
                 }
             }
-            DsComposerField(
+            SyComposerField(
                 value = input,
                 onValueChange = onInputChange,
                 visualTransformation = if (state.usageMode == LocalUsageMode.WORK) {
@@ -490,7 +469,7 @@ private fun ImportedImageAttachmentTile(
                 modifier = Modifier.fillMaxWidth().size(88.dp).clip(DsShapes.block),
             )
         }
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove),
             onClick = onRemove,
@@ -521,7 +500,7 @@ private fun ImportedAttachmentRow(
             null
         }
     }
-    DsCard {
+    SyGlassCard {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
@@ -551,11 +530,11 @@ private fun ImportedAttachmentRow(
                     color = colors.labelTertiary,
                 )
             }
-            DsButton(
+            SyButton(
                 stringResource(R.string.common_remove),
                 onRemove,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
     }

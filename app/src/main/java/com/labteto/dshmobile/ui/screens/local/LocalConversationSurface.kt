@@ -89,23 +89,16 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.MenuItem
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
-import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.shenyan.designsystem.components.SyIconButton
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.shenyan.designsystem.components.SySheetChoiceRow
+import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -116,6 +109,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -212,7 +206,8 @@ internal fun LocalConversationSurface(
     val rootSurfaceColor = colors.rootSurface()
     // Custom wallpapers remain visible behind the chat toolbar; work mode still gets its
     // stable root work surface from rootSurfaceColor above.
-    val topSurfaceColor = colors.rootSurface()
+    // V5: chat and work headers use solid top chrome, not a nested glass layer.
+    val topSurfaceColor = LocalSyPalette.current.topBar
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
@@ -542,7 +537,7 @@ internal fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onOpenDrawer != null) DsIconButton(
+                if (onOpenDrawer != null) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
@@ -603,7 +598,7 @@ internal fun LocalConversationSurface(
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
-                    DsIconButton(
+                    SyIconButton(
                         icon = FeatherIcons.Users,
                         contentDescription = stringResource(R.string.local_team_reopen),
                         onClick = { showTeamPanel = true },
@@ -643,13 +638,13 @@ internal fun LocalConversationSurface(
                         color = colors.labelSecondary,
                         modifier = Modifier.weight(1f),
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_persona_correction_undo),
                         onClick = {
                             onUndoPersonaCorrection(notice.id, notice.personaId, notice.correction)
                         },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -685,11 +680,11 @@ internal fun LocalConversationSurface(
                             color = colors.labelSecondary,
                         )
                     }
-                    DsButton(
+                    SyButton(
                         stringResource(R.string.common_close),
                         onDisableDeviceTurn,
                         modifier = Modifier.heightIn(min = DsSpacing.touchTarget),
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
                 if (approvalNoticeExpanded) {
@@ -740,13 +735,13 @@ internal fun LocalConversationSurface(
                 }
                 if (showEmptyGroupSetup) {
                     item {
-                        DsCard {
+                        SyGlassCard {
                             Text(
                                 stringResource(R.string.local_group_chat_setup_required),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_group_chat_manage_members),
                                 onClick = { showGroupMemberPicker = true },
                                 modifier = Modifier.fillMaxWidth(),
@@ -961,10 +956,10 @@ internal fun LocalConversationSurface(
                             color = colors.labelSecondary,
                         )
                     }
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_welcome_connect_action),
                         onClick = onConfigure,
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -1254,7 +1249,7 @@ internal fun LocalConversationSurface(
         !state.groupChat.enabled &&
         state.replySuggestions.any { it.text.isNotBlank() }
     ) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.local_reply_suggestions_title),
             onDismiss = { showReplySuggestions = false },
         ) {
@@ -1320,7 +1315,7 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = null,
             onDismiss = { showAttachmentPicker = false },
             showDragHandle = false,
@@ -1329,7 +1324,7 @@ internal fun LocalConversationSurface(
         ) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Camera,
                         label = stringResource(R.string.composer_camera),
                         modifier = Modifier.width(96.dp),
@@ -1342,7 +1337,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Image,
                         label = stringResource(R.string.local_attachment_image),
                         modifier = Modifier.width(96.dp),
@@ -1350,7 +1345,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Folder,
                         label = stringResource(R.string.local_attachment_file),
                         modifier = Modifier.width(96.dp),
@@ -1358,7 +1353,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Image,
                         label = stringResource(R.string.media_studio_entry),
                         modifier = Modifier.width(96.dp),
@@ -1372,7 +1367,7 @@ internal fun LocalConversationSurface(
                 }
             }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
                     icon = FeatherIcons.User,
                     onClick = {
@@ -1382,7 +1377,7 @@ internal fun LocalConversationSurface(
                 )
             }
             if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.local_team_reopen),
                     icon = FeatherIcons.ChevronRight,
                     onClick = {
@@ -1404,7 +1399,7 @@ internal fun LocalConversationSurface(
     }
 
     if (showMediaStudio) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.media_studio_title),
             onDismiss = { showMediaStudio = false },
             scrollable = true,
@@ -1505,19 +1500,19 @@ private fun EmptyLocalHarness(
             modifier = Modifier.widthIn(max = 280.dp),
         )
         Box {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_suggestions_title),
                 icon = FeatherIcons.Sparkles,
-                variant = DsButtonVariant.Info,
+                variant = SyButtonVariant.Info,
                 onClick = { suggestionsOpen = true },
             )
-            DsPopupMenu(
+            SyPopupMenu(
                 expanded = suggestionsOpen,
                 onDismiss = { suggestionsOpen = false },
                 items = listOf(
-                    MenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
-                    MenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
-                    MenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_files), FeatherIcons.FileText, onClick = { onSuggestion(filesPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_research), FeatherIcons.Globe, onClick = { onSuggestion(researchPrompt) }),
+                    SyMenuItem(stringResource(R.string.local_suggestion_tasks), FeatherIcons.CheckSquare, onClick = { onSuggestion(tasksPrompt) }),
                 ),
             )
         }

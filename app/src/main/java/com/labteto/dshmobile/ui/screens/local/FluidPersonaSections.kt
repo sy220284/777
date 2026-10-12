@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
-import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -40,7 +41,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
     val portrait by produceState<ImageBitmap?>(null, entry.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 320) }
     }
-    DsCard {
+    SyGlassCard {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium)) {
             Surface(color = colors.characterAccentTertiary, shape = RoundedCornerShape(20.dp),
@@ -66,7 +67,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
 internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int) {
     val colors = DsTheme.colors
     val state = story?.chatState
-    DsCard {
+    SyGlassCard {
         when (section) {
             0 -> {
                 FluidPersonaFactRow(stringResource(R.string.fluid_persona_stage), state?.relationshipState.orEmpty())

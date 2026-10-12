@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -49,13 +50,11 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsCheckbox
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.shenyan.designsystem.components.SyCheckboxControl
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -251,7 +250,7 @@ internal fun PersonaGalleryAddPanel(
             modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DsIconButton(
+            SyIconButton(
                 icon = FeatherIcons.ArrowLeft,
                 contentDescription = stringResource(R.string.persona_gallery_back_to_list),
                 onClick = onBack,
@@ -273,18 +272,18 @@ internal fun PersonaGalleryAddPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_persona_picker_new),
                 onClick = onCreate,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_import_file),
                 onClick = onImport,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
             )
         }
         if (presets.isNotEmpty()) {
@@ -326,7 +325,7 @@ internal fun PersonaGalleryAddPanel(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            DsButton(
+                            SyButton(
                                 text = stringResource(
                                     if (installed) R.string.persona_gallery_preset_taken
                                     else R.string.persona_gallery_preset_add,
@@ -335,10 +334,10 @@ internal fun PersonaGalleryAddPanel(
                                     if (!installed) onInstallPreset(preset.id)
                                 },
                                 enabled = !busy && !installed,
-                                variant = DsButtonVariant.Ghost,
-                                size = DsButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
                             )
-                            DsIconButton(
+                            SyIconButton(
                                 icon = FeatherIcons.X,
                                 contentDescription = stringResource(R.string.persona_gallery_preset_hide),
                                 onClick = { onRequestHidePreset(preset.id) },
@@ -394,17 +393,17 @@ internal fun PersonaGalleryEmptyState(
                 style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
             )
-            DsButton(
+            SyButton(
                 text = primary,
                 onClick = onPrimary,
-                size = DsButtonSize.Small,
+                size = SyButtonSize.Small,
             )
             secondary?.let {
-                DsButton(
+                SyButton(
                     text = it,
                     onClick = onSecondary,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }
@@ -450,7 +449,7 @@ internal fun CompactPersonaRow(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             if (managing) {
-                DsCheckbox(
+                SyCheckboxControl(
                     checked = selected,
                     onCheckedChange = { onClick() },
                 )
@@ -498,7 +497,7 @@ internal fun CompactPersonaRow(
                 )
             }
             if (managing) {
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.Pin,
                     contentDescription = stringResource(
                         if (pinned) R.string.persona_gallery_unpin else R.string.persona_gallery_pin,

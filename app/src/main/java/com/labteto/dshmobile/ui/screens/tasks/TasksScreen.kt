@@ -24,8 +24,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,18 +35,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.shenyan.designsystem.components.SyIconButton
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -53,6 +57,19 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import java.text.DateFormat
 import java.util.Date
+
+/** Device-side view filter only; never changes the persisted task's real status. */
+internal enum class WorkTaskListFilter { ALL, SCHEDULED, RUNNING, PAUSED }
+
+internal fun workTaskMatchesFilter(status: AutomationStatus, filter: WorkTaskListFilter): Boolean =
+    when (filter) {
+        WorkTaskListFilter.ALL -> true
+        WorkTaskListFilter.SCHEDULED ->
+            status == AutomationStatus.SCHEDULED || status == AutomationStatus.QUEUED
+        WorkTaskListFilter.RUNNING ->
+            status == AutomationStatus.RUNNING || status == AutomationStatus.WAITING_USER
+        WorkTaskListFilter.PAUSED -> status == AutomationStatus.PAUSED
+    }
 
 @Composable
 fun TasksScreen(
@@ -103,6 +120,8 @@ private fun WorkTasksScreen(
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
+    var listFilter by rememberSaveable { mutableStateOf(WorkTaskListFilter.ALL) }
+    val filteredTasks = visibleTasks.filter { workTaskMatchesFilter(it.status, listFilter) }
     val chatCreatePrompt = stringResource(R.string.tasks_create_chat_prompt)
     val createFromChat = { if (onCreateViaChat != null) onCreateViaChat(chatCreatePrompt) else Unit }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
@@ -161,7 +180,7 @@ private fun WorkTasksScreen(
     val navigateBack = { if (showCreate) resetEditor() else if (selectedTaskId != null) selectedTaskId = null else onClose() }
     BackHandler(enabled = showCreate || selectedTaskId != null || handleRootSystemBack) { navigateBack() }
 
-    val toast = rememberDsToast()
+    val toast = rememberSyToast()
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
             when (notice) {
@@ -189,7 +208,7 @@ private fun WorkTasksScreen(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 Box(Modifier.fillMaxWidth()) {
-                    DsTopBar(
+                    SyTopBar(
                         title = stringResource(
                             if (showCreate) {
                                 if (editingTaskIdState.value != null) R.string.tasks_edit else R.string.tasks_new
@@ -202,23 +221,23 @@ private fun WorkTasksScreen(
                     )
                     if (!showCreate && selectedTask == null) {
                         Box(Modifier.align(Alignment.CenterEnd)) {
-                            DsIconButton(
+                            SyIconButton(
                                 icon = FeatherIcons.Plus,
                                 contentDescription = stringResource(R.string.tasks_new),
                                 onClick = { createMenuOpen = true },
                                 tint = colors.labelPrimary,
                             )
-                            DsPopupMenu(
+                            SyPopupMenu(
                                 expanded = createMenuOpen,
                                 onDismiss = { createMenuOpen = false },
                                 items = listOf(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.tasks_create_manual),
                                         icon = FeatherIcons.Edit3,
                                         onClick = ::startCreate,
                                     ),
                                 ) + if (onCreateViaChat != null) listOf(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.tasks_create_via_chat),
                                         icon = FeatherIcons.MessageCircle,
                                         onClick = createFromChat,
@@ -253,18 +272,65 @@ private fun WorkTasksScreen(
                             onOpenSession = onOpenSession,
                         )
                     }
-                    else -> LazyColumn(
+                    else -> Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                     ) {
-                        items(visibleTasks, key = AutomationTask::id) { task ->
-                            TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                        // Screen 19: show the real schedule state in the same glass tab
+                        // language as the work/history pages; never fabricate budget figures.
+                        val statusFilters = WorkTaskListFilter.entries
+                        val titles = listOf(
+                            stringResource(R.string.tasks_filter_all),
+                            stringResource(R.string.tasks_filter_scheduled),
+                            stringResource(R.string.tasks_filter_running),
+                            stringResource(R.string.tasks_filter_paused),
+                        )
+                        SySegmented(
+                            segments = statusFilters.mapIndexed { index, filter ->
+                                SySegment(filter.name, "${titles[index]} · ${visibleTasks.count { workTaskMatchesFilter(it.status, filter) }}")
+                            },
+                            selectedKey = listFilter.name,
+                            onSelect = { key ->
+                                listFilter = WorkTaskListFilter.entries.firstOrNull { it.name == key }
+                                    ?: WorkTaskListFilter.ALL
+                            },
+                            role = Role.Tab,
+                            stretch = true,
+                            hapticOnChange = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (filteredTasks.isEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.large),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            ) {
+                                Text(
+                                    stringResource(R.string.tasks_filter_empty),
+                                    style = DsType.small13.withReadingWeight(),
+                                    color = colors.labelSecondary,
+                                )
+                                SyButton(
+                                    text = stringResource(R.string.tasks_filter_all),
+                                    onClick = { listFilter = WorkTaskListFilter.ALL },
+                                    variant = SyButtonVariant.Outline,
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+                            ) {
+                                items(filteredTasks, key = AutomationTask::id) { task ->
+                                    TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-        DsToastHost(toast, Modifier.safeDrawingPadding())
+        SyToastHost(toast, Modifier.safeDrawingPadding())
     }
 }
 
@@ -284,6 +350,7 @@ private fun TaskEmptyState(
             Image(
                 painter = painterResource(R.drawable.ic_ui_task_empty),
                 contentDescription = null,
+                colorFilter = ColorFilter.tint(colors.labelTertiary.copy(alpha = 0.72f)),
                 modifier = Modifier.padding(bottom = DsSpacing.medium),
             )
             Text(

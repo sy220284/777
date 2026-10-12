@@ -10,6 +10,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import com.labteto.dshmobile.connection.AppDisplayLimits
+import com.labteto.dshmobile.ui.shenyan.SyMode
+import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
+import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
 
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
@@ -57,7 +61,11 @@ data class DsColors(
     val warn: Color,
     val warnSecondary: Color,
     val warnTertiary: Color,
+    val progressFailedStart: Color,
+    val progressFailedEnd: Color,
     val toastBg: Color,
+    /** WCAG contrast against toastBg; never use onAccent for a dark toast. */
+    val onToast: Color,
     val tooltipBg: Color,
     val userBubble: Color,
     val userBubbleHighlight: Color,
@@ -98,7 +106,9 @@ object DsThemeTokens {
         successTertiary = DsLight.successTertiary,
         warnLabel = DsLight.warnLabel, warn = DsLight.warn, warnSecondary = DsLight.warnSecondary,
         warnTertiary = DsLight.warnTertiary,
-        toastBg = DsLight.toastBg, tooltipBg = DsLight.tooltipBg,
+        progressFailedStart = DsLight.progressFailedStart,
+        progressFailedEnd = DsLight.progressFailedEnd,
+        toastBg = DsLight.toastBg, onToast = Color(0xFFFAF6EC), tooltipBg = DsLight.tooltipBg,
         userBubble = DsLight.userBubble, userBubbleHighlight = DsLight.userBubbleHighlight,
         composerCard = DsLight.composerCard,
         sidebar = DsLight.sidebar, sidebarNavActive = DsLight.sidebarNavActive,
@@ -131,7 +141,9 @@ object DsThemeTokens {
         successTertiary = DsDark.successTertiary,
         warnLabel = DsDark.warnLabel, warn = DsDark.warn, warnSecondary = DsDark.warnSecondary,
         warnTertiary = DsDark.warnTertiary,
-        toastBg = DsDark.toastBg, tooltipBg = DsDark.tooltipBg,
+        progressFailedStart = DsDark.progressFailedStart,
+        progressFailedEnd = DsDark.progressFailedEnd,
+        toastBg = DsDark.toastBg, onToast = Color(0xFFF5F0E8), tooltipBg = DsDark.tooltipBg,
         userBubble = DsDark.userBubble, userBubbleHighlight = DsDark.userBubbleHighlight,
         composerCard = DsDark.composerCard,
         sidebar = DsDark.sidebar, sidebarNavActive = DsDark.sidebarNavActive,
@@ -253,6 +265,7 @@ fun DshTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
+    val reducedMotion = rememberSyReducedMotion()
     val dark = when (preference) {
         ThemePreference.LIGHT -> false
         ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
@@ -269,7 +282,9 @@ fun DshTheme(
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
     val currentDensity = LocalDensity.current
-    val clampedTextScale = textScale.coerceIn(0.9f, 1.3f)
+    val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
+    val effectiveFontScale = (currentDensity.fontScale * clampedTextScale)
+        .coerceAtMost(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)
     val readingPreferences = DsReadingPreferences(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
@@ -279,7 +294,7 @@ fun DshTheme(
         LocalDsReadingPreferences provides readingPreferences,
         LocalDensity provides Density(
             density = currentDensity.density,
-            fontScale = currentDensity.fontScale * clampedTextScale,
+            fontScale = effectiveFontScale,
         ),
     ) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
@@ -292,12 +307,43 @@ fun DshTheme(
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
             fluidGlass = preference != ThemePreference.MATTE_BLACK,
         ) {
-            MaterialTheme(
-                colorScheme = scheme,
-                typography = dsTypography(readingPreferences.textWeightAdjustment),
-                shapes = DsMaterialShapes,
-                content = content,
-            )
+            // One canonical visual theme owns all Material3 colour and shape tokens.
+            // Legacy DsColors remains available ONLY to screens still being migrated.
+            val syMode = when (preference) {
+                ThemePreference.LIGHT -> SyMode.LIGHT
+                ThemePreference.DARK -> SyMode.DARK
+                ThemePreference.MATTE_BLACK -> SyMode.MATTE
+                ThemePreference.SYSTEM -> SyMode.SYSTEM
+            }
+            val canonicalMode = when (preference) {
+                ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+                ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+                ThemePreference.SYSTEM -> if (systemDark)
+                    com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                    else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+            }
+            com.shenyan.designsystem.foundation.ShenyanTheme(
+                mode = canonicalMode,
+                reduceMotion = reducedMotion,
+                reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+            ) {
+                SyThemeProvider(
+                    mode = syMode,
+                    reduceMotion = reducedMotion,
+                    reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+                ) {
+                    // Preserve user-defined accent and reading accessibility controls.
+                    val resolvedScheme = if (palette.key == AccentPalettes.DEFAULT.key)
+                        MaterialTheme.colorScheme else scheme
+                    MaterialTheme(
+                        colorScheme = resolvedScheme,
+                        typography = dsTypography(readingPreferences.textWeightAdjustment),
+                        shapes = MaterialTheme.shapes,
+                        content = content,
+                    )
+                }
+            }
         }
     }
 }

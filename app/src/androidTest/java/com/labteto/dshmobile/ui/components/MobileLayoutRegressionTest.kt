@@ -1,8 +1,13 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.components.SyCategoryRow
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import com.labteto.dshmobile.connection.AppDisplayLimits
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -27,7 +32,8 @@ class MobileLayoutRegressionTest {
 
     // Representative phone window widths in dp. Emulator viewports must be >= 412dp:
     // otherwise a 412dp test would silently be constrained to the physical screen width.
-    private val phoneWidthsDp = listOf(360, 393, 412)
+    // Support starts at 393dp; 360dp is intentionally outside the compatibility matrix.
+    private val phoneWidthsDp = listOf(AppDisplayLimits.MIN_SUPPORTED_WIDTH_DP, 412)
 
     @Test
     fun mainstreamPhoneLargeTypeHeaderKeepsActionsOutsideText() {
@@ -39,7 +45,7 @@ class MobileLayoutRegressionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsTopBar(
+                        SyTopBar(
                             title = "个性化与长期记忆",
                             subtitle = "查看和管理聊天中记住的内容",
                             onBack = { back++ },
@@ -76,14 +82,14 @@ class MobileLayoutRegressionTest {
     }
 
     @Test
-    fun extraLargeTypeHeaderWrapsWithoutClippingOnMainstreamPhones() {
+    fun maximumSupportedTypeHeaderWrapsWithoutClippingOnMainstreamPhones() {
         val widthDp = mutableIntStateOf(phoneWidthsDp.first())
         compose.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsTopBar(
+                        SyTopBar(
                             title = "个性化与长期记忆",
                             subtitle = "查看和管理聊天中记住的内容",
                             onBack = {},
@@ -123,7 +129,7 @@ class MobileLayoutRegressionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsCategoryRow(
+                        SyCategoryRow(
                             icon = FeatherIcons.Folder,
                             title = "工作项目",
                             subtitle = "查看项目中保存的文件",
@@ -147,6 +153,64 @@ class MobileLayoutRegressionTest {
             assertTextFits("9999 个项目")
             compose.onNodeWithText("工作项目").performClick()
             compose.runOnIdle { assertEquals(index + 1, opened) }
+        }
+    }
+
+    @Test
+    fun categoryAdaptsLongLocalizedLabelsAndCountsAtMaximumSupportedType() {
+        val titleText = "来自工作区的长期项目文件"
+        val subtitleText = "这里会展示当前保存的项目文件和相关信息"
+        val valueText = "123456 个已保存文件"
+        var opened = 0
+        val widthDp = mutableIntStateOf(phoneWidthsDp.first())
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)) {
+                DshTheme {
+                    Box(Modifier.width(widthDp.intValue.dp)) {
+                        SyCategoryRow(
+                            icon = FeatherIcons.Folder,
+                            title = titleText,
+                            subtitle = subtitleText,
+                            value = valueText,
+                            onClick = { opened++ },
+                        )
+                    }
+                }
+            }
+        }
+        phoneWidthsDp.forEachIndexed { index, viewport ->
+            compose.runOnIdle { widthDp.intValue = viewport }
+            compose.waitForIdle()
+            val titleBounds = compose.onNodeWithText(titleText, useUnmergedTree = true)
+                .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val valueBounds = compose.onNodeWithText(valueText, useUnmergedTree = true)
+                .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue("宽度 ${viewport}dp：长标题和数量必须分行显示",
+                titleBounds.bottom <= valueBounds.top)
+            assertTextFits(titleText)
+            assertTextFits(subtitleText)
+            assertTextFits(valueText)
+            compose.onNodeWithText(titleText).performClick()
+            compose.runOnIdle { assertEquals(index + 1, opened) }
+        }
+    }
+
+    @Test
+    fun themeCapsCombinedSystemAndReadingFontScaleAtOnePointFive() {
+        var observedScale = -1f
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
+                DshTheme(textScale = AppDisplayLimits.MAX_READING_SCALE) {
+                    val renderedFontScale = LocalDensity.current.fontScale
+                    SideEffect { observedScale = renderedFontScale }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE, observedScale, 0.0001f)
         }
     }
 

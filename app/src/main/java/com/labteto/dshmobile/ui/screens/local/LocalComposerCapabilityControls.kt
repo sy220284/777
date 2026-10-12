@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +32,8 @@ import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
@@ -94,7 +95,7 @@ internal fun LocalComposerCapabilityActions(
     val basicReasoning = LocalReasoningControls.requiresBasicReasoning(profile, usageMode)
     Box {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            DsComposerAction(
+            SyComposerAction(
                 icon = FeatherIcons.Gauge,
                 contentDescription = stringResource(
                     R.string.local_composer_reasoning_action,
@@ -114,7 +115,7 @@ internal fun LocalComposerCapabilityActions(
             }
 
         }
-        DsPopupMenu(
+        SyPopupMenu(
             expanded = openPanel == "reasoning" && !running,
             onDismiss = { onSelectPanel(null) },
             modifier = Modifier.widthIn(min = 260.dp, max = 320.dp),
@@ -340,7 +341,7 @@ internal fun LocalComposerPlanAction(
             else -> R.string.local_composer_plan_off
         },
     )
-    DsComposerAction(
+    SyComposerAction(
         icon = FeatherIcons.List,
         modifier = Modifier
             .testTag("local-composer-plan-toggle")

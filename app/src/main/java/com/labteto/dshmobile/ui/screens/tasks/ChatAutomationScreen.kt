@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -42,22 +42,21 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsSwitch
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.shenyan.designsystem.components.SySwitchControl
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -86,6 +85,13 @@ internal fun chatAutomationVisualStatus(task: AutomationTask): ChatAutomationVis
             task.scheduleType == AutomationScheduleType.WINDOW)
     ) ChatAutomationVisualStatus.ONGOING else ChatAutomationVisualStatus.PENDING
 }
+
+/** UI-only story/session filter; it does not mutate the task's persisted target. */
+internal fun chatAutomationInSession(
+    targetSessionId: String?,
+    currentSessionId: String,
+    currentOnly: Boolean,
+): Boolean = !currentOnly || (currentSessionId.isNotBlank() && targetSessionId == currentSessionId)
 
 internal fun sortChatAutomationTasks(tasks: List<AutomationTask>): List<AutomationTask> =
     tasks.sortedWith(
@@ -117,6 +123,12 @@ internal fun ChatAutomationScreen(
         sortChatAutomationTasks(state.tasks.filter { it.mode == AutomationMode.CHAT })
     }
     var draft by rememberSaveable { mutableStateOf("") }
+    // This filter is a view concern, not an automation policy; ALL always stays available.
+    var currentSessionOnly by rememberSaveable(harnessState.sessionId) { mutableStateOf(false) }
+    val currentSessionEvents = tasks.count { it.targetSessionId == harnessState.sessionId }
+    val visibleTasks = tasks.filter {
+        chatAutomationInSession(it.targetSessionId, harnessState.sessionId, currentSessionOnly)
+    }
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var policyTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
@@ -137,7 +149,7 @@ internal fun ChatAutomationScreen(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             Box(Modifier.padding(horizontal = DsSpacing.large)) {
-                DsTopBar(
+                SyTopBar(
                     title = stringResource(R.string.tasks_chat_title),
                     subtitle = stringResource(R.string.tasks_chat_subtitle),
                     onBack = onClose,
@@ -165,20 +177,43 @@ internal fun ChatAutomationScreen(
                         },
                     )
                 }
-                if (tasks.isEmpty()) {
+                if (tasks.isNotEmpty() && harnessState.sessionId.isNotBlank()) {
+                    item("event-session-filter") {
+                        SySegmented(
+                            segments = listOf(
+                                SySegment("all", stringResource(R.string.tasks_chat_filter_all, tasks.size)),
+                                SySegment(
+                                    "current",
+                                    stringResource(R.string.tasks_chat_filter_current, currentSessionEvents),
+                                ),
+                            ),
+                            selectedKey = if (currentSessionOnly) "current" else "all",
+                            onSelect = { currentSessionOnly = it == "current" },
+                            role = Role.Tab,
+                            hapticOnChange = true,
+                            stretch = true,
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.tiny),
+                        )
+                    }
+                }
+                if (visibleTasks.isEmpty()) {
                     item("events-empty") {
                         AutomationCardSurface(
                             modifier = Modifier.padding(horizontal = DsSpacing.large),
                         ) {
                             Text(
-                                stringResource(R.string.tasks_chat_events_empty),
+                                stringResource(
+                                    if (tasks.isEmpty()) R.string.tasks_chat_events_empty
+                                    else R.string.tasks_chat_filter_empty,
+                                ),
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.labelSecondary,
                             )
                         }
                     }
                 } else {
-                    items(tasks, key = AutomationTask::id) { task ->
+                    items(visibleTasks, key = AutomationTask::id) { task ->
                         val scheduleDescription = chatScheduleDescription(task)
                         val editSeed = stringResource(
                             R.string.tasks_chat_edit_seed,
@@ -221,19 +256,19 @@ internal fun ChatAutomationScreen(
                     color = colors.error,
                 )
             }
-            DsConversationComposer {
+            SyConversationComposer {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DsPill(text = stringResource(R.string.tasks_chat_plan_mention))
+                    SyPill(text = stringResource(R.string.tasks_chat_plan_mention))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
-                    DsComposerField(
+                    SyComposerField(
                         value = draft,
                         onValueChange = { draft = it },
                         placeholder = stringResource(R.string.tasks_chat_plan_placeholder),
@@ -242,27 +277,16 @@ internal fun ChatAutomationScreen(
                         maxLines = 5,
                     )
                     val canSubmitPlan = canPlan && draft.isNotBlank() && !state.planning
-                    val dark = colors.bgBase.luminance() < 0.5f
-                    val sendRes = when {
-                        !canSubmitPlan && dark -> R.drawable.ic_ui_button_send_disabled_dark
-                        !canSubmitPlan -> R.drawable.ic_ui_button_send_disabled_light
-                        dark -> R.drawable.ic_ui_button_send_dark
-                        else -> R.drawable.ic_ui_button_send_light
-                    }
-                    DsComposerAction(
+                    SyComposerAction(
                         icon = null,
+                        iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
+                        iconSize = 32.dp,
+                        tint = if (canSubmitPlan) colors.onAccent else colors.labelPrimary,
                         contentDescription = stringResource(R.string.tasks_chat_plan_send),
                         onClick = { viewModel.submitChatPlan(draft, editingTaskId) },
                         enabled = canSubmitPlan,
-                        containerColor = Color.Transparent,
+                        containerColor = colors.accent,
                         visualSize = 32.dp,
-                        content = {
-                            Image(
-                                painter = painterResource(sendRes),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                            )
-                        },
                     )
                 }
                 if (state.planning) {
@@ -294,14 +318,14 @@ internal fun ChatAutomationScreen(
 @Composable
 private fun AutomationCardSurface(
     modifier: Modifier = Modifier,
-    status: DsStatus = DsStatus.Neutral,
+    status: SyStatus = SyStatus.Neutral,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
     val borderColor = when (status) {
-        DsStatus.Running -> colors.accent.copy(alpha = 0.28f)
-        DsStatus.Warning -> colors.warn.copy(alpha = 0.32f)
-        DsStatus.Failed -> colors.error.copy(alpha = 0.28f)
+        SyStatus.Running -> colors.accent.copy(alpha = 0.28f)
+        SyStatus.Warning -> colors.warn.copy(alpha = 0.32f)
+        SyStatus.Failed -> colors.error.copy(alpha = 0.28f)
         else -> colors.borderL1
     }
     Surface(
@@ -362,7 +386,7 @@ private fun ChatAutomationEventRow(
                 style = DsType.small13Strong.withReadingWeight(),
                 color = colors.labelSecondary,
             )
-            DsStatusPill(
+            SyStatusPill(
                 state = visualStatus.dsStatus(),
                 label = visualStatus.label(),
             )
@@ -386,13 +410,13 @@ private fun ChatAutomationEventRow(
                 task.scheduleType == AutomationScheduleType.SILENCE ||
                 task.scheduleType == AutomationScheduleType.WINDOW
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause,
                     ),
                     onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             }
             if (task.targetSessionId == currentSessionId) {
@@ -401,48 +425,48 @@ private fun ChatAutomationEventRow(
                     task.scheduleType == AutomationScheduleType.SILENCE ||
                     task.scheduleType == AutomationScheduleType.WINDOW
                 ) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_policy_action),
                         onClick = onPolicy,
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                 )
             } else {
                 task.targetSessionId?.let { sessionId ->
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_open_conversation),
                         onClick = { onOpenSession(sessionId) },
-                        variant = DsButtonVariant.Ghost,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.tasks_delete_confirm),
                 onClick = { confirmDelete = true },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
     }
     if (task.targetSessionId == currentSessionId) {
-        DsButton(
+        SyButton(
             text = stringResource(R.string.tasks_chat_optimize),
             onClick = onOptimize,
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
             modifier = Modifier.fillMaxWidth(),
         )
     }
     if (confirmDelete) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.tasks_delete_confirm_title),
             onDismiss = { confirmDelete = false },
         ) {
@@ -455,18 +479,18 @@ private fun ChatAutomationEventRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmDelete = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_delete_confirm),
                     onClick = {
                         confirmDelete = false
                         onDelete()
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
@@ -506,7 +530,7 @@ private fun ChatAutomationPolicySheet(
         )
         return
     }
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.tasks_chat_policy_title),
         subtitle = stringResource(R.string.tasks_chat_policy_subtitle),
         onDismiss = onDismiss,
@@ -539,7 +563,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = quietEnabled,
                 onCheckedChange = { quietEnabled = it },
             )
@@ -549,7 +573,7 @@ private fun ChatAutomationPolicySheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(
                         R.string.tasks_chat_quiet_start,
                         formatMinute(quietStartMinute),
@@ -558,10 +582,10 @@ private fun ChatAutomationPolicySheet(
                         editingQuietStart = true
                     },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                    size = SyButtonSize.Small,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(
                         R.string.tasks_chat_quiet_end,
                         formatMinute(quietEndMinute),
@@ -570,8 +594,8 @@ private fun ChatAutomationPolicySheet(
                         editingQuietStart = false
                     },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Outline,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
+                    size = SyButtonSize.Small,
                 )
             }
         }
@@ -587,16 +611,16 @@ private fun ChatAutomationPolicySheet(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 row.forEach { minutes ->
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.tasks_chat_gap_hours, minutes / 60L),
                         onClick = { minGapMinutes = minutes },
                         modifier = Modifier.weight(1f),
                         variant = if (minGapMinutes == minutes) {
-                            DsButtonVariant.Info
+                            SyButtonVariant.Info
                         } else {
-                            DsButtonVariant.Outline
+                            SyButtonVariant.Outline
                         },
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
             }
@@ -617,16 +641,16 @@ private fun ChatAutomationPolicySheet(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
             (1..5).forEach { count ->
-                DsButton(
+                SyButton(
                     text = count.toString(),
                     onClick = { maxUnanswered = count },
                     modifier = Modifier.weight(1f),
                     variant = if (maxUnanswered == count) {
-                        DsButtonVariant.Info
+                        SyButtonVariant.Info
                     } else {
-                        DsButtonVariant.Outline
+                        SyButtonVariant.Outline
                     },
-                    size = DsButtonSize.Small,
+                    size = SyButtonSize.Small,
                 )
             }
         }
@@ -653,7 +677,7 @@ private fun ChatAutomationPolicySheet(
                     color = colors.labelTertiary,
                 )
             }
-            DsSwitch(
+            SySwitchControl(
                 checked = notify,
                 onCheckedChange = { notify = it },
             )
@@ -671,13 +695,13 @@ private fun ChatAutomationPolicySheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.tasks_save),
                 onClick = {
                     val saved = viewModel.updateChatPolicy(
@@ -697,7 +721,7 @@ private fun ChatAutomationPolicySheet(
                         saveError = saveFailedMessage
                     }
                 },
-                size = DsButtonSize.Small,
+                size = SyButtonSize.Small,
             )
         }
     }
@@ -718,12 +742,12 @@ private fun ChatAutomationVisualStatus.label(): String = stringResource(
     },
 )
 
-private fun ChatAutomationVisualStatus.dsStatus(): DsStatus = when (this) {
-    ChatAutomationVisualStatus.RUNNING -> DsStatus.Running
-    ChatAutomationVisualStatus.COMPLETED -> DsStatus.Done
-    ChatAutomationVisualStatus.BLOCKED -> DsStatus.Warning
-    ChatAutomationVisualStatus.FAILED -> DsStatus.Failed
-    else -> DsStatus.Neutral
+private fun ChatAutomationVisualStatus.dsStatus(): SyStatus = when (this) {
+    ChatAutomationVisualStatus.RUNNING -> SyStatus.Running
+    ChatAutomationVisualStatus.COMPLETED -> SyStatus.Done
+    ChatAutomationVisualStatus.BLOCKED -> SyStatus.Warning
+    ChatAutomationVisualStatus.FAILED -> SyStatus.Failed
+    else -> SyStatus.Neutral
 }
 
 @Composable

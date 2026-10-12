@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -91,22 +92,9 @@ import com.labteto.dshmobile.local.session.workHandoffDialogueCandidates
 import com.labteto.dshmobile.local.session.workHandoffSummaryWithSelectedMessages
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.local.model.canQueryMiniMaxQuota
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
@@ -114,6 +102,10 @@ import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -174,6 +166,25 @@ fun LocalHarnessScreen(
     val drawerFocusManager = LocalFocusManager.current
     val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
+    val onboardingPreferences = remember(context) {
+        context.getSharedPreferences("shenyan_first_launch", android.content.Context.MODE_PRIVATE)
+    }
+    var onboardingDecided by rememberSaveable { mutableStateOf(false) }
+    var presentFirstLaunch by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(shell.loading, shell.sessions, activeModelProfile) {
+        if (!onboardingDecided && !shell.loading) {
+            presentFirstLaunch = shouldPresentFirstLaunch(
+                dismissed = onboardingPreferences.getBoolean("completed", false),
+                hasUserContent = shell.sessions.any { !it.blank },
+                hasConfiguredModel = activeModelProfile != null,
+            )
+            onboardingDecided = true
+        }
+    }
+    fun finishFirstLaunch() {
+        onboardingPreferences.edit().putBoolean("completed", true).apply()
+        presentFirstLaunch = false
+    }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var settledSessionId by rememberSaveable { mutableStateOf("") }
@@ -699,9 +710,10 @@ fun LocalHarnessScreen(
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
+    // V5: only the mobile/tablet presentation is modal. At >=1024dp, real
+    // sessions and business routes remain reachable through a persistent 258dp rail.
+    val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
+    val syDrawerContent: @Composable () -> Unit = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
                 sessions = shell.sessions,
@@ -709,7 +721,7 @@ fun LocalHarnessScreen(
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
                 modeSwitchEnabled = shell.sessionId.isNotBlank() &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
-                drawerOpen = drawerState.isOpen,
+                drawerOpen = syWideViewport || drawerState.isOpen,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 currentGalleryId = shell.galleryId,
@@ -753,8 +765,8 @@ fun LocalHarnessScreen(
                     { openDrawerEntry(LocalFeatureDrawerEntry.MINIMAX_QUOTA) }
                 } else null,
             )
-        },
-    ) {
+    }
+    val sySceneContent: @Composable () -> Unit = {
         LocalFeatureAnimatedHost(
             stack = featureStack,
             predictiveBackProgress = predictiveBackProgress.value,
@@ -763,6 +775,51 @@ fun LocalHarnessScreen(
             featureStateHolder.SaveableStateProvider(renderedPage.name) {
                 LocalFeaturePageContent(renderedPage, featureContributions)
             }
+        }
+    }
+    if (syWideViewport) {
+        Row(Modifier.fillMaxSize()) {
+            syDrawerContent()
+            Box(Modifier.weight(1f)) { sySceneContent() }
+            // V5: native 318dp inspector reflects ACTUAL selected session and model.
+            // Hidden on narrow widths and non-home routes to protect work/editor space.
+            if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1440 &&
+                featurePage == LocalFeaturePage.HOME) {
+                val syInk = LocalSyPalette.current
+                SyMaterialFrame(
+                    modifier = Modifier.width(SyDimensions.inspector).fillMaxHeight()
+                        .padding(12.dp),
+                    tier = SyMaterialTier.L2_BAR,
+                ) {
+                    Text(stringResource(R.string.sy_v5_session_current), color = syInk.text, style = DsType.headline17)
+                    Text(
+                        text = shell.chatPersona.name.ifBlank { stringResource(R.string.sy_v5_persona_unbound) },
+                        color = syInk.secondaryText,
+                        style = DsType.std14,
+                    )
+                    Text(
+                        text = activeModelProfile?.displayName
+                            ?: activeModelProfile?.model
+                            ?: stringResource(R.string.sy_v5_model_unconfigured),
+                        color = syInk.tertiaryText,
+                        style = DsType.small13,
+                    )
+                    Text(
+                        text = if (shell.usageMode == LocalUsageMode.CHAT) stringResource(R.string.sy_v5_chat_mode) else stringResource(R.string.sy_v5_work_mode),
+                        color = syInk.secondaryText,
+                        style = DsType.small13,
+                    )
+                    SyButton(
+                        text = stringResource(R.string.sy_v5_persona_data),
+                        onClick = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
+            }
+        }
+    } else {
+        ModalNavigationDrawer(drawerState = drawerState, drawerContent = syDrawerContent) {
+            sySceneContent()
         }
     }
 
@@ -835,6 +892,22 @@ fun LocalHarnessScreen(
             onDismiss = {
                 pendingWorkCapability = null
                 workCapabilityConfirmed = false
+            },
+        )
+    }
+
+    if (presentFirstLaunch && !shell.loading) {
+        FirstLaunchOnboarding(
+            onSkip = ::finishFirstLaunch,
+            onStart = { selectedMode ->
+                finishFirstLaunch()
+                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+            },
+            onConfigureModel = { selectedMode ->
+                finishFirstLaunch()
+                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+                settingsDestination = SettingsDestination.MODELS
+                pushFeature(LocalFeaturePage.SETTINGS)
             },
         )
     }

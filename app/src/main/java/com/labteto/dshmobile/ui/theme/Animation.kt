@@ -65,6 +65,15 @@ object DsAnimations {
     /** Tab and content swaps. Short — a long swap on a large list costs a full relayout. */
     val tabSwap: FiniteAnimationSpec<Float> = tween(380, easing = fluidEase)
 
+    /** Reference component spec: glass tab thumb and 18dp underline settle in 200ms. */
+    val tabBackground: FiniteAnimationSpec<Color> = tween(200, easing = fluidEase)
+    val tabIndicator: FiniteAnimationSpec<Dp> = tween(200, easing = fluidEase)
+
+    /** Reference list entry: 360ms reveal; 80ms between items, capped at ten cards. */
+    val cascade: FiniteAnimationSpec<Float> = tween(360, easing = fluidEase)
+    const val cascadeStaggerMs = 80L
+    const val cascadeMaxItems = 10
+
     /** Sliding indicator used by compact segmented controls. It settles instead of gliding mechanically. */
     val segmentSlide: FiniteAnimationSpec<Dp> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,

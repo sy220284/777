@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.labteto.dshmobile.ui.components.DsSearchField
+import com.labteto.dshmobile.ui.shenyan.SySearchField
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -28,20 +30,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsFilterChip
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.DsSwitch
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyFilterChip
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -49,6 +52,17 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+
+/** Real connection-transport categories; unknown future transports remain under All. */
+internal enum class PluginTransportFilter { ALL, HTTP, STDIO }
+
+internal fun pluginTransportMatches(transport: String, filter: PluginTransportFilter): Boolean =
+    when (filter) {
+        PluginTransportFilter.ALL -> true
+        PluginTransportFilter.HTTP -> transport.contains("http", ignoreCase = true) ||
+            transport.contains("sse", ignoreCase = true)
+        PluginTransportFilter.STDIO -> transport.contains("stdio", ignoreCase = true)
+    }
 
 private data class InventoryRow(
     val id: String,
@@ -93,6 +107,7 @@ internal fun PluginInventoryBrowser(
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
+    var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
@@ -150,6 +165,10 @@ internal fun PluginInventoryBrowser(
             icon = FeatherIcons.Globe,
         )
     }
+    val filteredConnections = connected.filter { row ->
+        val server = connectedServices.firstOrNull { "service:${it.id}" == row.id }
+        server != null && pluginTransportMatches(server.transport.toString(), transportFilter)
+    }
     val installedSkills = skills.map { skill ->
         val display = skill.displayName
         InventoryRow("skill:" + skill.name, display, skill.description,
@@ -162,7 +181,7 @@ internal fun PluginInventoryBrowser(
             available = false, installablePreset = true)
     }
     val list = (if (skillsOnly) installedSkills + availablePresets else when (selectedCategory) {
-        1 -> connected
+        1 -> filteredConnections
         2 -> local.filter { it.id in setOf("local:android-runtime", "local:local-language-server", "local:local-builtin") }
         3 -> local.filter { it.id in setOf("local:android-device", "local:android-automation", "local:android-webhook") }
         4 -> local.filter { it.id == "local:local-vision" }
@@ -174,13 +193,13 @@ internal fun PluginInventoryBrowser(
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = DsSpacing.medium)) {
-            DsTopBar(
+            SyTopBar(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
                 modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
             )
-            DsSearchField(
+            SySearchField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
@@ -192,7 +211,7 @@ internal fun PluginInventoryBrowser(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     if (onImportSkill != null) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.skills_import_file),
                             onClick = onImportSkill,
                             enabled = !loading,
@@ -200,11 +219,11 @@ internal fun PluginInventoryBrowser(
                         )
                     }
                     if (onUseCapability != null) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.skills_create_in_chat),
                             onClick = { onUseCapability(skillCreationPrompt) },
                             enabled = !loading,
-                            variant = DsButtonVariant.Info,
+                            variant = SyButtonVariant.Info,
                             modifier = Modifier.weight(1f).testTag("skill-create-in-chat"),
                         )
                     }
@@ -216,9 +235,9 @@ internal fun PluginInventoryBrowser(
                     modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
                 )
                 if (onCreateSkill != null) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.skills_create_manual),
-                        variant = DsButtonVariant.Info,
+                        variant = SyButtonVariant.Info,
                         onClick = { showCreateSkill = true },
                         enabled = !loading,
                         modifier = Modifier.padding(horizontal = DsSpacing.comfortable),
@@ -231,9 +250,9 @@ internal fun PluginInventoryBrowser(
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
                 items(5) { category ->
-                    DsFilterChip(
+                    SyFilterChip(
                         text = when (category) {
-                            1 -> connectionStatus
+                            1 -> "${connectionStatus} · ${connectedServices.size}"
                             2 -> stringResource(R.string.plugin_category_work)
                             3 -> stringResource(R.string.plugin_category_device)
                             4 -> stringResource(R.string.plugin_category_design)
@@ -243,6 +262,44 @@ internal fun PluginInventoryBrowser(
                         onClick = { selectedCategory = category },
                     )
                 }
+            }
+            if (!skillsOnly && selectedCategory == 1) {
+                // Design screen 18: connection transport is a real property from
+                // the service handshake, never an invented plugin-store category.
+                val options = PluginTransportFilter.entries
+                val counts = options.map { filter ->
+                    connectedServices.count { pluginTransportMatches(it.transport.toString(), filter) }
+                }
+                SySegmented(
+                    segments = options.mapIndexed { index, filter ->
+                        SySegment(
+                            filter.name,
+                            "${stringResource(
+                                when (filter) {
+                                    PluginTransportFilter.ALL -> R.string.plugin_transport_all
+                                    PluginTransportFilter.HTTP -> R.string.plugin_transport_http
+                                    PluginTransportFilter.STDIO -> R.string.plugin_transport_stdio
+                                },
+                            )} · ${counts[index]}",
+                        )
+                    },
+                    selectedKey = transportFilter.name,
+                    onSelect = { key ->
+                        transportFilter = options.firstOrNull { it.name == key } ?: PluginTransportFilter.ALL
+                    },
+                    role = Role.Tab,
+                    hapticOnChange = true,
+                    stretch = true,
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.small)
+                        .testTag("plugin-transport-tabs"),
+                )
+                SyButton(
+                    text = stringResource(R.string.tools_external_services),
+                    variant = SyButtonVariant.Ghost,
+                    onClick = onManageConnections,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.comfortable),
+                )
             }
             if (loading || error != null || list.isEmpty()) {
                 Column(
@@ -256,14 +313,10 @@ internal fun PluginInventoryBrowser(
                         color = colors.labelSecondary,
                     )
                     if (error != null && onRetry != null) {
-                        DsButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                    } else if (!loading && !skillsOnly && selectedCategory == 1) {
-                        DsButton(
-                            text = stringResource(R.string.tools_external_services),
-                            variant = DsButtonVariant.Info,
-                            onClick = onManageConnections,
-                        )
+                        SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
                     }
+                    // The existing V5 service-nav action above remains available here.
+                    // Do not render a second visually identical external-service button.
                 }
             } else {
                 LazyColumn(
@@ -309,14 +362,14 @@ internal fun PluginInventoryBrowser(
                                     )
                                 }
                                 val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                                DsButton(
+                                SyButton(
                                     text = stringResource(
                                         if (item.installablePreset) R.string.skills_install
                                         else if (onUseCapability != null && item.available) R.string.plugin_use
                                         else R.string.tools_catalog_details
                                     ),
-                                    variant = DsButtonVariant.Info,
-                                    size = DsButtonSize.Small,
+                                    variant = SyButtonVariant.Info,
+                                    size = SyButtonSize.Small,
                                     onClick = {
                                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
                                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
@@ -331,21 +384,21 @@ internal fun PluginInventoryBrowser(
         }
     }
     selectedRow?.let { item ->
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = item.name,
             onDismiss = { selectedRow = null },
             scrollable = true,
             footer = {
                 val usePrompt = if (item.installedSkill) "@skill:${item.id.substringAfter(":")}\n" else stringResource(R.string.plugin_use_prompt, item.name, item.id.substringAfter(":"))
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (item.installablePreset) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
                         else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
                     ),
-                    modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Large,
+                    modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
+                    size = SyButtonSize.Large,
                     onClick = {
                         selectedRow = null
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
@@ -372,9 +425,9 @@ internal fun PluginInventoryBrowser(
 
 
             if (item.installedSkill && onOpenSkillEditor != null) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.skills_edit),
-                    variant = DsButtonVariant.Info,
+                    variant = SyButtonVariant.Info,
                     onClick = {
                         onOpenSkillEditor(item.id.substringAfter(":"))
                         selectedRow = null
@@ -392,7 +445,7 @@ internal fun PluginInventoryBrowser(
                         style = DsType.std14.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
-                    DsSwitch(
+                    SySwitchControl(
                         checked = item.modelInvocable,
                         onCheckedChange = {
                             onSetSkillModelInvocable(item.id.substringAfter(":"), it)
@@ -402,9 +455,9 @@ internal fun PluginInventoryBrowser(
                 }
             }
             if (item.installedSkill && onRemoveSkill != null) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_remove),
-                    variant = DsButtonVariant.Info,
+                    variant = SyButtonVariant.Info,
                     onClick = {
                         removeSkillName = item.id.substringAfter(":")
                         selectedRow = null
@@ -420,12 +473,12 @@ internal fun PluginInventoryBrowser(
         val canCreate = validId && validName && newSkillDescription.isNotBlank() &&
             newSkillDescription.length <= 240 &&
             newSkillBody.isNotBlank() && newSkillBody.length <= 12_000
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.skills_create),
             onDismiss = { showCreateSkill = false },
             scrollable = true,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.skills_install),
                     onClick = {
                         onCreateSkill(newSkillId, newSkillDisplayName.trim(), newSkillDescription, newSkillBody)
@@ -435,7 +488,7 @@ internal fun PluginInventoryBrowser(
                 )
             },
         ) {
-            DsTextField(
+            SyTextField(
                 value = newSkillId,
                 onValueChange = { newSkillId = it },
                 label = { Text(stringResource(R.string.skills_id_label)) },
@@ -443,7 +496,7 @@ internal fun PluginInventoryBrowser(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            DsTextField(
+            SyTextField(
                 value = newSkillDisplayName,
                 onValueChange = { newSkillDisplayName = it },
                 label = { Text(stringResource(R.string.skills_display_name_label)) },
@@ -451,13 +504,13 @@ internal fun PluginInventoryBrowser(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            DsTextField(
+            SyTextField(
                 value = newSkillDescription,
                 onValueChange = { newSkillDescription = it },
                 label = { Text(stringResource(R.string.skills_description_label)) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            DsTextField(
+            SyTextField(
                 value = newSkillBody,
                 onValueChange = { newSkillBody = it },
                 label = { Text(stringResource(R.string.skills_instruction_label)) },
@@ -467,11 +520,11 @@ internal fun PluginInventoryBrowser(
         }
     }
     removeSkillName?.let { id ->
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.skills_remove_title),
             onDismiss = { removeSkillName = null },
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_remove),
                     onClick = {
                         onRemoveSkill?.invoke(id)
@@ -488,12 +541,12 @@ internal fun PluginInventoryBrowser(
     }
 
     if (skillEditor != null && onSaveSkillDocument != null) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.skills_edit),
             onDismiss = { onCloseSkillEditor?.invoke() },
             scrollable = true,
             footer = {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_save),
                     onClick = {
                         onSaveSkillDocument(skillEditor.id, withLocalSkillDisplayName(editedSkillBody, editedSkillDisplayName))
@@ -510,14 +563,14 @@ internal fun PluginInventoryBrowser(
                 style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
-            DsTextField(
+            SyTextField(
                 value = editedSkillDisplayName,
                 onValueChange = { editedSkillDisplayName = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text(stringResource(R.string.skills_display_name_label)) },
             )
-            DsTextField(
+            SyTextField(
                 value = editedSkillBody,
                 onValueChange = { editedSkillBody = it },
                 modifier = Modifier.fillMaxWidth(),

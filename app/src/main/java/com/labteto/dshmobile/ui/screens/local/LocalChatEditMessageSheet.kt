@@ -14,15 +14,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.presentation.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.presentation.editableChatUserText
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -52,7 +52,7 @@ internal fun LocalChatEditMessageSheet(
     val emptyMessage = stringResource(R.string.local_edit_user_message_empty)
     val unchangedMessage = stringResource(R.string.local_edit_user_message_unchanged)
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_edit_user_message),
         onDismiss = { if (!submitting) onDismiss() },
     ) {
@@ -84,7 +84,7 @@ internal fun LocalChatEditMessageSheet(
                 color = colors.labelSecondary,
             )
         }
-        DsTextField(
+        SyTextField(
             value = text,
             onValueChange = {
                 text = it
@@ -102,17 +102,17 @@ internal fun LocalChatEditMessageSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
                 enabled = !submitting,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_edit_user_message_resend),
                 onClick = {
-                    if (submitting) return@DsButton
+                    if (submitting) return@SyButton
                     submitting = true
                     error = null
                     scope.launch {
@@ -145,7 +145,7 @@ internal fun LocalChatEditMessageSheet(
                     actionsEnabled &&
                     (text.trim().isNotEmpty() || chatMessageHasAttachmentContext(message)) &&
                     text.trim() != editableChatUserText(message).trim(),
-                size = DsButtonSize.Small,
+                size = SyButtonSize.Small,
             )
         }
     }

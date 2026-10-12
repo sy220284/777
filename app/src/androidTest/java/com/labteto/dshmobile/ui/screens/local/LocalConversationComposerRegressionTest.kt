@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
@@ -15,7 +16,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
-import com.labteto.dshmobile.ui.components.DS_COMPOSER_FIELD_TAG
+import com.labteto.dshmobile.ui.shenyan.SY_COMPOSER_FIELD_TAG
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -95,7 +96,7 @@ class LocalConversationComposerRegressionTest {
             }
         }
 
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
         compose.waitForIdle()
         compose.onNodeWithContentDescription(
             context.getString(R.string.local_composer_more_actions),
@@ -107,8 +108,8 @@ class LocalConversationComposerRegressionTest {
             assertTrue(focusChanges.contains(true))
             assertEquals(false, focusChanges.last())
         }
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains(draft)
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertIsNotFocused()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertIsNotFocused()
     }
 
     @Test
@@ -139,7 +140,7 @@ class LocalConversationComposerRegressionTest {
             }
         }
 
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
         compose.waitForIdle()
         compose.onNodeWithContentDescription(
             context.getString(R.string.local_composer_more_actions),
@@ -177,7 +178,7 @@ class LocalConversationComposerRegressionTest {
             }
         }
 
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
         compose.waitForIdle()
 
         compose.runOnIdle {
@@ -234,7 +235,7 @@ class LocalConversationComposerRegressionTest {
             assertTrue(changedDrafts.isEmpty())
             assertEquals(0, attachmentsCleared)
         }
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains("来了")
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains("来了")
     }
 
     @Test
@@ -284,7 +285,7 @@ class LocalConversationComposerRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).performClick().assertIsFocused()
         compose.onNodeWithContentDescription(
             context.getString(
                 R.string.local_composer_reasoning_action,
@@ -294,7 +295,7 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithText(
             context.getString(R.string.local_composer_reasoning_unsupported),
         ).assertIsDisplayed()
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG).assertTextContains(draft)
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains(draft)
     }
 
 

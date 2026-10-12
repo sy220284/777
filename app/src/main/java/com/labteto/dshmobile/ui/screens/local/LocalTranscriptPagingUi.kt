@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -26,8 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -265,11 +266,11 @@ internal fun LocalTranscriptPagingStatus(
 ) {
     val colors = DsTheme.colors
     if (error != null) {
-        DsButton(
+        SyButton(
             text = stringResource(R.string.local_transcript_retry_older),
             onClick = onRetry,
             modifier = modifier.fillMaxWidth(),
-            variant = DsButtonVariant.Ghost,
+            variant = SyButtonVariant.Ghost,
         )
         return
     }

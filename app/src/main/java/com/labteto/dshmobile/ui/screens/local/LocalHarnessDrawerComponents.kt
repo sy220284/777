@@ -47,11 +47,11 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsCheckbox
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyCheckboxControl
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
@@ -62,6 +62,19 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
+
+/** The drawer uses only public persona-card fields; private dialogue/diaries are never searched here. */
+internal fun localDrawerMatchingPersonas(
+    gallery: List<PersonaGalleryEntry>,
+    query: String,
+): List<PersonaGalleryEntry> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    return gallery.filter { entry ->
+        entry.persona.name.contains(needle, ignoreCase = true) ||
+            entry.persona.coreIdentity.contains(needle, ignoreCase = true)
+    }
+}
 
 internal data class LocalDrawerSessionSections(
     val pinned: List<LocalSessionSummary>,
@@ -74,10 +87,11 @@ internal fun localDrawerSessionSections(
     pinnedSessionIds: Set<String>,
     query: String,
     sessionTitleOverrides: Map<String, String>,
+    includeOtherModes: Boolean = false,
 ): LocalDrawerSessionSections {
     val normalizedQuery = query.trim()
     val visible = sessions.asSequence()
-        .filter { !it.blank && it.usageMode == usageMode }
+        .filter { !it.blank && (includeOtherModes || it.usageMode == usageMode) }
         .filter { session ->
             normalizedQuery.isEmpty() ||
                 (sessionTitleOverrides[session.id] ?: session.title)
@@ -246,7 +260,7 @@ internal fun DrawerQuickAction(
                 )
             }
         }
-        badge?.let { DsPill(text = it) }
+        badge?.let { SyPill(text = it) }
     }
 }
 
@@ -293,6 +307,7 @@ internal fun LocalSessionDrawerRow(
     onRename: () -> Unit,
     onTogglePinned: () -> Unit,
     onDelete: () -> Unit,
+    searchModeLabel: String? = null,
 ) {
     val colors = DsTheme.colors
     var menuOpen by remember { mutableStateOf(false) }
@@ -302,7 +317,7 @@ internal fun LocalSessionDrawerRow(
     val thresholdPulse = rememberHapticPulse()
 
     Box(Modifier.fillMaxWidth()) {
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.Trash2,
             contentDescription = stringResource(R.string.local_delete_session),
             onClick = {
@@ -346,7 +361,7 @@ internal fun LocalSessionDrawerRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionOpen) {
-                DsCheckbox(checked = selected, onCheckedChange = { onClick() })
+                SyCheckboxControl(checked = selected, onCheckedChange = { onClick() })
             }
 
             Column(
@@ -375,30 +390,36 @@ internal fun LocalSessionDrawerRow(
                         )
                     }
                 }
-
-
+                searchModeLabel?.let { mode ->
+                    Text(
+                        mode,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelSecondary,
+                        maxLines = 1,
+                    )
+                }
             }
         }
-        DsPopupMenu(
+        SyPopupMenu(
             expanded = menuOpen,
             onDismiss = { menuOpen = false },
             items = listOf(
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.common_rename),
                     icon = FeatherIcons.Edit3,
                     onClick = onRename,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.local_drawer_multi_select),
                     icon = FeatherIcons.List,
                     onClick = onSelectMultiple,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
                     icon = FeatherIcons.Pin,
                     onClick = onTogglePinned,
                 ),
-                MenuItem(
+                SyMenuItem(
                     text = stringResource(R.string.local_delete_session),
                     icon = FeatherIcons.Trash2,
                     danger = true,

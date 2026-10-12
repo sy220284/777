@@ -48,11 +48,8 @@ import com.labteto.dshmobile.local.TokenUsageGroupSummary
 import com.labteto.dshmobile.local.TokenUsageModeAnalytics
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsSegment
-import com.labteto.dshmobile.ui.components.DsSegmented
-import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.shenyan.SySegment
+import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -190,8 +187,8 @@ internal fun UsageRangeSelector(selectedIndex: Int, onSelect: (Int) -> Unit) {
         stringResource(R.string.usage_range_30),
         stringResource(R.string.usage_range_90),
     )
-    DsSegmented(
-        segments = labels.mapIndexed { index, label -> DsSegment(index.toString(), label) },
+    SySegmented(
+        segments = labels.mapIndexed { index, label -> SySegment(index.toString(), label) },
         selectedKey = selectedIndex.toString(),
         onSelect = { key -> key.toIntOrNull()?.let(onSelect) },
     )

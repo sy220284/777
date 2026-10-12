@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.sidebar
 
+
 import android.content.Context
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
@@ -50,10 +51,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.rememberSidebarAvatarStore
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -213,7 +214,7 @@ private fun SidebarAvatarSheet(
     val presets = remember {
         PersonaPresetCatalog.presets.filter { it.artwork != null }
     }
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.sidebar_avatar_title),
         subtitle = stringResource(R.string.sidebar_avatar_subtitle),
         onDismiss = onDismiss,
@@ -222,20 +223,20 @@ private fun SidebarAvatarSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.sidebar_avatar_custom),
                 onClick = onCustom,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
                 icon = FeatherIcons.Image,
-                variant = DsButtonVariant.Info,
+                variant = SyButtonVariant.Info,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.sidebar_avatar_reset),
                 onClick = onReset,
                 enabled = !busy && !selected.isNullOrBlank(),
-                size = DsButtonSize.Normal,
-                variant = DsButtonVariant.Ghost,
+                size = SyButtonSize.Normal,
+                variant = SyButtonVariant.Ghost,
             )
         }
         error?.let {

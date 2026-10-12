@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
@@ -45,23 +46,20 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.shenyan.designsystem.components.SyIconButton
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsTimeline
-import com.labteto.dshmobile.ui.components.DsTimelineItem
-import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyTimeline
+import com.labteto.dshmobile.ui.shenyan.SyTimelineItem
 import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -196,23 +194,23 @@ internal fun TaskCard(
                 )
             }
             Box {
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.MoreVertical,
                     contentDescription = stringResource(R.string.tasks_actions),
                     onClick = { actionsOpen = true },
                 )
-                DsPopupMenu(
+                SyPopupMenu(
                     expanded = actionsOpen,
                     onDismiss = { actionsOpen = false },
                     items = listOf(
-                        MenuItem(stringResource(R.string.tasks_edit), FeatherIcons.Edit3, onClick = onEdit),
-                        MenuItem(stringResource(R.string.tasks_try_now), FeatherIcons.Activity, onClick = onRunNow),
-                        MenuItem(
+                        SyMenuItem(stringResource(R.string.tasks_edit), FeatherIcons.Edit3, onClick = onEdit),
+                        SyMenuItem(stringResource(R.string.tasks_try_now), FeatherIcons.Activity, onClick = onRunNow),
+                        SyMenuItem(
                             stringResource(if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause),
                             FeatherIcons.Clock,
                             onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
                         ),
-                        MenuItem(stringResource(R.string.tasks_delete_confirm), FeatherIcons.Trash2, danger = true, onClick = { confirmDelete = true }),
+                        SyMenuItem(stringResource(R.string.tasks_delete_confirm), FeatherIcons.Trash2, danger = true, onClick = { confirmDelete = true }),
                     ),
                 )
             }
@@ -223,13 +221,13 @@ internal fun TaskCard(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DsStatusPill(
+            SyStatusPill(
                 state = taskStatus(task.status),
                 label = taskStatusLabel(task.status),
             )
-            DsPill(text = scheduleLabel)
+            SyPill(text = scheduleLabel)
             if (task.mode == AutomationMode.CHAT && task.quietHoursEnabled) {
-                DsPill(
+                SyPill(
                     text = stringResource(
                         R.string.tasks_chat_quiet_hours_value,
                         formatMinuteOfDay(task.quietStartHour * 60 + task.quietStartMinute),
@@ -276,9 +274,9 @@ internal fun TaskCard(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            val timelineItems = mutableListOf<DsTimelineItem>()
+            val timelineItems = mutableListOf<SyTimelineItem>()
             for (receipt in task.runReceipts.asReversed()) {
-                timelineItems += DsTimelineItem(
+                timelineItems += SyTimelineItem(
                     text = stringResource(
                         R.string.tasks_run_history_item,
                         formatTime(receipt.finishedAt),
@@ -287,7 +285,7 @@ internal fun TaskCard(
                     state = receiptStatus(receipt.status),
                 )
             }
-            DsTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
+            SyTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
         }
 
         if (task.mode == AutomationMode.CHAT) {
@@ -295,17 +293,17 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_try_now),
                     onClick = onRunNow,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_edit),
                     onClick = onEdit,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
                 )
             }
         }
@@ -316,28 +314,28 @@ internal fun TaskCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (task.recurringMinutes != null) {
-                    DsButton(
+                    SyButton(
                         text = stringResource(
                             if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume
                             else R.string.tasks_pause,
                         ),
                         onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_open_result),
                     onClick = { onOpenSession(sessionId) },
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Outline,
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Outline,
                 )
             }
         }
     }
 
     if (confirmDelete) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.tasks_delete_confirm_title),
             onDismiss = { confirmDelete = false },
         ) {
@@ -353,18 +351,18 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmDelete = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.tasks_delete_confirm),
                     onClick = {
                         confirmDelete = false
                         onCancel()
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
@@ -388,20 +386,20 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
     return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
-private fun receiptStatus(status: AutomationStatus): DsStatus = when (status) {
-    AutomationStatus.COMPLETED -> DsStatus.Done
-    AutomationStatus.BLOCKED -> DsStatus.Warning
-    AutomationStatus.FAILED -> DsStatus.Failed
-    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> DsStatus.Running
-    else -> DsStatus.Neutral
+private fun receiptStatus(status: AutomationStatus): SyStatus = when (status) {
+    AutomationStatus.COMPLETED -> SyStatus.Done
+    AutomationStatus.BLOCKED -> SyStatus.Warning
+    AutomationStatus.FAILED -> SyStatus.Failed
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
+    else -> SyStatus.Neutral
 }
 
-private fun taskStatus(status: AutomationStatus): DsStatus = when (status) {
-    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> DsStatus.Running
-    AutomationStatus.COMPLETED -> DsStatus.Done
-    AutomationStatus.BLOCKED -> DsStatus.Warning
-    AutomationStatus.FAILED -> DsStatus.Failed
-    else -> DsStatus.Neutral
+private fun taskStatus(status: AutomationStatus): SyStatus = when (status) {
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
+    AutomationStatus.COMPLETED -> SyStatus.Done
+    AutomationStatus.BLOCKED -> SyStatus.Warning
+    AutomationStatus.FAILED -> SyStatus.Failed
+    else -> SyStatus.Neutral
 }
 
 @Composable
@@ -435,7 +433,7 @@ internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                 Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary, maxLines = 2)
                 Text(formatTime(task.nextRunAt), style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
-                DsStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
+                SyStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
             }
             androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.labelTertiary)
         }
