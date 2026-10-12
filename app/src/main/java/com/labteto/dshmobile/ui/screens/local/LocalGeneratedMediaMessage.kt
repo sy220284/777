@@ -322,11 +322,12 @@ internal fun LocalGeneratedVideoTaskRow(
 
 @Composable
 private fun MediaMessageCard(
-    title: String, subtitle: String, content: @Composable () -> Unit,
+    title: String, subtitle: String, modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
 ) {
     val colors = DsTheme.colors
     Surface(
-        modifier = Modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
+        modifier = modifier.fillMaxWidth(0.90f).widthIn(max = 470.dp),
         shape = DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
@@ -576,6 +577,9 @@ internal fun LocalWorkArtifactMessageRow(
     MediaMessageCard(
         title = if (artifact.category == "file") resources.getString(R.string.media_chat_work_file, name) else resources.getString(R.string.media_chat_work_result),
         subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing) else resources.getString(R.string.media_chat_work_output_here),
+        modifier = if (artifact.category == "file" && artifact.currentlyAvailable != false) {
+            Modifier.localArtifactSharedBounds(workspacePath, artifact.reference)
+        } else Modifier,
     ) {
         if (isImage && file != null) {
             MediaInlinePicture(file, null)
