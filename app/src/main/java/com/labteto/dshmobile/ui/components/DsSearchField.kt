@@ -30,6 +30,8 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Reference SearchBar: 14dp glass plate, solid on focus and warm focus outline.
@@ -45,20 +47,21 @@ fun DsSearchField(
     shortcut: String? = null,
 ) {
     val colors = DsTheme.colors
+    val sy = LocalSyPalette.current
     var focused by remember { mutableStateOf(false) }
     val fill by animateColorAsState(
-        targetValue = if (focused) colors.bgLayer1
-            else colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+        targetValue = if (focused) sy.solid
+            else sy.l3,
         animationSpec = DsAnimations.tabBackground, label = "searchGlassFocus",
     )
     val outline by animateColorAsState(
-        targetValue = if (focused) colors.accent else colors.borderL1,
+        targetValue = if (focused) sy.peach else sy.border,
         animationSpec = DsAnimations.tabBackground, label = "searchFocusLine",
     )
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = fill,
-        shape = DsShapes.row,
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, outline),
     ) {
         Row(
@@ -68,20 +71,20 @@ fun DsSearchField(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(FeatherIcons.Search, contentDescription = null,
-                modifier = Modifier.size(18.dp), tint = colors.labelTertiary)
+                modifier = Modifier.size(18.dp), tint = sy.tertiaryText)
             Box(Modifier.weight(1f)) {
                 BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier.onFocusChanged { focused = it.isFocused },
                     singleLine = true,
-                    textStyle = DsType.std14.withReadingWeight().copy(color = colors.labelPrimary),
-                    cursorBrush = SolidColor(colors.accent),
+                    textStyle = DsType.std14.withReadingWeight().copy(color = sy.text),
+                    cursorBrush = SolidColor(sy.peach),
                     decorationBox = { textField ->
                         Box {
                             if (value.isEmpty() && !focused) {
                                 Text(placeholder, style = DsType.std14.withReadingWeight(),
-                                    color = colors.labelTertiary)
+                                    color = sy.tertiaryText)
                             }
                             textField()
                         }
@@ -89,8 +92,8 @@ fun DsSearchField(
                 )
             }
             if (!shortcut.isNullOrBlank()) {
-                Surface(color = colors.bgLayer2, shape = DsShapes.chip,
-                    border = BorderStroke(1.dp, colors.borderL1)) {
+                Surface(color = sy.l2, shape = DsShapes.chip,
+                    border = BorderStroke(1.dp, sy.border)) {
                     Text(shortcut, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                         style = DsType.caption11.copy(fontFamily = DsType.codeFont).withReadingWeight(),
                         color = colors.labelSecondary)
