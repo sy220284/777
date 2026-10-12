@@ -187,6 +187,8 @@ fun LocalHarnessScreen(
         presentFirstLaunch = false
     }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
+    var newSessionOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
+    var groupSetupOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var settledSessionId by rememberSaveable { mutableStateOf("") }
     var settledUsageMode by rememberSaveable { mutableStateOf("") }
@@ -267,6 +269,10 @@ fun LocalHarnessScreen(
         featureStack = back.stack
         drawerFeatureOriginStack = back.drawerOriginStack
         if (back.reopenDrawer && !syWideViewport) scope.launch { drawerState.open() }
+    }
+
+    fun reopenDrawerWhenModalReturns(fromDrawer: Boolean) {
+        if (fromDrawer && !syWideViewport) scope.launch { drawerState.open() }
     }
 
     fun resetFeatureNavigation() {
@@ -499,7 +505,10 @@ fun LocalHarnessScreen(
                 settingsEntryRequest++
             },
             onPushFeature = ::pushFeature,
-            onNewSession = { showNewSessionMode = true },
+            onNewSession = {
+                newSessionOpenedFromDrawer = false
+                showNewSessionMode = true
+            },
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -528,7 +537,10 @@ fun LocalHarnessScreen(
             onPopFeature = ::popFeature,
             sessions = shell.sessions,
             onSwitchSession = ::switchToSessionAndShowConversation,
-            onOpenGroupSetup = { showGroupSetup = true },
+            onOpenGroupSetup = {
+                groupSetupOpenedFromDrawer = true
+                showGroupSetup = true
+            },
             onPromptPersonaSave = { showPersonaGallerySavePrompt = true },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -769,6 +781,7 @@ fun LocalHarnessScreen(
                 },
                 onNewSession = {
                     scope.launch { drawerState.close() }
+                    newSessionOpenedFromDrawer = true
                     showNewSessionMode = true
                 },
                 onSwitchSession = { sessionId ->
@@ -944,17 +957,26 @@ fun LocalHarnessScreen(
         )
     }
 
+    fun dismissNewSessionMode() {
+        showNewSessionMode = false
+        reopenDrawerWhenModalReturns(newSessionOpenedFromDrawer)
+        newSessionOpenedFromDrawer = false
+    }
+
     if (showNewSessionMode) {
         if (shell.usageMode == LocalUsageMode.CHAT && shell.groupChat.enabled) {
             GroupNewSessionDialog(
-                onDismiss = { showNewSessionMode = false },
+                onDismiss = ::dismissNewSessionMode,
                 onNewGroup = {
                     showNewSessionMode = false
+                    groupSetupOpenedFromDrawer = newSessionOpenedFromDrawer
+                    newSessionOpenedFromDrawer = false
                     showGroupSetup = true
                 },
                 onNewSingle = {
                     if (viewModel.createSingleChatSession()) {
                         showNewSessionMode = false
+                        newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
                 },
@@ -963,10 +985,11 @@ fun LocalHarnessScreen(
             NewSessionModeDialog(
                 usageMode = shell.usageMode,
                 projectAvailable = projectRecoveryNotice == null,
-                onDismiss = { showNewSessionMode = false },
+                onDismiss = ::dismissNewSessionMode,
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
                         showNewSessionMode = false
+                        newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
                 },
@@ -997,7 +1020,11 @@ fun LocalHarnessScreen(
                 }
                 created
             },
-            onDismiss = { showGroupSetup = false },
+            onDismiss = {
+                showGroupSetup = false
+                reopenDrawerWhenModalReturns(groupSetupOpenedFromDrawer)
+                groupSetupOpenedFromDrawer = false
+            },
         )
     }
 
@@ -1017,7 +1044,10 @@ fun LocalHarnessScreen(
                 showPersonaGallerySavePrompt = false
                 openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE)
             },
-            onDismiss = { showPersonaGallerySavePrompt = false },
+            onDismiss = {
+                showPersonaGallerySavePrompt = false
+                reopenDrawerWhenModalReturns(true)
+            },
         )
     }
 
