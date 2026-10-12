@@ -38,6 +38,7 @@ internal fun PersonaProfile.forRuntimeStoryStage(context: ChatContextState): Per
 internal class CharacterRuntimeProjector(
     private val relationshipEngine: ChatRelationshipEngine,
     private val loreEngine: CharacterLoreEngine,
+    private val intimacyMode: ChatIntimacyMode = ChatIntimacyMode(),
 ) {
     fun project(
         persona: PersonaProfile,
@@ -73,6 +74,7 @@ internal class CharacterRuntimeProjector(
                     unlockedStages = context.visibleStoryStages(),
                 ),
                 relationshipEngine.prompt(userInput, runtimeState),
+                intimacyMode.prompt(userInput, runtimeState),
             ).filter(String::isNotBlank).joinToString("\n\n"),
         )
     }
