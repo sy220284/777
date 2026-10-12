@@ -45,6 +45,10 @@ internal data class ChatContinuityCheck(
  * remain in raw dialogue / soft memory rather than being promoted into hard state.
  */
 internal object ChatSceneRuntime {
+    /** Validate an archived scene transition before allowing it to remain authoritative. */
+    fun isPlausibleRecordedEvent(event: ChatSceneEvent): Boolean =
+        event.kind != ChatSceneEventKind.LOCATION || isPlausibleMovementDestination(event.to)
+
     fun extractTurnEvents(
         previous: ChatSceneState,
         userMessage: String,
