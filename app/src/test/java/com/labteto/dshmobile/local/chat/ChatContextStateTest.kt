@@ -620,4 +620,43 @@ class ChatContextStateTest {
         assertTrue(cleaned.continuity.unfinished.isEmpty())
     }
 
+    @Test
+    fun acknowledgedAgreementClosesOnlyTheQuestionThePlannerRetired() {
+        val question = "对方是否接受保密与提前告知条件尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf("还要收拾桌子", question))
+        val candidate = ChatContinuityState(unfinished = listOf("还要收拾桌子"))
+        val confirmed = groundContinuityEvidence(
+            previous = previous,
+            candidate = candidate,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 88L,
+                userMessage = "好，我答应你了",
+                assistantMessage = "谢谢你答应我，我们说定了",
+            )),
+        )
+        assertEquals(listOf("还要收拾桌子"), confirmed.unfinished)
+
+        val unrelated = groundContinuityEvidence(
+            previous = previous,
+            candidate = candidate,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 89L,
+                userMessage = "好，喝杯茶",
+                assistantMessage = "好呀，喝茶",
+            )),
+        )
+        assertEquals(previous.unfinished, unrelated.unfinished)
+
+        val notRetiredByPlanner = groundContinuityEvidence(
+            previous = previous,
+            candidate = previous,
+            pendingTurns = listOf(ChatPendingTurn(
+                sequence = 90L,
+                userMessage = "好，我答应你了",
+                assistantMessage = "谢谢你答应我",
+            )),
+        )
+        assertEquals(previous.unfinished, notRetiredByPlanner.unfinished)
+    }
+
 }
