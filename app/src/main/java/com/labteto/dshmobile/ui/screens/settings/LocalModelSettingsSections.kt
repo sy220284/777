@@ -252,9 +252,14 @@ internal fun LocalModelSettingsCard(
                         ModelCapabilityTags(modelContract.clientModalities)
                         val creatorKinds = modelContract.mediaOffers.map { it.kind }.distinct()
                         val contextDescription = modelContract.documentedContextWindowTokens
-                            ?.let { "上下文 $it Token" } ?: "上下文容量未确认"
+                            ?.let { stringResource(R.string.local_model_policy_known_context, it) }
+                            ?: stringResource(R.string.local_model_policy_unknown_context)
                         Text(
-                            "$contextDescription · Work 每片 ${modelContract.executionBudget.workRequestsPerSlice} 次请求",
+                            stringResource(
+                                R.string.local_model_policy_work_budget,
+                                contextDescription,
+                                modelContract.executionBudget.workRequestsPerSlice,
+                            ),
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.labelSecondary,
                         )
