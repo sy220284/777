@@ -314,13 +314,9 @@ internal fun PluginInventoryBrowser(
                     )
                     if (error != null && onRetry != null) {
                         DsButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                    } else if (!loading && !skillsOnly && selectedCategory == 1) {
-                        DsButton(
-                            text = stringResource(R.string.tools_external_services),
-                            variant = DsButtonVariant.Info,
-                            onClick = onManageConnections,
-                        )
                     }
+                    // The existing V5 service-nav action above remains available here.
+                    // Do not render a second visually identical external-service button.
                 }
             } else {
                 LazyColumn(
