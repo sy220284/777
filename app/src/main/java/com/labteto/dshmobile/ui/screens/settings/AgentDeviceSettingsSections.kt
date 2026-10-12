@@ -81,6 +81,7 @@ import kotlinx.serialization.json.contentOrNull
 internal fun DeviceCapabilitiesCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
+    onRequestPostingPermission: () -> Unit,
 ) {
     val overallState = when {
         state.loading -> DsStatus.Running
@@ -118,8 +119,8 @@ internal fun DeviceCapabilitiesCard(
                 label = stringResource(R.string.settings_notifications_posting_permission),
                 enabled = enabled,
                 hint = stringResource(R.string.settings_notifications_posting_hint),
-                actionLabel = stringResource(R.string.settings_notifications_open_system),
-                onAction = viewModel::openAppNotificationSettings,
+                actionLabel = stringResource(R.string.settings_notifications_request),
+                onAction = onRequestPostingPermission,
             )
         }
         CapabilityRow(
@@ -144,15 +145,25 @@ internal fun DeviceCapabilitiesCard(
 internal fun NotificationPostingPermissionCard(
     state: DeviceCapabilitiesState,
     viewModel: SettingsViewModel,
+    onRequestPostingPermission: () -> Unit,
 ) {
     SettingsCard(stringResource(R.string.settings_notifications_system_group)) {
         CapabilityRow(
             label = stringResource(R.string.settings_notifications_posting_permission),
             enabled = state.postingNotifications == true,
             hint = stringResource(R.string.settings_notifications_posting_hint),
-            actionLabel = stringResource(R.string.settings_notifications_open_system),
-            onAction = viewModel::openAppNotificationSettings,
+            actionLabel = stringResource(R.string.settings_notifications_request),
+            onAction = onRequestPostingPermission,
         )
+        if (state.postingNotifications != true) {
+            DsButton(
+                text = stringResource(R.string.settings_notifications_open_system),
+                onClick = viewModel::openAppNotificationSettings,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Text(
             stringResource(R.string.settings_notifications_only_events),
             style = DsType.caption11.withReadingWeight(),

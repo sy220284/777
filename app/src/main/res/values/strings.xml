@@ -2191,5 +2191,6 @@
     <string name="local_drawer_search_people_heading">人物</string>
     <string name="local_drawer_search_open_gallery">在人物图集中查看</string>
     <string name="local_drawer_search_empty_both">没有匹配的会话或人物。试试其他关键词。</string>
+    <string name="settings_notifications_request">允许通知</string>
 </resources>
 

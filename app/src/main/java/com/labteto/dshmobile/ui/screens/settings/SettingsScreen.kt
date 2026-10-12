@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import android.Manifest
+import android.os.Build
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -218,6 +220,16 @@ fun SettingsScreen(
     val colors = settingsInkColors(DsTheme.colors)
     val toast = rememberDsToast()
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { viewModel.refreshDeviceCapabilities() }
+    val requestPostingPermission: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.openAppNotificationSettings()
+        }
+    }
     val scope = rememberCoroutineScope()
     val exportFailed = stringResource(R.string.settings_export_diagnostics_failed)
     val exportSuccess = stringResource(R.string.settings_export_diagnostics_success)
@@ -850,11 +862,11 @@ fun SettingsScreen(
                                 color = colors.labelSecondary,
                             )
                         }
-                        DeviceCapabilitiesCard(deviceCapabilities, viewModel)
+                        DeviceCapabilitiesCard(deviceCapabilities, viewModel, requestPostingPermission)
                     }
 
                     SettingsDestination.NOTIFICATIONS -> {
-                        NotificationPostingPermissionCard(deviceCapabilities, viewModel)
+                        NotificationPostingPermissionCard(deviceCapabilities, viewModel, requestPostingPermission)
                         SettingsCard(stringResource(R.string.settings_notifications_group_jobs)) {
                             ToggleRow(
                                 stringResource(R.string.settings_notifications_local_jobs),
