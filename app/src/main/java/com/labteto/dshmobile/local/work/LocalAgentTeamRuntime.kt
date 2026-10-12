@@ -446,11 +446,12 @@ internal class LocalAgentTeamRuntime(
     }
 
     private fun requireMemberCapacity(state: LocalTeamProjection) {
-        require(state.members.count { it.phase != LocalTeamMemberPhase.DISMISSED } < MAX_TEAMMATES) {
-            "TEAM_MEMBER_LIMIT：当前最多允许 " + MAX_TEAMMATES + " 个未解雇 teammate"
-        }
-        require(state.members.size < MAX_TEAM_MEMBER_HISTORY) {
-            "TEAM_MEMBER_HISTORY_LIMIT：历史成员已达 " + MAX_TEAM_MEMBER_HISTORY + " 个"
+        val liveJobs = jobs.snapshotInfos().asSequence()
+            .filterNot { it.status in setOf("completed", "failed", "cancelled", "killed") }
+            .map(LocalJobInfo::id).toSet()
+        val liveCount = activeTeamMemberReservations(state.members, liveJobs)
+        require(liveCount < MAX_TEAMMATES) {
+            "TEAM_MEMBER_LIMIT：当前运行或预留 $liveCount/$MAX_TEAMMATES 个 teammate；结束的成员仅保留历史，不占运行名额"
         }
     }
 
@@ -1022,11 +1023,9 @@ internal class LocalAgentTeamRuntime(
     ): String {
         return synchronized(commandLock) {
             val state = project(sessionId)
-            require(state.tasks.count { it.status != LocalTeamTaskStatus.DELETED } < MAX_TASKS) {
-                "TEAM_TASK_LIMIT：最多允许 $MAX_TASKS 个活动任务"
-            }
-            require(state.tasks.size < MAX_TEAM_TASK_HISTORY) {
-                "TEAM_TASK_HISTORY_LIMIT：历史任务已达 $MAX_TEAM_TASK_HISTORY 个"
+            val activeCount = activeTeamTaskReservations(state.tasks)
+            require(activeCount < MAX_TASKS) {
+                "TEAM_TASK_LIMIT：当前 $activeCount/$MAX_TASKS 个未完成任务，历史已完成任务不占运行名额"
             }
             val id = nextTaskId(state.tasks)
             val task = LocalTeamTaskSnapshot(
