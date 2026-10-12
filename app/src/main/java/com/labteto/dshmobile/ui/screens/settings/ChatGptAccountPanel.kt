@@ -41,9 +41,9 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.DsMenu
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.shenyan.designsystem.components.SyPill
+import com.labteto.dshmobile.ui.shenyan.SyStatus
+import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -129,13 +129,13 @@ internal fun ChatGptAccountPanel(
                         )
                     }
                 }
-                DsStatusPill(
+                SyStatusPill(
                     state = when {
                         selected?.signedIn == true &&
                             selected.sharingEnabled &&
-                            state.phase == ChatGptAuthPhase.CONNECTED -> DsStatus.Done
-                        state.phase == ChatGptAuthPhase.ERROR -> DsStatus.Failed
-                        else -> DsStatus.Neutral
+                            state.phase == ChatGptAuthPhase.CONNECTED -> SyStatus.Done
+                        state.phase == ChatGptAuthPhase.ERROR -> SyStatus.Failed
+                        else -> SyStatus.Neutral
                     },
                     label = when {
                         selected?.signedIn == true &&
@@ -209,12 +209,12 @@ internal fun ChatGptAccountPanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (selected.sharingEnabled) {
-                        DsPill(text = stringResource(R.string.chatgpt_plan_usage))
-                        DsPill(text = stringResource(R.string.chatgpt_model_count, planModels.size))
+                        SyPill(text = stringResource(R.string.chatgpt_plan_usage))
+                        SyPill(text = stringResource(R.string.chatgpt_model_count, planModels.size))
                     } else if (selected.signedIn) {
-                        DsPill(text = stringResource(R.string.chatgpt_signed_in_plan_disabled))
+                        SyPill(text = stringResource(R.string.chatgpt_signed_in_plan_disabled))
                     } else {
-                        DsPill(text = stringResource(R.string.chatgpt_not_connected))
+                        SyPill(text = stringResource(R.string.chatgpt_not_connected))
                     }
                 }
 
@@ -422,8 +422,8 @@ internal fun ChatGptAccountPanel(
                                             modifier = Modifier.weight(1f, fill = false),
                                         )
                                         if (model.active) {
-                                            DsStatusPill(
-                                                DsStatus.Done,
+                                            SyStatusPill(
+                                                SyStatus.Done,
                                                 stringResource(R.string.local_model_in_use),
                                             )
                                         }
