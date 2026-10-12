@@ -60,6 +60,7 @@ import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -152,6 +153,27 @@ internal fun LocalGeneratedVideoTaskRow(
     var refreshing by remember(task.id) { mutableStateOf(false) }
     var showingPlayer by remember(task.id) { mutableStateOf(false) }
     var error by remember(task.id) { mutableStateOf<String?>(null) }
+    // Poll the original provider task while this conversation is visible. The runtime
+    // never re-submits a billable video request; it only reads its persisted task ID.
+    LaunchedEffect(task.id, task.phase, offer?.id) {
+        if (offer != null && task.phase in setOf(
+                LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING
+            )) {
+            var waitMillis = 15_000L
+            while (true) {
+                delay(waitMillis)
+                try {
+                    viewModel.refreshVideo(offer, task.id)
+                    waitMillis = 15_000L
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    error = failure.message ?: "进度查询失败"
+                    waitMillis = (waitMillis * 2).coerceAtMost(90_000L)
+                }
+            }
+        }
+    }
     val phase = when (task.phase) {
         LocalMediaVideoPhase.SUBMITTING -> "正在提交"
         LocalMediaVideoPhase.OUTCOME_UNKNOWN -> "提交结果待确认"
