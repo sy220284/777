@@ -38,7 +38,7 @@ class LocalWorkDeliveryEvidenceTest {
                 put("name", "write")
                 put("is_error", false)
                 put("artifact_path", "src/main.kt")
-                put("artifact_sha256", "abc123")
+                put("artifact_sha256", "a".repeat(64))
             })
             val onlyArtifact = localWorkDeliveryEvidence(log, goal)
             assertEquals("file-write", onlyArtifact.artifactCallId)
