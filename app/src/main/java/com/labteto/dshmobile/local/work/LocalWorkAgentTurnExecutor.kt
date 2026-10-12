@@ -248,6 +248,7 @@ internal class LocalWorkAgentTurnExecutor(
                         name = settlement.call.name,
                         step = activeStep,
                         started = settlement.started,
+                        verifiedReadOnly = workTurnToolRuntime.isVerifiedReadOnly(settlement.call.name),
                     )
                     runEventLog.append("tool/result", buildJsonObject {
                         result.step?.let { put("step", it) }
@@ -257,7 +258,7 @@ internal class LocalWorkAgentTurnExecutor(
                         put("model_content", result.modelContent)
                         put("is_error", true)
                         put("error_code", result.code)
-                        put("retryable", result.code == SessionRecovery.TOOL_NOT_STARTED)
+                        put("retryable", result.code != SessionRecovery.TOOL_OUTCOME_UNKNOWN)
                         put(
                             "side_effect",
                             if (result.code == SessionRecovery.TOOL_OUTCOME_UNKNOWN) "possible" else "none",

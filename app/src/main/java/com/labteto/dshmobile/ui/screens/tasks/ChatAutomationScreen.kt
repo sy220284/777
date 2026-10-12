@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -46,13 +47,10 @@ import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.labteto.dshmobile.ui.shenyan.SyDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
@@ -258,7 +256,7 @@ internal fun ChatAutomationScreen(
                     color = colors.error,
                 )
             }
-            DsConversationComposer {
+            SyConversationComposer {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -270,7 +268,7 @@ internal fun ChatAutomationScreen(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
                 ) {
-                    DsComposerField(
+                    SyComposerField(
                         value = draft,
                         onValueChange = { draft = it },
                         placeholder = stringResource(R.string.tasks_chat_plan_placeholder),
@@ -279,7 +277,7 @@ internal fun ChatAutomationScreen(
                         maxLines = 5,
                     )
                     val canSubmitPlan = canPlan && draft.isNotBlank() && !state.planning
-                    DsComposerAction(
+                    SyComposerAction(
                         icon = null,
                         iconPainter = painterResource(R.drawable.ic_ui_button_send_glyph),
                         iconSize = 32.dp,

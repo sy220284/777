@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 
@@ -53,11 +54,9 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.shenyan.SySegment
-import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -143,11 +142,11 @@ internal fun UsageCalculationPage(
                 onClick = { modelMenuExpanded = true },
                 variant = SyButtonVariant.Ghost,
             )
-            DsPopupMenu(
+            SyPopupMenu(
                 expanded = modelMenuExpanded,
                 onDismiss = { modelMenuExpanded = false },
                 items = (listOf<String?>(null) + availableModels).map { model ->
-                    MenuItem(
+                    SyMenuItem(
                         text = model ?: allModelsLabel,
                         onClick = { onSelectModel(model) },
                     )

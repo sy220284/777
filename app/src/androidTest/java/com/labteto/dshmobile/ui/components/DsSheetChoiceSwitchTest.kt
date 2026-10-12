@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.components.SySheetChoiceRow
+
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -19,7 +21,7 @@ class DsSheetChoiceSwitchTest {
         var clicks = 0
         compose.setContent {
             DshTheme {
-                DsSheetChoiceRow(title = "推理", switchChecked = checked.value,
+                SySheetChoiceRow(title = "推理", switchChecked = checked.value,
                     modifier = Modifier.testTag("reasoning-row"),
                     onClick = { clicks++; checked.value = !checked.value })
             }

@@ -14,31 +14,31 @@ ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
 
 RULES = (
-    (re.compile(r"\bAlertDialog\s*\("), set(), "use DsDialog"),
+    (re.compile(r"\bAlertDialog\s*\("), set(), "use SyDialog"),
     (
         re.compile(r"\bDialog\s*\("),
-        {"components/Overlays.kt", "shenyan/SyResponsiveSheet.kt", "shenyan/SyOverlays.kt"},
+        {"shenyan/SyResponsiveSheet.kt", "shenyan/SyOverlays.kt"},
         "use SyResponsiveSheet/SyConfirmDialog",
     ),
     (
         re.compile(r"\bModalBottomSheet\s*\("),
-        {"components/DsBottomSheet.kt", "shenyan/SyResponsiveSheet.kt"},
+        {"shenyan/SyResponsiveSheet.kt"},
         "use SyResponsiveSheet",
     ),
     (
         re.compile(r"\bDropdownMenu\s*\("),
-        {"components/Overlays.kt", "shenyan/SyOverlays.kt"},
+        {"shenyan/SyOverlays.kt"},
         "use SyPopupMenu/SyMenu",
     ),
     (
         re.compile(r"\bPopup\s*\("),
-        {"components/Overlays.kt", "shenyan/SyOverlays.kt"},
+        {"shenyan/SyOverlays.kt"},
         "use SyPopupMenu/SyContextActionMenu or another shared popup primitive",
     ),
     (
         re.compile(r"\bOutlinedCard\s*\("),
         set(),
-        "use a shared Ds* card such as DsDeliverableCard",
+        "use SyMaterialFrame/SyGlassCard",
     ),
 )
 

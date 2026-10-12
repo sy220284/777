@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.sidebar
 
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,10 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsSlider
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SySlider
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -52,7 +53,7 @@ internal fun SidebarAvatarCropper(
         SidebarAvatarSource.Custom(prepared.file, crop)
     }
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.sidebar_avatar_crop_title),
         subtitle = stringResource(R.string.sidebar_avatar_crop_subtitle),
         onDismiss = { if (!busy) onCancel() },
@@ -104,7 +105,7 @@ internal fun SidebarAvatarCropper(
             style = DsType.small13Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
-        DsSlider(
+        SySlider(
             value = crop.zoom,
             onValueChange = { zoom ->
                 if (!busy) {
@@ -132,14 +133,14 @@ internal fun SidebarAvatarCropper(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onCancel,
                 modifier = Modifier.weight(1f),
                 enabled = !busy,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.sidebar_avatar_crop_confirm),
                 onClick = { onConfirm(crop) },
                 modifier = Modifier.weight(1f),

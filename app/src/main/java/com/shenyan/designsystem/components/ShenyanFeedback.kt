@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -169,7 +170,7 @@ fun SyPill(
         else -> p.textSecondary
     }
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier.heightIn(min = SyMetric.touch),
+        Surface(onClick = onClick, modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = SyMetric.touch),
             shape = shape, color = fill, border = BorderStroke(1.dp, p.border)) {
             Box(Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
                 contentAlignment = Alignment.Center) {

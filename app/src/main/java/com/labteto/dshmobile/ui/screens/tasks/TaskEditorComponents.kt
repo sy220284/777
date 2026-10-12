@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +34,7 @@ import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -74,7 +75,7 @@ internal fun ColumnScope.TaskEditorPane(
         modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        DsGroupCard {
+        SyGroupCard {
             Text(
                 stringResource(
                     if (editingTaskId != null) R.string.tasks_edit else R.string.tasks_new,
@@ -97,7 +98,7 @@ internal fun ColumnScope.TaskEditorPane(
         }
         // Screen 13: goal, schedule and execution notifications are separate
         // panels. Keep the actual task's prompt and schedule as the only data owners.
-        DsGroupCard {
+        SyGroupCard {
             Text(
                 stringResource(R.string.tasks_schedule_label),
                 style = DsType.small13Strong.withReadingWeight(),
@@ -156,7 +157,7 @@ internal fun ColumnScope.TaskEditorPane(
                 )
             }
         }
-        DsGroupCard {
+        SyGroupCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -36,13 +37,13 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.labteto.dshmobile.ui.screens.settings.UsageCalculationPage
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.ui.screens.settings.MiniMaxQuotaCard
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -239,23 +240,23 @@ private fun ChatScreenshot() {
                 onRegenerate = { true },
             )
         }
-        DsConversationComposer {
+        SyConversationComposer {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsComposerAction(
+                SyComposerAction(
                     icon = Icons.Outlined.AttachFile,
                     contentDescription = "添加附件",
                     onClick = {},
                 )
-                DsComposerField(
+                SyComposerField(
                     value = "",
                     onValueChange = {},
                     placeholder = "和神里绫华说点什么…",
                     modifier = Modifier.weight(1f),
                 )
-                DsComposerAction(
+                SyComposerAction(
                     icon = Icons.Filled.ArrowUpward,
                     contentDescription = "发送",
                     onClick = {},
@@ -335,23 +336,23 @@ private fun WorkScreenshot() {
             onOpenResults = {},
         )
         Spacer(Modifier.weight(1f))
-        DsConversationComposer {
+        SyConversationComposer {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DsComposerAction(
+                SyComposerAction(
                     icon = Icons.Outlined.AttachFile,
                     contentDescription = "添加附件",
                     onClick = {},
                 )
-                DsComposerField(
+                SyComposerField(
                     value = "",
                     onValueChange = {},
                     placeholder = "继续交代任务…",
                     modifier = Modifier.weight(1f),
                 )
-                DsComposerAction(
+                SyComposerAction(
                     icon = Icons.Filled.ArrowUpward,
                     contentDescription = "发送",
                     onClick = {},
@@ -414,7 +415,7 @@ private fun QuotaScreenshot() {
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        DsTopBar(title = "MiniMax 套餐额度", onBack = {}, backContentDescription = "返回")
+        SyTopBar(title = "MiniMax 套餐额度", onBack = {}, backContentDescription = "返回")
         MiniMaxQuotaCard(MiniMaxProviderUsage.ModelQuota(
             name = "general",
             interval = MiniMaxProviderUsage.Window(null, null, 83.0),

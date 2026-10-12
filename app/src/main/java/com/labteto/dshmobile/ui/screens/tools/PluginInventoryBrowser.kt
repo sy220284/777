@@ -397,7 +397,7 @@ internal fun PluginInventoryBrowser(
                         else if (item.connectedService) R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
                     size = SyButtonSize.Large,
                     onClick = {
                         selectedRow = null

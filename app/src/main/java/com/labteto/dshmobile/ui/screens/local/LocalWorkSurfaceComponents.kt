@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,14 +28,11 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.session.LocalConversationMode
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsExpandableColumn
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyExpandableColumn
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -228,19 +226,19 @@ internal fun ExecutionStatusCard(
                 actionRequiredJobs.size > 4 ||
                 backgroundJobs.size > 4
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(if (showAll) R.string.audit_show_summary else R.string.audit_show_all),
                     onClick = { showAll = !showAll },
-                    variant = DsButtonVariant.Ghost,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_run_open_results),
                 onClick = onOpenResults,
-                variant = DsButtonVariant.Outline,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Outline,
+                size = SyButtonSize.Small,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -252,13 +250,13 @@ internal fun ExecutionStatusCard(
                 )
             }
 
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_run_resources),
                 onClick = { technicalDetailsExpanded = !technicalDetailsExpanded },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
-            DsExpandableColumn(
+            SyExpandableColumn(
                 visible = technicalDetailsExpanded,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
@@ -417,7 +415,7 @@ internal fun RunCenterJobsSection(
                                 else -> colors.labelTertiary
                             },
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(
                                 if (expanded) R.string.local_run_job_hide
                                 else R.string.local_run_job_view,
@@ -436,11 +434,11 @@ internal fun RunCenterJobsSection(
                                     jobActionFeedback = ""
                                 }
                             },
-                            variant = DsButtonVariant.Ghost,
-                            size = DsButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
                         )
                     }
-                    DsExpandableColumn(
+                    SyExpandableColumn(
                         visible = expanded,
                         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                     ) {
@@ -484,7 +482,7 @@ internal fun RunCenterJobsSection(
                                 )
                             }
                             if (job.canMessage) {
-                                DsComposerField(
+                                SyComposerField(
                                     value = agentMessageDraft,
                                     onValueChange = {
                                         agentMessageDraft = it
@@ -498,7 +496,7 @@ internal fun RunCenterJobsSection(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End,
                                 ) {
-                                    DsButton(
+                                    SyButton(
                                         text = stringResource(R.string.local_run_agent_send),
                                         onClick = {
                                             val message = agentMessageDraft.trim()
@@ -521,8 +519,8 @@ internal fun RunCenterJobsSection(
                                         },
                                         enabled = agentMessageDraft.isNotBlank() && !agentMessageSending,
                                         loading = agentMessageSending,
-                                        variant = DsButtonVariant.Outline,
-                                        size = DsButtonSize.Small,
+                                        variant = SyButtonVariant.Outline,
+                                        size = SyButtonSize.Small,
                                     )
                                 }
                                 if (agentMessageFeedback.isNotBlank()) {
@@ -538,14 +536,14 @@ internal fun RunCenterJobsSection(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            DsButton(
+                            SyButton(
                                 text = stringResource(R.string.local_run_job_refresh),
                                 onClick = { refreshJobOutput(job.id) },
-                                variant = DsButtonVariant.Ghost,
-                                size = DsButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
                             )
                             if (job.status in setOf("running", "dormant", "interrupted")) {
-                                DsButton(
+                                SyButton(
                                     text = stringResource(R.string.local_run_job_stop),
                                     onClick = {
                                         scope.launch {
@@ -561,8 +559,8 @@ internal fun RunCenterJobsSection(
                                             }
                                         }
                                     },
-                                    variant = DsButtonVariant.Danger,
-                                    size = DsButtonSize.Small,
+                                    variant = SyButtonVariant.Danger,
+                                    size = SyButtonSize.Small,
                                 )
                             }
                         }

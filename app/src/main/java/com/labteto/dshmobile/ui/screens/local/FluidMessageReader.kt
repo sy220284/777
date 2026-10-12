@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyEmptyState
+
 import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 
@@ -22,7 +24,7 @@ internal fun FluidMessageReader(title: String, content: String, onDismiss: () ->
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.bgBase) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title, onBack = onDismiss, backContentDescription = stringResource(R.string.common_back))
-                if (content.isBlank()) DsPageEmptyState(FeatherIcons.BookOpen,
+                if (content.isBlank()) SyEmptyState(FeatherIcons.BookOpen,
                     stringResource(R.string.fluid_reader_empty), body = "", modifier = Modifier.weight(1f))
                 else SelectionContainer(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())

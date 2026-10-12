@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -64,9 +65,7 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.shenyan.SyMenu
-import com.labteto.dshmobile.ui.components.DsValueRow
-import com.labteto.dshmobile.ui.shenyan.SyMenuItem
+import com.labteto.dshmobile.ui.shenyan.SyValueRow
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -129,7 +128,7 @@ internal fun LocalMemorySettingsCard(
     var showRulesEditor by remember { mutableStateOf(false) }
 
     SettingsCard(stringResource(R.string.advanced_memory_settings)) {
-        DsValueRow(
+        SyValueRow(
             label = stringResource(R.string.advanced_user_rules),
             value = stringResource(R.string.advanced_user_rules_count, userRules.length, 6_000),
             hint = stringResource(R.string.advanced_user_rules_hint),

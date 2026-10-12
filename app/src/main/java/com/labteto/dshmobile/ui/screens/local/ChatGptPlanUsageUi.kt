@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,10 +18,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -38,13 +39,13 @@ internal fun ChatGptPlanUsageBar(profile: LocalModelProfile?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
-        DsPill(text = stringResource(R.string.chatgpt_using_plan), selected = true)
+        SyPill(text = stringResource(R.string.chatgpt_using_plan), selected = true)
         Spacer(Modifier.weight(1f))
-        DsButton(
+        SyButton(
             text = stringResource(R.string.chatgpt_manage_usage),
             onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
+            size = SyButtonSize.Small,
+            variant = SyButtonVariant.Ghost,
         )
     }
 }
@@ -104,43 +105,43 @@ internal fun LocalConversationErrorCard(
             )
             when {
                 showConnectAction -> {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_welcome_connect_action),
                         onClick = onSwitchModelSource,
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
                 usageError -> {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.chatgpt_manage_usage),
                         onClick = { uriHandler.openUri(CHATGPT_USAGE_URL) },
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.chatgpt_switch_model_source),
                         onClick = onSwitchModelSource,
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
                 modelRecovery -> {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.chatgpt_switch_model_source),
                         onClick = onSwitchModelSource,
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
                 sendRejectMessage == null && restoreRequest != null -> {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_restore_request),
                         onClick = { onRestoreRequest(restoreRequest) },
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
             }

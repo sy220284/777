@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,7 +65,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
-import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState

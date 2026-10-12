@@ -5,7 +5,7 @@ V6 沿用 V5 的 38 屏布局、暖纸 / 烟熏玻璃 / 哑光黑、五级材质
 ## 这次补齐了什么
 
 - 文件列表新增音频、视频、压缩包三类图标：40dp 矢量画布、圆角线条，浅色 / 深色共六份 Android XML 与六份同源 SVG；哑光复用深色图标。文件列表已按真实扩展名使用这些资源。
-- 将原生组件迁移产生的 4 份新增源码和 8 份修改源码全部同步到 `compose-v6/`，同时保留当前业务适配层及 Feather 矢量图标源。`compose-v5/` 继续作为历史参考。
+- 将当前 14 份原生绘制源码（相对 V5 为 6 新增、8 修改）同步到 `compose-v6/`，同时保留业务适配层、触觉工具与 Feather 矢量图标源。`compose-v5/` 继续作为历史参考。
 - 修正浅色 L4 为暖纸色 88% 不透明度，页面 push/pop 为 360ms；哑光或全实色表面不执行背景模糊，也不增加玻璃嵌套层数。
 - 补齐 App 实际使用的字体、文件图标和文案资源。网页设计另生成覆盖设计包中文字符的五档字体子集，避免离线打开时依赖远程字体。动态业务正文仍使用宿主系统字体回退。
 - 原 V5 的 20 组 P0/P1 设计样例与状态矩阵完整保留；设计样例不等同于这些能力已经在 App 全部接入。
@@ -19,6 +19,8 @@ V6 沿用 V5 的 38 屏布局、暖纸 / 烟熏玻璃 / 哑光黑、五级材质
 
 旧 V3/V4/V5 验证记录和预览均为历史资料，不能替代 V6 的真实构建、测试和设备验收结果。
 
+本轮替换进度见 `V6-UI-RETIREMENT.zh-CN.md`：201 处旧组件调用已清零，旧绘制源码退出；字体偏好、壁纸分析和业务回调保留。顶栏副标题落在按钮行下方，交互标签满足 48dp 宽高，工具详情操作拥有独立测试定位。完整 38 屏视觉验收仍独立进行。
+
 ## 本地编译与再次同步
 
 按仓库 `docs/DEVELOPMENT.md` 执行已经验证的安装路径：
@@ -29,7 +31,9 @@ V6 沿用 V5 的 38 屏布局、暖纸 / 烟熏玻璃 / 哑光黑、五级材质
 bash tools/dev/ai-toolchain.sh plan --profile build
 # 只下载 main 最新成功「开发工具链」运行中缺失的组件，解压到同一个目录。
 bash tools/dev/ai-toolchain.sh bootstrap --profile build --artifacts-dir /绝对路径/组件目录
-bash tools/dev/ai-toolchain.sh gradle --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleOptimized
+bash tools/dev/ai-toolchain.sh gradle --no-configuration-cache --no-build-cache --max-workers=2 \
+  -Pkotlin.incremental=false -Pksp.incremental=false \
+  :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleOptimized
 ```
 
 素材同步只使用当前生产源，不手工维护第二份原生绘制：

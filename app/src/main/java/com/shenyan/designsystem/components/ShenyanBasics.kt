@@ -86,7 +86,7 @@ fun SyButton(
         onClick = onClick,
         enabled = enabled && !loading,
         interactionSource = interaction,
-        modifier = modifier.heightIn(min = height.coerceAtLeast(SyMetric.touch)).scale(scale),
+        modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch)).scale(scale),
         color = if (style == SyButtonStyle.PRIMARY) Color.Transparent else fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),

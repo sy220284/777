@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.Manifest
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,7 +10,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.MainActivity
-import com.labteto.dshmobile.ui.components.DS_COMPOSER_FIELD_TAG
+import com.labteto.dshmobile.ui.shenyan.SY_COMPOSER_FIELD_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -43,7 +44,7 @@ class LocalColdStartupRegressionTest {
         try {
             compose.waitUntil(timeoutMillis = 30_000L) {
                 runCatching {
-                    compose.onAllNodesWithTag(DS_COMPOSER_FIELD_TAG, useUnmergedTree = true)
+                    compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
                         .fetchSemanticsNodes().isNotEmpty()
                 }.getOrDefault(false)
             }
@@ -65,6 +66,6 @@ class LocalColdStartupRegressionTest {
                 failure,
             )
         }
-        compose.onNodeWithTag(DS_COMPOSER_FIELD_TAG, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true).assertExists()
     }
 }

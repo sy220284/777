@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -20,9 +21,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.interaction.LocalQuestion
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -96,20 +97,20 @@ internal fun LocalPlanReviewCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_plan_review_confirm),
                     onClick = onApprove,
                     enabled = !busy,
-                    variant = DsButtonVariant.Info,
-                    size = DsButtonSize.Small,
+                    variant = SyButtonVariant.Info,
+                    size = SyButtonSize.Small,
                 )
                 review.decline?.let {
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_plan_review_decline),
                         onClick = onDecline,
                         enabled = !busy,
-                        variant = DsButtonVariant.Outline,
-                        size = DsButtonSize.Small,
+                        variant = SyButtonVariant.Outline,
+                        size = SyButtonSize.Small,
                     )
                 }
                 Spacer(Modifier.weight(1f))

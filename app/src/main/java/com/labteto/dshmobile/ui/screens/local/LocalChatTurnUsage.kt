@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
@@ -17,10 +18,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.TokenUsageAggregate
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.screens.settings.UsageGroupDetailPage
 import com.labteto.dshmobile.ui.screens.settings.UsageRequestDetailPage
 import kotlinx.coroutines.CancellationException
@@ -38,10 +39,10 @@ internal class LocalChatTurnUsageUi {
 @Composable
 internal fun LocalChatTurnUsageButton(aggregate: TokenUsageAggregate, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        DsButton(
+        SyButton(
             stringResource(if (aggregate.unreportedRequestCount > 0) R.string.local_chat_turn_usage_incomplete
                 else R.string.local_chat_turn_usage_known, aggregate.totalTokens),
-            onClick = onClick, variant = DsButtonVariant.Ghost, size = DsButtonSize.Small,
+            onClick = onClick, variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
         )
     }
 }
@@ -90,12 +91,12 @@ internal fun LocalChatTurnUsageController(
             loading = false
         }
     }
-    if (enabled && ui.selectedTurn != null) DsBottomSheet(
+    if (enabled && ui.selectedTurn != null) SyResponsiveSheet(
         title = stringResource(R.string.local_chat_turn_usage_title),
         onDismiss = { ui.selectedTurn = null }, scrollable = true,
     ) {
         Text(stringResource(R.string.local_chat_turn_usage_scope))
-        if (requestId != null) DsButton(stringResource(R.string.common_back), onClick = { requestId = null }, variant = DsButtonVariant.Ghost)
+        if (requestId != null) SyButton(stringResource(R.string.common_back), onClick = { requestId = null }, variant = SyButtonVariant.Ghost)
         when {
             loading -> Text(stringResource(R.string.local_run_usage_loading))
             failed -> Text(stringResource(R.string.local_run_usage_unavailable))

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,10 +26,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -130,7 +131,7 @@ internal fun ChatSurfaceHeader(
                 )
             }
             if (!groupEnabled && tuningEnabled) {
-                DsIconButton(
+                SyIconButton(
                     icon = FeatherIcons.User,
                     contentDescription = stringResource(R.string.local_character_tuning_open),
                     onClick = onOpenCharacterTuning,
@@ -142,15 +143,15 @@ internal fun ChatSurfaceHeader(
             }
         }
         if (groupEnabled) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_group_chat_leave),
                 onClick = onExitGroupChat,
                 enabled = !running,
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
             )
         }
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.Plus,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
@@ -214,13 +215,13 @@ internal fun WorkSurfaceHeader(
             StateDot(StateDotState.Running, size = 8.dp)
             Spacer(Modifier.width(DsSpacing.xsmall))
         }
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.CheckSquare,
             contentDescription = stringResource(R.string.local_execution_console),
             onClick = onOpenRunCenter,
             tint = colors.labelSecondary,
         )
-        DsIconButton(
+        SyIconButton(
             icon = FeatherIcons.Plus,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,

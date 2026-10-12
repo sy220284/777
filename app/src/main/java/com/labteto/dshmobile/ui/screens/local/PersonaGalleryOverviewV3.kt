@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -35,15 +36,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -197,7 +197,7 @@ internal fun PersonaGalleryOverviewV3(
     val regularEntries = filteredEntries.filterNot { it.id in pinnedIds }
 
     if (confirmingDelete) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.persona_gallery_delete_selected_title),
             onDismiss = { if (!deleting) confirmingDelete = false },
         ) {
@@ -210,14 +210,14 @@ internal fun PersonaGalleryOverviewV3(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmingDelete = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     enabled = !deleting,
                     modifier = Modifier.weight(1f),
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.persona_gallery_delete_selected, selectedIds.size),
                     onClick = {
                         deleting = true
@@ -236,7 +236,7 @@ internal fun PersonaGalleryOverviewV3(
                             deleting = false
                         }
                     },
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                     enabled = !deleting && selectedIds.isNotEmpty(),
                     modifier = Modifier.weight(1f),
                 )
@@ -299,12 +299,12 @@ internal fun PersonaGalleryOverviewV3(
                             maxLines = 1,
                         )
                     }
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.persona_gallery_save_current_short),
                         onClick = onSyncCurrent,
                         enabled = canSave && !busy,
-                        size = DsButtonSize.Small,
-                        variant = DsButtonVariant.Ghost,
+                        size = SyButtonSize.Small,
+                        variant = SyButtonVariant.Ghost,
                     )
                 }
             }
@@ -324,14 +324,14 @@ internal fun PersonaGalleryOverviewV3(
                 color = DsTheme.colors.labelPrimary,
                 modifier = Modifier.weight(1f),
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_add),
                 onClick = { adding = true },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
                 enabled = !busy && !managing,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(
                     if (managing) R.string.persona_gallery_manage_done else R.string.persona_gallery_manage,
                 ),
@@ -339,14 +339,14 @@ internal fun PersonaGalleryOverviewV3(
                     managing = !managing
                     if (!managing) selectedIds.clear()
                 },
-                variant = DsButtonVariant.Ghost,
-                size = DsButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
                 enabled = entries.isNotEmpty() && !busy,
             )
         }
 
         if (entries.isNotEmpty()) {
-            DsTextField(
+            SyTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -501,11 +501,11 @@ internal fun PersonaGalleryOverviewV3(
         }
 
         if (managing && selectedIds.isNotEmpty()) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.persona_gallery_delete_selected, selectedIds.size),
                 onClick = { confirmingDelete = true },
                 modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Danger,
+                variant = SyButtonVariant.Danger,
                 enabled = !busy && !deleting,
             )
         }

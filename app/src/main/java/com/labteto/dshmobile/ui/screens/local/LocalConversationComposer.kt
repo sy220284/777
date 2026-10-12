@@ -46,7 +46,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyComposerAction
 import com.labteto.dshmobile.ui.shenyan.SyComposerField
-import com.labteto.dshmobile.ui.shenyan.SyComposerMetrics
 import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill

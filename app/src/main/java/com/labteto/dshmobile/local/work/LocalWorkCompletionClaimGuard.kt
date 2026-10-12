@@ -14,11 +14,12 @@ internal object LocalWorkCompletionClaimGuard {
     fun inspect(
         text: String,
         workState: LocalWorkState,
+        deliveryEvidence: LocalWorkDeliveryEvidence? = null,
     ): LocalOutputQualityResult {
         if (text.isBlank()) return LocalOutputQualityResult(text)
         val corrected = correctGlobalCompletionClaims(text)
         if (corrected == text) return LocalOutputQualityResult(text)
-        val evidence = localWorkCompletionEvidence(workState)
+        val evidence = localWorkCompletionEvidence(workState, deliveryEvidence)
         if (evidence.readyForGoalCompletion) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
             text = truthfulIncompleteDeliveryText(evidence) + "\n\n" + corrected,
@@ -65,7 +66,10 @@ internal fun guardWorkCompletionDelivery(
 ): LocalModelReply {
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
-    val result = LocalWorkCompletionClaimGuard.inspect(original, state.work)
+    val result = LocalWorkCompletionClaimGuard.inspect(
+        original, state.work,
+        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it.description) },
+    )
     if (!result.changed) return reply
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
@@ -99,7 +103,10 @@ internal fun recordWorkCompletionQuality(
     eventLog: LocalSessionEventLog,
 ) {
     if (state.usageMode != LocalUsageMode.WORK) return
-    val result = LocalWorkCompletionClaimGuard.inspect(text, state.work)
+    val result = LocalWorkCompletionClaimGuard.inspect(
+        text, state.work,
+        state.work.goal?.let { localWorkDeliveryEvidence(eventLog, it.description) },
+    )
     if (result.findings.isEmpty()) return
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))

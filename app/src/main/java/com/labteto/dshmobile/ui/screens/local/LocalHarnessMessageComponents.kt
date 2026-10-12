@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import android.graphics.BitmapFactory
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -67,24 +68,16 @@ import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
-import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsContextActionMenu
-import com.labteto.dshmobile.ui.components.DsIconBox
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
-import com.labteto.dshmobile.ui.components.UserBubble
+import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -206,16 +199,16 @@ internal fun LocalMessageRow(
                             skillDisplayNames = skillDisplayNames,
                         )
                     }
-                    val actionMenu: @Composable (Boolean, () -> Unit, List<MenuItem>) -> Unit =
+                    val actionMenu: @Composable (Boolean, () -> Unit, List<SyMenuItem>) -> Unit =
                         if (chatMode) { open, dismiss, items -> FluidMessageActionSheet(open, dismiss, items) }
-                        else { open, dismiss, items -> DsContextActionMenu(open, dismiss, items) }
+                        else { open, dismiss, items -> SyContextActionMenu(open, dismiss, items) }
                     actionMenu(
                         actionsOpen,
                         { actionsOpen = false },
                         buildList {
                             if (copyText.isNotBlank()) {
                                 add(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.common_copy),
                                         icon = FeatherIcons.Copy,
                                         onClick = {
@@ -227,7 +220,7 @@ internal fun LocalMessageRow(
                             }
                             if (canEdit) {
                                 add(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.local_edit_user_message),
                                         icon = FeatherIcons.Edit3,
                                         onClick = { onEdit(message) },
@@ -236,7 +229,7 @@ internal fun LocalMessageRow(
                             }
                             if (chatMode && onLocateSourceMemory != null) {
                                 add(
-                                    MenuItem(
+                                    SyMenuItem(
                                         text = stringResource(R.string.chat_locate_message_memory),
                                         icon = FeatherIcons.BookOpen,
                                         onClick = { onLocateSourceMemory(message) },
@@ -308,13 +301,13 @@ internal fun LocalMessageRow(
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
                 val copyableContent = if (chatMode) extractLocalCharacterThought(visibleContent, streaming).second else visibleContent
                 FluidMessageActionSheet(actionsOpen, { actionsOpen = false }, buildList {
-                    if (copyableContent.isNotBlank()) add(MenuItem(
+                    if (copyableContent.isNotBlank()) add(SyMenuItem(
                         text = stringResource(R.string.common_copy), icon = FeatherIcons.Copy,
                         onClick = { clipboard.setText(AnnotatedString(copyableContent)); copied = true }))
-                    onReadMessage?.let { read -> add(MenuItem(
+                    onReadMessage?.let { read -> add(SyMenuItem(
                         text = stringResource(R.string.fluid_reader_title), icon = FeatherIcons.BookOpen,
                         onClick = { read(message) })) }
-                    if (canRegenerate) add(MenuItem(
+                    if (canRegenerate) add(SyMenuItem(
                         text = stringResource(R.string.local_regenerate_reply), icon = FeatherIcons.Retry,
                         onClick = { if (!onRegenerate(message.id))
                             Toast.makeText(context, regenerateFailedMessage, Toast.LENGTH_SHORT).show() }))
@@ -389,7 +382,7 @@ private fun LocalUserMessageContent(
         message.visibleBlocks().forEach { block ->
             when (block) {
                 is LocalMessageBlock.Text -> if (block.text.isNotBlank()) {
-                    UserBubble(if (showSkillNames) localSkillCallDisplayText(block.text, skillDisplayNames) else block.text)
+                    SyUserBubble(if (showSkillNames) localSkillCallDisplayText(block.text, skillDisplayNames) else block.text)
                 }
                 is LocalMessageBlock.Image -> LocalTranscriptImage(
                     image = block,

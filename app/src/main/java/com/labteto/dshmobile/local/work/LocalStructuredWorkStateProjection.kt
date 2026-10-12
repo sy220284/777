@@ -35,6 +35,7 @@ internal fun structuredWorkState(
         .takeLast(MAX_STRUCTURED_TODO_ITEMS)
 
     val constraints = linkedSetOf<String>()
+    val revokedConstraints = linkedSetOf<String>()
     val decisions = linkedSetOf<String>()
     var decisionEpoch = 0L
     var constraintEpoch = 0L
@@ -51,12 +52,19 @@ internal fun structuredWorkState(
                 "user/message" -> {
                     eventText(event.data)?.let { userText ->
                         val constraintReset = isExplicitWorkConstraintReset(userText)
+                        val scopedEdit = parseLocalWorkScopedConstraintEdit(userText)
                         if (constraintReset) {
                             constraints.clear()
+                            revokedConstraints.clear()
                             constraintEpoch = event.sequence
                         }
-                        if (!constraintReset || hasNewWorkConstraintAfterReset(userText)) {
+                        if (scopedEdit != null) {
+                            revokedConstraints += scopedEdit.previous
+                            constraints.removeAll { isRevokedWorkConstraint(it, revokedConstraints) }
+                            scopedEdit.replacement?.let(constraints::add)
+                        } else if (!constraintReset || hasNewWorkConstraintAfterReset(userText)) {
                             extractLocalWorkCueSnippet(userText, LocalWorkCueKind.CONSTRAINT)
+                                ?.takeUnless { isRevokedWorkConstraint(it, revokedConstraints) }
                                 ?.let(constraints::add)
                         }
                         if (isExplicitWorkDecisionReset(userText)) {
@@ -145,6 +153,7 @@ internal fun structuredWorkState(
         goals = goals,
         plan = plan,
         constraints = constraints.toList().takeLast(MAX_STRUCTURED_CONSTRAINTS),
+        revokedConstraints = revokedConstraints.toList().takeLast(64),
         decisions = decisions.toList().takeLast(MAX_STRUCTURED_DECISIONS),
         decisionEpoch = decisionEpoch,
         constraintEpoch = constraintEpoch,

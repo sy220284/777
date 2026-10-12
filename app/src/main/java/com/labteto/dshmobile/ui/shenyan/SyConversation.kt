@@ -47,12 +47,31 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.foundation.SyMotion
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
+
+const val SY_COMPOSER_FIELD_TAG = "ds-composer-field"
+const val SY_CONVERSATION_COMPOSER_TAG = "ds-conversation-composer"
 
 object SyComposerMetrics {
     val actionTouchTarget = SyMetric.touch
     val actionVisualSize = 32.dp
     val primaryActionVisualSize = 34.dp
     val actionIconSize = 18.dp
+}
+
+/** Wallpaper analysis stays owned by the host; the new library owns bubble drawing. */
+@Composable
+fun SyUserBubble(text: String, modifier: Modifier = Modifier) {
+    val p = LocalSyColors.current
+    val wallpaper = LocalAppBackgroundState.current
+    val fill = wallpaper.surfaceColor(p.selected, BackgroundRegion.MIDDLE, .76f, .96f)
+    val edge = if (wallpaper.hasImage) {
+        if (wallpaper.darkTheme) Color.White.copy(alpha = .28f) else Color.Black.copy(alpha = .24f)
+    } else p.border
+    com.shenyan.designsystem.components.SyUserBubble(text, modifier, fill, edge, DsType.chatBody.withReadingWeight())
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,14 +10,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsCard
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.shenyan.designsystem.components.SyCategoryRow
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -101,7 +102,7 @@ internal fun LocalProjectScreen(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DsTopBar(
+            SyTopBar(
                 title = stringResource(R.string.local_project_management_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.local_project_back),
@@ -113,15 +114,15 @@ internal fun LocalProjectScreen(
             )
             if (recovery != null) {
                 Text(requireNotNull(recovery))
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_project_backup_and_reset),
                     onClick = { runCatching { actions.backupAndReset() }.onFailure { error = it.message } },
                     modifier = Modifier.fillMaxWidth(),
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
                 return@Column
             }
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.local_project_start_work_session),
                 onClick = {
                     runCatching { actions.createProjectWorkSession() }
@@ -135,9 +136,9 @@ internal fun LocalProjectScreen(
                 style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
             )
-            DsCard {
+            SyGlassCard {
                 state.projects.forEach { project ->
-                    DsCategoryRow(
+                    SyCategoryRow(
                         icon = if (project.id == state.activeId) FeatherIcons.CheckCircle else FeatherIcons.Folder,
                         title = project.name,
                         modifier = Modifier.testTag("projectRow:${project.id}")
@@ -151,15 +152,15 @@ internal fun LocalProjectScreen(
                     )
                 }
             }
-            DsCard {
-                DsTextField(
+            SyGlassCard {
+                SyTextField(
                     value = newName,
                     onValueChange = { newName = it.take(80) },
                     label = { Text(stringResource(R.string.local_project_name_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_project_create),
                     onClick = {
                         runCatching { actions.create(newName) }
@@ -167,24 +168,24 @@ internal fun LocalProjectScreen(
                             .onFailure { error = it.message }
                     },
                     enabled = newName.isNotBlank(),
-                    variant = DsButtonVariant.Outline,
+                    variant = SyButtonVariant.Outline,
                 )
             }
             active?.let { project ->
-                DsCard {
+                SyGlassCard {
                     Text(
                         stringResource(R.string.local_project_current_settings),
                         style = DsType.std14Strong.withReadingWeight(),
                         color = DsTheme.colors.labelPrimary,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = nameDraft,
                         onValueChange = { nameDraft = it.take(80) },
                         label = { Text(stringResource(R.string.local_project_rename_hint)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_project_rename),
                         onClick = {
                             runCatching { actions.rename(project.id, nameDraft) }
@@ -192,10 +193,10 @@ internal fun LocalProjectScreen(
                                 .onFailure { error = it.message }
                         },
                         enabled = nameDraft.isNotBlank() && nameDraft.trim() != project.name,
-                        variant = DsButtonVariant.Outline,
+                        variant = SyButtonVariant.Outline,
                     )
                     Text(stringResource(R.string.local_project_instruction_label, project.name))
-                    DsTextField(
+                    SyTextField(
                         value = instructionDraft,
                         onValueChange = { instructionDraft = it.take(8_000) },
                         label = { Text(stringResource(R.string.local_project_instruction_hint)) },
@@ -203,7 +204,7 @@ internal fun LocalProjectScreen(
                         minLines = 4,
                         maxLines = 12,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_project_save_instruction),
                         onClick = {
                             runCatching { actions.updateInstructions(project.id, instructionDraft) }
@@ -211,13 +212,13 @@ internal fun LocalProjectScreen(
                                 .onFailure { error = it.message }
                         },
                         enabled = instructionDraft != project.instructions,
-                        variant = DsButtonVariant.Outline,
+                        variant = SyButtonVariant.Outline,
                     )
                     if (project.id != com.labteto.dshmobile.local.project.DEFAULT_PROJECT_ID) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.local_project_delete),
                             onClick = { pendingDeleteId = project.id },
-                            variant = DsButtonVariant.Danger,
+                            variant = SyButtonVariant.Danger,
                             enabled = !deleting,
                         )
                     }
@@ -225,33 +226,33 @@ internal fun LocalProjectScreen(
             }
         }
         error?.let { message ->
-            DsCard(modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
+            SyGlassCard(modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
                 Text(message, style = DsType.small13.withReadingWeight(), color = DsTheme.colors.error)
             }
         }
     }
     val target = state.projects.firstOrNull { it.id == pendingDeleteId }
     if (target != null) {
-        DsDialog(
+        SyDialog(
             title = stringResource(R.string.local_project_delete),
             onDismiss = { if (!deleting) pendingDeleteId = null },
         ) {
             Text(stringResource(R.string.local_project_delete_confirm, target.name))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { pendingDeleteId = null },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     enabled = !deleting,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_project_delete),
                     modifier = Modifier.testTag("local_project_confirm_delete"),
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                     loading = deleting,
                     enabled = !deleting,
                     onClick = {
-                        if (deleting) return@DsButton
+                        if (deleting) return@SyButton
                         deleting = true
                         scope.launch {
                             try {

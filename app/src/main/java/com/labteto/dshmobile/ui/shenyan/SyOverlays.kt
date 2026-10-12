@@ -9,6 +9,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +21,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -42,6 +48,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -72,6 +80,7 @@ fun SyDialog(
 ) {
     val p = LocalSyColors.current
     val reduced = LocalSyReduceMotion.current
+    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * .85f
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val scale by animateFloatAsState(
@@ -86,16 +95,22 @@ fun SyDialog(
             dismissOnClickOutside = dismissOnScrimTap,
         ),
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding().testTag("sy-dialog-scrim").clickable(
+            enabled = dismissOnScrimTap,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onDismiss,
+        ), contentAlignment = Alignment.Center) {
             Surface(
-                modifier = Modifier.fillMaxWidth(.92f).widthIn(max = 560.dp).scale(scale),
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(.92f).heightIn(max = maxHeight).scale(scale)
+                    .pointerInput(Unit) { detectTapGestures { } },
                 shape = RoundedCornerShape(SyMetric.radiusSheet),
                 color = p.materialL4,
                 border = BorderStroke(1.dp, p.border),
                 shadowElevation = 16.dp,
             ) {
                 Column(
-                    Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                    Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (!title.isNullOrBlank()) {

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +9,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.Modifier
-import com.labteto.dshmobile.ui.components.DsProgressBar
-import com.labteto.dshmobile.ui.components.DsProgressStatus
+import com.labteto.dshmobile.ui.shenyan.SyProgressBar
+import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,14 +35,14 @@ internal fun workflowStageLabel(stage: String): String = stringResource(when (st
 })
 
 /** Explicitly derive color/motion from real execution state, not percentage alone. */
-internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): DsProgressStatus {
+internal fun workflowProgressVisualStatus(progress: LocalWorkflowProgress): SyProgressStatus {
     val blocked = progress.blockedReason != null || progress.stage == WorkflowStage.STALLED
     return when {
-        blocked -> DsProgressStatus.Failed
+        blocked -> SyProgressStatus.Failed
         progress.stage == WorkflowStage.COMPLETED && progress.total > 0 &&
-            progress.completed >= progress.total -> DsProgressStatus.Done
-        progress.total <= 0 -> DsProgressStatus.Idle
-        else -> DsProgressStatus.Running
+            progress.completed >= progress.total -> SyProgressStatus.Done
+        progress.total <= 0 -> SyProgressStatus.Idle
+        else -> SyProgressStatus.Running
     }
 }
 
@@ -69,7 +70,7 @@ internal fun WorkflowProgressSection(progress: LocalWorkflowProgress) {
         Text(progress.task, style = DsType.small13.withReadingWeight(), color = colors.labelPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(stringResource(R.string.local_workflow_processed, progress.completed, progress.total), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
         if (progress.total > 0) {
-            DsProgressBar(
+            SyProgressBar(
                 value = progress.completed.coerceAtLeast(0).toFloat() /
                     progress.total.toFloat(),
                 modifier = Modifier.fillMaxWidth(),

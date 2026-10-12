@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
+import com.labteto.dshmobile.ui.shenyan.SyToastHost
+import com.labteto.dshmobile.ui.shenyan.rememberSyToast
+
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -14,9 +17,9 @@ class DsToastRegressionTest {
     private fun installToast() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            val toast = rememberDsToast()
+            val toast = rememberSyToast()
             SideEffect { show = toast.second }
-            DshTheme { DsToastHost(toast) }
+            DshTheme { SyToastHost(toast) }
         }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()

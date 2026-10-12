@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.shenyan
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,7 +111,7 @@ fun SyGlassCard(
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(4.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) = com.shenyan.designsystem.components.SyMaterialFrame(
-    modifier = modifier,
+    modifier = modifier.fillMaxWidth(),
     onClick = onClick,
     tier = if (elevated) com.shenyan.designsystem.components.SyMaterialTier.L4_OVERLAY
         else com.shenyan.designsystem.components.SyMaterialTier.L3_CARD,

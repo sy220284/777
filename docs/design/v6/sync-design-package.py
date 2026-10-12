@@ -25,6 +25,7 @@ shutil.copytree(REPO / 'app/src/main/java/com/labteto/dshmobile/ui/shenyan', nat
 icons = native / 'com/labteto/dshmobile/ui/components'
 icons.mkdir(parents=True)
 shutil.copy2(REPO / 'app/src/main/java/com/labteto/dshmobile/ui/components/FeatherIcons.kt', icons)
+shutil.copy2(REPO / 'app/src/main/java/com/labteto/dshmobile/ui/components/HapticFeedback.kt', icons)
 resources = out / 'android-v6/res'
 for folder in ['drawable', 'font']:
     (resources / folder).mkdir(parents=True, exist_ok=True)
@@ -38,6 +39,7 @@ shutil.copy2(REPO / 'app/src/main/res/values/strings.xml', resources / 'values/s
 shutil.copytree(HERE / 'assets', out / 'assets/v6')
 shutil.copy2(HERE / 'file-icons.json', out / 'assets/v6/file-icons.json')
 shutil.copy2(HERE / 'README.zh-CN.md', out / 'V6-DELIVERY.zh-CN.md')
+shutil.copy2(HERE / 'UI-RETIREMENT.zh-CN.md', out / 'V6-UI-RETIREMENT.zh-CN.md')
 shutil.copy2(HERE / 'verification.json', out / 'V6-VERIFICATION.json')
 shutil.copy2(REPO / 'THIRD_PARTY_NOTICES.md', out / 'THIRD-PARTY-NOTICES.md')
 font_dir = out / 'assets/fonts'

@@ -56,6 +56,22 @@ class LocalSubagentInboxRecoveryScanTest {
     }
 
     @Test
+    fun damagedMiddleSegmentDoesNotSilentlySkipClaimedMessages() {
+        val failed = runCatching {
+            recoverSubagentInboxClaims(
+                backgroundJobId = "job", checkpointSequence = 10L, scanThrough = 15L,
+                alreadyClaimed = emptySet(), pendingIds = emptySet(),
+                pageAfter = { cursor ->
+                    if (cursor == 10L) listOf(event(11L), event(13L), event(14L), event(15L))
+                    else emptyList()
+                },
+            )
+        }.exceptionOrNull()
+        assertTrue(failed is IllegalStateException)
+        assertTrue(failed?.message.orEmpty().contains("SEQUENCE_GAP"))
+    }
+
+    @Test
     fun missingArchivedPageFailsClosedRatherThanSkippingUserInputs() {
         val failure = runCatching {
             recoverSubagentInboxClaims(

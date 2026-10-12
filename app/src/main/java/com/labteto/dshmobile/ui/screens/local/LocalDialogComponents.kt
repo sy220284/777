@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +15,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -33,8 +34,8 @@ internal fun RenameDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember(initial) { mutableStateOf(initial) }
-    DsBottomSheet(title = title, onDismiss = onDismiss) {
-        DsTextField(
+    SyResponsiveSheet(title = title, onDismiss = onDismiss) {
+        SyTextField(
             value = text,
             onValueChange = { text = it },
             modifier = Modifier.fillMaxWidth(),
@@ -42,16 +43,16 @@ internal fun RenameDialog(
             placeholder = { Text(title, style = DsType.std14.withReadingWeight()) },
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
             Spacer(Modifier.width(DsSpacing.small))
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_save),
                 onClick = { onConfirm(text.trim()) },
-                variant = DsButtonVariant.Info,
+                variant = SyButtonVariant.Info,
                 enabled = text.trim().isNotEmpty(),
             )
         }
@@ -67,16 +68,16 @@ internal fun ConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    DsDialog(title = title, onDismiss = onDismiss) {
+    SyDialog(title = title, onDismiss = onDismiss) {
         Text(body, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_cancel),
                 onClick = onDismiss,
-                variant = DsButtonVariant.Ghost,
+                variant = SyButtonVariant.Ghost,
             )
             Spacer(Modifier.width(DsSpacing.small))
-            DsButton(text = confirmLabel, onClick = onConfirm, variant = DsButtonVariant.Danger)
+            SyButton(text = confirmLabel, onClick = onConfirm, variant = SyButtonVariant.Danger)
         }
     }
 }

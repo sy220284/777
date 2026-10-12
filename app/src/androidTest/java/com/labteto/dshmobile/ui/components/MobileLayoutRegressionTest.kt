@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.components.SyCategoryRow
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -39,7 +42,7 @@ class MobileLayoutRegressionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsTopBar(
+                        SyTopBar(
                             title = "个性化与长期记忆",
                             subtitle = "查看和管理聊天中记住的内容",
                             onBack = { back++ },
@@ -83,7 +86,7 @@ class MobileLayoutRegressionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.8f)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsTopBar(
+                        SyTopBar(
                             title = "个性化与长期记忆",
                             subtitle = "查看和管理聊天中记住的内容",
                             onBack = {},
@@ -123,7 +126,7 @@ class MobileLayoutRegressionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                 DshTheme {
                     Box(Modifier.width(widthDp.intValue.dp)) {
-                        DsCategoryRow(
+                        SyCategoryRow(
                             icon = FeatherIcons.Folder,
                             title = "工作项目",
                             subtitle = "查看项目中保存的文件",

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -98,7 +99,7 @@ class LocalRunCenterAgentActionsTest {
                 )
             }
         }
-        // DsSheetChoiceRow deliberately uses distinct title/subtitle semantics nodes.
+        // SySheetChoiceRow deliberately uses distinct title/subtitle semantics nodes.
         // Verify the actual service row stays visible while its event-derived phase changes.
         val running = context.getString(R.string.local_tool_phase_running)
         val completed = context.getString(R.string.local_tool_phase_completed)

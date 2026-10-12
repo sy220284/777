@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,10 +22,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -99,13 +99,13 @@ internal fun GroupAnnouncementSheet(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_group_announcement_title),
         onDismiss = { if (!saving) onDismiss() },
     ) {
         Text(stringResource(R.string.local_group_announcement_hint),
             style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
-        DsTextField(
+        SyTextField(
             value = draft,
             onValueChange = { draft = it.take(2_000); error = null },
             modifier = Modifier.fillMaxWidth(),
@@ -115,7 +115,7 @@ internal fun GroupAnnouncementSheet(
             enabled = enabled && !saving,
         )
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
-        DsButton(
+        SyButton(
             text = stringResource(
                 if (saving) R.string.local_group_announcement_saving
                 else R.string.local_group_announcement_save,

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,10 +28,10 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalModelTemperatureRange
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsBottomSheet
-import com.labteto.dshmobile.ui.components.DsSlider
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -88,7 +89,7 @@ internal fun CharacterBehaviorTuningDialog(
     var saveError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
-    DsBottomSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.local_character_tuning_title),
         onDismiss = { if (!saving) onDismiss() },
         scrollable = true,
@@ -96,18 +97,18 @@ internal fun CharacterBehaviorTuningDialog(
         footer = {
             saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_character_tuning_restore),
                     onClick = { draft = draft.copy(samplingTemperaturePosition = null, expressionVariation = 50) },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     enabled = !saving,
                 )
                 Spacer(Modifier.width(DsSpacing.small))
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_character_tuning_done),
                     enabled = !saving,
                     onClick = {
-                        if (saving) return@DsButton
+                        if (saving) return@SyButton
                         val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
                         saving = true
                         saveError = null
@@ -204,7 +205,7 @@ private fun BehaviorSlider(
                 color = colors.characterAccent,
             )
         }
-        DsSlider(
+        SySlider(
             value = clean.toFloat(),
             onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maximum)) },
             enabled = enabled,

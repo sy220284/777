@@ -48,9 +48,10 @@ fun SyTopBar(
     val tokens = LocalSyColors.current
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = tokens.surfaceSolid,
+        color = tokens.topBar,
         border = BorderStroke(1.dp, tokens.border.copy(alpha = .45f)),
     ) {
+        Column {
         Row(
             Modifier.fillMaxWidth().heightIn(
                 min = if (LocalConfiguration.current.screenWidthDp >= 600) 64.dp else 56.dp,
@@ -77,12 +78,6 @@ fun SyTopBar(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (!subtitle.isNullOrBlank()) {
-                    Text(subtitle, color = tokens.textSecondary,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center, maxLines = 2,
-                        overflow = TextOverflow.Ellipsis)
-                }
             }
             if ((actionIcon != null || actionPainter != null) && onAction != null) {
                 IconButton(onClick = onAction, enabled = actionEnabled,
@@ -98,6 +93,12 @@ fun SyTopBar(
             } else {
                 Box(Modifier.size(48.dp))
             }
+        }
+        if (!subtitle.isNullOrBlank()) {
+            Text(subtitle, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+                color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
         }
     }
 }

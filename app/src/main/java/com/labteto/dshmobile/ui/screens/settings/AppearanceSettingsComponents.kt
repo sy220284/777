@@ -45,7 +45,7 @@ import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.ToggleRow
-import com.labteto.dshmobile.ui.components.UserBubble
+import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -73,7 +73,7 @@ internal fun AppearanceReadingPreview() {
             style = DsType.chatBody.withReadingWeight(),
             color = colors.labelPrimary,
         )
-        UserBubble(stringResource(R.string.settings_appearance_preview_user))
+        SyUserBubble(stringResource(R.string.settings_appearance_preview_user))
         Text(
             stringResource(R.string.settings_appearance_preview_hint),
             style = DsType.small13.withReadingWeight(),
