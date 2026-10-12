@@ -736,7 +736,13 @@ internal fun renderChatContextForModel(
         // Preserve all facts in storage; only relevant facts participate in this model request.
         fun relevant(value: String): Boolean =
             focusQuery == null || ChatMemorySelector.isRelevantToTurn(focusQuery, value)
-        val events = continuity.recentEvents.filter(::relevant)
+        // A latest completed event is a continuity checkpoint, not another to-do.
+        // Keep it available unless the user explicitly redirects the conversation.
+        val events = if (focusQuery != null && ChatMemorySelector.isExplicitTopicShift(focusQuery)) {
+            emptyList()
+        } else {
+            (continuity.recentEvents.filter(::relevant) + continuity.recentEvents.takeLast(1)).distinct()
+        }
         val decisions = continuity.decisions.filter(::relevant)
         val unfinished = continuity.unfinished.filter(::relevant)
         if (events.isNotEmpty() || decisions.isNotEmpty() || unfinished.isNotEmpty()) {
