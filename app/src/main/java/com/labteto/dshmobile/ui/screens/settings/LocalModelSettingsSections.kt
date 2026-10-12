@@ -106,9 +106,14 @@ internal fun LocalModelSettingsCard(
     var editingProfileId by remember { mutableStateOf<String?>(null) }
     var editorGeneration by remember { mutableStateOf(0L) }
     var apiKey by remember { mutableStateOf("") }
+    var credentialSourceProfileId by remember { mutableStateOf<String?>(null) }
     var contextWindowTokens by remember { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
+    var discoveredModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var catalogStatus by remember { mutableStateOf<String?>(null) }
+    var catalogError by remember { mutableStateOf(false) }
+    var refreshingModels by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
     val matchingRoutes = local.modelProfiles.filter {
@@ -123,6 +128,9 @@ internal fun LocalModelSettingsCard(
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
         editorGeneration++
         editingProfileId = id
+        credentialSourceProfileId = id
+        discoveredModels = emptyList()
+        catalogStatus = null
         model = name
         baseUrl = url
         protocol = id?.let { profileId ->
@@ -134,6 +142,43 @@ internal fun LocalModelSettingsCard(
         contextWindowTokens = id?.let { profileId -> local.modelProfiles.firstOrNull { it.id == profileId }?.contextWindowTokensOverride?.toString() }.orEmpty()
         apiKey = ""
         testStatus = null
+    }
+
+    val refreshModels: () -> Unit = refresh@{
+        if (refreshingModels || saving || baseUrl.isBlank()) return@refresh
+        refreshingModels = true
+        catalogError = false
+        catalogStatus = null
+        val queriedKey = apiKey
+        val queriedUrl = baseUrl
+        val queriedProtocol = protocol
+        val sourceProfileId = credentialSourceProfileId
+        val generation = editorGeneration
+        scope.launch {
+            try {
+                val found = viewModel.discoverApiModels(
+                    queriedKey, queriedUrl, queriedProtocol, sourceProfileId,
+                )
+                if (showEditor && editorGeneration == generation) {
+                    discoveredModels = found
+                    catalogStatus = if (found.isEmpty()) {
+                        "接口返回了空模型目录；仍可手动填写模型 ID"
+                    } else {
+                        "已从接口获取 ${found.size} 个模型，点击模型名称即可选择"
+                    }
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (showEditor && editorGeneration == generation) {
+                    discoveredModels = emptyList()
+                    catalogError = true
+                    catalogStatus = "模型目录获取失败：${error.message ?: "接口未响应"}；可以继续手动填写模型"
+                }
+            } finally {
+                refreshingModels = false
+            }
+        }
     }
 
     LaunchedEffect(requestAddModel) {
@@ -274,10 +319,11 @@ internal fun LocalModelSettingsCard(
                         val savedUrl = baseUrl
                         val savedProtocol = protocol
                         val savedProfileId = editingProfileId
+                        val savedCredentialSourceProfileId = credentialSourceProfileId
                         val savedContextWindowOverride = contextWindowTokens.toIntOrNull() ?: 0
                         scope.launch {
                             try {
-                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId, savedContextWindowOverride)
+                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId, savedContextWindowOverride, savedCredentialSourceProfileId)
                                 if (showEditor && editorGeneration == savedGeneration) {
                                     apiKey = ""
                                     showEditor = false
@@ -293,8 +339,8 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                 }, modifier = Modifier.fillMaxWidth(), size = DsButtonSize.Large, loading = saving,
-                    enabled = !testing && !saving && model.isNotBlank() && baseUrl.isNotBlank() &&
-                        (savedRoute || apiKey.isNotBlank()))
+                    enabled = !testing && !saving && !refreshingModels && model.isNotBlank() && baseUrl.isNotBlank() &&
+                        (savedRoute || apiKey.isNotBlank() || credentialSourceProfileId != null))
             },
         ) {
             Column(Modifier.fillMaxWidth(),
@@ -318,7 +364,18 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                     },
-                    items = LocalModelPresets.entries.map { preset ->
+                    items = discoveredModels.map { discovered ->
+                        MenuItem("接口可用 · $discovered") {
+                            // A new discovered model is a new route. Preserve the original
+                            // credential reference, without exposing or copying its key into UI.
+                            if (editingProfileId != null) credentialSourceProfileId = editingProfileId
+                            editingProfileId = null
+                            model = discovered
+                            custom = true
+                            testStatus = null
+                            editorGeneration++
+                        }
+                    } + LocalModelPresets.entries.map { preset ->
                         MenuItem("${preset.provider} · ${preset.model}") {
                             custom = false
                             editRoute(preset.model, preset.baseUrl, null)
@@ -329,10 +386,18 @@ internal fun LocalModelSettingsCard(
                     },
                 )
                 if (custom) {
-                    DsTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(model, onValueChange = {
+                        if (editingProfileId != null) credentialSourceProfileId = editingProfileId
+                        model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null
+                    },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_default_model)) })
-                    DsTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(baseUrl, onValueChange = {
+                        baseUrl = it.take(1000); editingProfileId = null
+                        credentialSourceProfileId = null
+                        discoveredModels = emptyList(); catalogStatus = null
+                        editorGeneration++; testStatus = null
+                    },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                     LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
@@ -365,13 +430,60 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                 }
-                if (custom) LocalModelProtocolPicker(protocol) { protocol = it; editorGeneration++; testStatus = null }
-                DsTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
+                if (custom) LocalModelProtocolPicker(protocol) {
+                    protocol = it; editorGeneration++; testStatus = null
+                    discoveredModels = emptyList(); catalogStatus = null
+                }
+                DsTextField(apiKey, onValueChange = {
+                    apiKey = it.take(8000); editorGeneration++; testStatus = null
+                    discoveredModels = emptyList(); catalogStatus = null
+                },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
                         else R.string.advanced_model_key)) },
                     supportingText = { if (savedRoute) Text(stringResource(R.string.local_model_keep_key)) },
                     visualTransformation = PasswordVisualTransformation())
+                DsButton(
+                    if (refreshingModels) "正在获取模型列表…" else "从接口刷新模型列表",
+                    onClick = refreshModels,
+                    enabled = !refreshingModels && !testing && !saving && baseUrl.isNotBlank() &&
+                        (apiKey.isNotBlank() || credentialSourceProfileId != null),
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = DsButtonVariant.Outline,
+                )
+                catalogStatus?.let { status ->
+                    Text(status, style = DsType.small13.withReadingWeight(),
+                        color = if (catalogError) colors.error else colors.labelSecondary)
+                }
+                if (discoveredModels.isNotEmpty()) {
+                    DsMenu(
+                        anchor = {
+                            Surface(shape = DsShapes.row,
+                                color = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+                                modifier = Modifier.fillMaxWidth()) {
+                                Row(Modifier.fillMaxWidth().padding(DsSpacing.comfortable),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Text("选择接口返回的模型（${discoveredModels.size}）",
+                                        style = DsType.std14Strong.withReadingWeight(),
+                                        color = colors.labelPrimary, modifier = Modifier.weight(1f))
+                                    Icon(FeatherIcons.ChevronRight, contentDescription = null)
+                                }
+                            }
+                        },
+                        items = discoveredModels.map { discovered ->
+                            MenuItem(discovered) {
+                                if (editingProfileId != null) credentialSourceProfileId = editingProfileId
+                                editingProfileId = null
+                                model = discovered
+                                custom = true
+                                testStatus = null
+                                editorGeneration++
+                            }
+                        },
+                    )
+                    Text("目录来自 API 服务端，列出不代表该模型一定支持对话；可用下方连接测试验证。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                }
                 testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
                     color = if (it.startsWith("连接成功")) colors.labelSecondary else colors.error) }
                 DsButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
@@ -388,8 +500,17 @@ internal fun LocalModelSettingsCard(
                             try {
                                 val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId)
                                 if (showEditor && editorGeneration == testedGeneration) testStatus = result
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                if (showEditor && editorGeneration == testedGeneration) {
+                                    testStatus = "连接测试失败：${error.message ?: "接口未响应"}"
+                                }
                             } finally {
                                 testing = false
+                                // Catalog refresh is independent of this model's inference result.
+                                // A stale preset must not prevent discovery of current IDs.
+                                if (showEditor && editorGeneration == testedGeneration) refreshModels()
                             }
                         }
                     }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
