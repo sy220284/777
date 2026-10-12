@@ -224,7 +224,7 @@ internal class MiniMaxNativeMediaClient @Inject constructor(
             .url("https://${route.host}$path")
             .header("Authorization", "Bearer $credential")
             .header("Accept", "application/json")
-        val request = (if (body == null) builder.get() else builder.post(body)).build()
+        val request = (if (body == null) builder.get() else builder.post(localMediaOneShotBody(body))).build()
         if (body != null) markMediaRequestStarted()
         withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
             if (!response.isSuccessful) throwMediaHttpFailure("MiniMax 多模态", response.code)

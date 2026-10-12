@@ -1,9 +1,9 @@
 {
   "version": 1,
   "scope": "repository_code_and_all_production_sources",
-  "repository_code_file_count": 1451,
+  "repository_code_file_count": 1452,
   "production_source_count": 827,
-  "test_code_file_count": 471,
+  "test_code_file_count": 472,
   "workflow_files": [
     ".github/workflows/capture-readme-ui.yml",
     ".github/workflows/ci.yml",
@@ -1084,7 +1084,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
-      "sha256": "2b9ebfd689ac6883"
+      "sha256": "a5399afd1dcd1cf5"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaCatalog.kt",
@@ -1104,7 +1104,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaRequestAdmission.kt",
-      "sha256": "bf90fa3a2ae5c748"
+      "sha256": "133484015227c6cf"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaResultStore.kt",
@@ -1332,7 +1332,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
-      "sha256": "15d3fb008c453c4a"
+      "sha256": "f965a9a308c63c5c"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxProviderQuota.kt",
@@ -1912,7 +1912,7 @@
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt",
-      "sha256": "10e0aa5ab0dce5d5"
+      "sha256": "d98efa8132f577c3"
     },
     {
       "path": "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPromptBudgetPolicy.kt",
@@ -3380,12 +3380,17 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "d7675e0b7db4",
+  "source_snapshot": "abc2104f86b9",
   "observed_delta": {
-    "baseline": "5dd46cf4c75d",
+    "baseline": "d7675e0b7db4",
     "added_production_files": [],
     "removed_production_files": [],
-    "modified_production_files": [],
+    "modified_production_files": [
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaApiClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/LocalMediaRequestAdmission.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/model/MiniMaxNativeMediaClient.kt",
+      "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolPolicy.kt"
+    ],
     "moved_unchanged_files": [],
     "added_routes": [],
     "removed_routes": [],

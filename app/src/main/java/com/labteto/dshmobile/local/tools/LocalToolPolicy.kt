@@ -194,7 +194,7 @@ internal object LocalToolPolicy {
         return ToolMetadata(
             family = family,
             workspaceAccess = when (canonical) {
-                "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query" -> ToolWorkspaceAccess.READ
+                "read", "file_inspect", "list_files", "glob", "grep", "skill", "json_query", "update_goal" -> ToolWorkspaceAccess.READ
                 "write", "edit", "apply_patch", "download_file", "present", "bash" -> ToolWorkspaceAccess.WRITE
                 else -> ToolWorkspaceAccess.NONE
             },

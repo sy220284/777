@@ -18,3 +18,11 @@ internal fun throwMediaHttpFailure(provider: String, code: Int): Nothing {
     if (code in setOf(400, 401, 403, 404, 405, 413, 415, 422, 429)) throw LocalMediaRequestRejected(reason)
     error(reason) // A server-side failure is not affirmative proof that billing never started.
 }
+
+/** Do not let connection recovery, 503 follow-ups or authentication replay a charged POST. */
+internal fun localMediaOneShotBody(body: okhttp3.RequestBody): okhttp3.RequestBody = object : okhttp3.RequestBody() {
+    override fun contentType() = body.contentType()
+    override fun contentLength() = body.contentLength()
+    override fun writeTo(sink: okio.BufferedSink) = body.writeTo(sink)
+    override fun isOneShot(): Boolean = true
+}

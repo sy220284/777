@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_snapshot": "d7675e0b7db4",
+  "source_snapshot": "abc2104f86b9",
   "scope": "previously_14_unproven_plus_76_file_only_description_traces",
   "interpretation": "独立实现：是否有独立产品入口；能用：必须证明执行路径和实际行为。源码和测试存在无法自动证明可用。",
   "summary": {
@@ -2066,7 +2066,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt"
       ],
-      "test_file_symbol_reference_count": 16,
+      "test_file_symbol_reference_count": 17,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
@@ -2120,7 +2120,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 50,
+      "test_file_symbol_reference_count": 51,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2174,7 +2174,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 50,
+      "test_file_symbol_reference_count": 51,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2228,7 +2228,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 50,
+      "test_file_symbol_reference_count": 51,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",
@@ -2403,7 +2403,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt"
       ],
-      "test_file_symbol_reference_count": 16,
+      "test_file_symbol_reference_count": 17,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
@@ -2452,7 +2452,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/OnDemandLanguageServerManager.kt"
       ],
-      "test_file_symbol_reference_count": 16,
+      "test_file_symbol_reference_count": 17,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/usage/TokenUsageDatabaseAndroidTest.kt",
         "app/src/test/java/com/labteto/dshmobile/local/LocalApprovalPolicyTest.kt",
@@ -3098,7 +3098,7 @@
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
         "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestOptions.kt"
       ],
-      "test_file_symbol_reference_count": 50,
+      "test_file_symbol_reference_count": 51,
       "test_reference_samples": [
         "app/src/androidTest/java/com/labteto/dshmobile/local/LocalWebCancellationAndroidTest.kt",
         "app/src/androidTest/java/com/labteto/dshmobile/local/model/chatgpt/ChatGptAuthRecoveryAndroidTest.kt",

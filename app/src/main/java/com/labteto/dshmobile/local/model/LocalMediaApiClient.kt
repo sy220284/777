@@ -296,7 +296,7 @@ internal class LocalMediaApiClient @Inject constructor(
             put("response_format", "mp3")
         }
         val request = authorizedRequest(offer, "https://api.openai.com/v1/audio/speech")
-            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .post(localMediaOneShotBody(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())))
             .build()
         return withContext(Dispatchers.IO) {
             markMediaRequestStarted()
@@ -386,7 +386,7 @@ internal class LocalMediaApiClient @Inject constructor(
         }
         val request = authorizedRequest(offer, url)
             .header("X-DashScope-Async", "enable")
-            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .post(localMediaOneShotBody(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())))
             .build()
         val root = readJson(request)
         return root["output"]?.jsonObject?.get("task_id")?.jsonPrimitive?.contentOrNull
@@ -410,8 +410,11 @@ internal class LocalMediaApiClient @Inject constructor(
         readJson(authorizedRequest(offer, url).post(body).build())
 
     private suspend fun readJson(request: Request): JsonObject = withContext(Dispatchers.IO) {
-        if (request.method == "POST") markMediaRequestStarted()
-        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
+        val admitted = if (request.method == "POST") {
+            markMediaRequestStarted()
+            request.newBuilder().post(localMediaOneShotBody(requireNotNull(request.body))).build()
+        } else request
+        withCancellableHttpResponse(mediaHttp.newCall(admitted)) { response ->
             if (!response.isSuccessful) throwMediaHttpFailure("创作服务", response.code)
             val payload = response.body?.string() ?: error("创作服务未返回数据")
             LocalMediaApiResponse.checked(json.parseToJsonElement(payload).jsonObject)

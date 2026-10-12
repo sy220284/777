@@ -84,6 +84,34 @@ class LocalWorkspaceReadWriteGateTest {
         hold.complete(Unit); writer.await(); reader.await()
         assertTrue(read)
     }
+    @Test fun goalCompletionCheckAndCommitWaitForAndExcludeWorkspaceWrites() = runTest {
+        val gate = LocalWorkspaceReadWriteGate()
+        val goal = com.labteto.dshmobile.harness.tools.HarnessTool(
+            "update_goal", com.labteto.dshmobile.harness.tools.functionToolSchema("update_goal", "complete goal"),
+            com.labteto.dshmobile.harness.tools.ToolAccess.AGENT_CONTROL,
+            com.labteto.dshmobile.harness.tools.ToolApprovalPolicy.NEVER,
+            com.labteto.dshmobile.harness.tools.ToolExposure.CORE,
+            LocalToolPolicy.metadata("update_goal"),
+            executor = com.labteto.dshmobile.harness.tools.HarnessToolExecutor { _, _, _ -> com.labteto.dshmobile.harness.tools.ToolResult("completed") })
+        val releaseWrite = CompletableDeferred<Unit>()
+        val writerEntered = CompletableDeferred<Unit>()
+        val writer = async { gate.withWrite { writerEntered.complete(Unit); releaseWrite.await() } }
+        writerEntered.await()
+        val releaseCommit = CompletableDeferred<Unit>()
+        var checked = false
+        val complete = async { gate.execute(goal) { checked = true; releaseCommit.await() } }
+        runCurrent()
+        assertFalse(checked)
+        releaseWrite.complete(Unit); writer.await(); runCurrent()
+        assertTrue(checked)
+        var overwritten = false
+        val laterWrite = async { gate.withWrite { overwritten = true } }
+        runCurrent()
+        assertFalse(overwritten)
+        releaseCommit.complete(Unit); complete.await(); laterWrite.await()
+        assertTrue(overwritten)
+    }
+
     @Test fun unrelatedRemoteReadDoesNotWaitForWorkspaceWriter() = runTest {
         val gate = LocalWorkspaceReadWriteGate()
         val remote = com.labteto.dshmobile.harness.tools.HarnessTool(
