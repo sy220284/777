@@ -15,6 +15,9 @@ internal data class LocalModelAdmissionRequest(
     val contextWindowTokensOverride: Int?,
     val messages: List<JsonObject>,
     val tools: JsonArray,
+    /** Optional frozen route-derived context policy; legacy admission callers may omit it. */
+    val operationalInputLimitSnapshot: Int? = null,
+    val contextWindowSnapshot: Int? = null,
 )
 
 internal fun interface LocalModelAdmissionPort {
@@ -29,16 +32,10 @@ internal fun validateModelRequestAdmission(request: LocalModelAdmissionRequest) 
     val pressure = LocalPromptPressureMeter.measure(
         messages = request.messages,
         tools = request.tools,
-        operationalLimitTokens = operationalInputLimitTokens(
-            request.model,
-            request.baseUrl,
-            request.contextWindowTokensOverride,
-        ),
-        modelContextWindowTokens = documentedContextWindowTokens(
-            request.model,
-            request.baseUrl,
-            request.contextWindowTokensOverride,
-        ),
+        operationalLimitTokens = request.operationalInputLimitSnapshot
+            ?: operationalInputLimitTokens(request.model, request.baseUrl, request.contextWindowTokensOverride),
+        modelContextWindowTokens = request.contextWindowSnapshot
+            ?: documentedContextWindowTokens(request.model, request.baseUrl, request.contextWindowTokensOverride),
     )
     if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
         throw LocalModelException(
@@ -123,6 +120,8 @@ internal class LocalAgentModelRequestRuntime(
             contextWindowTokensOverride = surface.contextWindowTokensOverride,
             messages = messages,
             tools = tools,
+            operationalInputLimitSnapshot = surface.contract.operationalInputLimitTokens,
+            contextWindowSnapshot = surface.contract.documentedContextWindowTokens,
         )
         validateModelRequestAdmission(admissionRequest)
         return admission?.execute(admissionRequest, invokeProvider) ?: invokeProvider()
