@@ -34,6 +34,17 @@ class ShenyanV5ContractTest {
         assertEquals(380, SyDurations.sheet)
     }
 
+    @Test fun compatibilityPaletteIsAnAliasNotAnIndependentTheme() {
+        val canonical = com.shenyan.designsystem.foundation.ShenyanPalettes
+        assertEquals(canonical.light.materialL4, SyPalettes.Light.l4)
+        assertEquals(canonical.light.topBar, SyPalettes.Light.topBar)
+        assertEquals(canonical.dark.primary, SyPalettes.Dark.peach)
+        assertEquals(canonical.dark.materialL3, SyPalettes.Dark.l3)
+        assertEquals(canonical.matte.materialL5, SyPalettes.Matte.solid)
+        assertEquals(canonical.matte.topBar, SyPalettes.Matte.topBar)
+        assertEquals(canonical.matte.overlay, SyPalettes.Matte.scrim)
+    }
+
     @Test fun systemModeHasDeterministicFallback() {
         assertEquals(SyPalettes.Light, SyPalettes.forMode(SyMode.SYSTEM, false))
         assertEquals(SyPalettes.Dark, SyPalettes.forMode(SyMode.SYSTEM, true))
