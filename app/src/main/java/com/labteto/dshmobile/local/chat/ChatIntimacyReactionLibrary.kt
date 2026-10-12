@@ -69,6 +69,10 @@ internal object ChatIntimacyReactionLibrary {
         IntimacyReactionScene("reconciliation", listOf("和好", "道歉", "争执后", "冷战", "原谅"),
             "先保持一点距离、观察，再慢慢靠近", "起初肩背紧绷，确认安心后才放松",
             "解释感受、确认误会而不是强行和好", "sigh"),
+        IntimacyReactionScene("adult-closeness", listOf("做爱", "性爱", "性行为", "亲热", "上床"),
+            "根据真实正在进行的动作调整距离与支撑，交流感受并按需要暂停",
+            "呼吸节奏、肌肉紧绷与放松、重心与手指动作可随感受变化",
+            "简短表达喜欢、舒适度、节奏或需要休息，也允许自然停顿", "breath"),
         IntimacyReactionScene("pause", listOf("不舒服", "想停", "暂停", "先等等", "保持距离"),
             "松开手、后退、让出空间、停止当前动作", "紧绷可能仍在，不代替口头决定",
             "明确提出暂停、调整或结束", "uncertain"),
@@ -94,6 +98,7 @@ internal object ChatIntimacyReactionLibrary {
         "shy" to "耳根发热、垂眼、忍笑或抿唇",
         "playful" to "眉梢扬起、憋笑失败或假装严肃",
         "reconciliation" to "神情先谨慎，听完后才逐渐柔和",
+        "adult-closeness" to "视线交流、片刻闭眼、认真观察彼此的感受",
         "pause" to "皱眉、避开目光、直接表达需要",
         "afterglow" to "平静对视、轻笑、目光放松",
     )
@@ -107,6 +112,7 @@ internal object ChatIntimacyReactionLibrary {
         "face-touch" to "轻抚脸颊", "hand-touch" to "牵手与手背触碰",
         "caress" to "自然轻抚", "shy" to "害羞与紧张",
         "playful" to "玩笑与笑场", "reconciliation" to "争执后和好",
+        "adult-closeness" to "成年亲密互动",
         "pause" to "暂停与不适", "afterglow" to "亲近后的余韵",
         "unspecified" to "当前亲近互动",
     )
@@ -127,7 +133,7 @@ internal object ChatIntimacyReactionLibrary {
         "hum" to "自然鼻音、轻哼或完全不发声",
         "quiet" to "呼吸声、简短应答或安静无声",
         "laugh" to "轻笑、憋笑或话语中的笑意",
-        "breath" to "短促吸气、片刻屏息或自然呼气",
+        "breath" to "短促吸气、轻声低吟、片刻屏息或自然呼气",
         "hesitation" to "话音停顿、迟疑的鼻音或声线微颤",
         "uncertain" to "发问、短促停顿或直接表达不舒服",
     )
