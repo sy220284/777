@@ -135,4 +135,44 @@ class LocalEffectiveModelContractTest {
         assertEquals(first.operationalInputLimitTokens, second.operationalInputLimitTokens)
         assertEquals(original, original.copy())
     }
+    @Test
+    fun frozenRunSurfaceMatchesContractAndExposesSeparateCreativeOffers() {
+        val miniMax = LocalModelProfile(
+            id = "minimax-account",
+            model = "MiniMax-M2.7",
+            baseUrl = "https://api.minimaxi.com/v1",
+            credentialRef = "account-a",
+        )
+        val run = miniMax.toRunModelSurface()
+        val contract = LocalEffectiveModelContracts.forProfile(miniMax)
+        assertEquals(contract, run.contract)
+        assertEquals(contract.runtime, run.capabilities)
+        assertEquals(contract.operationalInputLimitTokens, run.contract.operationalInputLimitTokens)
+        assertEquals(
+            setOf(LocalMediaKind.IMAGE, LocalMediaKind.VIDEO, LocalMediaKind.SPEECH, LocalMediaKind.TRANSCRIBE),
+            contract.mediaOffers.map { it.kind }.toSet(),
+        )
+        assertFalse(LocalModelCapability.VIDEO in contract.clientModalities)
+        val proxy = contract.copy(mediaOffers = emptyList())
+        assertTrue(proxy.mediaOffers.isEmpty())
+        val otherAccount = LocalEffectiveModelContracts.forProfile(
+            miniMax.copy(id = "other", credentialRef = "account-b"),
+        )
+        assertNotEquals(contract.routeFingerprint, otherAccount.routeFingerprint)
+    }
+
+    @Test
+    fun creativeServiceContractDoesNotAssumePlanOrProxyAuthorization() {
+        val plan = LocalModelProfile(
+            id = "oauth", model = "gpt-5.6", baseUrl = "https://api.openai.com/v1",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN, credentialRef = "plan-account",
+        )
+        assertTrue(LocalEffectiveModelContracts.forProfile(plan).mediaOffers.isEmpty())
+        val proxy = plan.copy(authKind = LocalModelAuthKind.API_KEY, baseUrl = "https://proxy.example/v1")
+        assertTrue(LocalEffectiveModelContracts.forProfile(proxy).mediaOffers.isEmpty())
+        val officialKey = plan.copy(authKind = LocalModelAuthKind.API_KEY, credentialRef = "api-account")
+        assertTrue(LocalEffectiveModelContracts.forProfile(officialKey).mediaOffers.isNotEmpty())
+    }
+
+
 }
