@@ -24,7 +24,7 @@
 | 14 | 能力面板 | `local/LocalWorkCapabilitySheet.kt；tools/FluidCapabilityCatalogue.kt` | 部分 | 低中高授权等级与工具来源映射、审批不可逆交互待验 |
 | 15 | 工作历史 | `local/LocalWorkHistorySheet.kt` | 本轮修改 | 已接全部/调用/开始/结果真实事件页签与原证据回跳；状态聚合需可信数据源 |
 | 16 | 工作区 | `local/LocalWorkspaceFilesDialog.kt` | 部分 | 路径边界与分享已接；目录树、文件预览、权限回退需验 |
-| 17 | 代理团队 | `local/LocalAgentTeamUi.kt` | 待改 | 主代理+子代理的任务行/状态反馈需与真实执行态匹配 |
+| 17 | 代理团队 | `local/LocalAgentTeamUi.kt` | 本轮修改 | 真实任务数进度已接统一 running/done/failed 视觉态、成员与任务详情展开触觉；分工布局与实机动效待验 |
 | 18 | 工具插件 | `tools/ToolsScreen.kt；tools/PluginInventoryBrowser.kt` | 本轮修改 | 实际连接 HTTP/stdio/全部分类、实时数量及连接管理已接；设计中的商店/Webhook 操作只有实态后可显示 |
 | 19 | 任务计划 | `tasks/TasksScreen.kt` | 本轮修改 | 全部/待执行/执行中/暂停玻璃选项及动态计数、空态恢复已接；单任务成本/预算不可取时不显示 |
 | 20 | 设置首页 | `settings/SettingsScreen.kt` | 部分 | 三组分区已接，保留额外入口仍须归一同款列表行和图标 |
@@ -99,3 +99,5 @@
 - 所有新入口仅调用仓库现有业务回调，不覆盖本机定时逻辑和模型协议。
 - Figma MCP Starter 限流且为 View seat，本轮无法通过插件读写 Figma 节点，源 HTML 和预览作为验收资料。
 - 最新 head 的构建、两代 Android 仪表测试及视觉截图/录屏未通过前仍保持 Draft。
+
+- 第 17 屏（第四组）：代理团队进度改用 `DsProgressBar` 的实际运行/完成/失败颜色，成员和任务详情使用触觉反馈；不改变调度、代理日志和审批语义。
