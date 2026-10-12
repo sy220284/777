@@ -240,6 +240,7 @@ internal fun PersonaGalleryScreen(
     var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
+    var confirmDiscardStoryDraft by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || storyStage.trim() != story.chatContext.storyStage ||
@@ -370,7 +371,7 @@ internal fun PersonaGalleryScreen(
         if (selected == null) {
             onDismiss()
         } else if (hasLocalStoryEdits) {
-            error = saveEditsBeforeSwitchText
+            confirmDiscardStoryDraft = true
         } else {
             selectedId = null
             selectedStoryId = null
@@ -381,6 +382,36 @@ internal fun PersonaGalleryScreen(
     }
 
     BackHandler(enabled = selected != null, onBack = ::navigateBack)
+
+    if (confirmDiscardStoryDraft && selected != null) {
+        SyDialog(
+            title = stringResource(R.string.persona_gallery_discard_draft_title),
+            onDismiss = { confirmDiscardStoryDraft = false },
+        ) {
+            Text(stringResource(R.string.persona_gallery_discard_draft_body))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SyButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { confirmDiscardStoryDraft = false },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.weight(1f),
+                )
+                SyButton(
+                    text = stringResource(R.string.persona_gallery_discard_draft_confirm),
+                    onClick = {
+                        confirmDiscardStoryDraft = false
+                        selectedId = null
+                        selectedStoryId = null
+                        deletingCharacter = false
+                        error = null
+                        notice = null
+                    },
+                    variant = SyButtonVariant.Danger,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
 
     presets.firstOrNull { it.id == pendingPresetDeleteId }?.let { pending ->
         DeletePresetConfirmDialog(
