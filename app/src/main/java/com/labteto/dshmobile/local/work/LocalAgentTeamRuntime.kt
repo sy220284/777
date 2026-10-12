@@ -1647,6 +1647,19 @@ internal class LocalAgentTeamRuntime(
             if (task.blockedBy.isNotEmpty()) append(" | blockedBy=${task.blockedBy.joinToString(",")}")
             if (task.writeScopes.isNotEmpty()) append(" | writeScopes=${task.writeScopes.joinToString(",")}")
             if (warnings.isNotEmpty()) append(" | warnings=${warnings.joinToString(";")}")
+            append(" | workspace=shared")
+            append(" | write_execution=serialized")
+            if (task.writeScopes.isNotEmpty()) {
+                append(" | scope_enforcement=advisory_only")
+            }
+            if (task.status == LocalTeamTaskStatus.IN_PROGRESS &&
+                state.tasks.any { other ->
+                    other.id != task.id && other.status == LocalTeamTaskStatus.IN_PROGRESS &&
+                        (task.writeScopes.isEmpty() || other.writeScopes.isEmpty())
+                }
+            ) {
+                append(" | note=parallel_task_scope_unknown; execution_mutex_guards_writes")
+            }
         }
     }
 
