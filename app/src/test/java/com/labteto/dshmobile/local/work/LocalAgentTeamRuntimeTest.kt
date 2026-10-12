@@ -1545,7 +1545,7 @@ class LocalAgentTeamRuntimeTest {
             LocalToolCall("task-view", "team_task_get", buildJsonObject {
                 put("task_id", "task-3")
             }, "{}"), binding,
-        ).content
+        ).orEmpty()
         assertTrue(taskView.contains("workspace=shared"))
         assertTrue(taskView.contains("write_execution=serialized"))
         assertTrue(taskView.contains("scope_enforcement=advisory_only"))
