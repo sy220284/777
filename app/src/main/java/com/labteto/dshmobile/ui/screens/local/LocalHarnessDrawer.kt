@@ -53,7 +53,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
-import com.labteto.dshmobile.ui.components.DsIconButton
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -119,13 +119,13 @@ internal fun LocalModeDrawer(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(onClick = { syRailCollapsed = false }, modifier = Modifier.semantics { contentDescription = expandLabel }) { Text("»", color = sy.text) }
-            DsIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
+            SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
+            SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
                 onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.Search, contentDescription = stringResource(R.string.sy_v5_tasks),
+            SyIconButton(icon = FeatherIcons.Search, contentDescription = stringResource(R.string.sy_v5_tasks),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
-            DsIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
+            SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
         }
         return
@@ -265,7 +265,7 @@ internal fun LocalModeDrawer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    DsIconButton(
+                    SyIconButton(
                         icon = FeatherIcons.Search,
                         contentDescription = stringResource(R.string.common_search),
                         onClick = {
@@ -278,7 +278,7 @@ internal fun LocalModeDrawer(
                         containerColor = colors.bgLayer1,
                         tint = colors.labelPrimary,
                     )
-                    DsIconButton(
+                    SyIconButton(
                         icon = FeatherIcons.Plus,
                         contentDescription = stringResource(R.string.chatlist_new_session),
                         onClick = onNewSession,
@@ -494,7 +494,7 @@ internal fun LocalModeDrawer(
                                 variant = SyButtonVariant.Danger,
                                 size = SyButtonSize.Small,
                             )
-                            DsIconButton(
+                            SyIconButton(
                                 icon = FeatherIcons.X,
                                 contentDescription = stringResource(R.string.common_close),
                                 onClick = {
