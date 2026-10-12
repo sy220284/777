@@ -35,11 +35,11 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
 import com.labteto.dshmobile.local.model.chatgpt.shouldRequestChatGptPlanConsent
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -159,7 +159,7 @@ internal fun ChatGptAccountPanel(
                     style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.chatgpt_continue),
                     onClick = { viewModel.connectChatGpt { error -> error?.let(report) } },
                     enabled = !busy,
@@ -224,14 +224,14 @@ internal fun ChatGptAccountPanel(
                         style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
-                    DsButton(
+                    SyButton(
                         text = enablePlanLabel,
                         onClick = {
                             viewModel.connectChatGpt(selected.id, requestPlanConsent = true) { error -> error?.let(report) }
                         },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
-                        size = DsButtonSize.Small,
+                        size = SyButtonSize.Small,
                     )
                 }
                 if (otherAccounts.isNotEmpty()) {
@@ -261,7 +261,7 @@ internal fun ChatGptAccountPanel(
                                 color = colors.labelSecondary,
                                 modifier = Modifier.weight(1f),
                             )
-                            DsButton(
+                            SyButton(
                                 text = when {
                                     account.sharingEnabled -> useAccountLabel
                                     account.signedIn -> enablePlanLabel
@@ -279,8 +279,8 @@ internal fun ChatGptAccountPanel(
                                 },
                                 // A later account tap replaces the previous catalog-loading request.
                                 enabled = !busy || state.phase == ChatGptAuthPhase.LOADING_MODELS,
-                                size = DsButtonSize.Small,
-                                variant = DsButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                                variant = SyButtonVariant.Ghost,
                             )
                             if (!busy) {
                                 DsMenu(
@@ -308,7 +308,7 @@ internal fun ChatGptAccountPanel(
                     }
                 }
 
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (testing) R.string.chatgpt_testing_connection else R.string.chatgpt_test_connection,
                     ),
@@ -322,7 +322,7 @@ internal fun ChatGptAccountPanel(
                     },
                     enabled = !busy && !testing && selected.sharingEnabled,
                     modifier = Modifier.fillMaxWidth(),
-                    size = DsButtonSize.Small,
+                    size = SyButtonSize.Small,
                 )
                 Text(
                     stringResource(R.string.chatgpt_test_hint),
@@ -441,11 +441,11 @@ internal fun ChatGptAccountPanel(
                                 }
                                 if (!model.active && state.connected) {
                                     model.profileId?.let { profileId ->
-                                        DsButton(
+                                        SyButton(
                                             text = stringResource(R.string.chatgpt_account_use_model),
                                             onClick = { viewModel.selectLocalModel(profileId) },
-                                            size = DsButtonSize.Small,
-                                            variant = DsButtonVariant.Ghost,
+                                            size = SyButtonSize.Small,
+                                            variant = SyButtonVariant.Ghost,
                                         )
                                     }
                                 }
@@ -472,7 +472,7 @@ internal fun ChatGptAccountPanel(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.chatgpt_retry_authorization),
                             onClick = {
                                 viewModel.restartChatGptAuthorization(state.pendingAccountId) { error ->
@@ -480,15 +480,15 @@ internal fun ChatGptAccountPanel(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Outline,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
                         )
-                        DsButton(
+                        SyButton(
                             text = stringResource(R.string.chatgpt_cancel_authorization),
                             onClick = viewModel::cancelChatGptAuthorization,
                             modifier = Modifier.weight(1f),
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
                         )
                     }
                 }
@@ -511,27 +511,27 @@ internal fun ChatGptAccountPanel(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.chatgpt_cancel),
                     onClick = { removeAccountId = null },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.chatgpt_remove_registration_confirm),
                     onClick = {
                         removeAccountId = null
                         viewModel.removeChatGptAccount(accountId) { warning -> warning?.let(report) }
                     },
                     modifier = Modifier.weight(1f),
-                    variant = DsButtonVariant.Danger,
+                    variant = SyButtonVariant.Danger,
                 )
             }
         }
     }
 
     if (showWelcome) {
-        DsBottomSheet(
+        SyResponsiveSheet(
             title = stringResource(R.string.chatgpt_welcome_title),
             onDismiss = {
                 welcomePrefs.edit().putBoolean("plan_welcome_seen_v1", true).apply()
@@ -543,7 +543,7 @@ internal fun ChatGptAccountPanel(
                 style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.chatgpt_welcome_confirm),
                 onClick = {
                     welcomePrefs.edit().putBoolean("plan_welcome_seen_v1", true).apply()
