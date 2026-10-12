@@ -126,6 +126,80 @@ internal class LocalMediaApiClient @Inject constructor(
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
+    /** Keep provider CDN images in durable app storage whenever the official result URL is accessible. */
+    suspend fun downloadGeneratedImage(link: String): File = withContext(Dispatchers.IO) {
+        val uri = java.net.URI(link)
+        require(uri.scheme.equals("https", true) && uri.userInfo == null &&
+            !uri.host.isNullOrBlank() && uri.port == -1) { "仅支持安全 HTTPS 图片地址" }
+        val request = Request.Builder().url(link).get().build()
+        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
+            check(response.isSuccessful && response.request.url.isHttps) { "无法下载生成图片" }
+            val body = response.body ?: error("图片下载响应为空")
+            val mime = body.contentType()?.toString()?.substringBefore(';')?.lowercase()
+                ?: error("生成图片缺少媒体类型")
+            val extension = LocalMediaApiResponse.imageExtension(mime)
+            require(body.contentLength() <= 20_000_000L) { "生成图片超过保存上限" }
+            val file = outputFile(extension)
+            try {
+                var count = 0L
+                body.byteStream().use { input ->
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            count += n
+                            require(count <= 20_000_000L) { "生成图片超过保存上限" }
+                            output.write(buffer, 0, n)
+                        }
+                    }
+                }
+                require(file.length() > 0L) { "生成图片为空" }
+                file
+            } catch (error: Throwable) {
+                file.delete()
+                throw error
+            }
+        }
+    }
+
+    suspend fun downloadGeneratedVideo(link: String): File = withContext(Dispatchers.IO) {
+        val uri = java.net.URI(link)
+        require(uri.scheme.equals("https", true) && uri.userInfo == null &&
+            !uri.host.isNullOrBlank() && uri.port == -1) { "仅支持安全 HTTPS 视频地址" }
+        val request = Request.Builder().url(link).get().build()
+        withCancellableHttpResponse(mediaHttp.newCall(request)) { response ->
+            check(response.isSuccessful && response.request.url.isHttps) { "视频下载失败" }
+            val body = response.body ?: error("视频下载响应为空")
+            val mime = body.contentType()?.toString()?.substringBefore(';')?.lowercase()
+            require(mime == null || mime in setOf("video/mp4", "application/octet-stream")) {
+                "生成视频返回了不支持的格式"
+            }
+            require(body.contentLength() <= 200_000_000L) { "视频超过本地保存上限" }
+            val file = outputFile("mp4")
+            try {
+                var count = 0L
+                body.byteStream().use { input ->
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(16_384)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            count += n
+                            require(count <= 200_000_000L) { "视频超过本地保存上限" }
+                            output.write(buffer, 0, n)
+                        }
+                    }
+                }
+                require(file.length() > 0) { "视频下载为空" }
+                file
+            } catch (error: Throwable) {
+                file.delete()
+                throw error
+            }
+        }
+    }
+
     suspend fun image(offer: LocalMediaOffer, prompt: String, ratio: String): LocalMediaImageResult {
         require(offer.kind == LocalMediaKind.IMAGE && prompt.isNotBlank())
         require(ratio in setOf("1:1", "16:9", "9:16", "4:3", "3:4"))

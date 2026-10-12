@@ -17,7 +17,7 @@ RULES = (
     (re.compile(r"\bAlertDialog\s*\("), set(), "use DsDialog"),
     (
         re.compile(r"\bDialog\s*\("),
-        {"components/Overlays.kt", "shenyan/SyResponsiveSheet.kt"},
+        {"components/Overlays.kt", "shenyan/SyResponsiveSheet.kt", "shenyan/SyOverlays.kt"},
         "use SyResponsiveSheet/SyConfirmDialog",
     ),
     (
@@ -27,13 +27,13 @@ RULES = (
     ),
     (
         re.compile(r"\bDropdownMenu\s*\("),
-        {"components/Overlays.kt"},
-        "use DsPopupMenu/DsMenu",
+        {"components/Overlays.kt", "shenyan/SyOverlays.kt"},
+        "use SyPopupMenu/SyMenu",
     ),
     (
         re.compile(r"\bPopup\s*\("),
-        {"components/Overlays.kt"},
-        "use DsPopupMenu/DsContextActionMenu or another shared Ds* popup primitive",
+        {"components/Overlays.kt", "shenyan/SyOverlays.kt"},
+        "use SyPopupMenu/SyContextActionMenu or another shared popup primitive",
     ),
     (
         re.compile(r"\bOutlinedCard\s*\("),

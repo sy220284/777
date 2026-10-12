@@ -56,6 +56,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
+import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsTimeline
 import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -388,12 +389,12 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
     return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
-private fun receiptStatus(status: AutomationStatus): SyStatus = when (status) {
-    AutomationStatus.COMPLETED -> SyStatus.Done
-    AutomationStatus.BLOCKED -> SyStatus.Warning
-    AutomationStatus.FAILED -> SyStatus.Failed
-    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
-    else -> SyStatus.Neutral
+private fun receiptStatus(status: AutomationStatus): DsStatus = when (status) {
+    AutomationStatus.COMPLETED -> DsStatus.Done
+    AutomationStatus.BLOCKED -> DsStatus.Warning
+    AutomationStatus.FAILED -> DsStatus.Failed
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> DsStatus.Running
+    else -> DsStatus.Neutral
 }
 
 private fun taskStatus(status: AutomationStatus): SyStatus = when (status) {

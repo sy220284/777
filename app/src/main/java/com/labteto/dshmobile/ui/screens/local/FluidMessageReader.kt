@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
+import com.labteto.dshmobile.ui.shenyan.SyTopBar
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll

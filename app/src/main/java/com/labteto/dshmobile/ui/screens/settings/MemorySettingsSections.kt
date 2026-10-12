@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.shenyan.SySearchField
+
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SySwitchControl
 
@@ -266,7 +268,7 @@ internal fun MemoryManagementCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        com.labteto.dshmobile.ui.components.SySearchField(
+        SySearchField(
             value = query,
             onValueChange = { query = it.take(200) },
             modifier = Modifier.fillMaxWidth(),

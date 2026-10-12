@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+
 import android.Manifest
 import android.os.Build
 import android.graphics.BitmapFactory
@@ -630,7 +632,7 @@ fun SettingsScreen(
                                         }
                                     },
                                     enabled = canAddFilter,
-                                    size = com.labteto.dshmobile.ui.components.SyButtonSize.Small,
+                                    size = SyButtonSize.Small,
                                 )
                             }
                             customFilters.forEach { phrase ->
@@ -1030,7 +1032,7 @@ private fun ChatFilterPhraseRow(
                 text = removeLabel,
                 onClick = onRemove,
                 variant = SyButtonVariant.Ghost,
-                size = com.labteto.dshmobile.ui.components.SyButtonSize.Small,
+                size = SyButtonSize.Small,
             )
         }
     }

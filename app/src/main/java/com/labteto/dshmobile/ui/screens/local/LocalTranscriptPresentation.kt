@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.model.LocalMediaResult
+import com.labteto.dshmobile.local.model.LocalMediaVideoTask
+import com.labteto.dshmobile.local.model.LocalMediaCreationJob
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 
 /**
  * User-facing transcript projection.
@@ -40,6 +44,23 @@ internal sealed interface LocalTranscriptItem {
     }
 
     /** One event per lazy-list row; the persisted transcript remains unchanged. */
+    /** Sidecar media timeline rows are visible but never replayed as model/persona dialogue. */
+    data class MediaResult(val result: LocalMediaResult) : LocalTranscriptItem {
+        override val key: String = "media-result:${result.id}"
+    }
+
+    data class CreationJob(val job: LocalMediaCreationJob) : LocalTranscriptItem {
+        override val key: String = "media-result:${job.id}"
+    }
+
+    data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
+        override val key: String = "media-video:${task.id}"
+    }
+
+    data class WorkArtifact(val artifact: LocalArtifactUiItem) : LocalTranscriptItem {
+        override val key: String = "work-artifact:${artifact.category}:${artifact.reference}"
+    }
+
     data class WorkStep(
         val message: LocalHarnessMessage,
         val repeatCount: Int = 1,
@@ -197,3 +218,50 @@ internal fun shouldShowWorkStreamingTail(
     (lastItem as? LocalTranscriptItem.Message)?.message?.role == "assistant")
 
 private val WORK_PROCESS_ROLES = setOf("reasoning", "tool", "progress")
+
+// Insert paid media results into the conversation timeline without polluting model history.
+// Legacy unassigned archive items remain in Media Studio, never leak across sessions.
+internal fun mergeLocalMediaTimeline(
+    transcript: List<LocalTranscriptItem>,
+    sessionId: String,
+    results: List<LocalMediaResult>,
+    videoTasks: List<LocalMediaVideoTask>,
+    jobs: List<LocalMediaCreationJob> = emptyList(),
+): List<LocalTranscriptItem> {
+    if (sessionId.isBlank()) return transcript
+    val delivered = results.filter { it.sessionId == sessionId }
+    val finishedIds = delivered.mapTo(mutableSetOf()) { it.id }
+    val media = delivered.map { LocalTranscriptItem.MediaResult(it) } +
+        jobs.filter { it.sessionId == sessionId && it.id !in finishedIds }
+            .map { LocalTranscriptItem.CreationJob(it) } +
+        videoTasks.filter { it.sessionId == sessionId }.map { LocalTranscriptItem.VideoTask(it) }
+    if (media.isEmpty()) return transcript
+    // A pending media card must not jump below newer chat messages after completion.
+    val operationTimestamps = jobs.associate { it.id to it.createdAtMillis }
+    fun timestamp(item: LocalTranscriptItem): Long = when (item) {
+        is LocalTranscriptItem.Message -> item.message.createdAt
+        is LocalTranscriptItem.Thinking -> item.messages.first().createdAt
+        is LocalTranscriptItem.WorkProcess -> item.messages.first().createdAt
+        is LocalTranscriptItem.WorkStep -> item.message.createdAt
+        is LocalTranscriptItem.MediaResult ->
+            operationTimestamps[item.result.id] ?: item.result.createdAtMillis
+        is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
+        is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+        is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
+    }
+    // Stable sort preserves original transcript order when event timestamps tie.
+    return (transcript + media).sortedBy(::timestamp)
+}
+
+// Work products should be directly reachable from the conversation, not only its Output tab.
+// Existing event-derived artifact facts remain the sole source, without copying file bytes.
+internal fun appendWorkArtifactsToTranscript(
+    transcript: List<LocalTranscriptItem>,
+    artifacts: List<LocalArtifactUiItem>,
+): List<LocalTranscriptItem> {
+    // Prefer the latest state of a file. Keep the lazy timeline complete; Work's
+    // dedicated artifact browser remains an index, not the only way to recover results.
+    val unique = artifacts.filter { it.reference.isNotBlank() }.asReversed()
+        .distinctBy { it.category to it.reference }.asReversed()
+    return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
+}

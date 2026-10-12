@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyProgressBar
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -188,7 +191,7 @@ internal fun UsageCalculationPage(
     }
 
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
-        com.labteto.dshmobile.ui.components.SyGlassCard {
+        SyGlassCard {
             Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
                 color = colors.labelPrimary)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
@@ -224,7 +227,7 @@ internal fun UsageCalculationPage(
                                         color = colors.labelSecondary,
                                     )
                                 }
-                                com.labteto.dshmobile.ui.components.SyProgressBar(
+                                SyProgressBar(
                                     (entry.value.tracked.totalTokens.toDouble() / total).toFloat(),
                                 )
                             }

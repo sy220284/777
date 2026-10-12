@@ -48,7 +48,8 @@ fun SyMaterialFrame(
         SyMaterialTier.L4_OVERLAY -> c.materialL4
         SyMaterialTier.L5_SOLID -> c.materialL5
     }
-    val blurRadius = if (resolved == SyMaterialTier.L5_SOLID) 0.dp else when (resolved) {
+    // Opaque Matte surfaces must never sample or blur the supplied backdrop.
+    val blurRadius = if (resolved == SyMaterialTier.L5_SOLID || fill.alpha == 1f) 0.dp else when (resolved) {
         SyMaterialTier.L1_SECTION -> 18.dp
         SyMaterialTier.L2_BAR -> 28.dp
         SyMaterialTier.L3_CARD -> 20.dp
@@ -68,7 +69,7 @@ fun SyMaterialFrame(
                 Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) { backdrop() }
             }
             Box(Modifier.matchParentSize().background(fill))
-            CompositionLocalProvider(LocalSyGlassDepth provides (if (resolved == SyMaterialTier.L5_SOLID) nested else nested + 1)) {
+            CompositionLocalProvider(LocalSyGlassDepth provides (if (fill.alpha == 1f) nested else nested + 1)) {
                 Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
                     verticalArrangement = verticalArrangement, content = content)
             }

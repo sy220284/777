@@ -9,6 +9,92 @@ import org.junit.Test
 
 class LocalTranscriptPresentationTest {
     @Test
+    fun creationReceiptStaysInChatAndBecomesResultAtSameStableKey() {
+        val job = com.labteto.dshmobile.local.model.LocalMediaCreationJob(
+            id = "operation-1", sessionId = "session-a", kind = "IMAGE",
+            provider = "MINIMAX", model = "image-01", prompt = "海边",
+            createdAtMillis = 50L,
+        )
+        val waiting = mergeLocalMediaTimeline(emptyList(), "session-a", emptyList(), emptyList(), listOf(job))
+        assertEquals(listOf("media-result:operation-1"), waiting.map { it.key })
+        assertTrue(waiting.first() is LocalTranscriptItem.CreationJob)
+        val completed = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = job.id, provider = job.provider, model = job.model, kind = job.kind,
+            createdAtMillis = job.createdAtMillis + 15L,
+            remoteUrl = "https://cdn.example.com/success.png", sessionId = job.sessionId,
+        )
+        val delivered = mergeLocalMediaTimeline(emptyList(), "session-a", listOf(completed),
+            emptyList(), listOf(job.copy(
+                phase = com.labteto.dshmobile.local.model.LocalMediaCreationPhase.SUCCEEDED,
+            )))
+        assertEquals(waiting.map { it.key }, delivered.map { it.key })
+        assertTrue(delivered.first() is LocalTranscriptItem.MediaResult)
+        val nextChatMessage = LocalTranscriptItem.Message(
+            LocalHarnessMessage("later", "user", "下一条消息", createdAt = 70L),
+        )
+        val ordered = mergeLocalMediaTimeline(listOf(nextChatMessage), "session-a",
+            listOf(completed), emptyList(), listOf(job))
+        assertEquals(listOf("media-result:operation-1", "message:later"),
+            ordered.map { it.key })
+        assertTrue(mergeLocalMediaTimeline(emptyList(), "session-b", listOf(completed),
+            emptyList(), listOf(job)).isEmpty())
+    }
+
+    @Test
+    fun workArtifactsAppearInConversationWithoutDuplicateFiles() {
+        val transcript = listOf(LocalTranscriptItem.Message(
+            LocalHarnessMessage("answer", "assistant", "文件已生成", createdAt = 10L),
+        ))
+        val artifact = com.labteto.dshmobile.local.presentation.LocalArtifactUiItem(
+            reference = "reports/analysis.md",
+            category = "file",
+            sourceCallId = "write-file",
+            asOfSequence = 10L,
+            currentlyAvailable = true,
+        )
+        val repeated = artifact.copy(asOfSequence = 30L)
+        val out = appendWorkArtifactsToTranscript(transcript, listOf(artifact, repeated))
+        assertEquals(2, out.size)
+        assertEquals("message:answer", out.first().key)
+        assertEquals(repeated, (out.last() as LocalTranscriptItem.WorkArtifact).artifact)
+        assertEquals(out.map { it.key }, appendWorkArtifactsToTranscript(transcript, listOf(artifact)).map { it.key })
+    }
+
+    @Test
+    fun mediaTimelineAppearsInlineInOwningSessionOnlyAndRetainsStableIdentity() {
+        val chat = listOf(
+            LocalTranscriptItem.Message(LocalHarnessMessage("u", "user", "画一幅", createdAt = 100L)),
+            LocalTranscriptItem.Message(LocalHarnessMessage("a", "assistant", "好的", createdAt = 300L)),
+        )
+        val image = com.labteto.dshmobile.local.model.LocalMediaResult(
+            id = "image-a", provider = "MINIMAX", model = "image-01", kind = "IMAGE",
+            createdAtMillis = 200L, remoteUrl = "https://cdn.example.com/a.png",
+            sessionId = "session-a",
+        )
+        val otherSession = image.copy(id = "image-b", sessionId = "session-b")
+        val video = com.labteto.dshmobile.local.model.LocalMediaVideoTask(
+            id = "video-a", offerId = "offer", routeFingerprint = "route",
+            provider = "MINIMAX", model = "Hailuo", profileId = "profile",
+            startedAtMillis = 250L, updatedAtMillis = 350L,
+            phase = com.labteto.dshmobile.local.model.LocalMediaVideoPhase.PROCESSING,
+            sessionId = "session-a",
+        )
+        val combined = mergeLocalMediaTimeline(chat, "session-a", listOf(image, otherSession), listOf(video))
+        assertEquals(listOf(
+            "message:u", "media-result:image-a", "media-video:video-a", "message:a",
+        ), combined.map { it.key })
+        val completed = video.copy(
+            phase = com.labteto.dshmobile.local.model.LocalMediaVideoPhase.SUCCEEDED,
+            downloadUrl = "https://cdn.example.com/a.mp4",
+        )
+        val refreshed = mergeLocalMediaTimeline(chat, "session-a", listOf(image), listOf(completed))
+        assertEquals(combined.map { it.key }, refreshed.map { it.key })
+        assertEquals(completed, (refreshed[2] as LocalTranscriptItem.VideoTask).task)
+        assertEquals(chat, mergeLocalMediaTimeline(chat, "session-c", listOf(image), listOf(video)))
+        assertEquals(chat, mergeLocalMediaTimeline(chat, "", listOf(image), listOf(video)))
+    }
+
+    @Test
     fun durableWorkFinalAnswerSuppressesTransientDuplicateTail() {
         val answer = LocalTranscriptItem.Message(message("final", "assistant", "任务已完成"))
         val progress = LocalTranscriptItem.WorkProcess(listOf(message("p1", "progress", "处理中")))

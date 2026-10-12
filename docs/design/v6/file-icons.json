@@ -1,0 +1,13 @@
+{
+  "grid": 40,
+  "labels": {"audio": "音频文件", "video": "视频文件", "archive": "压缩文件"},
+  "themes": {
+    "light": {"paper": "#FAF7F2", "edge": "#B8AB9B", "audio": "#376E5D", "video": "#855431", "archive": "#76608F"},
+    "dark": {"paper": "#35312D", "edge": "#6A6156", "audio": "#9AD4BE", "video": "#F0B891", "archive": "#B9A0D4"}
+  },
+  "glyphs": {
+    "audio": "M18,27V16L27,14V25 M18,18L27,16 M18,27A3,3 0 1,1 15,24A3,3 0 0,1 18,27 M27,25A3,3 0 1,1 24,22A3,3 0 0,1 27,25",
+    "video": "M13,15H26A2,2 0 0,1 28,17V29A2,2 0 0,1 26,31H13A2,2 0 0,1 11,29V17A2,2 0 0,1 13,15Z M18,19L23,23L18,27Z",
+    "archive": "M18,12H22 M18,16H22 M18,20H22 M18,24H22 M18,28H22V32H18Z"
+  }
+}

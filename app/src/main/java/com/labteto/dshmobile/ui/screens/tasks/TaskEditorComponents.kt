@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -341,7 +343,7 @@ private fun TaskSchedulePicker(
     }
     val validTime = selectedMillis != null && selectedMillis >= System.currentTimeMillis() + 60_000L
 
-    com.labteto.dshmobile.ui.components.SyResponsiveSheet(
+    SyResponsiveSheet(
         title = stringResource(
             if (choosingTime) R.string.app_schedule_choose_time else R.string.app_schedule_choose_date,
         ),
@@ -412,7 +414,7 @@ internal fun AutomationTimePickerSheet(
         initialMinute = initialMinuteOfDay % 60,
         is24Hour = true,
     )
-    com.labteto.dshmobile.ui.components.SyResponsiveSheet(
+    SyResponsiveSheet(
         title = stringResource(R.string.tasks_schedule_label),
         onDismiss = onDismiss,
         footer = {

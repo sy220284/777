@@ -25,6 +25,18 @@ class ShenyanV5ContractTest {
         assertTrue(p.lilac != p.mint)
     }
 
+    @Test fun overlayMatchesThePageSpecAndMatteIsOpaqueAtEveryTier() {
+        val light = com.shenyan.designsystem.foundation.ShenyanPalettes.light
+        assertEquals(.88f, light.materialL4.alpha, .004f)
+        assertEquals(250f / 255f, light.materialL4.red, .001f)
+        assertEquals(247f / 255f, light.materialL4.green, .001f)
+        assertEquals(242f / 255f, light.materialL4.blue, .001f)
+        val matte = com.shenyan.designsystem.foundation.ShenyanPalettes.matte
+        listOf(matte.materialL1, matte.materialL2, matte.materialL3, matte.materialL4, matte.materialL5)
+            .forEach { assertEquals(1f, it.alpha, 0f) }
+        assertEquals(360, com.shenyan.designsystem.foundation.SyMotion.pushMs)
+    }
+
     @Test fun viewportContractMatchesV5() {
         assertEquals(258f, SyDimensions.navigationExpanded.value, 0f)
         assertEquals(64f, SyDimensions.navigationCollapsed.value, 0f)

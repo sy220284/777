@@ -42,7 +42,7 @@ data class SyColors(
 private val Light = SyColors(
     canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
     materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0x75FFFFFF),
-    materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xD9FFFFFF),
+    materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xE0FAF7F2),
     materialL5 = Color(0xFFFAF7F2), materialSheen = Color(0xB8FFFFFF),
     surface = Color(0xA3FFFFFF), surfaceRaised = Color(0x75FFFFFF), surfaceSolid = Color(0xFFFAF7F2),
     border = Color(0xCCFFFFFF), text = Color(0xFF3A342D),
@@ -104,7 +104,7 @@ object SyMotion {
     const val selectMs = 200
     const val dialogMs = 280
     const val sheetMs = 380
-    const val pushMs = 480
+    const val pushMs = 360
     const val morphMs = 360
     const val toolExpandMs = 200
     const val toolDetailDelayMs = 80
