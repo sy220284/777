@@ -74,6 +74,14 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
+/** Narrow rail uses the same mode-dependent destination as the expanded drawer. */
+internal fun localCollapsedRailPrimaryEntry(mode: LocalUsageMode): LocalFeatureDrawerEntry =
+    if (mode == LocalUsageMode.CHAT) LocalFeatureDrawerEntry.PERSONA_GALLERY
+    else LocalFeatureDrawerEntry.PROJECT
+
+internal fun localCollapsedRailTaskTitle(mode: LocalUsageMode): Int =
+    if (mode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title
+
 @Composable
 internal fun LocalModeDrawer(
     currentSessionId: String,
@@ -107,6 +115,7 @@ internal fun LocalModeDrawer(
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
+    onOpenPersonaSearchResult: (String) -> Unit,
     onOpenDiary: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
@@ -140,9 +149,16 @@ internal fun LocalModeDrawer(
             )
             SyIconButton(icon = FeatherIcons.Plus, contentDescription = stringResource(R.string.sy_v5_new_session),
                 onClick = onNewSession, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.sy_v5_gallery),
-                onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
-            SyIconButton(icon = FeatherIcons.CheckSquare, contentDescription = stringResource(R.string.sy_v5_tasks),
+            when (localCollapsedRailPrimaryEntry(usageMode)) {
+                LocalFeatureDrawerEntry.PERSONA_GALLERY ->
+                    SyIconButton(icon = FeatherIcons.User, contentDescription = stringResource(R.string.persona_gallery_title),
+                        onClick = onOpenPersonaGallery, containerColor = sy.l3, tint = sy.text)
+                LocalFeatureDrawerEntry.PROJECT ->
+                    SyIconButton(icon = FeatherIcons.Folder, contentDescription = stringResource(R.string.local_project_management_title),
+                        onClick = onProjects, containerColor = sy.l3, tint = sy.text)
+                else -> error("Unexpected collapsed rail primary destination")
+            }
+            SyIconButton(icon = FeatherIcons.Clock, contentDescription = stringResource(localCollapsedRailTaskTitle(usageMode)),
                 onClick = onTasks, containerColor = sy.l3, tint = sy.text)
             SyIconButton(icon = FeatherIcons.SettingsOutline, contentDescription = stringResource(R.string.sy_v5_settings),
                 onClick = onSettings, containerColor = sy.l3, tint = sy.text)
@@ -405,7 +421,7 @@ internal fun LocalModeDrawer(
                                 stringResource(R.string.local_drawer_search_open_gallery)
                             },
                             value = stringResource(R.string.local_drawer_search_open_gallery),
-                            onClick = onOpenPersonaGallery,
+                            onClick = { onOpenPersonaSearchResult(entry.id) },
                         )
                     }
                 }
