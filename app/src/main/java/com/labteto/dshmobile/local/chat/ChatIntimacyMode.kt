@@ -32,6 +32,37 @@ internal fun isInteractionResetIntent(input: String): Boolean {
         NEGATED_INTIMACY_HINTS.any { text.contains(it) }
 }
 
+/**
+ * An actual affectionate action, not merely a discussion of its vocabulary,
+ * activates INTIMATE at intensity 5 even without a sexual-keyword request.
+ * Shared by user-intent detection and assistant-output state projection.
+ */
+internal fun hasHighIntensityIntimacyAction(input: String): Boolean {
+    val text = input.trim().lowercase()
+    if (text.isBlank() || isInteractionResetIntent(text)) return false
+    if (NON_INTERACTION_INTENT_HINTS.any { text.contains(it) } &&
+        DIRECT_INTIMATE_ACTION_HINTS.none { text.contains(it) }) return false
+
+    return HIGH_INTIMACY_ACTION_HINTS.any { action ->
+        var index = text.indexOf(action)
+        while (index >= 0) {
+            val before = text.substring(0, index)
+                .takeLast(10)
+                .substringAfterLast('，')
+                .substringAfterLast(',')
+                .substringAfterLast('。')
+                .substringAfterLast('；')
+                .substringAfterLast('！')
+                .substringAfterLast('？')
+            if (INTIMATE_ACTION_NEGATION.none { negation ->
+                    before.takeLast(7).contains(negation)
+                }) return@any true
+            index = text.indexOf(action, index + action.length)
+        }
+        false
+    }
+}
+
 internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIntent {
     val text = input.trim().lowercase()
     if (text.isBlank()) return ChatInteractionIntent.NORMAL
@@ -52,7 +83,8 @@ internal fun classifyExplicitInteractionIntent(input: String): ChatInteractionIn
     if (nonInteractionContext && !directIntimateAction) return ChatInteractionIntent.NORMAL
 
     val intimateRequested =
-        directIntimateAction || ADULT_INTIMACY_HINTS.any { text.contains(it) }
+        directIntimateAction || hasHighIntensityIntimacyAction(input) ||
+            ADULT_INTIMACY_HINTS.any { text.contains(it) }
 
     return when {
         intimateRequested ->
@@ -211,6 +243,7 @@ internal fun extractInteractionPerformanceSignals(text: String): ChatInteraction
 
 internal fun assistantInitiatedInteractionIntensity(text: String): Int {
     if (text.isBlank()) return 0
+    if (hasHighIntensityIntimacyAction(text)) return 5
     val suggestiveScore = chineseSuggestiveFlirtingScore(text)
     if (suggestiveScore >= 6) return 3
     if (suggestiveScore >= CHINESE_FLIRTING_SCORE_THRESHOLD) return 2
@@ -248,7 +281,18 @@ internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
     "【中文双关】结合关系、语境和语气理解言外之意；保留双层含义，不无故拆成字面解释。"
 
 private val ADULT_INTIMACY_HINTS = listOf(
-    "亲吻", "接吻", "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
+    "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
+)
+
+/** Includes narrated actions as well as direct requests: "她抱住了我" must count. */
+private val HIGH_INTIMACY_ACTION_HINTS = listOf(
+    "搂抱", "拥抱", "搂住", "抱住", "抱着", "搂着", "环抱",
+    "亲吻", "接吻", "轻吻", "吻住", "吻上", "亲了", "吻了", "亲一口",
+    "抚摸", "轻抚", "爱抚", "抚着", "抚过", "摩挲", "摸了摸", "摸着",
+)
+private val INTIMATE_ACTION_NEGATION = listOf(
+    "不要", "别", "不许", "禁止", "停止", "拒绝", "不能", "没有",
+    "并未", "不再", "未曾", "不想", "不",
 )
 private val DIRECT_INTIMATE_ACTION_HINTS = listOf(
     "亲我", "亲一下", "亲一口", "抱我", "抱住我", "搂住我", "吻我", "吻一下",
