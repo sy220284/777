@@ -63,7 +63,8 @@ internal fun parentConversationForSubagent(history: List<JsonObject>): MutableLi
                 } else {
                     val visible = item.filterKeys { key ->
                         key !in setOf(
-                            "reasoning", "reasoning_content", "analysis", "thoughts",
+                            "reasoning", "reasoning_content", "reasoning_details",
+                            "analysis", "thoughts", "provider_replay", "model_tool_calls",
                             "tool_calls", "function_call", "tool_call_id",
                         )
                     }
