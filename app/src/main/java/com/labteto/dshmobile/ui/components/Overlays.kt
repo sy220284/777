@@ -151,7 +151,7 @@ fun DsDialog(
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL2),
-                shadowElevation = 1.dp,
+                shadowElevation = 16.dp,
             ) {
                 Column(
                     Modifier.padding(com.labteto.dshmobile.ui.theme.DsSpacing.comfortable),
@@ -244,7 +244,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
                 Text(
                     message.orEmpty(),
                     style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.onAccent,
+                    color = DsTheme.colors.onToast,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
