@@ -803,26 +803,26 @@ fun LocalHarnessScreen(
                         .padding(12.dp),
                     tier = SyMaterialTier.L2_BAR,
                 ) {
-                    Text("当前会话", color = syInk.text, style = DsType.headline17)
+                    Text(stringResource(R.string.sy_v5_session_current), color = syInk.text, style = DsType.headline17)
                     Text(
-                        text = shell.chatPersona.name.ifBlank { "未绑定人物" },
+                        text = shell.chatPersona.name.ifBlank { stringResource(R.string.sy_v5_persona_unbound) },
                         color = syInk.secondaryText,
                         style = DsType.std14,
                     )
                     Text(
                         text = activeModelProfile?.displayName
                             ?: activeModelProfile?.model
-                            ?: "尚未选择模型",
+                            ?: stringResource(R.string.sy_v5_model_unconfigured),
                         color = syInk.tertiaryText,
                         style = DsType.small13,
                     )
                     Text(
-                        text = if (shell.usageMode == LocalUsageMode.CHAT) "聊天模式" else "工作模式",
+                        text = if (shell.usageMode == LocalUsageMode.CHAT) stringResource(R.string.sy_v5_chat_mode) else stringResource(R.string.sy_v5_work_mode),
                         color = syInk.secondaryText,
                         style = DsType.small13,
                     )
                     DsButton(
-                        text = "人物与资料",
+                        text = stringResource(R.string.sy_v5_persona_data),
                         onClick = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
                         variant = DsButtonVariant.Ghost,
                     )
