@@ -406,7 +406,13 @@ internal fun groundContinuityEvidence(
             // projection AND be supported by the real exchange, never a generic "好".
             val confirmedByEventId = kind == ChatContinuityFactKind.OPEN_THREAD &&
                 plannerOmittedFact && eventId in resolvedContinuityIds &&
-                confirmationClosesPendingQuestion(previousFact, orderedTurns)
+                ChatContinuityEventIdentity.confirmsQuestion(
+                    previousFact,
+                    orderedTurns,
+                    previousValues.count {
+                        Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(it)
+                    },
+                )
             continuityRemovalGrounded(
                 kind = kind,
                 fact = previousFact,
@@ -460,7 +466,11 @@ internal fun groundContinuityEvidence(
                     ?.first
                 if (inherited != null) {
                     accepted += value
-                    acceptedEvidence[key] = inherited.copy(kind = kind, text = value)
+                    acceptedEvidence[key] = inherited.copy(
+                        kind = kind,
+                        text = value,
+                        eventId = chatContinuityEventId(kind, value, inherited.sourceSequence),
+                    )
                 }
             }
         }
@@ -533,21 +543,6 @@ internal fun groundContinuityEvidence(
     )
 }
 
-/**
- * A short acceptance is evidence for a model-selected, uniquely identified unresolved
- * yes/no event only when the character acknowledges it. A generic "好" is not completion.
- */
-private fun confirmationClosesPendingQuestion(
-    fact: String,
-    turns: List<ChatPendingTurn>,
-): Boolean {
-    if (!Regex("""(?:是否|有没有|待确认|尚未明确|还没确认)""").containsMatchIn(fact)) return false
-    return turns.any { turn ->
-        Regex("""(?:我答应|答应你|同意|说定了|说好了)""").containsMatchIn(turn.userMessage) &&
-            Regex("""(?:答应|同意|说定|约定)""").containsMatchIn(turn.assistantMessage)
-    }
-}
-
 private fun continuityRemovalGrounded(
     kind: ChatContinuityFactKind,
     fact: String,
@@ -567,7 +562,9 @@ private fun continuityRemovalGrounded(
         if (!hasRemovalSignal) return@any false
 
         val score = continuityEvidenceScore(fact, userEvidence)
-        val anchorMatched = continuityRemovalAnchorMatches(fact, userEvidence)
+        val anchorMatched = if (kind == ChatContinuityFactKind.OPEN_THREAD) {
+            ChatContinuityEventIdentity.matchesEvidenceSubject(fact, userEvidence)
+        } else continuityRemovalAnchorMatches(fact, userEvidence)
         when (kind) {
             ChatContinuityFactKind.DECISION ->
                 anchorMatched ||
@@ -606,24 +603,8 @@ private fun continuityAnchorCore(fact: String): String =
         .replace(CONTINUITY_ANCHOR_TIME_NOISE, "")
         .replace(CONTINUITY_ANCHOR_GENERIC_NOISE, "")
 
-private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean {
-    if (ChatContextAssembler.semanticallySimilar(left, right)) return true
-    val a = continuityAnchorCore(left)
-    val b = continuityAnchorCore(right)
-    if (a.length < 2 || b.length < 2) return false
-    if (a == b) return true
-    val shorter = if (a.length <= b.length) a else b
-    val longer = if (a.length <= b.length) b else a
-    if (shorter.length >= 2 && longer.contains(shorter)) return true
-
-    val aa = continuityBigrams(a)
-    val bb = continuityBigrams(b)
-    if (aa.isEmpty() || bb.isEmpty()) return false
-    val shared = aa.count(bb::contains)
-    if (shared < 2) return false
-    val containment = shared.toDouble() / minOf(aa.size, bb.size).toDouble()
-    return containment >= 0.6
-}
+private fun continuityOpenThreadsShareSubject(left: String, right: String): Boolean =
+    ChatContinuityEventIdentity.sameSubject(left, right)
 
 private val GENERIC_CONTINUITY_ANCHORS = setOf(
     "这个", "那个", "事情", "这事", "那事", "一下", "之后", "然后", "已经",

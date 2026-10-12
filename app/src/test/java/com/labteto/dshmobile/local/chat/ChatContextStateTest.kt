@@ -747,4 +747,54 @@ class ChatContextStateTest {
         assertEquals(context, context.normalized())
     }
 
+    @Test
+    fun relatedWordingDoesNotMergeDistinctOpenEvents() {
+        val confidentiality = "对方是否同意保密尚未明确"
+        val photo = "对方是否同意公开照片尚未明确"
+        assertFalse(ChatContinuityEventIdentity.sameSubject(confidentiality, photo))
+        assertTrue(ChatContinuityEventIdentity.sameSubject("还要确认车票", "车票还没确认"))
+        val previous = ChatContinuityState(unfinished = listOf(confidentiality, photo))
+        val turn = ChatPendingTurn(
+            sequence = 120L,
+            userMessage = "保密这件事我答应你",
+            assistantMessage = "我们约定保密",
+        )
+        val accepted = groundContinuityEvidence(
+            previous,
+            ChatContinuityState(unfinished = listOf(photo)),
+            listOf(turn),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, confidentiality,
+            )),
+        )
+        assertEquals(listOf(photo), accepted.unfinished)
+        val wrongSelection = groundContinuityEvidence(
+            previous,
+            ChatContinuityState(unfinished = listOf(confidentiality)),
+            listOf(turn),
+            resolvedContinuityIds = listOf(chatContinuityEventId(
+                ChatContinuityFactKind.OPEN_THREAD, photo,
+            )),
+        )
+        assertTrue(photo in wrongSelection.unfinished)
+    }
+
+    @Test
+    fun genericAcceptanceCannotChooseBetweenTwoPendingQuestions() {
+        val first = "对方是否同意保密尚未明确"
+        val second = "对方是否同意公开照片尚未明确"
+        val previous = ChatContinuityState(unfinished = listOf(first, second))
+        val vague = ChatPendingTurn(
+            sequence = 121L,
+            userMessage = "好，我答应你",
+            assistantMessage = "谢谢你答应我",
+        )
+        val result = groundContinuityEvidence(
+            previous, ChatContinuityState(unfinished = listOf(second)),
+            listOf(vague),
+            resolvedContinuityIds = listOf(chatContinuityEventId(ChatContinuityFactKind.OPEN_THREAD, first)),
+        )
+        assertEquals(previous.unfinished.toSet(), result.unfinished.toSet())
+    }
+
 }
