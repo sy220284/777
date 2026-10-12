@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -107,31 +112,41 @@ private fun DsSegment(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val emphasis by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = DsAnimations.tabSwap,
-        label = "segment",
+    val thumb by animateColorAsState(
+        targetValue = if (selected) colors.bgLayer1 else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = DsAnimations.tabBackground,
+        label = "segmentGlassThumb",
     )
-    Box(
-        contentAlignment = Alignment.Center,
+    val underline by animateDpAsState(
+        targetValue = if (selected && role == Role.Tab) 18.dp else 0.dp,
+        animationSpec = DsAnimations.tabIndicator,
+        label = "segmentUnderline",
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .heightIn(min = DsSpacing.touchTarget)
+            .shadow(if (selected) 2.dp else 0.dp, DsShapes.row)
             .clip(DsShapes.row)
-            .background(colors.bgLayer1.copy(alpha = emphasis))
+            .background(thumb)
             .selectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
-            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
+            .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall),
     ) {
         Text(
             label,
             style = DsType.tabText.withReadingWeight(),
             color = when {
                 !enabled -> colors.labelDimmed
-                selected -> colors.accent
-                else -> colors.labelTertiary
+                selected -> colors.labelPrimary
+                else -> colors.labelSecondary
             },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (role == Role.Tab) {
+            Spacer(Modifier.height(DsSpacing.tiny))
+            Spacer(Modifier.width(underline).height(2.dp).background(colors.accent, DsShapes.chip))
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,10 +56,22 @@ fun DsCard(
         animationSpec = DsAnimations.interactionColor,
         label = "cardBackground",
     )
+    val hoverLift by animateDpAsState(
+        targetValue = if (onClick != null && hovered) (-2).dp else 0.dp,
+        animationSpec = DsAnimations.segmentSlide,
+        label = "glassCardLift",
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (onClick != null && hovered) 14.dp
+            else if (elevated) 8.dp else 0.dp,
+        animationSpec = DsAnimations.segmentSlide,
+        label = "glassCardElevation",
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (elevated) Modifier.shadow(1.dp, DsShapes.block, clip = false) else Modifier)
+            .offset(y = hoverLift)
+            .then(if (elevation > 0.dp) Modifier.shadow(elevation, DsShapes.block, clip = false) else Modifier)
             .clip(DsShapes.block)
             .background(background)
             .border(1.dp, colors.borderL1, DsShapes.block)
