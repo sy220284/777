@@ -17,15 +17,6 @@ data class LocalGoal(
     val note: String? = null,
 )
 
-/** Canonical runtime stage identifiers, shared by logic and UI to avoid duplicated magic strings. */
-object WorkflowStage {
-    const val EXECUTING = "执行中"
-    const val REASSIGNING = "重新指派"
-    const val VERIFYING = "验收中"
-    const val COMPLETED = "已完成"
-    const val STALLED = "受阻"
-}
-
 data class LocalWorkflowProgress(
     val sessionId: String,
     val stage: String,
