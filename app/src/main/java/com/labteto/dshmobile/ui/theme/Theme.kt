@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import com.labteto.dshmobile.ui.shenyan.SyMode
 import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
+import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
 
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
@@ -263,6 +264,7 @@ fun DshTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
+    val reducedMotion = rememberSyReducedMotion()
     val dark = when (preference) {
         ThemePreference.LIGHT -> false
         ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
@@ -318,8 +320,16 @@ fun DshTheme(
                     com.shenyan.designsystem.foundation.ShenyanMode.DARK
                     else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
             }
-            com.shenyan.designsystem.foundation.ShenyanTheme(mode = canonicalMode) {
-                SyThemeProvider(mode = syMode) {
+            com.shenyan.designsystem.foundation.ShenyanTheme(
+                mode = canonicalMode,
+                reduceMotion = reducedMotion,
+                reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+            ) {
+                SyThemeProvider(
+                    mode = syMode,
+                    reduceMotion = reducedMotion,
+                    reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+                ) {
                     // Preserve user-defined accent and reading accessibility controls.
                     val resolvedScheme = if (palette.key == AccentPalettes.DEFAULT.key)
                         MaterialTheme.colorScheme else scheme
