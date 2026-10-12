@@ -326,6 +326,9 @@ internal class LocalToolExecutionCoordinator(
                         // The registry calls this only after schema checks and user approval.
                         // Waiting for approval must never hold a filesystem read/write lease.
                         executionLease = workspaceReadWriteGate.acquire(admittedTool)
+                        // Admission can suspend behind another read/write operation. A correction
+                        // committed during that wait must invalidate this still-unstarted call.
+                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         recordExecutionStarted(sessionId, call, executionIdentity)
                         executionStarted = true
                     },
