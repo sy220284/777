@@ -53,6 +53,29 @@ internal fun localFeatureOpenFromDrawer(
 internal fun localFeaturePop(stack: List<String>): List<String> =
     if (stack.size <= 1) listOf(LocalFeaturePage.HOME.name) else stack.dropLast(1)
 
+/** Drawer-origin routes return through their inner pages, then reopen the original drawer. */
+internal data class LocalFeatureBackResult(
+    val stack: List<String>,
+    val drawerOriginStack: List<String>?,
+    val reopenDrawer: Boolean,
+)
+
+internal fun localFeatureBack(
+    stack: List<String>,
+    drawerOriginStack: List<String>?,
+): LocalFeatureBackResult {
+    if (drawerOriginStack != null && stack == drawerOriginStack) {
+        return LocalFeatureBackResult(stack, null, reopenDrawer = true)
+    }
+    val next = localFeaturePop(stack)
+    val reachedDrawer = drawerOriginStack != null && next == drawerOriginStack
+    return LocalFeatureBackResult(
+        stack = next,
+        drawerOriginStack = drawerOriginStack.takeUnless { reachedDrawer },
+        reopenDrawer = reachedDrawer,
+    )
+}
+
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
 
 internal fun acceptLocalSessionNavigation(
