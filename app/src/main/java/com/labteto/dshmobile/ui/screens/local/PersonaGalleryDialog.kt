@@ -72,6 +72,7 @@ import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
