@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.model.LocalMediaResult
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
+import com.labteto.dshmobile.local.presentation.LocalArtifactUiItem
 
 /**
  * User-facing transcript projection.
@@ -49,6 +50,10 @@ internal sealed interface LocalTranscriptItem {
 
     data class VideoTask(val task: LocalMediaVideoTask) : LocalTranscriptItem {
         override val key: String = "media-video:${task.id}"
+    }
+
+    data class WorkArtifact(val artifact: LocalArtifactUiItem) : LocalTranscriptItem {
+        override val key: String = "work-artifact:${artifact.category}:${artifact.reference}:${artifact.asOfSequence}"
     }
 
     data class WorkStep(
@@ -228,7 +233,19 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.WorkStep -> item.message.createdAt
         is LocalTranscriptItem.MediaResult -> item.result.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
+        is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
     // Stable sort preserves original transcript order when event timestamps tie.
     return (transcript + media).sortedBy(::timestamp)
+}
+
+// Work products should be directly reachable from the conversation, not only its Output tab.
+// Existing event-derived artifact facts remain the sole source, without copying file bytes.
+internal fun appendWorkArtifactsToTranscript(
+    transcript: List<LocalTranscriptItem>,
+    artifacts: List<LocalArtifactUiItem>,
+): List<LocalTranscriptItem> {
+    val unique = artifacts.filter { it.reference.isNotBlank() }
+        .distinctBy { it.category to it.reference }.takeLast(20)
+    return transcript + unique.map(LocalTranscriptItem::WorkArtifact)
 }
