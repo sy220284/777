@@ -40,7 +40,8 @@ internal fun PersonaWorldBookEditor(
     onChange: (List<PersonaLoreEntry>) -> Unit,
 ) {
     val colors = DsTheme.colors
-    var expandedIndex by rememberSaveable { mutableIntStateOf(0) }
+    // A different character's world-book must not inherit the previous editor selection.
+    var expandedIndex by rememberSaveable(entries.firstOrNull()?.id) { mutableIntStateOf(0) }
     Text(
         stringResource(R.string.local_persona_lore_title),
         style = DsType.base16Strong.withReadingWeight(),
