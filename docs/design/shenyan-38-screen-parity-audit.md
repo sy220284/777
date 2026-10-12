@@ -13,7 +13,7 @@
 | 03 | 运行中心 | `local/LocalRunCenterScreen.kt；local/FluidRunBoardColumn.kt` | 部分 | 三看板已接，长列表、空态、等待审批进入后动效未验 |
 | 04 | 消耗与用量 | `settings/UsageCalculationPage.kt；settings/UsageCalculationComponents.kt` | 待改 | 参考趋势/模型构成/单笔详情三层布局；仅能展示真实 provider 统计 |
 | 05 | 沉浸阅读 | `local/FluidMessageReader.kt；local/LocalFeatureAnimatedHost.kt` | 部分 | 抽屉收起/返回/消息原位恢复需实机验证 |
-| 06 | 人物图集 | `local/FluidPersonaGalleryGrid.kt；local/PersonaGalleryOverviewV3.kt` | 部分 | 双列卡已有；真实人物照片、长按管理、首屏 Cascade 动效待验 |
+| 06 | 人物图集 | `local/FluidPersonaGalleryGrid.kt；local/PersonaGalleryOverviewV3.kt` | 本轮修改 | 首十卡 360ms/80ms Cascade 已接，长按有震动；照片适配/进入后动作仍需设备比对 |
 | 07 | 人物档案 | `local/FluidPersonaSections.kt；local/PersonaGalleryDialog.kt` | 部分 | 关系/故事线/记忆/档案四段必须与现有状态分离一致 |
 | 08 | 世界书 | `local/PersonaWorldBookEditor.kt` | 部分 | 已拆列表编辑；宽屏左右/手机上下、切换草稿、关键词触发联动待验 |
 | 09 | 人物日记 | `local/CharacterDiaryScreen.kt` | 部分 | 阅读布局、隐私隔离已接；编辑/停用/来源返回的实际设备交互需验 |
@@ -22,7 +22,7 @@
 | 12 | 人物定时互动 | `tasks/ChatAutomationScreen.kt；local/LocalAutomationUiContribution.kt` | 待改 | 按人物/触发时间/内容组织；不得伪造亲密度与长期计数 |
 | 13 | 任务编辑器 | `tasks/TaskEditorComponents.kt` | 本轮修改 | 目标/计划/通知分组已改；设计中的步骤拆解需真实工作任务 API 支持，不能造假 |
 | 14 | 能力面板 | `local/LocalWorkCapabilitySheet.kt；tools/FluidCapabilityCatalogue.kt` | 部分 | 低中高授权等级与工具来源映射、审批不可逆交互待验 |
-| 15 | 工作历史 | `local/LocalWorkHistorySheet.kt` | 待改 | 真实运行快照、状态筛选、证据恢复、内容展开需按真实记录整理 |
+| 15 | 工作历史 | `local/LocalWorkHistorySheet.kt` | 本轮修改 | 已接全部/调用/开始/结果真实事件页签与原证据回跳；状态聚合需可信数据源 |
 | 16 | 工作区 | `local/LocalWorkspaceFilesDialog.kt` | 部分 | 路径边界与分享已接；目录树、文件预览、权限回退需验 |
 | 17 | 代理团队 | `local/LocalAgentTeamUi.kt` | 待改 | 主代理+子代理的任务行/状态反馈需与真实执行态匹配 |
 | 18 | 工具插件 | `tools/ToolsScreen.kt；tools/PluginInventoryBrowser.kt` | 待改 | MCP/stdio/webhook 分栏与授权状态，保留真实连接数据 |
@@ -41,7 +41,7 @@
 | 31 | 首次引导 | `local/LocalHarnessScreen.kt；local/LocalModeIntroBanner.kt` | 待改 | 三步引导和先体验后授权的真实导航状态 |
 | 32 | 权限申请 | `settings/DeviceCapabilitiesController.kt` | 待改 | 单项权限按需解释/拒绝/重试，不批量抢授权 |
 | 33 | 全局搜索 | `local/LocalHarnessDrawerComponents.kt` | 待接通 | 会话/人物/任务/文件跨域入口及高亮，无独立统一可验证闭环 |
-| 34 | 空态合集 | `components/DsPageEmptyState.kt` | 部分 | 统一空态底板与可执行恢复动作，不得只显示文案 |
+| 34 | 空态合集 | `components/DsPageEmptyState.kt` | 本轮修改 | 共用空态真实动作升级为主按钮，复杂空态分支与屏幕布局仍需验收 |
 | 35 | 错误态合集 | `components/Overlays.kt；components/DsPageEmptyState.kt` | 部分 | 网络/权限/设备/语义故障需真实诊断与对应操作 |
 | 36 | 通知样式 | `components/Overlays.kt；settings/SettingsScreen.kt` | 待改 | 应用内 toast 与系统通知分别验颜色、跳转和免打扰 |
 | 37 | 完成转场 | `local/WorkflowProgressSection.kt；local/LocalWorkStateContent.kt` | 待改 | 原位 Morph/任务卡片出现，不能无条件弹成功提示 |
@@ -79,7 +79,7 @@
 | Sheet | 底部 +40px，380ms | `DsBottomSheet` (Material3 Sheet) | 系统动态曲线和手势仍待实机对比 |
 | Swap | ±60px，380ms | `FluidSectionSwap` | 已接但页面覆盖不足 |
 | Morph | 原位变形，500ms | 部分工作状态单独动画 | 缺统一实现/验收 |
-| Cascade | 80ms stagger，最多 10 条 | 人物图集与抽屉未见完整接入证据 | 缺统一实现/验收 |
+| Cascade | 80ms stagger，最多 10 条 | `FluidPersonaGalleryGrid` + `DsAnimations.cascade` 已接；抽屉未接 | 图集待设备验证/抽屉待补齐 |
 
 ## 质量门禁与禁止事项
 
