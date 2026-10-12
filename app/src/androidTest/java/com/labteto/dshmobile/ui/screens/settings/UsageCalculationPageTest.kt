@@ -12,8 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -70,7 +68,7 @@ class UsageCalculationPageTest {
             }
         }
         compose.onNodeWithText("全部模型 ▾").performClick()
-        compose.onNode(hasText("MiniMax-M3") and hasClickAction()).performClick()
+        compose.onNodeWithText("MiniMax-M3", substring = false).performClick()
         compose.onNodeWithText("450").assertExists()
         compose.onNodeWithText("MiniMax-M3 ▾").performClick()
         compose.onNodeWithText("never-used").performClick()
