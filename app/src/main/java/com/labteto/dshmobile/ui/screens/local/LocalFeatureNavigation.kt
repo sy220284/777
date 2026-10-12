@@ -14,7 +14,8 @@ internal fun localFeaturePush(
     page: LocalFeaturePage,
 ): List<String> {
     if (localFeatureCurrent(stack) == page) return stack
-    return (stack.ifEmpty { listOf(LocalFeaturePage.HOME.name) } + page.name).takeLast(12)
+    // Do not truncate parent routes: a deep feature must still return to its true entry.
+    return stack.ifEmpty { listOf(LocalFeaturePage.HOME.name) } + page.name
 }
 
 internal data class LocalFeatureDrawerOpenResult(
@@ -53,7 +54,38 @@ internal fun localFeatureOpenFromDrawer(
 internal fun localFeaturePop(stack: List<String>): List<String> =
     if (stack.size <= 1) listOf(LocalFeaturePage.HOME.name) else stack.dropLast(1)
 
+/** Drawer-origin routes return through their inner pages, then reopen the original drawer. */
+internal data class LocalFeatureBackResult(
+    val stack: List<String>,
+    val drawerOriginStack: List<String>?,
+    val reopenDrawer: Boolean,
+)
+
+internal fun localFeatureBack(
+    stack: List<String>,
+    drawerOriginStack: List<String>?,
+): LocalFeatureBackResult {
+    if (drawerOriginStack != null && stack == drawerOriginStack) {
+        return LocalFeatureBackResult(stack, null, reopenDrawer = true)
+    }
+    val next = localFeaturePop(stack)
+    val reachedDrawer = drawerOriginStack != null && next == drawerOriginStack
+    return LocalFeatureBackResult(
+        stack = next,
+        drawerOriginStack = drawerOriginStack.takeUnless { reachedDrawer },
+        reopenDrawer = reachedDrawer,
+    )
+}
+
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
+
+/** Conversation selected from the sidebar has one one-shot return to its source drawer. */
+internal fun localConversationShouldReturnToDrawer(
+    page: LocalFeaturePage,
+    drawerOpen: Boolean,
+    wideViewport: Boolean,
+    enteredFromDrawer: Boolean,
+): Boolean = enteredFromDrawer && page == LocalFeaturePage.HOME && !drawerOpen && !wideViewport
 
 internal fun acceptLocalSessionNavigation(
     currentSessionId: String,

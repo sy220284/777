@@ -129,6 +129,7 @@ internal fun LocalConversationSurface(
     workActions: LocalWorkFeatureUiActions? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     readRequest: Long = 0L,
+    onReaderDismissed: () -> Unit = {},
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
@@ -1128,7 +1129,11 @@ internal fun LocalConversationSurface(
         FluidMessageReader(
             title = message?.speakerName ?: sessionTitle,
             content = message?.content?.let(::visibleAssistantText).orEmpty(),
-            onDismiss = { readerOpen = false; readerMessageId = null },
+            onDismiss = {
+                readerOpen = false
+                readerMessageId = null
+                onReaderDismissed()
+            },
         )
     }
 

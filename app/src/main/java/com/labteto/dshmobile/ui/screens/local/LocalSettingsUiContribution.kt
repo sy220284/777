@@ -7,6 +7,7 @@ import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
 // FEATURE_TREE: {"id":"settings.minimax.quota","path":"第一层｜产品功能与界面 / 设置与个人配置 / 用量与成本 / MiniMax 侧边栏套餐额度","entry":"localSettingsFeatureUiContribution","owner":"SETTINGS","test":"app/src/test/java/com/labteto/dshmobile/ui/screens/local/MiniMaxQuotaNavigationTest.kt#quotaDrawerOpensQuotaDirectlyAndClosesDrawer"}
 internal fun localSettingsFeatureUiContribution(
     settingsDestination: SettingsDestination,
+    settingsEntryRequest: Int = 0,
     memorySourceSessionId: String? = null,
     memorySourceMessageId: String? = null,
     updateStatus: String?,
@@ -44,6 +45,7 @@ internal fun localSettingsFeatureUiContribution(
             onPopFeature()
         },
         initialDestination = settingsDestination,
+        entryRequest = settingsEntryRequest,
         memorySourceSessionId = memorySourceSessionId,
         memorySourceMessageId = memorySourceMessageId,
         onCheckUpdate = onCheckUpdate,

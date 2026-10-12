@@ -40,7 +40,7 @@ internal fun FluidCapabilityCatalogue(entries: List<LocalCapabilityUiEntry>, loa
     var selected by remember { mutableStateOf<LocalCapabilityUiEntry?>(null) }
     val families = entries.groupBy { it.family }.toSortedMap()
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        SyTopBar(stringResource(R.string.fluid_capability_title), onBack = onBack,
+        SyTopBar(stringResource(R.string.tools_title), onBack = onBack,
             backContentDescription = stringResource(R.string.common_back),
             actionIcon = FeatherIcons.RefreshCw, onAction = onRefresh, actionEnabled = !loading,
             actionContentDescription = stringResource(R.string.tools_refresh))

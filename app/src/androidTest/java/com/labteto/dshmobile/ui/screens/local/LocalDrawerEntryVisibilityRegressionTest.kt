@@ -72,6 +72,67 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.onNodeWithText(context.getString(R.string.local_run_center)).assertDoesNotExist()
     }
     @Test
+    fun workSidebarLabelsCallMatchingFeatureActions() {
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            DshTheme {
+                DrawerQuickActions(
+                    usageMode = LocalUsageMode.WORK, groupMemberCount = 0, galleryCount = 0,
+                    onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
+                    onTasks = { opened += "tasks" },
+                    onWorkspaceFiles = { opened += "workspace" },
+                    onProjects = { opened += "projects" },
+                    onOpenRunCenter = { opened += "run" },
+                    onTools = { opened += "tools" },
+                    onUsage = { opened += "usage" },
+                    onImmersiveReader = { opened += "reader" },
+                )
+            }
+        }
+        listOf(
+            R.string.local_project_management_title to "projects",
+            R.string.local_run_center to "run",
+            R.string.chatlist_workspace_files to "workspace",
+            R.string.tasks_title to "tasks",
+            R.string.tools_title to "tools",
+            R.string.usage_calculation_title to "usage",
+            R.string.fluid_reader_title to "reader",
+        ).forEach { (label, action) ->
+            compose.onNodeWithText(context.getString(label)).performClick()
+            compose.runOnIdle { assertEquals(action, opened.last()) }
+        }
+        compose.runOnIdle { assertEquals(7, opened.size) }
+    }
+
+    @Test
+    fun chatSidebarLabelsCallMatchingFeatureActions() {
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            DshTheme {
+                DrawerQuickActions(
+                    usageMode = LocalUsageMode.CHAT, groupMemberCount = 0, galleryCount = 0,
+                    onOpenGroupChat = { opened += "group" },
+                    onOpenPersonaGallery = { opened += "gallery" },
+                    onOpenDiary = { opened += "diary" },
+                    onTasks = { opened += "chat_tasks" },
+                    onWorkspaceFiles = {}, onProjects = {}, onOpenRunCenter = {},
+                    onTools = {},
+                )
+            }
+        }
+        listOf(
+            R.string.persona_gallery_title to "gallery",
+            R.string.local_group_chat_title to "group",
+            R.string.tasks_chat_title to "chat_tasks",
+            R.string.chat_diary_title to "diary",
+        ).forEach { (label, action) ->
+            compose.onNodeWithText(context.getString(label)).performClick()
+            compose.runOnIdle { assertEquals(action, opened.last()) }
+        }
+        compose.runOnIdle { assertEquals(4, opened.size) }
+    }
+
+    @Test
     fun quotaEntryAppearsInBothModesAndDisappearsWithoutMiniMaxAction() {
         var opens = 0
         val mode = androidx.compose.runtime.mutableStateOf(LocalUsageMode.WORK)

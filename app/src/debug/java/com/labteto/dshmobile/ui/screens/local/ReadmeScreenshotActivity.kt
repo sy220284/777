@@ -163,6 +163,7 @@ private fun NavigationScreenshot() {
             groupMemberCount = 3,
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
+            onOpenPersonaSearchResult = {},
             onOpenDiary = {},
             onTasks = {},
             onTools = {},

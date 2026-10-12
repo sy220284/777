@@ -489,10 +489,11 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showPluginBrowser || showAgentSettings || handleRootSystemBack) {
+    BackHandler(enabled = showPluginBrowser || showAgentSettings || !capabilityCatalogueVisible || handleRootSystemBack) {
         when {
             showAgentSettings -> showAgentSettings = false
             showPluginBrowser -> showPluginBrowser = false
+            !capabilityCatalogueVisible -> capabilityCatalogueVisible = true
             else -> onClose()
         }
     }
@@ -589,7 +590,7 @@ fun ToolsScreen(
                 SyTopBar(
                     title = stringResource(R.string.tools_title),
                     subtitle = stringResource(R.string.tools_subtitle),
-                    onBack = onClose,
+                    onBack = { capabilityCatalogueVisible = true },
                     backContentDescription = stringResource(R.string.common_back),
                     largeTitle = false,
                     actionIcon = FeatherIcons.RefreshCw,
