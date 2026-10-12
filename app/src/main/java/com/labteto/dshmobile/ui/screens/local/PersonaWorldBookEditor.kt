@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
@@ -84,6 +85,7 @@ internal fun PersonaWorldBookEditor(
                         text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
                         onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
                         variant = DsButtonVariant.Ghost,
+                        modifier = Modifier.testTag("personaLoreSelect:$index"),
                     )
                 }
             }
@@ -95,7 +97,7 @@ internal fun PersonaWorldBookEditor(
                 },
                 enabled = entries.size < 80,
                 variant = DsButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("personaLoreAdd"),
             )
         }
     }
@@ -123,14 +125,14 @@ internal fun PersonaWorldBookEditor(
                     value = entry.title,
                     onValueChange = { change(entry.copy(title = it)) },
                     label = { Text(stringResource(R.string.local_persona_lore_entry_title)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("personaLoreTitle"),
                     singleLine = true,
                 )
                 DsTextField(
                     value = entry.content,
                     onValueChange = { change(entry.copy(content = it)) },
                     label = { Text(stringResource(R.string.local_persona_lore_entry_content)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("personaLoreContent"),
                     minLines = 3,
                     maxLines = 8,
                 )
@@ -196,6 +198,7 @@ internal fun PersonaWorldBookEditor(
                         expandedIndex = -1
                     },
                     variant = DsButtonVariant.Ghost,
+                    modifier = Modifier.testTag("personaLoreRemove"),
                 )
             }
         }
