@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -98,17 +99,21 @@ internal class LocalWorkTurnToolRuntime(
         binding: LocalWorkRunBinding,
     ): List<String> = schemas.names(schemas(policy, binding))
 
-    internal fun isParallel(name: String): Boolean = name in PARALLEL_SUBAGENT_TOOLS
+    internal fun isParallel(name: String): Boolean =
+        name in PARALLEL_SUBAGENT_TOOLS ||
+            isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
 
     internal suspend fun execute(
         binding: LocalWorkRunBinding,
         call: LocalToolCall,
         allowMutation: Boolean = true,
+        stillCurrent: () -> Boolean = { true },
     ): AgentToolResult = execution.executeScoped(
         original = call,
         sessionId = binding.sessionId,
         allowMutation = allowMutation,
         planModeEnabled = binding.state.value.work.planMode,
+        beforeExecution = stillCurrent,
         approval = { normalized, tool, summary ->
             approve(binding, normalized, summary, tool)
         },
@@ -118,13 +123,18 @@ internal class LocalWorkTurnToolRuntime(
         binding: LocalWorkRunBinding,
         calls: List<LocalToolCall>,
         allowMutation: Boolean = true,
+        superseded: () -> Boolean = { false },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val parallel = calls.size > 1 && calls.all { isParallel(it.name) }
         if (!parallel) {
-            return calls.map { call -> call to execute(binding, call, allowMutation) }
+            return calls.map { call ->
+                call to if (superseded()) workSteeredToolResult(call)
+                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
+            }
         }
         return isolatedParallelMap(calls) { call ->
-            call to execute(binding, call, allowMutation)
+            call to if (superseded()) workSteeredToolResult(call)
+                else execute(binding, call, allowMutation, stillCurrent = { !superseded() })
         }.mapIndexed { index, result ->
             result.getOrElse { error ->
                 val call = calls[index]
@@ -199,3 +209,20 @@ internal fun parallelToolFailure(
         readOnly = access != null && LocalToolPolicy.isReadOnlyInvocation(call.name, access, call.arguments),
         executionStarted = null)
 }
+
+/**
+ * Shared-read admission is opt-in rather than inferred from READ_ONLY/NETWORK access:
+ * a third-party tool can claim READ_ONLY while writing a remote session or seeking approval.
+ * Write and agent-control calls retain their existing exclusive, ordered execution path.
+ */
+internal fun isSafeParallelReadTool(tool: HarnessTool?): Boolean = isParallelSafeReadTool(tool)
+
+/** A committed correction invalidates unstarted calls from the preceding model sample. */
+internal fun workSteeredToolResult(call: LocalToolCall): AgentToolResult = AgentToolResult(
+    content = "用户已请求立即调整。旧模型采样生成的工具调用未开始执行：" + call.name,
+    isError = true,
+    errorCode = "WORK_TOOL_SUPERSEDED",
+    retryable = false,
+    sideEffect = AgentToolSideEffect.NONE,
+    recoveryHint = "先读取本轮新的用户要求，不要重复执行已作废的工具调用。",
+)

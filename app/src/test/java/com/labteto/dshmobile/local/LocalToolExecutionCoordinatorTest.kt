@@ -17,6 +17,8 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.work.LocalWorkState
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -685,6 +687,127 @@ class LocalToolExecutionCoordinatorTest {
         assertFalse(executed)
         assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
         assertTrue(result.recoveryHint.orEmpty().contains("不要重复调用"))
+    }
+
+    @Test
+    fun correctionAfterApprovalButBeforeExecutionRejectsStaleWriteWithoutSideEffect() = runBlocking {
+        var executed = false
+        var corrected = false
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.ALWAYS,
+            ) {
+                executed = true
+                ToolResult("should not execute")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("tool-old", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "work",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ ->
+                corrected = true
+                true
+            },
+            beforeExecution = { !corrected },
+        )
+        assertEquals("WORK_TOOL_SUPERSEDED", result.errorCode)
+        assertTrue(result.isError)
+        assertFalse(result.retryable)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertFalse(executed)
+    }
+
+    @Test
+    fun unchangedSamplingGenerationStillExecutesApprovedWriteOnce() = runBlocking {
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.ALWAYS,
+            ) {
+                executed++
+                ToolResult("ok")
+            })
+        }
+        val result = coordinator(registry).executeScoped(
+            original = LocalToolCall("tool-current", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "work",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ -> true },
+            beforeExecution = { true },
+        )
+        assertFalse(result.isError)
+        assertEquals(1, executed)
+    }
+
+
+    @Test
+    fun correctionWhileOldWriteWaitsForWorkspaceLeaseRejectsItBeforeExecution() = runBlocking {
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val reachedAdmission = CompletableDeferred<Unit>()
+        var corrected = false
+        var guardChecks = 0
+        var staleExecutions = 0
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "write",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.NEVER,
+            ) {
+                firstStarted.complete(Unit)
+                releaseFirst.await()
+                ToolResult("first done")
+            })
+            register(tool(
+                name = "edit",
+                access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.NEVER,
+            ) {
+                staleExecutions++
+                ToolResult("must not execute")
+            })
+        }
+        val coordinator = coordinator(registry)
+        val active = async {
+            coordinator.executeScoped(
+                original = LocalToolCall("active", "write", JsonObject(emptyMap()), "{}"),
+                sessionId = "work",
+                allowMutation = true,
+                planModeEnabled = false,
+                approval = { _, _, _ -> true },
+            )
+        }
+        firstStarted.await()
+        val waiting = async {
+            coordinator.executeScoped(
+                original = LocalToolCall("stale", "edit", JsonObject(emptyMap()), "{}"),
+                sessionId = "work",
+                allowMutation = true,
+                planModeEnabled = false,
+                approval = { _, _, _ -> true },
+                beforeExecution = {
+                    guardChecks++
+                    reachedAdmission.complete(Unit)
+                    !corrected
+                },
+            )
+        }
+        reachedAdmission.await()
+        corrected = true
+        releaseFirst.complete(Unit)
+        assertFalse(active.await().isError)
+        val rejected = waiting.await()
+        assertEquals("WORK_TOOL_SUPERSEDED", rejected.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, rejected.sideEffect)
+        assertEquals(0, staleExecutions)
+        assertEquals(2, guardChecks)
     }
 
     @Test

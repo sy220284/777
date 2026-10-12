@@ -231,13 +231,20 @@ class AndroidRuntimePlugin(
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
-                    val alive = terminalProvider.isAlive(sessionId)
+                    val fromPreviousRuntime = terminalProvider.isFromPreviousRuntime(sessionId)
+                    val alive = !fromPreviousRuntime && terminalProvider.isAlive(sessionId)
                     if (!alive) terminalLeases.remove(sessionId)?.close()
                     ToolResult(
                         buildJsonObject {
                             put("session_id", sessionId)
                             put("alive", alive)
+                            put("stale_runtime", fromPreviousRuntime)
+                            put("runtime_generation", terminalProvider.runtimeGeneration())
                             put("native_pty", terminalProvider.nativePtyAvailable())
+                            if (fromPreviousRuntime) {
+                                put("recovery_hint",
+                                    "执行环境已重建，旧终端状态不可用。先核对文件和外部操作结果，再重新打开终端，避免重复写入。")
+                            }
                         }.toString(),
                     )
                 },

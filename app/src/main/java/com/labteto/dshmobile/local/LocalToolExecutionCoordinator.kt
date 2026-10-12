@@ -13,12 +13,12 @@ import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,10 +49,7 @@ internal class LocalToolExecutionCoordinator(
     private val networkSearchEnabled: () -> Boolean = { true },
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
-    private val workspaceMutationMutex = Mutex()
-    private val serializedWorkspaceTools = setOf(
-        "write", "edit", "apply_patch", "bash", "run_shell", "download_file",
-    )
+    private val workspaceReadWriteGate = LocalWorkspaceReadWriteGate()
 
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
@@ -258,6 +255,7 @@ internal class LocalToolExecutionCoordinator(
         allowMutation: Boolean,
         planModeEnabled: Boolean,
         approval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
+        beforeExecution: () -> Boolean = { true },
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
@@ -299,8 +297,7 @@ internal class LocalToolExecutionCoordinator(
             executionId = executionIdFactory(),
             rootCallId = call.id,
         )
-        val serializedMutation = !readLike && call.name in serializedWorkspaceTools
-        if (serializedMutation) workspaceMutationMutex.lock()
+        var executionLease: LocalWorkspaceReadWriteGate.Lease? = null
         val invocation = try {
             registry.executeTracked(
                 name = call.name,
@@ -322,7 +319,16 @@ internal class LocalToolExecutionCoordinator(
                         if (!granted) approvalDenied = true
                         granted
                     },
-                    onExecutionStarted = {
+                    onExecutionStarted = { admittedTool ->
+                        // A new correction can arrive while awaiting approval or resource admission.
+                        // Reject the stale call before entering its executor, with no side effect.
+                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
+                        // The registry calls this only after schema checks and user approval.
+                        // Waiting for approval must never hold a filesystem read/write lease.
+                        executionLease = workspaceReadWriteGate.acquire(admittedTool)
+                        // Admission can suspend behind another read/write operation. A correction
+                        // committed during that wait must invalidate this still-unstarted call.
+                        if (!beforeExecution()) throw LocalToolSampleSuperseded()
                         recordExecutionStarted(sessionId, call, executionIdentity)
                         executionStarted = true
                     },
@@ -332,6 +338,15 @@ internal class LocalToolExecutionCoordinator(
             if (!currentCoroutineContext().isActive) throw cancelled
             AppLog.info("LocalToolExecution", "operation=execute_tool_cancelled tool=${call.name} call_id=${call.id} session_id=$sessionId")
             return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted, sessionId = sessionId)
+        } catch (superseded: LocalToolSampleSuperseded) {
+            return AgentToolResult(
+                content = "用户已要求立即调整，本次旧工具调用尚未开始执行：" + call.name,
+                isError = true,
+                errorCode = "WORK_TOOL_SUPERSEDED",
+                retryable = false,
+                sideEffect = AgentToolSideEffect.NONE,
+                recoveryHint = "读取最新已提交的用户要求，不要重复执行旧调用。",
+            )
         } catch (error: LocalWebException) {
             return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,
                 cause = error, sessionId = sessionId)
@@ -361,7 +376,7 @@ internal class LocalToolExecutionCoordinator(
                 executionStarted, error::class.java.simpleName, cause = error, sessionId = sessionId,
             )
         } finally {
-            if (serializedMutation) workspaceMutationMutex.unlock()
+            executionLease?.close()
         }
         executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result
@@ -475,3 +490,6 @@ internal data class LocalToolExecutionIdentity(
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/** Work-owned revision guard rejected a stale call before it entered the registered executor. */
+internal class LocalToolSampleSuperseded : IllegalStateException("Work model sample superseded by user")

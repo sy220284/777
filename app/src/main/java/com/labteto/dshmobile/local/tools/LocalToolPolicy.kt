@@ -194,6 +194,11 @@ internal object LocalToolPolicy {
             family = family,
             discoveryKeywords = discoveryKeywords,
             usageNotes = usageNotes,
+            // Audited native queries: no workspace/session mutation, network side effect or
+            // approval interaction. New external/plugin tools must explicitly opt in.
+            parallelReadSafe = canonical in setOf(
+                "read", "file_inspect", "list_files", "glob", "grep", "json_query",
+            ),
         )
     }
 

@@ -153,6 +153,9 @@ class LocalWorkRunRegistry internal constructor(
                     }
                 },
                 onQueued = {
+                    if (prepared.steerCurrentRun) {
+                        binding.steeringRevision.update { it + 1L }
+                    }
                     binding.state.update { current ->
                         current.copy(
                             kernel = current.kernel.copy(

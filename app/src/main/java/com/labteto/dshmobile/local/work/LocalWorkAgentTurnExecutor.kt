@@ -70,6 +70,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -169,9 +171,11 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             var modelStep = 0
+            var latestAcceptedSamplingRevision = binding.steeringRevision.value
             val modelToolStepSurface = LocalModelToolStepSurface()
             var requestPrepared = false
             var workPromptContext = LocalWorkTurnPromptContext()
+            var projectedSteeringRevision = binding.steeringRevision.value
             val runSnapshot = runState.value
             val runToolSurface = LocalRunToolSurface(
                 runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
@@ -280,8 +284,26 @@ internal class LocalWorkAgentTurnExecutor(
                         workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
+                    while (true) {
+                    val observedSteer = binding.steeringRevision.value
                     workModelHistoryRuntime.drainPendingInputs(binding)
                     val snapshot = runState.value
+                    if (observedSteer != projectedSteeringRevision) {
+                        val effectiveInput = runHistory.snapshot().asReversed()
+                            .firstOrNull { (it["role"] as? JsonPrimitive)?.contentOrNull == "user" }
+                            ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
+                            ?.takeIf(String::isNotBlank) ?: input
+                        workPromptContext = contextComposer.composeWorkTurnContext(
+                            input = effectiveInput,
+                            snapshot = snapshot,
+                            workspacePath = workspacePath,
+                            projectInstructions = projectContext.instructionsFor(snapshot.projectId),
+                            skillGuidance = resolveLocalWorkSkillGuidance(
+                                sessionStorage.files.workspace, effectiveInput,
+                            ),
+                        )
+                        projectedSteeringRevision = observedSteer
+                    }
                     val tools = modelToolStepSurface.capture(
                         runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),
                     )
@@ -320,7 +342,8 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    val rawReply = try {
+                    val sampling = try {
+                        sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                         modelRequests.complete(
                             snapshot = snapshot,
                             messages = requestMessages,
@@ -349,6 +372,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                             }
                         }
+                        }
                     } catch (error: Throwable) {
                         if (error is LocalModelException) lastModelError = error
                         val nativeImageRejected =
@@ -366,6 +390,19 @@ internal class LocalWorkAgentTurnExecutor(
                             throw error
                         }
                     }
+                    val rawReply = when (sampling) {
+                        LocalWorkSamplingOutcome.Steered -> {
+                            runEventLog.append("work/model-sampling-steered", buildJsonObject {
+                                put("step", modelStep + 1)
+                                put("run_id", runContext.runId)
+                                put("revision", binding.steeringRevision.value)
+                                put("effect", "model_only")
+                            })
+                            continue
+                        }
+                        is LocalWorkSamplingOutcome.Completed -> sampling.value
+                    }
+                    latestAcceptedSamplingRevision = observedSteer
                     val reply = rawReply.also { completed ->
                         usageTracker.recordForeground(
                             snapshot = snapshot,
@@ -381,7 +418,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val deliveryReply = guardWorkCompletionDelivery(reply, runState.value, runEventLog)
                     modelStep += 1
                     repliesByStep[modelStep] = deliveryReply
-                    AgentModelReply(
+                    return@AgentModel AgentModelReply(
                         content = deliveryReply.content.orEmpty(),
                         toolCalls = if (runPolicy.allowToolExecution) {
                             deliveryReply.toolCalls.map { call ->
@@ -396,16 +433,23 @@ internal class LocalWorkAgentTurnExecutor(
                             emptyList()
                         },
                     )
+                    }
+                    error("Unreachable: Work sampling must return or be cancelled")
                 },
                 tools = AgentToolExecutor { call ->
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    if (!modelToolStepSurface.allows(call.name)) {
+                    if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
+                        workSteeredToolResult(call.toLocalToolCall())
+                    } else if (!modelToolStepSurface.allows(call.name)) {
                         modelToolStepSurface.hiddenCallResult(call.name)
                     } else {
                         workTurnToolRuntime.execute(
                             binding = binding,
                             call = call.toLocalToolCall(),
                             allowMutation = true,
+                            stillCurrent = {
+                                binding.steeringRevision.value == latestAcceptedSamplingRevision
+                            },
                         )
                     }
                 },
@@ -415,6 +459,7 @@ internal class LocalWorkAgentTurnExecutor(
                         binding = binding,
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
+                        superseded = { binding.steeringRevision.value != latestAcceptedSamplingRevision },
                     ).map { (_, result) -> result }
                 },
                 isParallelTool = { call ->
