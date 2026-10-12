@@ -51,7 +51,7 @@ internal object ChatIntimacyReactionLibrary {
         IntimacyReactionScene("hair-touch", listOf("抚摸头发", "轻抚头发", "摸头发", "头发", "发梢", "发丝", "理了理头发"),
             "略微低头、抬手整理头发、指尖相触", "肩颈放松或因意外而微缩",
             "开玩笑说别弄乱、柔声回应或沉默", "hum"),
-        IntimacyReactionScene("face-touch", listOf("抚摸脸", "轻抚脸", "摸脸颊", "抚脸颊", "摸着脸", "抚过脸"),
+        IntimacyReactionScene("face-touch", listOf("抚摸脸", "轻抚脸", "摸脸颊", "抚脸颊", "摸着脸", "抚过脸", "脸颊", "面颊"),
             "稍微偏头、握住对方的手、认真对视", "目光和面部肌肉逐渐舒展或短暂紧张",
             "问一句怎么了、说出喜欢或不习惯", "soft"),
         IntimacyReactionScene("hand-touch", listOf("牵手", "握住手", "十指相扣", "手背", "摩挲", "摸了摸手", "指尖"),
@@ -180,12 +180,27 @@ internal object ChatIntimacyReactionLibrary {
         return IntimacyReactionPlan(chosen.id, notes.joinToString("\n"))
     }
 
-    private fun bestScene(text: String): IntimacyReactionScene? =
-        scenes.mapIndexedNotNull { index, scene ->
-            val match = scene.cues.filter { text.contains(it) }.maxOfOrNull(String::length) ?: return@mapIndexedNotNull null
-            Triple(scene, match, index)
+    /** Body-part words alone do not prove that a kiss (rather than a caress) happened. */
+    private fun bestScene(text: String): IntimacyReactionScene? {
+        val kissing = listOf("亲", "吻", "接吻").any { text.contains(it) }
+        val touching = listOf("摸", "抚", "摩挲", "触碰", "触").any { text.contains(it) }
+        return scenes.mapIndexedNotNull { index, scene ->
+            val compatible = when (scene.id) {
+                "forehead-kiss", "cheek-kiss" -> kissing
+                "hair-touch", "face-touch" -> touching
+                else -> true
+            }
+            if (!compatible) return@mapIndexedNotNull null
+            val match = scene.cues.filter { text.contains(it) }.maxOfOrNull(String::length)
+                ?: return@mapIndexedNotNull null
+            val contactBonus = when (scene.id) {
+                "forehead-kiss", "cheek-kiss", "hair-touch", "face-touch" -> 3
+                else -> 0
+            }
+            Triple(scene, match + contactBonus, index)
         }.maxWithOrNull(compareBy<Triple<IntimacyReactionScene, Int, Int>> { it.second }
             .thenBy { -it.third })?.first
+    }
 
     private fun personaTone(persona: PersonaProfile?): String {
         if (persona == null) return ""
