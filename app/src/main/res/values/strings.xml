@@ -2219,5 +2219,12 @@
     <string name="media_chat_work_file_changed">原成果已在工作区被修改</string>
     <string name="media_chat_view_entire_file">查看完整文件</string>
     <string name="media_chat_open_result">打开成果</string>
+    <string name="media_chat_creating_now">正在生成成果</string>
+    <string name="media_chat_creating_hint">可以返回聊天继续使用；成果生成完成后会在这里出现。</string>
+    <string name="media_chat_creation_uncertain">生成结果待确认</string>
+    <string name="media_chat_creation_failed">生成未完成</string>
+    <string name="media_chat_creation_saved">已生成并保存</string>
+    <string name="media_chat_creation_uncertain_hint">请先核对服务商的生成记录。</string>
+    <string name="media_chat_creation_safe_retry">为避免重复计费，应用不会自动重新提交此请求。</string>
 </resources>
 
