@@ -72,6 +72,39 @@ class LocalWorkDeliveryEvidenceTest {
         }
     }
 
+    @Test fun artifactOutputWithoutMatchingInvocationInCurrentGoalCannotPassAcceptance() {
+        val root = Files.createTempDirectory("goal-evidence-correlation").toFile()
+        try {
+            val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
+            val goal = "修改代码文件"
+            log.append("tool/call", buildJsonObject {
+                put("id", "old-call"); put("name", "write")
+            })
+            log.append("goal/state", buildJsonObject {
+                put("description", goal); put("status", "active")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "old-call"); put("name", "write"); put("is_error", false)
+                put("artifact_path", "src/main.kt"); put("artifact_sha256", "b".repeat(64))
+            })
+            assertEquals(null, localWorkDeliveryEvidence(log, goal).artifactCallId)
+            log.append("tool/result", buildJsonObject {
+                put("id", "no-call"); put("name", "write"); put("is_error", false)
+                put("artifact_path", "src/other.kt"); put("artifact_sha256", "c".repeat(64))
+            })
+            assertEquals(null, localWorkDeliveryEvidence(log, goal).artifactCallId)
+            log.append("tool/call", buildJsonObject {
+                put("id", "current-call"); put("name", "write")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "current-call"); put("name", "write"); put("is_error", false)
+                put("artifact_path", "src/new.kt"); put("artifact_sha256", "d".repeat(64))
+            })
+            assertEquals("current-call", localWorkDeliveryEvidence(log, goal).artifactCallId)
+            log.close()
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun modelClaimCannotFabricatePositiveToolEvents() {
         val dir = Files.createTempDirectory("goal-evidence-model").toFile()
         try {

@@ -53,7 +53,16 @@ internal fun localWorkDeliveryEvidence(
             !event.value("artifact_path").isNullOrBlank() &&
             event.value("artifact_sha256")?.matches(Regex("""^[a-fA-F0-9]{64}$""")) == true &&
             !event.value("id").isNullOrBlank()
-    }?.takeIf { it.sequence > startSequence } else null
+    }?.takeIf { result ->
+        if (result.sequence <= startSequence) return@takeIf false
+        val id = result.data.value("id") ?: return@takeIf false
+        // An output event alone (or an old invocation finishing late) is not proof that
+        // this goal actually invoked a tool to produce its artifact.
+        val call = log.latestMatching(
+            setOf("tool/call"), beforeSequenceExclusive = result.sequence,
+        ) { event -> event.value("id") == id }
+        call != null && call.sequence > startSequence
+    } else null
 
     val test = if (needsTest) {
         log.latestMatching(setOf("tool/result")) { event ->
