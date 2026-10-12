@@ -1,0 +1,164 @@
+package com.shenyan.designsystem.foundation
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+/** 完全独立的新组件库，不依赖 777 旧版 DsTheme / DsButton / Ds*。 */
+enum class ShenyanMode { LIGHT, DARK, MATTE }
+
+@Immutable
+data class SyColors(
+    val canvas: Color,
+    // Five semantic material tiers. L1-L3 are translucent; L4 prioritises readability; L5 solid.
+    val materialL1: Color,
+    val materialL2: Color,
+    val materialL3: Color,
+    val materialL4: Color,
+    val materialL5: Color,
+    val materialSheen: Color,
+    val clay: Color = Color(0xFFC98B6B),
+    val surface: Color,
+    val surfaceRaised: Color,
+    val surfaceSolid: Color,
+    val border: Color,
+    val text: Color,
+    val textSecondary: Color,
+    val textTertiary: Color,
+    val primary: Color = Color(0xFFE8A87C),
+    val primaryPressed: Color = Color(0xFFD9926B),
+    val onPrimary: Color = Color(0xFF3A342D),
+    val mint: Color = Color(0xFF7FBFA8),
+    val lilac: Color = Color(0xFFB9A0D4),
+    val warning: Color = Color(0xFFE0A458),
+    val danger: Color = Color(0xFFD9705F),
+    val selected: Color,
+    val overlay: Color,
+)
+
+private val Light = SyColors(
+    canvas = Color(0xFFEDE6DA),
+    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0x75FFFFFF),
+    materialL3 = Color(0xA3FFFFFF), materialL4 = Color(0xD9FFFFFF),
+    materialL5 = Color(0xFFFAF7F2), materialSheen = Color(0xB8FFFFFF),
+    surface = Color(0xA3FFFFFF), surfaceRaised = Color(0x75FFFFFF), surfaceSolid = Color(0xFFFAF7F2),
+    border = Color(0xCCFFFFFF), text = Color(0xFF3A342D),
+    textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
+    selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
+)
+private val Dark = SyColors(
+    canvas = Color(0xFF24211E),
+    materialL1 = Color(0x0EFFF5E4), materialL2 = Color(0x16FFF5E4),
+    materialL3 = Color(0x1FFFF5E4), materialL4 = Color(0xE0312B26),
+    materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
+    surface = Color(0x1FFFF5E4), surfaceRaised = Color(0x16FFF5E4), surfaceSolid = Color(0xFF35312D),
+    border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
+    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
+    selected = Color(0xFF60422F), overlay = Color(0x5C000000)
+)
+private val Matte = SyColors(
+    canvas = Color(0xFF0F0F10),
+    materialL1 = Color(0xFF181819), materialL2 = Color(0xFF1E1E20),
+    materialL3 = Color(0xFF232324), materialL4 = Color(0xFF29292B),
+    materialL5 = Color(0xFF29292B), materialSheen = Color(0x0EFFFFFF),
+    surface = Color(0xFF232324), surfaceRaised = Color(0xFF1E1E20), surfaceSolid = Color(0xFF29292B),
+    border = Color(0x1AFFFFFF), text = Color(0xFFF5F0E8),
+    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
+    selected = Color(0xFF573F30), overlay = Color(0x99000000)
+)
+
+val LocalSyColors = staticCompositionLocalOf { Light }
+
+/** 非业务状态量统一设计，用户自定义字体缩放交由 Compose sp / 系统处理。 */
+object SyMetric {
+    val touch = 48.dp
+    val gapXs = 2.dp
+    val gapSm = 6.dp
+    val gapMd = 10.dp
+    val gapLg = 14.dp
+    val gapSection = 22.dp
+    val gapPage = 34.dp
+    val gapHero = 54.dp
+    val radiusSm = 9.dp
+    val radiusControl = 13.dp
+    val radiusCard = 18.dp
+    val radiusSheet = 24.dp
+}
+object SyMotion {
+    const val pressMs = 80
+    const val selectMs = 200
+    const val dialogMs = 280
+    const val sheetMs = 380
+    const val pushMs = 480
+    const val morphMs = 360
+    const val toolExpandMs = 200
+    const val toolDetailDelayMs = 80
+    const val toastMs = 200
+    const val sidebarMs = 280
+    const val sidebarContentDelayMs = 60
+}
+
+/** 明确传入 reduceMotion；由宿主根据系统动画缩放/无障碍设置确定，不擅自读取旧项目开关。 */
+val LocalSyReduceMotion = staticCompositionLocalOf { false }
+val LocalSyReduceTransparency = staticCompositionLocalOf { false }
+
+@Composable
+fun ShenyanTheme(
+    mode: ShenyanMode = ShenyanMode.LIGHT,
+    reduceMotion: Boolean = false,
+    reduceTransparency: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val colors = when (mode) {
+        ShenyanMode.LIGHT -> Light
+        ShenyanMode.DARK -> Dark
+        ShenyanMode.MATTE -> Matte
+    }
+    val scheme = (if (mode == ShenyanMode.LIGHT) lightColorScheme(
+        primary = colors.primary, onPrimary = colors.onPrimary,
+        background = colors.canvas, onBackground = colors.text,
+        surface = colors.surfaceSolid, onSurface = colors.text,
+        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
+        secondary = colors.mint, tertiary = colors.lilac, error = colors.danger
+    ) else darkColorScheme(
+        primary = colors.primary, onPrimary = colors.onPrimary,
+        background = colors.canvas, onBackground = colors.text,
+        surface = colors.surfaceSolid, onSurface = colors.text,
+        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
+        secondary = colors.mint, tertiary = colors.lilac, error = colors.danger
+    ))
+    CompositionLocalProvider(LocalSyColors provides colors, LocalSyReduceMotion provides reduceMotion,
+        LocalSyReduceTransparency provides reduceTransparency) {
+        MaterialTheme(
+            colorScheme = scheme,
+            shapes = Shapes(
+                small = RoundedCornerShape(SyMetric.radiusControl),
+                medium = RoundedCornerShape(SyMetric.radiusCard),
+                large = RoundedCornerShape(SyMetric.radiusSheet)
+            ), content = content
+        )
+    }
+}
+
+enum class SyPhase { IDLE, WAITING, RUNNING, DONE, FAILED, CANCELLED, BLOCKED }
+
+data class SyOption(val id: String, val label: String, val enabled: Boolean = true)
+data class SyAction(val id: String, val label: String, val destructive: Boolean = false, val enabled: Boolean = true)
+data class SyStep(val id: String, val label: String, val detail: String, val phase: SyPhase)
+data class SyFileNode(val id: String, val name: String, val isFolder: Boolean, val depth: Int = 0)
+data class SyAttachment(val id: String, val name: String, val description: String = "", val phase: SyPhase = SyPhase.DONE)
+
+/** Nested surfaces become solid after three translucent layers. */
+val LocalSyGlassDepth = staticCompositionLocalOf { 0 }
+/** A11y: use status words, never use colour alone to distinguish running/failure. */
+fun SyPhase.asChineseLabel(): String = when (this) {
+    SyPhase.IDLE -> "未开始"
+    SyPhase.WAITING -> "等待中"
+    SyPhase.RUNNING -> "运行中"
+    SyPhase.DONE -> "已完成"
+    SyPhase.FAILED -> "失败，可检查"
+    SyPhase.CANCELLED -> "已取消"
+    SyPhase.BLOCKED -> "等待批准"
+}
