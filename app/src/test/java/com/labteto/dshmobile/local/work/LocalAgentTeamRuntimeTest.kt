@@ -1539,6 +1539,16 @@ class LocalAgentTeamRuntimeTest {
         assertEquals(1, tasks["task-2"]?.revision)
         assertEquals(LocalTeamTaskStatus.IN_PROGRESS, tasks["task-3"]?.status)
         assertNull(fixture.runtime.project(session).failure)
+        // write_scopes coordinate claims; they do not sandbox arbitrary commands or grant
+        // an actual per-agent Git worktree. The tool execution gate protects writes.
+        val taskView = fixture.runtime.execute(
+            LocalToolCall("task-view", "team_task_get", buildJsonObject {
+                put("task_id", "task-3")
+            }, "{}"), binding,
+        ).content
+        assertTrue(taskView.contains("workspace=shared"))
+        assertTrue(taskView.contains("write_execution=serialized"))
+        assertTrue(taskView.contains("scope_enforcement=advisory_only"))
     }
 
     @Test
