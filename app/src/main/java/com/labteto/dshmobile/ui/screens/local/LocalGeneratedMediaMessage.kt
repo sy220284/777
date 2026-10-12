@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,14 +78,15 @@ internal fun LocalGeneratedMediaResultRow(
     viewModel: LocalMediaStudioViewModel,
     onInsertText: (String) -> Unit,
 ) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     val file = remember(result.id, result.fileName) { viewModel.resultFile(result) }
     var error by remember(result.id) { mutableStateOf<String?>(null) }
     val label = when (result.kind) {
-        LocalMediaKind.IMAGE.name -> context.getString(R.string.media_chat_image_done)
-        LocalMediaKind.SPEECH.name -> context.getString(R.string.media_chat_speech_done)
-        LocalMediaKind.TRANSCRIBE.name -> context.getString(R.string.media_chat_transcript_done)
-        else -> context.getString(R.string.media_chat_generic_result)
+        LocalMediaKind.IMAGE.name -> resources.getString(R.string.media_chat_image_done)
+        LocalMediaKind.SPEECH.name -> resources.getString(R.string.media_chat_speech_done)
+        LocalMediaKind.TRANSCRIBE.name -> resources.getString(R.string.media_chat_transcript_done)
+        else -> resources.getString(R.string.media_chat_generic_result)
     }
     MediaMessageCard(title = label, subtitle = "${result.provider} · ${result.model}") {
         result.description?.takeIf(String::isNotBlank)?.let {
@@ -97,15 +99,15 @@ internal fun LocalGeneratedMediaResultRow(
                 MediaInlinePicture(file = file, remoteUrl = result.remoteUrl)
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     if (file != null) {
-                        DsButton(text = context.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
                             onClick = { viewMediaFile(context, file, imageMime(file)) { error = it } })
-                        DsButton(text = context.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
                             onClick = { shareMediaFile(context, file, imageMime(file)) { error = it } })
                     } else result.remoteUrl?.let { url ->
-                        DsButton(text = context.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_view_image), size = DsButtonSize.Small,
                             onClick = { openMediaUrl(context, url) { error = it } })
-                        DsButton(text = context.getString(R.string.media_chat_share_url), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_share_url), size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
                             onClick = { shareMediaUrl(context, url) { error = it } })
                     }
@@ -114,10 +116,10 @@ internal fun LocalGeneratedMediaResultRow(
             LocalMediaKind.SPEECH.name -> {
                 if (file != null) {
                     InlineSpeechPlayer(file)
-                    DsButton(text = context.getString(R.string.media_chat_share_audio), size = DsButtonSize.Small,
+                    DsButton(text = resources.getString(R.string.media_chat_share_audio), size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, file, "audio/mpeg") { error = it } })
-                } else Text(context.getString(R.string.media_chat_audio_missing), color = DsTheme.colors.labelSecondary)
+                } else Text(resources.getString(R.string.media_chat_audio_missing), color = DsTheme.colors.labelSecondary)
             }
             LocalMediaKind.TRANSCRIBE.name -> {
                 result.textOutput?.let { text ->
@@ -126,13 +128,13 @@ internal fun LocalGeneratedMediaResultRow(
                             color = DsTheme.colors.labelPrimary)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                        DsButton(text = context.getString(R.string.media_chat_insert_text), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_insert_text), size = DsButtonSize.Small,
                             onClick = { onInsertText(text) })
-                        DsButton(text = context.getString(R.string.media_chat_copy), size = DsButtonSize.Small,
+                        DsButton(text = resources.getString(R.string.media_chat_copy), size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
                             onClick = {
                                 (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                                    .setPrimaryClip(ClipData.newPlainText(context.getString(R.string.media_chat_transcription), text))
+                                    .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.media_chat_transcription), text))
                             })
                     }
                 }
@@ -148,6 +150,7 @@ internal fun LocalGeneratedVideoTaskRow(
     offers: List<LocalMediaOffer>,
     viewModel: LocalMediaStudioViewModel,
 ) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val savedVideo = remember(task.id, task.fileName) { viewModel.videoFile(task) }
@@ -172,19 +175,19 @@ internal fun LocalGeneratedVideoTaskRow(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
-                    error = failure.message ?: context.getString(R.string.media_chat_poll_failure)
+                    error = failure.message ?: resources.getString(R.string.media_chat_poll_failure)
                     waitMillis = (waitMillis * 2).coerceAtMost(90_000L)
                 }
             }
         }
     }
     val phase = when (task.phase) {
-        LocalMediaVideoPhase.SUBMITTING -> context.getString(R.string.media_chat_submitting)
-        LocalMediaVideoPhase.OUTCOME_UNKNOWN -> context.getString(R.string.media_chat_outcome_unknown)
-        LocalMediaVideoPhase.QUEUED -> context.getString(R.string.media_chat_queued)
-        LocalMediaVideoPhase.PROCESSING -> context.getString(R.string.media_chat_processing)
-        LocalMediaVideoPhase.SUCCEEDED -> context.getString(R.string.media_chat_video_done)
-        LocalMediaVideoPhase.FAILED -> context.getString(R.string.media_chat_generation_failed)
+        LocalMediaVideoPhase.SUBMITTING -> resources.getString(R.string.media_chat_submitting)
+        LocalMediaVideoPhase.OUTCOME_UNKNOWN -> resources.getString(R.string.media_chat_outcome_unknown)
+        LocalMediaVideoPhase.QUEUED -> resources.getString(R.string.media_chat_queued)
+        LocalMediaVideoPhase.PROCESSING -> resources.getString(R.string.media_chat_processing)
+        LocalMediaVideoPhase.SUCCEEDED -> resources.getString(R.string.media_chat_video_done)
+        LocalMediaVideoPhase.FAILED -> resources.getString(R.string.media_chat_generation_failed)
     }
     MediaMessageCard(title = phase, subtitle = "${task.provider} · ${task.model}") {
         task.description?.let {
@@ -200,19 +203,19 @@ internal fun LocalGeneratedVideoTaskRow(
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
                     androidx.compose.foundation.layout.Box(
                         contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        DsButton(context.getString(R.string.media_chat_play_video), onClick = { showingPlayer = true })
+                        DsButton(resources.getString(R.string.media_chat_play_video), onClick = { showingPlayer = true })
                     }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                DsButton(text = if (showingPlayer) context.getString(R.string.media_chat_collapse_video) else context.getString(R.string.media_chat_play_video), size = DsButtonSize.Small,
+                DsButton(text = if (showingPlayer) resources.getString(R.string.media_chat_collapse_video) else resources.getString(R.string.media_chat_play_video), size = DsButtonSize.Small,
                     onClick = { showingPlayer = !showingPlayer })
                 if (savedVideo != null) {
-                    DsButton(text = context.getString(R.string.media_chat_share_video), size = DsButtonSize.Small,
+                    DsButton(text = resources.getString(R.string.media_chat_share_video), size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
                         onClick = { shareMediaFile(context, savedVideo, "video/mp4") { error = it } })
                 } else {
-                    DsButton(text = context.getString(R.string.media_chat_open_video), size = DsButtonSize.Small,
+                    DsButton(text = resources.getString(R.string.media_chat_open_video), size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
                         onClick = { openMediaUrl(context, task.downloadUrl) { error = it } })
                 }
@@ -223,7 +226,7 @@ internal fun LocalGeneratedVideoTaskRow(
                     color = DsTheme.colors.labelSecondary)
             }
             if (task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
-                DsButton(text = if (refreshing) context.getString(R.string.media_chat_polling) else context.getString(R.string.media_chat_refresh_progress),
+                DsButton(text = if (refreshing) resources.getString(R.string.media_chat_polling) else resources.getString(R.string.media_chat_refresh_progress),
                     enabled = !refreshing && offer != null,
                     size = DsButtonSize.Small, onClick = {
                         val bound = offer ?: return@DsButton
@@ -232,16 +235,16 @@ internal fun LocalGeneratedVideoTaskRow(
                             error = null
                             try { viewModel.refreshVideo(bound, task.id) }
                             catch (cancelled: CancellationException) { throw cancelled }
-                            catch (failure: Exception) { error = failure.message ?: context.getString(R.string.media_chat_refresh_failed) }
+                            catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.media_chat_refresh_failed) }
                             finally { refreshing = false }
                         }
                     })
             } else if (task.phase == LocalMediaVideoPhase.OUTCOME_UNKNOWN) {
-                Text(context.getString(R.string.media_chat_check_remote_task),
+                Text(resources.getString(R.string.media_chat_check_remote_task),
                     color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             }
             if (offer == null && task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)) {
-                Text(context.getString(R.string.media_chat_account_missing),
+                Text(resources.getString(R.string.media_chat_account_missing),
                     color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             }
         }
@@ -277,6 +280,7 @@ private fun MediaMessageCard(
 
 @Composable
 private fun MediaInlinePicture(file: File?, remoteUrl: String?) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     var bitmap by remember(file?.absolutePath, remoteUrl) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(file?.absolutePath, remoteUrl) {
@@ -286,12 +290,12 @@ private fun MediaInlinePicture(file: File?, remoteUrl: String?) {
         .background(DsTheme.colors.bgLayer1, DsShapes.block)
         .border(1.dp, DsTheme.colors.borderL3, DsShapes.block)
     if (bitmap != null) {
-        Image(bitmap = bitmap!!, contentDescription = context.getString(R.string.media_chat_generated_image),
+        Image(bitmap = bitmap!!, contentDescription = resources.getString(R.string.media_chat_generated_image),
             contentScale = ContentScale.Fit, modifier = modifier)
     } else {
         androidx.compose.foundation.layout.Box(modifier,
             contentAlignment = androidx.compose.ui.Alignment.Center) {
-            Text(context.getString(R.string.media_chat_preview_pending), style = DsType.caption11.withReadingWeight(),
+            Text(resources.getString(R.string.media_chat_preview_pending), style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary)
         }
     }
@@ -345,6 +349,7 @@ private fun decodeMediaPreview(file: File?, remoteUrl: String?): ImageBitmap? = 
 
 @Composable
 private fun InlineSpeechPlayer(file: File) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
@@ -352,7 +357,7 @@ private fun InlineSpeechPlayer(file: File) {
     DisposableEffect(file.absolutePath) {
         onDispose { player?.release(); player = null }
     }
-    DsButton(text = if (playing) context.getString(R.string.media_chat_pause_audio) else context.getString(R.string.media_chat_play_audio), size = DsButtonSize.Small,
+    DsButton(text = if (playing) resources.getString(R.string.media_chat_pause_audio) else resources.getString(R.string.media_chat_play_audio), size = DsButtonSize.Small,
         onClick = {
             runCatching {
                 val current = player ?: MediaPlayer().apply {
@@ -362,7 +367,7 @@ private fun InlineSpeechPlayer(file: File) {
                 }.also { player = it }
                 if (playing) current.pause() else current.start()
                 playing = !playing
-            }.onFailure { error = it.message ?: context.getString(R.string.media_chat_audio_failed) }
+            }.onFailure { error = it.message ?: resources.getString(R.string.media_chat_audio_failed) }
         })
     error?.let { Text(it, style = DsType.caption11.withReadingWeight(),
         color = DsTheme.colors.labelSecondary) }
@@ -370,6 +375,7 @@ private fun InlineSpeechPlayer(file: File) {
 
 @Composable
 private fun InlineVideoPlayer(url: String, localFile: File?, onError: (String) -> Unit) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     var player by remember(url, localFile?.absolutePath) { mutableStateOf<VideoView?>(null) }
     DisposableEffect(url, localFile?.absolutePath) {
@@ -383,7 +389,7 @@ private fun InlineVideoPlayer(url: String, localFile: File?, onError: (String) -
                 controls.setAnchorView(this)
                 setMediaController(controls)
                 setOnPreparedListener { start() }
-                setOnErrorListener { _, _, _ -> onError(context.getString(R.string.media_chat_video_failed)); true }
+                setOnErrorListener { _, _, _ -> onError(resources.getString(R.string.media_chat_video_failed)); true }
                 setVideoURI(localFile?.let { Uri.fromFile(it) } ?: Uri.parse(url))
                 player = this
             }
@@ -409,6 +415,7 @@ internal fun LocalWorkArtifactMessageRow(
     actions: LocalWorkFeatureUiActions?,
     onOpen: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     val file = remember(workspacePath, artifact.reference, artifact.versionNow) {
         runCatching {
@@ -434,7 +441,7 @@ internal fun LocalWorkArtifactMessageRow(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                error = failure.message ?: context.getString(R.string.media_chat_preview_failed)
+                error = failure.message ?: resources.getString(R.string.media_chat_preview_failed)
             }
         }
     }
@@ -442,8 +449,8 @@ internal fun LocalWorkArtifactMessageRow(
         artifact.reference.substringAfterLast('.', "").lowercase() in setOf("png", "jpg", "jpeg", "webp")
     val name = artifact.reference.substringAfterLast('/').ifBlank { artifact.reference }
     MediaMessageCard(
-        title = if (artifact.category == "file") context.getString(R.string.media_chat_work_file, name) else context.getString(R.string.media_chat_work_result),
-        subtitle = if (artifact.currentlyAvailable == false) context.getString(R.string.media_chat_work_file_missing) else context.getString(R.string.media_chat_work_output_here),
+        title = if (artifact.category == "file") resources.getString(R.string.media_chat_work_file, name) else resources.getString(R.string.media_chat_work_result),
+        subtitle = if (artifact.currentlyAvailable == false) resources.getString(R.string.media_chat_work_file_missing) else resources.getString(R.string.media_chat_work_output_here),
     ) {
         if (isImage && file != null) {
             MediaInlinePicture(file, null)
@@ -456,15 +463,15 @@ internal fun LocalWorkArtifactMessageRow(
             }
             if (text.length > 2500) {
                 DsButton(
-                    text = if (expanded) context.getString(R.string.media_chat_collapse_preview) else context.getString(R.string.media_chat_expand_preview),
+                    text = if (expanded) resources.getString(R.string.media_chat_collapse_preview) else resources.getString(R.string.media_chat_expand_preview),
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Ghost,
                     onClick = { expanded = !expanded },
                 )
             }
         } else if (artifact.category == "file") {
-            Text(if (file != null) context.getString(R.string.media_chat_work_file_ready)
-                else context.getString(R.string.media_chat_work_no_preview),
+            Text(if (file != null) resources.getString(R.string.media_chat_work_file_ready)
+                else resources.getString(R.string.media_chat_work_no_preview),
                 style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         } else {
             Text(artifact.reference.take(160),
@@ -473,21 +480,21 @@ internal fun LocalWorkArtifactMessageRow(
         }
         if (artifact.versionAtCreation != null && artifact.versionNow != null &&
             artifact.versionAtCreation != artifact.versionNow) {
-            Text(context.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
+            Text(resources.getString(R.string.media_chat_work_file_changed), style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             if (artifact.category == "file") {
-                DsButton(context.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = DsButtonSize.Small)
+                DsButton(resources.getString(R.string.media_chat_view_entire_file), onClick = onOpen, size = DsButtonSize.Small)
                 if (file != null) {
-                    DsButton(context.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
+                    DsButton(resources.getString(R.string.media_chat_share_save), size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
                         onClick = {
                             shareMediaFile(context, file, localArtifactMime(file)) { error = it }
                         })
                 }
             } else if (artifact.reference.startsWith("https://")) {
-                DsButton(context.getString(R.string.media_chat_open_result), size = DsButtonSize.Small,
+                DsButton(resources.getString(R.string.media_chat_open_result), size = DsButtonSize.Small,
                     onClick = { openMediaUrl(context, artifact.reference) { error = it } })
             }
         }
