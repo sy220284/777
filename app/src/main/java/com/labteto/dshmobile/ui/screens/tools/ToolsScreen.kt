@@ -60,7 +60,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.components.StateDot
@@ -607,7 +607,7 @@ fun ToolsScreen(
                     state.servers.isEmpty() &&
                     !state.githubConfigured
                 if (initialLoading) {
-                    DsPageLoadingState(
+                    SyLoadingState(
                         icon = FeatherIcons.Tool,
                         label = stringResource(R.string.tools_loading),
                         modifier = Modifier.weight(1f).fillMaxWidth(),
