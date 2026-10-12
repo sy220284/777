@@ -92,6 +92,10 @@ internal fun ColumnScope.TaskEditorPane(
                 minLines = 2,
                 maxLines = 5,
             )
+        }
+        // Screen 13: goal, schedule and execution notifications are separate
+        // panels. Keep the actual task's prompt and schedule as the only data owners.
+        DsGroupCard {
             Text(
                 stringResource(R.string.tasks_schedule_label),
                 style = DsType.small13Strong.withReadingWeight(),
@@ -149,6 +153,8 @@ internal fun ColumnScope.TaskEditorPane(
                     singleLine = true,
                 )
             }
+        }
+        DsGroupCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
