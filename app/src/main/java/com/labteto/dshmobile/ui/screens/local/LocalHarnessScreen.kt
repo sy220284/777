@@ -163,6 +163,7 @@ fun LocalHarnessScreen(
     val sessionTitleOverrides by viewModel.sessionTitleOverrides.collectAsStateWithLifecycle()
     val projectRecoveryNotice by viewModel.projectRecoveryNotice.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -189,15 +190,21 @@ fun LocalHarnessScreen(
         presentFirstLaunch = false
     }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
+    var newSessionOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
+    var groupSetupOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
     var settledSessionId by rememberSaveable { mutableStateOf("") }
     var settledUsageMode by rememberSaveable { mutableStateOf("") }
     var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var conversationOpenedFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var requestedFilePath by rememberSaveable(shell.sessionId) { mutableStateOf<String?>(null) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
+    var settingsEntryRequest by rememberSaveable { mutableIntStateOf(0) }
     var memorySourceSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var memorySourceMessageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var drawerGalleryTargetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var drawerGalleryEntryVersion by rememberSaveable { mutableIntStateOf(0) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
     var searchedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var composerHandoff by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -250,11 +257,12 @@ fun LocalHarnessScreen(
     val predictiveBackProgress = remember { Animatable(0f) }
 
     fun pushFeature(page: LocalFeaturePage) {
-        drawerFeatureOriginStack = null
+        // Keep the drawer origin when opening nested feature pages.
         featureStack = localFeaturePush(featureStack, page)
     }
 
     fun openFeatureFromDrawer(page: LocalFeaturePage) {
+        conversationOpenedFromDrawer = false
         val navigation = localFeatureOpenFromDrawer(
             stack = featureStack,
             originStack = drawerFeatureOriginStack,
@@ -265,8 +273,14 @@ fun LocalHarnessScreen(
     }
 
     fun popFeature() {
-        drawerFeatureOriginStack = null
-        featureStack = localFeaturePop(featureStack)
+        val back = localFeatureBack(featureStack, drawerFeatureOriginStack)
+        featureStack = back.stack
+        drawerFeatureOriginStack = back.drawerOriginStack
+        if (back.reopenDrawer && !syWideViewport) scope.launch { drawerState.open() }
+    }
+
+    fun reopenDrawerWhenModalReturns(fromDrawer: Boolean) {
+        if (fromDrawer && !syWideViewport) scope.launch { drawerState.open() }
     }
 
     fun resetFeatureNavigation() {
@@ -275,6 +289,20 @@ fun LocalHarnessScreen(
             .filterNot { it == LocalFeaturePage.HOME }
             .forEach { featureStateHolder.removeState(it.name) }
         featureStack = localFeatureHome()
+    }
+
+    fun switchToSessionAndShowConversation(
+        sessionId: String,
+        fromDrawer: Boolean = false,
+    ): Boolean {
+        val accepted = viewModel.switchSession(sessionId)
+        if (accepted) conversationOpenedFromDrawer = fromDrawer
+        if (accepted && sessionId == shell.sessionId) {
+            // Tapping the current conversation must return to its conversation surface.
+            resetFeatureNavigation()
+            scope.launch { drawerState.close() }
+        }
+        return accepted
     }
 
     // Only a settled session/mode transition commits navigation. This covers every entry point,
@@ -459,7 +487,7 @@ fun LocalHarnessScreen(
         updateInstructions = viewModel::updateProjectInstructions,
     )
     val automationActions = LocalAutomationFeatureUiActions(
-        switchSession = viewModel::switchSession,
+        switchSession = { switchToSessionAndShowConversation(it) },
     )
     val activeConversationState = when (shell.usageMode) {
         LocalUsageMode.CHAT -> viewModel.chatSurfaceState
@@ -484,17 +512,29 @@ fun LocalHarnessScreen(
                 filesMode = LocalFilesMode.CONVERSATION
                 pushFeature(LocalFeaturePage.WORKSPACE)
             },
-            onSettingsDestinationChange = { settingsDestination = it },
+            onSettingsDestinationChange = {
+                settingsDestination = it
+                settingsEntryRequest++
+            },
             onPushFeature = ::pushFeature,
-            onNewSession = { showNewSessionMode = true },
+            onNewSession = {
+                newSessionOpenedFromDrawer = false
+                showNewSessionMode = true
+            },
             onOpenDrawer = { scope.launch { drawerState.open() } },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
+            onReturnFromDrawerReader = {
+                drawerFeatureOriginStack?.let { featureStack = it }
+                drawerFeatureOriginStack = null
+                if (!syWideViewport) scope.launch { drawerState.open() }
+            },
             onUseWorkCapability = ::useWorkCapability,
             onLocateMemoryForMessage = { messageId ->
                 memorySourceSessionId = shell.sessionId
                 memorySourceMessageId = messageId
                 settingsDestination = SettingsDestination.MEMORY_MANAGEMENT
+                settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             composerHandoff = composerHandoff,
@@ -503,13 +543,19 @@ fun LocalHarnessScreen(
         ),
         localChatFeatureUiContribution(
             gallery = gallery,
+            initialGalleryEntryId = drawerGalleryTargetId,
+            galleryEntryOpenVersion = drawerGalleryEntryVersion,
             state = viewModel.chatSurfaceState,
             actions = chatActions,
             onNewPersona = { showNewPersona = true },
             onPopFeature = ::popFeature,
             sessions = shell.sessions,
-            onSwitchSession = viewModel::switchSession,
-            onOpenGroupSetup = { showGroupSetup = true },
+            onSwitchSession = { switchToSessionAndShowConversation(it) },
+            onSwitchSessionFromDrawer = { switchToSessionAndShowConversation(it, fromDrawer = true) },
+            onOpenGroupSetup = {
+                groupSetupOpenedFromDrawer = true
+                showGroupSetup = true
+            },
             onPromptPersonaSave = { showPersonaGallerySavePrompt = true },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
@@ -520,7 +566,7 @@ fun LocalHarnessScreen(
                 handoffWorkCapability(resources.getString(R.string.local_artifact_continue_prompt, path))
             },
             onOpenSourceSession = { sourceSessionId ->
-                viewModel.switchSession(sourceSessionId)
+                switchToSessionAndShowConversation(sourceSessionId)
             },
             requestedFilePath = requestedFilePath,
             onRequestedFilePathChange = { requestedFilePath = it },
@@ -556,7 +602,10 @@ fun LocalHarnessScreen(
             startAtPlugins = toolsStartAtPlugins,
             startAtSkills = toolsStartAtSkills,
             onUseCapability = ::useWorkCapability,
-            onSettingsDestinationChange = { settingsDestination = it },
+            onSettingsDestinationChange = {
+                settingsDestination = it
+                settingsEntryRequest++
+            },
             onPushFeature = ::pushFeature,
             onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
@@ -564,18 +613,30 @@ fun LocalHarnessScreen(
         ),
         localSettingsFeatureUiContribution(
             settingsDestination = settingsDestination,
+            settingsEntryRequest = settingsEntryRequest,
             memorySourceSessionId = memorySourceSessionId,
             memorySourceMessageId = memorySourceMessageId,
             updateStatus = updateStatus,
             onCheckUpdate = onCheckUpdate,
-            onSettingsDestinationChange = { settingsDestination = it },
+            onSettingsDestinationChange = {
+                settingsDestination = it
+                settingsEntryRequest++
+            },
             onPopFeature = ::popFeature,
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { drawerState.close() } },
         ),
     )
 
-    fun openDrawerEntry(entry: LocalFeatureDrawerEntry) {
+    fun openDrawerEntry(entry: LocalFeatureDrawerEntry, galleryTargetId: String? = null) {
+        if (entry == LocalFeatureDrawerEntry.PERSONA_GALLERY ||
+            entry == LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE
+        ) {
+            // All ordinary gallery entries must clear a previous search's selected persona.
+            // Only the explicit search-result entry carries its own target.
+            drawerGalleryTargetId = galleryTargetId
+            drawerGalleryEntryVersion++
+        }
         val action = localFeatureDrawerAction(entry, featureContributions)
             ?: error("Missing Feature drawer contribution: $entry")
         action()
@@ -651,6 +712,10 @@ fun LocalHarnessScreen(
                 modeIntro = target
             }
         }
+        if (target != shell.usageMode || returningFromGroupToSingle) {
+            // Mode tabs live in the drawer: the next Home back returns to the source drawer.
+            conversationOpenedFromDrawer = true
+        }
         // Work capability handoff owns pendingUsageMode; ordinary taps use the
         // runtime navigation inbox, keeping the drawer tied to the real session.
         viewModel.switchUsageMode(target)
@@ -660,6 +725,8 @@ fun LocalHarnessScreen(
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
         if (shell.loading || shell.sessionId.isBlank()) return@LaunchedEffect
         if (target == shell.sessionId) {
+            resetFeatureNavigation()
+            if (drawerState.isOpen) drawerState.close()
             onSessionRequestConsumed()
         } else if (shell.sessions.none { it.id == target }) {
             onSessionRequestConsumed()
@@ -676,12 +743,20 @@ fun LocalHarnessScreen(
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen) {
+    BackHandler(enabled = !syWideViewport && drawerState.isOpen) {
         scope.launch { drawerState.close() }
+    }
+    BackHandler(
+        enabled = localConversationShouldReturnToDrawer(
+            featurePage, drawerState.isOpen, syWideViewport, conversationOpenedFromDrawer,
+        ),
+    ) {
+        conversationOpenedFromDrawer = false
+        scope.launch { drawerState.open() }
     }
 
     PredictiveBackHandler(
-        enabled = !drawerState.isOpen && featurePage != LocalFeaturePage.HOME,
+        enabled = (syWideViewport || !drawerState.isOpen) && featurePage != LocalFeaturePage.HOME,
     ) { progress ->
         var swipeEdge: Int? = null
         try {
@@ -717,7 +792,6 @@ fun LocalHarnessScreen(
 
     // V5: only the mobile/tablet presentation is modal. At >=1024dp, real
     // sessions and business routes remain reachable through a persistent 258dp rail.
-    val syWideViewport = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1024
     val syDrawerContent: @Composable () -> Unit = {
             LocalModeDrawer(
                 currentSessionId = shell.sessionId,
@@ -743,13 +817,12 @@ fun LocalHarnessScreen(
                 },
                 onNewSession = {
                     scope.launch { drawerState.close() }
+                    newSessionOpenedFromDrawer = true
                     showNewSessionMode = true
                 },
                 onSwitchSession = { sessionId ->
-                    if (viewModel.switchSession(sessionId) && sessionId == shell.sessionId) {
-                        // Different sessions close the drawer only once the shell activates them.
-                        scope.launch { drawerState.close() }
-                    }
+                    // Different sessions close the drawer only once the shell activates them.
+                    switchToSessionAndShowConversation(sessionId, fromDrawer = true)
                 },
                 onDeleteSessions = ::deleteSessionsAndNavigate,
                 onRenameSession = viewModel::renameSession,
@@ -773,7 +846,12 @@ fun LocalHarnessScreen(
                 onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
-                onOpenPersonaGallery = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
+                onOpenPersonaGallery = {
+                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)
+                },
+                onOpenPersonaSearchResult = { galleryId ->
+                    openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY, galleryId)
+                },
                 onOpenDiary = { openDrawerEntry(LocalFeatureDrawerEntry.DIARY) },
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
                 onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
@@ -894,11 +972,13 @@ fun LocalHarnessScreen(
             onConfigureModel = {
                 workCapabilityConfiguring = true
                 settingsDestination = SettingsDestination.MODELS
+                settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onConfigureDevice = {
                 workCapabilityConfiguring = true
                 settingsDestination = SettingsDestination.PERMISSIONS
+                settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
             onContinue = {
@@ -930,22 +1010,33 @@ fun LocalHarnessScreen(
                 finishFirstLaunch()
                 if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
                 settingsDestination = SettingsDestination.MODELS
+                settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
             },
         )
     }
 
+    fun dismissNewSessionMode() {
+        showNewSessionMode = false
+        reopenDrawerWhenModalReturns(newSessionOpenedFromDrawer)
+        newSessionOpenedFromDrawer = false
+    }
+
     if (showNewSessionMode) {
         if (shell.usageMode == LocalUsageMode.CHAT && shell.groupChat.enabled) {
             GroupNewSessionDialog(
-                onDismiss = { showNewSessionMode = false },
+                onDismiss = ::dismissNewSessionMode,
                 onNewGroup = {
                     showNewSessionMode = false
+                    groupSetupOpenedFromDrawer = newSessionOpenedFromDrawer
+                    newSessionOpenedFromDrawer = false
                     showGroupSetup = true
                 },
                 onNewSingle = {
                     if (viewModel.createSingleChatSession()) {
                         showNewSessionMode = false
+                        conversationOpenedFromDrawer = newSessionOpenedFromDrawer
+                        newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
                 },
@@ -954,10 +1045,12 @@ fun LocalHarnessScreen(
             NewSessionModeDialog(
                 usageMode = shell.usageMode,
                 projectAvailable = projectRecoveryNotice == null,
-                onDismiss = { showNewSessionMode = false },
+                onDismiss = ::dismissNewSessionMode,
                 onSelect = { mode ->
                     if (viewModel.createSession(mode)) {
                         showNewSessionMode = false
+                        conversationOpenedFromDrawer = newSessionOpenedFromDrawer
+                        newSessionOpenedFromDrawer = false
                         // The settled session observer owns navigation reset.
                     }
                 },
@@ -984,11 +1077,17 @@ fun LocalHarnessScreen(
                 val created = viewModel.createGroupChatSession(ids)
                 if (created) {
                     showGroupSetup = false
+                    conversationOpenedFromDrawer = groupSetupOpenedFromDrawer
+                    groupSetupOpenedFromDrawer = false
                     // Wait for the committed group session before resetting feature navigation.
                 }
                 created
             },
-            onDismiss = { showGroupSetup = false },
+            onDismiss = {
+                showGroupSetup = false
+                reopenDrawerWhenModalReturns(groupSetupOpenedFromDrawer)
+                groupSetupOpenedFromDrawer = false
+            },
         )
     }
 
@@ -1008,7 +1107,10 @@ fun LocalHarnessScreen(
                 showPersonaGallerySavePrompt = false
                 openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE)
             },
-            onDismiss = { showPersonaGallerySavePrompt = false },
+            onDismiss = {
+                showPersonaGallerySavePrompt = false
+                reopenDrawerWhenModalReturns(true)
+            },
         )
     }
 
