@@ -101,10 +101,10 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPill
+import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
+import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
@@ -507,7 +507,7 @@ internal fun LocalConversationSurface(
                 .padding(horizontal = DsMetrics.screenHorizontal, vertical = DsSpacing.small),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onOpenDrawer != null) DsIconButton(
+                if (onOpenDrawer != null) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),
                     onClick = onOpenDrawer,
@@ -568,7 +568,7 @@ internal fun LocalConversationSurface(
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
-                    DsIconButton(
+                    SyIconButton(
                         icon = FeatherIcons.Users,
                         contentDescription = stringResource(R.string.local_team_reopen),
                         onClick = { showTeamPanel = true },
@@ -1311,7 +1311,7 @@ internal fun LocalConversationSurface(
                 }
             }
             if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.local_persona_picker_title),
                     icon = FeatherIcons.User,
                     onClick = {
@@ -1321,7 +1321,7 @@ internal fun LocalConversationSurface(
                 )
             }
             if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
-                DsSheetChoiceRow(
+                SySheetChoiceRow(
                     title = stringResource(R.string.local_team_reopen),
                     icon = FeatherIcons.ChevronRight,
                     onClick = {
