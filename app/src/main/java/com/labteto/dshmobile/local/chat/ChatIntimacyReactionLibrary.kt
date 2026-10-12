@@ -98,6 +98,19 @@ internal object ChatIntimacyReactionLibrary {
         "afterglow" to "平静对视、轻笑、目光放松",
     )
 
+    private val sceneLabels = mapOf(
+        "sudden-hug" to "突然拥抱", "reunion-hug" to "久别重逢",
+        "comfort-hug" to "安慰拥抱", "back-hug" to "身后拥抱",
+        "gentle-hug" to "温柔拥抱", "leaning" to "并肩依偎",
+        "forehead-kiss" to "额头亲吻", "cheek-kiss" to "脸颊亲吻",
+        "brief-kiss" to "短暂亲吻", "hair-touch" to "轻抚头发",
+        "face-touch" to "轻抚脸颊", "hand-touch" to "牵手与手背触碰",
+        "caress" to "自然轻抚", "shy" to "害羞与紧张",
+        "playful" to "玩笑与笑场", "reconciliation" to "争执后和好",
+        "pause" to "暂停与不适", "afterglow" to "亲近后的余韵",
+        "unspecified" to "当前亲近互动",
+    )
+
     private val unspecified = IntimacyReactionScene(
         "unspecified", emptyList(),
         "只依据已经发生的接触决定回应，不凭空补出拥抱、亲吻或新的动作",
@@ -144,10 +157,10 @@ internal object ChatIntimacyReactionLibrary {
         val mood = state.mood.trim().takeUnless { it.isBlank() || it == "自然" }
         val setting = environmentCue(context.scene)
         val recent = (state.recentActionTags.takeLast(2) + state.recentPoseTags.takeLast(2) +
-            state.recentVerbalTags.takeLast(2)).distinct().takeLast(5)
+            state.recentVerbalTags.takeLast(2)).distinct().takeLast(5).map { it.take(24) }
         val sound = vocalPalette.getValue(chosen.vocalKind)
         val notes = buildList {
-            add("【本轮反应素材｜候选，不是固定动作脚本】情境=${chosen.id}。")
+            add("【本轮反应素材｜候选，不是固定动作脚本】情境=${sceneLabels.getValue(chosen.id)}。")
             add("微动作：${chosen.microAction}；身体：${chosen.bodySignal}。")
             add("表情/目光：${facePalette[chosen.id] ?: "遵循已发生的场景与人物感受"}。")
             add("语言：${chosen.dialogue}；可能的自然声音：$sound（也可不发声）。")
