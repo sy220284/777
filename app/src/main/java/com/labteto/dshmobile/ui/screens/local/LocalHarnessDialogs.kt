@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -92,6 +93,7 @@ internal fun NewSessionModeDialog(
         onDismiss = onDismiss,
     ) {
         SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_continue
                 else R.string.local_new_session_continue,
@@ -100,11 +102,13 @@ internal fun NewSessionModeDialog(
         )
         if (!chatMode && projectAvailable) {
             SySheetChoiceRow(
+                modifier = Modifier.heightIn(min = 72.dp),
                 title = stringResource(R.string.local_project_start_work_session),
                 onClick = { onSelect(LocalConversationMode.PROJECT) },
             )
         }
         SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_new
                 else R.string.local_new_session_independent,
@@ -120,16 +124,10 @@ internal fun GroupNewSessionDialog(
     onNewGroup: () -> Unit,
     onNewSingle: () -> Unit,
 ) {
-    val colors = DsTheme.colors
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
     ) {
-        Text(
-            stringResource(R.string.local_group_new_session_intro),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
         SySheetChoiceRow(
             title = stringResource(R.string.local_group_new_group),
             onClick = onNewGroup,
