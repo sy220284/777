@@ -20,11 +20,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaLoreEntry
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsSlider
-import com.labteto.dshmobile.ui.components.DsSwitch
-import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SySlider
+import com.shenyan.designsystem.components.SySwitchControl
+import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -99,22 +99,22 @@ internal fun PersonaWorldBookEditor(
                                 )
                             }
                         }
-                        DsButton(
+                        SyButton(
                             text = stringResource(if (expandedIndex == index) R.string.local_persona_lore_collapse else R.string.local_persona_lore_edit),
                             onClick = { expandedIndex = if (expandedIndex == index) -1 else index },
-                            variant = DsButtonVariant.Ghost,
+                            variant = SyButtonVariant.Ghost,
                             modifier = Modifier.testTag("personaLoreSelect:$index"),
                         )
                     }
                 }
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.local_persona_lore_add),
                     onClick = {
                         onChange(entries + PersonaLoreEntry(id = "lore-${UUID.randomUUID()}"))
                         expandedIndex = entries.size
                     },
                     enabled = entries.size < 80,
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     modifier = Modifier.fillMaxWidth().testTag("personaLoreAdd"),
                 )
             }
@@ -140,14 +140,14 @@ internal fun PersonaWorldBookEditor(
                         style = DsType.base16Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = entry.title,
                         onValueChange = { change(entry.copy(title = it)) },
                         label = { Text(stringResource(R.string.local_persona_lore_entry_title)) },
                         modifier = Modifier.fillMaxWidth().testTag("personaLoreTitle"),
                         singleLine = true,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = entry.content,
                         onValueChange = { change(entry.copy(content = it)) },
                         label = { Text(stringResource(R.string.local_persona_lore_entry_content)) },
@@ -155,7 +155,7 @@ internal fun PersonaWorldBookEditor(
                         minLines = 3,
                         maxLines = 8,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = entry.keywords.joinToString("\n"),
                         onValueChange = { change(entry.copy(keywords = splitLoreEditorLines(it))) },
                         label = { Text(stringResource(R.string.local_persona_lore_entry_keywords)) },
@@ -163,14 +163,14 @@ internal fun PersonaWorldBookEditor(
                         minLines = 2,
                         maxLines = 4,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = entry.temporalScope,
                         onValueChange = { change(entry.copy(temporalScope = it.take(160))) },
                         label = { Text(stringResource(R.string.persona_v4_story_stage_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
-                    DsTextField(
+                    SyTextField(
                         value = entry.secondaryKeywords.joinToString("\n"),
                         onValueChange = { change(entry.copy(secondaryKeywords = splitLoreEditorLines(it))) },
                         label = { Text(stringResource(R.string.local_persona_lore_entry_secondary_keywords)) },
@@ -189,7 +189,7 @@ internal fun PersonaWorldBookEditor(
                             style = DsType.small13.withReadingWeight(),
                             color = colors.labelPrimary,
                         )
-                        DsSwitch(
+                        SySwitchControl(
                             checked = entry.alwaysOn,
                             onCheckedChange = { change(entry.copy(alwaysOn = it)) },
                         )
@@ -199,24 +199,24 @@ internal fun PersonaWorldBookEditor(
                         style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
-                    DsSlider(
+                    SySlider(
                         value = entry.priority.toFloat().coerceIn(0f, 100f),
                         onValueChange = { change(entry.copy(priority = it.roundToInt())) },
                         valueRange = 0f..100f,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_persona_lore_spoiler, entry.spoilerLevel),
                         onClick = { change(entry.copy(spoilerLevel = (entry.spoilerLevel + 1) % 4)) },
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                     )
-                    DsButton(
+                    SyButton(
                         text = stringResource(R.string.local_persona_lore_remove),
                         onClick = {
                             onChange(entries.filterIndexed { position, _ -> position != index })
                             expandedIndex = -1
                         },
-                        variant = DsButtonVariant.Ghost,
+                        variant = SyButtonVariant.Ghost,
                         modifier = Modifier.testTag("personaLoreRemove"),
                     )
                 }
