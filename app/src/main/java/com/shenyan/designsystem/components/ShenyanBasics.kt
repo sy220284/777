@@ -243,9 +243,14 @@ fun SyToast(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SyProgressBar(progress: Float?, phase: SyPhase, modifier: Modifier = Modifier) {
+fun SyProgressBar(
+    progress: Float?,
+    phase: SyPhase,
+    modifier: Modifier = Modifier,
+    tintOverride: Color? = null,
+) {
     val c = LocalSyColors.current
-    val color = when (phase) {
+    val color = tintOverride ?: when (phase) {
         SyPhase.FAILED -> c.clay
         SyPhase.DONE, SyPhase.RUNNING -> c.mint
         SyPhase.WAITING -> c.lilac
