@@ -23,14 +23,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.components.DsTextField
-import com.labteto.dshmobile.ui.components.DsSwitch
+import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
+import com.labteto.dshmobile.ui.shenyan.SyButtonSize
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -80,7 +80,7 @@ internal fun ColumnScope.TaskEditorPane(
                 style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
             )
-            DsTextField(
+            SyTextField(
                 value = prompt,
                 onValueChange = {
                     prompt = it
@@ -123,7 +123,7 @@ internal fun ColumnScope.TaskEditorPane(
                     createError = null
                 },
             )
-            DsButton(
+            SyButton(
                 text = stringResource(
                     R.string.tasks_first_run_value,
                     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -132,16 +132,16 @@ internal fun ColumnScope.TaskEditorPane(
                 onClick = {
                     showSchedulePicker = true
                 },
-                variant = DsButtonVariant.Outline,
+                variant = SyButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.tasks_schedule_custom),
                 onClick = { cadence = AutomationCadence.CUSTOM },
-                variant = if (cadence == AutomationCadence.CUSTOM) DsButtonVariant.Outline else DsButtonVariant.Ghost,
+                variant = if (cadence == AutomationCadence.CUSTOM) SyButtonVariant.Outline else SyButtonVariant.Ghost,
             )
             if (cadence == AutomationCadence.CUSTOM) {
-                DsTextField(
+                SyTextField(
                     value = customHours,
                     onValueChange = {
                         customHours = it.filter(Char::isDigit).take(5)
@@ -171,7 +171,7 @@ internal fun ColumnScope.TaskEditorPane(
                         color = colors.labelTertiary,
                     )
                 }
-                DsSwitch(
+                SySwitchControl(
                     checked = notify,
                     onCheckedChange = { notify = it },
                 )
@@ -189,15 +189,15 @@ internal fun ColumnScope.TaskEditorPane(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = onReset,
-                    variant = DsButtonVariant.Info,
+                    variant = SyButtonVariant.Info,
                     modifier = Modifier.weight(1f),
-                    size = DsButtonSize.Large,
+                    size = SyButtonSize.Large,
 
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(
                         if (editingTaskId != null) R.string.tasks_save else R.string.tasks_create,
                     ),
@@ -246,7 +246,7 @@ internal fun ColumnScope.TaskEditorPane(
                         if (ok) onReset() else createError = createInvalidMessage
                     },
                     modifier = Modifier.weight(1f),
-                    size = DsButtonSize.Large,
+                    size = SyButtonSize.Large,
 
                 )
             }
@@ -276,19 +276,19 @@ private fun CadenceRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        DsButton(
+        SyButton(
             text = firstLabel,
             onClick = { onSelect(first) },
             modifier = Modifier.weight(1f),
-            variant = if (selected == first) DsButtonVariant.Info else DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = if (selected == first) SyButtonVariant.Info else SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
         )
-        DsButton(
+        SyButton(
             text = secondLabel,
             onClick = { onSelect(second) },
             modifier = Modifier.weight(1f),
-            variant = if (selected == second) DsButtonVariant.Info else DsButtonVariant.Ghost,
-            size = DsButtonSize.Small,
+            variant = if (selected == second) SyButtonVariant.Info else SyButtonVariant.Ghost,
+            size = SyButtonSize.Small,
         )
     }
 }
@@ -341,7 +341,7 @@ private fun TaskSchedulePicker(
     }
     val validTime = selectedMillis != null && selectedMillis >= System.currentTimeMillis() + 60_000L
 
-    com.labteto.dshmobile.ui.components.DsBottomSheet(
+    com.labteto.dshmobile.ui.components.SyResponsiveSheet(
         title = stringResource(
             if (choosingTime) R.string.app_schedule_choose_time else R.string.app_schedule_choose_date,
         ),
@@ -355,7 +355,7 @@ private fun TaskSchedulePicker(
                 headline = null,
                 showModeToggle = false,
             )
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.app_schedule_next),
                 onClick = { choosingTime = true },
                 enabled = dateState.selectedDateMillis != null,
@@ -379,13 +379,13 @@ private fun TaskSchedulePicker(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             ) {
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_back),
                     onClick = { choosingTime = false },
-                    variant = DsButtonVariant.Ghost,
+                    variant = SyButtonVariant.Ghost,
                     modifier = Modifier.weight(1f),
                 )
-                DsButton(
+                SyButton(
                     text = stringResource(R.string.common_ok),
                     onClick = { selectedMillis?.let(onPicked) },
                     enabled = validTime,
@@ -412,11 +412,11 @@ internal fun AutomationTimePickerSheet(
         initialMinute = initialMinuteOfDay % 60,
         is24Hour = true,
     )
-    com.labteto.dshmobile.ui.components.DsBottomSheet(
+    com.labteto.dshmobile.ui.components.SyResponsiveSheet(
         title = stringResource(R.string.tasks_schedule_label),
         onDismiss = onDismiss,
         footer = {
-            DsButton(
+            SyButton(
                 text = stringResource(R.string.common_ok),
                 onClick = { onPicked(time.hour * 60 + time.minute) },
                 modifier = Modifier.fillMaxWidth(),
