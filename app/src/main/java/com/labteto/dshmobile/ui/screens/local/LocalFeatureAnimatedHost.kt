@@ -6,6 +6,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.unit.IntOffset
+import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
+import com.labteto.dshmobile.ui.shenyan.SyDurations
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,6 +38,14 @@ internal fun LocalFeatureAnimatedHost(
     }
     val pushOffset = with(LocalDensity.current) { DsAnimations.pushOffset.roundToPx() }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
+    val reduced = LocalSyReducedMotion.current
+    val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
+    val push = tween<IntOffset>(if (reduced) 80 else SyDurations.page, easing = ease)
+    val pop = tween<IntOffset>(if (reduced) 80 else 320, easing = ease)
+    val peer = tween<IntOffset>(if (reduced) 80 else 280, easing = ease)
+    val fadeEnter = tween<Float>(if (reduced) 80 else 150,
+        delayMillis = if (reduced) 0 else SyDurations.sidebarDelay, easing = ease)
+    val fadeExit = tween<Float>(if (reduced) 80 else 110, easing = ease)
 
     AnimatedContent(
         targetState = stack,
@@ -44,31 +57,31 @@ internal fun LocalFeatureAnimatedHost(
             when {
                 targetState.size > initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageForward) { pushOffset } +
-                            fadeIn(DsAnimations.featurePageEnterFade)
+                        slideInHorizontally(push) { pushOffset } +
+                            fadeIn(fadeEnter)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageForward) { -pushOffset / 2 } +
-                            fadeOut(DsAnimations.featurePageExitFade),
+                        slideOutHorizontally(push) { -pushOffset / 2 } +
+                            fadeOut(fadeExit),
                     )
                 }
 
                 targetState.size < initialState.size -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePageBackward) { -pushOffset / 2 } +
-                            fadeIn(DsAnimations.featurePageEnterFade)
+                        slideInHorizontally(pop) { -pushOffset / 2 } +
+                            fadeIn(fadeEnter)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePageBackward) { pushOffset } +
-                            fadeOut(DsAnimations.featurePageExitFade),
+                        slideOutHorizontally(pop) { pushOffset } +
+                            fadeOut(fadeExit),
                     )
                 }
 
                 else -> {
                     (
-                        slideInHorizontally(DsAnimations.featurePagePeer) { pushOffset / 4 } +
-                            fadeIn(DsAnimations.featurePageEnterFade)
+                        slideInHorizontally(peer) { pushOffset / 4 } +
+                            fadeIn(fadeEnter)
                         ).togetherWith(
-                        slideOutHorizontally(DsAnimations.featurePagePeer) { -pushOffset / 4 } +
-                            fadeOut(DsAnimations.featurePageExitFade),
+                        slideOutHorizontally(peer) { -pushOffset / 4 } +
+                            fadeOut(fadeExit),
                     )
                 }
             }
