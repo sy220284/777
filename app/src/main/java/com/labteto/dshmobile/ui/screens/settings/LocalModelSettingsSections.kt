@@ -376,18 +376,7 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                     },
-                    items = visibleCatalogModels.map { discovered ->
-                        MenuItem(stringResource(R.string.local_model_catalog_option, discovered)) {
-                            // A new discovered model is a new route. Preserve the original
-                            // credential reference, without exposing or copying its key into UI.
-                            if (editingProfileId != null) credentialSourceProfileId = editingProfileId
-                            editingProfileId = null
-                            model = discovered
-                            custom = true
-                            testStatus = null
-                            editorGeneration++
-                        }
-                    } + LocalModelPresets.entries.map { preset ->
+                    items = LocalModelPresets.entries.map { preset ->
                         MenuItem("${preset.provider} · ${preset.model}") {
                             custom = false
                             editRoute(preset.model, preset.baseUrl, null)
@@ -519,6 +508,11 @@ internal fun LocalModelSettingsCard(
                         val testedProfileId = editingProfileId
                         val testedCredentialSourceProfileId = credentialSourceProfileId
                         val testedGeneration = editorGeneration
+                        // Model inventory is independent of inference support and should be
+                        // discoverable immediately, even if the selected model is obsolete.
+                        if (testedKey.isNotBlank() || testedCredentialSourceProfileId != null) {
+                            refreshModels()
+                        }
                         scope.launch {
                             try {
                                 val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId, testedCredentialSourceProfileId)
@@ -531,9 +525,6 @@ internal fun LocalModelSettingsCard(
                                 }
                             } finally {
                                 testing = false
-                                // Catalog refresh is independent of this model's inference result.
-                                // A stale preset must not prevent discovery of current IDs.
-                                if (showEditor && editorGeneration == testedGeneration) refreshModels()
                             }
                         }
                     }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
