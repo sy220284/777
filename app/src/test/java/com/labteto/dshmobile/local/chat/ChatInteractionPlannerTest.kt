@@ -1636,4 +1636,28 @@ class ChatInteractionPlannerTest {
         val previous = ChatCharacterState(mood = "开心")
         assertEquals(null, planner.parse("随便说点别的", previous))
     }
+    @Test
+    fun resolvedUnknownsAreReplacedWithoutErasingOmittedState() {
+        val previous = ChatCharacterState(
+            dynamics = RelationshipDynamics(unknowns = listOf("是否同意保密约定", "下次见面地点")),
+        )
+        val reduced = planner.parse(
+            """{"state":{"dynamics":{"unknowns":["下次见面地点"]}},"turnSignificance":"MINOR"}""",
+            previous, userMessage = "好，我答应你，保密。", assistantMessage = "谢谢你答应。",
+        )!!.state
+        assertEquals(listOf("下次见面地点"), reduced.dynamics.unknowns)
+
+        val noPatch = planner.parse(
+            """{"state":{},"turnSignificance":"NONE"}""",
+            reduced, userMessage = "嗯", assistantMessage = "好",
+        )!!.state
+        assertEquals(listOf("下次见面地点"), noPatch.dynamics.unknowns)
+
+        val closed = planner.parse(
+            """{"state":{"dynamics":{"unknowns":[]}},"turnSignificance":"MINOR"}""",
+            reduced, userMessage = "地点也确定了", assistantMessage = "好，说定了",
+        )!!.state
+        assertTrue(closed.dynamics.unknowns.isEmpty())
+    }
+
 }
