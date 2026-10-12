@@ -81,10 +81,14 @@ internal class LocalWorkProgressCoordinator(
     ): String {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
         val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog)
+        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated.description) else null
         eventLog.append("goal/state", buildJsonObject {
             put("description", updated.description)
             put("status", updated.status)
             updated.note?.let { put("note", it) }
+            delivery?.successfulToolCallId?.let { put("executed_tool_call_id", it) }
+            delivery?.artifactCallId?.let { put("artifact_tool_call_id", it) }
+            delivery?.testCallId?.let { put("verification_tool_call_id", it) }
         })
         state.update { it.copy(goal = updated) }
         persist()
