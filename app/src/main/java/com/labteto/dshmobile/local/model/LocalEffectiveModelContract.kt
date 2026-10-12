@@ -23,6 +23,8 @@ internal data class LocalEffectiveModelContract(
     val routeFingerprint: String?,
     val documentedModalities: Set<LocalModelCapability>,
     val clientModalities: Set<LocalModelCapability>,
+    /** Wired provider API offers; actual quota remains the Media runtime's responsibility. */
+    val mediaOffers: List<LocalMediaOffer>,
     val runtime: LocalModelRuntimeCapabilities,
     val reasoning: LocalReasoningSelection?,
     val temperature: LocalModelTemperatureRange?,
@@ -118,6 +120,7 @@ internal object LocalEffectiveModelContracts {
             routeFingerprint = exactProfile?.routeFingerprint(),
             documentedModalities = documented,
             clientModalities = client,
+            mediaOffers = exactProfile?.let { LocalMediaCatalog.offers(listOf(it)) } ?: emptyList(),
             runtime = runtime,
             reasoning = LocalReasoningRequestPolicy.resolve(reasoningProfile, withTools),
             temperature = LocalModelPresets.chatTemperatureRangeFor(model, baseUrl),
