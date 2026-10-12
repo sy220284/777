@@ -36,6 +36,12 @@ class LocalModelGateway @Inject constructor(
     fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
 
+    /** Read-only, non-credential capability contract for Chat, Work and Settings. */
+    internal fun effectiveContract(
+        profile: LocalModelProfile,
+        withTools: Boolean = false,
+    ): LocalEffectiveModelContract = LocalEffectiveModelContracts.forProfile(profile, withTools)
+
     suspend fun synchronizeCredentialSelection(profile: LocalModelProfile) =
         credentials.synchronizeSelection(profile)
 
@@ -245,6 +251,13 @@ class LocalModelGateway @Inject constructor(
             model = model,
             baseUrl = baseUrl,
         )
+        val contract = LocalEffectiveModelContracts.resolve(
+            model = model,
+            baseUrl = baseUrl,
+            protocol = protocol,
+            authKind = resolved.authKind,
+            profile = effectiveProfile,
+        )
         return LocalResolvedModelRoute(
             profileId = effectiveProfile?.id,
             provider = effectiveProfile?.provider?.takeIf(String::isNotBlank) ?: preset?.provider.orEmpty(),
@@ -253,12 +266,7 @@ class LocalModelGateway @Inject constructor(
             authKind = resolved.authKind,
             protocol = protocol,
             bearerToken = resolved.bearerToken,
-            capabilities = LocalModelPresets.runtimeCapabilitiesFor(
-                model = model,
-                baseUrl = baseUrl,
-                protocol = protocol,
-                authKind = resolved.authKind,
-            ),
+            capabilities = contract.runtime,
         )
     }
 

@@ -4,12 +4,12 @@ import com.labteto.dshmobile.local.LocalModelException
 import java.io.IOException
 
 /**
- * Model retries must be exact replays of an attempt that has not produced any output.
+ * Whole-request replay is permitted only with affirmative evidence that inference did not
+ * start: a pre-send failure, or a provider's explicit HTTP rejection marked retryable.
  *
- * Providers normally wrap admitted transport failures in LocalModelException with retryable=false.
- * A raw IOException can still escape from a custom/compatible transport after text chunks were
- * delivered. In that case the response itself proves that the request reached the provider:
- * never replay it automatically. Continue the task using the durable Work recovery path instead.
+ * A raw IOException gives NO such proof even when the client saw zero response characters.
+ * In particular, the service could have finished inference and the response could have been
+ * lost in transit. Replaying such an outcome can duplicate usage on subscription models.
  */
 internal fun canRetryModelAttemptAfterOutput(
     error: Exception,
@@ -17,8 +17,17 @@ internal fun canRetryModelAttemptAfterOutput(
 ): Boolean {
     if (streamedChars > 0) return false
     return when (error) {
-        is LocalModelException -> error.retryable
-        is IOException -> true
+        is LocalModelException -> error.retryable && when (error.admissionState) {
+            LocalModelAdmissionState.NOT_SENT,
+            LocalModelAdmissionState.REJECTED -> true
+            // A provider may expose an explicit failed HTTP status before adopting the newer
+            // admission API; an actual non-success response is affirmative rejection evidence.
+            LocalModelAdmissionState.NOT_APPLICABLE ->
+                error.status?.let { it in 400..599 } == true
+            LocalModelAdmissionState.MAYBE_ADMITTED,
+            LocalModelAdmissionState.ADMITTED -> false
+        }
+        is IOException -> false // No admission evidence: fail conservatively; do not guess.
         else -> false
     }
 }

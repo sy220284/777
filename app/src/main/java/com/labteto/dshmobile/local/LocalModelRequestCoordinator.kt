@@ -19,7 +19,7 @@ import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
-import com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput
+import com.labteto.dshmobile.local.model.LocalModelAttemptStreamEvidence
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
@@ -35,7 +35,6 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
-import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.LOCAL_NATIVE_TOOL_IMAGE_GENERATION
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
 import com.labteto.dshmobile.local.model.resolveLocalNativeToolNames
@@ -154,12 +153,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             null
         }
         val promptCacheTtl = if (cachePolicy.supportsCacheOptions) "30m" else null
-        val operationalLimit = operationalInputLimitTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
-        val modelContextWindow = documentedContextWindowTokens(
-            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-        )
+        val operationalLimit = runSurface.contract.operationalInputLimitTokens
+        val modelContextWindow = runSurface.contract.documentedContextWindowTokens
         val previousSourcePressure = pressureStore.latestSource(
             snapshot.sessionId,
             snapshot.usageMode,
@@ -170,6 +165,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
         )
+        val softProjectionScale = if (baselinePressure.estimatedInputTokens.toDouble() >= operationalLimit * 0.85) {
+            // Never defer context recovery near the real uncalibrated admission boundary.
+            1.0
+        } else {
+            pressureStore.softProjectionScale(routeFingerprint)
+        }
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
             workProjectionEnabled = contextPolicy != null,
@@ -186,6 +187,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             previousPressure = previousSourcePressure,
                             cachePolicy = cachePolicy,
                             allowSemanticProjection = step <= 1,
+                            softProjectionScale = softProjectionScale,
                         ),
                     )
                 }
@@ -220,11 +222,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         ) {
             contextPolicy.assess(
                 LocalRequestContextAssessmentInput(
-                    current = pressure,
-                    previous = previousSourcePressure,
+                    current = pressureStore.forSoftProjection(routeFingerprint, pressure),
+                    previous = previousSourcePressure?.let { pressureStore.forSoftProjection(routeFingerprint, it) },
                     operationalLimitTokens = operationalLimit,
                     cachePolicy = cachePolicy,
-                    growthCurrent = baselinePressure,
+                    growthCurrent = pressureStore.forSoftProjection(routeFingerprint, baselinePressure),
                 ),
             )
         } else {
@@ -345,6 +347,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("auth_kind", frozenProfile.authKind.name)
             put("protocol", runSurface.protocol.name)
             put("route_fingerprint", routeFingerprint)
+            put("model_contract_version", 1)
+            put("contract_operational_input_limit", runSurface.contract.operationalInputLimitTokens)
+            runSurface.contract.documentedContextWindowTokens?.let { put("contract_documented_context_window", it) }
+            put("contract_work_requests_per_slice", runSurface.contract.executionBudget.workRequestsPerSlice)
+            put("contract_image_input_status", runSurface.contract.imageInput.status.name.lowercase())
+            put("contract_tool_calling_status", runSurface.contract.toolCalling.status.name.lowercase())
+            put("soft_projection_scale_permille", (softProjectionScale * 1_000).toInt())
             put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
             put("prompt_cache_key_enabled", promptCacheKey != null)
             put("prompt_cache_ttl_enabled", promptCacheTtl != null)
@@ -442,22 +451,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         var providerStartedNanos: Long? = null
-        var attemptStreamTail = ""
-        var attemptStreamChars = 0
-
-        fun appendAttemptStream(delta: String) {
-            if (delta.isEmpty()) return
-            attemptStreamChars += delta.length
-            attemptStreamTail = takeLastWithoutSplittingSurrogatePair(
-                attemptStreamTail + delta,
-                MAX_ATTEMPT_STREAM_TAIL_CHARS,
-            )
-        }
+        val attemptEvidence = LocalModelAttemptStreamEvidence()
         val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
-                canRetryModelAttemptAfterOutput(error, attemptStreamChars)
+                attemptEvidence.retryable(error)
             },
             backoffMillis = { failedAttempt, error ->
                 (error as? LocalModelException)?.providerRetryAfterMs
@@ -470,8 +469,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         attemptStartedNanos = System.nanoTime()
                         providerStartedNanos = null
                         lastProviderError = null
-                        attemptStreamTail = ""
-                        attemptStreamChars = 0
+                        attemptEvidence.beginAttempt()
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
@@ -570,10 +568,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "failed")
-                            put("stream_total_chars", attemptStreamChars)
-                            if (attemptStreamTail.isNotEmpty()) {
-                                put("stream_tail", attemptStreamTail)
-                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            put("stream_total_chars", attemptEvidence.emittedChars)
+                            if (attemptEvidence.tail.isNotEmpty()) {
+                                put("stream_tail", attemptEvidence.tail)
+                                put("stream_tail_truncated", attemptEvidence.truncated)
                             }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
@@ -596,10 +594,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "cancelled")
-                            put("stream_total_chars", attemptStreamChars)
-                            if (attemptStreamTail.isNotEmpty()) {
-                                put("stream_tail", attemptStreamTail)
-                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            put("stream_total_chars", attemptEvidence.emittedChars)
+                            if (attemptEvidence.tail.isNotEmpty()) {
+                                put("stream_tail", attemptEvidence.tail)
+                                put("stream_tail_truncated", attemptEvidence.truncated)
                             }
                             put("will_retry", false)
                             event.reason?.let { put("detail", it.take(2_000)) }
@@ -798,7 +796,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             },
                             onDelta = { delta ->
                                     val visible = delta.content
-                                    appendAttemptStream(visible)
+                                    attemptEvidence.append(visible)
                                     streamPreview.append(visible)
                                 },
                             )
@@ -859,10 +857,25 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     diagnosticSurface = cacheDiagnosticSurface,
                                 )
                             }
+                            val rawAcceptedEstimate = LocalPromptPressureMeter.measure(
+                                messages = activeMessages,
+                                tools = tools,
+                                operationalLimitTokens = operationalLimit,
+                                modelContextWindowTokens = modelContextWindow,
+                            ).estimatedInputTokens
                             if (reply.usage.reported) {
-                                pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                                pressureStore.recordReportedUsage(
+                                    snapshot.sessionId, reply.usage.promptTokens,
+                                    routeFingerprint = routeFingerprint,
+                                    rawEstimatedInputTokens = rawAcceptedEstimate,
+                                )
                             }
                             log.append("request/completed", buildJsonObject {
+                                put("raw_estimated_prompt_tokens", rawAcceptedEstimate)
+                                pressureStore.routeCalibration(routeFingerprint)?.let { (samples, permille) ->
+                                    put("route_calibration_samples", samples)
+                                    put("route_soft_estimate_scale_permille", permille)
+                                }
                                 put("request_uid", requestUid)
                                 put("request_envelope_fingerprint", requestEnvelopeFingerprint)
                                 put("header_seq", requestHeader.sequence)
@@ -990,6 +1003,5 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private companion object {
         const val REQUEST_EVIDENCE_VERSION = 3
         const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 2
-        const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
     }
 }

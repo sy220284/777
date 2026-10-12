@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
@@ -215,7 +215,7 @@ internal fun LocalComposerCapabilityPanel(
                 color = colors.labelPrimary,
             )
             val range = profile?.let {
-                LocalModelPresets.chatTemperatureRangeFor(it.model, it.baseUrl)
+                LocalEffectiveModelContracts.forProfile(it).temperature
             }
             // Mirror LocalModelGateway: explicit LOW/DEEP/MAX never transmit temperature;
             // DeepSeek also needs thinking explicitly disabled for sampling to take effect.

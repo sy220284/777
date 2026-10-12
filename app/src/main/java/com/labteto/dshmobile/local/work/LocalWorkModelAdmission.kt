@@ -13,6 +13,8 @@ internal fun LocalWorkExecutionControl.asModelAdmissionPort(): LocalModelAdmissi
             contextWindowTokensOverride = request.contextWindowTokensOverride,
             messages = request.messages,
             tools = request.tools,
+            operationalInputLimitSnapshot = request.operationalInputLimitSnapshot,
+            contextWindowSnapshot = request.contextWindowSnapshot,
         ) {
             block()
         }

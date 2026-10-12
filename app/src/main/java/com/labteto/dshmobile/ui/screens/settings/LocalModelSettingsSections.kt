@@ -49,6 +49,7 @@ import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalMediaCatalog
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
+import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
@@ -266,10 +267,21 @@ internal fun LocalModelSettingsCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        ModelCapabilityTags(
-                            LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
+                        val modelContract = LocalEffectiveModelContracts.forProfile(profile)
+                        ModelCapabilityTags(modelContract.clientModalities)
+                        val creatorKinds = modelContract.mediaOffers.map { it.kind }.distinct()
+                        val contextDescription = modelContract.documentedContextWindowTokens
+                            ?.let { stringResource(R.string.local_model_policy_known_context, it) }
+                            ?: stringResource(R.string.local_model_policy_unknown_context)
+                        Text(
+                            stringResource(
+                                R.string.local_model_policy_work_budget,
+                                contextDescription,
+                                modelContract.executionBudget.workRequestsPerSlice,
+                            ),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelSecondary,
                         )
-                        val creatorKinds = LocalMediaCatalog.offers(listOf(profile)).map { it.kind }.distinct()
                         if (creatorKinds.isNotEmpty()) {
                             val creativeLabels = mapOf(
                                 LocalMediaKind.IMAGE to stringResource(R.string.media_studio_capability_image),

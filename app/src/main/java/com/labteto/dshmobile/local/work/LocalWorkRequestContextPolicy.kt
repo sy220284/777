@@ -24,6 +24,7 @@ internal class LocalWorkRequestContextPolicy(
             structuredWorkState = structuredState,
             cachePolicy = input.cachePolicy,
             allowSemanticProjection = input.allowSemanticProjection,
+            softProjectionScale = input.softProjectionScale,
         )
         return LocalRequestContextProjection(
             messages = projected.messages,

@@ -107,6 +107,13 @@ internal class LocalRequestPressureStore(
         val window: MutableWindow = MutableWindow(),
     )
 
+    private data class ModelEstimateCalibration(var samples: Int = 0, var scale: Double = 1.0)
+    private val routeCalibrations = object : LinkedHashMap<String, ModelEstimateCalibration>(16, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, ModelEstimateCalibration>?,
+        ): Boolean = size > 64
+    }
+
     private val capacity = maxSessions.coerceAtLeast(1)
     private val sessions = object : LinkedHashMap<String, SessionEntry>(16, 0.75f, true) {
         override fun removeEldestEntry(
@@ -138,8 +145,22 @@ internal class LocalRequestPressureStore(
     }
 
     @Synchronized
-    fun recordReportedUsage(sessionId: String, inputTokens: Long) {
+    fun recordReportedUsage(
+        sessionId: String,
+        inputTokens: Long,
+        routeFingerprint: String? = null,
+        rawEstimatedInputTokens: Int? = null,
+    ) {
         if (inputTokens <= 0L) return
+        val key = routeFingerprint?.takeIf(String::isNotBlank)
+        val estimate = rawEstimatedInputTokens?.takeIf { it > 0 }
+        if (key != null && estimate != null) {
+            val observed = (inputTokens.toDouble() / estimate).coerceIn(0.70, 1.15)
+            val calibration = routeCalibrations.getOrPut(key) { ModelEstimateCalibration() }
+            calibration.scale = if (calibration.samples == 0) observed
+                else calibration.scale * 0.75 + observed * 0.25
+            calibration.samples = (calibration.samples + 1).coerceAtMost(Int.MAX_VALUE)
+        }
         val window = sessions.getOrPut(sessionId) { SessionEntry() }.window
         if (!window.serverObserved) {
             window.prefillTokens = inputTokens
@@ -147,6 +168,37 @@ internal class LocalRequestPressureStore(
             window.serverObserved = true
         }
     }
+
+    /**
+     * Only a soft planning input, never a model/provider hard context admission guard.
+     * Require repeated same-credential-route observations before reducing Work compaction pressure.
+     */
+    @Synchronized
+    fun forSoftProjection(routeFingerprint: String, pressure: LocalPromptPressure): LocalPromptPressure {
+        val calibration = routeCalibrations[routeFingerprint] ?: return pressure
+        if (calibration.samples < 4) return pressure
+        fun scaled(tokens: Int): Int =
+            if (tokens <= 0) 0 else (tokens * calibration.scale).toInt().coerceAtLeast(1)
+        return pressure.copy(
+            estimatedInputTokens = scaled(pressure.estimatedInputTokens),
+            systemTokens = scaled(pressure.systemTokens),
+            historyTokens = scaled(pressure.historyTokens),
+            currentUserTokens = scaled(pressure.currentUserTokens),
+            toolDefinitionTokens = scaled(pressure.toolDefinitionTokens),
+        )
+    }
+
+    @Synchronized
+    fun softProjectionScale(routeFingerprint: String): Double {
+        val calibration = routeCalibrations[routeFingerprint] ?: return 1.0
+        return if (calibration.samples >= 4) calibration.scale else 1.0
+    }
+
+    @Synchronized
+    fun routeCalibration(routeFingerprint: String): Pair<Int, Int>? =
+        routeCalibrations[routeFingerprint]?.let {
+            it.samples to (it.scale * 1_000).toInt()
+        }
 
     @Synchronized
     fun advanceGeneration(sessionId: String, estimatedTokensAfter: Int) {

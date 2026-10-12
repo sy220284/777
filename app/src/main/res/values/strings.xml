@@ -2215,5 +2215,8 @@
     <string name="shenyan_onboarding_start">进入应用</string>
     <string name="shenyan_onboarding_skip">我之前用过</string>
     <string name="shenyan_onboarding_setup_model">先配置模型</string>
+    <string name="local_model_policy_known_context">上下文 %1$d Token</string>
+    <string name="local_model_policy_unknown_context">上下文容量未确认</string>
+    <string name="local_model_policy_work_budget">%1$s · Work 每片 %2$d 次请求</string>
 </resources>
 

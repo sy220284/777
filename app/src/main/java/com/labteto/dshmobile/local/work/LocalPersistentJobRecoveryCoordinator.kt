@@ -458,39 +458,14 @@ internal class LocalPersistentJobRecoveryCoordinator(
         checkpointSequence: Long,
         alreadyClaimed: Set<String>,
         pendingIds: Set<String>,
-    ): List<QueuedAgentInput> {
-        val recovered = mutableListOf<QueuedAgentInput>()
-        val seen = alreadyClaimed.toMutableSet()
-        val scanThrough = log.latestSequence()
-        var cursor = checkpointSequence
-        var pages = 0
-        while (cursor < scanThrough) {
-            check(pages < MAX_RECOVERY_EVENT_PAGES) {
-                "持久子代理恢复事件过多，拒绝无界扫描"
-            }
-            pages += 1
-            val page = log.pageAfter(cursor, RECOVERY_EVENT_PAGE_SIZE)
-            if (page.isEmpty()) break
-            for (event in page) {
-                if (event.sequence > scanThrough) break
-                if (
-                    event.type != LOCAL_SUBAGENT_INBOX_CLAIM_EVENT ||
-                    event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != backgroundJobId
-                ) {
-                    continue
-                }
-                val messages = decodeLocalSubagentInboxClaimedMessages(event.data) ?: continue
-                for (message in messages) {
-                    if (message.id in pendingIds || !seen.add(message.id)) continue
-                    recovered += message
-                }
-            }
-            val nextCursor = page.last().sequence
-            if (nextCursor <= cursor) break
-            cursor = nextCursor
-        }
-        return recovered
-    }
+    ): List<QueuedAgentInput> = recoverSubagentInboxClaims(
+        backgroundJobId = backgroundJobId,
+        checkpointSequence = checkpointSequence,
+        scanThrough = log.latestSequence(),
+        alreadyClaimed = alreadyClaimed,
+        pendingIds = pendingIds,
+        pageAfter = { after -> log.pageAfter(after, RECOVERY_EVENT_PAGE_SIZE) },
+    )
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =
         if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
@@ -522,6 +497,5 @@ internal class LocalPersistentJobRecoveryCoordinator(
         const val MIN_PERSISTENT_SUBAGENT_RESUME_VERSION = 1
         const val PERSISTENT_SUBAGENT_RESUME_VERSION = 3
         const val RECOVERY_EVENT_PAGE_SIZE = 200
-        const val MAX_RECOVERY_EVENT_PAGES = 64
     }
 }
