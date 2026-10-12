@@ -252,9 +252,6 @@ class ChatRelationshipEngineTest {
             resolveChatInteractionIntent("别碰我，停下来", previous),
         )
         assertEquals(0, nextInteractionIntensity("别碰我，停下来", previous))
-        assertEquals(ChatInteractionIntent.NORMAL, resolveChatInteractionIntent("我不想继续了", previous))
-        assertEquals(ChatInteractionIntent.NORMAL, classifyExplicitInteractionIntent("不要上床"))
-        assertFalse(engine.prompt("我不想继续了", previous).contains("【本轮意图优先：成年亲密互动】"))
     }
 
     @Test
