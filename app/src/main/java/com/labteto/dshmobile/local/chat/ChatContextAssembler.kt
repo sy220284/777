@@ -12,6 +12,13 @@ internal object ChatMemorySelector {
     fun continuityQuery(query: String, context: ChatContextState): String {
         val text = query.trim()
         if (isExplicitTopicShift(text)) return text
+        // After an explicit topic pause, "嗯/继续" does not reactivate older pending raw
+        // turns that happen to be adjacent in the archive.
+        if (context.attention.pausedSubject.isNotBlank() &&
+            ChatTurnContextPolicy.isWeakReply(text)) {
+            return listOf(text, context.attention.lastUserSubject)
+                .filter(String::isNotBlank).joinToString(" ")
+        }
         val ongoing = context.pendingForRequest(limit = 4).sortedBy(ChatPendingTurn::sequence)
             .takeLast(2).flatMap { listOf(it.userMessage, it.assistantMessage) }
             .filter { it.trim() !in LOW_INFORMATION_REPLIES && it.isNotBlank() }
