@@ -171,6 +171,8 @@ internal fun PersonaGallerySavePromptDialog(
 @Composable
 internal fun PersonaGalleryScreen(
     entries: List<PersonaGalleryEntry>,
+    initialEntryId: String? = null,
+    entryOpenVersion: Int = 0,
     presets: List<PersonaPreset>,
     currentPersona: PersonaProfile,
     currentGalleryId: String?,
@@ -207,7 +209,8 @@ internal fun PersonaGalleryScreen(
                 .toSet(),
         )
     }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    // New sidebar navigation owns its target; internal detail/list Back stays local.
+    var selectedId by rememberSaveable(entryOpenVersion) { mutableStateOf(initialEntryId) }
     val selected = entries.firstOrNull { it.id == selectedId }
     var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
