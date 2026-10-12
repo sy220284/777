@@ -240,7 +240,7 @@ internal fun PersonaGalleryScreen(
     var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
-    var confirmDiscardStoryDraft by remember { mutableStateOf(false) }
+    var confirmDiscardStoryDraft by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
     val hasLocalStoryEdits = selectedStory?.let { story ->
         notes != story.notes || storyStage.trim() != story.chatContext.storyStage ||
