@@ -302,30 +302,31 @@ fun DshTheme(
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
             fluidGlass = preference != ThemePreference.MATTE_BLACK,
         ) {
-            // V5 tokens are available to every screen while business callbacks migrate.
-            // Material3's existing legacy scheme remains only as a compatibility layer.
-            SyThemeProvider(mode = when (preference) {
+            // One canonical visual theme owns all Material3 colour and shape tokens.
+            // Legacy DsColors remains available ONLY to screens still being migrated.
+            val syMode = when (preference) {
                 ThemePreference.LIGHT -> SyMode.LIGHT
                 ThemePreference.DARK -> SyMode.DARK
                 ThemePreference.MATTE_BLACK -> SyMode.MATTE
                 ThemePreference.SYSTEM -> SyMode.SYSTEM
-            }) {
-                // Canonical V5 component library receives exactly the persisted app mode.
-                // Legacy Material3 typography remains nested until every screen is migrated.
-                com.shenyan.designsystem.foundation.ShenyanTheme(
-                    mode = when (preference) {
-                        ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-                        ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                        ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
-                        ThemePreference.SYSTEM -> if (systemDark)
-                            com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                            else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-                    },
-                ) {
+            }
+            val canonicalMode = when (preference) {
+                ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+                ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+                ThemePreference.SYSTEM -> if (systemDark)
+                    com.shenyan.designsystem.foundation.ShenyanMode.DARK
+                    else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
+            }
+            com.shenyan.designsystem.foundation.ShenyanTheme(mode = canonicalMode) {
+                SyThemeProvider(mode = syMode) {
+                    // Preserve user-defined accent and reading accessibility controls.
+                    val resolvedScheme = if (palette.key == AccentPalettes.DEFAULT.key)
+                        MaterialTheme.colorScheme else scheme
                     MaterialTheme(
-                        colorScheme = scheme,
+                        colorScheme = resolvedScheme,
                         typography = dsTypography(readingPreferences.textWeightAdjustment),
-                        shapes = DsMaterialShapes,
+                        shapes = MaterialTheme.shapes,
                         content = content,
                     )
                 }
