@@ -50,7 +50,8 @@ internal class CharacterRuntimeProjector(
         val activePersona = persona.forRuntimeStoryStage(context)
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
         val runtimeState = privateState
-        val storyPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
+        val storyPrompt = storyContext?.takeUnless { ChatMemorySelector.isExplicitTopicShift(userInput) }
+            ?.takeIf(String::isNotBlank)?.let {
             """
             【连续性摘要｜已发生】
             ${it.take(MAX_STORY_CONTEXT_CHARS)}
@@ -60,9 +61,9 @@ internal class CharacterRuntimeProjector(
         return CharacterRuntimeProjection(
             stablePrompt = stablePrompt(activePersona),
             dynamicPrompt = listOf(
-                momentPrompt(activePersona, runtimeState),
+                momentPrompt(activePersona, runtimeState, userInput),
                 renderCharacterLifePrompt(runtimeState.lifeState),
-                renderChatContextForModel(context),
+                renderChatContextForModel(context, focusQuery = userInput),
                 relevantBackgroundPrompt(activePersona, userInput),
                 relevantCharacterFactPrompt(persona, context, userInput, storyContext),
                 context.storyStage.takeIf(String::isNotBlank)
@@ -122,27 +123,49 @@ internal class CharacterRuntimeProjector(
         return packCharacterSections(heading, sections, STABLE_PERSONA_TOKEN_BUDGET)
     }
 
-    private fun momentPrompt(persona: PersonaProfile, state: ChatCharacterState): String {
+    private fun momentPrompt(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+        userInput: String,
+    ): String {
         val lines = mutableListOf<String>()
         state.physicalState.takeIf(String::isNotBlank)?.let { lines += "身体：${it.take(140)}" }
         state.mood.takeUnless { it.isBlank() || it == "自然" }?.let { lines += "情绪：${it.take(100)}" }
-        state.activeGoal.takeIf(String::isNotBlank)?.let { lines += "当前目标：${it.take(180)}" }
-        state.currentAgenda.takeIf(String::isNotBlank)?.let { lines += "正在做：${it.take(180)}" }
-        state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
-        state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
-        state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法）" }
-            ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
-                ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
-        state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
-        // Relationship facts and shared objects belong to ChatRelationshipEngine.prompt.
-        // Do not render the same state twice into one request.
-        state.unresolvedThreads.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
-            lines += "还没做完/说完：${it.joinToString("；").take(260)}"
+
+        // Ongoing business survives in the state, but does not become an instruction to
+        // resurrect that subject on every turn. The raw dialogue already carries continuity.
+        val candidates = listOf(
+            "这一刻容易注意" to state.currentFocus,
+            "脑子里还挂着" to state.immediateConcern,
+            "正在做" to state.currentAgenda,
+            "当前目标" to state.activeGoal,
+            "此刻的拉扯" to state.internalConflict,
+        )
+        val selected = mutableListOf<String>()
+        candidates.forEach { (label, value) ->
+            if (selected.size >= 2 || value.isBlank() ||
+                !ChatMemorySelector.isRelevantToTurn(userInput, value)) return@forEach
+            if (selected.none { ChatContextAssembler.semanticallySimilar(it.substringAfter('：'), value) }) {
+                selected += "$label：${value.take(180)}"
+            }
         }
+        lines += selected
+        state.currentUserImpression.takeIf(String::isNotBlank)?.let {
+            lines += "你目前怎么看对方：${it.take(240)}（人物的主观看法）"
+        } ?: persona.initialUserImpression.takeIf { persona.facts.isEmpty() && it.isNotBlank() }
+            ?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+        val open = state.unresolvedThreads.filter {
+            ChatMemorySelector.isRelevantToTurn(userInput, it) &&
+                selected.none { selectedLine ->
+                    ChatContextAssembler.semanticallySimilar(selectedLine.substringAfter('：'), it)
+                }
+        }.takeLast(1)
+        if (open.isNotEmpty()) lines += "还没做完/说完：${open.joinToString("；").take(180)}"
+        if (lines.isEmpty()) return ""
         return buildString {
             appendLine("【此刻】")
             val budgets = allocateCharacterContextBudget(lines,
-                MOMENT_TOKEN_BUDGET - estimateModelTokens("【此刻】\n") - lines.size)
+                MOMENT_TOKEN_BUDGET - estimateModelTokens("【此刻】\\n") - lines.size)
             lines.forEachIndexed { index, line ->
                 appendLine(takeWithinModelTokenBudget(line, budgets[index]))
             }
