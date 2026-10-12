@@ -12,6 +12,8 @@ internal data class LocalRunModelSurface(
     val protocol: LocalModelProtocol,
     val capabilities: LocalModelRuntimeCapabilities,
     val routeFingerprint: String,
+    /** Frozen once for this run; downstream context and tools must not re-read settings. */
+    val contract: LocalEffectiveModelContract,
 ) {
     val promptCachePolicy: LocalPromptCachePolicy get() = capabilities.promptCachePolicy
     val model: String get() = profile.model
@@ -26,6 +28,7 @@ internal fun LocalModelProfile.toRunModelSurface(): LocalRunModelSurface {
         protocol = contract.protocol,
         capabilities = contract.runtime,
         routeFingerprint = contract.routeFingerprint ?: routeFingerprint(),
+        contract = contract,
     )
 }
 
