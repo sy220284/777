@@ -430,7 +430,16 @@ while frontier_sources:
         reachable_scripts.add(relative)
         frontier_sources.append(script_sources[relative])
 
+# The feature-tree *maintenance* workflow was explicitly retired. Its verifier remains
+# usable for an operator's manual scan, but must not be mistaken for a mandatory CI gate.
+# If automatic maintenance is reintroduced, normal workflow reachability is required again.
+manual_feature_tree_validator = (
+    not (WORKFLOWS / "feature-tree-auto.yml").exists() and
+    (ROOT / "docs" / "FEATURE-TREE-AUTOMATION.zh-CN.md").is_file()
+)
 for guard in sorted(SCRIPTS.glob("check-*.py")):
+    if guard.name == "check-feature-tree-sync.py" and manual_feature_tree_validator:
+        continue
     if guard.relative_to(ROOT).as_posix() not in reachable_scripts:
         violations.append(f"{guard.name}: gate is not invoked by any reachable workflow run step")
 
