@@ -95,17 +95,17 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
-import com.labteto.dshmobile.ui.components.DsCategoryRow
-import com.labteto.dshmobile.ui.components.DsComposerAction
-import com.labteto.dshmobile.ui.components.DsComposerField
-import com.labteto.dshmobile.ui.components.DsComposerMetrics
-import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.shenyan.designsystem.components.SyCategoryRow
+import com.labteto.dshmobile.ui.shenyan.SyComposerAction
+import com.labteto.dshmobile.ui.shenyan.SyComposerField
+import com.labteto.dshmobile.ui.shenyan.SyComposerMetrics
+import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
+import com.shenyan.designsystem.components.SyGroupCard
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.shenyan.designsystem.components.SySheetChoiceRow
-import com.labteto.dshmobile.ui.components.DsQuickActionTile
+import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
@@ -1268,7 +1268,7 @@ internal fun LocalConversationSurface(
         ) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Camera,
                         label = stringResource(R.string.composer_camera),
                         modifier = Modifier.width(96.dp),
@@ -1281,7 +1281,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Image,
                         label = stringResource(R.string.local_attachment_image),
                         modifier = Modifier.width(96.dp),
@@ -1289,7 +1289,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Folder,
                         label = stringResource(R.string.local_attachment_file),
                         modifier = Modifier.width(96.dp),
@@ -1297,7 +1297,7 @@ internal fun LocalConversationSurface(
                     )
                 }
                 item {
-                    DsQuickActionTile(
+                    SyQuickActionTile(
                         icon = FeatherIcons.Image,
                         label = stringResource(R.string.media_studio_entry),
                         modifier = Modifier.width(96.dp),
