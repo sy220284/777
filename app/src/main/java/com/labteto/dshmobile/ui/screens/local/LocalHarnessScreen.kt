@@ -114,6 +114,10 @@ import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
+import com.labteto.dshmobile.ui.shenyan.SyDimensions
+import com.labteto.dshmobile.ui.shenyan.SyMaterialFrame
+import com.labteto.dshmobile.ui.shenyan.SyMaterialTier
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -789,6 +793,41 @@ fun LocalHarnessScreen(
         Row(Modifier.fillMaxSize()) {
             syDrawerContent()
             Box(Modifier.weight(1f)) { sySceneContent() }
+            // V5: native 318dp inspector reflects ACTUAL selected session and model.
+            // Hidden on narrow widths and non-home routes to protect work/editor space.
+            if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1440 &&
+                featurePage == LocalFeaturePage.HOME) {
+                val syInk = LocalSyPalette.current
+                SyMaterialFrame(
+                    modifier = Modifier.width(SyDimensions.inspector).fillMaxHeight()
+                        .padding(12.dp),
+                    tier = SyMaterialTier.L2_BAR,
+                ) {
+                    Text("当前会话", color = syInk.text, style = DsType.headline17)
+                    Text(
+                        text = shell.chatPersona.name.ifBlank { "未绑定人物" },
+                        color = syInk.secondaryText,
+                        style = DsType.std14,
+                    )
+                    Text(
+                        text = activeModelProfile?.displayName
+                            ?: activeModelProfile?.model
+                            ?: "尚未选择模型",
+                        color = syInk.tertiaryText,
+                        style = DsType.small13,
+                    )
+                    Text(
+                        text = if (shell.usageMode == LocalUsageMode.CHAT) "聊天模式" else "工作模式",
+                        color = syInk.secondaryText,
+                        style = DsType.small13,
+                    )
+                    DsButton(
+                        text = "人物与资料",
+                        onClick = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
+            }
         }
     } else {
         ModalNavigationDrawer(drawerState = drawerState, drawerContent = syDrawerContent) {
