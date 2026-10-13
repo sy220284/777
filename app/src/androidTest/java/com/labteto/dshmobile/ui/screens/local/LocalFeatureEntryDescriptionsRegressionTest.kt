@@ -16,12 +16,16 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.shenyan.designsystem.components.SyQuickActionTile
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -188,6 +192,49 @@ class LocalFeatureEntryDescriptionsRegressionTest {
         }
         compose.onNodeWithText("多模态创作").performClick()
         compose.runOnIdle { assertEquals("media", lastAction) }
+    }
+
+    @Test
+    fun messageMediaActionsHaveThreeDistinctIcons() {
+        val message = LocalHarnessMessage(
+            id = "media-action-icons", role = "assistant",
+            content = "内容", createdAt = 0L,
+        )
+        var actions = emptyList<SyMenuItem>()
+        compose.setContent {
+            DshTheme {
+                actions = fluidMessageMediaItems(message, onCreate = { _, _ -> })
+            }
+        }
+        compose.runOnIdle {
+            assertEquals(3, actions.size)
+            assertEquals(3, actions.map { it.icon }.distinct().size)
+            actions.forEach { assertNotNull(it.icon) }
+        }
+    }
+
+    @Test
+    fun workMessageContextActionsAllFitAndRespondOnMobile() {
+        var clicked = ""
+        val labels = listOf("复制内容", "编辑消息", "查看记录", "重新生成", "插入图片", "继续执行")
+        compose.setContent {
+            DshTheme {
+                SyContextActionMenu(
+                    expanded = true,
+                    onDismiss = {},
+                    items = labels.map { label ->
+                        SyMenuItem(
+                            text = label,
+                            icon = FeatherIcons.Copy,
+                            onClick = { clicked = label },
+                        )
+                    },
+                )
+            }
+        }
+        labels.forEach { label -> compose.onNodeWithText(label).assertIsDisplayed() }
+        compose.onNodeWithText(labels.last()).performClick()
+        compose.runOnIdle { assertEquals(labels.last(), clicked) }
     }
 
 }
