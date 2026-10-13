@@ -44,12 +44,18 @@ internal class ChatInteractionPromptBuilder {
         if (state.continuity.recentEvents.isNotEmpty()) {
             appendLine("近期事件：${state.continuity.recentEvents.joinToString("；")}")
         }
-        if (state.continuity.decisions.isNotEmpty()) {
-            appendLine("已定事项：${state.continuity.decisions.joinToString("；")}")
+        val visibleDecisions = ChatContinuityPromptProjection.select(
+            state.continuity.decisions, userMessage,
+        )
+        val visibleUnfinished = ChatContinuityPromptProjection.select(
+            state.continuity.unfinished, userMessage,
+        )
+        if (visibleDecisions.isNotEmpty()) {
+            appendLine("已定事项（历史有效事项仍在持久记录中，此处仅为本轮选取）：${visibleDecisions.joinToString("；")}")
         }
-        if (state.continuity.unfinished.isNotEmpty()) {
-            appendLine("待续事件（编号只用于准确结清，不向用户展示）：")
-            state.continuity.unfinished.forEach { fact ->
+        if (visibleUnfinished.isNotEmpty()) {
+            appendLine("待续事件（编号仅用于准确结清；未展示事项不代表已完成）：")
+            visibleUnfinished.forEach { fact ->
                 val source = state.continuity.evidence.firstOrNull {
                     it.kind == ChatContinuityFactKind.OPEN_THREAD && it.text == fact
                 }
