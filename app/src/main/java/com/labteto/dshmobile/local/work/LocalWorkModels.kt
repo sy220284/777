@@ -15,6 +15,11 @@ data class LocalGoal(
     val description: String,
     val status: String = "active",
     val note: String? = null,
+    val id: String = "",
+    val startedAtSequence: Long = -1L,
+    /** Explicit acceptance, never inferred from the language used in description. */
+    val artifactPaths: List<String> = emptyList(),
+    val verificationCommands: List<String> = emptyList(),
 )
 
 data class LocalWorkflowProgress(

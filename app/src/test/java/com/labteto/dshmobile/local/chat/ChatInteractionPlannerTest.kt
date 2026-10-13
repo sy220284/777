@@ -998,6 +998,20 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun parsedPostTurnIntimateActionsAlsoEnterMaximumMode() {
+        val state = planner.parse(
+            """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+            previous = ChatCharacterState(),
+            userMessage = "今天怎么样",
+            assistantMessage = "她伸出手轻轻抚摸我的头发。",
+        )!!.state
+
+        assertEquals(ChatInteractionIntent.INTIMATE.name, state.interactionIntent)
+        assertEquals(100, state.interactionIntentStrength)
+        assertEquals(5, state.interactionIntensity)
+    }
+
+    @Test
     fun proactiveTurnWithoutUserMessagePreservesExistingInteractionIntent() {
         val previous = ChatCharacterState(
             interactionIntent = ChatInteractionIntent.INTIMATE.name,

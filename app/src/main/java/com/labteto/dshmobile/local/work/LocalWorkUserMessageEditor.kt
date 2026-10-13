@@ -164,6 +164,7 @@ internal class LocalWorkUserMessageEditor @Inject constructor(
                 }))
                 put("goal", controls.goal?.let { goal ->
                     buildJsonObject {
+                        workGoalEvent(goal).forEach { (key, value) -> put(key, value) }
                         put("description", goal.description)
                         put("status", goal.status)
                         goal.note?.let { put("note", it) }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -86,45 +87,31 @@ internal fun NewSessionModeDialog(
     onSelect: (LocalConversationMode) -> Unit,
     projectAvailable: Boolean = true,
 ) {
-    val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
     SyResponsiveSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
     ) {
-        if (!chatMode) {
-            Text(
-                stringResource(R.string.local_new_session_dialog_intro),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.labelSecondary,
-            )
-        }
         SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_continue
                 else R.string.local_new_session_continue,
-            ),
-            subtitle = stringResource(
-                if (chatMode) R.string.local_new_session_chat_continue_hint
-                else R.string.local_new_session_continue_hint,
             ),
             onClick = { onSelect(LocalConversationMode.CONTINUATION) },
         )
         if (!chatMode && projectAvailable) {
             SySheetChoiceRow(
+                modifier = Modifier.heightIn(min = 72.dp),
                 title = stringResource(R.string.local_project_start_work_session),
-                subtitle = stringResource(R.string.local_project_new_session_hint),
                 onClick = { onSelect(LocalConversationMode.PROJECT) },
             )
         }
         SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
             title = stringResource(
                 if (chatMode) R.string.local_new_session_chat_new
                 else R.string.local_new_session_independent,
-            ),
-            subtitle = stringResource(
-                if (chatMode) R.string.local_new_session_chat_independent_hint
-                else R.string.local_new_session_independent_hint,
             ),
             onClick = { onSelect(LocalConversationMode.INDEPENDENT) },
         )
@@ -137,16 +124,10 @@ internal fun GroupNewSessionDialog(
     onNewGroup: () -> Unit,
     onNewSingle: () -> Unit,
 ) {
-    val colors = DsTheme.colors
     SyResponsiveSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
     ) {
-        Text(
-            stringResource(R.string.local_group_new_session_intro),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelSecondary,
-        )
         SySheetChoiceRow(
             title = stringResource(R.string.local_group_new_group),
             onClick = onNewGroup,

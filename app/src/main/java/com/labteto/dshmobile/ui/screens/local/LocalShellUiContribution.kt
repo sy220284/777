@@ -43,15 +43,20 @@ internal fun localShellFeatureUiContribution(
     onOpenDrawer: () -> Unit,
     onOpenFromDrawer: (LocalFeaturePage) -> Unit,
     onCloseDrawer: () -> Unit,
+    onReturnFromDrawerReader: () -> Unit,
 ): LocalFeatureUiContribution {
     var readerRequest by androidx.compose.runtime.saveable.rememberSaveable {
         androidx.compose.runtime.mutableLongStateOf(0L)
+    }
+    var readerOpenedFromDrawer by androidx.compose.runtime.saveable.rememberSaveable(shell.sessionId) {
+        androidx.compose.runtime.mutableStateOf(false)
     }
     val scope = rememberCoroutineScope()
     val surface by state.collectAsStateWithLifecycle()
     return LocalFeatureUiContribution(
         moduleId = LocalFeatureModuleId.SHELL,
         drawerActions = mapOf(LocalFeatureDrawerEntry.IMMERSIVE_READER to {
+            readerOpenedFromDrawer = true
             readerRequest++
             onOpenFromDrawer(LocalFeaturePage.HOME)
             onCloseDrawer()
@@ -62,6 +67,12 @@ internal fun localShellFeatureUiContribution(
         LocalConversationSurface(
             state = surface,
             readRequest = readerRequest,
+            onReaderDismissed = {
+                if (readerOpenedFromDrawer) {
+                    readerOpenedFromDrawer = false
+                    onReturnFromDrawerReader()
+                }
+            },
             workActions = workActions,
             onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,

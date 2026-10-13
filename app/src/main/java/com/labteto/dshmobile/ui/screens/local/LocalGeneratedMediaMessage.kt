@@ -88,6 +88,9 @@ internal fun LocalCreationJobMessageRow(
 ) {
     val resources = LocalResources.current
     val phase = when (job.phase) {
+        LocalMediaCreationPhase.PREPARING -> R.string.media_creation_preparing
+        LocalMediaCreationPhase.SAVING -> R.string.media_creation_saving
+        LocalMediaCreationPhase.SAVE_FAILED -> R.string.media_creation_save_failed
         LocalMediaCreationPhase.SUBMITTING -> R.string.media_chat_creating_now
         LocalMediaCreationPhase.OUTCOME_UNKNOWN -> R.string.media_chat_creation_uncertain
         LocalMediaCreationPhase.FAILED -> R.string.media_chat_creation_failed
@@ -103,7 +106,7 @@ internal fun LocalCreationJobMessageRow(
                 overflow = TextOverflow.Ellipsis)
         }
         when (job.phase) {
-            LocalMediaCreationPhase.SUBMITTING -> {
+            LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SAVING, LocalMediaCreationPhase.SUBMITTING -> {
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = DsTheme.colors.labelSecondary,
@@ -112,7 +115,7 @@ internal fun LocalCreationJobMessageRow(
                 Text(resources.getString(R.string.media_chat_creating_hint),
                     style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
             }
-            LocalMediaCreationPhase.OUTCOME_UNKNOWN, LocalMediaCreationPhase.FAILED -> {
+            LocalMediaCreationPhase.OUTCOME_UNKNOWN, LocalMediaCreationPhase.FAILED, LocalMediaCreationPhase.SAVE_FAILED -> {
                 Text(job.error ?: resources.getString(R.string.media_chat_creation_uncertain_hint),
                     style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelSecondary)
                 Text(resources.getString(R.string.media_chat_creation_safe_retry),
@@ -310,6 +313,20 @@ internal fun LocalGeneratedVideoTaskRow(
                 Text(resources.getString(R.string.media_chat_account_missing),
                     color = DsTheme.colors.labelSecondary, style = DsType.caption11.withReadingWeight())
             }
+        }
+        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && savedVideo == null) {
+            SyButton(text = resources.getString(R.string.media_retry_save), size = SyButtonSize.Small,
+                onClick = { scope.launch {
+                    try { viewModel.retryVideoSave(task.id); error = null }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { error = failure.message }
+                } })
+            if (offer != null) SyButton(text = resources.getString(R.string.media_refresh_link), size = SyButtonSize.Small,
+                onClick = { scope.launch {
+                    try { viewModel.refreshVideo(offer, task.id) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { error = failure.message }
+                } })
         }
         task.lastError?.takeIf { task.phase == LocalMediaVideoPhase.SUCCEEDED }?.let {
             Text(it, style = DsType.caption11.withReadingWeight(),

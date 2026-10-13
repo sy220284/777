@@ -63,7 +63,6 @@ internal fun localFeatureRestoreStack(
     val restored = stack.mapNotNull(LocalFeatureCatalog::resolve)
         .mapNotNull { page -> localFeatureContributionFor(page, contributions).restorePage(page) }
         .map(LocalFeaturePage::name)
-        .takeLast(12)
     return if (restored.firstOrNull() == LocalFeaturePage.HOME.name) restored else localFeatureHome() + restored
 }
 

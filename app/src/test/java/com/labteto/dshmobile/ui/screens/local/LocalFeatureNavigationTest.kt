@@ -192,6 +192,94 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun historyAndModeChosenFromDrawerReturnToTheDrawerOnlyOnce() {
+        assertTrue(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = false,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = true, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.SETTINGS, drawerOpen = false, wideViewport = false,
+            enteredFromDrawer = true,
+        ))
+        assertFalse(localConversationShouldReturnToDrawer(
+            LocalFeaturePage.HOME, drawerOpen = false, wideViewport = true,
+            enteredFromDrawer = true,
+        ))
+    }
+
+    @Test
+    fun drawerEntryPopsEveryFeatureBeforeReturningToDrawer() {
+        val origin = localFeatureHome()
+        val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
+        val nested = localFeaturePush(opened.stack, LocalFeaturePage.SETTINGS)
+
+        val inner = localFeatureBack(nested, opened.originStack)
+        assertEquals(opened.stack, inner.stack)
+        assertEquals(origin, inner.drawerOriginStack)
+        assertFalse(inner.reopenDrawer)
+
+        val outer = localFeatureBack(inner.stack, inner.drawerOriginStack)
+        assertEquals(origin, outer.stack)
+        assertEquals(null, outer.drawerOriginStack)
+        assertTrue(outer.reopenDrawer)
+
+        val ordinary = localFeatureBack(localFeaturePush(origin, LocalFeaturePage.SETTINGS), null)
+        assertFalse(ordinary.reopenDrawer)
+        assertEquals(origin, ordinary.stack)
+    }
+
+    @Test
+    fun drawerExitRestoresItsOriginalUnderlyingFeature() {
+        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.RUN_CENTER)
+        val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
+        val backed = localFeatureBack(opened.stack, opened.originStack)
+        assertTrue(backed.reopenDrawer)
+        assertEquals(origin, backed.stack)
+    }
+
+    @Test
+    fun drawerReselectingCurrentFeatureReturnsToDrawerWithoutLosingItsPage() {
+        val origin = localFeaturePush(localFeatureHome(), LocalFeaturePage.TOOLS)
+        val opened = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
+        val backed = localFeatureBack(opened.stack, opened.originStack)
+        assertEquals(origin, backed.stack)
+        assertTrue(backed.reopenDrawer)
+    }
+
+    @Test
+    fun consecutiveSidebarChoicesStillReturnThroughDrawer() {
+        val origin = localFeatureHome()
+        val tools = localFeatureOpenFromDrawer(origin, null, LocalFeaturePage.TOOLS)
+        val settings = localFeatureOpenFromDrawer(tools.stack, tools.originStack, LocalFeaturePage.SETTINGS)
+        val detail = localFeaturePush(settings.stack, LocalFeaturePage.WORKSPACE)
+        val first = localFeatureBack(detail, settings.originStack)
+        val second = localFeatureBack(first.stack, first.drawerOriginStack)
+        assertFalse(first.reopenDrawer)
+        assertTrue(second.reopenDrawer)
+        assertEquals(origin, second.stack)
+    }
+
+    @Test
+    fun collapsedRailLabelsAndTargetsMatchExpandedDrawerModes() {
+        assertEquals(LocalFeatureDrawerEntry.PERSONA_GALLERY,
+            localCollapsedRailPrimaryEntry(LocalUsageMode.CHAT))
+        assertEquals(LocalFeatureDrawerEntry.PROJECT,
+            localCollapsedRailPrimaryEntry(LocalUsageMode.WORK))
+        assertEquals(com.labteto.dshmobile.R.string.tasks_chat_title,
+            localCollapsedRailTaskTitle(LocalUsageMode.CHAT))
+        assertEquals(com.labteto.dshmobile.R.string.tasks_title,
+            localCollapsedRailTaskTitle(LocalUsageMode.WORK))
+    }
+
+    @Test
     fun featureCatalogAssignsEveryRouteToExactlyOneModule() {
         val registered = LocalFeatureCatalog.modules.flatMap { it.routes }
 
@@ -286,15 +374,18 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
-    fun navigationHistoryIsBoundedToTwelveEntries() {
+    fun deepNavigationPreservesEveryParentInsteadOfDiscardingHistory() {
         var stack = localFeatureHome()
         repeat(20) { index ->
             val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.RUN_CENTER
             stack = localFeaturePush(stack, page)
         }
 
-        assertEquals(12, stack.size)
+        assertEquals(21, stack.size)
+        assertEquals(LocalFeaturePage.HOME.name, stack.first())
         assertEquals(LocalFeaturePage.RUN_CENTER, localFeatureCurrent(stack))
+        repeat(20) { stack = localFeaturePop(stack) }
+        assertEquals(localFeatureHome(), stack)
     }
 
     @Test

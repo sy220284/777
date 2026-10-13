@@ -104,6 +104,17 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         )
     }
 
+    internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
+        val captured = executionSessionId?.let(workRuns::get)?.aggregateSnapshot() ?: runtimeStateStore.state.value
+        if (captured.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) return com.labteto.dshmobile.harness.tools.ToolResult(
+            "当前处于规划模式，只能检查和制定方案", isError = true, errorCode = "PLAN_MODE_BLOCKED")
+        if (call.name in setOf("bash", "run_shell")) {
+            require(allowMutation) { "该子任务处于只读模式" }
+            return LocalShellTool.executeResult(call.arguments, workspace, jobs, executionSessionId)
+        }
+        return com.labteto.dshmobile.harness.tools.ToolResult(execute(call, allowMutation, executionSessionId))
+    }
+
     internal suspend fun execute(
         call: LocalToolCall,
         allowMutation: Boolean,

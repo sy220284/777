@@ -38,7 +38,6 @@ import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.model.LocalMediaProvider
 import com.labteto.dshmobile.local.model.LocalMediaVideoPhase
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.presentation.LocalMediaImage
 import com.labteto.dshmobile.local.presentation.LocalMediaVoice
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
@@ -68,8 +67,9 @@ internal fun LocalMediaStudioSheetContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val models = remember(profiles) { LocalMediaCatalog.offers(profiles) }
-    val videoTasks by viewModel.videoTasks.collectAsState()
-    val generatedResults by viewModel.generatedResults.collectAsState()
+    val archive by viewModel.archive.collectAsState()
+    val videoTasks = archive.videos
+    val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsState()
     var showHistory by remember { mutableStateOf(true) }
     var showVideoArchive by remember { mutableStateOf(false) }
@@ -92,7 +92,6 @@ internal fun LocalMediaStudioSheetContent(
     }
     var busy by remember(selected?.id) { mutableStateOf(false) }
     var error by remember(selected?.id) { mutableStateOf<String?>(null) }
-    var image by remember(selected?.id) { mutableStateOf<LocalMediaImage?>(null) }
     var viewedVideoTaskId by rememberSaveable(selected?.id) { mutableStateOf("") }
     var transcript by remember(selected?.id) { mutableStateOf<String?>(null) }
     var audioFile by remember(selected?.id) { mutableStateOf<File?>(null) }
@@ -205,25 +204,6 @@ internal fun LocalMediaStudioSheetContent(
                             viewModel.submitImage(selected, prompt, ratio, sessionId)
                             if (selected.id == activeOfferId) onDelivered()
                         } })
-                    image?.url?.let { url ->
-                        SyButton(text = stringResource(R.string.minimax_media_open_image),
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { openMediaUrl(context, url) { error = it } })
-                    }
-                    image?.file?.let { file ->
-                        val mime = when (file.extension.lowercase()) {
-                            "png" -> "image/png"
-                            "jpg", "jpeg" -> "image/jpeg"
-                            "webp" -> "image/webp"
-                            else -> "application/octet-stream"
-                        }
-                        SyButton(text = stringResource(R.string.media_studio_view_image),
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { viewMediaFile(context, file, mime) { error = it } })
-                        SyButton(text = stringResource(R.string.media_studio_share_image),
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { shareMediaFile(context, file, mime) { error = it } })
-                    }
                 }
                 LocalMediaKind.VIDEO -> {
                     SyButton(text = stringResource(R.string.minimax_media_start_video),
@@ -358,7 +338,11 @@ internal fun LocalMediaStudioSheetContent(
                 color = colors.labelPrimary, style = DsType.caption11.withReadingWeight()) }
         }
         storageError?.let {
+            SyButton(text = stringResource(R.string.media_retry_storage), onClick = { scope.launch { viewModel.retryStorage() } })
             Text(stringResource(R.string.minimax_media_error, it), color = colors.labelPrimary, style = DsType.caption11.withReadingWeight())
+        }
+        if (archive.hasMore) {
+            SyButton(text = stringResource(R.string.media_load_older), onClick = viewModel::loadOlderArchive)
         }
         if (videoTasks.isNotEmpty()) {
             SyButton(
@@ -402,7 +386,7 @@ internal fun LocalMediaStudioSheetContent(
                                     color = colors.labelSecondary,
                                     style = DsType.caption11.withReadingWeight())
                             } else if (task.phase in setOf(
-                                    LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING
+                                    LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING, LocalMediaVideoPhase.SUCCEEDED
                                 )
                             ) {
                                 SyButton(
@@ -422,6 +406,29 @@ internal fun LocalMediaStudioSheetContent(
                                         }
                                     },
                                 )
+                            }
+                            if (task.phase == LocalMediaVideoPhase.SUCCEEDED && viewModel.videoFile(task) == null) {
+                                SyButton(text = stringResource(R.string.media_retry_save), size = SyButtonSize.Small,
+                                    onClick = { scope.launch {
+                                        try { viewModel.retryVideoSave(task.id) }
+                                        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                        catch (failure: Exception) { historyError = failure.message.orEmpty() }
+                                    } })
+                            }
+                            if (task.phase in setOf(LocalMediaVideoPhase.SUCCEEDED, LocalMediaVideoPhase.FAILED, LocalMediaVideoPhase.OUTCOME_UNKNOWN)) {
+                                SyButton(text = stringResource(R.string.media_studio_delete_record), size = SyButtonSize.Small,
+                                    onClick = { pendingDeleteId = task.id })
+                                if (pendingDeleteId == task.id) {
+                                    Text(stringResource(R.string.media_delete_video_warning))
+                                    SyButton(text = stringResource(R.string.media_studio_delete_confirm), size = SyButtonSize.Small,
+                                        onClick = { scope.launch {
+                                            try { viewModel.removeResult(task.id); pendingDeleteId = null }
+                                            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                            catch (failure: Exception) { historyError = failure.message.orEmpty() }
+                                        } })
+                                    SyButton(text = stringResource(R.string.media_studio_delete_cancel), size = SyButtonSize.Small,
+                                        onClick = { pendingDeleteId = null })
+                                }
                             }
                             task.downloadUrl?.let { url ->
                                 SyButton(

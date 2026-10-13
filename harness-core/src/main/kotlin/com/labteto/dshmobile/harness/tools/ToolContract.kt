@@ -13,6 +13,9 @@ enum class ToolExposure {
     INTERNAL,
 }
 
+/** Shared workspace participation is independent of permission and batch parallelism. */
+enum class ToolWorkspaceAccess { NONE, READ, WRITE }
+
 data class ToolMetadata(
     val family: String,
     val discoveryKeywords: Set<String> = emptySet(),
@@ -20,6 +23,7 @@ data class ToolMetadata(
     val usageNotes: List<String> = emptyList(),
     /** Explicit opt-in for concurrent pure reads. Never inferred from access alone. */
     val parallelReadSafe: Boolean = false,
+    val workspaceAccess: ToolWorkspaceAccess = ToolWorkspaceAccess.NONE,
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }

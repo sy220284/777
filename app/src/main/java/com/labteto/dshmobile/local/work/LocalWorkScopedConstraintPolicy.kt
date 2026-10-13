@@ -33,6 +33,21 @@ internal fun parseLocalWorkScopedConstraintEdit(text: String): LocalWorkScopedCo
     }
 }
 
+/**
+ * A later explicit user re-authorization can remove an earlier tombstone. Reinstatement is
+ * not inferred from paraphrases, model proposals, or quoted examples in a question.
+ */
+internal fun parseLocalWorkConstraintReinstatement(text: String): String? {
+    val normalized = text.trim()
+    if (normalized.endsWith("?") || normalized.endsWith("？") ||
+        Regex("""^(?:建议|讨论|考虑|假设|是否|能否)""").containsMatchIn(normalized)
+    ) return null
+    val match = Regex(
+        """^(?:请)?(?:恢复|重新启用|重新采用|重新执行|重新确认|再次要求)\s*[「『“"]([^」』”"]{1,240})[」』”"](?:这条)?(?:约束|要求|规则)?[。！!]?\s*$""",
+    ).matchEntire(normalized) ?: return null
+    return match.groupValues[1].trim().takeIf(String::isNotBlank)
+}
+
 internal fun normalizedWorkConstraint(text: String): String =
     text.trim().replace(Regex("""\s+"""), " ").lowercase()
 
@@ -42,8 +57,10 @@ internal fun normalizedWorkConstraint(text: String): String =
  */
 internal fun isRevokedWorkConstraint(constraint: String, tombstones: Collection<String>): Boolean {
     val normalized = normalizedWorkConstraint(constraint)
+    // Exact normalized authority identity only. A substring could revoke another rule:
+    // "必须兼容旧接口" must not silently delete "平板端必须兼容旧接口".
     return tombstones.any { target ->
         val phrase = normalizedWorkConstraint(target)
-        phrase.length >= 4 && (normalized == phrase || normalized.contains(phrase))
+        phrase.isNotEmpty() && normalized == phrase
     }
 }

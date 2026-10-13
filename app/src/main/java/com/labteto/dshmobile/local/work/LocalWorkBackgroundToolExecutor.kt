@@ -53,7 +53,12 @@ internal class LocalWorkBackgroundToolExecutor(
             canonical
         }
         val log = sessionStorage.eventLogs.get(sessionId)
+        val goal = log.latestMatching(setOf("goal/state")) { true }?.data
+        val goalId = goal?.get("id")
+        val artifactPaths = (goal?.get("artifactPaths") as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
         log.append("tool/call", buildJsonObject {
+            goalId?.let { put("goal_id", it) }
             put("id", normalized.id)
             put("name", normalized.name)
             put("arguments", normalized.arguments)
@@ -62,7 +67,7 @@ internal class LocalWorkBackgroundToolExecutor(
         })
         val result = try {
             executeUtility(normalized, sessionId, memoryTools, enabledOptionalTools)
-                ?: executeAutomationRegistered(normalized, allowMutation, sessionId, onApprovalBlocked)
+                ?: executeAutomationRegistered(normalized, allowMutation, sessionId, goalId?.let { (it as? JsonPrimitive)?.contentOrNull }, artifactPaths, onApprovalBlocked)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -76,6 +81,9 @@ internal class LocalWorkBackgroundToolExecutor(
             java.io.File(sessionStorage.files.workspace.path), normalized.name, result.content,
         ) else null
         log.append("tool/result", buildJsonObject {
+            result.executionId?.let { put("execution_id", it) }
+            result.processExitCode?.let { put("process_exit_code", it) }
+            put("file_versions", JsonObject(result.fileVersions.mapValues { JsonPrimitive(it.value) }))
             put("id", normalized.id)
             put("name", normalized.name)
             put("content", com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
@@ -98,6 +106,8 @@ internal class LocalWorkBackgroundToolExecutor(
         original: LocalToolCall,
         allowMutation: Boolean,
         sessionId: String,
+        goalId: String?,
+        artifactPaths: List<String>,
         onApprovalBlocked: (String) -> Unit,
     ): AgentToolResult {
         val result = tools.execution.executeScoped(
@@ -105,6 +115,12 @@ internal class LocalWorkBackgroundToolExecutor(
             sessionId = sessionId,
             allowMutation = allowMutation,
             planModeEnabled = false,
+            executionAttributes = mapOf("goal_id" to goalId.orEmpty()),
+            observeFileVersions = {
+                artifactPaths.mapNotNull { path ->
+                    localWorkFileSha256(java.io.File(sessionStorage.files.workspace.path), path)?.let { path to it }
+                }.toMap()
+            },
             approval = { call, tool, _ ->
                 val approvalMode = approvalPreferences.currentMode()
                 if (shouldAutoApproveTool(approvalMode, tool)) {

@@ -2,7 +2,7 @@
 
 独立读取仓库源码、工具注册、路由、Compose入口、测试映射及功能树，与原扫描器结果逐项对照。
 
-源码快照：4e97c66a4edd；生产Kotlin/Java：803个。
+源码快照：abc2104f86b9；生产Kotlin/Java：827个。
 
 ## 独立识别的代码入口
 
@@ -13,12 +13,12 @@
 
 ## 与实际功能树对照
 
-中文结构树共有542个节点，末级功能描述445项。
-- 第一层｜产品功能与界面：305项
+中文结构树共有544个节点，末级功能描述447项。
+- 第一层｜产品功能与界面：307项
 - 第三层｜平台与工程保障：38项
 - 第二层｜共享运行能力：102项
 
-具有具体静态源码、测试方法或CI作业证据：355项；只有生产文件存在线索：76项；缺少可确认入口：14项。三类相加覆盖全部功能树叶节点。
+具有具体静态源码、测试方法或CI作业证据：357项；只有生产文件存在线索：76项；缺少可确认入口：14项。三类相加覆盖全部功能树叶节点。
 
 ## 精确证据分层
 
@@ -27,10 +27,10 @@
 | candidate_file_only | 3 |
 | ci_workflow_configuration | 14 |
 | historical_file_only | 73 |
-| named_code_declaration | 210 |
+| named_code_declaration | 209 |
 | no_code_entry | 14 |
 | test_method_mapping | 128 |
-| unexecuted_instrumentation | 3 |
+| unexecuted_instrumentation | 6 |
 
 ## 测试和真实性限制
 

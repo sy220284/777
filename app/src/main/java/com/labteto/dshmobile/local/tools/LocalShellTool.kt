@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.tools
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import kotlinx.serialization.json.JsonObject
+import com.labteto.dshmobile.harness.tools.ToolResult
 
 /**
  * Owns local shell timeout policy and foreground/background execution semantics.
@@ -15,7 +16,11 @@ internal object LocalShellTool {
         workspace: LocalWorkspace,
         jobs: LocalJobManager,
         ownerSessionId: String? = null,
-    ): String {
+    ): String = executeResult(args, workspace, jobs, ownerSessionId).content
+
+    suspend fun executeResult(
+        args: JsonObject, workspace: LocalWorkspace, jobs: LocalJobManager, ownerSessionId: String? = null,
+    ): ToolResult {
         val command = args.string("command")
         val background = args.boolean("run_in_background", false)
         val timeout = args.int(
@@ -27,15 +32,15 @@ internal object LocalShellTool {
         )
 
         return if (background) {
-            jobs.start(
+            ToolResult(jobs.start(
                 label = "后台命令",
                 expectedDurationMillis = timeout * 1_000L,
                 ownerSessionId = ownerSessionId,
             ) { _, report ->
                 workspace.shell(command, timeout, report, throwOnFailure = true)
-            }
+            })
         } else {
-            workspace.shell(command, timeout)
+            workspace.shellResult(command, timeout)
         }
     }
 
