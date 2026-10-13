@@ -23,6 +23,8 @@ import org.junit.Test
 class DsBottomSheetRegressionTest {
     @get:Rule val compose = createComposeRule()
 
+    // 360dp is a deliberately constrained boundary case, NOT the V6 default
+    // sheet height (83% of viewport, at most 730dp).
     @Test
     fun reducedViewportReservesFooterSpaceAndKeepsBodyActionsReachable() {
         var selected = 0
@@ -41,6 +43,8 @@ class DsBottomSheetRegressionTest {
                 }
             }
         }
+        // The sheet animates in; assert layout after its entry transition settles.
+        compose.waitForIdle()
         compose.onNodeWithText("继续工作").assertIsDisplayed().performClick()
         compose.onNodeWithText("选择末条消息").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithText("继续工作").assertIsDisplayed()
@@ -50,6 +54,7 @@ class DsBottomSheetRegressionTest {
         }
     }
 
+    // Default-height V6 sheet: no artificial 360dp modifier.
     @Test
     fun longSheetKeepsSaveActionVisibleAndClickable() {
         var saved = 0
