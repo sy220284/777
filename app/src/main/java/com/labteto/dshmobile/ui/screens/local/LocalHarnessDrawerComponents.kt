@@ -55,7 +55,6 @@ import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyIconBox
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.shenyan.designsystem.components.SyCheckboxControl
-import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -132,8 +131,6 @@ internal fun localDrawerSessionSections(
 @Composable
 internal fun DrawerQuickActions(
     usageMode: LocalUsageMode,
-    groupMemberCount: Int,
-    galleryCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
     onOpenDiary: () -> Unit,
@@ -161,13 +158,11 @@ internal fun DrawerQuickActions(
                 DrawerQuickAction(
                     icon = SyEntryIcons.Gallery,
                     title = stringResource(R.string.persona_gallery_title),
-                    badge = galleryCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenPersonaGallery,
                 )
                 DrawerQuickAction(
                     icon = SyEntryIcons.GroupChat,
                     title = stringResource(R.string.local_group_chat_title),
-                    badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenGroupChat,
                 )
                 DrawerQuickAction(
@@ -223,7 +218,6 @@ internal fun DrawerQuickAction(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    badge: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
@@ -264,7 +258,6 @@ internal fun DrawerQuickAction(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        badge?.let { SyPill(text = it) }
     }
 }
 

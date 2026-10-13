@@ -234,14 +234,6 @@ private fun ChatScreenshot() {
             onRenameSession = {},
             onDeleteSession = {},
         )
-        // Production mobile navigation, not the previous standalone chat-header mock.
-        V6MobileHomeNavigation(
-            mode = LocalUsageMode.CHAT,
-            onSessions = {},
-            onPersona = {},
-            onWorkspace = {},
-            onSearch = {},
-        )
         Column(
             modifier = Modifier
                 .weight(1f)

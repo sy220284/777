@@ -1,6 +1,5 @@
 package com.shenyan.designsystem.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 
 /**
- * V5 solid top chrome. Business navigation and permissions stay caller-owned.
+ * Seamless scene top bar: the host owns the background; business navigation stays caller-owned.
  * The start/end slots have equal touch targets so the title remains genuinely centered.
  */
 @Composable
@@ -45,13 +44,7 @@ fun SyTopBar(
     onAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalSyColors.current
-    SyMaterialSurface(
-        modifier = modifier.fillMaxWidth(),
-        tier = SyMaterialTier.L2_BAR,
-        shape = androidx.compose.ui.graphics.RectangleShape, shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, tokens.border.copy(alpha = .45f)),
-    ) {
-        Column {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(
                 min = if (LocalConfiguration.current.screenWidthDp >= 600) 64.dp else 56.dp,
@@ -98,7 +91,6 @@ fun SyTopBar(
             Text(subtitle, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
                 color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        }
         }
     }
 }
