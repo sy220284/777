@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -75,7 +77,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -191,7 +192,7 @@ internal fun ChatPersonaPickerDialog(
             )
             // Keep the sheet header visible; only the portrait grid scrolls.
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val gap = DsSpacing.small
+                val gap = SyMetric.gapMd
                 val columns = (maxWidth / 108.dp).toInt().coerceIn(3, 6)
                 val tileEdge = (maxWidth - gap * (columns - 1)) / columns
                 val rows = (entries.size + columns - 1) / columns
@@ -362,8 +363,8 @@ internal fun ApprovalDialog(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                Modifier.padding(SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Text(
                     stringResource(R.string.local_approval_purpose_title),
@@ -554,8 +555,8 @@ internal fun ChatPersonaDialog(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                modifier = Modifier.padding(SyMetric.gapLg),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Text(
                     stringResource(R.string.local_persona_ai_title),
@@ -828,8 +829,8 @@ private fun PersonaFactCategoryEditor(
 @Composable
 private fun PersonaFormSection(title: String, content: @Composable () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.small),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+        modifier = Modifier.fillMaxWidth().padding(top = SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
         Text(title, style = DsType.base16Strong.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         content()

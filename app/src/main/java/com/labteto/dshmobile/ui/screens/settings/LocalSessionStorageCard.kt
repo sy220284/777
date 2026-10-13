@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.labteto.dshmobile.ui.components.FeatherIcons
 
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +18,6 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -41,7 +42,7 @@ internal fun LocalSessionStorageCard(
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Text(formatStorageBytes(status.totalBytes),
                     style = DsType.display24.withReadingWeight().copy(fontFeatureSettings = "tnum"),
@@ -97,7 +98,7 @@ internal fun LocalSessionStorageCard(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             SyButton(
                 text = stringResource(R.string.settings_local_session_storage_compact),

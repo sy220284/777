@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,7 +51,6 @@ import kotlinx.coroutines.delay
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.foundation.SyColors
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -626,7 +627,7 @@ private fun CodeBlock(
             if (allowCopy) {
                 Box(
                     modifier = Modifier
-                        .size(DsSpacing.touchTarget)
+                        .size(SyMetric.touch)
                         .clip(DsShapes.chip)
                         .clickable {
                             clipboard.setText(AnnotatedString(code))

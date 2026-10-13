@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -18,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsSpacing
 
 /** Keeps send/stop pinned to the right on narrow devices without clipping capability controls. */
 @Composable
@@ -48,7 +49,7 @@ internal fun LocalConversationComposerExpandedRow(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Row(
                     modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),

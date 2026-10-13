@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
@@ -58,7 +60,6 @@ import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -296,22 +297,22 @@ internal fun LocalWorkspaceFilesDialog(
                             directory = ""
                         },
                         modifier = Modifier.padding(
-                            horizontal = DsSpacing.medium,
-                            vertical = DsSpacing.small,
+                            horizontal = SyMetric.gapLg,
+                            vertical = SyMetric.gapMd,
                         ),
                     )
                 }
 
                 if (preview == null) SySearchField(query, { query = it },
                     placeholder = stringResource(R.string.fluid_files_search),
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small))
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             Text(
                                 stringResource(R.string.local_files_selected_count, selected.size),
@@ -328,9 +329,9 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(
-                                horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall,
+                                horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm,
                             ),
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         ) {
                             SyButton(
                                 text = stringResource(R.string.local_files_select_all),
@@ -353,7 +354,7 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                     } else {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                             horizontalArrangement = Arrangement.End,
                         ) {
                             SyButton(
@@ -367,7 +368,7 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 if (preview != null && isShareableWorkspacePath(preview!!.file.path)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                         horizontalArrangement = Arrangement.End,
                     ) {
                         SyButton(
@@ -381,7 +382,7 @@ internal fun LocalWorkspaceFilesDialog(
                 shareError?.let {
                     Text(
                         it,
-                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.xsmall),
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
                         style = DsType.small13.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
@@ -460,7 +461,7 @@ internal fun LocalWorkspaceFilesDialog(
                 if (previewLoading) {
                     Text(
                         stringResource(R.string.local_files_loading),
-                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 }
@@ -471,7 +472,7 @@ internal fun LocalWorkspaceFilesDialog(
 @Composable
 private fun LocalFilesEmpty(title: String, body: String) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = DsSpacing.xlarge),
+        modifier = Modifier.fillMaxSize().padding(horizontal = SyMetric.gapPage),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -486,14 +487,14 @@ private fun LocalFilesEmpty(title: String, body: String) {
             style = DsType.base16Strong.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = DsSpacing.small),
+            modifier = Modifier.padding(top = SyMetric.gapMd),
         )
         Text(
             body,
             style = DsType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = DsSpacing.xsmall),
+            modifier = Modifier.padding(top = SyMetric.gapSm),
         )
     }
 }
@@ -511,7 +512,7 @@ private fun ConversationLocalFileList(
                     stringResource(R.string.panel_artifacts),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 )
             }
             items(files.artifacts, key = { "artifact:" + it.path }) { file ->
@@ -524,7 +525,7 @@ private fun ConversationLocalFileList(
                     stringResource(R.string.app_project_context),
                     style = DsType.small13Strong.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 )
             }
             items(files.involved, key = { "involved:" + it.path }) { file ->
@@ -607,7 +608,7 @@ private fun LocalDirectoryRow(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium),
+            .padding(horizontal = SyMetric.gapLg),
         shape = DsShapes.row,
         color = colors.canvas,
     ) {
@@ -615,9 +616,9 @@ private fun LocalDirectoryRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 62.dp)
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Image(
                 painter = painterResource(
@@ -629,7 +630,7 @@ private fun LocalDirectoryRow(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Text(
                     name,
@@ -669,7 +670,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.medium)
+            .padding(horizontal = SyMetric.gapLg)
             .combinedClickable(
                 onClick = { if (selecting) controls?.toggle?.invoke(file.path) else onClick() },
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
@@ -681,9 +682,9 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 70.dp)
-                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Image(
                 painter = painterResource(fileIconRes),
@@ -692,7 +693,7 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Text(
                     fileName,
@@ -729,8 +730,8 @@ private fun LocalFileRow(file: LocalWorkspaceFile, onClick: () -> Unit) {
 @Composable
 private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
     Column(
-        Modifier.fillMaxSize().padding(horizontal = DsSpacing.medium),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        Modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
         Text(
             "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
@@ -740,7 +741,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
         if (preview.text == null) {
             Text(
                 stringResource(R.string.local_files_binary_hint),
-                modifier = Modifier.padding(vertical = DsSpacing.medium),
+                modifier = Modifier.padding(vertical = SyMetric.gapLg),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         } else {

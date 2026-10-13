@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import androidx.compose.foundation.text.selection.SelectionContainer
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +44,6 @@ import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.shenyan.designsystem.components.SyEmptyState
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -181,7 +182,7 @@ internal fun LocalRunCenterScreen(
                         (if (state.pendingQuestion != null) 1 else 0) + (if (state.pendingApproval != null) 1 else 0),
                     toolActivities.count { it.phase !in listOf(LocalToolUiPhase.RUNNING, LocalToolUiPhase.DECLARED) },
                 ).map { stringResource(R.string.fluid_item_count, it) },
-                modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 tag = "runBoardSection",
             )
             if (onOpenSourceSession != null) {
@@ -190,20 +191,20 @@ internal fun LocalRunCenterScreen(
                     onClick = onOpenSourceSession,
                     variant = SyButtonVariant.Ghost,
                     size = SyButtonSize.Small,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg),
                 )
             } else if (sourceSessionMissing) {
                 Text(
                     stringResource(R.string.local_work_handoff_source_removed),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg),
                 )
             }
             if (onHistoryPage != null) {
                 SyButton(text = stringResource(R.string.local_run_full_history), onClick = { showFullHistory = true },
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small,
-                    modifier = Modifier.padding(horizontal = DsSpacing.medium))
+                    modifier = Modifier.padding(horizontal = SyMetric.gapLg))
             }
             if (usageRevision != null && sessionUsage != null) {
                 LocalRunCenterUsageSection(state.sessionId, usageRevision, sessionUsage, taskUsage, requestUsage)
@@ -223,7 +224,7 @@ internal fun LocalRunCenterScreen(
                             text = stringResource(R.string.local_artifact_more_history),
                             onClick = { artifactScanLimit = (artifactScanLimit * 2).coerceAtMost(4_096) },
                             variant = SyButtonVariant.Ghost,
-                            modifier = Modifier.padding(DsSpacing.medium),
+                            modifier = Modifier.padding(SyMetric.gapLg),
                         )
                     }
                 }
@@ -232,7 +233,7 @@ internal fun LocalRunCenterScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                        .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 ) {
                     if (boardSection != 2) {
                         FluidRunBoardColumn(
@@ -322,7 +323,7 @@ internal fun LocalRunCenterScreen(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                             ) {
                                 val detail = when {
                                     artifact.category != "file" -> stringResource(R.string.local_delivery_source_not_verified)
@@ -524,7 +525,7 @@ internal fun LocalRunCenterScreen(
                 Text(stringResource(R.string.local_tool_activity_evidence_error), color = colors.dangerInk)
                 SyButton(stringResource(R.string.common_retry), { evidenceRetry++ })
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 SyButton(stringResource(R.string.fluid_copy_tool_id), {
                     clipboard.setText(AnnotatedString(selectedActivity.callId))
                 }, variant = SyButtonVariant.Ghost)

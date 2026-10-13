@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.foundation.SyMetric
+
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
@@ -59,7 +61,6 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.delay
@@ -90,11 +91,11 @@ internal fun LocalAgentSwarmLaunchEntry(
             modifier = Modifier
                 .heightIn(min = 72.dp)
                 .padding(
-                    horizontal = DsSpacing.medium,
-                    vertical = DsSpacing.small,
+                    horizontal = SyMetric.gapLg,
+                    vertical = SyMetric.gapMd,
                 ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_ui_create_subagent),
@@ -152,11 +153,11 @@ internal fun LocalAgentTeamStatusBar(
             Column {
                 Row(
                     modifier = Modifier.padding(
-                        horizontal = DsSpacing.medium,
-                        vertical = DsSpacing.small,
+                        horizontal = SyMetric.gapLg,
+                        vertical = SyMetric.gapMd,
                     ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_ui_task_subagent),
@@ -204,11 +205,11 @@ internal fun LocalAgentTeamStatusBar(
                 if (team.visible && team.members.isNotEmpty()) {
                     Column(
                         modifier = Modifier.padding(
-                            start = DsSpacing.medium,
-                            end = DsSpacing.medium,
-                            bottom = DsSpacing.small,
+                            start = SyMetric.gapLg,
+                            end = SyMetric.gapLg,
+                            bottom = SyMetric.gapMd,
                         ),
-                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     ) {
                         team.members
                             .sortedBy(::teamMemberPriority)
@@ -217,7 +218,7 @@ internal fun LocalAgentTeamStatusBar(
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                 ) {
                                     StateDot(memberDotState(member), size = 6.dp)
                                     Text(
@@ -298,7 +299,7 @@ internal fun LocalAgentTeamSheet(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             if (team.rebuilding) {
                 Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.textSecondary)
@@ -334,7 +335,7 @@ internal fun LocalAgentTeamSheet(
                     color = colors.textSecondary,
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     team.members.sortedBy(::teamMemberPriority).forEach { member ->
                         TeamMemberRow(
                             member = member,
@@ -370,7 +371,7 @@ internal fun LocalAgentTeamSheet(
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textTertiary,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                     team.tasks.forEach { task -> TeamTaskRow(task) }
                 }
             }
@@ -410,7 +411,7 @@ internal fun LocalAgentTeamSheet(
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small, Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.End),
             ) {
                 SyButton(
                     text = stringResource(R.string.common_cancel),
@@ -452,7 +453,7 @@ private fun TeamProgressBlock(team: LocalAgentTeamUiState) {
     val progress = if (team.tasks.isEmpty()) 0f else {
         team.completedTaskCount.toFloat() / team.tasks.size.toFloat()
     }
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -529,16 +530,16 @@ private fun TeamMemberRow(
     ) {
         Row(
             modifier = Modifier.padding(
-                horizontal = DsSpacing.medium,
-                vertical = DsSpacing.medium,
+                horizontal = SyMetric.gapLg,
+                vertical = SyMetric.gapLg,
             ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
             StateDot(memberDotState(member), size = 8.dp)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
                 Text(
                     member.friendlyName,
@@ -621,8 +622,8 @@ private fun TeamMemberDetail(
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            modifier = Modifier.padding(SyMetric.gapLg),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             member.description.takeIf(String::isNotBlank)?.let { description ->
                 Text(
@@ -672,7 +673,7 @@ private fun TeamMemberDetail(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 SyTextField(
                     value = draft,
@@ -795,10 +796,10 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Icon(
                     imageVector = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
                     contentDescription = null,
@@ -815,7 +816,7 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
             }
             if (expanded) {
                 SelectionContainer {
-                    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                         details.forEach { detail ->
                             Text(detail, style = DsType.caption11, color = colors.textSecondary)
                         }
@@ -934,7 +935,7 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by rememberSaveable { mutableStateOf(false) }
     if (team.activities.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
         SyButton(
             text = stringResource(R.string.app_team_activity_feed),
             onClick = { expanded = !expanded },
@@ -955,7 +956,7 @@ private fun TeamActivityFeed(team: LocalAgentTeamUiState) {
                 "delivered" -> R.string.app_team_message_delivered
                 else -> R.string.app_team_task_created
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Icon(painterResource(R.drawable.ic_ui_task_subagent), contentDescription = null, tint = colors.textSecondary)
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -981,8 +982,8 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
     val clipboard = LocalClipboardManager.current
     var expanded by rememberSaveable(member.id) { mutableStateOf(false) }
     SyMaterialSurface(modifier = Modifier.fillMaxWidth(), shape = DsShapes.block, tier = SyMaterialTier.L3_CARD,) {
-        Column(Modifier.padding(DsSpacing.small), verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Column(Modifier.padding(SyMetric.gapMd), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 WorkOperationIcon(com.labteto.dshmobile.ui.AgentOperationKind.Delegate, member.activity == "running" || member.phase == "provisioning")
                 Text(stringResource(R.string.app_team_worksite), style = DsType.small13Strong, color = colors.text, modifier = Modifier.weight(1f))
             }
@@ -995,7 +996,7 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
                 )
             }
             if (output.isNotBlank()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                     SyButton(
                         text = stringResource(if (expanded) R.string.local_team_collapse_output else R.string.local_team_expand_output),
                         onClick = { expanded = !expanded },
