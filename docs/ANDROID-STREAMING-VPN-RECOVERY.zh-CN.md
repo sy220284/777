@@ -15,6 +15,7 @@ APK 中的 `libclash.so` 为 Clash/Mihomo 类代理内核。官方 Android 教�
 
 - 兼容 Chat Completions 的读取空闲超时为 180 秒，Anthropic 与 Responses 为 300 秒，模型总调用不设绝对截止。
 - 已被模型服务接收的请求禁止自动重放整轮推理，保留既有安全续接和已执行工具去重的边界。
+- 底层 OkHttp 对默认可重传的 POST 请求体可能自动恢复并再次发送；777 的模型推理请求体现在明确标记为 **isOneShot**，由上层统一执行安全重试，避免代理断线时绕过受理状态门禁。
 - 新增的 `transport_kind` 单独记录底层异常：`timeout`、`dns_failure`、`tls_failure`、`connection_reset`、`broken_pipe`、`unexpected_eof`、`stream_incomplete` 等；不会覆盖 `failure_kind=stream_interrupted`。
 - 前台请求失败日志补充 `network_path_at_start` 与 `network_path_at_failure`，只包含 VPN/Wi-Fi/蜂窝与 Android 网络是否已验证，不记录 IP、SSID、代理节点或凭证。
 - 对照 `request_uid` 和 `request_id` 把 777 失败日志与同一时刻代理连接日志关联，才能确认是网络切换、节点掉线、上游超时，还是 SSE 终止标记丢失。
