@@ -263,8 +263,7 @@ internal fun LocalConversationSurface(
     var teamCardDismissed by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var approvalNoticeExpanded by rememberSaveable { mutableStateOf(false) }
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
-    var showLoadedMessageSearch by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    var requestedSearchMessageId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -364,22 +363,6 @@ internal fun LocalConversationSurface(
         showPlanReview = planReview != null,
         showStreamingTail = showStreamingTail,
     )
-    // The search sheet returns a stable message ID, not an index from a stale list.
-    // Translate to the actual LazyColumn slot only after the current projection is ready.
-    LaunchedEffect(requestedSearchMessageId, transcriptItems) {
-        val targetId = requestedSearchMessageId ?: return@LaunchedEffect
-        val index = transcriptItems.indexOfFirst {
-            it is LocalTranscriptItem.Message && it.message.id == targetId
-        }
-        if (index >= 0) {
-            val preceding = listOf(
-                mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
-                showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
-            ).count { it }
-            listState.scrollToItem(preceding + index)
-        }
-        requestedSearchMessageId = null
-    }
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
     val messageActionsEnabled =
@@ -645,7 +628,7 @@ internal fun LocalConversationSurface(
                     onPersona = onOpenPersonaGallery,
                     onWorkspace = onOpenWorkspaceFiles,
                     onSearch = if (state.usageMode == LocalUsageMode.CHAT)
-                        ({ showLoadedMessageSearch = true }) else onOpenGlobalSearch,
+                        ({ loadedSearchState.open = true }) else onOpenGlobalSearch,
                 )
             }
         }
@@ -1180,20 +1163,17 @@ internal fun LocalConversationSurface(
 
     }
 
-    if (showLoadedMessageSearch && state.usageMode == LocalUsageMode.CHAT) {
-        V6LoadedConversationSearchSheet(
-            transcript = transcriptItems,
-            onSelect = { hit ->
-                showLoadedMessageSearch = false
-                requestedSearchMessageId = hit.messageId
-            },
-            onDismiss = { showLoadedMessageSearch = false },
-            onSearchAll = {
-                showLoadedMessageSearch = false
-                onOpenGlobalSearch()
-            },
-        )
-    }
+    V6LoadedConversationSearchHost(
+        controller = loadedSearchState,
+        transcript = transcriptItems,
+        listState = listState,
+        leadingRows = listOf(
+            mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
+            showEmptyWorkbench, showEmptyGroupSetup, planReview != null,
+        ).count { it },
+        visible = state.usageMode == LocalUsageMode.CHAT,
+        onSearchAll = onOpenGlobalSearch,
+    )
     if (readerOpen) {
         val message = (transcriptHistory.olderMessages + state.messages).firstOrNull { it.id == readerMessageId }
         FluidMessageReader(
