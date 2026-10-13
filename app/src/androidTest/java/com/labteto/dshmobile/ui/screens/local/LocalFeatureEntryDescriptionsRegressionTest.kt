@@ -45,21 +45,20 @@ class LocalFeatureEntryDescriptionsRegressionTest {
                     usageMode = LocalUsageMode.WORK,
                     onDismiss = {},
                     onSelect = { selected = it },
-                    projectAvailable = true,
                 )
             }
         }
         listOf(
             R.string.local_new_session_dialog_intro,
             R.string.local_new_session_continue_hint,
-            R.string.local_project_new_session_hint,
             R.string.local_new_session_independent_hint,
         ).forEach { resource ->
             compose.onNodeWithText(context.getString(resource)).assertDoesNotExist()
         }
         compose.onNodeWithText(context.getString(R.string.local_new_session_continue)).assertExists()
-        compose.onNodeWithText(context.getString(R.string.local_project_start_work_session)).performClick()
-        compose.runOnIdle { assertEquals(LocalConversationMode.PROJECT, selected) }
+        compose.onNodeWithText("用当前项目开始新工作").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_new_session_independent)).performClick()
+        compose.runOnIdle { assertEquals(LocalConversationMode.INDEPENDENT, selected) }
     }
 
     @Test

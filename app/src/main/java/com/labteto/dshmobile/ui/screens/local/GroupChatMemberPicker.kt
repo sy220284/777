@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
 
-import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
 
@@ -16,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SyCheckboxControl
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -119,32 +116,6 @@ internal fun GroupChatMemberPickerSheet(
             style = DsType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
-
-        // The reference group-picker explicitly explains whose memory can be used.
-        // No invitation or selection may silently disclose another person's private thread.
-        com.shenyan.designsystem.components.SyMaterialFrame(
-            tier = com.shenyan.designsystem.components.SyMaterialTier.L1_SECTION,
-            modifier = Modifier.fillMaxWidth(),
-            horizontalPadding = 0.dp, verticalPadding = 0.dp,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            ) {
-                Icon(
-                    FeatherIcons.Shield,
-                    contentDescription = null,
-                    tint = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
-                )
-                Text(
-                    stringResource(R.string.local_group_chat_memory_isolation_hint),
-                    style = DsType.small13.withReadingWeight(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
 
         if (entries.isEmpty()) {
             Text(

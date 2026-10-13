@@ -193,7 +193,6 @@ private fun NavigationScreenshot() {
             loadSearchFiles = { emptyList() },
             onSearchTask = {},
             onSearchFile = {},
-            onProjects = {},
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
             onOpenPersonaSearchResult = {},

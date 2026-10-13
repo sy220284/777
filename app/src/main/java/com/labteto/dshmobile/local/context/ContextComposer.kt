@@ -16,7 +16,6 @@ data class ContextRequest(
     val projectId: String?,
     val lineageId: String?,
     val handoffSummary: String?,
-    val projectInstructions: String = "",
 )
 
 data class ContextComposition(
@@ -79,17 +78,6 @@ class ContextComposer @Inject constructor(
                         memories = emptyList(),
                         handoffSummary = null,
                     ),
-                ),
-                PromptLayer(
-                    id = "project-instructions",
-                    priority = 300,
-                    stability = PromptLayerStability.STABLE,
-                    content = request.projectInstructions.takeIf {
-                        it.isNotBlank() && request.projectId != null &&
-                            request.mode != LocalConversationMode.INDEPENDENT
-                    }?.let { rules ->
-                        "【项目文件约定（与本轮用户明确要求冲突时以用户为准）】\n$rules"
-                    }.orEmpty(),
                 ),
                 PromptLayer(
                     id = "query-recall",
