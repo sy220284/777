@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
     constraints {
         // Independent resolution must use the same verified Lifecycle baseline as the App.
         // Constraints add no unused runtime dependency and allow newer transitive versions.

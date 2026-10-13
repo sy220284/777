@@ -3476,9 +3476,9 @@
     }
   ],
   "warning": "代码候选不等于产品功能或功能验收，功能节点仅依据源码中 FEATURE_TREE 声明变更。",
-  "source_snapshot": "33664f822b50",
+  "source_snapshot": "93a6c0d6dd29",
   "observed_delta": {
-    "baseline": "3c66554ae536",
+    "baseline": "33664f822b50",
     "added_production_files": [],
     "removed_production_files": [],
     "modified_production_files": [],
