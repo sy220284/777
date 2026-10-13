@@ -137,6 +137,15 @@ for path in UI.rglob("*.kt"):
         violations.append(f"{relative}: retired Ds drawing component {match.group(0)}")
     if re.search(r"\bDsTheme\.colors\b", source):
         actual.add(relative)
+    if re.search(r"\bDsSpacing\b", source):
+        violations.append(f"{relative}: retired DsSpacing token; use canonical SyMetric")
+
+# Debug previews must follow the same spacing tokens as production Compose UI.
+for path in (ROOT / "app/src/debug/java").rglob("*.kt"):
+    source = mask_non_code(path.read_text(encoding="utf-8"))
+    if re.search(r"\bDsSpacing\b", source):
+        violations.append(f"{path.relative_to(ROOT)}: retired DsSpacing token; use canonical SyMetric")
+
 for new in sorted(actual - baseline):
     violations.append(f"{new}: new legacy DsTheme.colors consumer; use canonical LocalSyColors")
 for stale in sorted(baseline - actual):
