@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
