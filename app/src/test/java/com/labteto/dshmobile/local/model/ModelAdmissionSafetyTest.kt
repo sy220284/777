@@ -24,6 +24,8 @@ class ModelAdmissionSafetyTest {
         val body = "{}".toRequestBody("application/json".toMediaType())
             .withModelAdmissionTracking(tracker)
 
+        // A buffered JSON body is replayable by default; inference admission is not.
+        assertTrue(body.isOneShot())
         assertEquals(LocalModelAdmissionState.NOT_SENT, tracker.snapshot())
         body.writeTo(Buffer())
 
