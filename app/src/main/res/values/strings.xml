@@ -2268,9 +2268,6 @@
     <string name="tasks_chat_filter_current">当前会话 · %1$d</string>
     <string name="tasks_chat_filter_empty">当前会话没有安排事件。切换到“全部事件”可以查看其他会话的计划。</string>
     <string name="local_model_inventory_summary">已配置 %1$d 个 API 模型 · 使用中 %2$d 个</string>
-    <string name="settings_update_installed_version">当前版本：%1$s（构建 %2$d）</string>
-    <string name="settings_update_not_checked">尚未执行版本检查</string>
-    <string name="settings_update_action_description">仅在点击后检查更新。发现可安装版本时，沿用应用已有的下载安装与确认流程。</string>
     <string name="shenyan_onboarding_welcome">装进口袋的 Agent 终端</string>
     <string name="shenyan_onboarding_intro">它能陪你聊天、记住设定，也能在这台手机上帮你完成真实任务。先体验，再决定开放哪些设备能力。</string>
     <string name="shenyan_onboarding_choose">选择你的开始方式</string>

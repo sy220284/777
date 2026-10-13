@@ -129,7 +129,6 @@ enum class SettingsDestination {
     ADVANCED,
     SESSION_STORAGE,
     DIAGNOSTICS,
-    UPDATE,
 }
 
 internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
@@ -340,7 +339,6 @@ fun SettingsScreen(
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
         SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
         SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
-        SettingsDestination.UPDATE -> stringResource(R.string.settings_update_check)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -448,12 +446,9 @@ fun SettingsScreen(
                                 compact = true,
                             )
                             AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = SyEntryIcons.Updates,
-                                title = stringResource(R.string.settings_update_check),
-                                value = updateStatus,
-                                onClick = { openPage(SettingsDestination.UPDATE) },
-                                compact = true,
+                            UpdateCheckSettingsRow(
+                                updateStatus = updateStatus,
+                                onCheckUpdate = onCheckUpdate,
                             )
                         }
                         Text(
@@ -942,36 +937,6 @@ fun SettingsScreen(
                         )
                     }
 
-                    SettingsDestination.UPDATE -> {
-                        SettingsCard(stringResource(R.string.settings_update_check)) {
-                            Text(
-                                stringResource(
-                                    R.string.settings_update_installed_version,
-                                    BuildConfig.VERSION_NAME,
-                                    BuildConfig.VERSION_CODE,
-                                ),
-                                style = DsType.std14Strong.withReadingWeight(),
-                                color = colors.text,
-                            )
-                            Text(
-                                updateStatus ?: stringResource(R.string.settings_update_not_checked),
-                                style = DsType.small13.withReadingWeight(),
-                                color = colors.textSecondary,
-                            )
-                            Text(
-                                stringResource(R.string.settings_update_action_description),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.textTertiary,
-                            )
-                            SyButton(
-                                text = stringResource(R.string.settings_update_check),
-                                onClick = onCheckUpdate,
-                                variant = SyButtonVariant.Primary,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-
                     SettingsDestination.DIAGNOSTICS -> {
                         AppSettingsSection {
                             AppSettingsRow(
@@ -1072,6 +1037,22 @@ internal fun SettingsCard(
             content()
         }
     }
+}
+
+/** 更新检查是设置页内的即时操作，不占用独立导航层级。 */
+@Composable
+internal fun UpdateCheckSettingsRow(
+    updateStatus: String?,
+    onCheckUpdate: () -> Unit,
+) {
+    AppSettingsRow(
+        icon = SyEntryIcons.Updates,
+        title = stringResource(R.string.settings_update_check),
+        subtitle = updateStatus,
+        onClick = onCheckUpdate,
+        compact = true,
+        showChevron = false,
+    )
 }
 
 private const val MAX_CUSTOM_CHAT_FILTERS = 50

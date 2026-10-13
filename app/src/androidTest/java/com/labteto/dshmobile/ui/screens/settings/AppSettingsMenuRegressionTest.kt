@@ -71,6 +71,25 @@ class AppSettingsMenuRegressionTest {
     }
 
     @Test
+    fun updateCheckRunsInSettingsWithoutOpeningAnotherPage() {
+        val checkCount = mutableIntStateOf(0)
+        assertFalse(SettingsDestination.entries.any { it.name == "UPDATE" })
+        compose.setContent {
+            DshTheme {
+                AppSettingsSection {
+                    UpdateCheckSettingsRow(
+                        updateStatus = "当前已是最新版本。",
+                        onCheckUpdate = { checkCount.intValue++ },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("检查更新").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, checkCount.intValue) }
+        compose.onNodeWithText("当前已是最新版本。").assertIsDisplayed()
+    }
+
+    @Test
     fun longStatusDoesNotHideSettingsDestination() {
         compose.setContent {
             DshTheme {

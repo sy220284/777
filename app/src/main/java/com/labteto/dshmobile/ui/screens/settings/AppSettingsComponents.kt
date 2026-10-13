@@ -91,6 +91,7 @@ internal fun AppSettingsRow(
     trailing: (@Composable () -> Unit)? = null,
     compact: Boolean = false,
     reservedEntryHeight: Dp? = null,
+    showChevron: Boolean = true,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val stackedValue = LocalDensity.current.fontScale >= 1.2f
@@ -134,7 +135,7 @@ internal fun AppSettingsRow(
             )
         }
         trailing?.invoke()
-        if (onClick != null) {
+        if (onClick != null && showChevron) {
             Icon(
                 FeatherIcons.ChevronRight,
                 contentDescription = null,
