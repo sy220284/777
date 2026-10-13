@@ -643,7 +643,16 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 activeChatBranchMessages(before.chat.chatBranches).mapTo(hashSetOf()) { it.id }
             } else null,
         )
-        if (pending.isEmpty()) return true
+        if (pending.isEmpty()) {
+            // A gap in the restored archive is not successful reconciliation.
+            if (group.context.pendingThroughSequence > group.context.processedThroughSequence) {
+                eventLog.append("group/post-turn-batch", buildJsonObject {
+                    put("status", "recovery-pending-unavailable")
+                })
+                return false
+            }
+            return true
+        }
         val speakers = pendingGroupSpeakers(pending, group.members, before.messages)
         if (speakers == null || speakers.isEmpty()) {
             eventLog.append("group/post-turn-batch", buildJsonObject {
@@ -670,6 +679,10 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         }
 
         // Apply one generation-scoped cursor transition; never mix with a newer branch.
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+            expectedSessionId, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return false
+        try {
         val latest = runtimeStateStore.state.value
         if (latest.sessionId != expectedSessionId ||
             !latest.chat.groupChat.enabled ||
@@ -714,6 +727,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             put("remaining_pending", nextContext.pendingTurns.size)
         })
         return true
+        } finally {
+            lease.close()
+        }
     }
 
     suspend fun run(
