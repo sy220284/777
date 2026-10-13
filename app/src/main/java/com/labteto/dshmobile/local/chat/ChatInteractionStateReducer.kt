@@ -19,6 +19,7 @@ internal class ChatInteractionStateReducer {
         val effectivePatch = ChatStatePatchAuthority.effectivePatch(
             raw = rawState,
             state = decoded.state,
+            previous = agedPrevious,
             significance = significance,
             quotations = decoded.stateEvidence,
             userMessage = userMessage,
