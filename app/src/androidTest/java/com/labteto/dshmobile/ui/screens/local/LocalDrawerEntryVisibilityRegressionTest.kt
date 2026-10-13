@@ -27,7 +27,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-
                     onTools = { openToolsCount++ },
                 )
             }
@@ -54,7 +53,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenDiary = {},
                     onTasks = {},
                     onWorkspaceFiles = {},
-
                     onTools = {},
                 )
             }
@@ -77,7 +75,6 @@ class LocalDrawerEntryVisibilityRegressionTest {
                     onOpenGroupChat = {}, onOpenPersonaGallery = {}, onOpenDiary = {},
                     onTasks = { opened += "tasks" },
                     onWorkspaceFiles = { opened += "workspace" },
-
                     onTools = { opened += "tools" },
                     onUsage = { opened += "usage" },
                     onImmersiveReader = { opened += "reader" },
@@ -94,7 +91,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
             compose.onNodeWithText(context.getString(label)).performClick()
             compose.runOnIdle { assertEquals(action, opened.last()) }
         }
-        compose.runOnIdle { assertEquals(6, opened.size) }
+        compose.runOnIdle { assertEquals(5, opened.size) }
     }
 
     @Test
